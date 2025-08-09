@@ -72,6 +72,11 @@ spec:
       kind: RedisFailover
       jsonPointers:
         - /status
+    # Ignore generated fields in QuestDB resources
+    - group: crd.questdb.io
+      kind: QuestDB
+      jsonPointers:
+        - /status
 
   # Revision history
   revisionHistoryLimit: 5
