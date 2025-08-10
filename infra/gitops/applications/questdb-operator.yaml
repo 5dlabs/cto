@@ -93,12 +93,5 @@ spec:
       jsonPointers:
         - /webhooks/0/clientConfig/caBundle
 
-  # Health assessment
-  health:
-    - group: apps
-      kind: Deployment
-      namespace: questdb-operator
-      name: questdb-operator-controller-manager
-
   # Revision history
   revisionHistoryLimit: 5
