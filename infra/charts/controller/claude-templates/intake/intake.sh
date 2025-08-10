@@ -392,6 +392,8 @@ ls -la .taskmaster/
 
 # Copy PRD and architecture files after initialization
 echo "📋 Copying PRD and architecture files..."
+# Ensure directories exist regardless of task-master version behavior
+mkdir -p .taskmaster/docs .taskmaster/tasks
 cp "$PRD_FILE" ".taskmaster/docs/prd.txt"
 if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
     cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
