@@ -49,7 +49,6 @@ spec:
       - "save 300 10"
       - "save 60 10000"
       - "tcp-keepalive 60"
-      - "tcp-backlog 128"
       - "databases 16"
       - "timeout 300"
 

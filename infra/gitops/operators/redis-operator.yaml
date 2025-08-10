@@ -96,6 +96,7 @@ rules:
       - events
       - configmaps
       - secrets
+      - persistentvolumeclaims
     verbs:
       - "*"
   - apiGroups:
