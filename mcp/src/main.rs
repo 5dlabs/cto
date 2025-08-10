@@ -840,35 +840,46 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow!("project_name is required"))?;
 
-    // Read PRD from project's intake folder or use provided content
+    // Read PRD from project root or intake folder (root preferred), or use provided content
     let project_path = workspace_dir.join(project_name);
     let intake_path = project_path.join("intake");
-    let prd_file = intake_path.join("prd.txt");
+    let prd_file_root = project_path.join("prd.txt");
+    let prd_file_intake = intake_path.join("prd.txt");
 
     let prd_content = if let Some(content) = arguments.get("prd_content").and_then(|v| v.as_str()) {
         // Allow override via parameter for compatibility
         content.to_string()
-    } else if prd_file.exists() {
+    } else if prd_file_root.exists() {
+        eprintln!("📋 Reading PRD from {project_name}/prd.txt");
+        std::fs::read_to_string(&prd_file_root)
+            .with_context(|| format!("Failed to read {project_name}/prd.txt"))?
+    } else if prd_file_intake.exists() {
         eprintln!("📋 Reading PRD from {project_name}/intake/prd.txt");
-        std::fs::read_to_string(&prd_file)
+        std::fs::read_to_string(&prd_file_intake)
             .with_context(|| format!("Failed to read {project_name}/intake/prd.txt"))?
     } else {
         return Err(anyhow!(
-            "No PRD found. Please create {}/intake/prd.txt or provide prd_content parameter",
+            "No PRD found. Please create either {}/prd.txt or {}/intake/prd.txt, or provide prd_content parameter",
+            project_name,
             project_name
         ));
     };
 
-    // Read optional architecture file
-    let arch_file = intake_path.join("architecture.md");
+    // Read optional architecture file (prefer root, then intake)
+    let arch_file_root = project_path.join("architecture.md");
+    let arch_file_intake = intake_path.join("architecture.md");
     let architecture_content = if let Some(content) = arguments
         .get("architecture_content")
         .and_then(|v| v.as_str())
     {
         content.to_string()
-    } else if arch_file.exists() {
+    } else if arch_file_root.exists() {
+        eprintln!("🏗️ Reading architecture from {project_name}/architecture.md");
+        std::fs::read_to_string(&arch_file_root)
+            .with_context(|| format!("Failed to read {project_name}/architecture.md"))?
+    } else if arch_file_intake.exists() {
         eprintln!("🏗️ Reading architecture from {project_name}/intake/architecture.md");
-        std::fs::read_to_string(&arch_file)
+        std::fs::read_to_string(&arch_file_intake)
             .with_context(|| format!("Failed to read {project_name}/intake/architecture.md"))?
     } else {
         String::new()
@@ -981,6 +992,36 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         ])
         .output();
 
+    // Determine source labels for reporting
+    let prd_source_label = if arguments
+        .get("prd_content")
+        .and_then(|v| v.as_str())
+        .is_some()
+    {
+        "provided"
+    } else if prd_file_root.exists() {
+        "prd.txt"
+    } else if prd_file_intake.exists() {
+        "intake/prd.txt"
+    } else {
+        // Should be unreachable due to earlier validation
+        "provided"
+    };
+
+    let architecture_source_label = if arguments
+        .get("architecture_content")
+        .and_then(|v| v.as_str())
+        .is_some()
+    {
+        "provided"
+    } else if arch_file_root.exists() {
+        "architecture.md"
+    } else if arch_file_intake.exists() {
+        "intake/architecture.md"
+    } else {
+        "none"
+    };
+
     match output {
         Ok(result) if result.status.success() => {
             let workflow_json: Value = serde_json::from_slice(&result.stdout)
@@ -1000,8 +1041,8 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     "project_name": project_name,
                     "repository": repository_name,
                     "branch": branch,
-                    "prd_source": if prd_file.exists() { "intake/prd.txt" } else { "provided" },
-                    "architecture_source": if arch_file.exists() { "intake/architecture.md" } else { "none" }
+                    "prd_source": prd_source_label,
+                    "architecture_source": architecture_source_label
                 }
             }))
         }
