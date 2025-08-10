@@ -22,7 +22,7 @@ spec:
   source:
     repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator
     chart: postgres-operator
-    targetRevision: 1.13.0  # Downgrade to resolve bootstrap issues
+    targetRevision: 1.14.0  # Latest stable version
     helm:
       values: |
         # Operator configuration
@@ -33,13 +33,8 @@ spec:
           resync_period: "30m"
           # Set repair period
           repair_period: "5m"
-          # Use older Spilo image that doesn't have cron issues  
-          docker_image: "ghcr.io/zalando/spilo-15:3.0-p1"
-          
-        # PostgreSQL configuration
-        configPostgreSQL:
-          # Use older Spilo image
-          docker_image: "ghcr.io/zalando/spilo-15:3.0-p1"
+          # Use specific Spilo image with pgvector support
+          docker_image: "ghcr.io/zalando/spilo-16:3.2-p2"
 
         # Resource configuration
         configKubernetes:
