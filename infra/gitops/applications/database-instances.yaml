@@ -29,7 +29,7 @@ metadata:
         namespaces: ["databases"]
         clusters: ["in-cluster"]
       - apiGroups: [""]
-        kinds: ["Pod", "Service", "Secret"]  
+        kinds: ["Pod", "Service", "Secret"]
         namespaces: ["databases"]
         clusters: ["in-cluster"]
   finalizers:
@@ -65,7 +65,7 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
-      - ApplyOutOfSyncOnly=false  # Enable full resource discovery  
+      - ApplyOutOfSyncOnly=false  # Enable full resource discovery
       - SkipDryRunOnMissingResource=true  # Allow discovery of operator-created resources
 
     retry:

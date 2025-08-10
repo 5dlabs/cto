@@ -23,7 +23,7 @@ spec:
     repoURL: https://github.com/5dlabs/cto
     targetRevision: main
     path: infra/gitops/operators
-    
+
     directory:
       recurse: false
       include: "redis-operator.yaml"
