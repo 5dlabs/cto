@@ -13,7 +13,7 @@ image:
 # Agent/Task Runner image configuration (used by controller to create Jobs)
 agent:
   image:
-    repository: ghcr.io/5dlabs/cto/claude-code
+    repository: ghcr.io/5dlabs/cto/claude
     tag: "latest"
     pullPolicy: Always
 
@@ -73,9 +73,9 @@ agents:
     description: "Senior Backend Architect & Systems Engineer"
     systemPrompt: |
       You are Rex, a Senior Backend Architect & Systems Engineer at 5D Labs.
-      
-      Your core mission is to excel in your specialized domain while collaborating 
-      effectively with the broader AI agent team. You bring deep expertise and 
+
+      Your core mission is to excel in your specialized domain while collaborating
+      effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
 
   blaze:
@@ -88,9 +88,9 @@ agents:
     description: "Performance Engineer & Optimization Specialist"
     systemPrompt: |
       You are Blaze, a Performance Engineer & Optimization Specialist at 5D Labs.
-      
-      Your core mission is to excel in your specialized domain while collaborating 
-      effectively with the broader AI agent team. You bring deep expertise and 
+
+      Your core mission is to excel in your specialized domain while collaborating
+      effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
 
   cipher:
@@ -103,9 +103,9 @@ agents:
     description: "Security Engineer & Code Analysis Specialist"
     systemPrompt: |
       You are Cipher, a Security Engineer & Code Analysis Specialist at 5D Labs.
-      
-      Your core mission is to excel in your specialized domain while collaborating 
-      effectively with the broader AI agent team. You bring deep expertise and 
+
+      Your core mission is to excel in your specialized domain while collaborating
+      effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
 
 # Agent defaults are now managed through cto-config.json in the MCP server
@@ -123,7 +123,7 @@ namespace:
   # PodSecurity configuration (required for Toolman's Docker-in-Docker)
   podSecurity:
     enforce: "privileged"
-    audit: "privileged" 
+    audit: "privileged"
     warn: "privileged"
   labels: {}
   annotations: {}
@@ -223,7 +223,7 @@ secrets:
 rbac:
   # Create RBAC resources
   create: true
-  
+
   # Controller RBAC (for managing CodeRun/DocsRun resources)
   controller:
     # Use Role/RoleBinding (true) or ClusterRole/ClusterRoleBinding (false)
