@@ -24,6 +24,10 @@ spec:
     targetRevision: master
     path: example/operator
 
+    directory:
+      recurse: false
+      include: "{operator,serviceaccount,roles,rolebinding}.yaml"
+
   # Destination configuration
   destination:
     server: https://kubernetes.default.svc
@@ -49,7 +53,7 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # Ignore certain differences in CRDs
+  # Ignore certain differences in CRDs and monitoring
   ignoreDifferences:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
@@ -61,6 +65,10 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas  # Allow HPA to manage replicas
+    - group: monitoring.coreos.com
+      kind: PodMonitor
+      jsonPointers:
+        - "*"  # Ignore PodMonitor if monitoring CRDs not installed
 
   # Revision history
   revisionHistoryLimit: 5
