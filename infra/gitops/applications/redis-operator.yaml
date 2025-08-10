@@ -18,11 +18,15 @@ spec:
   # Project configuration
   project: platform
 
-  # Source configuration - Using official Redis operator Helm chart
+  # Source configuration - Using official Redis operator GitHub manifests
   source:
-    repoURL: https://spotahome.github.io/redis-operator
-    chart: redis-operator
-    targetRevision: 3.2.9
+    repoURL: https://github.com/spotahome/redis-operator
+    targetRevision: master
+    path: example/operator
+    
+    directory:
+      recurse: false
+      include: "{operator,serviceaccount,roles,rolebinding}.yaml"
 
   # Destination configuration
   destination:
@@ -49,7 +53,7 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # Ignore certain differences in CRDs
+  # Ignore certain differences in CRDs and monitoring
   ignoreDifferences:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
@@ -61,6 +65,10 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas  # Allow HPA to manage replicas
+    - group: monitoring.coreos.com
+      kind: PodMonitor
+      jsonPointers:
+        - "*"  # Ignore PodMonitor if monitoring CRDs not installed
 
   # Revision history
   revisionHistoryLimit: 5
