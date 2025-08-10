@@ -19,6 +19,19 @@ metadata:
     app.kubernetes.io/name: database-instances
     app.kubernetes.io/part-of: platform
     app.kubernetes.io/component: database
+  annotations:
+    # Enable ArgoCD to discover and track child resources created by operators
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    # Enable resource discovery for operator-managed resources
+    argocd.argoproj.io/resource-inclusion: |
+      - apiGroups: ["apps"]
+        kinds: ["StatefulSet"]
+        namespaces: ["databases"]
+        clusters: ["in-cluster"]
+      - apiGroups: [""]
+        kinds: ["Pod", "Service", "Secret"]
+        namespaces: ["databases"]
+        clusters: ["in-cluster"]
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -52,6 +65,8 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=false  # Enable full resource discovery
+      - SkipDryRunOnMissingResource=true  # Allow discovery of operator-created resources
 
     retry:
       limit: 5
