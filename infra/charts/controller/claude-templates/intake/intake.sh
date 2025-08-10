@@ -409,22 +409,40 @@ task-master models --set-fallback "claude-3-5-sonnet-20241022"
 echo "📄 Parsing PRD to generate tasks..."
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
-    --output ".taskmaster/tasks/tasks.json" \
     --force || {
     echo "❌ Failed to parse PRD"
     exit 1
 }
 
+# Resolve tasks.json path (use default, fallback to discovery)
+TASKS_FILE=".taskmaster/tasks/tasks.json"
+if [ ! -f "$TASKS_FILE" ]; then
+    ALT_TASKS_FILE=$(find .taskmaster -maxdepth 2 -name tasks.json | head -n 1 || true)
+    if [ -n "$ALT_TASKS_FILE" ] && [ -f "$ALT_TASKS_FILE" ]; then
+        TASKS_FILE="$ALT_TASKS_FILE"
+    else
+        echo "❌ tasks.json not found after parse"
+        exit 1
+    fi
+fi
+
 # Analyze complexity if requested
 if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
     echo "🔍 Analyzing task complexity..."
-    task-master analyze-complexity
+    mkdir -p .taskmaster/reports
+    task-master analyze-complexity --file "$TASKS_FILE" || {
+        echo "❌ analyze-complexity failed"
+        exit 1
+    }
 fi
 
 # Expand tasks if requested
 if [ "$EXPAND_TASKS" = "true" ]; then
     echo "🌳 Expanding tasks with subtasks..."
-    task-master expand --all --force
+    task-master expand --all --force --file "$TASKS_FILE" || {
+        echo "❌ expand failed"
+        exit 1
+    }
 fi
 
 # Review and align tasks with architecture using Claude
@@ -460,7 +478,7 @@ EOF
 
         # Run Claude to review and update tasks
         echo "🔍 Running Claude review..."
-        claude --output-format stream-json --model "$MODEL" /tmp/review-prompt.md || {
+        claude -p --output-format stream-json --verbose --model "$MODEL" /tmp/review-prompt.md || {
             echo "⚠️ Claude review failed, but continuing..."
         }
         

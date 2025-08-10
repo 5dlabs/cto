@@ -1,0 +1,49 @@
+# Task ID: 2
+# Title: Design and Implement Core Trading Data Models
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Create TypeScript interfaces and classes for core trading entities including orders, positions, market data, and user accounts
+# Details:
+Define interfaces for: Order (market/limit, buy/sell, amount, price, status), Position (token pair, entry price, current value, PnL), MarketData (price, volume, timestamp), UserAccount (wallet address, balances, trading history). Implement validation logic for each model. Create utility functions for data transformation and serialization. Use Zod or similar for runtime validation.
+
+# Test Strategy:
+Unit tests for all model validations, test edge cases for numeric precision, verify serialization/deserialization, test data transformation utilities
+
+# Subtasks:
+## 1. Design and Implement Order Model with Validation [pending]
+### Dependencies: None
+### Description: Create TypeScript interface and class for Order entity with comprehensive validation logic for market/limit orders
+### Details:
+Define Order interface with properties: orderId, type (market/limit), side (buy/sell), tokenPair, amount, price (optional for market orders), status (pending/filled/cancelled/failed), timestamp, slippage tolerance. Implement validation methods for order amounts (positive numbers), price validation for limit orders, token pair validation. Create factory methods for creating market and limit orders. Add methods for order status updates and order matching logic.
+
+## 2. Design and Implement Position Model with PnL Calculations [pending]
+### Dependencies: None
+### Description: Create Position model with real-time profit/loss calculation capabilities and position tracking
+### Details:
+Define Position interface with: positionId, tokenPair, entryPrice, currentPrice, amount, side (long/short), entryTimestamp, unrealizedPnL, realizedPnL, fees. Implement methods for calculating PnL with proper decimal precision using libraries like decimal.js. Add position value calculation methods. Create position update logic for price changes. Implement position closing logic with final PnL calculation. Add support for partial position closing.
+
+## 3. Design and Implement MarketData Model [pending]
+### Dependencies: None
+### Description: Create MarketData model for handling real-time and historical market data with proper timestamp management
+### Details:
+Define MarketData interface with: tokenPair, price, volume24h, high24h, low24h, open24h, close, timestamp, source (DEX name), liquidity, priceChange24h. Implement data normalization methods for different DEX formats. Add methods for calculating moving averages and price trends. Create data aggregation logic for multiple sources. Implement efficient data storage structure for time-series data. Add data validation for preventing stale or invalid market data.
+
+## 4. Design and Implement UserAccount Model [pending]
+### Dependencies: 2.1, 2.2
+### Description: Create comprehensive UserAccount model with wallet integration and trading history tracking
+### Details:
+Define UserAccount interface with: walletAddress, accountId, balances (Map of token addresses to amounts), openPositions array, orderHistory array, tradingStats (total volume, win rate, total PnL), createdAt, lastActivity. Implement methods for balance updates, position management, order history tracking. Add methods for calculating account metrics and performance. Create account state persistence logic. Implement account validation and security checks.
+
+## 5. Create Data Transformation and Serialization Utilities [pending]
+### Dependencies: 2.1, 2.2, 2.3, 2.4
+### Description: Implement utility functions for transforming data between different formats and handling serialization/deserialization
+### Details:
+Create transformation utilities for: Converting between on-chain and off-chain data formats, BigNumber to decimal conversions with proper precision, Date/timestamp handling across different formats, Token amount normalization (handling different decimals). Implement JSON serialization with custom handlers for BigNumber and Date types. Create data migration utilities for schema updates. Add compression utilities for storing large datasets. Implement data export formats (CSV, JSON) for user data.
+
+## 6. Implement Zod Schemas for Runtime Validation [pending]
+### Dependencies: 2.1, 2.2, 2.3, 2.4
+### Description: Create comprehensive Zod schemas for all data models with runtime type checking and validation
+### Details:
+Define Zod schemas for Order, Position, MarketData, and UserAccount models. Implement custom Zod validators for: Solana addresses, token amounts (positive numbers with decimal precision), price validation, timestamp validation. Create schema composition for complex nested structures. Add error message customization for better user feedback. Implement schema versioning for backward compatibility. Create validation middleware for API endpoints. Add performance optimizations for high-frequency validations.
+

@@ -1,0 +1,1007 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Repository and Development Environment",
+        "description": "Initialize the project repository with proper structure, configure development environment for Solana development, and set up necessary tooling",
+        "details": "Create project structure with folders for: src/, tests/, docs/, scripts/. Initialize package.json with Solana web3.js, Anchor framework dependencies. Setup TypeScript configuration. Configure ESLint and Prettier. Create .gitignore for node_modules, .env, and build artifacts. Setup environment variables structure for RPC endpoints, wallet keys. Install Solana CLI tools and configure local validator for testing.",
+        "testStrategy": "Verify all dependencies install correctly, ensure Solana CLI commands work, test local validator startup, validate TypeScript compilation",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Git Repository and Create Project Structure",
+            "description": "Set up Git repository and create the foundational folder structure for the Solana project",
+            "dependencies": [],
+            "details": "Initialize a new Git repository. Create the following directory structure: src/ (with subdirectories for components/, utils/, hooks/, services/), tests/ (unit/, integration/), docs/, scripts/. Create README.md with project overview. Initialize .git with initial commit.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Setup Package.json with Solana Dependencies",
+            "description": "Initialize npm project and install all required Solana development dependencies",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "Run npm init to create package.json. Install core dependencies: @solana/web3.js, @project-serum/anchor, @solana/wallet-adapter-base, @solana/wallet-adapter-react, @solana/wallet-adapter-wallets. Add dev dependencies: @types/node, typescript, ts-node. Configure npm scripts for build, test, and dev commands.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Configure TypeScript Environment",
+            "description": "Set up TypeScript configuration for Solana development with proper compiler options",
+            "dependencies": [
+              "1.2"
+            ],
+            "details": "Create tsconfig.json with target ES2020, module commonjs, strict mode enabled. Configure path aliases for @/ imports. Set up separate tsconfig files for tests. Enable decorators and experimental features needed for Anchor. Configure source maps and output directory to dist/.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Setup ESLint and Prettier Configuration",
+            "description": "Configure code linting and formatting tools with Solana/TypeScript best practices",
+            "dependencies": [
+              "1.3"
+            ],
+            "details": "Install ESLint with TypeScript parser and Prettier. Create .eslintrc.js with rules for TypeScript, import sorting, and Solana conventions. Configure .prettierrc with 2-space indentation, single quotes, trailing commas. Add format and lint scripts to package.json. Configure VS Code settings.json for auto-formatting.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Configure Git Ignore and Hooks",
+            "description": "Set up Git configuration to exclude build artifacts and implement pre-commit hooks",
+            "dependencies": [
+              "1.4"
+            ],
+            "details": "Create comprehensive .gitignore including: node_modules/, dist/, .env*, *.log, .anchor/, target/, test-ledger/, wallet-keys/. Install husky for Git hooks. Configure pre-commit hook to run ESLint and Prettier. Add commit message linting with commitlint.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Setup Environment Variables Structure",
+            "description": "Create environment configuration system for managing RPC endpoints and wallet keys",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "Create .env.example with template for SOLANA_RPC_URL, SOLANA_NETWORK (devnet/mainnet), WALLET_PRIVATE_KEY placeholder. Install dotenv package. Create config/ directory with environment-specific configs. Implement config validation script. Document all environment variables in README.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Install and Configure Solana CLI Tools",
+            "description": "Set up Solana command-line tools and configure for local development",
+            "dependencies": [
+              "1.6"
+            ],
+            "details": "Install Solana CLI using official installation script. Configure Solana CLI to use devnet by default. Generate development keypair for testing. Install Anchor CLI for program development. Configure CLI to use environment-specific RPC URLs. Create helper scripts for common CLI operations.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Setup Local Validator and Testing Environment",
+            "description": "Configure Solana test validator for local development and integration testing",
+            "dependencies": [
+              "1.7"
+            ],
+            "details": "Configure solana-test-validator with custom settings. Create validator startup script with preset accounts and balances. Set up test wallet with SOL airdrop. Configure Anchor.toml for local testing. Create test helper utilities for validator management. Document local testing workflow in docs/.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Design and Implement Core Trading Data Models",
+        "description": "Create TypeScript interfaces and classes for core trading entities including orders, positions, market data, and user accounts",
+        "details": "Define interfaces for: Order (market/limit, buy/sell, amount, price, status), Position (token pair, entry price, current value, PnL), MarketData (price, volume, timestamp), UserAccount (wallet address, balances, trading history). Implement validation logic for each model. Create utility functions for data transformation and serialization. Use Zod or similar for runtime validation.",
+        "testStrategy": "Unit tests for all model validations, test edge cases for numeric precision, verify serialization/deserialization, test data transformation utilities",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and Implement Order Model with Validation",
+            "description": "Create TypeScript interface and class for Order entity with comprehensive validation logic for market/limit orders",
+            "dependencies": [],
+            "details": "Define Order interface with properties: orderId, type (market/limit), side (buy/sell), tokenPair, amount, price (optional for market orders), status (pending/filled/cancelled/failed), timestamp, slippage tolerance. Implement validation methods for order amounts (positive numbers), price validation for limit orders, token pair validation. Create factory methods for creating market and limit orders. Add methods for order status updates and order matching logic.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Design and Implement Position Model with PnL Calculations",
+            "description": "Create Position model with real-time profit/loss calculation capabilities and position tracking",
+            "dependencies": [],
+            "details": "Define Position interface with: positionId, tokenPair, entryPrice, currentPrice, amount, side (long/short), entryTimestamp, unrealizedPnL, realizedPnL, fees. Implement methods for calculating PnL with proper decimal precision using libraries like decimal.js. Add position value calculation methods. Create position update logic for price changes. Implement position closing logic with final PnL calculation. Add support for partial position closing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Design and Implement MarketData Model",
+            "description": "Create MarketData model for handling real-time and historical market data with proper timestamp management",
+            "dependencies": [],
+            "details": "Define MarketData interface with: tokenPair, price, volume24h, high24h, low24h, open24h, close, timestamp, source (DEX name), liquidity, priceChange24h. Implement data normalization methods for different DEX formats. Add methods for calculating moving averages and price trends. Create data aggregation logic for multiple sources. Implement efficient data storage structure for time-series data. Add data validation for preventing stale or invalid market data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Design and Implement UserAccount Model",
+            "description": "Create comprehensive UserAccount model with wallet integration and trading history tracking",
+            "dependencies": [
+              "2.1",
+              "2.2"
+            ],
+            "details": "Define UserAccount interface with: walletAddress, accountId, balances (Map of token addresses to amounts), openPositions array, orderHistory array, tradingStats (total volume, win rate, total PnL), createdAt, lastActivity. Implement methods for balance updates, position management, order history tracking. Add methods for calculating account metrics and performance. Create account state persistence logic. Implement account validation and security checks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create Data Transformation and Serialization Utilities",
+            "description": "Implement utility functions for transforming data between different formats and handling serialization/deserialization",
+            "dependencies": [
+              "2.1",
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "Create transformation utilities for: Converting between on-chain and off-chain data formats, BigNumber to decimal conversions with proper precision, Date/timestamp handling across different formats, Token amount normalization (handling different decimals). Implement JSON serialization with custom handlers for BigNumber and Date types. Create data migration utilities for schema updates. Add compression utilities for storing large datasets. Implement data export formats (CSV, JSON) for user data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement Zod Schemas for Runtime Validation",
+            "description": "Create comprehensive Zod schemas for all data models with runtime type checking and validation",
+            "dependencies": [
+              "2.1",
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "Define Zod schemas for Order, Position, MarketData, and UserAccount models. Implement custom Zod validators for: Solana addresses, token amounts (positive numbers with decimal precision), price validation, timestamp validation. Create schema composition for complex nested structures. Add error message customization for better user feedback. Implement schema versioning for backward compatibility. Create validation middleware for API endpoints. Add performance optimizations for high-frequency validations.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement Solana Wallet Integration",
+        "description": "Integrate wallet connectivity for Phantom, Solflare, and other major Solana wallets to enable user authentication and transaction signing",
+        "details": "Use @solana/wallet-adapter libraries to implement multi-wallet support. Create WalletProvider component for React integration. Implement connection management with auto-reconnect logic. Handle wallet events (connect, disconnect, account change). Store wallet state in context/state management. Implement transaction signing flow with proper error handling.",
+        "testStrategy": "Test wallet connection/disconnection flows, verify transaction signing with test transactions, test error scenarios (rejected transactions, network issues), validate wallet switching",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Install and Configure Wallet Adapter Libraries",
+            "description": "Set up @solana/wallet-adapter packages and configure the necessary dependencies for multi-wallet support",
+            "dependencies": [],
+            "details": "Install @solana/wallet-adapter-react, @solana/wallet-adapter-react-ui, @solana/wallet-adapter-wallets, and @solana/wallet-adapter-base. Configure TypeScript types and module resolution. Set up wallet adapter styles and theme customization. Install specific wallet adapters for Phantom, Solflare, Backpack, and other major wallets.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create WalletProvider Component",
+            "description": "Build a React component that wraps the application with wallet adapter context and provides multi-wallet support",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Create WalletProvider component using WalletProvider from @solana/wallet-adapter-react. Configure supported wallets array including Phantom, Solflare, Backpack, Ledger, and others. Set up network configuration (mainnet-beta, devnet). Implement custom wallet modal UI or use default WalletModalProvider. Add wallet adapter configuration options.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement Connection Management Logic",
+            "description": "Build robust connection management system with auto-reconnect capabilities and connection state tracking",
+            "dependencies": [
+              "3.2"
+            ],
+            "details": "Implement auto-connect on page load if previously connected. Create reconnection logic with exponential backoff for network failures. Add connection state persistence in localStorage. Implement connection timeout handling. Create hooks for connection status monitoring. Add network switching capabilities.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Handle Wallet Events",
+            "description": "Set up comprehensive event handling for all wallet state changes and user interactions",
+            "dependencies": [
+              "3.3"
+            ],
+            "details": "Implement event listeners for wallet connect, disconnect, and account change events. Create handlers for wallet ready state changes. Add listeners for wallet errors and warnings. Implement account change detection and handling. Create event logging for debugging. Handle wallet adapter specific events.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Wallet State Management",
+            "description": "Create a centralized state management system for wallet data using React Context or state management library",
+            "dependencies": [
+              "3.4"
+            ],
+            "details": "Create WalletContext with wallet state (connected, publicKey, balance). Implement custom hooks (useWallet, useConnection) for easy access. Add wallet metadata storage (wallet name, icon, adapter). Create actions for wallet operations. Implement state persistence across page refreshes. Add derived state for wallet status indicators.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Build Transaction Signing Flow",
+            "description": "Implement secure transaction creation, signing, and submission flow with proper user confirmation",
+            "dependencies": [
+              "3.5"
+            ],
+            "details": "Create transaction builder utilities for common operations. Implement transaction simulation before signing. Add user confirmation modal with transaction details. Build signing request handler with timeout. Implement transaction status tracking. Add support for versioned transactions. Create utilities for fee estimation.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Add Comprehensive Error Handling",
+            "description": "Implement robust error handling for all wallet operations with user-friendly error messages",
+            "dependencies": [
+              "3.6"
+            ],
+            "details": "Create error boundary for wallet-related components. Implement specific error handlers for common wallet errors (rejected transaction, insufficient balance, network error). Add user-friendly error messages and recovery suggestions. Create error logging system. Implement retry mechanisms for transient errors. Add fallback UI for wallet connection failures.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Build Solana RPC Connection Layer",
+        "description": "Create a robust RPC connection management system with fallback endpoints, retry logic, and connection pooling",
+        "details": "Implement RPC client wrapper using @solana/web3.js Connection class. Configure multiple RPC endpoints (mainnet-beta, devnet) with automatic fallback. Add exponential backoff retry logic for failed requests. Implement connection health monitoring. Create request batching for efficiency. Add WebSocket support for real-time updates. Cache frequently accessed data with TTL.",
+        "testStrategy": "Test failover between RPC endpoints, verify retry logic under network failures, load test connection pooling, validate WebSocket reconnection, test cache invalidation",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create RPC client wrapper class",
+            "description": "Build a TypeScript class that wraps the @solana/web3.js Connection class with enhanced functionality for managing RPC connections",
+            "dependencies": [],
+            "details": "Create RPCClient class extending or wrapping Connection. Add constructor to accept configuration options. Implement base methods for common RPC operations (getBalance, getTransaction, etc.). Add error handling and logging infrastructure. Create interfaces for configuration and response types. Setup connection timeout and request ID tracking.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement multi-endpoint configuration with fallback logic",
+            "description": "Configure multiple RPC endpoints and implement automatic fallback mechanism when primary endpoints fail",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Create endpoint configuration structure supporting mainnet-beta, devnet, and custom RPCs. Implement endpoint priority system and health scoring. Build fallback logic to switch endpoints on failure. Add endpoint rotation for load distribution. Configure endpoint-specific settings (rate limits, timeouts). Implement endpoint selection strategy based on latency and reliability.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add exponential backoff retry mechanism",
+            "description": "Implement intelligent retry logic with exponential backoff for failed RPC requests",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Create retry configuration with max attempts, initial delay, and backoff multiplier. Implement exponential backoff algorithm with jitter. Add request-specific retry policies. Handle different error types appropriately (network vs rate limit). Implement circuit breaker pattern for failing endpoints. Add retry metrics and logging.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement connection health monitoring",
+            "description": "Build a health monitoring system that tracks RPC endpoint performance and availability",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "Create health check service with periodic ping tests. Implement latency tracking for each endpoint. Monitor success/failure rates and response times. Build endpoint scoring algorithm based on health metrics. Add automatic endpoint disabling for unhealthy nodes. Create health status dashboard/API. Implement alerting for degraded performance.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create request batching system",
+            "description": "Implement request batching to optimize RPC calls and reduce network overhead",
+            "dependencies": [
+              "4.1",
+              "4.3"
+            ],
+            "details": "Build request queue with configurable batch size and timeout. Implement JSON-RPC 2.0 batch request formatting. Create request aggregation logic for similar calls. Handle batch response parsing and error distribution. Optimize batch sizing based on endpoint limits. Add priority queuing for time-sensitive requests. Implement batch request deduplication.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add WebSocket support for real-time updates",
+            "description": "Implement WebSocket connections for real-time data subscriptions and updates",
+            "dependencies": [
+              "4.1",
+              "4.2"
+            ],
+            "details": "Create WebSocket connection manager with auto-reconnect. Implement subscription management for account, slot, and program updates. Handle WebSocket message parsing and event distribution. Add connection state management and error recovery. Implement subscription deduplication and cleanup. Create event emitter for subscription updates. Add WebSocket connection pooling.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement caching layer with TTL",
+            "description": "Build a caching system with time-to-live support for frequently accessed data",
+            "dependencies": [
+              "4.1",
+              "4.5"
+            ],
+            "details": "Create cache storage interface supporting memory and Redis backends. Implement cache key generation for different request types. Add TTL configuration per data type (accounts, transactions, etc.). Build cache invalidation strategies. Implement cache warming for critical data. Add cache hit/miss metrics. Create cache size management with LRU eviction.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Add connection pooling and load balancing",
+            "description": "Implement connection pooling to manage multiple concurrent connections and distribute load across endpoints",
+            "dependencies": [
+              "4.2",
+              "4.4",
+              "4.6"
+            ],
+            "details": "Create connection pool with configurable size limits. Implement connection lifecycle management (create, reuse, destroy). Build load balancing algorithms (round-robin, least-connections, weighted). Add connection health tracking within pool. Implement request routing based on endpoint capabilities. Create pool statistics and monitoring. Add graceful shutdown handling for pool cleanup.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Develop Token Account Management System",
+        "description": "Build functionality to fetch, display, and manage user's SPL token accounts and balances",
+        "details": "Use getParsedTokenAccountsByOwner to fetch all token accounts. Implement token metadata resolution using Metaplex. Create balance tracking with real-time updates via WebSocket. Build token list with search/filter functionality. Add support for associated token accounts creation. Implement balance caching with automatic refresh. Handle token decimals properly for display.",
+        "testStrategy": "Test token account fetching for wallets with many tokens, verify balance accuracy, test real-time balance updates, validate token metadata resolution, test ATA creation",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Token Account Fetching with getParsedTokenAccountsByOwner",
+            "description": "Create service to fetch all SPL token accounts for a given wallet address using Solana's getParsedTokenAccountsByOwner RPC method",
+            "dependencies": [],
+            "details": "Build TokenAccountService class with methods to fetch parsed token accounts. Handle pagination for wallets with many tokens. Parse account data to extract mint addresses, balances, and decimals. Implement error handling for RPC failures. Create TypeScript interfaces for token account data structures. Add retry logic for failed requests.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Integrate Metaplex for Token Metadata Resolution",
+            "description": "Implement token metadata fetching using Metaplex SDK to retrieve token names, symbols, logos, and other metadata",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Setup Metaplex SDK and configure connection. Create metadata resolver that fetches token metadata from on-chain accounts. Implement fallback to token lists (Jupiter, Solana token list) for missing metadata. Cache metadata locally to reduce RPC calls. Handle NFTs and regular SPL tokens differently. Build metadata update mechanism for changed data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build Real-time Balance Tracking with WebSocket",
+            "description": "Implement WebSocket subscription system to track balance changes in real-time for all user token accounts",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Setup WebSocket connection to Solana RPC. Implement accountSubscribe for each token account. Create event handlers for balance updates. Build reconnection logic for dropped connections. Implement efficient subscription management to avoid hitting limits. Create balance change notification system. Handle subscription cleanup on component unmount.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Create Token List UI with Search and Filter",
+            "description": "Build user interface component to display token list with search, sort, and filter functionality",
+            "dependencies": [
+              "5.1",
+              "5.2"
+            ],
+            "details": "Create TokenList React component with virtualized rendering for performance. Implement search by token name, symbol, or mint address. Add filters for: hide zero balances, show only verified tokens, filter by value threshold. Build sort options: by balance, by value, alphabetically. Add token logo display with fallback images. Implement responsive design for mobile/desktop.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Associated Token Account Creation",
+            "description": "Build functionality to create Associated Token Accounts (ATA) for tokens the user doesn't have accounts for yet",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Implement ATA derivation using findProgramAddress. Create function to check if ATA exists before creation. Build transaction to create ATA with proper fee payer. Handle batch ATA creation for multiple tokens. Implement user confirmation flow before creation. Add cost estimation for ATA creation. Handle errors for insufficient SOL balance.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add Balance Caching with Refresh Logic",
+            "description": "Implement local caching system for token balances with automatic refresh mechanisms",
+            "dependencies": [
+              "5.1",
+              "5.3"
+            ],
+            "details": "Create IndexedDB schema for balance cache storage. Implement cache invalidation strategy with TTL. Build background refresh worker for periodic updates. Add manual refresh trigger for users. Implement differential updates to minimize data transfer. Create cache warming on app startup. Handle cache corruption and recovery.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Handle Token Decimals and Formatting",
+            "description": "Create comprehensive system for properly handling token decimals in calculations and display formatting",
+            "dependencies": [
+              "5.1",
+              "5.2"
+            ],
+            "details": "Build decimal handling utilities using BigNumber or similar library. Create formatters for different display contexts (full precision, abbreviated, USD value). Implement locale-aware number formatting. Handle tokens with non-standard decimals (not 6 or 9). Create conversion utilities between raw amounts and UI amounts. Add copy functionality for full precision values.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement DEX Integration for Price Discovery",
+        "description": "Integrate with major Solana DEXs (Raydium, Orca, Jupiter) for market data and price discovery",
+        "details": "Integrate Jupiter Aggregator API for best price routing. Implement Raydium SDK for AMM pool data. Add Orca Whirlpool integration for concentrated liquidity data. Create unified price feed aggregator. Implement slippage calculation. Build order routing logic to find best execution path. Cache price data with appropriate TTL. Handle different pool types (AMM, CLMM).",
+        "testStrategy": "Compare prices across DEXs for accuracy, test routing algorithm with various trade sizes, verify slippage calculations, test API rate limiting handling, validate price feed updates",
+        "priority": "high",
+        "dependencies": [
+          2,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integrate Jupiter Aggregator API",
+            "description": "Implement Jupiter V6 API integration for aggregated price discovery and optimal swap routes across all Solana DEXs",
+            "dependencies": [],
+            "details": "Set up Jupiter SDK and API client. Implement quote fetching with /v6/quote endpoint. Parse route information including intermediate tokens and DEXs. Handle API rate limiting with proper backoff. Implement error handling for API failures. Create TypeScript interfaces for Jupiter API responses. Set up authentication if required.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Raydium SDK for AMM pools",
+            "description": "Integrate Raydium SDK to fetch liquidity pool data, prices, and trading pair information from Raydium's AMM pools",
+            "dependencies": [],
+            "details": "Install and configure Raydium SDK. Implement pool fetching using Raydium's pool keys. Parse pool state including reserves, fees, and price data. Calculate spot prices from pool reserves. Handle different pool versions (V4, V5). Implement real-time pool updates via WebSocket. Create pool data models and interfaces.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add Orca Whirlpool integration",
+            "description": "Integrate Orca's Whirlpool SDK for concentrated liquidity pools to access tick data and calculate prices within specific ranges",
+            "dependencies": [],
+            "details": "Set up Orca Whirlpool SDK. Fetch whirlpool pool data including tick arrays and liquidity distribution. Implement price calculation from tick data. Handle tick spacing and price ranges. Parse position data for liquidity depth analysis. Implement sqrt price to price conversion. Support for different fee tiers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Create unified price feed aggregator",
+            "description": "Build a unified interface that aggregates price data from all integrated DEXs and provides normalized price feeds",
+            "dependencies": [
+              "6.1",
+              "6.2",
+              "6.3"
+            ],
+            "details": "Design unified price feed interface. Implement price normalization across different DEX formats. Create weighted average price calculation based on liquidity. Handle token decimal differences. Implement price confidence scoring. Build price update subscription system. Create fallback logic for missing price data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement slippage calculation logic",
+            "description": "Develop algorithms to calculate expected slippage for trades based on liquidity depth and trade size across different pool types",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Implement slippage calculation for constant product AMMs. Add concentrated liquidity slippage calculation. Create trade impact estimation based on pool reserves. Build slippage tolerance validation. Implement dynamic slippage suggestions based on market conditions. Handle multi-hop trade slippage aggregation. Create slippage visualization data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Build order routing algorithm",
+            "description": "Create intelligent routing system that finds optimal execution paths across multiple DEXs considering price, slippage, and fees",
+            "dependencies": [
+              "6.1",
+              "6.4",
+              "6.5"
+            ],
+            "details": "Implement path finding algorithm for multi-hop trades. Calculate total cost including fees and slippage. Build route optimization considering gas costs. Implement split routing for large orders. Create route scoring system. Handle circular route prevention. Add maximum hop limit configuration.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Add price data caching with TTL",
+            "description": "Implement efficient caching layer for price data with time-to-live settings to reduce API calls and improve performance",
+            "dependencies": [
+              "6.4"
+            ],
+            "details": "Design cache schema for price data. Implement Redis or in-memory cache with TTL. Create cache invalidation strategy based on volatility. Build cache warming on startup. Implement stale-while-revalidate pattern. Add cache hit/miss metrics. Create different TTL settings for different data types.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Handle different pool types (AMM/CLMM)",
+            "description": "Create abstraction layer to handle different pool mechanisms including traditional AMMs and concentrated liquidity market makers",
+            "dependencies": [
+              "6.2",
+              "6.3"
+            ],
+            "details": "Design pool type abstraction interface. Implement AMM pool handler for constant product formula. Create CLMM handler for concentrated liquidity. Build pool type detection logic. Implement unified liquidity depth calculation. Handle pool-specific parameters and constraints. Create pool type conversion utilities.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Build Trading Execution Engine",
+        "description": "Create the core trading engine that can execute swaps through integrated DEXs with optimal routing",
+        "details": "Implement swap execution using Jupiter API for aggregated routing. Build transaction construction with proper compute units and priority fees. Add pre-flight simulation for transaction validation. Implement slippage protection and MEV protection. Create transaction status tracking. Handle partial fills and failed transactions. Add transaction retry logic with updated blockhash.",
+        "testStrategy": "Test swap execution on devnet first, verify slippage protection works, test transaction retry logic, validate compute unit optimization, test various token pairs and amounts",
+        "priority": "high",
+        "dependencies": [
+          3,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Jupiter swap execution",
+            "description": "Integrate Jupiter aggregator API to execute token swaps with optimal routing across multiple DEXs",
+            "dependencies": [],
+            "details": "Set up Jupiter SDK integration and configure API endpoints. Implement quote fetching with route optimization. Build swap instruction generation using Jupiter's computed routes. Handle token account validation and creation if needed. Implement proper error handling for API failures and rate limits.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Build transaction construction with compute units",
+            "description": "Create transaction builder that properly sets compute unit limits and budgets for optimal execution",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "Implement dynamic compute unit calculation based on transaction complexity. Build transaction instruction ordering for optimal execution. Add compute budget instructions with proper limits. Implement transaction size validation to stay within limits. Create helper functions for common transaction patterns.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add priority fee optimization",
+            "description": "Implement dynamic priority fee calculation to ensure timely transaction execution",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "Integrate with RPC methods to fetch recent priority fees. Implement fee estimation based on network congestion. Build adaptive fee adjustment based on transaction urgency. Create configurable fee strategies (fast, normal, slow). Add maximum fee limits to prevent overpaying.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement pre-flight simulation",
+            "description": "Build transaction simulation system to validate trades before submission",
+            "dependencies": [
+              "7.2",
+              "7.3"
+            ],
+            "details": "Implement simulateTransaction RPC calls for validation. Parse simulation results to detect potential failures. Validate token balances and allowances before execution. Check for common error conditions like insufficient SOL for fees. Create detailed error messages for simulation failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add slippage protection mechanism",
+            "description": "Implement configurable slippage tolerance to protect users from unfavorable price movements",
+            "dependencies": [
+              "7.1",
+              "7.4"
+            ],
+            "details": "Build slippage calculation based on quoted vs expected amounts. Implement minimum output amount validation. Create configurable slippage tolerance settings. Add automatic slippage adjustment based on liquidity. Implement price impact warnings for large trades.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement MEV protection",
+            "description": "Add mechanisms to protect transactions from MEV attacks and sandwich trades",
+            "dependencies": [
+              "7.3",
+              "7.5"
+            ],
+            "details": "Implement transaction privacy features using commitment levels. Add random transaction timing within acceptable windows. Build sandwich attack detection based on mempool analysis. Implement partial fill strategies to reduce MEV exposure. Create monitoring for suspicious transaction patterns.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Create transaction status tracking",
+            "description": "Build comprehensive system to track transaction lifecycle from submission to confirmation",
+            "dependencies": [
+              "7.4"
+            ],
+            "details": "Implement WebSocket subscriptions for transaction status updates. Create transaction state machine (pending, processing, confirmed, failed). Build timeout handling for stuck transactions. Implement confirmation counting with configurable thresholds. Add transaction history logging with detailed status changes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Handle partial fills and failures",
+            "description": "Implement robust handling for partially executed trades and transaction failures",
+            "dependencies": [
+              "7.7"
+            ],
+            "details": "Build partial fill detection from transaction logs. Implement remainder order handling for unfilled amounts. Create failure categorization (insufficient funds, slippage, network errors). Build automatic refund detection and processing. Implement user notifications for partial fills and failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Add retry logic with blockhash updates",
+            "description": "Implement intelligent retry mechanism with fresh blockhashes for failed transactions",
+            "dependencies": [
+              "7.7",
+              "7.8"
+            ],
+            "details": "Build blockhash management with automatic refresh. Implement exponential backoff for retry attempts. Create retry strategies based on failure types. Add maximum retry limits with user notifications. Implement transaction deduplication to prevent double execution.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Create Trading UI Components",
+        "description": "Build React components for the trading interface including order forms, position displays, and market data visualization",
+        "details": "Create TradingPanel component with buy/sell forms. Build PositionList showing open positions with PnL. Implement OrderBook component for market depth. Create PriceChart using TradingView or lightweight-charts. Build TokenSelector with search functionality. Add SlippageSettings component. Implement responsive design for mobile. Use React Query for data fetching.",
+        "testStrategy": "Test UI components with various screen sizes, verify form validations, test real-time data updates, validate chart rendering performance, test accessibility compliance",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Build TradingPanel Component with Buy/Sell Forms",
+            "description": "Create the main trading panel component with integrated buy and sell order forms, including input validation and order submission logic",
+            "dependencies": [],
+            "details": "Implement TradingPanel as the main container component. Create BuyForm and SellForm sub-components with inputs for amount, price (for limit orders), and order type selection. Add form validation for numeric inputs, minimum amounts, and available balance checks. Implement order preview functionality showing estimated costs and fees. Add loading states and error handling for order submission. Style with consistent theme and ensure proper spacing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create PositionList Component with PnL Display",
+            "description": "Build a component to display user's open positions with real-time profit/loss calculations and position management actions",
+            "dependencies": [],
+            "details": "Create PositionList component that fetches and displays all open positions. Implement PositionCard sub-component showing token pair, entry price, current price, position size, and PnL (both absolute and percentage). Add real-time price updates using WebSocket connections. Include action buttons for closing positions or modifying orders. Implement color coding for profit (green) and loss (red). Add sorting and filtering options by token pair, PnL, or position size.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement OrderBook Component",
+            "description": "Create an order book component displaying market depth with bid/ask orders and spread visualization",
+            "dependencies": [],
+            "details": "Build OrderBook component with separate bid and ask sections. Implement real-time order book updates via WebSocket subscription. Display price levels with aggregated volumes and visual depth bars. Add spread indicator showing the difference between best bid and ask. Implement price level grouping with adjustable precision. Add click-to-fill functionality for quick order placement. Optimize rendering performance for frequent updates using React.memo and virtualization for large order books.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Integrate Price Charts with TradingView or Lightweight-Charts",
+            "description": "Implement interactive price charts with technical indicators and drawing tools for market analysis",
+            "dependencies": [],
+            "details": "Create PriceChart component using TradingView widget or lightweight-charts library. Implement multiple timeframe options (1m, 5m, 1h, 1d, etc.). Add popular technical indicators (MA, RSI, MACD, Bollinger Bands). Include drawing tools for trend lines and support/resistance levels. Implement chart type switching (candlestick, line, bars). Add volume overlay display. Ensure proper cleanup of chart instances on component unmount. Handle responsive sizing for different screen dimensions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Build TokenSelector Component with Search",
+            "description": "Create a token selection component with search functionality, filtering, and token metadata display",
+            "dependencies": [],
+            "details": "Implement TokenSelector as a modal or dropdown component. Add search input with fuzzy matching on token name, symbol, and address. Display token list with icons, names, symbols, and balances. Implement filtering by token type, balance > 0, or favorites. Add token metadata fetching with caching. Include recent/popular tokens section. Implement keyboard navigation for accessibility. Add loading states while fetching token lists and metadata.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create SlippageSettings Component",
+            "description": "Build a component for users to configure slippage tolerance and other trading preferences",
+            "dependencies": [],
+            "details": "Create SlippageSettings component with preset options (0.1%, 0.5%, 1%) and custom input. Add validation for reasonable slippage values with warnings for high settings. Implement transaction deadline setting for order expiration. Add expert mode toggle for advanced features. Include gas price adjustment options. Store user preferences in localStorage. Add tooltips explaining each setting's impact. Implement visual feedback for setting changes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement Responsive Design for Mobile",
+            "description": "Adapt all trading UI components for mobile devices with touch-optimized interactions and responsive layouts",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.3",
+              "8.4",
+              "8.5",
+              "8.6"
+            ],
+            "details": "Implement responsive breakpoints using CSS Grid and Flexbox. Create mobile-specific layouts for TradingPanel with tabbed interface. Adapt OrderBook for vertical space constraints with collapsible sections. Optimize PriceChart for touch interactions and smaller screens. Design mobile-friendly TokenSelector with full-screen modal. Implement swipe gestures for navigation between components. Add bottom sheet pattern for forms and settings. Test on various device sizes and orientations.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Setup React Query for Data Fetching",
+            "description": "Configure React Query for efficient data fetching, caching, and synchronization across all trading components",
+            "dependencies": [],
+            "details": "Install and configure React Query with QueryClient. Create custom hooks for fetching market data, positions, and order book. Implement query invalidation strategies for real-time updates. Set up optimistic updates for order placement and cancellation. Configure stale time and cache time for different data types. Add error retry logic with exponential backoff. Implement query prefetching for improved performance. Create loading and error boundary components for consistent UX.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Implement Transaction History and Analytics",
+        "description": "Build system to track, store, and analyze user's trading history with performance metrics",
+        "details": "Create IndexedDB schema for local transaction storage. Implement transaction parser for swap events. Calculate metrics: total volume, win rate, average PnL, best/worst trades. Build export functionality (CSV/JSON). Create performance charts and statistics dashboard. Implement filters by date range, token, profit/loss. Add transaction categorization.",
+        "testStrategy": "Test transaction parsing accuracy, verify metric calculations, test data persistence across sessions, validate export formats, test with large transaction histories",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and implement IndexedDB schema",
+            "description": "Create a robust IndexedDB schema for storing transaction history with proper indexing for efficient queries",
+            "dependencies": [],
+            "details": "Design database schema with stores for transactions, metrics cache, and user preferences. Create indexes on timestamp, token addresses, transaction type, and profit/loss. Implement versioning and migration logic. Add composite indexes for complex queries. Include fields for transaction hash, block time, token pairs, amounts, fees, and calculated metrics.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create transaction parser for swap events",
+            "description": "Build a parser to extract and normalize swap transaction data from Solana blockchain events",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Implement parser for different DEX swap instructions (Jupiter, Raydium, Orca). Extract token addresses, amounts, prices, fees from transaction logs. Handle different instruction formats and program versions. Parse associated metadata like slippage and route info. Normalize data into consistent format for storage.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement volume and trade count metrics",
+            "description": "Calculate and track total trading volume and trade count statistics across different time periods",
+            "dependencies": [
+              "9.2"
+            ],
+            "details": "Calculate total volume in USD and SOL. Track trade counts by token pair and time period. Implement rolling window calculations (24h, 7d, 30d, all-time). Store pre-calculated metrics for performance. Handle volume aggregation across multiple tokens. Update metrics in real-time as new transactions are added.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Calculate win rate and PnL metrics",
+            "description": "Implement profit/loss calculations and win rate analytics for trading performance evaluation",
+            "dependencies": [
+              "9.2",
+              "9.3"
+            ],
+            "details": "Calculate realized PnL for each trade using entry/exit prices. Track unrealized PnL for open positions. Compute win rate percentage and profit factor. Calculate average win/loss amounts. Identify best and worst trades by PnL. Handle fee deductions in PnL calculations. Support multiple base currencies for PnL display.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Build export functionality (CSV/JSON)",
+            "description": "Create data export features allowing users to download their transaction history and analytics",
+            "dependencies": [
+              "9.3",
+              "9.4"
+            ],
+            "details": "Implement CSV export with customizable columns. Create JSON export with nested structure for complex data. Add date range selection for exports. Include calculated metrics in export files. Implement chunked export for large datasets. Add export templates for tax reporting. Generate filename with timestamp and filters.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create performance charts dashboard",
+            "description": "Build interactive charts and visualizations for trading performance metrics",
+            "dependencies": [
+              "9.3",
+              "9.4"
+            ],
+            "details": "Implement PnL chart over time using Chart.js or similar. Create volume bar charts by day/week/month. Build win rate pie chart and distribution graphs. Add portfolio value line chart. Implement token allocation donut chart. Create trade frequency heatmap. Ensure responsive design and smooth animations.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement date/token/profit filters",
+            "description": "Add comprehensive filtering system for transaction history and analytics views",
+            "dependencies": [
+              "9.1",
+              "9.6"
+            ],
+            "details": "Create date range picker with preset options (today, week, month, custom). Implement token selector with search functionality. Add profit/loss toggle filter. Create advanced filters for trade size and fee ranges. Implement filter persistence in URL params. Update all metrics and charts based on active filters. Add filter reset functionality.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Add transaction categorization system",
+            "description": "Implement a system to categorize and tag transactions for better organization and analysis",
+            "dependencies": [
+              "9.2",
+              "9.7"
+            ],
+            "details": "Create predefined categories (swap, add liquidity, remove liquidity, etc.). Allow custom user-defined tags and categories. Implement auto-categorization based on transaction patterns. Add bulk categorization tools. Create category-based analytics views. Store categories in IndexedDB with transactions. Enable filtering and grouping by categories.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Add Security Features and Error Handling",
+        "description": "Implement comprehensive security measures and robust error handling throughout the platform",
+        "details": "Add transaction simulation before execution to prevent failures. Implement rate limiting for RPC calls. Add input sanitization for all user inputs. Create comprehensive error boundaries in React. Implement proper key management (never expose private keys). Add CORS protection for API calls. Create audit logging for critical operations. Implement session timeout for wallet connections.",
+        "testStrategy": "Perform security audit of all input fields, test error boundaries with various failure scenarios, verify rate limiting works, test transaction simulation accuracy, validate key security",
+        "priority": "high",
+        "dependencies": [
+          7,
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Transaction Simulation System",
+            "description": "Build a comprehensive transaction simulation framework that validates transactions before execution to prevent failures and protect users from costly mistakes",
+            "dependencies": [],
+            "details": "Create simulation service using Solana's simulateTransaction RPC method. Build wrapper functions to parse simulation results and identify potential failures. Implement checks for: insufficient balance, account ownership, program errors, compute unit limits. Create user-friendly error messages for common failure scenarios. Add simulation caching to reduce RPC calls. Integrate with trading execution engine to run simulations before all swaps.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add RPC Rate Limiting",
+            "description": "Implement rate limiting for all RPC calls to prevent abuse and ensure stable performance under high load",
+            "dependencies": [],
+            "details": "Create rate limiter using token bucket algorithm. Configure limits per endpoint (e.g., 100 req/min for getAccountInfo, 50 req/min for sendTransaction). Implement request queuing for rate-limited calls. Add exponential backoff for retry logic. Create monitoring for rate limit hits. Support multiple RPC endpoints with fallback logic. Add user-specific rate limits for authenticated endpoints.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create Input Sanitization Layer",
+            "description": "Build comprehensive input validation and sanitization for all user inputs to prevent injection attacks and ensure data integrity",
+            "dependencies": [],
+            "details": "Implement validation schemas using Zod for all API endpoints. Create sanitization functions for: wallet addresses (base58 validation), token amounts (decimal precision, max values), slippage percentages (0-100 range). Add XSS protection for any text inputs. Validate all Solana public keys and program IDs. Create whitelist for allowed token mints. Implement request body size limits.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement React Error Boundaries",
+            "description": "Create comprehensive error handling in the React application with graceful fallbacks and error reporting",
+            "dependencies": [],
+            "details": "Build top-level ErrorBoundary component with fallback UI. Create specific error boundaries for: trading interface, wallet connection, transaction history. Implement error logging to external service (Sentry/LogRocket). Add user-friendly error messages with recovery actions. Create error recovery mechanisms (retry buttons, refresh prompts). Implement error state persistence to prevent loops.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Design Secure Key Management System",
+            "description": "Implement secure handling of sensitive data ensuring private keys are never exposed or stored insecurely",
+            "dependencies": [],
+            "details": "Ensure all private key operations happen in-wallet (Phantom, Solflare). Never request or store private keys in application. Implement secure storage for non-sensitive data using encrypted IndexedDB. Create secure communication channel for wallet interactions. Add key derivation for any app-specific signing needs. Implement secure session tokens for authenticated operations. Add memory cleanup for sensitive data.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add CORS Protection",
+            "description": "Implement proper CORS configuration to prevent unauthorized cross-origin requests and protect API endpoints",
+            "dependencies": [],
+            "details": "Configure CORS headers for all API endpoints with strict origin whitelist. Implement preflight request handling for complex requests. Add CSRF token validation for state-changing operations. Configure secure cookie settings (HttpOnly, Secure, SameSite). Implement origin validation for WebSocket connections. Add request signing for sensitive endpoints. Create development vs production CORS policies.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Create Audit Logging System",
+            "description": "Build comprehensive audit logging for all critical operations to ensure traceability and security monitoring",
+            "dependencies": [
+              "10.5"
+            ],
+            "details": "Implement structured logging for: wallet connections/disconnections, transaction attempts/completions, configuration changes, error events. Create tamper-proof log storage with timestamps and request IDs. Add log rotation and retention policies. Implement real-time alerting for suspicious activities. Create admin dashboard for log viewing. Add export functionality for compliance. Include request metadata (IP, user agent).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Implement Session Timeout for Wallets",
+            "description": "Create automatic session management for wallet connections with configurable timeout periods",
+            "dependencies": [
+              "10.5"
+            ],
+            "details": "Implement inactivity timer that disconnects wallet after 30 minutes. Add warning modal 5 minutes before timeout. Create session extension mechanism on user activity. Store session state securely in memory only. Implement proper cleanup on timeout (clear cache, reset state). Add remember me option with secure token storage. Create re-authentication flow for expired sessions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Conduct Security Audit and Penetration Testing",
+            "description": "Perform comprehensive security testing to identify and fix vulnerabilities before production deployment",
+            "dependencies": [
+              "10.1",
+              "10.2",
+              "10.3",
+              "10.4",
+              "10.5",
+              "10.6",
+              "10.7",
+              "10.8"
+            ],
+            "details": "Run automated security scanning tools (OWASP ZAP, Burp Suite). Perform manual penetration testing on all endpoints. Test for: SQL injection, XSS, CSRF, authentication bypass, rate limit bypass. Audit smart contract interactions for reentrancy and overflow issues. Review all dependencies for known vulnerabilities. Create security checklist and remediation plan. Document security best practices for team.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-10T23:17:19.548Z",
+      "updated": "2025-08-10T23:17:19.548Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
