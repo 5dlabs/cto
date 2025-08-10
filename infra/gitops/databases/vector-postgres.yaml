@@ -13,8 +13,6 @@ spec:
   postgresql:
     version: "16"
     parameters:
-      # Load extensions - pgvector doesn't need preloading, available as extension
-      shared_preload_libraries: "bg_mon,pg_stat_statements,pgextwlist,pg_auth_mon,timescaledb"
       max_connections: "200"
       shared_buffers: "512MB"
       effective_cache_size: "2GB"
@@ -121,7 +119,6 @@ spec:
       defaultUsers: true
       extensions:
         pg_stat_statements: "public"
-        timescaledb: "public"        # For time-series metrics
 
   # Connection pooler
   enableConnectionPooler: true
