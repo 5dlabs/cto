@@ -478,7 +478,7 @@ EOF
 
         # Run Claude to review and update tasks
         echo "🔍 Running Claude review..."
-        claude --output-format stream-json --model "$MODEL" /tmp/review-prompt.md || {
+        claude -p --output-format stream-json --verbose --model "$MODEL" /tmp/review-prompt.md || {
             echo "⚠️ Claude review failed, but continuing..."
         }
         
