@@ -1,0 +1,55 @@
+# Task ID: 5
+# Title: Develop Token Account Management System
+# Status: pending
+# Dependencies: 3, 4
+# Priority: medium
+# Description: Build functionality to fetch, display, and manage user's SPL token accounts and balances
+# Details:
+Use getParsedTokenAccountsByOwner to fetch all token accounts. Implement token metadata resolution using Metaplex. Create balance tracking with real-time updates via WebSocket. Build token list with search/filter functionality. Add support for associated token accounts creation. Implement balance caching with automatic refresh. Handle token decimals properly for display.
+
+# Test Strategy:
+Test token account fetching for wallets with many tokens, verify balance accuracy, test real-time balance updates, validate token metadata resolution, test ATA creation
+
+# Subtasks:
+## 1. Implement Token Account Fetching with getParsedTokenAccountsByOwner [pending]
+### Dependencies: None
+### Description: Create service to fetch all SPL token accounts for a given wallet address using Solana's getParsedTokenAccountsByOwner RPC method
+### Details:
+Build TokenAccountService class with methods to fetch parsed token accounts. Handle pagination for wallets with many tokens. Parse account data to extract mint addresses, balances, and decimals. Implement error handling for RPC failures. Create TypeScript interfaces for token account data structures. Add retry logic for failed requests.
+
+## 2. Integrate Metaplex for Token Metadata Resolution [pending]
+### Dependencies: 5.1
+### Description: Implement token metadata fetching using Metaplex SDK to retrieve token names, symbols, logos, and other metadata
+### Details:
+Setup Metaplex SDK and configure connection. Create metadata resolver that fetches token metadata from on-chain accounts. Implement fallback to token lists (Jupiter, Solana token list) for missing metadata. Cache metadata locally to reduce RPC calls. Handle NFTs and regular SPL tokens differently. Build metadata update mechanism for changed data.
+
+## 3. Build Real-time Balance Tracking with WebSocket [pending]
+### Dependencies: 5.1
+### Description: Implement WebSocket subscription system to track balance changes in real-time for all user token accounts
+### Details:
+Setup WebSocket connection to Solana RPC. Implement accountSubscribe for each token account. Create event handlers for balance updates. Build reconnection logic for dropped connections. Implement efficient subscription management to avoid hitting limits. Create balance change notification system. Handle subscription cleanup on component unmount.
+
+## 4. Create Token List UI with Search and Filter [pending]
+### Dependencies: 5.1, 5.2
+### Description: Build user interface component to display token list with search, sort, and filter functionality
+### Details:
+Create TokenList React component with virtualized rendering for performance. Implement search by token name, symbol, or mint address. Add filters for: hide zero balances, show only verified tokens, filter by value threshold. Build sort options: by balance, by value, alphabetically. Add token logo display with fallback images. Implement responsive design for mobile/desktop.
+
+## 5. Implement Associated Token Account Creation [pending]
+### Dependencies: 5.1
+### Description: Build functionality to create Associated Token Accounts (ATA) for tokens the user doesn't have accounts for yet
+### Details:
+Implement ATA derivation using findProgramAddress. Create function to check if ATA exists before creation. Build transaction to create ATA with proper fee payer. Handle batch ATA creation for multiple tokens. Implement user confirmation flow before creation. Add cost estimation for ATA creation. Handle errors for insufficient SOL balance.
+
+## 6. Add Balance Caching with Refresh Logic [pending]
+### Dependencies: 5.1, 5.3
+### Description: Implement local caching system for token balances with automatic refresh mechanisms
+### Details:
+Create IndexedDB schema for balance cache storage. Implement cache invalidation strategy with TTL. Build background refresh worker for periodic updates. Add manual refresh trigger for users. Implement differential updates to minimize data transfer. Create cache warming on app startup. Handle cache corruption and recovery.
+
+## 7. Handle Token Decimals and Formatting [pending]
+### Dependencies: 5.1, 5.2
+### Description: Create comprehensive system for properly handling token decimals in calculations and display formatting
+### Details:
+Build decimal handling utilities using BigNumber or similar library. Create formatters for different display contexts (full precision, abbreviated, USD value). Implement locale-aware number formatting. Handle tokens with non-standard decimals (not 6 or 9). Create conversion utilities between raw amounts and UI amounts. Add copy functionality for full precision values.
+

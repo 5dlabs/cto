@@ -1,0 +1,61 @@
+# Task ID: 1
+# Title: Setup Project Repository and Development Environment
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Initialize the project repository with proper structure, configure development environment for Solana development, and set up necessary tooling
+# Details:
+Create project structure with folders for: src/, tests/, docs/, scripts/. Initialize package.json with Solana web3.js, Anchor framework dependencies. Setup TypeScript configuration. Configure ESLint and Prettier. Create .gitignore for node_modules, .env, and build artifacts. Setup environment variables structure for RPC endpoints, wallet keys. Install Solana CLI tools and configure local validator for testing.
+
+# Test Strategy:
+Verify all dependencies install correctly, ensure Solana CLI commands work, test local validator startup, validate TypeScript compilation
+
+# Subtasks:
+## 1. Initialize Git Repository and Create Project Structure [pending]
+### Dependencies: None
+### Description: Set up Git repository and create the foundational folder structure for the Solana project
+### Details:
+Initialize a new Git repository. Create the following directory structure: src/ (with subdirectories for components/, utils/, hooks/, services/), tests/ (unit/, integration/), docs/, scripts/. Create README.md with project overview. Initialize .git with initial commit.
+
+## 2. Setup Package.json with Solana Dependencies [pending]
+### Dependencies: 1.1
+### Description: Initialize npm project and install all required Solana development dependencies
+### Details:
+Run npm init to create package.json. Install core dependencies: @solana/web3.js, @project-serum/anchor, @solana/wallet-adapter-base, @solana/wallet-adapter-react, @solana/wallet-adapter-wallets. Add dev dependencies: @types/node, typescript, ts-node. Configure npm scripts for build, test, and dev commands.
+
+## 3. Configure TypeScript Environment [pending]
+### Dependencies: 1.2
+### Description: Set up TypeScript configuration for Solana development with proper compiler options
+### Details:
+Create tsconfig.json with target ES2020, module commonjs, strict mode enabled. Configure path aliases for @/ imports. Set up separate tsconfig files for tests. Enable decorators and experimental features needed for Anchor. Configure source maps and output directory to dist/.
+
+## 4. Setup ESLint and Prettier Configuration [pending]
+### Dependencies: 1.3
+### Description: Configure code linting and formatting tools with Solana/TypeScript best practices
+### Details:
+Install ESLint with TypeScript parser and Prettier. Create .eslintrc.js with rules for TypeScript, import sorting, and Solana conventions. Configure .prettierrc with 2-space indentation, single quotes, trailing commas. Add format and lint scripts to package.json. Configure VS Code settings.json for auto-formatting.
+
+## 5. Configure Git Ignore and Hooks [pending]
+### Dependencies: 1.4
+### Description: Set up Git configuration to exclude build artifacts and implement pre-commit hooks
+### Details:
+Create comprehensive .gitignore including: node_modules/, dist/, .env*, *.log, .anchor/, target/, test-ledger/, wallet-keys/. Install husky for Git hooks. Configure pre-commit hook to run ESLint and Prettier. Add commit message linting with commitlint.
+
+## 6. Setup Environment Variables Structure [pending]
+### Dependencies: 1.1
+### Description: Create environment configuration system for managing RPC endpoints and wallet keys
+### Details:
+Create .env.example with template for SOLANA_RPC_URL, SOLANA_NETWORK (devnet/mainnet), WALLET_PRIVATE_KEY placeholder. Install dotenv package. Create config/ directory with environment-specific configs. Implement config validation script. Document all environment variables in README.
+
+## 7. Install and Configure Solana CLI Tools [pending]
+### Dependencies: 1.6
+### Description: Set up Solana command-line tools and configure for local development
+### Details:
+Install Solana CLI using official installation script. Configure Solana CLI to use devnet by default. Generate development keypair for testing. Install Anchor CLI for program development. Configure CLI to use environment-specific RPC URLs. Create helper scripts for common CLI operations.
+
+## 8. Setup Local Validator and Testing Environment [pending]
+### Dependencies: 1.7
+### Description: Configure Solana test validator for local development and integration testing
+### Details:
+Configure solana-test-validator with custom settings. Create validator startup script with preset accounts and balances. Set up test wallet with SOL airdrop. Configure Anchor.toml for local testing. Create test helper utilities for validator management. Document local testing workflow in docs/.
+

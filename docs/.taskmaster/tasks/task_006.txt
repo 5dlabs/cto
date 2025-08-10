@@ -1,0 +1,61 @@
+# Task ID: 6
+# Title: Implement DEX Integration for Price Discovery
+# Status: pending
+# Dependencies: 2, 4
+# Priority: high
+# Description: Integrate with major Solana DEXs (Raydium, Orca, Jupiter) for market data and price discovery
+# Details:
+Integrate Jupiter Aggregator API for best price routing. Implement Raydium SDK for AMM pool data. Add Orca Whirlpool integration for concentrated liquidity data. Create unified price feed aggregator. Implement slippage calculation. Build order routing logic to find best execution path. Cache price data with appropriate TTL. Handle different pool types (AMM, CLMM).
+
+# Test Strategy:
+Compare prices across DEXs for accuracy, test routing algorithm with various trade sizes, verify slippage calculations, test API rate limiting handling, validate price feed updates
+
+# Subtasks:
+## 1. Integrate Jupiter Aggregator API [pending]
+### Dependencies: None
+### Description: Implement Jupiter V6 API integration for aggregated price discovery and optimal swap routes across all Solana DEXs
+### Details:
+Set up Jupiter SDK and API client. Implement quote fetching with /v6/quote endpoint. Parse route information including intermediate tokens and DEXs. Handle API rate limiting with proper backoff. Implement error handling for API failures. Create TypeScript interfaces for Jupiter API responses. Set up authentication if required.
+
+## 2. Implement Raydium SDK for AMM pools [pending]
+### Dependencies: None
+### Description: Integrate Raydium SDK to fetch liquidity pool data, prices, and trading pair information from Raydium's AMM pools
+### Details:
+Install and configure Raydium SDK. Implement pool fetching using Raydium's pool keys. Parse pool state including reserves, fees, and price data. Calculate spot prices from pool reserves. Handle different pool versions (V4, V5). Implement real-time pool updates via WebSocket. Create pool data models and interfaces.
+
+## 3. Add Orca Whirlpool integration [pending]
+### Dependencies: None
+### Description: Integrate Orca's Whirlpool SDK for concentrated liquidity pools to access tick data and calculate prices within specific ranges
+### Details:
+Set up Orca Whirlpool SDK. Fetch whirlpool pool data including tick arrays and liquidity distribution. Implement price calculation from tick data. Handle tick spacing and price ranges. Parse position data for liquidity depth analysis. Implement sqrt price to price conversion. Support for different fee tiers.
+
+## 4. Create unified price feed aggregator [pending]
+### Dependencies: 6.1, 6.2, 6.3
+### Description: Build a unified interface that aggregates price data from all integrated DEXs and provides normalized price feeds
+### Details:
+Design unified price feed interface. Implement price normalization across different DEX formats. Create weighted average price calculation based on liquidity. Handle token decimal differences. Implement price confidence scoring. Build price update subscription system. Create fallback logic for missing price data.
+
+## 5. Implement slippage calculation logic [pending]
+### Dependencies: 6.2, 6.3, 6.4
+### Description: Develop algorithms to calculate expected slippage for trades based on liquidity depth and trade size across different pool types
+### Details:
+Implement slippage calculation for constant product AMMs. Add concentrated liquidity slippage calculation. Create trade impact estimation based on pool reserves. Build slippage tolerance validation. Implement dynamic slippage suggestions based on market conditions. Handle multi-hop trade slippage aggregation. Create slippage visualization data.
+
+## 6. Build order routing algorithm [pending]
+### Dependencies: 6.1, 6.4, 6.5
+### Description: Create intelligent routing system that finds optimal execution paths across multiple DEXs considering price, slippage, and fees
+### Details:
+Implement path finding algorithm for multi-hop trades. Calculate total cost including fees and slippage. Build route optimization considering gas costs. Implement split routing for large orders. Create route scoring system. Handle circular route prevention. Add maximum hop limit configuration.
+
+## 7. Add price data caching with TTL [pending]
+### Dependencies: 6.4
+### Description: Implement efficient caching layer for price data with time-to-live settings to reduce API calls and improve performance
+### Details:
+Design cache schema for price data. Implement Redis or in-memory cache with TTL. Create cache invalidation strategy based on volatility. Build cache warming on startup. Implement stale-while-revalidate pattern. Add cache hit/miss metrics. Create different TTL settings for different data types.
+
+## 8. Handle different pool types (AMM/CLMM) [pending]
+### Dependencies: 6.2, 6.3
+### Description: Create abstraction layer to handle different pool mechanisms including traditional AMMs and concentrated liquidity market makers
+### Details:
+Design pool type abstraction interface. Implement AMM pool handler for constant product formula. Create CLMM handler for concentrated liquidity. Build pool type detection logic. Implement unified liquidity depth calculation. Handle pool-specific parameters and constraints. Create pool type conversion utilities.
+
