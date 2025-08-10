@@ -1,0 +1,61 @@
+# Task ID: 9
+# Title: Implement Transaction History and Analytics
+# Status: pending
+# Dependencies: 7, 8
+# Priority: medium
+# Description: Build system to track, store, and analyze user's trading history with performance metrics
+# Details:
+Create IndexedDB schema for local transaction storage. Implement transaction parser for swap events. Calculate metrics: total volume, win rate, average PnL, best/worst trades. Build export functionality (CSV/JSON). Create performance charts and statistics dashboard. Implement filters by date range, token, profit/loss. Add transaction categorization.
+
+# Test Strategy:
+Test transaction parsing accuracy, verify metric calculations, test data persistence across sessions, validate export formats, test with large transaction histories
+
+# Subtasks:
+## 1. Design and implement IndexedDB schema [pending]
+### Dependencies: None
+### Description: Create a robust IndexedDB schema for storing transaction history with proper indexing for efficient queries
+### Details:
+Design database schema with stores for transactions, metrics cache, and user preferences. Create indexes on timestamp, token addresses, transaction type, and profit/loss. Implement versioning and migration logic. Add composite indexes for complex queries. Include fields for transaction hash, block time, token pairs, amounts, fees, and calculated metrics.
+
+## 2. Create transaction parser for swap events [pending]
+### Dependencies: 9.1
+### Description: Build a parser to extract and normalize swap transaction data from Solana blockchain events
+### Details:
+Implement parser for different DEX swap instructions (Jupiter, Raydium, Orca). Extract token addresses, amounts, prices, fees from transaction logs. Handle different instruction formats and program versions. Parse associated metadata like slippage and route info. Normalize data into consistent format for storage.
+
+## 3. Implement volume and trade count metrics [pending]
+### Dependencies: 9.2
+### Description: Calculate and track total trading volume and trade count statistics across different time periods
+### Details:
+Calculate total volume in USD and SOL. Track trade counts by token pair and time period. Implement rolling window calculations (24h, 7d, 30d, all-time). Store pre-calculated metrics for performance. Handle volume aggregation across multiple tokens. Update metrics in real-time as new transactions are added.
+
+## 4. Calculate win rate and PnL metrics [pending]
+### Dependencies: 9.2, 9.3
+### Description: Implement profit/loss calculations and win rate analytics for trading performance evaluation
+### Details:
+Calculate realized PnL for each trade using entry/exit prices. Track unrealized PnL for open positions. Compute win rate percentage and profit factor. Calculate average win/loss amounts. Identify best and worst trades by PnL. Handle fee deductions in PnL calculations. Support multiple base currencies for PnL display.
+
+## 5. Build export functionality (CSV/JSON) [pending]
+### Dependencies: 9.3, 9.4
+### Description: Create data export features allowing users to download their transaction history and analytics
+### Details:
+Implement CSV export with customizable columns. Create JSON export with nested structure for complex data. Add date range selection for exports. Include calculated metrics in export files. Implement chunked export for large datasets. Add export templates for tax reporting. Generate filename with timestamp and filters.
+
+## 6. Create performance charts dashboard [pending]
+### Dependencies: 9.3, 9.4
+### Description: Build interactive charts and visualizations for trading performance metrics
+### Details:
+Implement PnL chart over time using Chart.js or similar. Create volume bar charts by day/week/month. Build win rate pie chart and distribution graphs. Add portfolio value line chart. Implement token allocation donut chart. Create trade frequency heatmap. Ensure responsive design and smooth animations.
+
+## 7. Implement date/token/profit filters [pending]
+### Dependencies: 9.1, 9.6
+### Description: Add comprehensive filtering system for transaction history and analytics views
+### Details:
+Create date range picker with preset options (today, week, month, custom). Implement token selector with search functionality. Add profit/loss toggle filter. Create advanced filters for trade size and fee ranges. Implement filter persistence in URL params. Update all metrics and charts based on active filters. Add filter reset functionality.
+
+## 8. Add transaction categorization system [pending]
+### Dependencies: 9.2, 9.7
+### Description: Implement a system to categorize and tag transactions for better organization and analysis
+### Details:
+Create predefined categories (swap, add liquidity, remove liquidity, etc.). Allow custom user-defined tags and categories. Implement auto-categorization based on transaction patterns. Add bulk categorization tools. Create category-based analytics views. Store categories in IndexedDB with transactions. Enable filtering and grouping by categories.
+
