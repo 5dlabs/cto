@@ -23,6 +23,10 @@ spec:
     repoURL: https://github.com/spotahome/redis-operator
     targetRevision: master
     path: example/operator
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 44c7e612 (Fix Redis operator with tested GitHub source configuration)
     directory:
       recurse: false
       include: "{operator,serviceaccount,roles,rolebinding}.yaml"
