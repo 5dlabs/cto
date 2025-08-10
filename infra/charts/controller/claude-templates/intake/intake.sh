@@ -409,7 +409,6 @@ task-master models --set-fallback "claude-3-5-sonnet-20241022"
 echo "📄 Parsing PRD to generate tasks..."
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
-    --output ".taskmaster/tasks/tasks.json" \
     --force || {
     echo "❌ Failed to parse PRD"
     exit 1
