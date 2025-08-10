@@ -18,15 +18,11 @@ spec:
   # Project configuration
   project: platform
 
-  # Source configuration - Using our local Redis operator manifests
+  # Source configuration - Using official Redis operator Helm chart
   source:
-    repoURL: https://github.com/5dlabs/cto
-    targetRevision: main
-    path: infra/gitops/operators
-
-    directory:
-      recurse: false
-      include: "redis-operator.yaml"
+    repoURL: https://spotahome.github.io/redis-operator
+    chart: redis-operator
+    targetRevision: 3.2.9
 
   # Destination configuration
   destination:
