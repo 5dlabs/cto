@@ -18,16 +18,15 @@ spec:
   # Project configuration
   project: platform
 
-  # Source configuration - Using Spotahome's manifests
+  # Source configuration - Using our local Redis operator manifests
   source:
-    repoURL: https://github.com/spotahome/redis-operator
-    targetRevision: v1.3.0-rc1  # Latest available version (stable v1.3.0 not yet released)
-    path: manifests
-
-    # Directory configuration - use raw manifests without kustomize
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/gitops/operators
+    
     directory:
       recurse: false
-      include: "*.yaml"
+      include: "redis-operator.yaml"
 
   # Destination configuration
   destination:
@@ -66,14 +65,6 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas  # Allow HPA to manage replicas
-
-  # Health assessment for the operator
-  health:
-    # Custom health check for the redis operator deployment
-    - group: apps
-      kind: Deployment
-      namespace: redis-operator
-      name: redisoperator
 
   # Revision history
   revisionHistoryLimit: 5
