@@ -4,8 +4,8 @@
     "docs": {
       "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Morgan",
-      "includeCodebase": true,
-      "sourceBranch": "main"
+      "includeCodebase": false,
+      "sourceBranch": "feature/docs-job-run"
     },
     "intake": {
       "model": "claude-opus-4-20250514",

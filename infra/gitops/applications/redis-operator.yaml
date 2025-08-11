@@ -23,7 +23,6 @@ spec:
     repoURL: https://github.com/spotahome/redis-operator
     targetRevision: master
     path: example/operator
-
     directory:
       recurse: false
       include: "{operator,serviceaccount,roles,rolebinding}.yaml"
