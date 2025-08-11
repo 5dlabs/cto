@@ -1395,7 +1395,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .and_then(|n| n.as_str())
         .ok_or(anyhow!("No running pod found for job"))?;
 
-    // Format a stream-json user message line
+    // Format a stream-json user message line (one JSON object per line)
     let line = json!({
         "type": "user",
         "message": {
@@ -1405,19 +1405,22 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     })
     .to_string();
 
-    // Use kubectl exec to append to FIFO
-    let cmd = format!(
-        "kubectl -n {} exec {} -- /bin/sh -lc 'printf %s >> {}'",
-        namespace,
-        pod_name,
-        fifo_path
-    );
-    let out = std::process::Command::new("/bin/sh")
-        .arg("-lc")
-        .arg(cmd)
+    // Append via stdin to avoid quoting issues; ensure newline for JSONL framing
+    let mut child = std::process::Command::new("kubectl")
+        .args(["-n", namespace, "exec", "-i", pod_name, "--", "/bin/sh", "-lc", &format!("cat >> {}", fifo_path)])
         .env("KUBECONFIG", std::env::var("KUBECONFIG").unwrap_or_default())
-        .output()
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
         .context("Failed to exec into pod")?;
+    if let Some(stdin) = child.stdin.as_mut() {
+        use std::io::Write as _;
+        stdin
+            .write_all(format!("{}\n", line).as_bytes())
+            .context("Failed writing input to kubectl exec")?;
+    }
+    let out = child.wait_with_output()?;
     if out.status.success() {
         Ok(json!({"success": true, "pod": pod_name, "fifo": fifo_path}))
     } else {

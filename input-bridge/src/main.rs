@@ -25,9 +25,23 @@ struct InputMessage {
 }
 
 #[derive(Serialize)]
-struct JsonLMessage {
-    role: String,
-    content: String,
+#[serde(tag = "type")]
+enum StreamJsonEvent<'a> {
+    #[serde(rename = "user")]
+    User { #[serde(borrow)] message: StreamJsonUserMessage<'a> },
+}
+
+#[derive(Serialize)]
+struct StreamJsonUserMessage<'a> {
+    role: &'a str,
+    content: Vec<StreamJsonContent<'a>>,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type")]
+enum StreamJsonContent<'a> {
+    #[serde(rename = "text")]
+    Text { text: &'a str },
 }
 
 async fn handle_input(
@@ -36,7 +50,12 @@ async fn handle_input(
 ) -> impl IntoResponse {
     let _lock = state.fifo_writer.lock().await;
 
-    let message = JsonLMessage { role: "user".to_string(), content: payload.text };
+    let message = StreamJsonEvent::User {
+        message: StreamJsonUserMessage {
+            role: "user",
+            content: vec![StreamJsonContent::Text { text: &payload.text }],
+        },
+    };
 
     match write_to_fifo(&state.fifo_path, &message).await {
         Ok(_) => (StatusCode::OK, "Message sent successfully"),
@@ -47,10 +66,10 @@ async fn handle_input(
     }
 }
 
-async fn write_to_fifo(path: &PathBuf, message: &JsonLMessage) -> Result<(), Box<dyn std::error::Error>> {
+async fn write_to_fifo(path: &PathBuf, message: &StreamJsonEvent<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let mut file = tokio::task::spawn_blocking({
         let path = path.clone();
-        move || OpenOptions::new().write(true).append(true).open(path)
+        move || OpenOptions::new().read(true).write(true).append(true).open(path)
     })
     .await??;
 
