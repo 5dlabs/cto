@@ -22,6 +22,10 @@ api:
   enabled: true
   port: 8080
   name: http
+  image:
+    repository: ghcr.io/5dlabs/cto/input-bridge
+    tag: latest
+    pullPolicy: IfNotPresent
 
 env:
   - name: ANTHROPIC_API_KEY

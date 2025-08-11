@@ -20,11 +20,16 @@ spec:
         app.kubernetes.io/name: {{ include "claude-agent.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: claude-agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["/bin/bash", "-lc", "set -e; FIFO=/workspace/agent-input.jsonl; rm -f $FIFO; mkfifo $FIFO; echo '{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Agent ready. Send input.\"}]}}' > $FIFO & claude -p --output-format stream-json --input-format stream-json --verbose < $FIFO"]
+          command: ["/bin/bash", "-lc", "set -e; FIFO=/workspace/agent-input.jsonl; rm -f $FIFO; mkfifo $FIFO; ( echo '{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Agent ready. Send input.\"}]}}' > $FIFO ) & exec claude -p --output-format stream-json --input-format stream-json --verbose < $FIFO"]
           env: {{- toYaml .Values.env | nindent 12 }}
           ports:
             - name: ssh
