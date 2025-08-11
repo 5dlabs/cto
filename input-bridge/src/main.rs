@@ -15,8 +15,7 @@ use tracing::{error, info, warn};
 
 #[derive(Clone)]
 struct AppState {
-    fifo_path: PathBuf,
-    fifo_writer: Arc<Mutex<()>>, // Mutex to ensure sequential writes
+    fifo_writer: Arc<Mutex<std::fs::File>>, // Persistent writer to keep FIFO open and serialize writes
 }
 
 #[derive(Deserialize)]
@@ -48,7 +47,8 @@ async fn handle_input(
     State(state): State<AppState>,
     Json(payload): Json<InputMessage>,
 ) -> impl IntoResponse {
-    let _lock = state.fifo_writer.lock().await;
+    // Lock the persistent writer to serialize writes and keep the FIFO open
+    let file_guard = state.fifo_writer.lock().await;
 
     let message = StreamJsonEvent::User {
         message: StreamJsonUserMessage {
@@ -57,7 +57,7 @@ async fn handle_input(
         },
     };
 
-    match write_to_fifo(&state.fifo_path, &message).await {
+    match write_to_fifo(&file_guard, &message).await {
         Ok(_) => (StatusCode::OK, "Message sent successfully"),
         Err(e) => {
             error!("Failed to write to FIFO: {}", e);
@@ -66,17 +66,13 @@ async fn handle_input(
     }
 }
 
-async fn write_to_fifo(path: &PathBuf, message: &StreamJsonEvent<'_>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = tokio::task::spawn_blocking({
-        let path = path.clone();
-        move || OpenOptions::new().read(true).write(true).append(true).open(path)
-    })
-    .await??;
-
+async fn write_to_fifo(file: &std::fs::File, message: &StreamJsonEvent<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let json_line = serde_json::to_string(message)? + "\n";
+    // Clone the file handle so we can move it into the blocking task
+    let mut writer = file.try_clone()?;
     tokio::task::spawn_blocking(move || {
-        file.write_all(json_line.as_bytes())?;
-        file.flush()?;
+        writer.write_all(json_line.as_bytes())?;
+        writer.flush()?;
         Ok::<_, std::io::Error>(())
     })
     .await??;
@@ -111,7 +107,16 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let state = AppState { fifo_path, fifo_writer: Arc::new(Mutex::new(())) };
+    // Open a persistent writer (read-write to avoid open() blocking) and keep it for the lifetime of the process
+    let persistent_file = tokio::task::spawn_blocking({
+        let p = fifo_path.clone();
+        move || OpenOptions::new().read(true).write(true).append(true).open(p)
+    })
+    .await
+    .expect("Join error opening FIFO writer")
+    .expect("Failed to open FIFO for persistent writer");
+
+    let state = AppState { fifo_writer: Arc::new(Mutex::new(persistent_file)) };
 
     let app = Router::new().route("/input", post(handle_input)).route("/health", get(health_check)).with_state(state);
 
