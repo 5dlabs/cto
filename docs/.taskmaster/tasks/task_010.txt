@@ -1,0 +1,88 @@
+# Task ID: 10
+# Title: Docs, Logging/Monitoring, and Acceptance Testing
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Write architecture and deployment docs; add structured logging and basic metrics; run acceptance tests against the PRD criteria.
+# Details:
+Documentation:
+- architecture.md: data flow (tail → parse → embeds → webhook), bot lifecycle, security model (no bot token in pods), optional input.
+- deploy.md: bot setup with Twilight, registering slash commands, required Discord permissions, Helm deploy steps, environment configuration, troubleshooting (rate limits, missing category), parity_mode usage.
+Logging & Monitoring:
+- Use tracing with JSON logs for ingestion; include run/channel IDs, rate-limit events, backoff retries. Optional Prometheus metrics.
+Acceptance Tests:
+- Criteria: dedicated channel created; watcher streams embeds for tool use, assistant messages, errors, final summary; no measurable slowdown; retention/cleanup works.
+- Load test: simulate high-frequency events to trigger batching and rate-limit code paths.
+- Reliability test: restart watcher; ensure it resumes without impacting agent.
+
+
+# Test Strategy:
+Manual runbook plus automated e2e scripts: 
+- Spin up bot and watcher (with mock transcript). 
+- Verify Discord channel creation and embeds content. 
+- Confirm final summary embed fields (tokens, cost, tool count, error count). 
+- Measure latency from file append to webhook POST using timestamps and ensure ≤100ms average (in local network conditions). 
+- Verify channel archive/delete after retention. 
+- Review logs for errors and ensure no bot token present in pod logs.
+
+# Subtasks:
+## 1. Architecture Documentation (architecture.md) [pending]
+### Dependencies: None
+### Description: Author architecture.md covering data flow, bot lifecycle, security, and optional input path.
+### Details:
+Deliverables: architecture.md with diagrams and narrative. Include: 1) Data flow: tail → parse → embeds → webhook (sequence and component diagrams), 2) Bot lifecycle: run creation, channel mapping, streaming embeds, final summary, shutdown, 3) Security model: no bot token in pods/sidecars, secret handling, log redaction boundaries, 4) Optional input path: slash command → bot → pod-local HTTP bridge (/input), auth and channel mapping, 5) Failure/retry and rate-limit handling paths, 6) Key configuration knobs (poll interval, batch size, parity_mode, filters). Acceptance: PR reviewed doc with diagrams checked in under docs/architecture.md.
+
+## 2. Deployment Documentation (deploy.md) [pending]
+### Dependencies: None
+### Description: Write deploy.md covering Discord setup, permissions, commands, Helm install, config, troubleshooting.
+### Details:
+Deliverables: deploy.md including: 1) Discord app setup with Twilight, OAuth2, public key, token storage, required permissions/intents, 2) Slash command registration steps (/runs, /input) and examples, 3) Helm install for bot service and watcher sidecar with sample values.yaml, 4) Environment configuration (DISCORD_WEBHOOK_URL, TRANSCRIPT_PATH or WORKSPACE_PATH+SESSION, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS, LOG_LEVEL), 5) Troubleshooting: rate limits, missing category, permissions errors, parity_mode usage, health probes, 6) Example end-to-end quickstart. Acceptance: validated by a fresh deploy following the doc.
+
+## 3. Structured JSON Logging with Tracing [pending]
+### Dependencies: None
+### Description: Implement tracing-based JSON logs across bot and watcher with IDs, levels, and redaction.
+### Details:
+Implement: 1) tracing subscriber emitting JSON, 2) Correlation fields on every event: run_id, channel_id, component, event_type, request_id, 3) Explicit logs for 429 rate-limit events, backoff/retry, webhook responses, parsing errors, 4) Configurable log levels via env, 5) Secret redaction (tokens, signatures) and PII minimization, 6) Sampling for high-volume debug logs. Document fields and examples. Acceptance: logs validated in local run showing required fields and redaction; 429/backoff paths produce expected entries.
+
+## 4. Basic Prometheus Metrics and Dashboards [pending]
+### Dependencies: None
+### Description: Expose minimal Prometheus metrics and provide example Grafana dashboard.
+### Details:
+Implement: 1) /metrics endpoint with counters and histograms (events_ingested_total, embeds_posted_total, webhook_post_latency_ms, parse_errors_total, rate_limit_events_total), 2) Gauges for in-flight batch size and memory footprint, 3) Labels: component, channel_id (hashed), outcome, 4) Docs for scraping and sample Grafana JSON with panels for latency, error rate, and rate-limit events. Acceptance: metrics scrapeable locally; dashboard visualizes test run.
+
+## 5. Acceptance Criteria Definition and Checklist [pending]
+### Dependencies: None
+### Description: Codify PRD acceptance criteria and thresholds as a checklist.
+### Details:
+Create a definitive checklist enumerating: 1) Dedicated channel created, 2) Watcher streams embeds for tool use, assistant messages, errors, final summary (with tokens, cost, tool count, error count), 3) No measurable slowdown (target latency budget defined), 4) Retention/cleanup works, 5) Security: no token leakage, 6) Observability present (logs/metrics). Include pass/fail thresholds for latency and error rates and how to measure them. Acceptance: checklist merged under docs/acceptance.md.
+
+## 6. Automated E2E Acceptance Test Harness [pending]
+### Dependencies: 10.5
+### Description: Build scripts to spin up bot+watcher with mock transcript and verify PRD criteria.
+### Details:
+Implement: 1) Local harness to run bot and watcher against a mocked Discord webhook server, 2) Generate mock transcript covering tools, assistant messages, errors, and final summary, 3) Assertions: channel created, embed counts and required fields, final summary fields present, 4) Latency measurement from file append to webhook POST using timestamps; report p50/p95, 5) Exit non-zero on failures; CI job integration. Acceptance: all checks pass on a clean run within thresholds.
+
+## 7. Load Testing for Batching and Rate-Limit Paths [pending]
+### Dependencies: 10.3, 10.4, 10.6
+### Description: Simulate high-frequency events to trigger batching and 429 handling; collect stats.
+### Details:
+Implement: 1) Load generator that appends bursts to transcript to exceed posting rate, 2) Verify batching behavior and 429/backoff code paths triggered (via logs and metrics), 3) Collect latency histograms and error rates; export run report, 4) Define pass thresholds for p95 latency and 429 recovery time. Acceptance: report shows batching engaged, 429 handled without data loss, and metrics within thresholds.
+
+## 8. Reliability and Restart-Resume Testing [pending]
+### Dependencies: 10.3, 10.6
+### Description: Test watcher restart mid-run and ensure resume without agent impact; measure resource usage.
+### Details:
+Implement scenarios: 1) Kill and restart watcher during active stream; assert no duplicate or missing embeds and proper resume from offset, 2) Crash individual pipeline stages and verify auto-restart and health probes, 3) Measure memory footprint and CPU under steady state and after restarts; ensure no leak, 4) Validate independence from agent process. Acceptance: tests pass with zero data loss and stable resource usage.
+
+## 9. Security Review and Token Leakage Verification [pending]
+### Dependencies: 10.3
+### Description: Perform security review of secrets handling and confirm no bot token in pods/logs.
+### Details:
+Actions: 1) Configure secret scanning on logs and artifacts to detect tokens/keys, 2) Manual and automated grep for sensitive patterns in logs, 3) Verify deployment ensures bot token not mounted/exposed in sidecars; review env and volumes, 4) Document redaction policies and a security checklist. Acceptance: zero findings for token leakage; checklist merged under docs/security.md.
+
+## 10. Documentation Publishing and Operator Runbook [pending]
+### Dependencies: 10.1, 10.2, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9
+### Description: Polish READMEs, link docs, and publish an operator runbook for on-call procedures.
+### Details:
+Deliverables: 1) Root README with overview and quickstart linking architecture, deploy, acceptance, and security docs, 2) Operator runbook: dashboards to check, common alerts, troubleshooting playbooks (rate limits, missing category, webhook failures), 3) Known issues and SLOs, 4) Versioned doc links and release notes checklist. Acceptance: docs linted and reviewed; runbook validated by a dry-run exercise.
+

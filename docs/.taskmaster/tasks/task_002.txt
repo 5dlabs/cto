@@ -1,0 +1,131 @@
+# Task ID: 2
+# Title: Implement JSONL Tailer with ≤100ms Polling
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Build an efficient tailer to stream new lines from the Claude append-only JSONL transcript with at most 100ms latency and low overhead.
+# Details:
+Requirements:
+- Default path: ~/.claude/projects/<encoded-workspace>/<session>.jsonl. Allow override via WORKSPACE_PATH and SESSION env vars or direct TRANSCRIPT_PATH.
+- Handle file discovery retries and late creation; treat file as append-only; tolerate rotations.
+- Use a non-blocking poll loop every POLL_INTERVAL_MS (default 100ms) to read new bytes and split into lines.
+- Avoid busy-wait: sleep for interval when no new data.
+- Keep file descriptor and current offset; if inode changes, reopen and continue.
+- Use buffered reading via tokio::fs::File and tokio::io::AsyncReadExt with a BytesMut buffer.
+Pseudo-code:
+loop {
+  path = resolve_transcript_path();
+  file = open_with_retry(path).await;
+  let mut offset = file.metadata().await?.len();
+  loop {
+    let new_len = file.metadata().await?.len();
+    if new_len > offset { read_range(file, offset..new_len).await -> buffer; offset = new_len; emit_lines(buffer); }
+    tokio::time::sleep(interval).await;
+  }
+}
+- Emit each complete line via mpsc channel to the parser stage.
+- Expose backpressure: bounded channel, drop or coalesce if overwhelmed (log rate).
+- Resource constraints: avoid allocations by reusing buffers.
+Configuration:
+- ENV: TRANSCRIPT_PATH, POLL_INTERVAL_MS (default 100), DISCOVERY_RETRY_MS (default 1000).
+Failure handling:
+- If file missing, log once, retry discovery.
+- If read error, reopen file.
+Metrics:
+- Lines/sec, bytes/sec, tail latency.
+
+
+# Test Strategy:
+Unit tests with a temp file: append lines in another task and assert tailer emits them within ~150ms average. Test file rotation by renaming and creating a new file. Property test for arbitrary line boundaries. Measure CPU with long idle; ensure sleep occurs. Use tokio::time::pause to simulate timing deterministically.
+
+# Subtasks:
+## 1. Path Resolution and Discovery [pending]
+### Dependencies: None
+### Description: Implement transcript path resolution with env overrides and workspace/session discovery.
+### Details:
+Implement resolve_transcript_path():
+- Resolution order: TRANSCRIPT_PATH -> (WORKSPACE_PATH + SESSION) -> error.
+- Construct default path: ~/.claude/projects/<encoded-workspace>/<session>.jsonl.
+- Expand ~ and environment variables; normalize separators; ensure parent dirs exist check is non-fatal (file may be late-created).
+- encoded-workspace: URL-safe base64 of UTF-8 WORKSPACE_PATH without padding; expose helper encode_workspace_path().
+- Return absolute PathBuf; log a single warning if path not found; do not spam logs during retries (handled by open logic).
+
+## 2. Tailer Config and Initialization [pending]
+### Dependencies: None
+### Description: Define configuration surface and builder for the tailer with sane defaults and validation.
+### Details:
+Create TailerConfig with fields: transcript_path (Option<PathBuf>), poll_interval_ms (default 100), discovery_retry_ms (default 1000), channel_capacity (e.g., 1024), drop_policy (drop|coalesce), log_rate_window_ms (e.g., 1000), start_at_end (true), newline ("\n" with CRLF tolerant).
+- Load from ENV; optionally accept clap-derived values injected by caller.
+- Validate bounds: poll_interval_ms in [10, 1000], discovery_retry_ms in [100, 60000], capacity > 0.
+- Provide Tailer::new(config) that wires path resolution (uses resolve_transcript_path if transcript_path is None).
+
+## 3. File Open/Reopen and Rotation Handling [pending]
+### Dependencies: 2.1, 2.2
+### Description: Implement open_with_retry, late creation handling, inode change detection, and reopen on read errors.
+### Details:
+Implement async open_with_retry(path, discovery_retry_ms):
+- Loop: attempt tokio::fs::File::open; on NotFound, sleep discovery_retry_ms and retry; log once per minute at most.
+- On open, capture file identity: (dev, ino) on Unix via std::os::unix::fs::MetadataExt; on Windows use file_index_low/high via winapi or metadata fileid if available; store for rotation detection.
+- Determine initial offset: if start_at_end then metadata.len() else 0.
+- Provide detect_rotation(current_file): periodically compare stored identity to current metadata; if changed, close and reopen, resetting offset to new file's current len (to avoid replay) unless start_at_end is false.
+- On any read error (other than WouldBlock), close and reopen with backoff; preserve partial line buffer where possible.
+
+## 4. Async Read Loop and Buffer Management [pending]
+### Dependencies: 2.3, 2.2
+### Description: Implement non-blocking polling loop that reads appended bytes, maintains offset, and reuses buffers.
+### Details:
+Implement tail_loop(file, poll_interval_ms):
+- Use a reusable BytesMut read_buf and a BytesMut carry_buf for trailing partial line across iterations.
+- Each tick: get new_len = file.metadata().await?.len(). If new_len > offset: seek to offset (AsyncSeekExt), read up to (new_len - offset) into read_buf in chunks; advance offset as bytes consumed.
+- Avoid busy-wait: always tokio::time::sleep(poll_interval_ms) when no new bytes.
+- Minimize allocations: reserve capacity based on last read size; shrink_to_fit rarely (e.g., on rotations).
+- Handle CRLF and UTF-8 agnostic processing: split on '\n'; retain preceding '\r' stripping.
+- On rotation detected (from subtask 2.3), swap handle and update identity and offset; keep carry_buf.
+
+## 5. Line Splitting and mpsc Emission with Backpressure [pending]
+### Dependencies: 2.4, 2.2
+### Description: Split into complete lines and emit over a bounded channel with drop/coalesce policy and rate-limited logging.
+### Details:
+Implement line_split_and_emit(read_buf, carry_buf, sender):
+- Prepend carry_buf, split on '\n'; for the final fragment without '\n', store back into carry_buf.
+- Emit TailItem::Line { offset, ts_emitted, bytes } for each complete line; trim trailing '\r'.
+- mpsc channel capacity from config; if full:
+  - drop policy: increment drop counter, skip sending, and periodically send TailItem::DropNotice { dropped_count } every log_rate_window_ms.
+  - coalesce policy: batch multiple lines into TailItem::Batch up to a limit, then send once space is available; if still full after a short try_send window, fall back to drop and log.
+- Ensure emission preserves ordering relative to file offset; avoid unbounded per-iteration batches to cap latency.
+
+## 6. Metrics and Tracing Instrumentation [pending]
+### Dependencies: 2.4, 2.5
+### Description: Expose lines/sec, bytes/sec, tail latency, drops, rotations, and idle CPU indicators with tracing spans.
+### Details:
+Integrate metrics crate (or prometheus exporter hooks) and tracing:
+- Counters: tailer_lines_total, tailer_bytes_total, tailer_dropped_lines_total, tailer_rotations_total, tailer_reopens_total.
+- Histograms: tailer_emit_latency_ms (time from file len increase observed to emission), tailer_poll_duration_ms, tailer_batch_size.
+- Gauges: tailer_channel_occupancy.
+- Tracing spans around poll/read/emit; log at INFO on start/rotation, WARN on persistent drops, ERROR on reopen failures.
+- Idle CPU check: track time spent sleeping vs active per minute and export tailer_idle_ratio gauge.
+
+## 7. Test Suite: Timing, Rotation, Boundaries, and Idle [pending]
+### Dependencies: 2.3, 2.4, 2.5, 2.6
+### Description: Write deterministic and integration-style async tests covering timing, rotation, line boundaries, and idle behavior.
+### Details:
+Tests:
+- Timing: with tokio::time::pause and advance, append lines to a temp file from another task; assert average emission latency <= 150ms under light load.
+- Rotation: write, rename current file, create a new one, append more; assert detection and continued tailing without duplicate lines.
+- Boundary property: using proptest, generate arbitrary chunk splits and CRLF/UTF-8 edge cases; assert emitted lines match ground truth joins on '\n'.
+- Backpressure: saturate channel; verify drop/coalesce behavior and rate-limited warnings; counters increment.
+- Idle CPU: long idle period; assert sleeps occur (low poll CPU), using instrumentation of sleep vs active time.
+- Error recovery: inject read/open errors (via mock FS or fault injection) and assert reopen with backoff.
+
+## 8. Documentation and Examples [pending]
+### Dependencies: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7
+### Description: Provide module docs, configuration reference, and runnable examples demonstrating usage and limitations.
+### Details:
+Produce docs:
+- Overview of JSONL tailing assumptions (append-only, newline-terminated), path resolution rules, and rotation behavior.
+- Configuration reference for ENV and programmatic TailerConfig, including defaults and recommended values.
+- Backpressure policies and their trade-offs; guidance for choosing channel capacity.
+- Metrics catalog and example Prometheus queries; tracing examples.
+- Example: start tailer, receive mpsc lines, print or forward to parser; include code snippet with graceful shutdown.
+- Known limitations and platform notes (inode detection differences).
+

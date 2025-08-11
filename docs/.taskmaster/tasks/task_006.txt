@@ -1,0 +1,92 @@
+# Task ID: 6
+# Title: Sidecar Watcher Main Pipeline and Configuration
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Wire tailer → parser → formatter → webhook sender into a resilient async pipeline with health checks, metrics, and configuration.
+# Details:
+Implementation:
+- CLI/ENV with clap: DISCORD_WEBHOOK_URL (required), TRANSCRIPT_PATH or WORKSPACE_PATH+SESSION, POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE (bool), FILTERS (JSON or env-specific), LOG_LEVEL.
+- Build pipeline with bounded channels to avoid memory bloat.
+- Independent restart safety: if any stage fails, attempt to restart stage without terminating process; ensure no agent impact.
+- Health endpoints: optional local TCP probe or UNIX socket that reports OK; or write a heartbeat file for K8s liveness/readiness probes.
+- Metrics: expose Prometheus text on a local HTTP port (optional) or log-based counters if port not allowed.
+- Graceful shutdown: SIGTERM handling to flush pending messages and send final summary if available.
+Pseudo-code:
+spawn tailer -> tx_lines;
+spawn parser+aggregator(rx_lines) -> tx_events;
+spawn formatter(rx_events) -> tx_posts;
+spawn sender(rx_posts);
+await shutdown signal;
+
+
+# Test Strategy:
+End-to-end local test: write a temp transcript file with a sequence of events; run watcher with a mock webhook endpoint; assert end-to-end messages posted and final summary present. Verify average latency ≤100ms across multiple events (using timestamps in events). Stress test with 10k lines to check memory stays <64Mi (measure RSS).
+
+# Subtasks:
+## 1. CLI and ENV configuration with clap [pending]
+### Dependencies: None
+### Description: Define all flags, env vars, defaults, help text, and mutual exclusions for the watcher.
+### Details:
+Add flags and env mapping: DISCORD_WEBHOOK_URL (required), TRANSCRIPT_PATH or WORKSPACE_PATH plus SESSION (mutually exclusive group), POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE (bool), FILTERS (inline JSON or file path), LOG_LEVEL (default info). Add optional ops flags: METRICS_PORT (optional; if absent use log), HEALTH_TARGET (tcp://host:port, unix:///path, or file:///path), --health (one-shot probe mode), SHUTDOWN_GRACE_MS (default 5000). Provide clear help text and examples; redact secrets in clap debug; validate basic types.
+
+## 2. Configuration loading, precedence, and validation [pending]
+### Dependencies: 6.1
+### Description: Load config from CLI and env, enforce precedence, validate values, and compute derived settings.
+### Details:
+Precedence: CLI > ENV > defaults. Validate DISCORD_WEBHOOK_URL scheme; ensure exactly one of TRANSCRIPT_PATH or WORKSPACE_PATH+SESSION; resolve default transcript path ~/.claude/projects/<encoded-workspace>/<session>.jsonl when needed; expand ~ and environment variables. Parse FILTERS JSON into structured filters; validate BATCH_SIZE >= 1 and POLL_INTERVAL_MS in [10, 1000]. Parse HEALTH_TARGET into enum {Tcp(addr), Unix(path), File(path)}; choose metrics mode based on METRICS_PORT. Compute derived capacities for bounded channels using BATCH_SIZE (e.g., lines=BATCH_SIZE*5, events=BATCH_SIZE*3, posts=BATCH_SIZE*2) with minimum 1 and caps to prevent memory bloat. Derive timeouts for sender and shutdown using SHUTDOWN_GRACE_MS.
+
+## 3. Channel topology and backpressure plan [pending]
+### Dependencies: 6.2
+### Description: Design and implement bounded channels between stages with capacity tuning and backpressure behavior.
+### Details:
+Instantiate tokio mpsc channels: tailer→parser (lines), parser+aggregator→formatter (events), formatter→sender (posts) with capacities from config. Document send semantics to await on full channels to apply backpressure; no message drops. Add periodic queue depth sampling for metrics. Estimate memory footprint per queue element; adjust defaults to keep under constraints. Define batching boundaries influenced by BATCH_SIZE for parser/aggregator.
+
+## 4. Stage supervision and restart-on-failure [pending]
+### Dependencies: 6.3
+### Description: Introduce per-stage supervisors that monitor tasks, classify errors, and restart failed stages without process exit.
+### Details:
+Wrap each stage (tailer, parser+aggregator, formatter, sender) in a supervisor that owns its JoinHandle and restart policy. Error classification: transient (IO, HTTP 5xx, parse recoverable) vs fatal (schema incompatibility, invalid config). Implement jittered exponential backoff (100ms to 5s) with cap and restart counters; add circuit-breaker logic to avoid hot-loop restarts. Preserve channels across restarts; ensure backpressure holds while a stage is down. Surface restart events to metrics and logs.
+
+## 5. Health checks: endpoints and heartbeat [pending]
+### Dependencies: 6.2
+### Description: Provide liveness/readiness reporting via TCP/UNIX or heartbeat file, plus a one-shot --health probe mode.
+### Details:
+If HEALTH_TARGET is tcp:// or unix://, serve a minimal handler returning OK for /livez and /readyz (HTTP if tcp port is HTTP; otherwise line-based OK). For file://, update a heartbeat file with current timestamp periodically and on successful pipeline activity; readiness indicated by an additional ready marker or timestamp freshness threshold. Readiness should reflect all stages healthy recently; liveness indicates process up. Implement --health to probe HEALTH_TARGET once and exit 0/1 for integration with exec probes.
+
+## 6. Metrics exposure: Prometheus text or log-based counters [pending]
+### Dependencies: 6.2, 6.3
+### Description: Expose key pipeline metrics via an optional Prometheus endpoint or periodic structured log summaries.
+### Details:
+If METRICS_PORT is set, expose /metrics Prometheus text with counters and gauges: lines_read_total, events_parsed_total, posts_formatted_total, webhook_posts_sent_total, errors_total{stage,kind}, restarts_total{stage}, queue_depth_{lines,events,posts}, tailer_lag_bytes, tailer_lag_ms, end_to_end_latency_ms histogram. If not set, emit periodic structured log snapshots of the same metrics. Provide lightweight metrics registry and helpers for per-stage instrumentation.
+
+## 7. Graceful shutdown and drain [pending]
+### Dependencies: 6.3, 6.4
+### Description: Handle SIGTERM/SIGINT to stop intake, drain queues, and send a final summary within a grace window.
+### Details:
+Install signal listeners; on shutdown start, stop tailer intake, allow parser/formatter/sender to drain; enforce SHUTDOWN_GRACE_MS with a timeout. If configured and available, format and send a final summary message before exit. Ensure idempotent shutdown and proper closing of health and metrics endpoints. Log durations and any dropped items; update metrics for shutdown outcomes.
+
+## 8. Pipeline integration and wiring with existing modules [pending]
+### Dependencies: 6.2, 6.3, 6.4
+### Description: Wire tailer, parser+aggregator, formatter, and sender modules behind supervised tasks and bounded channels.
+### Details:
+Integrate Task 2 tailer to emit lines to tx_lines; integrate parser+aggregator to produce events applying FILTERS; connect formatter to build payloads; connect sender to post to DISCORD_WEBHOOK_URL with retries and rate-limit handling. Add feature gating for PARITY_MODE to alter formatting and event selection. Ensure modules expose cancellation and error surfaces compatible with supervision. Close channels on terminal errors only during shutdown.
+
+## 9. Structured logging and tracing [pending]
+### Dependencies: 6.1, 6.2
+### Description: Emit structured JSON logs with spans per stage, log-level control, and sensitive data redaction.
+### Details:
+Use tracing with JSON formatter; configure LOG_LEVEL. Establish spans for tailer, parser, formatter, sender, and supervisor. Include fields: run_id or short_id, pipeline_id, stage, restart_count, queue_depths, and latency samples. Redact tokens in DISCORD_WEBHOOK_URL. Map errors to codes and include context for troubleshooting. Optionally enable sampling for high-volume logs.
+
+## 10. End-to-end test harness and resilience verification [pending]
+### Dependencies: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9
+### Description: Build tests that validate E2E functionality, latency, memory bounds, supervision restarts, health, and metrics.
+### Details:
+Create a mock transcript file and a mock webhook server; run the watcher against it. Assert that events propagate end-to-end and a final summary is posted. Measure average end-to-end latency across multiple events and ensure it is ≤100ms on CI-grade hardware by injecting timestamps. Stress with 10k lines to confirm no memory bloat and bounded queue sizes. Inject failures by killing a stage; assert supervisor restarts it and pipeline recovers without process exit. Verify health endpoints report OK and metrics counters/gauges are exposed as expected.
+
+## 11. Operations documentation and runbook [pending]
+### Dependencies: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10
+### Description: Produce user-facing docs for local and Kubernetes sidecar usage, configuration reference, and troubleshooting.
+### Details:
+Write a runbook covering installation, CLI examples, env variables, defaults, and health probe usage (--health, HEALTH_TARGET). Document metrics endpoint and example Prometheus scrapings; provide log-based metrics fallback. Include K8s sidecar examples aligning with Task 9: liveness/readiness probes (HTTP/TCP/exec), heartbeat file option, and env configuration. Add tuning guidance for BATCH_SIZE and channel capacities, and troubleshooting steps for common failures and restarts.
+
