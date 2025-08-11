@@ -2,980 +2,881 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
-        "title": "Rust Watcher Project Setup and Config",
-        "description": "Initialize the Rust sidecar watcher with async runtime, config loading, and CLI/env wiring to meet MVP deliverables.",
-        "details": "Implementation outline:\n- Tech stack: Rust 1.78+, tokio, serde/serde_json, reqwest (HTTP), tracing (logs), anyhow/thiserror (errors), clap (CLI), config + envy (env), notify/inotify (file tailing), similar (diff), regex, bytes, tokio-util, axum (for optional input bridge later)\n- Config sources (priority): CLI flags > env > config file. Env keys per PRD: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE (default false), FILTERS (includeTools/includePatterns/minStdoutLength), STATS toggles, MODEL_COSTS (map)\n- Define Config struct:\n  struct Config { webhook_url: Option<String>, workspace_path: PathBuf, poll_interval_ms: u64, batch_size: usize, parity_mode: bool, filters: Filters, stats: StatsCfg, resources: ResourceHints, }\n- Provide a discovery function for transcript file path override via CLI: --transcript <path>, else discover latest ~/.claude/projects/<encoded-workspace>/<session>.jsonl\n- Establish structured logging via tracing_subscriber with JSON logs for clusters\n- Prepare crate layout:\n  - bin/watcher.rs (main)\n  - lib modules: config.rs, tail.rs, parse.rs, embeds.rs, webhook.rs, stats.rs, trunc.rs, diff.rs, filters.rs, health.rs\n- Pseudo-code main:\n  fn main(){\n    let cfg = load_config(); init_tracing();\n    let tx = spawn_webhook_sender(cfg.webhook_url, cfg.batch_size);\n    let tail = Tail::new(discover_path(cfg.workspace_path)?, cfg.poll_interval_ms);\n    loop { for line in tail.next_line().await { if let Some(ev)=parse_event(&line,cfg.parity_mode,&cfg.filters){ let embeds = build_embeds(ev, &mut stats); tx.send(Message{embeds, attachments}).await; } } }\n  }\n- Ensure binary size small: build with strip, LTO; run with low memory via small allocations\n",
-        "testStrategy": "- Unit tests for config parsing precedence (CLI > env > file) using temp env and clap mock args\n- Verify default values match PRD (poll 100ms, batch 10)\n- Smoke run with no webhook_url (Phase 1: static pre-created) and with webhook_url set\n- Benchmark binary memory (<64Mi) via cargo-criterion or valgrind massif in CI\n- Lint/clippy and fmt; ensure MSRV gates and release profile (lto=true, codegen-units=1)",
+        "id": 11,
+        "title": "Initialize Rust Monorepo and Project Scaffolding",
+        "description": "Create a Cargo workspace with crates for watcher, bot, input-bridge, and a shared crate for formatting and common types. Set up tooling, CI, and basic configs to enable fast, low-overhead development per PRD.",
+        "details": "- Create Cargo workspace structure:\n  - crates/watcher (sidecar tailer)\n  - crates/bot (Discord bot using serenity)\n  - crates/input-bridge (pod-local HTTP → FIFO/stdin)\n  - crates/shared (event types, embed builders, truncation, cost calc)\n- Dependencies (latest stable compatible): tokio (multi-thread), serde/serde_json, reqwest, serenity, axum, tower, thiserror, tracing/tracing-subscriber, anyhow, clap, clap-derive, notify, similar (diff), time, governor (rate limit optional), parking_lot, bytes.\n- Lint/format: rustfmt, clippy; set RUSTFLAGS for opt-level z (release) in watcher to reduce mem.\n- Features: shared: diff, embeds, cost-estimator; watcher: parity-mode, filters; bot: http-server; input-bridge: fifo-io.\n- .env loading via dotenvy (development only). In prod use env vars.\n- CI skeleton: cargo fmt --check, cargo clippy -D warnings, cargo test --all, build --release.\n- Tracing setup (JSON logs optional; include RUST_LOG config guidance).\n- Pseudo-code structure:\n  workspace/Cargo.toml:\n  [workspace]\n  members=[\"crates/*\"]\n  [profile.release]\n  opt-level=\"z\"\n  lto=true\n  codegen-units=1\n- README with quickstart and workspace commands.",
+        "testStrategy": "- Build all crates: cargo build --release --all.\n- Run cargo test --all, ensure no panics.\n- Lint: cargo fmt -- --check; cargo clippy -D warnings.\n- Verify minimal binary sizes and memory usage baseline using /usr/bin/time on watcher hello-world run.",
         "priority": "medium",
         "dependencies": [],
         "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Crate and workspace skeleton with bin/lib layout",
-            "description": "Create the Rust project skeleton matching the specified module layout and minimal compile-ready stubs.",
+            "title": "Create workspace and crate skeleton",
+            "description": "Initialize a Cargo workspace and scaffold crates: watcher, bot, input-bridge, shared with release profiles optimized for size.",
             "dependencies": [],
-            "details": "Deliverables:\n- Cargo.toml with baseline deps: tokio, serde/serde_json, tracing, tracing-subscriber, anyhow, thiserror, clap, config, envy, reqwest (optional feature \"webhook\"), notify/inotify (optional feature \"inotify\"), similar, regex, bytes, tokio-util, axum (optional feature \"bridge\"). Default features minimal to keep binary small.\n- bin/watcher.rs entrypoint and src/lib with modules: config.rs, tail.rs, parse.rs, embeds.rs, webhook.rs, stats.rs, trunc.rs, diff.rs, filters.rs, health.rs; each module exports stub types/functions used by main.\n- Feature flags wired so non-MVP modules compile as stubs when disabled.\n- README with high-level overview and run instructions.\nAcceptance Criteria:\n- `cargo build` and `cargo run -- --help` succeed on Rust 1.78+.\n- Directory/file layout matches outline and compiles with stubbed modules.\n- No unused mandatory dependencies; optional deps behind features.\nRisks:\n- Early dependency bloat increases binary size. Mitigate via optional features and minimal default features.\nOwner: Rust Engineer A\nEstimate: 0.5 day",
+            "details": "- Create directory layout: crates/watcher, crates/bot, crates/input-bridge, crates/shared\n- Top-level Cargo.toml:\n  - [workspace] members = [\"crates/*\"]\n  - [profile.release] opt-level = \"z\", lto = true, codegen-units = 1\n  - [profile.dev] opt-level = 0\n  - [profile.release.package.\"watcher\"] panic = \"abort\" (override)\n- Add .cargo/config.toml:\n  - [build] target-dir = \"target\"\n  - Optionally add platform rustflags for stripping on Linux (link-arg=-s)\n- Crate scaffolds:\n  - shared: library crate (src/lib.rs) with placeholder modules: types, embeds, truncation, cost\n  - watcher: binary crate (src/main.rs) with clap boilerplate and hello-world main\n  - bot: binary crate (src/main.rs) with hello-world main\n  - input-bridge: binary crate (src/main.rs) with hello-world main\n- Ensure all crates compile with cargo build --all",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
-            "title": "Async runtime init (tokio) and graceful shutdown plumbing",
-            "description": "Initialize tokio runtime, main loop skeleton, and implement graceful shutdown on SIGINT/SIGTERM with task coordination.",
+            "title": "Wire dependencies and crate feature flags",
+            "description": "Add required dependencies and define crate-level features per PRD across workspace and crates.",
             "dependencies": [
-              "1.1"
+              "11.1"
             ],
-            "details": "Deliverables:\n- tokio::main entrypoint; initialize runtime with sensible worker/thread settings.\n- Graceful shutdown: listen for Ctrl+C and SIGTERM; broadcast shutdown via watch or broadcast channel; join tasks with a bounded timeout; ensure webhook sender channel drains with a deadline.\n- Main loop skeleton per pseudo-code: create config (stub), init_tracing (stub), spawn_webhook_sender (stub), Tail::new (stub), and an async loop that reads lines and no-ops parse when stubs are in place.\n- Backpressure-aware mpsc channel between parser and webhook sender; bounded size with metrics counters placeholders.\nAcceptance Criteria:\n- On SIGINT, process exits within 5s, logs shutdown start/complete, and no task leaks (all JoinHandles resolve).\n- Running with no webhook_url does not spawn HTTP client; with webhook_url set, a stub sender task is spawned and drained.\n- No panics when no transcript is available (pending later discovery implementation).\nRisks:\n- Task leaks or deadlocks during shutdown. Mitigate with timeouts and cancellation propagation.\nOwner: Rust Engineer B\nEstimate: 0.5 day",
+            "details": "- Use [workspace.dependencies] in root Cargo.toml to pin versions centrally (latest stable-compatible): tokio (rt-multi-thread, macros), serde, serde_json, reqwest, serenity, axum, tower, thiserror, tracing, tracing-subscriber, anyhow, clap (derive, env), notify, similar, time, governor (optional), parking_lot, bytes\n- shared/Cargo.toml:\n  - deps: serde, serde_json, thiserror, tracing, time\n  - optional deps: similar (feature \"diff\")\n  - features: diff = [\"dep:similar\"], embeds = [], cost-estimator = [\"time\"], default = []\n- watcher/Cargo.toml:\n  - deps: tokio, notify, serde, serde_json, anyhow, thiserror, tracing, clap, parking_lot, bytes, shared = { path = \"../shared\", default-features = false, features = [\"diff\", \"embeds\", \"cost-estimator\"] }\n  - features: parity-mode = [], filters = [], default = []\n- bot/Cargo.toml:\n  - deps: serenity, tokio, reqwest, clap, anyhow, thiserror, tracing, shared = { path = \"../shared\" }\n  - optional deps: axum (feature \"http-server\"), governor (feature \"rate-limit\")\n  - features: http-server = [\"dep:axum\"], rate-limit = [\"dep:governor\"], default = []\n- input-bridge/Cargo.toml:\n  - deps: axum, tower, tokio, serde, serde_json, anyhow, thiserror, tracing, bytes\n  - features: fifo-io = [], default = []\n- Verify cargo check -p <crate> passes for each crate",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
-            "title": "Config struct and precedence (CLI > env > file)",
-            "description": "Implement Config loading with clap, config, and envy; define defaults and environment key mapping per PRD.",
+            "title": "Set up dev tooling, formatting, and local env loading",
+            "description": "Configure rustfmt, clippy, EditorConfig, dotenvy (dev-only), and size-focused build settings for watcher.",
             "dependencies": [
-              "1.1"
+              "11.1"
             ],
-            "details": "Deliverables:\n- Define Config struct: webhook_url: Option<String>, workspace_path: PathBuf, poll_interval_ms: u64 (default 100), batch_size: usize (default 10), parity_mode: bool (default false), filters: Filters, stats: StatsCfg, resources: ResourceHints.\n- CLI flags via clap: --webhook-url, --workspace <path>, --poll-interval-ms, --batch-size, --parity-mode, --filters.* (includeTools, includePatterns, minStdoutLength), --stats.* toggles, --model-costs <JSON or path>, --config <file>.\n- Env mapping via envy/config: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS (JSON or CSV), STATS_* toggles, MODEL_COSTS (JSON).\n- Config file support (TOML/YAML/JSON), loaded if --config provided or default watcher.(toml|yaml|json) present; implement merge order: defaults < file < env < CLI.\n- Provide load_config() returning fully merged Config with validation (paths exist when required; positive intervals/sizes; sane bounds).\nAcceptance Criteria:\n- Precedence behaves exactly as CLI > env > file; unspecified fields fall back to defaults.\n- Invalid inputs yield clear errors (e.g., negative values rejected, invalid JSON in FILTERS/ MODEL_COSTS).\n- `--help` shows all flags with defaults.\nRisks:\n- Ambiguous FILTERS/ MODEL_COSTS parsing. Mitigate by preferring JSON strings and documenting CSV fallback.\nOwner: Rust Engineer A\nEstimate: 1 day",
+            "details": "- Add rustfmt.toml (e.g., max_width = 100, use_small_heuristics = \"Max\")\n- Add .editorconfig for consistent whitespace/line endings\n- Add clippy config (optional) or rely on CI with -D warnings\n- Add dotenvy as a dev-dependency only where needed (watcher, bot) or behind feature:\n  - shared: add feature dev-env = [\"dep:dotenvy\"], and optional dependency dotenvy (dev only)\n  - Provide a helper fn shared::env::load_dev() that calls dotenvy::dotenv().ok() when debug_assertions and feature enabled\n- Optimize watcher binary size/perf:\n  - Confirm profile.release.package.\"watcher\" panic = \"abort\" (already set)\n  - Document RUSTFLAGS usage for local builds: RUSTFLAGS=\"-C strip=symbols\" cargo build -p watcher --release\n- Add rust-toolchain.toml with channel = \"stable\"",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
-            "title": "Transcript path discovery with --transcript override and fallback",
-            "description": "Provide discovery function to resolve transcript JSONL path via CLI override or ~/.claude/projects/<encoded-workspace>/<session>.jsonl fallback.",
+            "title": "Configure CI workflows (GitHub Actions)",
+            "description": "Add CI to run fmt check, clippy with -D warnings, tests, and release build with proper caching.",
             "dependencies": [
-              "1.3"
+              "11.2",
+              "11.3"
             ],
-            "details": "Deliverables:\n- CLI flag: --transcript <path> to directly specify the transcript file.\n- discover_transcript_path(workspace_path): resolves to latest .jsonl by mtime under ~/.claude/projects/<encoded-workspace>/, where <encoded-workspace> is percent-encoding of the absolute workspace path.\n- Handles missing dirs and empty directories gracefully with actionable error messages; logs diagnostics.\n- Expose in config flow so main uses resolved path if not overridden.\nAcceptance Criteria:\n- If --transcript is provided and exists, it is used verbatim.\n- Without --transcript, discovery selects the most recently modified .jsonl file under the computed directory.\n- If nothing found, the app exits with a clear error and non-zero code without panic.\nRisks:\n- Encoding mismatch vs. upstream generator. Mitigate by allowing an override and logging the computed path for troubleshooting.\nOwner: Rust Engineer B\nEstimate: 0.5 day",
+            "details": "- .github/workflows/ci.yml:\n  - on: [push, pull_request]\n  - jobs.build: ubuntu-latest\n  - steps: checkout, set up Rust (use rust-toolchain), cache (Swatinem/rust-cache@v2), cargo fmt -- --check, cargo clippy --all-targets --all-features -D warnings, cargo test --all --all-features, cargo build --release --all\n  - concurrency: group by ref to avoid duplicate runs\n- Artifacts: optionally upload target/release sizes summary (from scripts in subtask 7)\n- Branch protection guidance for main to require CI green",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
-            "title": "Structured JSON logging via tracing_subscriber with runId/channelId fields",
-            "description": "Establish JSON-structured logging for cluster consumption with stable runId and optional channelId enrichment.",
+            "title": "Implement tracing/logging initialization and env examples",
+            "description": "Provide shared tracing setup (JSON optional) and example environment configuration including RUST_LOG guidance.",
             "dependencies": [
-              "1.1",
-              "1.3"
+              "11.2"
             ],
-            "details": "Deliverables:\n- init_tracing(config): configure tracing-subscriber with JSON formatter to stdout; fields include ts, level, target, message, runId, channelId, component.\n- Generate a runId (ULID or UUID v4) at startup; attach as root span field and propagate via tracing.\n- Provide helper function to attach channelId to events where available; default null when unknown.\n- Log level configured via RUST_LOG and/or --log-level.\nAcceptance Criteria:\n- Logs are valid JSON; piping through `jq` works.\n- Every log line includes runId; channelId appears on events where present.\n- Switching log level at startup changes verbosity accordingly.\nRisks:\n- Excessive log volume impacting performance. Mitigate with sensible defaults and rate-limited debug logs.\nOwner: Rust Engineer C\nEstimate: 0.5 day",
+            "details": "- In shared, add logging module with init_tracing(format: env) that:\n  - Reads LOG_FORMAT (\"json\" or \"pretty\"), default pretty\n  - Configures tracing_subscriber with EnvFilter (default \"info\" if RUST_LOG unset)\n  - Enables JSON output when LOG_FORMAT=json\n- Call shared::logging::init_tracing() from each binary's main before other init\n- Add .env.example with common vars:\n  - RUST_LOG=info\n  - LOG_FORMAT=pretty\n  - DISCORD_WEBHOOK_URL=... (bot/watcher)\n  - INPUT_FIFO=/agent/input.fifo (input-bridge)\n- Document JSON logs optionality and how to override per binary via env",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
-            "title": "Release profile tuning, MSRV gate, and lint/format CI",
-            "description": "Optimize binary size and reliability: release profile (LTO, strip, codegen-units=1), set MSRV, and add clippy/fmt CI.",
+            "title": "Author README and CONTRIBUTING",
+            "description": "Write README with quickstart, workspace commands, run targets, and CONTRIBUTING notes covering tooling and CI expectations.",
             "dependencies": [
-              "1.1"
+              "11.2",
+              "11.3",
+              "11.4",
+              "11.5"
             ],
-            "details": "Deliverables:\n- Cargo.toml: [profile.release] lto = \"fat\", codegen-units = 1, strip = true, opt-level = \"z\" (or \"s\"); consider panic = \"abort\" behind feature flag \"tiny\".\n- rust-version = \"1.78\" in Cargo.toml to enforce MSRV.\n- GitHub Actions workflow(s): build, test, clippy -D warnings, fmt --check, MSRV matrix (1.78 + stable) on Linux.\n- Document release build steps; verify stripped binary size and note memory targets.\nAcceptance Criteria:\n- CI green on main: build, test, clippy, fmt for MSRV and stable.\n- `cargo build --release` produces a stripped binary; size reduction observed vs. debug; target binary size reasonable for MVP (<10 MB on x86_64-unknown-linux-gnu, indicative not hard-fail).\nRisks:\n- LTO and panic=abort may complicate backtraces. Mitigate by disabling panic=abort by default and using it only for size-sensitive builds.\nOwner: DevOps Engineer\nEstimate: 0.5 day",
+            "details": "- README contents:\n  - Overview of monorepo and crates\n  - Quickstart: install Rust, cargo build --all, cargo test --all\n  - Running: cargo run -p watcher|bot|input-bridge -- --help\n  - Env setup: .env for development only (dotenvy), use real env in production\n  - Logging: RUST_LOG guidance and LOG_FORMAT\n  - Profiles and size optimization rationale (opt-level z, LTO, codegen-units)\n  - Workspace commands cheat sheet\n- CONTRIBUTING.md:\n  - Code style (rustfmt), linting (clippy -D warnings), testing, PR checks\n  - Commit/PR guidelines and CI status requirements",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
-            "title": "Tests: config precedence/defaults and smoke runs (with/without webhook)",
-            "description": "Add unit/integration tests for config precedence and defaults; smoke tests for runtime with and without webhook; basic logging and discovery tests.",
+            "title": "Baseline build, size checks, and automation scripts with DoD",
+            "description": "Add scripts and Makefile for common tasks; capture baseline binary sizes and memory for watcher; define DoD.",
             "dependencies": [
-              "1.2",
-              "1.3",
-              "1.4",
-              "1.5",
-              "1.6"
+              "11.1",
+              "11.2",
+              "11.3",
+              "11.4",
+              "11.5",
+              "11.6"
             ],
-            "details": "Deliverables:\n- Unit tests: verify CLI > env > file for all primary fields; confirm defaults (poll 100ms, batch 10, parity false) when unspecified; validate FILTERS and MODEL_COSTS parsing.\n- Integration tests: smoke run without webhook_url (no HTTP attempts); with webhook_url using a local mock server if feature \"webhook\" enabled; ensure startup, log emission with runId, and graceful shutdown.\n- Discovery tests: temp directory with fake ~/.claude/projects structure; ensure latest mtime selection and override behavior.\n- Optional (ignored) memory check: ensure idle RSS under ~64 MiB on Linux by sampling /proc/self/status.\nAcceptance Criteria:\n- `cargo test` passes on MSRV and stable in CI; no flaky sleeps (use tokio time::pause where applicable).\n- Tests assert precedence, default values, and presence of runId in logs; discovery selects expected file.\n- Smoke tests exit cleanly within timeout and without panics.\nRisks:\n- Env leakage between tests and platform differences. Mitigate with tempdirs, serializing env tests, and conditional cfg for Linux-only checks.\nOwner: QA Engineer\nEstimate: 1 day",
+            "details": "- scripts/size.sh:\n  - Build release: cargo build --release --all\n  - Strip symbols where supported\n  - Print sizes for target/release/{watcher,bot,input-bridge}\n  - Run /usr/bin/time -v ./target/release/watcher --help to capture baseline RSS\n  - Output summary to SIZES.md\n- Makefile targets:\n  - fmt, lint, test, build, run-watcher, run-bot, run-bridge, size\n- Ensure watcher has minimal clap CLI so --help exits quickly for measurement\n- Definition of Done:\n  - All crates compile and basic hello-world mains run\n  - CI green on fmt/clippy/test/build\n  - README and CONTRIBUTING present\n  - SIZES.md committed with baseline sizes and watcher memory metrics",
             "status": "pending",
             "testStrategy": ""
           }
         ]
       },
       {
-        "id": 2,
-        "title": "Low-latency JSONL Tailer (≤100ms) with Inotify + Fallback",
-        "description": "Implement append-only JSONL tailing from Claude transcript with ≤100ms average latency and low CPU.",
-        "details": "- Use Linux inotify (inotify-rs) for write/close_write/modify events; fall back to polling every poll_interval_ms when inotify unsupported\n- Handle file rotation and session discovery: watch directory ~/.claude/projects/<encoded-workspace>/ for new <session>.jsonl; pick latest mtime\n- Maintain an async file reader with an internal offset; when notified, read to EOF, splitting by newline; tolerate partial lines\n- Backpressure-safe channel to downstream parser\n- Pseudo-code:\n  struct Tail { file: File, path: PathBuf, pos: u64, watcher: Option<InotifyWatcher>, poll: Interval }\n  impl Tail { async fn next_line(&mut self)->Option<String>{ loop { if let Some(line)=read_if_available(){ return Some(line) } if let Some(evt)=self.watcher.next_event().await { if evt.is_write(){ continue } if evt.is_move_or_rename(){ reopen_latest()? } } else { self.poll.tick().await; continue } } }}\n- Optimize reads with BufReader and read_to_end chunking; ensure minimal allocations\n- Ensure CPU usage <1% by event-driven approach; when idle, sleep\n",
-        "testStrategy": "- Integration test: write N JSONL lines in a temp file with random intervals; assert tailer emits each within ≤100ms on average; use tokio time::pause for deterministic timing\n- Rotation test: move file and create new file; ensure Tail reopens and continues\n- Large line test: long JSON line (>10KB) to ensure no truncation before parse\n- Linux-only inotify test gated by cfg(target_os)\n- Measure CPU usage with a load test and ensure budget met",
+        "id": 12,
+        "title": "Implement Transcript JSONL Tailer and Event Parser (Watcher Core)",
+        "description": "Efficiently tail Claude’s append-only JSONL transcript with ≤100ms latency, parse events into structured internal types, and expose a stream to downstream formatting/posting pipeline.",
+        "details": "- Path resolution: prefer env WORKSPACE_PATH; else default ~/.claude/projects/<encoded-workspace>/<session>.jsonl. Provide discovery scan and retry with backoff.\n- Tailing approach: use tokio for async I/O; use notify crate (inotify/kqueue/FSEvents) to trigger reads; fallback to 100ms poll if events missed. Seek to end on startup (unless parity-mode) to avoid replay noise.\n- Robustness: handle file rotation or creation late. Reopen on rename/truncate.\n- Define event model in shared:\n  enum Event { ToolUse{kind:String, cmd:Option<String>, file:Option<String>, patch:Option<String>, cwd:Option<String>, ts:Option<String>}, Assistant{text:String, tokens_in:Option<u64>, tokens_out:Option<u64>, model:Option<String>, ts:Option<String>}, ToolResult{stdout:Option<String>, stderr:Option<String>, ts:Option<String>}, Completion{summary:Option<String>, totals:Option<Totals>, ts:Option<String>}, Error{message:String, ts:Option<String>} }\n  struct Totals{ tokens_in:u64, tokens_out:u64, tools:u64, errors:u64, duration_ms:Option<u64>, cost_usd:Option<f64>, model:Option<String> }\n- Parser: map Claude JSONL fields to Event, ignoring unknowns. Use serde_json::from_str per line, with defensive parsing to prevent crashes.\n- Filters from config (includeTools, includePatterns, minStdoutLength). Parity-mode bypasses filters and truncation decisions later.\n- Pseudo-code:\n  let mut file=open_and_seek(path, parity_mode);\n  let (tx, rx)=mpsc::channel(1024);\n  spawn(notify_watcher(path, tx.clone()));\n  loop { if let Some(line)=read_next_line(&mut file, 100ms)? { if let Ok(v)=serde_json::from_str::<Value>(&line) { if let Some(ev)=into_event(v) { if passes_filters(&ev) { tx.send(ev).await } } } } }\n- Performance: reuse buffers, avoid allocations; BufReader with capacity; parse small subset of fields.",
+        "testStrategy": "- Unit: feed synthetic JSONL lines for all event types; assert parsing correctness and filter behavior.\n- Integration: write to a temp file in another task simulating append every 50ms; ensure latency from write to rx.recv < 100ms avg (tokio time + Instant).\n- Rotation test: truncate/rename file mid-stream and continue.\n- Fuzz test parser with random junk lines to ensure no panics.",
         "priority": "medium",
-        "dependencies": [
-          1
-        ],
+        "dependencies": [],
         "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Tail core: async reader and offset management",
-            "description": "Define Tail struct and core async logic to read from an append-only JSONL file while tracking an internal byte offset.",
+            "title": "Path resolution and discovery",
+            "description": "Resolve transcript JSONL path via WORKSPACE_PATH or default discovery in ~/.claude/projects, with retry and backoff.",
             "dependencies": [],
-            "details": "- Implement struct Tail { file: tokio::fs::File, path: PathBuf, pos: u64, poll: Option<tokio::time::Interval>, watcher: Option<InotifyHandle>, buf: Vec<u8>, line_buf: Vec<u8> }\n- Provide async methods: Tail::open(path), Tail::reopen(path), Tail::read_available() -> Reads from current pos to EOF without blocking when no data\n- Ensure pos advances only by bytes successfully consumed into complete lines; partial trailing bytes remain in line_buf\n- Do not spin when idle: yield on no data; integrate with event/poll signals (wired in subtasks 2/3)\n- Config: poll_interval_ms, max_read_chunk (e.g., 64–256 KiB), workspace_dir\n- Acceptance: Can open an existing file, start at EOF, and read new appends without re-reading old content; no busy-loop when idle",
+            "details": "Implement path resolution: check WORKSPACE_PATH env first; else derive default ~/.claude/projects/<encoded-workspace>/<session>.jsonl. Provide a discovery scan to find the most recent/active session file. Expand ~ and handle cross-platform path rules. Implement retry with exponential backoff when file not found, and surface a resolved PathBuf once available. Prepare helpers to locate parent directory for watcher setup.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
-            "title": "Inotify watcher for write/close/rename",
-            "description": "Integrate inotify-rs to receive low-latency notifications for file and directory events that indicate new data or rotation.",
+            "title": "Async tailer core (tokio) with ≤100ms latency",
+            "description": "Build async tail loop that reads appended JSONL lines, parses into Events, and streams them via mpsc.",
             "dependencies": [
-              "2.1"
+              "12.1",
+              "12.5"
             ],
-            "details": "- Use inotify (or notify crate with inotify backend) on Linux; masks: MODIFY, CLOSE_WRITE, MOVED_TO, MOVED_FROM, MOVE_SELF, DELETE_SELF, CREATE\n- Watch both the active file and its parent directory to catch rotations and new sessions\n- Map events to actions: write/close_write => read_available; move/rename/delete => trigger reopen discovery\n- Handle queue overflow (IN_Q_OVERFLOW): fall back to a full resync by stat/reopen latest and fast-forward pos safely\n- If inotify init fails, set watcher=None so polling fallback (Subtask 3) drives progress\n- Acceptance: On a single append, an event arrives and triggers a read cycle within one wake; errors are surfaced but do not crash the loop",
+            "details": "Create tail_transcript(path, parity_mode) -> mpsc::Receiver<Event>. Use tokio async I/O with BufReader and reusable buffers to minimize allocations. Seek to end on startup unless parity_mode. Implement a loop that waits on a read-trigger (pluggable) or falls back to timed polling every 100ms; when data is available, read complete lines and parse via serde_json into Value then into Event. Apply a passes_filters() hook (no-op initially; wired in subtask 12.6). Expose a bounded channel (capacity ~1024) to downstream pipeline. Ensure graceful shutdown and backpressure handling.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
-            "title": "Polling fallback with tokio Interval",
-            "description": "Provide a low-CPU polling path when inotify is unavailable or disabled.",
+            "title": "Filesystem notifications with fallback polling",
+            "description": "Integrate notify crate to watch file and parent dir, with missed-event recovery and 100ms polling fallback.",
             "dependencies": [
-              "2.1"
+              "12.1"
             ],
-            "details": "- Create tokio::time::Interval with configurable poll_interval_ms (default 50ms) to check for file growth or rotation\n- On each tick, stat file size/inode; if size > pos, read_available; if inode changed or size < pos, treat as rotation/truncate and reopen\n- Ensure sleep when idle; no tight loops; jitter option (+/- 10%) to avoid phase lock across many instances\n- Acceptance: With only polling enabled, average end-to-end line latency ≤100ms when poll_interval_ms ≤50ms; idle CPU <1%",
+            "details": "Set up notify watcher (inotify/kqueue/FSEvents) on the target file if present and its parent directory. Translate create, write, rename, remove, and truncate events into lightweight triggers for the tail loop. Coalesce bursts and handle spurious events. Provide a periodic 100ms timer to ensure progress if events are missed. Expose a Send + Sync trigger channel compatible with the tailer core.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
-            "title": "Session discovery and latest-by-mtime selection",
-            "description": "Discover and track the current session JSONL file under ~/.claude/projects/<encoded-workspace>/, switching to the most recent by mtime.",
+            "title": "Rotation and late-creation handling",
+            "description": "Detect and recover from file rename/truncate and handle files that appear after startup.",
             "dependencies": [
-              "2.1",
-              "2.2",
-              "2.3"
+              "12.1",
+              "12.2",
+              "12.3"
             ],
-            "details": "- Monitor the workspace directory for new *.jsonl files (inotify CREATE/MOVED_TO) and maintain a sorted view by mtime\n- On startup, pick the latest mtime file; when new session appears or active file is moved/deleted, reopen the latest\n- Normalize and resolve symlinks; ensure permissions and existence checks\n- Provide helper: fn latest_session(dir) -> Option<PathBuf>\n- Acceptance: When a new session file is created, tailer switches within ≤100ms (inotify) or within one poll tick (polling fallback); always selects the newest mtime",
+            "details": "Detect truncation (file size smaller than last offset) and seek to start or end based on parity_mode. On rename or removal, close the old handle and attempt to reopen the new path discovered via parent directory events or discovery scan. Support late file creation by waiting on parent notifications and opening when the file appears. Track inode/metadata to avoid duplicate reads. Preserve offsets across reopen events safely.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
-            "title": "Robust JSONL line splitting with partial buffering and minimal allocations",
-            "description": "Implement efficient newline-delimited parsing that tolerates partial lines and large JSON strings.",
-            "dependencies": [
-              "2.1"
-            ],
-            "details": "- Use tokio::io::BufReader<File> with a tuned capacity (e.g., 64–256 KiB); read_to_end-style chunking into a reusable Vec<u8>\n- Maintain a reusable line_buf for partial trailing data; scan for '\\n' and emit complete lines; retain remainder across reads/rotations\n- Support very large lines (>10 KiB, up to several MB) without quadratic copies; grow buffers with amortized strategy\n- Validate UTF-8; if invalid, buffer until newline and attempt lossy decode or drop with error metric (configurable)\n- Acceptance: No panics on long lines; per-line allocations minimized (≤2 Vec growths on average for typical lines); preserves partial lines until completion",
+            "title": "Shared event model and defensive parser",
+            "description": "Define Event and Totals types and implement robust JSONL-to-Event mapping that ignores unknown fields.",
+            "dependencies": [],
+            "details": "Add shared types: enum Event { ToolUse{kind, cmd?, file?, patch?, cwd?, ts?}, Assistant{text, tokens_in?, tokens_out?, model?, ts?}, ToolResult{stdout?, stderr?, ts?}, Completion{summary?, totals?, ts?}, Error{message, ts?} } and struct Totals{ tokens_in, tokens_out, tools, errors, duration_ms?, cost_usd?, model? }. Implement into_event(Value) -> Option<Event> and serde_json::from_str per line with defensive parsing: ignore unknowns, accept Option fields, clamp excessively large strings, and never panic on malformed input (log and skip).",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
-            "title": "Backpressure-safe channel to downstream parser",
-            "description": "Expose a bounded mpsc channel for lines, ensuring producer backpressure and bounded memory.",
+            "title": "Configurable filters and parity-mode semantics",
+            "description": "Implement includeTools, includePatterns, minStdoutLength filters and parity-mode bypass.",
             "dependencies": [
-              "2.1",
-              "2.5"
+              "12.5",
+              "12.2"
             ],
-            "details": "- Use tokio::sync::mpsc::channel with configurable capacity (e.g., 1024)\n- Producer awaits send when full; optionally expose try_send with metrics for drops if a drop policy is enabled by config\n- Surface a graceful shutdown signal; on receiver drop, tailer stops reading and closes cleanly\n- Emit metrics: queue depth, send wait time, dropped count (if enabled)\n- Acceptance: Under a slow consumer, memory remains bounded, no busy-waiting, and CPU stays <1% idle",
+            "details": "Define a Filters config struct: includeTools (bool), includePatterns (list of regex or glob patterns applied to text/stdout/stderr), minStdoutLength (usize). Implement passes_filters(&Event, &Filters, parity_mode) such that parity_mode disables all filtering. Wire this into the tailer core so only passing events are sent downstream. Ensure patterns compile once and are reused; handle invalid patterns gracefully.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
-            "title": "File rotation and truncate handling",
-            "description": "Detect and handle file moves/renames/truncates without duplicating or losing lines.",
+            "title": "Performance profiling and optimizations",
+            "description": "Instrument latency and optimize allocations, buffer sizes, and channel capacities to meet ≤100ms target.",
             "dependencies": [
-              "2.1",
-              "2.2",
-              "2.3",
-              "2.4",
-              "2.5"
+              "12.2",
+              "12.3",
+              "12.4",
+              "12.6"
             ],
-            "details": "- On MOVE/RENAME/DELETE or inode change/size shrink, flush any complete lines from buffers, then reopen latest session\n- If the same path is recreated, detect new inode; reset pos to 0; if truncated (size < pos), reset pos accordingly\n- Preserve partial trailing bytes logically only if the same inode continues; on rotation to a new file, discard incomplete fragment (configurable) to avoid corrupt JSON\n- Ensure duplicate-suppression: do not re-emit already read bytes; verify via inode+pos tracking\n- Acceptance: Rotation test passes with zero duplicates/loss; switching happens within ≤100ms (inotify) or one poll tick; handles rapid successive rotations",
+            "details": "Add tracing spans and Instant-based metrics for write-to-receive latency and parse duration. Tune BufReader capacity (e.g., 64–256 KiB) and reuse String/Vec buffers to avoid reallocations. Parse only required fields from JSON to minimize overhead. Set mpsc capacity to balance throughput and memory (e.g., 1024). Validate missed-event recovery path cost and adjust poll interval (default 100ms) via config. Document tunables and demonstrate reduced allocations via heap profiling where possible.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
-            "title": "Tests and benchmarks: latency, rotation, large lines, Linux-gated inotify",
-            "description": "Build comprehensive tests and simple benches to validate latency, correctness, and resource usage; gate inotify tests to Linux.",
+            "title": "Testing and DoD verification",
+            "description": "Implement unit and integration tests, including rotation and fuzzing, and verify <100ms average tail latency.",
             "dependencies": [
-              "2.1",
-              "2.2",
-              "2.3",
-              "2.4",
-              "2.5",
-              "2.6",
-              "2.7"
+              "12.1",
+              "12.2",
+              "12.3",
+              "12.4",
+              "12.5",
+              "12.6",
+              "12.7"
             ],
-            "details": "- Integration: write N JSONL lines to a temp file with random 10–50ms intervals; assert average end-to-end latency ≤100ms; measure from write completion to receive\n- Rotation: move active file, create a new one, continue writing; assert no duplicates/misses and fast switch\n- Large line: emit >10 KiB and >1 MiB lines; ensure memory remains bounded and no panic\n- Inotify gating: cfg(target_os=\"linux\") for inotify-specific tests; ensure polling path tests run on all platforms\n- CPU idle check: when idle for 30s, process CPU <1% (approximate via /proc sampling on Linux or coarse wall-clock vs CPU time)\n- Benchmark sanity: sustained 100 lines/sec for 10s without backlog; queue depth stays below capacity\n- Acceptance: All tests green; metrics meet latency ≤100ms avg and idle CPU <1%",
+            "details": "Unit tests: feed synthetic JSONL lines for every Event type and assert mapping correctness and filter behavior; ensure unknown fields are ignored and malformed lines do not panic. Integration tests: append to a temp file every ~50ms and assert average latency from write to rx.recv is <100ms across sustained runs. Rotation tests: simulate truncate and rename; verify tailing continues without duplication or loss. Fuzz tests: random and junk lines to ensure parser robustness. DoD: all tests pass and sustained average tail latency <100ms in integration.",
             "status": "pending",
             "testStrategy": ""
           }
         ]
       },
       {
-        "id": 3,
-        "title": "Event Parser, Filtering, and Embed Builder",
-        "description": "Parse transcript JSONL into typed events, apply filters/parity mode, and build Discord embed payloads with code fences, diffs, truncation, and batching.",
-        "details": "- Define serde models with flexible fields:\n  enum EventKind { ToolUse{tool:String, cmd:Option<String>, file:Option<String>, patch:Option<String>, cwd:Option<String>}, Assistant{text:String}, ToolResult{stdout:Option<String>, stderr:Option<String>}, Summary{result:Option<String>} , Error{message:String}}\n  #[derive(Deserialize)] struct TranscriptLine{ timestamp: DateTime<Utc>, event: String, model:Option<String>, tokens_in:Option<u64>, tokens_out:Option<u64>, cost_usd:Option<f64>, tool:Option<String>, data:serde_json::Value }\n- Map event strings to kinds: tool_use (Bash/Write/Edit/Read/WebSearch), assistant, tool_result, result/summary, error\n- Filters: includeTools, includePatterns, minStdoutLength; Parity mode bypasses filters and truncation thresholds (within Discord hard limits)\n- Truncation and sanitization:\n  - Enforce Discord limits: description ≤4096 chars, ≤25 fields, ≤10 embeds/message; message content ≤2000 chars\n  - Sanitize code blocks: escape triple backticks within content by zero-width joiner or by slicing into safe chunks\n  - For stdout/stderr: render in ```text blocks, truncate beyond ~1000 chars with “(truncated)” appended and prepare attachment\n  - For diffs: prefer event-provided patch; else compute inline diff via similar crate, include contextual hunk up to 60 lines; attach full diff if larger\n- Embed templates per PRD with colors:\n  - ⚡ Bash tool_use: title, fields (Command fenced as ```bash), Working Dir, Tool Count\n  - 📝 Write/Edit/👁️ Read: fields File, Summary, Tool Count\n  - 💭 Assistant: description trimmed, fields Tokens In/Out, Cost, Model\n  - ❌ Error: description code-fenced stderr, field Total Errors\n  - ✅ Complete: fields Cost, Duration, Tokens total, Tools Used\n- Batching: collect embeds; flush when size==batch_size or 250ms idle; produce optional attachments array for overflows\n- Pseudo-code build_embeds(ev): match ev { ToolUse{..} => vec![embed]; ToolResult{..} => vec![embed]; Assistant{..} => maybe split across 2 embeds if >4096; Summary => vec![final_embed] }\n",
-        "testStrategy": "- Unit tests: sample JSONL lines for each event type -> expected embed structure (title, fields, colors)\n- Truncation tests: inputs at boundaries 2000/4096/25 fields and ensure no panic; verify attachments prepared when exceeding limits\n- Diff tests: ensure inline hunk length cap; validate diff fenced with ```diff and +/-\n- Parity mode test: confirm minimal truncation and all events passed\n- Fuzz test parser with random JSON objects to ensure robustness",
+        "id": 13,
+        "title": "Embed Formatting, Truncation, Diffing, and Batching Library",
+        "description": "Convert parsed events into Discord-compliant embeds and attachments with safe truncation, syntax highlighting, compact diffs for Write/Edit, and batching up to 10 embeds per message.",
+        "details": "- Implement shared::embeds with builders per template:\n  - tool_use Bash: title ⚡ Bash; fields: Command (```bash), Working Dir, Tool Count; color 0xF39C12.\n  - tool_use Write/Edit/Read: titles 📝 Write / 👁️ Read; fields: File, Summary, Tool Count; color 0xF39C12.\n  - assistant: title optional; description=trimmed text; fields: Tokens In/Out, Session Cost (estimated), Model; color 0x3498DB.\n  - tool_result error: title ❌ Error; description=stderr code-fenced; field Total Errors; color 0xE74C3C.\n  - completion: title ✅ Complete; fields: Cost, Duration, Tokens total, Tools Used; color 0x27AE60.\n- Limits: respect 2000 content, 4096 desc, ≤25 fields/embed, ≤10 embeds/message.\n- Truncation helpers: trim_with_note(s, max, note=\"(truncated)\"), sanitize_code_fences(lang, body) replacing backticks runs and zero-width spaces to prevent premature closure. Disable mentions in payload via allowed_mentions: none.\n- Attachments: for overflow (e.g., long stdout, full diff), create files and link using attachment://filename in embed; include summary field with name and size.\n- Diffing: for Write/Edit if patch present; else compute diff via similar::TextDiff::from_lines(old, new). Extract contextual hunk (40–60 lines). Format as ```diff with +/-. Truncate hunks if needed and attach full diff.\n- Batching: struct Batch{embeds:Vec<Embed>, files:Vec<FilePart>}. Implement Batch::try_push(embed) -> bool; flush when count==10 or time window elapses.\n- Cost estimator: map common Claude models to per-token costs (configurable) to compute Session Cost from tokens. Fallback to 0 if unknown.\n- Pseudo-code:\n  fn to_embeds(ev:&Event, stats:&mut Stats, cfg:&Cfg)->BatchItems {\n    match ev { Event::ToolUse{..}=>build_tool_use_embed(...), Event::Assistant{..}=>build_assistant_embed(...), Event::ToolResult{..}=>build_result_embed(...), Event::Completion{..}=>build_complete_embed(...), Event::Error{..}=>build_error_embed(...) }\n  }\n  fn fenced(lang,&text)->String { format!(\"```{}\\n{}\\n```\", lang, sanitize(text)) }\n",
+        "testStrategy": "- Snapshot tests: generate embeds JSON for representative events and compare to stored snapshots (insta crate).\n- Boundary tests: ensure field counts ≤25; descriptions ≤4096; proper truncation markers; no unclosed fences.\n- Diff tests: small, medium, and large patches; verify inline hunk lines 40–60; attachment created for large diffs.\n- Cost tests: verify estimator math from tokens and rates.\n- Security test: ensure allowed_mentions is set to none and content sanitization prevents @mentions.",
         "priority": "medium",
-        "dependencies": [
-          1,
-          2
-        ],
+        "dependencies": [],
         "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Serde models and tolerant JSONL parsing",
-            "description": "Define flexible serde models and a resilient JSONL reader to deserialize transcript lines into typed events.",
-            "dependencies": [],
-            "details": "- Define enum EventKind { ToolUse{tool, cmd?, file?, patch?, cwd?}, Assistant{text}, ToolResult{stdout?, stderr?}, Summary{result?}, Error{message} }.\n- Define TranscriptLine { timestamp: DateTime<Utc>, event: String, model?, tokens_in?, tokens_out?, cost_usd?, tool?, data: Value } with serde default/flatten where appropriate.\n- Implement tolerant parsing: accept RFC3339 timestamps; default Option fields to None; collect unknown keys under data.\n- Provide JSONL reader that streams lines, deserializes per-line, logs and skips invalid rows without crashing.\n- Expose conversion helper: TranscriptLine -> CanonicalEvent { ts, meta {model, tokens_in/out, cost}, kind: EventKind }.",
+            "title": "Embed builders per event with Discord limits enforced",
+            "description": "Implement shared::embeds builders for all event templates, enforcing Discord limits and producing compliant embeds ready for batching.",
+            "dependencies": [
+              "13.2",
+              "13.3",
+              "13.4",
+              "13.5",
+              "13.7"
+            ],
+            "details": "Create module shared::embeds with builder functions to render events into Discord Embed objects, enforcing: description <= 4096 chars, <= 25 fields per embed, and preparing content safe for message content <= 2000 if used. Builders: 1) build_tool_use_bash_embed(cmd: &str, cwd: &Path, tool_count: usize) -> Embed; title: \"⚡ Bash\"; fields: Command (fenced as bash), Working Dir, Tool Count; color 0xF39C12. 2) build_tool_use_fs_embed(kind: {Write, Edit, Read}, file: &Path, summary: &str, tool_count: usize, diff: Option<DiffSummary>) -> Embed; titles: \"📝 Write\" / \"👁️ Read\"; fields: File, Summary (trimmed), Tool Count; include inline diff snippet in description if provided; color 0xF39C12. 3) build_assistant_embed(text: &str, tokens_in: u32, tokens_out: u32, model: &str, cost: f64) -> Embed; optional title; description: trimmed text; fields: Tokens In, Tokens Out, Session Cost (estimated), Model; color 0x3498DB. 4) build_tool_result_error_embed(stderr: &str, total_errors: usize) -> Embed; title: \"❌ Error\"; description: code-fenced stderr; field: Total Errors; color 0xE74C3C. 5) build_completion_embed(cost: f64, duration_ms: u64, tokens_total: u32, tools_used: usize) -> Embed; title: \"✅ Complete\"; fields: Cost, Duration, Tokens total, Tools Used; color 0x27AE60. Use sanitize_code_fences and trim_with_note from 13.2; use diff formatting from 13.4; for overflow, delegate to attachments (13.5) by returning an embed that links attachment:// filenames in fields where appropriate. Ensure field name/value constraints (name <= 256, value <= 1024) are respected by truncation or redirection to attachments. Message payloads created by these builders must set allowed_mentions to none via 13.3. Acceptance: builders never produce embeds that exceed limits; snapshots in 13.8 validate structure and colors.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
-            "title": "Event string mapping to enum kinds",
-            "description": "Map event string values to EventKind variants and extract fields from data with fallbacks.",
-            "dependencies": [
-              "3.1"
-            ],
-            "details": "- Map event: \"tool_use\" (tools: Bash/Write/Edit/Read/WebSearch), \"assistant\", \"tool_result\", \"result\"|\"summary\", \"error\".\n- Extract fields from data: ToolUse {cmd, file, patch, cwd}; Assistant {text}; ToolResult {stdout, stderr}; Summary {result}; Error {message}.\n- Normalize tool names and accept case-insensitive aliases.\n- Robust error handling: if mapping fails, produce Error variant with message; never panic.\n- Provide EventMapper with fn map(line: TranscriptLine) -> CanonicalEvent.",
+            "title": "Truncation helpers and content sanitization",
+            "description": "Implement trim_with_note and code fence sanitization to prevent overflows and premature fence closures.",
+            "dependencies": [],
+            "details": "Provide helpers in shared::text: 1) trim_with_note(s: &str, max: usize, note: &str) -> (String, bool) that trims at valid UTF-8 boundaries, reserves space for note, and appends note if truncated. 2) sanitize_code_fences(lang: &str, body: &str) -> String that replaces backtick runs inside body by inserting a zero-width space after backticks and replaces existing zero-width spaces with a safe placeholder or removes them to avoid stealth mentions; also strips or neutralizes Discord mentions like @everyone by inserting zero-width space after '@' for non-code fields if needed. 3) fenced(lang: &str, text: &str) -> String that wraps sanitize_code_fences output with triple backticks and ensures a trailing newline and a closing fence. 4) strip_ansi(input: &str) -> String to remove ANSI escape sequences from tool outputs before embedding. All helpers must be allocation-safe and unit-tested for boundary conditions (empty, exact max, multibyte chars, long runs of backticks).",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
-            "title": "Filtering engine (includeTools, includePatterns, minStdoutLength)",
-            "description": "Implement configurable predicates to include/exclude events before embed building.",
-            "dependencies": [
-              "3.1",
-              "3.2"
-            ],
-            "details": "- Config schema: includeTools: Option<Vec<String>>; includePatterns: Option<Vec<String>> (compiled to Regex); minStdoutLength: Option<usize>.\n- For ToolUse/ToolResult/Assistant/Summary/Error, define predicates:\n  - includeTools matches ToolUse.tool (case-insensitive) and ToolResult inferred tool chain.\n  - includePatterns apply to concatenated textual fields (cmd/file/stdout/stderr/text/result/message).\n  - minStdoutLength gate ToolResult.stdout length.\n- Pre-compile regexes; on invalid pattern, log and skip that pattern.\n- Expose fn allow(event: &CanonicalEvent, filters: &Filters) -> bool.",
+            "title": "Disable mentions in payload builder",
+            "description": "Ensure outgoing Discord payloads have mentions disabled to prevent accidental pings.",
+            "dependencies": [],
+            "details": "Implement a message payload builder shared::payloads with AllowedMentions::none configuration (no roles, users, or everyone). Provide fn make_payload(content: Option<String>, embeds: Vec<Embed>, files: Vec<FilePart>) -> DiscordMessage that always sets allowed_mentions to none. Add a guard that rejects payloads if content contains raw @everyone or @here unless inside a code fence (best-effort heuristic). Acceptance: integration test verifies DiscordMessage JSON includes allowed_mentions with empty parse arrays.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
-            "title": "Parity mode bypass switch",
-            "description": "Add a global parity mode that bypasses filters and soft truncation thresholds while still respecting Discord hard limits.",
+            "title": "Diffing utilities with contextual hunks and diff formatting",
+            "description": "Implement utilities to parse or compute diffs and format compact contextual snippets as diff code blocks.",
             "dependencies": [
-              "3.3"
+              "13.2"
             ],
-            "details": "- Add ParityMode(bool) to pipeline context.\n- When enabled: skip Filters.allow, ignore minStdoutLength and diff/stdout soft truncation caps (~1000), but enforce Discord 2000/4096/25/10 limits.\n- Ensure attachments are always produced for over-limit content in parity mode.\n- Provide fn parity_wrap<T>(ctx, content, enforce_hard_limits_only: bool) to gate truncation behavior.",
+            "details": "Create shared::diff: 1) enum DiffInput { PatchText(String), OldNew { old: String, new_: String } }. 2) compute_diff(input: DiffInput) -> DiffSummary that uses similar::TextDiff::from_lines for OldNew; if PatchText given, parse minimally or fallback to compute. 3) Extract contextual hunks totaling approximately 40–60 lines; default target 50 lines across hunks with equal context around changes; collapse large sections with \"...\" markers. 4) Format inline snippet as a diff code fence (lang \"diff\") with lines prefixed +/-. 5) If total diff exceeds inline budget (e.g., 3 KB or would push embed description over 4096), mark is_truncated = true and return full_text in DiffSummary for attachment use. 6) Return DiffSummary { inline_snippet: String, full_text: Option<String>, is_truncated: bool, added: usize, removed: usize }. Ensure sanitization via fenced(\"diff\", ...) from 13.2 and no unclosed fences.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
-            "title": "Discord limits enforcement utilities",
-            "description": "Implement character/field/embed limit enforcement and safe splitting/chunking helpers.",
+            "title": "Attachments pipeline for overflow content",
+            "description": "Create attachment handling and embed linking using attachment:// and size summaries.",
             "dependencies": [
-              "3.1"
+              "13.2",
+              "13.4"
             ],
-            "details": "- Constants: MESSAGE_MAX=2000, EMBED_DESC_MAX=4096, EMBED_FIELDS_MAX=25, EMBEDS_PER_MESSAGE_MAX=10.\n- Safe trimming by Unicode scalar values (avoid breaking multi-byte); consider unicode-segmentation for grapheme-safe cuts.\n- Helpers:\n  - fn trim_message_content(s) -> String\n  - fn trim_embed_description(s) -> String\n  - fn cap_fields(fields) -> (Vec<Field>, overflow_count)\n  - fn split_embeds(embeds) -> Vec<Vec<Embed>> sized to <=10 each\n- Attachment overflow producer: when content is trimmed, return AttachmentSpec { filename, bytes, note }.",
+            "details": "Implement shared::attachments: 1) struct FilePart { filename: String, bytes: bytes::Bytes, content_type: String }. 2) fn make_attachment(filename: &str, bytes: impl Into<bytes::Bytes>, content_type: &str) -> FilePart; sanitize filename to remove path separators. 3) Policy helpers: should_attach_text(field_limit: usize, text: &str) -> bool; should_attach_desc(desc_limit: usize, text: &str) -> bool; use 1024 for field values, 4096 for descriptions. 4) fn link_attachment_field(embed: &mut Embed, field_name: &str, attach: &FilePart) to insert a field with value like \"attachment://filename\" and an adjacent summary field with humanized size. 5) For diffs: if DiffSummary.full_text is Some or inline truncation occurs, create a .diff attachment and link it; for long stdout/stderr, create .log attachments. 6) Ensure binary safety and size accounting; expose total attachments count to the batcher. Acceptance: snapshot tests show attachment links and size summaries; large inputs move to attachments.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
-            "title": "Code fence sanitization and escaping",
-            "description": "Create robust code block wrapper that escapes internal triple backticks and guarantees balanced fences.",
-            "dependencies": [
-              "3.5"
-            ],
-            "details": "- Implement sanitize_code_block(lang: &str, content: &str) -> String.\n- Strategy: escape ``` sequences by injecting zero-width joiner or by slicing into chunks between fences; ensure closing fence always present.\n- Normalize line endings to \\n; strip trailing whitespace that could break fences.\n- Provide specialized wrappers: code_text(content), code_bash(cmd), code_diff(patch_snippet).",
+            "title": "Batching struct and flush policy",
+            "description": "Implement Batch and Batch::try_push with a time/window-based flush strategy up to 10 embeds per message.",
+            "dependencies": [],
+            "details": "Create shared::batch: 1) struct Batch { embeds: Vec<Embed>, files: Vec<FilePart> }. 2) impl Batch { fn try_push(&mut self, embed: Embed) -> bool that returns false if pushing would exceed 10 embeds; fn add_file(&mut self, f: FilePart); fn is_full(&self) -> bool; }. 3) Batcher with windowed flushing: struct Batcher { current: Batch, max_embeds: usize, window: std::time::Duration, last_flush_at: Instant }. Methods: new(window), push_items(embeds: Vec<Embed>, files: Vec<FilePart>) -> Option<Batch> that flushes when count reaches 10 or when now - last_flush_at >= window; fn force_flush(&mut self) -> Option<Batch>. 4) Ensure attachments carry over with the batch. Acceptance: unit tests verify not exceeding 10 embeds, correct flush on window and count.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
-            "title": "Diff generation with hunk cap and attachment fallback",
-            "description": "Prefer provided patch; else compute inline diff with similar crate, cap context to 60 lines, and attach full diff if larger.",
-            "dependencies": [
-              "3.1",
-              "3.2"
-            ],
-            "details": "- Input: file path, optional provided patch, optional before/after text from data.\n- If patch provided: validate minimal structure; use as full attachment; derive inline snippet by truncating to <=60 lines with hunk headers.\n- Else compute diff via similar::{TextDiff,...}, generate unified-like snippet, cap total visible lines to 60.\n- Return structure: { inline_snippet (for embed using code_diff), full_attachment (Option<bytes>), truncated: bool, filename_hint }.\n- Handle large outputs gracefully; never exceed embed limits after sanitization.",
+            "title": "Cost estimator mapping and safe fallbacks",
+            "description": "Add configurable model-to-rate mapping and compute session cost from token counts.",
+            "dependencies": [],
+            "details": "Implement shared::costs: 1) struct ModelRates { input_per_token: f64, output_per_token: f64 }. 2) Configurable map: HashMap<String, ModelRates> loaded from cfg or defaults for common Claude models; allow overrides at runtime. 3) fn estimate_session_cost(model: &str, tokens_in: u32, tokens_out: u32, rates: &HashMap<String, ModelRates>) -> f64 that returns 0.0 if model unknown; round to 4 decimal places for display. 4) Integrate with assistant embed builder to show Session Cost (estimated). Acceptance: unit tests for known/unknown models and zero-safety.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
-            "title": "Embed templates and builders per event type",
-            "description": "Implement embed construction matching PRD templates and colors for all event kinds.",
+            "title": "Snapshot and boundary tests (insta) for builders and limits",
+            "description": "Create comprehensive insta snapshots and boundary tests validating builders, truncation, fences, and diffs.",
             "dependencies": [
-              "3.2",
-              "3.3",
-              "3.4",
-              "3.5",
-              "3.6",
-              "3.7"
+              "13.1",
+              "13.2",
+              "13.3",
+              "13.4",
+              "13.5",
+              "13.6",
+              "13.7"
             ],
-            "details": "- ToolUse (⚡ Bash): title with icon, fields: Command (```bash), Working Dir, Tool Count; color per PRD.\n- ToolUse (📝 Write/✏️ Edit/👁️ Read): fields: File, Summary (from data if present), Tool Count.\n- ToolResult: stdout/stderr rendered in ```text, truncate beyond ~1000 chars unless parity; produce attachment when truncated; include tool reference.\n- Assistant (💭): description trimmed to 4096; split into multiple embeds if >4096; fields: Tokens In/Out, Cost, Model.\n- Error (❌): description fenced stderr/message; field Total Errors.\n- Summary/Complete (✅): fields: Cost, Duration (if derivable), Tokens total, Tools Used; ensure final embed appearance.\n- All text through sanitize_code_block and Discord limits helpers; collect attachments for overflows and diffs.",
+            "details": "Add tests: 1) Snapshot JSON of Embed payloads for representative events (tool_use Bash; tool_use Write/Edit with and without diffs; assistant long text; tool_result error; completion). 2) Boundary tests: field count never exceeds 25; description <= 4096; field values <= 1024; message content (if used) <= 2000. 3) Truncation markers: verify presence of note \"(truncated)\" when applied. 4) Fence closure: no unclosed fences; code blocks remain intact even with backtick runs. 5) Diff tests: small, medium, large patches; inline hunks within ~50 lines; large diffs attach full version and mark is_truncated. 6) Attachment linkage: verify attachment:// references and size summary fields. 7) Batching tests: verify flush at 10 embeds and on time window. DoD: all tests green, snapshots stable.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 9,
-            "title": "Batching, idle flush, and attachment aggregation",
-            "description": "Collect embeds into batches, flush on size or 250ms idle, and aggregate attachments for oversized content.",
+            "title": "Security tests: mention neutralization and ANSI stripping",
+            "description": "Ensure no accidental mentions or terminal escapes slip through embeds and fields.",
             "dependencies": [
-              "3.8",
-              "3.5"
+              "13.1",
+              "13.2",
+              "13.3",
+              "13.5"
             ],
-            "details": "- Queue builder outputs; flush when queue.len()==batch_size or idle_timer==250ms.\n- While flushing, split embeds into groups of <=10; attach per-group attachments; ensure message content stays <=2000.\n- Preserve event order; do not interleave different runs (if applicable) within a batch.\n- Provide backpressure-safe async interface; ready for webhook posting later.\n- Emit metrics hooks (counts/bytes) placeholders for Task 10.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 10,
-            "title": "Comprehensive tests: parsing, limits, diffs, parity",
-            "description": "Add unit/property tests covering parser resilience, boundary truncation, diff correctness, batching, and parity pass-through.",
-            "dependencies": [
-              "3.1",
-              "3.2",
-              "3.3",
-              "3.4",
-              "3.5",
-              "3.6",
-              "3.7",
-              "3.8",
-              "3.9"
-            ],
-            "details": "- Parsing: sample JSONL for each event; fuzz malformed lines; ensure graceful skip with logs.\n- Limits: inputs at 2000/4096/25/10 boundaries; verify trimming without panic and attachment generation when over.\n- Code fences: strings containing triple backticks and unbalanced fences; ensure sanitized output renders correctly.\n- Diffs: validate 60-line cap, inline snippet format, and attachment fallback; parity mode disables soft caps.\n- Filters: includeTools/patterns/minStdoutLength matrix; ensure correct inclusion/exclusion.\n- Batching: size and idle flush behavior; embed splitting into <=10 per message; attachment aggregation.\n- Snapshot tests for embed JSON to catch regressions.",
+            "details": "Add tests to validate: 1) allowed_mentions is none on all payloads (no users, roles, everyone). 2) Strings containing @everyone, @here, and <@id> do not trigger mentions (either blocked by allowed_mentions or neutralized in non-code fields). 3) ANSI escape sequences in tool outputs are stripped by strip_ansi before embedding and do not render styled text. 4) Zero-width character handling: input containing ZWSP or ZWNJ cannot be used to craft stealth mentions; sanitization preserves readability. 5) Long untrusted stderr/stdout is moved to attachments when exceeding limits, ensuring embeds remain within constraints.",
             "status": "pending",
             "testStrategy": ""
           }
         ]
       },
       {
-        "id": 4,
-        "title": "Webhook Sender with Rate Limiting, Backoff, and Attachments",
-        "description": "Implement robust Discord webhook posting with batching, 429 handling, retry_with_jitter, and file attachments.",
-        "details": "- Build a sender task with bounded mpsc channel receiving Message{embeds:Vec<Embed>, attachments:Vec<FilePart>}\n- Discord webhook endpoint: POST https://discord.com/api/v10/webhooks/{id}/{token}?wait=true (use returned message id if needed). For attachments, use multipart/form-data with files as file[0], file[1], and payload_json including embeds and attachment metadata\n- Respect 10 embeds per message; if more, split across multiple messages\n- Rate limit handling: on 429, read JSON {retry_after: seconds/ms, global}, and X-RateLimit-* headers; sleep for retry_after + jitter; also inspect X-RateLimit-Remaining to preemptively slow\n- Backoff policy: exponential with decorrelated jitter; max backoff 10s; cap retries per message (e.g., 5) then DLQ/log\n- Network resiliency: timeouts (connect 2s, total 10s), retries on 5xx/timeout; idempotency not required for webhook\n- Pseudo-code:\n  loop { msg = rx.recv().await; let chunks = chunk_embeds(msg.embeds, 10); for c in chunks { let res = post_webhook(c, msg.attachments).await; match res { Ok => continue, Err(RateLimit{retry_after})=>sleep(retry_after+jitter), Err(e)=>retry/backoff } } }\n- Ensure sender doesn’t block parser: channel size tuning; drop oldest attachments if pressure high and log warning\n",
-        "testStrategy": "- Mock Discord API with test server returning 429 and X-RateLimit-*; assert sender obeys retry_after\n- Test multipart payload correctness; verify attachments arrive in a real Discord test channel (manual/integration)\n- Stress test with 1000 embeds over 60s to ensure batching and throughput; no ordering issues\n- Chaos tests: inject timeouts, DNS failures; confirm retries and no panics",
+        "id": 14,
+        "title": "Discord Webhook Client with Rate Limiting, Backoff, and Attachments",
+        "description": "Post batched embeds via channel-scoped webhook, respecting Discord limits and handling 429 responses with proper backoff. Support attachments for large outputs.",
+        "details": "- Implement shared::webhook::Client using reqwest with connect pool, gzip enabled, and timeout sensible defaults.\n- API:\n  - send_batch(webhook_url:&str, batch:Batch) -> Result<()>\n  - queue + worker: an mpsc channel to buffer BatchItems; worker aggregates to ≤10 embeds per request, flushes on size or time (e.g., 250ms) for near-real-time.\n- Rate limit handling:\n  - On 429, parse headers: Retry-After or X-RateLimit-Reset-After; sleep accordingly; requeue with jitter. Honor route-specific rate limit for webhooks.\n  - Backoff with exponential + jitter on 5xx; cap retries.\n- Multipart for attachments: use files[] name, attach via payload_json referencing attachments with attachment://.\n- Enforce content limits pre-send to avoid rejections.\n- Disable mentions: allowed_mentions: { parse: [] }.\n- Telemetry: logs for 2xx/4xx/5xx; counters for retries; latency histograms.\n- Pseudo-code:\n  loop { batch=collect_up_to(10, 250ms); let res=post(webhook_url, batch).await; match res.status { 2xx=>ok, 429=>sleep(retry_after); requeue(batch); 5xx=>retry_with_backoff(batch); 4xx=>log and drop } }",
+        "testStrategy": "- Wiremock server to emulate Discord webhook. Scenarios:\n  - 200 with embeds and attachments -> assert payload structure.\n  - 429 with Retry-After header -> assert delay and retry once.\n  - 5xx transient -> retries with backoff then success.\n  - Payload exceeding limits -> ensure truncated before send.\n- Concurrency test: multiple quick batches coalesce up to 10 embeds.\n- Measure end-to-end post latency remains < network limits.",
         "priority": "medium",
-        "dependencies": [
-          3
-        ],
-        "status": "pending",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Bounded Message Queue and Sender Task Skeleton",
-            "description": "Create a bounded mpsc channel and a dedicated async sender task to consume Message items and drive webhook posting.",
-            "dependencies": [],
-            "details": "Implement in Rust with tokio. Define core types: struct Message { embeds: Vec<Embed>, attachments: Vec<FilePart> }. FilePart { filename: String, bytes: bytes::Bytes, content_type: Option<String>, description: Option<String> }. Build tokio::sync::mpsc::channel(capacity from config, e.g., WEBHOOK_QUEUE_CAP default 100). Expose enqueue API that uses try_send where possible. Spawn a sender task: loop { if let Some(msg) = rx.recv().await { process_message(msg).await } }. process_message will chunk embeds and post via post_webhook. Wire webhook URL: https://discord.com/api/v10/webhooks/{id}/{token}?wait=true and build a reqwest::Client once and reuse. Add tracing logs for enqueue/dequeue and message ids returned (if used).",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Embed Chunking (≤10 per request)",
-            "description": "Implement utility to split embeds into chunks of up to 10 for Discord webhook limits.",
-            "dependencies": [
-              "4.1"
-            ],
-            "details": "Provide fn chunk_embeds(embeds: Vec<Embed>, max_per: usize) -> Vec<Vec<Embed>> with max_per default 10. Preserve order; return contiguous chunks; handle empty list. In the sender loop: let chunks = chunk_embeds(msg.embeds, 10); for each chunk, call post_webhook(chunk, msg.attachments.clone()). Keep attachments unchanged per chunk per the pseudocode. Unit test: 0, 1..9, 10, 11, 20 embeds produce expected chunk counts and sizes.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Multipart Builder for Attachments and payload_json",
-            "description": "Build multipart/form-data bodies with files as file[n] and payload_json containing embeds and attachment metadata.",
-            "dependencies": [
-              "4.2"
-            ],
-            "details": "Implement fn build_multipart(chunk: &[Embed], attachments: &[FilePart]) -> reqwest::multipart::Form. For each attachment i: add part named format!(\"file[{}]\", i) (per requirement) with Part::bytes(bytes.clone()).file_name(filename).mime_str(content_type or application/octet-stream). Build payload_json as a JSON string field: { \"embeds\": [..], \"attachments\": [{\"id\": i, \"filename\": filename, \"description\": optional}] }. Add .text(\"payload_json\", serde_json::to_string(&payload).unwrap()). In post_webhook, send POST to ...?wait=true with this Form. Parse success JSON to capture returned message id (string) if needed for logging. Validate that when attachments are empty, still send payload_json without files.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Rate Limit Handling (429 + X-RateLimit-* preemption)",
-            "description": "On 429, honor retry_after plus jitter; use X-RateLimit-* headers to preempt when remaining is 0.",
-            "dependencies": [
-              "4.3"
-            ],
-            "details": "Extend post_webhook to inspect responses: if status==429, parse body JSON { retry_after: number, global: bool }. Prefer X-RateLimit-Reset-After header (seconds.fraction) when present; else use retry_after (which may be seconds or ms per upstream; if >1000, treat as ms). Sleep for computed delay + small jitter (random 0..250ms). If global==true, apply a shared rate_limit_until Instant for all requests. Preemptive slow path: if X-RateLimit-Remaining==\"0\" and Reset-After present on a non-429 response, sleep Reset-After + jitter before next request in this sender. Track bucket key by URL (single webhook) and serialize sends accordingly.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Retry Policy with Decorrelated Jitter and Caps",
-            "description": "Implement transient error retries using decorrelated jitter, with max 10s backoff and max 5 attempts per chunk.",
-            "dependencies": [
-              "4.4"
-            ],
-            "details": "Adopt the decorrelated jitter algorithm (AWS). Parameters: base=250ms, max_backoff=10s, attempts_max=5. Pseudocode: sleep = base; for attempt in 1..=attempts_max { let delay = min(max_backoff, rand(base..(sleep*3))); sleep = delay; wait(delay); try request; on success break }. Integrate with 429 handling: if 429, always sleep retry_after(+jitter) and count toward attempts. Retry on 5xx and timeouts; do not retry on non-429 4xx (400/401/403/404/413/415, etc.)—treat as permanent. On exhaust, DLQ/log: emit tracing::error with summary (embed count, attachment names) and store to an optional dead-letter channel/file if configured.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "HTTP Client Timeouts and Transient Error Mapping",
-            "description": "Configure reqwest client timeouts and map timeouts/5xx to retryable errors.",
-            "dependencies": [
-              "4.5"
-            ],
-            "details": "Create a single reqwest::Client with .connect_timeout(Duration::from_secs(2)) and .timeout(Duration::from_secs(10)). Set a descriptive User-Agent. Implement fn post_webhook(chunk, attachments) -> Result<ResponseOk, PostError>. Map reqwest timeouts (is_timeout()) and network errors to PostError::Transient. Map HTTP 5xx to Transient; 429 to RateLimited{retry_after, global, headers}; other 4xx to Permanent. Ensure response body parsing is resilient with its own small timeout; log bodies for 4xx (without leaking large payloads).",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 7,
-            "title": "Backpressure Policy: Drop-Oldest Attachments with Logging",
-            "description": "Implement a pressure policy so the sender never blocks the parser: when pressure is high, drop oldest attachments and warn.",
-            "dependencies": [
-              "4.1",
-              "4.6"
-            ],
-            "details": "Introduce an intermediate bounded VecDeque<Message> buffer in front of the mpsc::Sender to implement custom pressure control. Producer enqueues into the deque; a background mover task drains the deque into the mpsc channel (try_send with yield). When deque length exceeds a high-water mark (configurable, default 2x channel capacity) or when try_send persistently fails, apply shedding: iterate from front and remove attachments (set msg.attachments = vec![]) on the oldest messages first until under threshold. Log tracing::warn with counts and filenames dropped; increment a metric counter. Never drop embeds. Ensure all operations are non-blocking (use async Mutex for the deque) and document the degradation policy.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 8,
-            "title": "Test Harness: Mock Discord Server and Stress Tests",
-            "description": "Build a mock server to validate 429 handling, X-RateLimit preemption, and multipart correctness; add stress tests.",
-            "dependencies": [
-              "4.1",
-              "4.2",
-              "4.3",
-              "4.4",
-              "4.5",
-              "4.6",
-              "4.7"
-            ],
-            "details": "Use axum or wiremock to stand up a local HTTP server emulating Discord endpoints. Tests: (1) 429 path returns {retry_after: 1.5, global:false} with X-RateLimit-*; assert client delays ≈1.5s + jitter before retry. (2) Preemptive RL: respond with X-RateLimit-Remaining: 0 and X-RateLimit-Reset-After: 0.75; assert next send sleeps that long. (3) Multipart verification: inspect incoming multipart parts to ensure file[0], file[1], and payload_json exist; payload_json embeds and attachments metadata ids/filenames match files. (4) Transient 5xx then 200: verify decorrelated jitter backoff caps at 10s and attempts ≤5. (5) Timeout: delay server beyond 10s to trigger client timeout and retry. (6) Stress: enqueue 1000 embeds over 60s; assert requests == ceil(1000/10); no panics; throughput and no starvation. (7) Backpressure: simulate slow server; fill buffers; assert oldest attachments are dropped and warnings emitted. Optionally include a manual integration test against a real Discord test webhook (behind feature flag).",
-            "status": "pending",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 5,
-        "title": "Statistics Aggregation and Final Summary Embed",
-        "description": "Track tokens, estimated cost, tools used, errors, duration; emit a final ✅ summary embed on completion or end-of-stream.",
-        "details": "- Maintain a Stats struct updated per event:\n  struct Stats { tokens_in:u64, tokens_out:u64, est_cost:f64, tool_counts:HashMap<String,u64>, error_count:u64, started_at:Instant, model:Option<String> }\n- Cost estimation: configurable per-model $/1K tokens; default table in config (overrideable) e.g., {\"claude-3.5-sonnet\":{\"input\":3.0,\"output\":15.0}}; compute cost = in/1000*input + out/1000*output; avoid vendor lock-in by making this config-driven\n- Increment tool_counts on tool_use; error_count on error/tool_result stderr non-empty\n- On Summary or when tail ends, build the ✅ Complete embed with fields: Cost, Duration, Tokens (total/in/out), Tools Used (aggregated), Model; color=0x27AE60\n- Include footer with runId/shortId and timestamps\n- Pseudo-code:\n  on_event(ev){ stats.update(ev); if matches Summary|Completion { let embeds = build_summary(stats); tx.send(embeds).await; } }\n",
-        "testStrategy": "- Unit tests for aggregation math including rounding; verify cost matches config tables\n- Test tools/error counting with mixed events\n- Simulate premature end-of-stream without explicit summary; ensure finalizer emits summary on drop\n- Snapshot test of final embed fields/formatting",
-        "priority": "medium",
-        "dependencies": [
-          3,
-          4
-        ],
-        "status": "pending",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Stats struct and per-event update logic",
-            "description": "Define a Stats aggregate and implement incremental update logic for all relevant stream events.",
-            "dependencies": [],
-            "details": "- Data model: struct Stats { tokens_in: u64, tokens_out: u64, est_cost: f64, tool_counts: HashMap<String,u64>, error_count: u64, started_at: Instant, model: Option<String> }\n- API: Stats::new(started_at: Instant, model: Option<String>) -> Self; Stats::apply_event(&mut self, ev: EventRef);\n- Event mapping (non-exhaustive):\n  - ModelSelected(name) -> set self.model = Some(name)\n  - TokensIn(n) -> self.tokens_in = self.tokens_in.saturating_add(n)\n  - TokensOut(n) -> self.tokens_out = self.tokens_out.saturating_add(n)\n  - ToolUse { name } -> increment tool_counts[name]\n  - ToolResult { name, stderr } -> increment tool_counts[name] if desired (count attempts on ToolUse; see subtask 3); if stderr not empty increment error_count\n  - Error { .. } -> increment error_count\n  - Summary | Completion | StreamEnd -> no direct stat change; finalizer will react\n- Helpers: Stats::total_tokens() -> u64; Stats::duration(now: Instant) -> Duration\n- Safety: use saturating arithmetic for u64; ignore negative/invalid token deltas; tolerate missing fields.\n- Keep est_cost updated by calling a provided estimator (subtask 2) after token changes.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Config-driven cost estimation with rounding policy",
-            "description": "Implement per-model input/output $/1K token rates loaded from config and compute estimated cost.",
-            "dependencies": [
-              "5.1"
-            ],
-            "details": "- Config shape (overrideable): { \"pricing\": { \"claude-3.5-sonnet\": { \"input\": 3.0, \"output\": 15.0 }, \"default\": { \"input\": 0.0, \"output\": 0.0 } } }\n- API: CostTable::from_config(cfg) -> Self; CostTable::estimate(model: Option<&str>, in_tokens: u64, out_tokens: u64) -> f64\n- Formula: cost = (in_tokens as f64 / 1000.0) * input_rate + (out_tokens as f64 / 1000.0) * output_rate\n- Model lookup: exact match -> rates; else fall back to \"default\" if present; else use zeros and log a warning.\n- Precision policy: store full-precision f64 in Stats.est_cost; presentation rounding occurs in embed (subtask 4). For tests, allow tolerance 1e-9.\n- Thread-safety: CostTable is Arc<CostTable> sharable; estimation is pure and lock-free.\n- Integrate: Stats::apply_event calls estimator after any token delta to refresh est_cost.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Tool usage aggregation and error counting rules",
-            "description": "Define consistent rules for counting tool invocations and errors across event types and implement them in Stats updates.",
-            "dependencies": [
-              "5.1"
-            ],
-            "details": "- Tool counting:\n  - On ToolUse { name }: increment tool_counts[name] by 1 (counts attempts, including retries)\n  - On ToolResult { name }: do not increment tool_counts (avoids double count), unless ToolUse is absent in the stream (then increment defensively if needed)\n- Error counting:\n  - Increment error_count on any Error event\n  - Increment on ToolResult if stderr is non-empty or status indicates failure\n  - Optionally treat events with level=\"error\" as errors\n- Normalization: trim and lowercase tool names for map keys; keep original case only for display aggregation if desired.\n- Idempotency: avoid double-incrementing on duplicate/replayed events by relying on event semantics (no de-dup here) and tests to verify expected counts.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Summary embed builder",
-            "description": "Build the ✅ completion embed from Stats with required fields, colors, and footer metadata.",
-            "dependencies": [
-              "5.1",
-              "5.2",
-              "5.3"
-            ],
-            "details": "- API: build_summary_embed(stats: &Stats, run_id: &str, short_id: &str, finished_at: SystemTime) -> Embed\n- Formatting:\n  - Title: \"✅ Run Complete\"\n  - Color: 0x27AE60\n  - Fields:\n    - Cost: render as USD rounded to 4 decimals (e.g., \"$0.0123\"); also include rate source if useful\n    - Duration: humanized (e.g., \"1m 23.456s\"), rounded to milliseconds\n    - Tokens: \"total=XYZ (in=A, out=B)\"\n    - Tools Used: aggregated \"name×count\" comma-separated; render \"—\" if none\n    - Model: model name or \"unknown\"\n  - Footer: text \"runId:<run_id> • shortId:<short_id> • started:<iso8601>\"; set embed timestamp to finished_at\n- Robustness: cap field lengths to Discord limits; truncate Tools field if too long and add \"+N more\" suffix.\n- Output type: compatible with webhook sender (existing Embed struct in project).",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Finalizer guard for Summary or end-of-stream emission",
-            "description": "Emit the summary embed on Summary/Completion event or on drop/end-of-stream to handle premature termination.",
-            "dependencies": [
-              "5.1",
-              "5.2",
-              "5.3",
-              "5.4"
-            ],
-            "details": "- Design: SummaryFinalizer holds Arc<Mutex<Stats>>, tx: Sender<Embed>, run_id, short_id, and an AtomicBool sent flag.\n- API:\n  - on_event(ev): update stats (delegates to Stats::apply_event); if ev matches Summary|Completion, call maybe_emit(now)\n  - maybe_emit(now): if sent.swap(true) == false, build embed via build_summary_embed and tx.send(embed).await (or try_send with retry policy)\n  - Drop: if not sent, call maybe_emit(now) to ensure EOS emission\n- Concurrency:\n  - Make maybe_emit idempotent; guard against double-send under race (multiple Summary events or Drop + event)\n  - Handle channel closed gracefully (log, no panic)\n- Integration: wire into the event processing loop so all events pass through finalizer.\n- Time sources: started_at from Stats; finished_at is now at emission for timestamp and duration.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "Tests: aggregation math, finalization, and embed snapshot",
-            "description": "Comprehensive unit/integration tests for math correctness, lifecycle finalization, and embed rendering.",
-            "dependencies": [
-              "5.1",
-              "5.2",
-              "5.3",
-              "5.4",
-              "5.5"
-            ],
-            "details": "- Math tests:\n  - Given pricing table and known in/out tokens, assert estimated cost matches formula within tolerance and rounds to 4 decimals in embed\n  - Verify token totals and duration formatting boundaries (sub-second, multi-hour)\n  - Unknown model fallback behavior\n- Tool/error tests:\n  - Mixed ToolUse/ToolResult with stderr cases; verify counts and error_count rules\n- Finalization tests:\n  - Summary event triggers exactly one embed\n  - Premature end-of-stream (no Summary) -> Drop emits embed exactly once\n  - Race: multiple Summary events + Drop do not double-send\n- Snapshot tests:\n  - Use insta (or similar) to snapshot embed JSON for stable fields/formatting (title, color, fields, footer)\n- Channel tests:\n  - Closed tx is handled without panic; log captured.",
-            "status": "pending",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 6,
-        "title": "Discord Bot Service: Channel Lifecycle and Webhook Provisioning",
-        "description": "Build a Discord bot that creates per-run channels in the “Agent Runs” category, provisions one webhook per run, and returns {channelId, webhookUrl}.",
-        "details": "- Tech stack: Node.js 20+, discord.js v14, fastify/express for REST API, node-fetch/axios; persistent store (Redis or SQLite) for run mapping and retention\n- Bot permissions: Manage Channels, Manage Webhooks, Read/Send Messages, Create Public Threads (optional)\n- REST endpoints:\n  - POST /runs {taskId, attempt, shortId, guildId, categoryName=\"Agent Runs\", retentionHours, bridgeUrl?, bridgeToken?} -> creates channel name run-{taskId}-{attempt}-{shortId} under category; creates webhook via POST /channels/{channel.id}/webhooks; stores mapping {runId, channelId, webhookId, webhookToken, expiresAt, bridgeUrl?, bridgeToken?}; returns {channelId, webhookUrl}\n  - POST /runs/{runId}/archive -> archive/move channel to “Archived Runs” or delete\n- Channel/category logic: find or create category by name\n- Security: bot token remains server-side only; do not emit to pods. Webhook URL is scoped per-channel\n- Rate limits: discord.js handles major RL; still respect retry_after in REST\n- Pseudo-code create:\n  const cat = findOrCreateCategory(guild, \"Agent Runs\");\n  const ch = await guild.channels.create({ name, parent: cat.id, type: 0 });\n  const hook = await ch.createWebhook({ name: `run-${shortId}` });\n  save({runId, ch.id, hook.id, hook.token, retention});\n  return { channelId: ch.id, webhookUrl: `https://discord.com/api/v10/webhooks/${hook.id}/${hook.token}` };\n- Post initial header embed via webhook with run metadata\n- Retention worker: cron job to archive/delete after TTL\n",
-        "testStrategy": "- Integration test against a Discord test guild: create, verify channel in category, verify webhook works, then cleanup\n- Unit tests for naming collisions and idempotency (same runId returns existing channel)\n- Retention test: advance time and ensure archive/delete occurs\n- Security check: ensure webhook URL is the only value exposed to pods",
-        "priority": "medium",
-        "dependencies": [
-          4
-        ],
-        "status": "pending",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "REST API scaffold with Fastify and auth",
-            "description": "Initialize Fastify REST server with config, JSON schema validation, and API key authentication.",
-            "dependencies": [],
-            "details": "- Stack: Node.js 20+, Fastify, dotenv/config. Add structured logging.\n- Config: DISCORD_BOT_TOKEN (server-only), API_KEY, DEFAULT_CATEGORY=\"Agent Runs\", ARCHIVE_CATEGORY=\"Archived Runs\", TEST_GUILD_ID?, STORAGE_BACKEND=redis|sqlite.\n- Security: never log or expose DISCORD_BOT_TOKEN; keep it on the server only, not emitted to pods or clients.\n- Middleware: API key auth via header (e.g., Authorization: Bearer <API_KEY>), request body validation via Fastify schemas.\n- Endpoints scaffold: POST /runs, POST /runs/:runId/archive, GET /healthz.\n- Error handling: consistent error envelope with HTTP codes and safe messages.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Discord client initialization and permission checks",
-            "description": "Set up discord.js v14 client, log in, and verify required permissions on target guilds.",
-            "dependencies": [
-              "6.1"
-            ],
-            "details": "- Initialize Client with minimal intents (Guilds) sufficient for channel/webhook management.\n- On ready: validate bot permissions on specified guild(s): Manage Channels, Manage Webhooks, Read/Send Messages.\n- Build utility to fetch guild by ID; fail fast if missing perms.\n- Add graceful shutdown (SIGINT/SIGTERM) to destroy client.\n- Security: never expose token in logs; redact sensitive headers.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Persistence layer and run schema with TTL",
-            "description": "Implement storage abstraction (Redis or SQLite) for run mapping, TTL, and status.",
-            "dependencies": [
-              "6.1"
-            ],
-            "details": "- Storage selector: Redis client with TTL (EXPIRE) or SQLite (better-sqlite3/knex) with schema + cron cleanup.\n- Schema Run: { runId (pk), taskId, attempt, shortId, guildId, categoryId, channelId, webhookId, webhookToken, bridgeUrl?, bridgeToken?, createdAt, expiresAt, status: active|archived|deleted }.\n- Indices: unique(runId), index(channelId), index(expiresAt).\n- API: getByRunId(runId), getByChannelName/guild, upsertRun(run), markArchived(runId), markDeleted(runId), dueForRetention(now), with transactional/idempotent semantics.\n- Concurrency: unique constraints to prevent duplicate runs; retries on conflict.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Guild category discovery/creation utilities",
-            "description": "Implement find-or-create for categories: Agent Runs and Archived Runs.",
-            "dependencies": [
-              "6.2"
-            ],
-            "details": "- Function: findOrCreateCategory(guild, name): search by name (type: GuildCategory), create if not found; return categoryId.\n- Handle optional categoryName override from request; default to config.\n- Cache category IDs per guild for short TTL to reduce API calls.\n- Error mapping: permission issues -> clear 403 for API layer.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Deterministic channel creation and idempotency",
-            "description": "Create per-run text channels with deterministic naming and ensure idempotent behavior.",
-            "dependencies": [
-              "6.3",
-              "6.4"
-            ],
-            "details": "- Name format: run-{taskId}-{attempt}-{shortId}; sanitize to [a-z0-9-], max 100 chars; collapse dashes.\n- Derive runId = `${taskId}:${attempt}:${shortId}`; if run exists in storage, return existing {channelId}.\n- If not exists: create channel under category with type 0 (text) and proper topic metadata.\n- Handle race: use storage unique(runId) to prevent dupes; on create conflict, fetch stored mapping and return it.\n- Store mapping (run -> channel) with expiresAt = now + retentionHours.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "Webhook provisioning and initial header embed",
-            "description": "Create a per-run webhook, store credentials, construct URL, and post initial metadata embed.",
-            "dependencies": [
-              "6.5"
-            ],
-            "details": "- Create webhook on the channel with name `run-{shortId}`; store {webhookId, webhookToken}.\n- Construct webhookUrl: https://discord.com/api/v10/webhooks/{webhookId}/{webhookToken}.\n- Post initial header embed via webhook with run metadata: taskId, attempt, shortId, runId, retention, timestamp, optional bridge presence.\n- Respect Discord limits: 1 embed initially, <= 6000 chars; redact secrets.\n- Update persistence with webhook info.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 7,
-            "title": "Rate limit and retry utilities",
-            "description": "Add centralized wrappers to respect Discord REST rate limits and retry_after semantics.",
-            "dependencies": [
-              "6.2"
-            ],
-            "details": "- Wrap REST calls not covered by discord.js convenience methods (e.g., webhook POSTs) to handle 429 JSON retry_after and X-RateLimit-* headers.\n- Implement exponential backoff with jitter, max retries, and idempotent safeguards.\n- Log RL events with correlation IDs; surface retry-after to callers when appropriate.\n- Integrate wrappers into channel/webhook/create and embed posting paths.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 8,
-            "title": "Retention worker (cron) to archive/delete",
-            "description": "Implement scheduled job to enforce TTL by archiving/moving or deleting run channels.",
-            "dependencies": [
-              "6.3",
-              "6.4",
-              "6.7"
-            ],
-            "details": "- Scheduler: node-cron or setInterval; runs every N minutes.\n- Query storage for dueForRetention(now): for each run, either move channel to Archived Runs category or delete per policy.\n- Use rate-limit wrappers; handle missing channels/webhooks gracefully; update status archived|deleted.\n- Ensure idempotency: safe to retry; skip if already archived/deleted.\n- Audit log actions; do not expose secrets.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 9,
-            "title": "End-to-end and unit tests (create/idempotency/webhook/retention)",
-            "description": "Write tests against a Discord test guild plus unit tests for naming/idempotency and retention.",
-            "dependencies": [
-              "6.1",
-              "6.2",
-              "6.3",
-              "6.4",
-              "6.5",
-              "6.6",
-              "6.7",
-              "6.8"
-            ],
-            "details": "- E2E: create run via POST /runs; assert channel under category, webhook URL works (send test message), returns {channelId, webhookUrl}. Cleanup: archive/delete.\n- Idempotency: same payload twice returns same resources.\n- Retention: set short TTL; wait/advance time; assert archive/delete and status updated.\n- RL: simulate 429 (mock or burst) to validate retry behavior.\n- Security: ensure API never returns bot token or secrets; only channelId and webhookUrl.",
-            "status": "pending",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 7,
-        "title": "Pod-local Input Bridge (Sidecar HTTP → Agent FIFO/stdin)",
-        "description": "Implement an optional HTTP bridge in the sidecar that accepts JSON POST /input and writes streaming JSONL to agent FIFO/stdin without blocking the agent.",
-        "details": "- Add an axum server in the Rust sidecar, listening on 0.0.0.0:8088 (configurable), with route POST /input; disabled by default via config\n- Request payload schema: { runId: string, channelId: string, userId: string, username: string, content: string, timestamp: string, token?: string }\n- Security: require a shared per-run token (HMAC or random) set by bot on /runs; reject if missing/invalid; optionally restrict to cluster network via NetworkPolicy (K8s)\n- Writing to agent: support two modes via config: FIFO path (AGENT_INPUT_FIFO) or inherit agent stdin (file descriptor). Implement non-blocking open on FIFO and spawn a writer task with bounded queue; write one line per message as compact JSON followed by newline\n- Backpressure: if agent not reading, buffer up to N messages (config); drop-oldest with warning beyond that to avoid deadlock\n- Pseudo-code handler:\n  async fn input(Json(msg)): -> Status { if !auth(msg.token) || !validate_channel(msg.channelId) { return 403 }\n    let line = serde_json::to_string(&msg)? + \"\\n\"; input_tx.try_send(line).map_err(|_| 503)?; 202 }\n- Observability: counters for messages forwarded, dropped, bytes written\n",
-        "testStrategy": "- Unit tests for auth token validation and schema validation\n- Integration test: create a temp FIFO, start reader, POST to /input, assert line arrives intact\n- Load test: 100 msgs/sec for 10s; verify no deadlocks and bounded memory\n- Failure test: reader paused; verify backpressure and drop policy works as configured",
-        "priority": "medium",
-        "dependencies": [
-          1
-        ],
+        "dependencies": [],
         "status": "pending",
         "subtasks": []
       },
       {
-        "id": 8,
-        "title": "Bot Message Forwarding and Cross-run Validation",
-        "description": "Extend the bot to forward messages from the run’s channel to the pod-local bridge with strict run/channel mapping validation.",
-        "details": "- Listen to MESSAGE_CREATE events in discord.js; only accept messages from channels registered for runs and ignore bot/self messages\n- Validation: map channelId -> runId; ensure message.channelId matches stored runId; prevent cross-run injection by refusing DMs or other channels\n- Payload build: { runId, channelId, userId, username, content, timestamp, token } where token is the per-run secret stored by the bot\n- Forward via HTTP POST to bridgeUrl with timeouts and retry on 5xx; exponential backoff; log failures\n- Slash commands (optional future): register /note and /input; for MVP, plain text messages only; respond with ephemeral ack via reply in channel if forwarding succeeded/failed\n- Respect content size; truncate if >4k chars and include a note; attachments: include URLs/filenames in payload array\n- Pseudo-code:\n  client.on('messageCreate', async (m)=>{ const run = runsByChannel.get(m.channel.id); if(!run) return; const body = {runId: run.id, channelId: m.channel.id, userId: m.author.id, username: m.author.username, content: m.content, timestamp: m.createdAt, token: run.bridgeToken}; await fetch(run.bridgeUrl+'/input',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); });\n",
-        "testStrategy": "- Unit tests: messages in non-run channels are ignored; run channel messages are forwarded\n- Integration test with local bridge server: verify payload schema and auth token\n- Error handling test: simulate bridge 500/timeout and ensure retries with backoff and user feedback\n- Security test: attempt spoofed channelId in payload (should not be possible as bot constructs payload); ensure mapping prevents cross-run injection",
+        "id": 15,
+        "title": "Watcher Binary Integration and Pipeline Orchestration",
+        "description": "Wire tailer, formatter, and webhook client into a low-overhead sidecar binary with config, initial header embed, final summary, health checks, and parity-mode.",
+        "details": "- CLI/env via clap + env vars:\n  - DISCORD_WEBHOOK_URL (required), WORKSPACE_PATH, POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE=false, FILTERS (JSON), COST_RATES (JSON), LOG_LEVEL.\n- Startup: resolve transcript path (block/retry until present). Post initial header embed including run metadata (taskId, attempt, shortId if available from env), model (if first event has it), timestamps.\n- Pipeline:\n  - tailer_rx -> formatter -> batch_queue -> webhook_client.\n  - Maintain Stats {tokens_in/out, tools_used, errors, start_ts} updated per event.\n- Finalization: on Completion event or tail idle timeout + EOF, post ✅ Complete embed with totals, cost, duration; revoke webhook optional by notifying bot endpoint if configured.\n- Health: expose /healthz with Axum returning 200 if tailer alive and webhook reachable lately; /metrics optional.\n- Performance: use Tokio current_thread in watcher if single-thread suffices; pin poll interval; reuse buffers; set reqwest client reuse.\n- Pseudo-code:\n  let cfg=load_cfg();\n  post_header(&cfg.webhook);\n  while let Some(ev)=rx.recv().await { let items=to_embeds(ev,&mut stats,&cfg); batch_tx.send(items).await; }\n  post_completion(stats);\n",
+        "testStrategy": "- End-to-end with a temp JSONL file and wiremock webhook: simulate run with all event types; assert initial header and final summary posted.\n- Failure modes: webhook unavailable initially -> retries; file appears late -> pipeline recovers.\n- Parity-mode test: ensure no filtering and minimal truncation.\n- Resource checks: run under /usr/bin/time; verify CPU <1% average and RSS <64Mi for synthetic stream.",
         "priority": "medium",
-        "dependencies": [
-          6,
-          7
-        ],
+        "dependencies": [],
         "status": "pending",
         "subtasks": [
           {
             "id": 1,
-            "title": "Implement messageCreate listener and base filters",
-            "description": "Add a discord.js v14 client.on('messageCreate') handler and filter out ineligible messages.",
+            "title": "CLI and environment config loader",
+            "description": "Implement clap + env config loader with validation, defaults, and a central Config struct.",
             "dependencies": [],
-            "details": "Scope: Listen to MESSAGE_CREATE and immediately ignore messages from bots/webhooks/self, system messages, and DMs. Ensure channel is a guild text channel or thread under a run channel if desired policy, but do not accept DMs. Prepare a safe message envelope (author, channelId, guildId, timestamps) to pass downstream.\nImplementation notes:\n- Check m.author?.bot, m.webhookId, m.system\n- Reject if !m.guildId (DM) or channel is not text-based\n- Do not mutate or reply here; simply emit to the next stage if eligible\n- Add structured logging for ignored cases for observability",
+            "details": "- Use clap with env var fallbacks to populate Config.\n- Supported env/flags: DISCORD_WEBHOOK_URL (required, URL), WORKSPACE_PATH (optional), POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE (default false), FILTERS (JSON), COST_RATES (JSON), LOG_LEVEL (default info), HTTP_ADDR (optional, e.g., 127.0.0.1:8080), WEBHOOK_REVOKE_URL (optional URL).\n- Validate: webhook URL non-empty and valid; POLL_INTERVAL_MS > 0; BATCH_SIZE >= 1; JSON fields parse to expected types.\n- Parse FILTERS and COST_RATES into typed structs (serde). COST_RATES should map model names to per-token cost for prompt/completion.\n- Include run metadata sources: TASK_ID, ATTEMPT, SHORT_ID from env if present.\n- Initialize tracing with LOG_LEVEL.\n- Construct a single reqwest::Client with connection reuse, keepalive, pooled DNS; expose in Config or Context.\n- Unit tests for defaults, invalid/missing values, and JSON parse errors.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 2,
-            "title": "Run/channel mapping validation layer",
-            "description": "Validate channelId → run mapping and prevent cross-run injection.",
+            "title": "Transcript path resolution with blocking retry",
+            "description": "Resolve transcript JSONL path and block with retries until the file appears.",
             "dependencies": [
-              "8.1"
+              "15.1"
             ],
-            "details": "Scope: Build/consume a runsByChannel Map<string, RunInfo> (populated by Task 6) and validate that the message.channelId is registered for a specific run. Enforce strict matching and refuse any message from unregistered channels or mismatched runs.\nImplementation notes:\n- Access runsByChannel.get(m.channel.id); if absent, return early\n- Confirm run.bridgeUrl and run.bridgeToken exist; if missing, log and ignore\n- Optionally support thread messages only if parent channel is registered (configuration-controlled)\n- Ensure no state leakage across runs; never infer run from content or username\n- Provide helper validateRunForMessage(message): RunInfo | null",
+            "details": "- Determine transcript path from WORKSPACE_PATH (e.g., <workspace>/transcript.jsonl or provided pattern); allow an override via an optional env/flag if provided.\n- Implement resolve_transcript_path() that polls at POLL_INTERVAL_MS until the file exists (and is readable), handling ENOENT gracefully.\n- Log periodic status and first success; support cancellation on shutdown signals.\n- Return a PathBuf and initial file offset for tailing.\n- Unit test: file appears late; permission error; immediate presence; cancellation.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 3,
-            "title": "Payload builder with token, truncation, and attachments",
-            "description": "Construct the JSON payload to send to the bridge with content policy and attachment references.",
+            "title": "Pipeline wiring: tailer → formatter → batching → webhook client",
+            "description": "Wire the async pipeline with channels, backpressure, retries, and performance tuning.",
             "dependencies": [
-              "8.2"
+              "15.1",
+              "15.2"
             ],
-            "details": "Scope: Build the request body { runId, channelId, userId, username, content, timestamp, token, attachments? } per schema. Handle content > 4000 chars by truncating and appending a note. Include attachment URLs and filenames.\nImplementation notes:\n- content: m.content || \"\"\n- Truncate if content.length > 4000; keep first 4000, append \" [truncated N chars]\"\n- timestamp: m.createdAt.toISOString()\n- attachments: map m.attachments to array of { name, url, size, contentType }\n- token: run.bridgeToken; NEVER log token\n- Return { body, wasTruncated } for downstream feedback",
+            "details": "- Tailer: async JSONL tail of the resolved file; non-blocking reads; emits Event items; detects EOF and idle periods; uses pinned poll interval.\n- Formatter: convert Events to Discord embeds/messages applying filters and parity-mode toggles; reuse buffers to limit allocations.\n- Batch queue: bounded mpsc; accumulate up to BATCH_SIZE or flush on time; coalesce small batches; ensure ordering.\n- Webhook client: send batches to DISCORD_WEBHOOK_URL using shared reqwest::Client; implement retry with exponential backoff and jitter; respect Discord rate limits if present.\n- Error handling: propagate fatal errors; retry transient ones; ensure backpressure does not deadlock.\n- Tokio runtime: prefer current_thread for watcher; spawn minimal tasks; pin poll interval; avoid blocking.\n- Pseudo-flow: while let Some(ev)=tailer_rx.recv() { let items=to_embeds(ev,&mut stats,&cfg); batch_tx.send(items).await; }",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 4,
-            "title": "HTTP forwarder with timeouts and exponential backoff",
-            "description": "POST payloads to run.bridgeUrl+'/input' with robust retry on 5xx/timeouts.",
+            "title": "Initial header embed posting",
+            "description": "Post the startup header embed with run metadata and optionally model from first event.",
             "dependencies": [
-              "8.3"
+              "15.1",
+              "15.3"
             ],
-            "details": "Scope: Implement forwardToBridge(run, body) with fetch/axios. Configure request timeout and retry policy with exponential backoff and jitter. Only retry on network errors/timeouts and 5xx; never on 4xx.\nImplementation notes:\n- Endpoint: `${run.bridgeUrl.replace(/\\/$/, '')}/input`\n- Headers: { 'content-type': 'application/json' }\n- Timeout: e.g., 5s per attempt (configurable)\n- Retry: maxAttempts=5, baseDelay=250ms, factor=2, jitter=±20%\n- Success: 2xx -> return ok\n- Failure: on 5xx/timeout -> retry; on 4xx -> fail fast\n- Log outcomes and final failures without sensitive data; include runId/channelId/messageId correlation IDs",
+            "details": "- Build header embed with: taskId, attempt, shortId (if present), start timestamp, workspace hint; include host/pid if desired.\n- Model inclusion strategy: if the first observed event contains model, include it; otherwise post header immediately and send a lightweight follow-up update when model is known.\n- Ensure idempotent header posting on retries; include a run correlation id to link messages.\n- Verify via wiremock that header is posted before processing bulk events.\n- Plumb webhook client from pipeline; handle transient failures with retries.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 5,
-            "title": "User feedback (ack/fail) and message lifecycle",
-            "description": "Reply in channel with success/failure and truncation notice; delete ack after short delay.",
+            "title": "Stats tracking and state updates per event",
+            "description": "Implement Stats struct and update logic for tokens/tools/errors and timings.",
             "dependencies": [
-              "8.3",
-              "8.4"
+              "15.1",
+              "15.3"
             ],
-            "details": "Scope: After forwarding, reply to the user with an ephemeral-like acknowledgement. On success: short message indicating delivered (and whether truncated). On failure: notify and suggest retry; avoid leaking internal reasons or tokens. Delete ack after N seconds.\nImplementation notes:\n- Use message.reply({ content, allowedMentions: { parse: [] } })\n- Success: \"Received and forwarded to agent.\" + \" Note: content was truncated to 4000 characters.\" if wasTruncated\n- Failure: \"Forwarding failed. Please try again shortly.\" Add correlation ID for support in logs\n- Delete ack after e.g., 5–10s if bot has Manage Messages; ignore errors\n- Ensure this behavior is disabled in DMs (already filtered) and respects channel permissions",
+            "details": "- Stats fields: tokens_in, tokens_out, tools_used (map or set with counts), errors (count and last error), start_ts, last_event_ts, batches_sent, webhook_failures.\n- Update in formatter and/or a dedicated observer per event; record tool invocations and token deltas.\n- Cost calculation: use COST_RATES to compute totals by model and overall; expose snapshot for final summary and /metrics.\n- Concurrency: wrap in Arc<Mutex> or parking_lot::Mutex; provide cheap snapshot method.\n- Unit tests: accumulation correctness, cost math by model, error increments.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 6,
-            "title": "Test suite: forwarding and cross-run validation",
-            "description": "Add unit/integration tests for filters, mapping, payload, retries, and user feedback.",
+            "title": "Completion detection and final summary post",
+            "description": "Detect completion by explicit event or idle EOF, then post ✅ summary and optional webhook revoke.",
             "dependencies": [
-              "8.1",
-              "8.2",
-              "8.3",
-              "8.4",
-              "8.5"
+              "15.3",
+              "15.4",
+              "15.5"
             ],
-            "details": "Coverage:\n- Non-run channel ignored: message in unrelated channel triggers no POST and no reply\n- Forwarding success: valid run channel posts correct payload (including attachments), ack sent\n- Retry on 5xx/timeout: simulate server errors; assert exponential backoff attempts and final outcome\n- Mapping prevents cross-run: attempts from other channels/DMs are rejected; no POST\n- Truncation policy: >4k content truncated with note; payload reflects truncated content\n- Token presence: payload includes token; ensure token never logged\n- Use mocked fetch/axios and stub discord.js message objects; add an integration test against a local test HTTP server",
-            "status": "pending",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 9,
-        "title": "Kubernetes Sidecar Template and Helm Packaging",
-        "description": "Provide K8s manifests and Helm values to deploy the watcher as a sidecar and configure bot integration, filters, and resources.",
-        "details": "- K8s sidecar container spec:\n  - image: discord-monitor:latest\n  - env: DISCORD_WEBHOOK_URL (Phase 1), WORKSPACE_PATH, POLL_INTERVAL_MS=100, BATCH_SIZE=10, PARITY_MODE, FILTERS JSON, STATS toggles, AGENT_INPUT_FIFO, BRIDGE_PORT\n  - resources: requests {cpu: 10m, memory: 32Mi}, limits {cpu: 100m, memory: 64Mi}\n  - probes: liveness/readiness on /healthz (to be added in Task 10)\n- Helm chart values matching PRD sketch under discord.monitoring.* including filters and stats\n- Template example sidecar for a Job/Pod spec: inject env from a Secret/ConfigMap; bot service returns webhookUrl which the orchestrator places into the pod env before start\n- Optional NetworkPolicy to restrict bridge endpoint to bot egress IPs or cluster internal\n- Provide chart for bot service (separate deployment + Service) with secrets (BOT_TOKEN), Redis, and retention worker CronJob\n- Documentation snippet for architecture.md and deploy steps\n",
-        "testStrategy": "- Helm template unit tests with helm unittest or chart-testing; render manifests with provided values\n- Dry-run apply in a test cluster; verify sidecar starts, envs present, and watcher can read transcript path\n- Resource verification: measure memory/CPU in a sample run to confirm limits are sufficient\n- Security review: ensure no bot token ever appears in sidecar envs or logs",
-        "priority": "medium",
-        "dependencies": [
-          1,
-          4,
-          6,
-          7
-        ],
-        "status": "pending",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Helm values schema and base library chart for watcher sidecar",
-            "description": "Create a Helm library chart that defines the values model under discord.monitoring.* to configure the watcher sidecar.",
-            "dependencies": [],
-            "details": "Deliverables:\n- Library chart name: discord-watcher-sidecar (type: library). Directory skeleton: Chart.yaml, values.yaml, values.schema.json, templates/_sidecar.tpl, templates/_helpers.tpl.\n- Values namespace: discord.monitoring.sidecar.* with defaults:\n  - image: repository, tag=discord-monitor:latest, pullPolicy\n  - env: webhookUrl: (string, optional), webhookUrlSecretRef: {name, key}, workspacePath (default: /workspace), pollIntervalMs (default: 100), batchSize (default: 10), parityMode (enum: full|parity), filters (object/JSON), stats: {enabled: bool, tokens: bool, costs: bool}\n  - bridge: {enabled: bool (default: false), port: 8088}\n  - resources: requests {cpu: 10m, memory: 32Mi}, limits {cpu: 100m, memory: 64Mi}\n  - securityContext defaults: runAsNonRoot=true, runAsUser=65532, readOnlyRootFilesystem=true, allowPrivilegeEscalation=false, capabilities.drop=[\"ALL\"]\n  - probes: {enabled: true, path: /healthz, port: 8088, initialDelaySeconds: 5, periodSeconds: 10, timeoutSeconds: 2, failureThreshold: 3, startupProbe: {enabled: true, failureThreshold: 30, periodSeconds: 5}}\n  - networkPolicy: {enabled: false, allowFromBotSelector: {namespaceSelector: {}, podSelector: {}}, allowedIngressCIDRs: [], allowedEgressCIDRs: [], restrictIngressToCluster: true}\n- values.schema.json:\n  - Types and validation for all above keys; enums for parityMode; integer ranges (pollIntervalMs >= 50, batchSize 1..50); conditionals for webhookUrl vs webhookUrlSecretRef.\n- Document mapping between values and container envs: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS, STATS_*, AGENT_INPUT_FIFO, BRIDGE_PORT.\n- Ensure no fields reference bot token; webhook URL only.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Sidecar container template with resources and securityContext",
-            "description": "Implement the reusable container spec template that consumes the values schema and sets resources and hardened securityContext.",
-            "dependencies": [
-              "9.1"
-            ],
-            "details": "Deliverables:\n- templates/_sidecar.tpl: define a Helm include that renders a complete sidecar container:\n  - name: discord-watcher\n  - image, imagePullPolicy from values\n  - env:\n    - DISCORD_WEBHOOK_URL from value or secretRef\n    - WORKSPACE_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE\n    - FILTERS (as JSON string from .Values or configMap key), STATS_* booleans\n    - AGENT_INPUT_FIFO (optional), BRIDGE_PORT (if bridge.enabled)\n  - ports: containerPort for bridge/health (name: health, port from values) exposed regardless of bridge.enabled to support probes\n  - volumeMounts: mount shared workspace volume at WORKSPACE_PATH (value-driven mountPath); do not mount any credentials except webhook secret if used\n  - resources from values defaults; allow override per workload via values\n  - securityContext per values (runAsNonRoot, readOnlyRootFilesystem, drop ALL caps, no privilege escalation)\n  - terminationMessagePolicy=FallbackToLogsOnError\n- Helper to easily inject this container into Pod/Job specs via include.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Wire liveness/readiness/startup probes to /healthz",
-            "description": "Add configurable HTTP probes on /healthz using the designated port; safe defaults anticipating Task 10 implementation.",
-            "dependencies": [
-              "9.2"
-            ],
-            "details": "Deliverables:\n- In _sidecar.tpl, conditionally render probes when .Values.discord.monitoring.sidecar.probes.enabled is true:\n  - readinessProbe: httpGet path=/healthz, port from values; initialDelaySeconds, periodSeconds, timeoutSeconds, failureThreshold from values\n  - livenessProbe: same path/port; slightly larger initialDelaySeconds if needed\n  - startupProbe: optional; enabled via values; generous failureThreshold/period to avoid flapping until /healthz is implemented in Task 10\n- Ensure the container exposes the health port even if bridge.enabled=false, so probes can bind.\n- Notes: /healthz endpoint will be implemented in Task 10; set defaults to avoid false restarts (e.g., startupProbe enabled by default).",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Secrets/Config injection and example Job/Pod templates",
-            "description": "Provide Secret/ConfigMap templates and example workload manifests demonstrating sidecar injection and env sourcing.",
-            "dependencies": [
-              "9.1",
-              "9.2",
-              "9.3"
-            ],
-            "details": "Deliverables:\n- Template(s):\n  - secret-watcher-webhook.yaml: optionally create a Secret with webhookUrl when .Values provides secretData; otherwise support referencing an existing secret via webhookUrlSecretRef\n  - configmap-watcher.yaml: optional ConfigMap to hold FILTERS JSON and STATS toggles; sidecar env can source via valueFrom configMapKeyRef\n- Example library templates:\n  - _job-with-watcher.tpl and _pod-with-watcher.tpl: show how to include the sidecar container next to an app container; mount a shared emptyDir volume at WORKSPACE_PATH for both containers\n  - Demonstrate envFrom secretRef/configMapRef for filters/stats; DISCORD_WEBHOOK_URL sourced only from Secret or direct value if orchestrator supplies it\n- Usage examples in comments for two patterns:\n  - Orchestrator sets DISCORD_WEBHOOK_URL directly in Pod env prior to start\n  - Orchestrator writes the webhook URL into a Secret which the Pod references\n- Security note: explicitly prohibit injecting BOT_TOKEN into these pods; validate in schema/docs that only webhook URL is accepted.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Optional NetworkPolicy to restrict bridge ingress",
-            "description": "Create a NetworkPolicy that limits ingress to the sidecar bridge port to bot service egress IPs or cluster-internal traffic.",
-            "dependencies": [
-              "9.1",
-              "9.2"
-            ],
-            "details": "Deliverables:\n- networkpolicy-bridge.yaml: rendered only if .Values.discord.monitoring.sidecar.bridge.enabled and .Values.discord.monitoring.sidecar.networkPolicy.enabled\n- Policy behavior:\n  - Ingress allowed to the sidecar's bridge/health port from either:\n    - namespaceSelector/podSelector matching the bot service (values: allowFromBotSelector)\n    - allowedIngressCIDRs (optional)\n    - if restrictIngressToCluster=true, allow only same-namespace traffic unless selectors override\n  - Deny all other ingress to the bridge port\n- Egress:\n  - Optionally render an egress policy allowing traffic to allowedEgressCIDRs for Discord webhook endpoints; if empty, do not render egress rules to avoid unintentionally blocking outbound webhooks\n- Label selectors: base on a stable label (e.g., app.kubernetes.io/name for the workload that includes the sidecar) with clear documentation on how to set it.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "Separate bot service chart with Redis and retention CronJob",
-            "description": "Provide a standalone Helm chart for the bot service, its secrets, optional Redis, and a retention worker CronJob.",
-            "dependencies": [
-              "9.1"
-            ],
-            "details": "Deliverables:\n- New chart: discord-bot (application chart)\n  - Deployment: bot container image, env for BOT_TOKEN (from Secret), bridge and API configs, resource and securityContext hardening\n  - Service: ClusterIP if needed (for internal diagnostics or readiness)\n  - Secret: bot-token (stringData.BOT_TOKEN), mounted only in bot pods; never referenced by watcher pods (security review)\n  - Redis: add as dependency (e.g., bitnami/redis) or lightweight StatefulSet, with values to enable/disable and to use an existing external Redis\n  - CronJob: retention worker that prunes Redis keys/channels based on retention policy in values\n  - NetworkPolicy (optional): egress to watcher bridge ports via namespace/pod selectors consistent with subtask 5\n- Values and schema:\n  - discord.bot.* including image, resources, securityContext, redis.enabled/external, retention.schedule, retention.ttl, networkPolicy settings\n- Security review:\n  - Ensure BOT_TOKEN is scoped to bot namespace and pods only\n  - Validate that watcher sidecar charts have no references to BOT_TOKEN\n  - Recommendation to separate namespaces and limit RBAC to prevent secret leakage.",
+            "details": "- Completion signals: explicit Completion event, or tail idle timeout after EOF, or external shutdown signal.\n- Drain pipeline: flush remaining batches; ensure no duplicates; capture final Stats snapshot and duration.\n- Build and post final summary embed with totals (tokens, tools, errors), cost, and elapsed time; mark run as complete with ✅.\n- Optional revoke: if WEBHOOK_REVOKE_URL is set, notify bot endpoint to revoke/cleanup the webhook; retry transient failures.\n- Guarantee single execution (use OnceCell/flag) and graceful shutdown ordering.\n- Tests: verify final embed and revoke call under both completion modes.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 7,
-            "title": "Chart testing, validation, and deployment documentation",
-            "description": "Set up chart unit tests and chart-testing, and write deploy steps and architecture notes.",
+            "title": "Health endpoints with Axum",
+            "description": "Expose /healthz (and optional /metrics) reflecting tailer liveness and webhook reachability.",
             "dependencies": [
-              "9.1",
-              "9.2",
-              "9.3",
-              "9.4",
-              "9.5",
-              "9.6"
+              "15.1",
+              "15.3",
+              "15.5"
             ],
-            "details": "Deliverables:\n- Tests:\n  - helm-unittest suites for sidecar library: validate env mapping, probes rendered, securityContext, resources, and NetworkPolicy selectors\n  - helm-unittest for bot chart: ensure BOT_TOKEN secret is only mounted in bot pods; Redis and CronJob toggles\n  - ct configuration (chart-testing) with lint and template checks; optional kind-based install test using sample values\n- Sample values files:\n  - examples/sidecar-values.yaml with filters/stats, bridge enabled, networkPolicy enabled\n  - examples/bot-values.yaml with redis.enabled, retention schedule, and networkPolicy to reach sidecars\n- Deployment docs (architecture.md snippet and deploy steps):\n  - Explain sidecar pattern, envs, filters/stats, parity mode, and bridge flow\n  - Security considerations: no bot token in worker pods; webhook URL only; how NetworkPolicy confines bridge access\n  - Step-by-step:\n    1) Install bot chart and create bot-token Secret\n    2) Install or integrate the sidecar library into workloads; set DISCORD_WEBHOOK_URL via orchestrator or Secret\n    3) Optionally enable bridge and NetworkPolicy\n    4) Verify with helm template/dry-run and kubectl get pods; check envs and resources\n    5) After Task 10, confirm /healthz reports OK\n- CI snippet for running ct and helm-unittest on PRs.",
-            "status": "pending",
-            "testStrategy": ""
-          }
-        ]
-      },
-      {
-        "id": 10,
-        "title": "Observability, Health Checks, and Hardening",
-        "description": "Add metrics, logging, health endpoints, and resilience features to meet non-functional requirements and risks.",
-        "details": "- Watcher metrics (Prometheus via metrics + prometheus_exporter): events_processed_total, embeds_sent_total, rate_limit_hits_total, webhook_retries_total, latency_ms (append->post), queue_depth, bytes_sent, truncations_total, cpu_mem_gauges\n- Health endpoints: /healthz (ready when webhook sender alive and tailer reading), /metrics for Prometheus; expose on localhost:9090\n- Robust error logging with tracing spans per runId and channelId; sample stack traces for unexpected errors\n- Reliability: auto-reconnect tail on errors; ensure independent restarts won’t impact agent; gracefully handle missing webhook (buffer for short time)\n- Backoff configurations centralized; jitter applied; DLQ/log file for permanently failed posts\n- Bot service: add basic metrics (forwarded_messages_total, bridge_errors_total), health route, and structured logs\n- Load/latency tests: measure end-to-end ≤100ms avg from append to post (network permitting); optimize if needed (e.g., coalesce small sleeps)\n- Risk mitigations: rate limit backoff already in Task 4; add discovery retry loop for transcript path variance\n",
-        "testStrategy": "- Unit tests for health state transitions (tailer disconnected -> not ready)\n- Benchmark end-to-end latency using a synthetic transcript appending tool and capturing post times\n- Metrics scrape test: ensure Prometheus can scrape /metrics\n- Failure injection tests: kill webhook network, rotate transcript file; validate automatic recovery\n- Verify no measurable slowdown on agent by comparing run times with/without watcher under load",
-        "priority": "medium",
-        "dependencies": [
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9
-        ],
-        "status": "pending",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Metrics Registry and Prometheus Exporter",
-            "description": "Introduce a metrics registry and Prometheus exporter with well-defined counters, gauges, and histograms for watcher and bot services.",
-            "dependencies": [],
-            "details": "- Use metrics + prometheus_exporter to expose /metrics on localhost:9090.\n- Define watcher metrics: counters events_processed_total, embeds_sent_total, rate_limit_hits_total, webhook_retries_total, truncations_total; gauges queue_depth, cpu_mem_gauges, bytes_sent; histogram latency_ms (append->post) with buckets [5,10,20,50,100,200,500,1000].\n- Define bot service metrics: counters forwarded_messages_total, bridge_errors_total; reuse cpu_mem_gauges.\n- Add low-cardinality labels where safe (e.g., component=\"watcher|bot\", outcome=\"ok|error\"). Avoid high-cardinality labels like runId/channelId on metrics.\n- Implement process CPU/memory gauges via sysinfo or equivalent.\n- Document metric names, units, and semantics; add a sample Prometheus scrape config.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 2,
-            "title": "Structured Tracing and Error Sampling",
-            "description": "Add tracing spans with runId/channelId fields and robust, structured error logging with sampling of unexpected stack traces.",
-            "dependencies": [],
-            "details": "- Use tracing/tracing-subscriber with JSON formatter; include fields: runId, channelId, event_kind, attempt, error.kind.\n- Define span lifecycle across pipeline stages: tail->parse->build_embed->send_webhook. Propagate trace context through async tasks.\n- Configure log levels via config/env; default info, with per-module overrides.\n- Sample unexpected errors (e.g., 1%) with captured backtraces enabled; always log full context for fatal paths.\n- Correlate logs to metrics via outcome fields; do not put high-cardinality fields into metric labels.\n- Provide log redaction for secrets (webhook URL, tokens).",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 3,
-            "title": "Centralized Backoff and Jitter Configuration",
-            "description": "Create a shared backoff module and configuration for retries with jitter for network, webhook, and discovery operations.",
-            "dependencies": [],
-            "details": "- Expose config: base_ms, max_ms, multiplier, jitter_pct, max_retries, per-category overrides (rate_limit, network, discovery, webhook_post).\n- Implement exponential backoff with full jitter; provide async sleep helper.\n- Emit metrics: backoff_attempts_total{category}, backoff_duration_ms histogram.\n- Use in retry wrappers so callers can compose: retry_async(category, op_fn).\n- Document defaults and guidance; ensure unit tests for bounds, jitter distribution, and max retry behavior.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 4,
-            "title": "Auto-Reconnect Tailer and Discovery Retry Loops",
-            "description": "Harden the tailer to auto-reconnect on errors and add discovery retry loops to handle transcript path variance and rotations.",
-            "dependencies": [
-              "10.3"
-            ],
-            "details": "- Detect file handle invalidation, EOF stalls, and errors; auto-reopen with backoff from centralized config.\n- Implement directory discovery loop for ~/.claude/projects/<workspace>/ session files; pick latest mtime; retry with backoff on not-found.\n- Handle file rotation seamlessly: persist and restore read offsets where safe to avoid duplicates.\n- Emit metrics: tail_reconnects_total, discovery_retries_total; logs with reason and durations.\n- Ensure independent restarts do not disrupt the agent: idempotent initialization and safe resource cleanup.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 5,
-            "title": "Webhook Outage Buffering with Bounded Queue and DLQ",
-            "description": "Gracefully handle missing/unreachable webhook by buffering with bounds and persisting permanently failed posts to a DLQ.",
-            "dependencies": [
-              "10.3"
-            ],
-            "details": "- Implement in-memory bounded queue sized by count and bytes; export queue_depth gauge; drop oldest or newest based on policy with truncations_total increments.\n- Retry sender with centralized backoff; apply jitter; respect rate-limit headers if present.\n- DLQ: append-only file for exhausted retries or payloads failing validation; include timestamp, reason; add DLQ rotation policy.\n- Background DLQ reprocessor with safe rate; metrics: dlq_writes_total, dlq_reprocess_total, webhook_retries_total{outcome}.\n- Guarantee at-least-once delivery semantics during transient outages; document trade-offs and ordering guarantees.",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 6,
-            "title": "Health Endpoints and Readiness Logic",
-            "description": "Expose /healthz and /metrics; mark ready only when tailer is reading and webhook sender is healthy; include liveness.",
-            "dependencies": [
-              "10.1",
-              "10.4",
-              "10.5"
-            ],
-            "details": "- Serve on localhost:9090 using the same HTTP server as /metrics; endpoints: /healthz (readiness), /livez (liveness), /metrics.\n- Readiness conditions: tailer connected and reading (recent activity or open handle), webhook sender not degraded (buffer below threshold, no sustained failures), config loaded.\n- Liveness: process responsive loop check.\n- Return JSON with component statuses and overall status; appropriate HTTP codes (200 ready, 503 not ready).\n- Unit tests for state transitions (tailer disconnect -> not ready; webhook outage -> not ready; recovery -> ready).",
-            "status": "pending",
-            "testStrategy": ""
-          },
-          {
-            "id": 7,
-            "title": "End-to-End Latency Benchmark Tool and SLOs",
-            "description": "Build a synthetic benchmark to measure append-to-post latency and enforce ≤100ms average SLO under normal conditions.",
-            "dependencies": [
-              "10.1",
-              "10.4",
-              "10.5",
-              "10.6"
-            ],
-            "details": "- Create a tool that appends synthetic transcript lines and timestamps when webhook post completes; record latency into latency_ms histogram.\n- Run warm/cold scenarios; report p50/p90/p99 and average; fail test if average >100ms (network permitting) with configurable guard.\n- Emit metrics for runs; save JSON report artifact; add CI job to execute against a local mock webhook server.\n- Optimize if needed (coalesce small sleeps, reduce allocations); document tuning knobs.",
+            "details": "- Axum server bound to HTTP_ADDR if provided; otherwise disabled.\n- /healthz: 200 if tailer task is alive and last webhook success within a recent window; include basic JSON body with timestamps and queue depth; else 503.\n- /metrics (optional): expose Prometheus metrics (counters for events, batches, failures, gauges for queue, timestamps, cost totals).\n- Share state via Arc context (stats snapshot, last_webhook_ok_at, last_event_at, tailer_alive flag).\n- Lightweight handlers suitable for current_thread runtime; avoid blocking.\n- Tests: hit /healthz during run and after completion; verify status transitions.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 8,
-            "title": "Failure Injection and Resilience Tests",
-            "description": "Systematically inject failures to validate recovery paths, buffering, and health signaling.",
+            "title": "Parity-mode behavior and minimal truncation toggles",
+            "description": "Implement PARITY_MODE to bypass filters and apply only minimal truncation for Discord limits.",
             "dependencies": [
-              "10.4",
-              "10.5",
-              "10.6",
-              "10.7"
+              "15.1",
+              "15.3",
+              "15.5"
             ],
-            "details": "- Scenarios: drop webhook connectivity, simulate HTTP 429/5xx, slow responses, kill/restart process, rotate transcript mid-write, corrupt line, missing path.\n- Verify: auto-reconnect works, retries backoff, health toggles to 503 then recovers, DLQ captures permanent failures, no data loss beyond policy.\n- Provide fault toggles in code or via proxy (toxiproxy) and scripts; gather metrics/logs snapshots for each scenario.\n- Add assertions on metrics deltas (rate_limit_hits_total increments, webhook_retries_total outcomes) and log markers.",
+            "details": "- When PARITY_MODE=true: disable FILTERS; avoid summarization; preserve event content ordering; only truncate to meet Discord message/embed limits; mark messages as parity for traceability.\n- When PARITY_MODE=false: apply configured FILTERS and normal formatting/truncation rules.\n- Ensure cost/stat updates are identical across modes for equal token counts.\n- Tests: parity mode produces near-pass-through embeds; non-parity mode applies filters; verify no hidden drops.",
             "status": "pending",
             "testStrategy": ""
           },
           {
             "id": 9,
-            "title": "Resource Monitoring and No-Slowdown Guardrails",
-            "description": "Monitor CPU/memory and event-loop health to ensure observability features do not slow the agent.",
+            "title": "End-to-end tests with wiremock and synthetic JSONL",
+            "description": "Write E2E tests covering normal flow, late file, webhook outage, and parity-mode.",
             "dependencies": [
-              "10.1",
-              "10.7"
+              "15.1",
+              "15.2",
+              "15.3",
+              "15.4",
+              "15.5",
+              "15.6",
+              "15.7",
+              "15.8"
             ],
-            "details": "- Track cpu_mem_gauges over time during benchmarks; add event loop lag metric (tick_jitter_ms) via periodic heartbeat and measuring drift.\n- Define thresholds (e.g., CPU < 20% avg, memory < 64Mi, lag < 10ms p99) and fail CI job if exceeded.\n- Optimize exporters/logging to be non-blocking and backpressure-aware; cap log rate with sampling.\n- Produce a short report comparing baseline vs with observability enabled; recommend config defaults if needed.",
+            "details": "- Use temp dir + synthetic transcript JSONL including all event types and a Completion event.\n- Wiremock webhook: assert header posted first, batches follow in order, final ✅ summary with correct totals/cost/duration.\n- Failure recovery: start with webhook returning 5xx for N attempts then recover; ensure retries and eventual success; start without transcript then create it; confirm pipeline recovers.\n- Parity-mode test: ensure no filtering and only minimal truncation is applied.\n- Health checks: during run /healthz is 200; during outage flips to 503; returns to 200 after recovery.\n- Resource sanity: run under load with small POLL_INTERVAL_MS and BATCH_SIZE; assert no excessive memory growth (approx via metrics) and timely processing.\n- DoD: e2e test green with header and final summary; resilience scenarios pass.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Discord Bot Service: Channel Lifecycle and Webhook Provisioning",
+        "description": "Build a serenity-based bot that creates per-run channels and channel-scoped webhooks in the “Agent Runs” category, returning {channelId, webhookUrl}. Implement retention-based archive/delete.",
+        "details": "- Serenity setup: minimal intents (GUILD_MESSAGES, GUILDS) and http client. Load DISCORD_BOT_TOKEN from secret.\n- HTTP API (Axum) for orchestrator:\n  - POST /run/create {taskId, attempt, shortId, guild_id?, category_name?}\n    - Ensure/find category “Agent Runs” (or provided), create text channel name format run-{taskId}-{attempt}-{shortId}.\n    - Create channel-scoped webhook; return {channelId, webhookUrl, webhookId} JSON.\n  - POST /run/complete {channelId, webhookId} -> delete webhook; optionally delete channel or schedule retention delete.\n- Store run map in memory (DashMap) keyed by channelId: {taskId, attempt, shortId, webhookId, created_at}. For crash resilience, optionally persist to a small file (MVP optional).\n- Post initial header embed via webhook or bot message if needed.\n- Retention: config RETENTION_HOURS; spawn background task scanning map and deleting channels/webhooks past window.\n- Permissions: restrict @everyone send if input disabled; bot manage webhooks and channels.\n- Pseudo-code (serenity + axum skeleton):\n  struct BotState{ http:Arc<Http>, cache:Cache, runs:DashMap<ChannelId, RunInfo> }\n  async fn create_run(Json(req)): -> Json<Response> { let cat=find_or_create_category(...); let ch=guild.create_channel(...).await?; let wh=ch.create_webhook(&state.http, \"run\").await?; Ok(Json({channelId:ch.id, webhookUrl:wh.url(), webhookId:wh.id})) }\n",
+        "testStrategy": "- Use a test guild: run bot pointing to a sandbox server.\n- Call /run/create via curl; assert channel created under category and webhook returned.\n- Call /run/complete; assert webhook deleted and channel removed after retention.\n- Negative: duplicate create for same run -> either reuse or create uniquely suffixed; ensure no panic.\n- Permission test: verify pod never receives bot token; only webhookUrl is returned.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Serenity bot skeleton and configuration",
+            "description": "Initialize a serenity-based bot with minimal gateway intents and an HTTP client, load configuration from environment, and expose shared state.",
+            "dependencies": [],
+            "details": "Set up a crates/bot binary. Initialize serenity::Client with intents GUILDS and GUILD_MESSAGES. Load DISCORD_BOT_TOKEN from env/secret manager. Build BotState with Arc<Http>, Cache, and placeholders for runs map. Wire logging/tracing, graceful shutdown, and config struct (e.g., RETENTION_HOURS, DEFAULT_GUILD_ID, DEFAULT_CATEGORY_NAME). Ensure bot token is never logged.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Axum HTTP API: POST /run/create and /run/complete",
+            "description": "Expose Axum endpoints for orchestrator to create and complete runs with JSON schemas and error handling.",
+            "dependencies": [
+              "16.1",
+              "16.3",
+              "16.4"
+            ],
+            "details": "Spin up an Axum server with JSON extractor/response. Define CreateRunRequest {taskId:String, attempt:u32, shortId:String, guild_id:Option<u64>, category_name:Option<String>} and CreateRunResponse {channelId:u64, webhookUrl:String, webhookId:u64}. Define CompleteRunRequest {channelId:u64, webhookId:u64}. Implement handlers calling category/channel/webhook helpers, returning typed JSON. Add structured errors (status codes for bad input, not found, Discord API errors). Bind port from env (e.g., BOT_HTTP_PORT).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Category discovery/creation and channel naming",
+            "description": "Implement utilities to find or create the target category and generate sanitized per-run channel names.",
+            "dependencies": [
+              "16.1"
+            ],
+            "details": "Add ensure_category(guild_id, category_name_or_default) -> CategoryId that searches existing categories by name (case-insensitive) and creates if missing. Implement build_channel_name(taskId, attempt, shortId) -> String using format run-{taskId}-{attempt}-{shortId}, lowercased, hyphen-only, trimmed to Discord limits. Provide create_text_channel_in_category(guild_id, category_id, name, topic?). Handle missing guild_id by using DEFAULT_GUILD_ID if configured.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Channel and channel-scoped webhook provisioning",
+            "description": "Create per-run text channels in the category and provision a channel-scoped webhook, returning IDs and URL.",
+            "dependencies": [
+              "16.3"
+            ],
+            "details": "Given guild and category, create the text channel with topic including taskId/attempt/shortId. Create a channel-scoped webhook named \"run\" and fetch its URL and ID. Return {channelId, webhookUrl, webhookId}. Optionally post an initial header embed via webhook. Ensure bot manages channels/webhooks and does not leak the bot token in responses or logs.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "In-memory run map (DashMap) with optional persistence",
+            "description": "Track run metadata keyed by channelId and optionally persist to a small file for crash resilience.",
+            "dependencies": [
+              "16.2",
+              "16.4"
+            ],
+            "details": "Define RunInfo {taskId, attempt, shortId, webhookId, created_at}. Use DashMap<ChannelId, RunInfo> in BotState. Insert on successful create; remove on complete/delete. Implement lightweight JSON persistence to a file path (e.g., RUNS_STATE_PATH) on every mutation or periodically; load at startup and validate entries (dropping those whose channel no longer exists). Guard with Tokio tasks and atomic write temp-rename pattern.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Retention worker for archive/delete past RETENTION_HOURS",
+            "description": "Implement a background task that scans runs and deletes webhooks/channels older than the configured retention window.",
+            "dependencies": [
+              "16.5"
+            ],
+            "details": "Read RETENTION_HOURS from config. Spawn a periodic task (e.g., every 60s) that computes cutoff and iterates DashMap entries. For each expired run: delete webhook, then delete the channel; handle partial failures with retries/backoff and skip-list to avoid hot loops. Remove from map after successful cleanup. Optionally support an ARCHIVE_CATEGORY move before deletion when an ARCHIVE_ONLY flag is set.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Permissions and safety controls",
+            "description": "Apply channel permission overwrites to restrict @everyone from sending messages and implement safety practices.",
+            "dependencies": [
+              "16.4"
+            ],
+            "details": "On channel creation, set PermissionOverwrites for @everyone: deny SEND_MESSAGES, allow VIEW_CHANNEL and READ_MESSAGE_HISTORY. Optionally grant a configured role ability to send if needed. Ensure AllowedMentions are restricted for any bot posts. Validate the bot has MANAGE_CHANNELS and MANAGE_WEBHOOKS. Redact secrets in logs and never return the bot token via the API.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Integration tests against sandbox guild",
+            "description": "Write end-to-end tests for create/complete flows, idempotency, and retention using a sandbox Discord guild.",
+            "dependencies": [
+              "16.1",
+              "16.2",
+              "16.3",
+              "16.4",
+              "16.5",
+              "16.6",
+              "16.7"
+            ],
+            "details": "Use a test guild ID from env (TEST_GUILD_ID) and a disposable category name. Test: call /run/create and assert channel under category and a webhook URL/ID returned; call /run/complete and assert webhook deleted; set RETENTION_HOURS small (e.g., 0.001) and assert channel removed by worker. Test idempotent create for same {taskId, attempt, shortId} returns existing channel/webhook (by finding existing channel name and reusing webhook or map record). Clean up any leftovers on failure.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Optional Operator Input Pipeline (Bot Relay → Pod-local HTTP Bridge)",
+        "description": "Enable operators to send ad-hoc guidance from the run’s channel to the running agent via a local HTTP bridge that writes to agent FIFO/stdin. Enforce channel scoping per run.",
+        "details": "- Bot relay (serenity EventHandler::message): accept messages or a slash command only in known run channels (validate against runs map). On command or message, POST to http://input-bridge/input with JSON {text, author, channelId, run:{taskId, attempt, shortId}}.\n- Reuse reqwest client; send acknowledgement in channel on success.\n- Bridge service (axum):\n  - POST /input -> reads JSON payload and writes a streaming line to FIFO/stdin.\n  - FIFO path from env INPUT_FIFO (default /agent/input.fifo). If FIFO not present, try to write to child process stdin file descriptor if exposed.\n  - Implement nonblocking open with retry; write newline-terminated UTF-8.\n  - Bind only 127.0.0.1; no external exposure.\n- Security: Bot validates message.channel_id belongs to a run; ignore others. Do not forward attachments (MVP). Rate limit bridge (e.g., 10 r/s) to protect agent.\n- Example bot handler:\n  if msg.channel_id == run.channel_id { if msg.content.starts_with(\"/send \") || cfg.accept_plain { let payload=...; client.post(\"http://input-bridge/input\").json(&payload).send().await?; msg.channel_id.say(&ctx.http, \"✅ forwarded\").await?; } }\n",
+        "testStrategy": "- Unit: bot side - simulate Message events for in-channel and out-of-channel; assert only in-channel calls bridge.\n- Bridge: create a temp named pipe; POST JSON; confirm bytes written to FIFO.\n- End-to-end (local): run bridge and a dummy reader of FIFO; send bot command; observe message arrives.\n- Security: attempt POST from non-local interface (if forced) should be rejected; invalid JSON returns 400; bridge rate limit enforced.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Bot-side message/command handler scoped to run channels",
+            "description": "Implement a serenity EventHandler::message that only accepts operator input from channels associated with active runs, parses /send commands or plain messages (if enabled), and prepares payloads for the local HTTP bridge.",
+            "dependencies": [],
+            "details": "Maintain a concurrent runs map keyed by channel_id with values {taskId, attempt, shortId}. In EventHandler::message, early-return unless msg.channel_id is in the runs map. Accept text when msg.content starts with \"/send \" or when config accept_plain=true; strip the command prefix and trim. Ignore attachments and non-text content for MVP. Construct payload JSON {text, author, channelId, run:{taskId, attempt, shortId}}. Reuse a single reqwest::Client across messages (e.g., in BotState). POST to http://input-bridge/input. Do not send acks/errors here; wire that in subtask 5.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "HTTP bridge service (Axum) with POST /input",
+            "description": "Expose a local Axum service that accepts JSON payloads for operator input and writes newline-terminated UTF-8 to the agent input stream via the writer component.",
+            "dependencies": [
+              "17.3"
+            ],
+            "details": "Define payload schema {text: String, author: String, channelId: String, run: {taskId: String, attempt: u32|String, shortId: String}} and validate text is non-empty and UTF-8 safe. Build Axum router with POST /input; on request, call a Writer trait to perform the write and map success to 200 OK with a minimal JSON body {status:\"ok\"}. Map writer errors to appropriate HTTP status (e.g., 429 from backpressure, 503 when agent input unavailable, 400 for invalid payload). Ensure newline termination added exactly once. Use Tower layers for error handling and JSON body size limits.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "FIFO/stdin writer with nonblocking open, retry, and backpressure",
+            "description": "Implement a writer that targets INPUT_FIFO when present or falls back to child process stdin, performing nonblocking open with retry and safe UTF-8 line writes.",
+            "dependencies": [],
+            "details": "Read FIFO path from env INPUT_FIFO (default /agent/input.fifo). Attempt O_NONBLOCK open of FIFO for write; if reader not present, retry with exponential backoff up to a bounded deadline, then return a retriable error. If FIFO not found or open fails permanently, attempt to write to an exposed child stdin file descriptor/handle if available. Ensure each write appends a single trailing newline; handle partial writes; flush if using stdin. Implement backpressure-aware writes: if pipe returns EAGAIN/EWOULDBLOCK, retry with jitter and surface a 429-style error to caller after budget is exhausted. Provide a simple Writer trait with write_line(&str) -> Result<(), WriterError> and an implementation over FIFO/stdin.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Local-only binding and basic rate limiting",
+            "description": "Restrict the bridge service to loopback and enforce per-process rate limiting to protect the agent input.",
+            "dependencies": [
+              "17.2",
+              "17.3"
+            ],
+            "details": "Bind Axum server only to 127.0.0.1 with an explicit non-TLS HTTP listener; avoid container port exposure. Add a Tower layer using governor or tower-ratelimit to limit to ~10 requests per second with a small burst (configurable). Return 429 with a clear JSON error body when rate limited. Ensure rate limit applies before invoking the writer. Optionally add simple request size limits to prevent large inputs.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Bot acknowledgements, error feedback, and retry policy",
+            "description": "Provide user-visible acks in the run channel on success, surface clear errors on failure, and implement limited retries to the bridge.",
+            "dependencies": [
+              "17.1",
+              "17.2"
+            ],
+            "details": "On successful POST to the bridge, reply in the same channel with a short acknowledgement (e.g., \"✅ forwarded\"). On known errors, map to actionable messages: 429 -> \"rate limited, try again shortly\"; 503 -> \"agent unavailable\"; other -> generic failure with correlation ID. Implement retry with exponential backoff for transient errors (5xx, connect timeouts) up to a small cap (e.g., 3 attempts) and suppress duplicate acks. Ensure slash command responses or message replies do not ping everyone; respect Discord rate limits. Log errors with context (run ids, channel id, http status).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Configuration wiring and observability",
+            "description": "Add configuration flags and minimal logging/metrics across bot and bridge components.",
+            "dependencies": [
+              "17.1",
+              "17.2",
+              "17.3",
+              "17.4"
+            ],
+            "details": "Config: ACCEPT_PLAIN (bool), INPUT_BRIDGE_URL (default http://input-bridge/input) for bot; INPUT_FIFO, RATE_LIMIT_RPS (default 10), LOG_LEVEL for bridge. Use env vars or a small config struct. Observability: structured logs with run/channel context; count metrics for inputs accepted, forwarded, dropped (out-of-scope channel), rate-limited, writer errors. Expose a lightweight /health endpoint on loopback or rely on process health logs. Ensure sensitive data (tokens) not logged.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Unit and integration tests",
+            "description": "Validate channel scoping, FIFO write behavior, rate limiting, and the end-to-end local flow from bot to agent input.",
+            "dependencies": [
+              "17.1",
+              "17.2",
+              "17.3",
+              "17.4",
+              "17.5",
+              "17.6"
+            ],
+            "details": "Bot unit tests: simulate Message events for in-run and out-of-channel; assert only in-channel attempts to call bridge; verify command parsing and payload content. Bridge tests: create a temp named pipe, run the Axum server bound to 127.0.0.1 with the FIFO writer, POST JSON, and assert bytes received and newline termination; test fallback when FIFO absent. Rate limit tests: hammer /input and assert 429s after the configured threshold. End-to-end local: start bridge, spawn a dummy FIFO reader, simulate bot handler call, and confirm the reader receives the line. Include negative tests for empty text, oversized payloads, and writer backpressure.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Security and Isolation Hardening",
+        "description": "Ensure pods never hold bot tokens, validate run/channel mappings to prevent cross-run injection, revoke webhooks on completion, and neutralize mentions/content hazards.",
+        "details": "- Token isolation: Only the bot deployment stores DISCORD_BOT_TOKEN (K8s Secret). Sidecar watcher receives only DISCORD_WEBHOOK_URL.\n- Mapping validation: bot maintains ChannelId→Run mapping; message relay checks this map before forwarding. Add signature (HMAC) option for bridge requests if desired (shared secret via env) though not strictly required for loopback.\n- Webhook lifecycle: on /run/complete or after final summary, delete webhook via bot; sidecar optionally calls bot endpoint to signal completion.\n- Allowed mentions: Set allowed_mentions:{parse:[]} in all webhook payloads to prevent @ mentions.\n- Sanitization: escape triple backticks inside code blocks; strip ANSI control sequences from stdout/stderr to avoid unwanted formatting.\n- Permissions: channel permission overwrite to disallow everyone from posting if input disabled; allow only bot and maintainers role if configured.\n- Logging hygiene: never log tokens or webhook URLs; redact in logs.\n- Pseudo-code: payload.allowed_mentions = AllowedMentions::none(); strip_ansi(s): regex \\x1B\\[[0-9;]*[A-Za-z] -> \"\".",
+        "testStrategy": "- Verify watcher container envs do not include bot token (inspect pod spec).\n- Attempt cross-run injection: send message from different channel; ensure bot refuses.\n- Confirm mention suppression: post message with @everyone from agent output; ensure no actual mention in Discord.\n- Webhook revocation: after completion, trying to post should fail (410/404); ensure bot deleted webhook.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Kubernetes Sidecar and Helm Chart Packaging",
+        "description": "Provide K8s manifests and Helm charts to deploy the watcher as a sidecar, the bot as a deployment, and the input-bridge in the agent pod. Include values reflecting PRD config and resource limits.",
+        "details": "- Helm chart structure charts/discord-monitor with subcharts or templates for:\n  - Bot Deployment + Service + Secret (bot token), ConfigMap for retention/config.\n  - Sidecar template snippet to inject into target workloads (document how to add). Env: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL, BATCH_SIZE, filters.\n  - Input-bridge Container (in same pod as agent) exposing 127.0.0.1 only; volumeMount for FIFO path if needed.\n- Resource requests/limits per PRD: watcher requests {cpu:10m, memory:32Mi} limits {cpu:100m, memory:64Mi}. Liveness/readiness probes: /healthz.\n- Values.yaml sketch from PRD:\n  discord.monitoring.enabled, polling.interval:100, batchSize:10, filters.includeTools, includePatterns, minStdoutLength, stats.trackCost/tokens/errors, resources.\n- RBAC minimal (bot needs none beyond network).\n- Example sidecar injection snippet for a Deployment:\n  containers:\n    - name: discord-watcher\n      image: discord-monitor:latest\n      env:\n        - name: DISCORD_WEBHOOK_URL\n          valueFrom: secretKeyRef: {...}\n        - name: WORKSPACE_PATH\n          value: /home/agent/.claude/projects/...\n      ports: [{name: health, containerPort: 8080}]\n      resources: {requests: {cpu: \"10m\", memory: \"32Mi\"}, limits: {cpu: \"100m\", memory: \"64Mi\"}}\n- Templating helpers to toggle parity-mode.\n- Documentation in NOTES.txt for how to wire bot create to inject webhook env into pod spec (e.g., via orchestrator).",
+        "testStrategy": "- helm template with provided values -> validate manifests with kubeval/kubeconform.\n- kind cluster smoke test: install bot chart; deploy a sample job with sidecar; port-forward if needed; verify watcher healthz.\n- Resource verification: kubectl top shows watcher under limits during synthetic run.\n- Secret scan: ensure no bot token in sidecar env; only webhook.\n- Probe tests: kill webhook endpoint; liveness restarts watcher independently without affecting agent.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Helm chart skeleton and helper templates",
+            "description": "Scaffold charts/discord-monitor with standard Helm structure and reusable helpers for naming, labels, and parity-mode toggles.",
+            "dependencies": [],
+            "details": "Create charts/discord-monitor with Chart.yaml, .helmignore, templates/, values.yaml (placeholder), and NOTES.txt (placeholder). Add templates/_helpers.tpl with helpers: name/fullname, labels/selectorLabels, image reference helpers, and a boolean helper for parity-mode toggles. Prepare directories or file stubs for: templates/bot/, templates/snippets/_sidecar.tpl, templates/snippets/_input_bridge.tpl, and templates/snippets/_common.tpl. Establish standard app.kubernetes.io labels and annotations across resources.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Bot Deployment, Service, Secret, and ConfigMap templates",
+            "description": "Implement bot Deployment, Service, Secret (bot token), and ConfigMap for retention/config with configurable env.",
+            "dependencies": [
+              "19.1",
+              "19.5",
+              "19.6"
+            ],
+            "details": "Add templates/bot/deployment.yaml with env from Secret (BOT_TOKEN) and from ConfigMap for retention/config and behavior (e.g., LOG_LEVEL, STATS_*). Include liveness/readiness probes on /healthz port 8080 using common helpers. Add templates/bot/service.yaml exposing port 8080 for health/metrics. Add templates/bot/secret.yaml to create Opaque secret when .Values.bot.secret.create is true, supporting existingSecret reference. Add templates/bot/configmap.yaml to hold retention and related settings. Wire resources via common helpers and values. No RBAC beyond optional ServiceAccount; set to disabled by default.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Sidecar template snippet for target workloads",
+            "description": "Provide a reusable sidecar container snippet with envs, probes, resources, and parity-mode toggles for injection into workloads.",
+            "dependencies": [
+              "19.1",
+              "19.5",
+              "19.6"
+            ],
+            "details": "Create templates/snippets/_sidecar.tpl exporting a named template that renders a container spec for the watcher sidecar. Include env: DISCORD_WEBHOOK_URL (from secret or value), WORKSPACE_PATH, POLL_INTERVAL (from .Values.polling.interval), BATCH_SIZE (.Values.batchSize), FILTERS (JSON), STATS booleans, PARITY_MODE, LOG_LEVEL. Add port named health on 8080 with liveness/readiness to /healthz via common helpers. Apply PRD resources: requests cpu 10m memory 32Mi; limits cpu 100m memory 64Mi. Provide values toggles to enable/disable sidecar and parity-mode. Document usage expectations (webhook secret provided externally).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Input-bridge container snippet for agent pod",
+            "description": "Add a reusable input-bridge container template that binds to 127.0.0.1 and supports FIFO volume mounts.",
+            "dependencies": [
+              "19.1",
+              "19.5",
+              "19.6"
+            ],
+            "details": "Create templates/snippets/_input_bridge.tpl exporting a named template for an additional container to be added to the agent pod. Configure arguments/env to bind only to 127.0.0.1, expose an internal port (configurable), and include liveness/readiness probes if applicable. Support volumeMount for FIFO path (from .Values.inputBridge.fifoPath) and document corresponding volume declaration in the host workload. Apply resources via common helpers and values.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Values.yaml reflecting PRD configuration",
+            "description": "Define a comprehensive values.yaml capturing PRD defaults for polling, batching, filters, stats, resources, secrets, and toggles.",
+            "dependencies": [
+              "19.1"
+            ],
+            "details": "Populate .Values with: discord.monitoring.enabled; polling.interval: 100; batchSize: 10; filters.includeTools, filters.includePatterns (list), filters.minStdoutLength; stats.trackCost, stats.tokens, stats.errors (booleans); parityMode: false. Define images (repository, tag, pullPolicy) for watcher, bot, inputBridge. Set watcher sidecar resources: requests {cpu: 10m, memory: 32Mi}, limits {cpu: 100m, memory: 64Mi}. Add probes config (paths/port/timeouts) defaulting to /healthz on 8080. Configure bot: service.type, port, resources, config.retention fields. Secrets: bot.secret.create, bot.secret.existingName/key; webhook.existingSecret/name/key. RBAC/serviceAccount toggles default false. Input-bridge: enabled, port, fifoPath.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Common probes/resources helpers and minimal RBAC",
+            "description": "Provide shared helpers for /healthz probes and resource rendering, and define minimal/optional RBAC objects.",
+            "dependencies": [
+              "19.1",
+              "19.5"
+            ],
+            "details": "Add templates/snippets/_common.tpl with named templates to render liveness/readiness probes to /healthz on 8080, reading delays/timeouts from values. Add a resources helper that maps .Values resources into container resources. Provide optional ServiceAccount template controlled by .Values.serviceAccount.create; leave Roles/RoleBindings absent by default per minimal RBAC requirement. Ensure templates gate creation via values toggles and use standard labels/annotations.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Documentation and NOTES.txt for webhook integration and injection",
+            "description": "Write NOTES.txt and usage docs explaining how to inject the sidecar and wire webhook env/secret into workloads.",
+            "dependencies": [
+              "19.1",
+              "19.2",
+              "19.3",
+              "19.4",
+              "19.5",
+              "19.6"
+            ],
+            "details": "In templates/NOTES.txt, include: helm install instructions; how to create or reference a Secret containing DISCORD_WEBHOOK_URL; example kubectl create secret command; how to inject the sidecar snippet using Helm include (e.g., include \"discord-monitor.sidecar\" . | nindent 8) into an existing Deployment; guidance for orchestrator-driven webhook creation and env injection; example of adding the input-bridge container via include; explanation of parity-mode toggles. Document expected health endpoints and resources. Specify DoD signals: helm template validates, kind install passes health checks, secrets are namespaced and not world-readable.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "CI: helm lint/template, kubeconform, and kind smoke test",
+            "description": "Set up CI to lint, render, validate, and smoke-test the chart on a kind cluster including a sample workload with sidecar.",
+            "dependencies": [
+              "19.1",
+              "19.2",
+              "19.3",
+              "19.4",
+              "19.5",
+              "19.6",
+              "19.7"
+            ],
+            "details": "Add .github/workflows/helm-ci.yml to run: helm lint charts/discord-monitor; helm template with PRD values to a manifest file; validate with kubeconform (or kubeval) strict mode. Provision kind cluster; helm install the chart; deploy a sample Deployment that includes the sidecar snippet; wait for readiness; port-forward and curl /healthz for bot and sidecar; verify resources applied; ensure Secret scoping is correct. Provide hack/smoke.sh to reproduce locally. Define CI artifacts and caching for tool downloads. DoD: helm template produces valid manifests; kind install passes health checks; secrets are correctly scoped.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "title": "Documentation, Acceptance Tests, and Performance Validation",
+        "description": "Deliver comprehensive docs and perform acceptance and performance testing to satisfy MVP criteria: live streaming to channel, readable errors/stdout, final summary, and no agent slowdown.",
+        "details": "- Docs:\n  - architecture.md (high-level architecture, data flow, security model).\n  - deploy.md (bot setup, guild permissions, creating category, Helm install, sidecar injection, envs).\n  - operations.md (retention, webhook revocation, troubleshooting rate limits, logs).\n  - formatting.md (embed templates, truncation rules, diff behavior, parity-mode).\n- Acceptance tests matrix:\n  - Basic visibility: pre-created static webhook; watcher streams tool_use, assistant, errors, final summary.\n  - Bot lifecycle: create channel+webhook per run; inject into pod; final summary + channel removal.\n  - Optional input: /send relayed to bridge; agent receives text via FIFO.\n  - Hardening: rate limit/backoff works; bot outage -> watcher continues via webhook.\n- Performance:\n  - Latency: measure append-to-post time across 1000 events; median ≤100ms.\n  - Overhead: measure CPU (<1%) and RSS (<64Mi) in realistic run.\n  - Reliability: restart watcher mid-run; ensure resume without agent impact.\n- Example scripts:\n  - scripts/gen_transcript.rs to emit synthetic JSONL at varying rates.\n  - scripts/measure_latency.rs using Instant stamps embedded into events and webhook mock timestamps.\n- Pseudo-checklist: All acceptance criteria from PRD ticked and evidenced with logs/screenshots.",
+        "testStrategy": "- Execute acceptance test plan against a sandbox Discord guild with a mock agent.\n- Collect metrics/logs demonstrating latency and resource usage below thresholds.\n- Peer review of docs; run new-hire dry-run from zero to streaming in <30 minutes.\n- Record failures/regressions and file issues with repro steps.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "architecture.md: High-level architecture, data flow, security model",
+            "description": "Author architecture.md covering components, end-to-end data flow, and the security model for streaming, errors/stdout, final summary, and resilience.",
+            "dependencies": [],
+            "details": "- Scope: watcher, Discord bot service, webhooks, orchestrator, agent, storage/metrics, and sandbox guild.\n- Data flow: agent emits events -> watcher formats -> posts to channel via webhook; capture errors/stdout; final summary emission; resume semantics on restart.\n- Sequence diagrams for: static webhook path, per-run channel/webhook lifecycle, optional /send relay via FIFO, and backpressure/rate-limit handling.\n- Security model: Discord bot token handling, webhook secrecy and rotation, least-privilege intents, guild/category scoping, network boundaries, audit/logging, and PII handling.\n- Failure modes: Discord outages, rate limits, webhook deletion, bot unavailability; recovery behavior and idempotency.\n- Assumptions and constraints: Discord limits, embed size, message rate caps, retries with jitter/backoff.\n- Definition of Done: architecture.md merged after peer review; diagrams and flows align with acceptance/perf plans.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "deploy.md: Bot setup, permissions, Helm install, sidecar injection, envs",
+            "description": "Create deploy.md describing Discord bot creation, guild permissions, category setup, Helm chart install, sidecar injection, and environment configuration.",
+            "dependencies": [
+              "20.1"
+            ],
+            "details": "- Prereqs: Discord application creation, token retrieval, sandbox guild access.\n- Guild setup: minimal intents, required permissions for channel/webhook management; create or detect \"Agent Runs\" category.\n- K8s: secrets for DISCORD_BOT_TOKEN, config maps/values, namespaces.\n- Helm: chart values (retention, category name, resources), install/upgrade/rollback commands.\n- Sidecar injection: how to attach watcher to target pods; env vars for webhook URL, FIFO paths, logging levels.\n- Validation steps: curl POST /run/create, confirm channel + webhook; smoke test event stream; /run/complete teardown.\n- Rollback and disaster recovery notes.\n- Definition of Done: deploy.md lets a new operator deploy to sandbox and verify end-to-end streaming.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "operations.md: Retention, webhook revocation, rate-limit/backoff, troubleshooting",
+            "description": "Produce operations.md covering retention policies, webhook revocation/rotation, rate-limit/backoff guidance, observability, and troubleshooting playbooks.",
+            "dependencies": [
+              "20.2"
+            ],
+            "details": "- Retention: archival vs delete timelines, channel cleanup, webhook deletion on run complete; manual overrides.\n- Webhook lifecycle: rotate/revoke procedures, incident response if URL leaked.\n- Rate limits: Discord headers, local backoff with jitter, safe retry policies, queuing behavior; how to tune.\n- Monitoring: logs, metrics, alerts (latency, error rates, rate-limit hits, CPU/RSS), dashboards.\n- Troubleshooting: common failures (permission errors, missing category, hitting embed limits, bot outage), step-by-step checks and remediation.\n- Runbooks for bot outage fallback (continue via static webhook), and for restarting watcher mid-run.\n- Definition of Done: operations.md peer-reviewed; runbooks validated in sandbox.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "formatting.md: Embed templates, truncation, diff behavior, parity-mode",
+            "description": "Write formatting.md detailing message/embeds templates, truncation rules, diff presentation, and parity-mode for console equivalence.",
+            "dependencies": [
+              "20.1"
+            ],
+            "details": "- Templates for: tool_use, assistant messages, errors/stdout, final summary; fields, color coding, footers, timestamps.\n- Limits: Discord message/embed constraints; truncation and overflow policy; attachment fallback when needed.\n- Diff behavior: how updates/edits are rendered; rules for collapsing/expanding; idempotent updates.\n- Parity-mode: toggles to mirror console logs; examples for each event type.\n- Examples: copy-pastable payloads for integration tests; expected render screenshots references.\n- Definition of Done: formatting.md approved; examples validated by test scripts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Acceptance tests: matrix and scripts (static webhook, lifecycle, optional input, hardening)",
+            "description": "Implement acceptance test matrix and scripts to validate visibility, bot lifecycle, optional /send input relay, and hardening scenarios.",
+            "dependencies": [
+              "20.2",
+              "20.4"
+            ],
+            "details": "- Matrix definition with pass criteria:\n  - Basic visibility: pre-created static webhook; watcher streams tool_use, assistant, errors, final summary.\n  - Bot lifecycle: per-run channel+webhook creation; injection into pod; final summary; channel removal.\n  - Optional input: /send relayed to bridge; agent consumes text via FIFO.\n  - Hardening: rate-limit/backoff effectiveness; bot outage -> watcher continues via webhook.\n- Implement driver scripts to orchestrate runs, capture logs, and collect screenshots.\n- Mock agent or generator to emit representative events.\n- Artifacts: logs, screenshots, and a summary report mapping to PRD acceptance criteria.\n- Definition of Done: all acceptance tests pass with recorded evidence.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Performance harness and synthetic generators; run and capture metrics",
+            "description": "Build and run performance harness with gen_transcript and latency measurement to meet thresholds: median ≤100ms, CPU <1%, RSS <64Mi; validate restart resilience.",
+            "dependencies": [
+              "20.2",
+              "20.5"
+            ],
+            "details": "- Implement scripts/gen_transcript.rs to emit synthetic JSONL at configurable rates and sizes.\n- Implement scripts/measure_latency.rs using embedded Instant timestamps and webhook mock timestamps; compute median and distribution across 1000 events.\n- Load tests at realistic and peak rates; capture p50/p95 latency and error rates.\n- Resource measurement: CPU (<1%) and RSS (<64Mi) for watcher in a realistic run; document tooling (e.g., cgroup metrics, pidstat, kubectl top).\n- Reliability: restart watcher mid-run; verify resume without agent impact or slowdown.\n- Produce machine-readable metrics and a brief narrative summary.\n- Definition of Done: thresholds met with reproducible logs/metrics artifacts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Evidence packaging and new-hire dry-run checklist",
+            "description": "Assemble evidence (logs, screenshots, metrics) and create a new-hire dry-run checklist to go from zero to streaming in under 30 minutes.",
+            "dependencies": [
+              "20.1",
+              "20.2",
+              "20.3",
+              "20.4",
+              "20.5",
+              "20.6"
+            ],
+            "details": "- Package artifacts: acceptance logs/screenshots, performance metrics, and reliability run outputs; index with context.\n- Create an evidence summary mapping each PRD acceptance and performance criterion to proof.\n- New-hire checklist: prerequisites, deploy steps, run acceptance basics, verify performance sampling; target completion <30 minutes.\n- Add links across docs (architecture/deploy/operations/formatting) and scripts.\n- Capture peer review sign-offs and any follow-up issues.\n- Definition of Done: evidence bundle published; checklist validated by a dry-run; all criteria satisfied.",
             "status": "pending",
             "testStrategy": ""
           }
@@ -984,7 +885,7 @@
     ],
     "metadata": {
       "created": "2025-08-11T05:40:40.719Z",
-      "updated": "2025-08-11T05:40:40.719Z",
+      "updated": "2025-08-11T06:37:48.028Z",
       "description": "Tasks for master context"
     }
   }

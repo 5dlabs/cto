@@ -1,0 +1,88 @@
+# Task ID: 13
+# Title: Embed Formatting, Truncation, Diffing, and Batching Library
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Convert parsed events into Discord-compliant embeds and attachments with safe truncation, syntax highlighting, compact diffs for Write/Edit, and batching up to 10 embeds per message.
+# Details:
+- Implement shared::embeds with builders per template:
+  - tool_use Bash: title ⚡ Bash; fields: Command (```bash), Working Dir, Tool Count; color 0xF39C12.
+  - tool_use Write/Edit/Read: titles 📝 Write / 👁️ Read; fields: File, Summary, Tool Count; color 0xF39C12.
+  - assistant: title optional; description=trimmed text; fields: Tokens In/Out, Session Cost (estimated), Model; color 0x3498DB.
+  - tool_result error: title ❌ Error; description=stderr code-fenced; field Total Errors; color 0xE74C3C.
+  - completion: title ✅ Complete; fields: Cost, Duration, Tokens total, Tools Used; color 0x27AE60.
+- Limits: respect 2000 content, 4096 desc, ≤25 fields/embed, ≤10 embeds/message.
+- Truncation helpers: trim_with_note(s, max, note="(truncated)"), sanitize_code_fences(lang, body) replacing backticks runs and zero-width spaces to prevent premature closure. Disable mentions in payload via allowed_mentions: none.
+- Attachments: for overflow (e.g., long stdout, full diff), create files and link using attachment://filename in embed; include summary field with name and size.
+- Diffing: for Write/Edit if patch present; else compute diff via similar::TextDiff::from_lines(old, new). Extract contextual hunk (40–60 lines). Format as ```diff with +/-. Truncate hunks if needed and attach full diff.
+- Batching: struct Batch{embeds:Vec<Embed>, files:Vec<FilePart>}. Implement Batch::try_push(embed) -> bool; flush when count==10 or time window elapses.
+- Cost estimator: map common Claude models to per-token costs (configurable) to compute Session Cost from tokens. Fallback to 0 if unknown.
+- Pseudo-code:
+  fn to_embeds(ev:&Event, stats:&mut Stats, cfg:&Cfg)->BatchItems {
+    match ev { Event::ToolUse{..}=>build_tool_use_embed(...), Event::Assistant{..}=>build_assistant_embed(...), Event::ToolResult{..}=>build_result_embed(...), Event::Completion{..}=>build_complete_embed(...), Event::Error{..}=>build_error_embed(...) }
+  }
+  fn fenced(lang,&text)->String { format!("```{}\n{}\n```", lang, sanitize(text)) }
+
+
+# Test Strategy:
+- Snapshot tests: generate embeds JSON for representative events and compare to stored snapshots (insta crate).
+- Boundary tests: ensure field counts ≤25; descriptions ≤4096; proper truncation markers; no unclosed fences.
+- Diff tests: small, medium, and large patches; verify inline hunk lines 40–60; attachment created for large diffs.
+- Cost tests: verify estimator math from tokens and rates.
+- Security test: ensure allowed_mentions is set to none and content sanitization prevents @mentions.
+
+# Subtasks:
+## 1. Embed builders per event with Discord limits enforced [pending]
+### Dependencies: 13.2, 13.3, 13.4, 13.5, 13.7
+### Description: Implement shared::embeds builders for all event templates, enforcing Discord limits and producing compliant embeds ready for batching.
+### Details:
+Create module shared::embeds with builder functions to render events into Discord Embed objects, enforcing: description <= 4096 chars, <= 25 fields per embed, and preparing content safe for message content <= 2000 if used. Builders: 1) build_tool_use_bash_embed(cmd: &str, cwd: &Path, tool_count: usize) -> Embed; title: "⚡ Bash"; fields: Command (fenced as bash), Working Dir, Tool Count; color 0xF39C12. 2) build_tool_use_fs_embed(kind: {Write, Edit, Read}, file: &Path, summary: &str, tool_count: usize, diff: Option<DiffSummary>) -> Embed; titles: "📝 Write" / "👁️ Read"; fields: File, Summary (trimmed), Tool Count; include inline diff snippet in description if provided; color 0xF39C12. 3) build_assistant_embed(text: &str, tokens_in: u32, tokens_out: u32, model: &str, cost: f64) -> Embed; optional title; description: trimmed text; fields: Tokens In, Tokens Out, Session Cost (estimated), Model; color 0x3498DB. 4) build_tool_result_error_embed(stderr: &str, total_errors: usize) -> Embed; title: "❌ Error"; description: code-fenced stderr; field: Total Errors; color 0xE74C3C. 5) build_completion_embed(cost: f64, duration_ms: u64, tokens_total: u32, tools_used: usize) -> Embed; title: "✅ Complete"; fields: Cost, Duration, Tokens total, Tools Used; color 0x27AE60. Use sanitize_code_fences and trim_with_note from 13.2; use diff formatting from 13.4; for overflow, delegate to attachments (13.5) by returning an embed that links attachment:// filenames in fields where appropriate. Ensure field name/value constraints (name <= 256, value <= 1024) are respected by truncation or redirection to attachments. Message payloads created by these builders must set allowed_mentions to none via 13.3. Acceptance: builders never produce embeds that exceed limits; snapshots in 13.8 validate structure and colors.
+
+## 2. Truncation helpers and content sanitization [pending]
+### Dependencies: None
+### Description: Implement trim_with_note and code fence sanitization to prevent overflows and premature fence closures.
+### Details:
+Provide helpers in shared::text: 1) trim_with_note(s: &str, max: usize, note: &str) -> (String, bool) that trims at valid UTF-8 boundaries, reserves space for note, and appends note if truncated. 2) sanitize_code_fences(lang: &str, body: &str) -> String that replaces backtick runs inside body by inserting a zero-width space after backticks and replaces existing zero-width spaces with a safe placeholder or removes them to avoid stealth mentions; also strips or neutralizes Discord mentions like @everyone by inserting zero-width space after '@' for non-code fields if needed. 3) fenced(lang: &str, text: &str) -> String that wraps sanitize_code_fences output with triple backticks and ensures a trailing newline and a closing fence. 4) strip_ansi(input: &str) -> String to remove ANSI escape sequences from tool outputs before embedding. All helpers must be allocation-safe and unit-tested for boundary conditions (empty, exact max, multibyte chars, long runs of backticks).
+
+## 3. Disable mentions in payload builder [pending]
+### Dependencies: None
+### Description: Ensure outgoing Discord payloads have mentions disabled to prevent accidental pings.
+### Details:
+Implement a message payload builder shared::payloads with AllowedMentions::none configuration (no roles, users, or everyone). Provide fn make_payload(content: Option<String>, embeds: Vec<Embed>, files: Vec<FilePart>) -> DiscordMessage that always sets allowed_mentions to none. Add a guard that rejects payloads if content contains raw @everyone or @here unless inside a code fence (best-effort heuristic). Acceptance: integration test verifies DiscordMessage JSON includes allowed_mentions with empty parse arrays.
+
+## 4. Diffing utilities with contextual hunks and diff formatting [pending]
+### Dependencies: 13.2
+### Description: Implement utilities to parse or compute diffs and format compact contextual snippets as diff code blocks.
+### Details:
+Create shared::diff: 1) enum DiffInput { PatchText(String), OldNew { old: String, new_: String } }. 2) compute_diff(input: DiffInput) -> DiffSummary that uses similar::TextDiff::from_lines for OldNew; if PatchText given, parse minimally or fallback to compute. 3) Extract contextual hunks totaling approximately 40–60 lines; default target 50 lines across hunks with equal context around changes; collapse large sections with "..." markers. 4) Format inline snippet as a diff code fence (lang "diff") with lines prefixed +/-. 5) If total diff exceeds inline budget (e.g., 3 KB or would push embed description over 4096), mark is_truncated = true and return full_text in DiffSummary for attachment use. 6) Return DiffSummary { inline_snippet: String, full_text: Option<String>, is_truncated: bool, added: usize, removed: usize }. Ensure sanitization via fenced("diff", ...) from 13.2 and no unclosed fences.
+
+## 5. Attachments pipeline for overflow content [pending]
+### Dependencies: 13.2, 13.4
+### Description: Create attachment handling and embed linking using attachment:// and size summaries.
+### Details:
+Implement shared::attachments: 1) struct FilePart { filename: String, bytes: bytes::Bytes, content_type: String }. 2) fn make_attachment(filename: &str, bytes: impl Into<bytes::Bytes>, content_type: &str) -> FilePart; sanitize filename to remove path separators. 3) Policy helpers: should_attach_text(field_limit: usize, text: &str) -> bool; should_attach_desc(desc_limit: usize, text: &str) -> bool; use 1024 for field values, 4096 for descriptions. 4) fn link_attachment_field(embed: &mut Embed, field_name: &str, attach: &FilePart) to insert a field with value like "attachment://filename" and an adjacent summary field with humanized size. 5) For diffs: if DiffSummary.full_text is Some or inline truncation occurs, create a .diff attachment and link it; for long stdout/stderr, create .log attachments. 6) Ensure binary safety and size accounting; expose total attachments count to the batcher. Acceptance: snapshot tests show attachment links and size summaries; large inputs move to attachments.
+
+## 6. Batching struct and flush policy [pending]
+### Dependencies: None
+### Description: Implement Batch and Batch::try_push with a time/window-based flush strategy up to 10 embeds per message.
+### Details:
+Create shared::batch: 1) struct Batch { embeds: Vec<Embed>, files: Vec<FilePart> }. 2) impl Batch { fn try_push(&mut self, embed: Embed) -> bool that returns false if pushing would exceed 10 embeds; fn add_file(&mut self, f: FilePart); fn is_full(&self) -> bool; }. 3) Batcher with windowed flushing: struct Batcher { current: Batch, max_embeds: usize, window: std::time::Duration, last_flush_at: Instant }. Methods: new(window), push_items(embeds: Vec<Embed>, files: Vec<FilePart>) -> Option<Batch> that flushes when count reaches 10 or when now - last_flush_at >= window; fn force_flush(&mut self) -> Option<Batch>. 4) Ensure attachments carry over with the batch. Acceptance: unit tests verify not exceeding 10 embeds, correct flush on window and count.
+
+## 7. Cost estimator mapping and safe fallbacks [pending]
+### Dependencies: None
+### Description: Add configurable model-to-rate mapping and compute session cost from token counts.
+### Details:
+Implement shared::costs: 1) struct ModelRates { input_per_token: f64, output_per_token: f64 }. 2) Configurable map: HashMap<String, ModelRates> loaded from cfg or defaults for common Claude models; allow overrides at runtime. 3) fn estimate_session_cost(model: &str, tokens_in: u32, tokens_out: u32, rates: &HashMap<String, ModelRates>) -> f64 that returns 0.0 if model unknown; round to 4 decimal places for display. 4) Integrate with assistant embed builder to show Session Cost (estimated). Acceptance: unit tests for known/unknown models and zero-safety.
+
+## 8. Snapshot and boundary tests (insta) for builders and limits [pending]
+### Dependencies: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7
+### Description: Create comprehensive insta snapshots and boundary tests validating builders, truncation, fences, and diffs.
+### Details:
+Add tests: 1) Snapshot JSON of Embed payloads for representative events (tool_use Bash; tool_use Write/Edit with and without diffs; assistant long text; tool_result error; completion). 2) Boundary tests: field count never exceeds 25; description <= 4096; field values <= 1024; message content (if used) <= 2000. 3) Truncation markers: verify presence of note "(truncated)" when applied. 4) Fence closure: no unclosed fences; code blocks remain intact even with backtick runs. 5) Diff tests: small, medium, large patches; inline hunks within ~50 lines; large diffs attach full version and mark is_truncated. 6) Attachment linkage: verify attachment:// references and size summary fields. 7) Batching tests: verify flush at 10 embeds and on time window. DoD: all tests green, snapshots stable.
+
+## 9. Security tests: mention neutralization and ANSI stripping [pending]
+### Dependencies: 13.1, 13.2, 13.3, 13.5
+### Description: Ensure no accidental mentions or terminal escapes slip through embeds and fields.
+### Details:
+Add tests to validate: 1) allowed_mentions is none on all payloads (no users, roles, everyone). 2) Strings containing @everyone, @here, and <@id> do not trigger mentions (either blocked by allowed_mentions or neutralized in non-code fields). 3) ANSI escape sequences in tool outputs are stripped by strip_ansi before embedding and do not render styled text. 4) Zero-width character handling: input containing ZWSP or ZWNJ cannot be used to craft stealth mentions; sanitization preserves readability. 5) Long untrusted stderr/stdout is moved to attachments when exceeding limits, ensuring embeds remain within constraints.
+

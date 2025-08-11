@@ -1,0 +1,78 @@
+# Task ID: 16
+# Title: Discord Bot Service: Channel Lifecycle and Webhook Provisioning
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Build a serenity-based bot that creates per-run channels and channel-scoped webhooks in the “Agent Runs” category, returning {channelId, webhookUrl}. Implement retention-based archive/delete.
+# Details:
+- Serenity setup: minimal intents (GUILD_MESSAGES, GUILDS) and http client. Load DISCORD_BOT_TOKEN from secret.
+- HTTP API (Axum) for orchestrator:
+  - POST /run/create {taskId, attempt, shortId, guild_id?, category_name?}
+    - Ensure/find category “Agent Runs” (or provided), create text channel name format run-{taskId}-{attempt}-{shortId}.
+    - Create channel-scoped webhook; return {channelId, webhookUrl, webhookId} JSON.
+  - POST /run/complete {channelId, webhookId} -> delete webhook; optionally delete channel or schedule retention delete.
+- Store run map in memory (DashMap) keyed by channelId: {taskId, attempt, shortId, webhookId, created_at}. For crash resilience, optionally persist to a small file (MVP optional).
+- Post initial header embed via webhook or bot message if needed.
+- Retention: config RETENTION_HOURS; spawn background task scanning map and deleting channels/webhooks past window.
+- Permissions: restrict @everyone send if input disabled; bot manage webhooks and channels.
+- Pseudo-code (serenity + axum skeleton):
+  struct BotState{ http:Arc<Http>, cache:Cache, runs:DashMap<ChannelId, RunInfo> }
+  async fn create_run(Json(req)): -> Json<Response> { let cat=find_or_create_category(...); let ch=guild.create_channel(...).await?; let wh=ch.create_webhook(&state.http, "run").await?; Ok(Json({channelId:ch.id, webhookUrl:wh.url(), webhookId:wh.id})) }
+
+
+# Test Strategy:
+- Use a test guild: run bot pointing to a sandbox server.
+- Call /run/create via curl; assert channel created under category and webhook returned.
+- Call /run/complete; assert webhook deleted and channel removed after retention.
+- Negative: duplicate create for same run -> either reuse or create uniquely suffixed; ensure no panic.
+- Permission test: verify pod never receives bot token; only webhookUrl is returned.
+
+# Subtasks:
+## 1. Serenity bot skeleton and configuration [pending]
+### Dependencies: None
+### Description: Initialize a serenity-based bot with minimal gateway intents and an HTTP client, load configuration from environment, and expose shared state.
+### Details:
+Set up a crates/bot binary. Initialize serenity::Client with intents GUILDS and GUILD_MESSAGES. Load DISCORD_BOT_TOKEN from env/secret manager. Build BotState with Arc<Http>, Cache, and placeholders for runs map. Wire logging/tracing, graceful shutdown, and config struct (e.g., RETENTION_HOURS, DEFAULT_GUILD_ID, DEFAULT_CATEGORY_NAME). Ensure bot token is never logged.
+
+## 2. Axum HTTP API: POST /run/create and /run/complete [pending]
+### Dependencies: 16.1, 16.3, 16.4
+### Description: Expose Axum endpoints for orchestrator to create and complete runs with JSON schemas and error handling.
+### Details:
+Spin up an Axum server with JSON extractor/response. Define CreateRunRequest {taskId:String, attempt:u32, shortId:String, guild_id:Option<u64>, category_name:Option<String>} and CreateRunResponse {channelId:u64, webhookUrl:String, webhookId:u64}. Define CompleteRunRequest {channelId:u64, webhookId:u64}. Implement handlers calling category/channel/webhook helpers, returning typed JSON. Add structured errors (status codes for bad input, not found, Discord API errors). Bind port from env (e.g., BOT_HTTP_PORT).
+
+## 3. Category discovery/creation and channel naming [pending]
+### Dependencies: 16.1
+### Description: Implement utilities to find or create the target category and generate sanitized per-run channel names.
+### Details:
+Add ensure_category(guild_id, category_name_or_default) -> CategoryId that searches existing categories by name (case-insensitive) and creates if missing. Implement build_channel_name(taskId, attempt, shortId) -> String using format run-{taskId}-{attempt}-{shortId}, lowercased, hyphen-only, trimmed to Discord limits. Provide create_text_channel_in_category(guild_id, category_id, name, topic?). Handle missing guild_id by using DEFAULT_GUILD_ID if configured.
+
+## 4. Channel and channel-scoped webhook provisioning [pending]
+### Dependencies: 16.3
+### Description: Create per-run text channels in the category and provision a channel-scoped webhook, returning IDs and URL.
+### Details:
+Given guild and category, create the text channel with topic including taskId/attempt/shortId. Create a channel-scoped webhook named "run" and fetch its URL and ID. Return {channelId, webhookUrl, webhookId}. Optionally post an initial header embed via webhook. Ensure bot manages channels/webhooks and does not leak the bot token in responses or logs.
+
+## 5. In-memory run map (DashMap) with optional persistence [pending]
+### Dependencies: 16.2, 16.4
+### Description: Track run metadata keyed by channelId and optionally persist to a small file for crash resilience.
+### Details:
+Define RunInfo {taskId, attempt, shortId, webhookId, created_at}. Use DashMap<ChannelId, RunInfo> in BotState. Insert on successful create; remove on complete/delete. Implement lightweight JSON persistence to a file path (e.g., RUNS_STATE_PATH) on every mutation or periodically; load at startup and validate entries (dropping those whose channel no longer exists). Guard with Tokio tasks and atomic write temp-rename pattern.
+
+## 6. Retention worker for archive/delete past RETENTION_HOURS [pending]
+### Dependencies: 16.5
+### Description: Implement a background task that scans runs and deletes webhooks/channels older than the configured retention window.
+### Details:
+Read RETENTION_HOURS from config. Spawn a periodic task (e.g., every 60s) that computes cutoff and iterates DashMap entries. For each expired run: delete webhook, then delete the channel; handle partial failures with retries/backoff and skip-list to avoid hot loops. Remove from map after successful cleanup. Optionally support an ARCHIVE_CATEGORY move before deletion when an ARCHIVE_ONLY flag is set.
+
+## 7. Permissions and safety controls [pending]
+### Dependencies: 16.4
+### Description: Apply channel permission overwrites to restrict @everyone from sending messages and implement safety practices.
+### Details:
+On channel creation, set PermissionOverwrites for @everyone: deny SEND_MESSAGES, allow VIEW_CHANNEL and READ_MESSAGE_HISTORY. Optionally grant a configured role ability to send if needed. Ensure AllowedMentions are restricted for any bot posts. Validate the bot has MANAGE_CHANNELS and MANAGE_WEBHOOKS. Redact secrets in logs and never return the bot token via the API.
+
+## 8. Integration tests against sandbox guild [pending]
+### Dependencies: 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7
+### Description: Write end-to-end tests for create/complete flows, idempotency, and retention using a sandbox Discord guild.
+### Details:
+Use a test guild ID from env (TEST_GUILD_ID) and a disposable category name. Test: call /run/create and assert channel under category and a webhook URL/ID returned; call /run/complete and assert webhook deleted; set RETENTION_HOURS small (e.g., 0.001) and assert channel removed by worker. Test idempotent create for same {taskId, attempt, shortId} returns existing channel/webhook (by finding existing channel name and reusing webhook or map record). Clean up any leftovers on failure.
+

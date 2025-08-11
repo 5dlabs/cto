@@ -1,0 +1,128 @@
+# Task ID: 15
+# Title: Watcher Binary Integration and Pipeline Orchestration
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Wire tailer, formatter, and webhook client into a low-overhead sidecar binary with config, initial header embed, final summary, health checks, and parity-mode.
+# Details:
+- CLI/env via clap + env vars:
+  - DISCORD_WEBHOOK_URL (required), WORKSPACE_PATH, POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE=false, FILTERS (JSON), COST_RATES (JSON), LOG_LEVEL.
+- Startup: resolve transcript path (block/retry until present). Post initial header embed including run metadata (taskId, attempt, shortId if available from env), model (if first event has it), timestamps.
+- Pipeline:
+  - tailer_rx -> formatter -> batch_queue -> webhook_client.
+  - Maintain Stats {tokens_in/out, tools_used, errors, start_ts} updated per event.
+- Finalization: on Completion event or tail idle timeout + EOF, post ✅ Complete embed with totals, cost, duration; revoke webhook optional by notifying bot endpoint if configured.
+- Health: expose /healthz with Axum returning 200 if tailer alive and webhook reachable lately; /metrics optional.
+- Performance: use Tokio current_thread in watcher if single-thread suffices; pin poll interval; reuse buffers; set reqwest client reuse.
+- Pseudo-code:
+  let cfg=load_cfg();
+  post_header(&cfg.webhook);
+  while let Some(ev)=rx.recv().await { let items=to_embeds(ev,&mut stats,&cfg); batch_tx.send(items).await; }
+  post_completion(stats);
+
+
+# Test Strategy:
+- End-to-end with a temp JSONL file and wiremock webhook: simulate run with all event types; assert initial header and final summary posted.
+- Failure modes: webhook unavailable initially -> retries; file appears late -> pipeline recovers.
+- Parity-mode test: ensure no filtering and minimal truncation.
+- Resource checks: run under /usr/bin/time; verify CPU <1% average and RSS <64Mi for synthetic stream.
+
+# Subtasks:
+## 1. CLI and environment config loader [pending]
+### Dependencies: None
+### Description: Implement clap + env config loader with validation, defaults, and a central Config struct.
+### Details:
+- Use clap with env var fallbacks to populate Config.
+- Supported env/flags: DISCORD_WEBHOOK_URL (required, URL), WORKSPACE_PATH (optional), POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE (default false), FILTERS (JSON), COST_RATES (JSON), LOG_LEVEL (default info), HTTP_ADDR (optional, e.g., 127.0.0.1:8080), WEBHOOK_REVOKE_URL (optional URL).
+- Validate: webhook URL non-empty and valid; POLL_INTERVAL_MS > 0; BATCH_SIZE >= 1; JSON fields parse to expected types.
+- Parse FILTERS and COST_RATES into typed structs (serde). COST_RATES should map model names to per-token cost for prompt/completion.
+- Include run metadata sources: TASK_ID, ATTEMPT, SHORT_ID from env if present.
+- Initialize tracing with LOG_LEVEL.
+- Construct a single reqwest::Client with connection reuse, keepalive, pooled DNS; expose in Config or Context.
+- Unit tests for defaults, invalid/missing values, and JSON parse errors.
+
+## 2. Transcript path resolution with blocking retry [pending]
+### Dependencies: 15.1
+### Description: Resolve transcript JSONL path and block with retries until the file appears.
+### Details:
+- Determine transcript path from WORKSPACE_PATH (e.g., <workspace>/transcript.jsonl or provided pattern); allow an override via an optional env/flag if provided.
+- Implement resolve_transcript_path() that polls at POLL_INTERVAL_MS until the file exists (and is readable), handling ENOENT gracefully.
+- Log periodic status and first success; support cancellation on shutdown signals.
+- Return a PathBuf and initial file offset for tailing.
+- Unit test: file appears late; permission error; immediate presence; cancellation.
+
+## 3. Pipeline wiring: tailer → formatter → batching → webhook client [pending]
+### Dependencies: 15.1, 15.2
+### Description: Wire the async pipeline with channels, backpressure, retries, and performance tuning.
+### Details:
+- Tailer: async JSONL tail of the resolved file; non-blocking reads; emits Event items; detects EOF and idle periods; uses pinned poll interval.
+- Formatter: convert Events to Discord embeds/messages applying filters and parity-mode toggles; reuse buffers to limit allocations.
+- Batch queue: bounded mpsc; accumulate up to BATCH_SIZE or flush on time; coalesce small batches; ensure ordering.
+- Webhook client: send batches to DISCORD_WEBHOOK_URL using shared reqwest::Client; implement retry with exponential backoff and jitter; respect Discord rate limits if present.
+- Error handling: propagate fatal errors; retry transient ones; ensure backpressure does not deadlock.
+- Tokio runtime: prefer current_thread for watcher; spawn minimal tasks; pin poll interval; avoid blocking.
+- Pseudo-flow: while let Some(ev)=tailer_rx.recv() { let items=to_embeds(ev,&mut stats,&cfg); batch_tx.send(items).await; }
+
+## 4. Initial header embed posting [pending]
+### Dependencies: 15.1, 15.3
+### Description: Post the startup header embed with run metadata and optionally model from first event.
+### Details:
+- Build header embed with: taskId, attempt, shortId (if present), start timestamp, workspace hint; include host/pid if desired.
+- Model inclusion strategy: if the first observed event contains model, include it; otherwise post header immediately and send a lightweight follow-up update when model is known.
+- Ensure idempotent header posting on retries; include a run correlation id to link messages.
+- Verify via wiremock that header is posted before processing bulk events.
+- Plumb webhook client from pipeline; handle transient failures with retries.
+
+## 5. Stats tracking and state updates per event [pending]
+### Dependencies: 15.1, 15.3
+### Description: Implement Stats struct and update logic for tokens/tools/errors and timings.
+### Details:
+- Stats fields: tokens_in, tokens_out, tools_used (map or set with counts), errors (count and last error), start_ts, last_event_ts, batches_sent, webhook_failures.
+- Update in formatter and/or a dedicated observer per event; record tool invocations and token deltas.
+- Cost calculation: use COST_RATES to compute totals by model and overall; expose snapshot for final summary and /metrics.
+- Concurrency: wrap in Arc<Mutex> or parking_lot::Mutex; provide cheap snapshot method.
+- Unit tests: accumulation correctness, cost math by model, error increments.
+
+## 6. Completion detection and final summary post [pending]
+### Dependencies: 15.3, 15.4, 15.5
+### Description: Detect completion by explicit event or idle EOF, then post ✅ summary and optional webhook revoke.
+### Details:
+- Completion signals: explicit Completion event, or tail idle timeout after EOF, or external shutdown signal.
+- Drain pipeline: flush remaining batches; ensure no duplicates; capture final Stats snapshot and duration.
+- Build and post final summary embed with totals (tokens, tools, errors), cost, and elapsed time; mark run as complete with ✅.
+- Optional revoke: if WEBHOOK_REVOKE_URL is set, notify bot endpoint to revoke/cleanup the webhook; retry transient failures.
+- Guarantee single execution (use OnceCell/flag) and graceful shutdown ordering.
+- Tests: verify final embed and revoke call under both completion modes.
+
+## 7. Health endpoints with Axum [pending]
+### Dependencies: 15.1, 15.3, 15.5
+### Description: Expose /healthz (and optional /metrics) reflecting tailer liveness and webhook reachability.
+### Details:
+- Axum server bound to HTTP_ADDR if provided; otherwise disabled.
+- /healthz: 200 if tailer task is alive and last webhook success within a recent window; include basic JSON body with timestamps and queue depth; else 503.
+- /metrics (optional): expose Prometheus metrics (counters for events, batches, failures, gauges for queue, timestamps, cost totals).
+- Share state via Arc context (stats snapshot, last_webhook_ok_at, last_event_at, tailer_alive flag).
+- Lightweight handlers suitable for current_thread runtime; avoid blocking.
+- Tests: hit /healthz during run and after completion; verify status transitions.
+
+## 8. Parity-mode behavior and minimal truncation toggles [pending]
+### Dependencies: 15.1, 15.3, 15.5
+### Description: Implement PARITY_MODE to bypass filters and apply only minimal truncation for Discord limits.
+### Details:
+- When PARITY_MODE=true: disable FILTERS; avoid summarization; preserve event content ordering; only truncate to meet Discord message/embed limits; mark messages as parity for traceability.
+- When PARITY_MODE=false: apply configured FILTERS and normal formatting/truncation rules.
+- Ensure cost/stat updates are identical across modes for equal token counts.
+- Tests: parity mode produces near-pass-through embeds; non-parity mode applies filters; verify no hidden drops.
+
+## 9. End-to-end tests with wiremock and synthetic JSONL [pending]
+### Dependencies: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.8
+### Description: Write E2E tests covering normal flow, late file, webhook outage, and parity-mode.
+### Details:
+- Use temp dir + synthetic transcript JSONL including all event types and a Completion event.
+- Wiremock webhook: assert header posted first, batches follow in order, final ✅ summary with correct totals/cost/duration.
+- Failure recovery: start with webhook returning 5xx for N attempts then recover; ensure retries and eventual success; start without transcript then create it; confirm pipeline recovers.
+- Parity-mode test: ensure no filtering and only minimal truncation is applied.
+- Health checks: during run /healthz is 200; during outage flips to 503; returns to 200 after recovery.
+- Resource sanity: run under load with small POLL_INTERVAL_MS and BATCH_SIZE; assert no excessive memory growth (approx via metrics) and timely processing.
+- DoD: e2e test green with header and final summary; resilience scenarios pass.
+

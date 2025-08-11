@@ -1,0 +1,154 @@
+# Task ID: 11
+# Title: Initialize Rust Monorepo and Project Scaffolding
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Create a Cargo workspace with crates for watcher, bot, input-bridge, and a shared crate for formatting and common types. Set up tooling, CI, and basic configs to enable fast, low-overhead development per PRD.
+# Details:
+- Create Cargo workspace structure:
+  - crates/watcher (sidecar tailer)
+  - crates/bot (Discord bot using serenity)
+  - crates/input-bridge (pod-local HTTP → FIFO/stdin)
+  - crates/shared (event types, embed builders, truncation, cost calc)
+- Dependencies (latest stable compatible): tokio (multi-thread), serde/serde_json, reqwest, serenity, axum, tower, thiserror, tracing/tracing-subscriber, anyhow, clap, clap-derive, notify, similar (diff), time, governor (rate limit optional), parking_lot, bytes.
+- Lint/format: rustfmt, clippy; set RUSTFLAGS for opt-level z (release) in watcher to reduce mem.
+- Features: shared: diff, embeds, cost-estimator; watcher: parity-mode, filters; bot: http-server; input-bridge: fifo-io.
+- .env loading via dotenvy (development only). In prod use env vars.
+- CI skeleton: cargo fmt --check, cargo clippy -D warnings, cargo test --all, build --release.
+- Tracing setup (JSON logs optional; include RUST_LOG config guidance).
+- Pseudo-code structure:
+  workspace/Cargo.toml:
+  [workspace]
+  members=["crates/*"]
+  [profile.release]
+  opt-level="z"
+  lto=true
+  codegen-units=1
+- README with quickstart and workspace commands.
+
+# Test Strategy:
+- Build all crates: cargo build --release --all.
+- Run cargo test --all, ensure no panics.
+- Lint: cargo fmt -- --check; cargo clippy -D warnings.
+- Verify minimal binary sizes and memory usage baseline using /usr/bin/time on watcher hello-world run.
+
+# Subtasks:
+## 1. Create workspace and crate skeleton [pending]
+### Dependencies: None
+### Description: Initialize a Cargo workspace and scaffold crates: watcher, bot, input-bridge, shared with release profiles optimized for size.
+### Details:
+- Create directory layout: crates/watcher, crates/bot, crates/input-bridge, crates/shared
+- Top-level Cargo.toml:
+  - [workspace] members = ["crates/*"]
+  - [profile.release] opt-level = "z", lto = true, codegen-units = 1
+  - [profile.dev] opt-level = 0
+  - [profile.release.package."watcher"] panic = "abort" (override)
+- Add .cargo/config.toml:
+  - [build] target-dir = "target"
+  - Optionally add platform rustflags for stripping on Linux (link-arg=-s)
+- Crate scaffolds:
+  - shared: library crate (src/lib.rs) with placeholder modules: types, embeds, truncation, cost
+  - watcher: binary crate (src/main.rs) with clap boilerplate and hello-world main
+  - bot: binary crate (src/main.rs) with hello-world main
+  - input-bridge: binary crate (src/main.rs) with hello-world main
+- Ensure all crates compile with cargo build --all
+
+## 2. Wire dependencies and crate feature flags [pending]
+### Dependencies: 11.1
+### Description: Add required dependencies and define crate-level features per PRD across workspace and crates.
+### Details:
+- Use [workspace.dependencies] in root Cargo.toml to pin versions centrally (latest stable-compatible): tokio (rt-multi-thread, macros), serde, serde_json, reqwest, serenity, axum, tower, thiserror, tracing, tracing-subscriber, anyhow, clap (derive, env), notify, similar, time, governor (optional), parking_lot, bytes
+- shared/Cargo.toml:
+  - deps: serde, serde_json, thiserror, tracing, time
+  - optional deps: similar (feature "diff")
+  - features: diff = ["dep:similar"], embeds = [], cost-estimator = ["time"], default = []
+- watcher/Cargo.toml:
+  - deps: tokio, notify, serde, serde_json, anyhow, thiserror, tracing, clap, parking_lot, bytes, shared = { path = "../shared", default-features = false, features = ["diff", "embeds", "cost-estimator"] }
+  - features: parity-mode = [], filters = [], default = []
+- bot/Cargo.toml:
+  - deps: serenity, tokio, reqwest, clap, anyhow, thiserror, tracing, shared = { path = "../shared" }
+  - optional deps: axum (feature "http-server"), governor (feature "rate-limit")
+  - features: http-server = ["dep:axum"], rate-limit = ["dep:governor"], default = []
+- input-bridge/Cargo.toml:
+  - deps: axum, tower, tokio, serde, serde_json, anyhow, thiserror, tracing, bytes
+  - features: fifo-io = [], default = []
+- Verify cargo check -p <crate> passes for each crate
+
+## 3. Set up dev tooling, formatting, and local env loading [pending]
+### Dependencies: 11.1
+### Description: Configure rustfmt, clippy, EditorConfig, dotenvy (dev-only), and size-focused build settings for watcher.
+### Details:
+- Add rustfmt.toml (e.g., max_width = 100, use_small_heuristics = "Max")
+- Add .editorconfig for consistent whitespace/line endings
+- Add clippy config (optional) or rely on CI with -D warnings
+- Add dotenvy as a dev-dependency only where needed (watcher, bot) or behind feature:
+  - shared: add feature dev-env = ["dep:dotenvy"], and optional dependency dotenvy (dev only)
+  - Provide a helper fn shared::env::load_dev() that calls dotenvy::dotenv().ok() when debug_assertions and feature enabled
+- Optimize watcher binary size/perf:
+  - Confirm profile.release.package."watcher" panic = "abort" (already set)
+  - Document RUSTFLAGS usage for local builds: RUSTFLAGS="-C strip=symbols" cargo build -p watcher --release
+- Add rust-toolchain.toml with channel = "stable"
+
+## 4. Configure CI workflows (GitHub Actions) [pending]
+### Dependencies: 11.2, 11.3
+### Description: Add CI to run fmt check, clippy with -D warnings, tests, and release build with proper caching.
+### Details:
+- .github/workflows/ci.yml:
+  - on: [push, pull_request]
+  - jobs.build: ubuntu-latest
+  - steps: checkout, set up Rust (use rust-toolchain), cache (Swatinem/rust-cache@v2), cargo fmt -- --check, cargo clippy --all-targets --all-features -D warnings, cargo test --all --all-features, cargo build --release --all
+  - concurrency: group by ref to avoid duplicate runs
+- Artifacts: optionally upload target/release sizes summary (from scripts in subtask 7)
+- Branch protection guidance for main to require CI green
+
+## 5. Implement tracing/logging initialization and env examples [pending]
+### Dependencies: 11.2
+### Description: Provide shared tracing setup (JSON optional) and example environment configuration including RUST_LOG guidance.
+### Details:
+- In shared, add logging module with init_tracing(format: env) that:
+  - Reads LOG_FORMAT ("json" or "pretty"), default pretty
+  - Configures tracing_subscriber with EnvFilter (default "info" if RUST_LOG unset)
+  - Enables JSON output when LOG_FORMAT=json
+- Call shared::logging::init_tracing() from each binary's main before other init
+- Add .env.example with common vars:
+  - RUST_LOG=info
+  - LOG_FORMAT=pretty
+  - DISCORD_WEBHOOK_URL=... (bot/watcher)
+  - INPUT_FIFO=/agent/input.fifo (input-bridge)
+- Document JSON logs optionality and how to override per binary via env
+
+## 6. Author README and CONTRIBUTING [pending]
+### Dependencies: 11.2, 11.3, 11.4, 11.5
+### Description: Write README with quickstart, workspace commands, run targets, and CONTRIBUTING notes covering tooling and CI expectations.
+### Details:
+- README contents:
+  - Overview of monorepo and crates
+  - Quickstart: install Rust, cargo build --all, cargo test --all
+  - Running: cargo run -p watcher|bot|input-bridge -- --help
+  - Env setup: .env for development only (dotenvy), use real env in production
+  - Logging: RUST_LOG guidance and LOG_FORMAT
+  - Profiles and size optimization rationale (opt-level z, LTO, codegen-units)
+  - Workspace commands cheat sheet
+- CONTRIBUTING.md:
+  - Code style (rustfmt), linting (clippy -D warnings), testing, PR checks
+  - Commit/PR guidelines and CI status requirements
+
+## 7. Baseline build, size checks, and automation scripts with DoD [pending]
+### Dependencies: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6
+### Description: Add scripts and Makefile for common tasks; capture baseline binary sizes and memory for watcher; define DoD.
+### Details:
+- scripts/size.sh:
+  - Build release: cargo build --release --all
+  - Strip symbols where supported
+  - Print sizes for target/release/{watcher,bot,input-bridge}
+  - Run /usr/bin/time -v ./target/release/watcher --help to capture baseline RSS
+  - Output summary to SIZES.md
+- Makefile targets:
+  - fmt, lint, test, build, run-watcher, run-bot, run-bridge, size
+- Ensure watcher has minimal clap CLI so --help exits quickly for measurement
+- Definition of Done:
+  - All crates compile and basic hello-world mains run
+  - CI green on fmt/clippy/test/build
+  - README and CONTRIBUTING present
+  - SIZES.md committed with baseline sizes and watcher memory metrics
+

@@ -1,0 +1,29 @@
+# Task ID: 14
+# Title: Discord Webhook Client with Rate Limiting, Backoff, and Attachments
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Post batched embeds via channel-scoped webhook, respecting Discord limits and handling 429 responses with proper backoff. Support attachments for large outputs.
+# Details:
+- Implement shared::webhook::Client using reqwest with connect pool, gzip enabled, and timeout sensible defaults.
+- API:
+  - send_batch(webhook_url:&str, batch:Batch) -> Result<()>
+  - queue + worker: an mpsc channel to buffer BatchItems; worker aggregates to ≤10 embeds per request, flushes on size or time (e.g., 250ms) for near-real-time.
+- Rate limit handling:
+  - On 429, parse headers: Retry-After or X-RateLimit-Reset-After; sleep accordingly; requeue with jitter. Honor route-specific rate limit for webhooks.
+  - Backoff with exponential + jitter on 5xx; cap retries.
+- Multipart for attachments: use files[] name, attach via payload_json referencing attachments with attachment://.
+- Enforce content limits pre-send to avoid rejections.
+- Disable mentions: allowed_mentions: { parse: [] }.
+- Telemetry: logs for 2xx/4xx/5xx; counters for retries; latency histograms.
+- Pseudo-code:
+  loop { batch=collect_up_to(10, 250ms); let res=post(webhook_url, batch).await; match res.status { 2xx=>ok, 429=>sleep(retry_after); requeue(batch); 5xx=>retry_with_backoff(batch); 4xx=>log and drop } }
+
+# Test Strategy:
+- Wiremock server to emulate Discord webhook. Scenarios:
+  - 200 with embeds and attachments -> assert payload structure.
+  - 429 with Retry-After header -> assert delay and retry once.
+  - 5xx transient -> retries with backoff then success.
+  - Payload exceeding limits -> ensure truncated before send.
+- Concurrency test: multiple quick batches coalesce up to 10 embeds.
+- Measure end-to-end post latency remains < network limits.

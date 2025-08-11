@@ -1,0 +1,85 @@
+# Task ID: 19
+# Title: Kubernetes Sidecar and Helm Chart Packaging
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Provide K8s manifests and Helm charts to deploy the watcher as a sidecar, the bot as a deployment, and the input-bridge in the agent pod. Include values reflecting PRD config and resource limits.
+# Details:
+- Helm chart structure charts/discord-monitor with subcharts or templates for:
+  - Bot Deployment + Service + Secret (bot token), ConfigMap for retention/config.
+  - Sidecar template snippet to inject into target workloads (document how to add). Env: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL, BATCH_SIZE, filters.
+  - Input-bridge Container (in same pod as agent) exposing 127.0.0.1 only; volumeMount for FIFO path if needed.
+- Resource requests/limits per PRD: watcher requests {cpu:10m, memory:32Mi} limits {cpu:100m, memory:64Mi}. Liveness/readiness probes: /healthz.
+- Values.yaml sketch from PRD:
+  discord.monitoring.enabled, polling.interval:100, batchSize:10, filters.includeTools, includePatterns, minStdoutLength, stats.trackCost/tokens/errors, resources.
+- RBAC minimal (bot needs none beyond network).
+- Example sidecar injection snippet for a Deployment:
+  containers:
+    - name: discord-watcher
+      image: discord-monitor:latest
+      env:
+        - name: DISCORD_WEBHOOK_URL
+          valueFrom: secretKeyRef: {...}
+        - name: WORKSPACE_PATH
+          value: /home/agent/.claude/projects/...
+      ports: [{name: health, containerPort: 8080}]
+      resources: {requests: {cpu: "10m", memory: "32Mi"}, limits: {cpu: "100m", memory: "64Mi"}}
+- Templating helpers to toggle parity-mode.
+- Documentation in NOTES.txt for how to wire bot create to inject webhook env into pod spec (e.g., via orchestrator).
+
+# Test Strategy:
+- helm template with provided values -> validate manifests with kubeval/kubeconform.
+- kind cluster smoke test: install bot chart; deploy a sample job with sidecar; port-forward if needed; verify watcher healthz.
+- Resource verification: kubectl top shows watcher under limits during synthetic run.
+- Secret scan: ensure no bot token in sidecar env; only webhook.
+- Probe tests: kill webhook endpoint; liveness restarts watcher independently without affecting agent.
+
+# Subtasks:
+## 1. Initialize Helm chart skeleton and helper templates [pending]
+### Dependencies: None
+### Description: Scaffold charts/discord-monitor with standard Helm structure and reusable helpers for naming, labels, and parity-mode toggles.
+### Details:
+Create charts/discord-monitor with Chart.yaml, .helmignore, templates/, values.yaml (placeholder), and NOTES.txt (placeholder). Add templates/_helpers.tpl with helpers: name/fullname, labels/selectorLabels, image reference helpers, and a boolean helper for parity-mode toggles. Prepare directories or file stubs for: templates/bot/, templates/snippets/_sidecar.tpl, templates/snippets/_input_bridge.tpl, and templates/snippets/_common.tpl. Establish standard app.kubernetes.io labels and annotations across resources.
+
+## 2. Bot Deployment, Service, Secret, and ConfigMap templates [pending]
+### Dependencies: 19.1, 19.5, 19.6
+### Description: Implement bot Deployment, Service, Secret (bot token), and ConfigMap for retention/config with configurable env.
+### Details:
+Add templates/bot/deployment.yaml with env from Secret (BOT_TOKEN) and from ConfigMap for retention/config and behavior (e.g., LOG_LEVEL, STATS_*). Include liveness/readiness probes on /healthz port 8080 using common helpers. Add templates/bot/service.yaml exposing port 8080 for health/metrics. Add templates/bot/secret.yaml to create Opaque secret when .Values.bot.secret.create is true, supporting existingSecret reference. Add templates/bot/configmap.yaml to hold retention and related settings. Wire resources via common helpers and values. No RBAC beyond optional ServiceAccount; set to disabled by default.
+
+## 3. Sidecar template snippet for target workloads [pending]
+### Dependencies: 19.1, 19.5, 19.6
+### Description: Provide a reusable sidecar container snippet with envs, probes, resources, and parity-mode toggles for injection into workloads.
+### Details:
+Create templates/snippets/_sidecar.tpl exporting a named template that renders a container spec for the watcher sidecar. Include env: DISCORD_WEBHOOK_URL (from secret or value), WORKSPACE_PATH, POLL_INTERVAL (from .Values.polling.interval), BATCH_SIZE (.Values.batchSize), FILTERS (JSON), STATS booleans, PARITY_MODE, LOG_LEVEL. Add port named health on 8080 with liveness/readiness to /healthz via common helpers. Apply PRD resources: requests cpu 10m memory 32Mi; limits cpu 100m memory 64Mi. Provide values toggles to enable/disable sidecar and parity-mode. Document usage expectations (webhook secret provided externally).
+
+## 4. Input-bridge container snippet for agent pod [pending]
+### Dependencies: 19.1, 19.5, 19.6
+### Description: Add a reusable input-bridge container template that binds to 127.0.0.1 and supports FIFO volume mounts.
+### Details:
+Create templates/snippets/_input_bridge.tpl exporting a named template for an additional container to be added to the agent pod. Configure arguments/env to bind only to 127.0.0.1, expose an internal port (configurable), and include liveness/readiness probes if applicable. Support volumeMount for FIFO path (from .Values.inputBridge.fifoPath) and document corresponding volume declaration in the host workload. Apply resources via common helpers and values.
+
+## 5. Values.yaml reflecting PRD configuration [pending]
+### Dependencies: 19.1
+### Description: Define a comprehensive values.yaml capturing PRD defaults for polling, batching, filters, stats, resources, secrets, and toggles.
+### Details:
+Populate .Values with: discord.monitoring.enabled; polling.interval: 100; batchSize: 10; filters.includeTools, filters.includePatterns (list), filters.minStdoutLength; stats.trackCost, stats.tokens, stats.errors (booleans); parityMode: false. Define images (repository, tag, pullPolicy) for watcher, bot, inputBridge. Set watcher sidecar resources: requests {cpu: 10m, memory: 32Mi}, limits {cpu: 100m, memory: 64Mi}. Add probes config (paths/port/timeouts) defaulting to /healthz on 8080. Configure bot: service.type, port, resources, config.retention fields. Secrets: bot.secret.create, bot.secret.existingName/key; webhook.existingSecret/name/key. RBAC/serviceAccount toggles default false. Input-bridge: enabled, port, fifoPath.
+
+## 6. Common probes/resources helpers and minimal RBAC [pending]
+### Dependencies: 19.1, 19.5
+### Description: Provide shared helpers for /healthz probes and resource rendering, and define minimal/optional RBAC objects.
+### Details:
+Add templates/snippets/_common.tpl with named templates to render liveness/readiness probes to /healthz on 8080, reading delays/timeouts from values. Add a resources helper that maps .Values resources into container resources. Provide optional ServiceAccount template controlled by .Values.serviceAccount.create; leave Roles/RoleBindings absent by default per minimal RBAC requirement. Ensure templates gate creation via values toggles and use standard labels/annotations.
+
+## 7. Documentation and NOTES.txt for webhook integration and injection [pending]
+### Dependencies: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6
+### Description: Write NOTES.txt and usage docs explaining how to inject the sidecar and wire webhook env/secret into workloads.
+### Details:
+In templates/NOTES.txt, include: helm install instructions; how to create or reference a Secret containing DISCORD_WEBHOOK_URL; example kubectl create secret command; how to inject the sidecar snippet using Helm include (e.g., include "discord-monitor.sidecar" . | nindent 8) into an existing Deployment; guidance for orchestrator-driven webhook creation and env injection; example of adding the input-bridge container via include; explanation of parity-mode toggles. Document expected health endpoints and resources. Specify DoD signals: helm template validates, kind install passes health checks, secrets are namespaced and not world-readable.
+
+## 8. CI: helm lint/template, kubeconform, and kind smoke test [pending]
+### Dependencies: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7
+### Description: Set up CI to lint, render, validate, and smoke-test the chart on a kind cluster including a sample workload with sidecar.
+### Details:
+Add .github/workflows/helm-ci.yml to run: helm lint charts/discord-monitor; helm template with PRD values to a manifest file; validate with kubeconform (or kubeval) strict mode. Provision kind cluster; helm install the chart; deploy a sample Deployment that includes the sidecar snippet; wait for readiness; port-forward and curl /healthz for bot and sidecar; verify resources applied; ensure Secret scoping is correct. Provide hack/smoke.sh to reproduce locally. Define CI artifacts and caching for tool downloads. DoD: helm template produces valid manifests; kind install passes health checks; secrets are correctly scoped.
+

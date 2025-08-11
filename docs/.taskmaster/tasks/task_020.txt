@@ -1,0 +1,118 @@
+# Task ID: 20
+# Title: Documentation, Acceptance Tests, and Performance Validation
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Deliver comprehensive docs and perform acceptance and performance testing to satisfy MVP criteria: live streaming to channel, readable errors/stdout, final summary, and no agent slowdown.
+# Details:
+- Docs:
+  - architecture.md (high-level architecture, data flow, security model).
+  - deploy.md (bot setup, guild permissions, creating category, Helm install, sidecar injection, envs).
+  - operations.md (retention, webhook revocation, troubleshooting rate limits, logs).
+  - formatting.md (embed templates, truncation rules, diff behavior, parity-mode).
+- Acceptance tests matrix:
+  - Basic visibility: pre-created static webhook; watcher streams tool_use, assistant, errors, final summary.
+  - Bot lifecycle: create channel+webhook per run; inject into pod; final summary + channel removal.
+  - Optional input: /send relayed to bridge; agent receives text via FIFO.
+  - Hardening: rate limit/backoff works; bot outage -> watcher continues via webhook.
+- Performance:
+  - Latency: measure append-to-post time across 1000 events; median ≤100ms.
+  - Overhead: measure CPU (<1%) and RSS (<64Mi) in realistic run.
+  - Reliability: restart watcher mid-run; ensure resume without agent impact.
+- Example scripts:
+  - scripts/gen_transcript.rs to emit synthetic JSONL at varying rates.
+  - scripts/measure_latency.rs using Instant stamps embedded into events and webhook mock timestamps.
+- Pseudo-checklist: All acceptance criteria from PRD ticked and evidenced with logs/screenshots.
+
+# Test Strategy:
+- Execute acceptance test plan against a sandbox Discord guild with a mock agent.
+- Collect metrics/logs demonstrating latency and resource usage below thresholds.
+- Peer review of docs; run new-hire dry-run from zero to streaming in <30 minutes.
+- Record failures/regressions and file issues with repro steps.
+
+# Subtasks:
+## 1. architecture.md: High-level architecture, data flow, security model [pending]
+### Dependencies: None
+### Description: Author architecture.md covering components, end-to-end data flow, and the security model for streaming, errors/stdout, final summary, and resilience.
+### Details:
+- Scope: watcher, Discord bot service, webhooks, orchestrator, agent, storage/metrics, and sandbox guild.
+- Data flow: agent emits events -> watcher formats -> posts to channel via webhook; capture errors/stdout; final summary emission; resume semantics on restart.
+- Sequence diagrams for: static webhook path, per-run channel/webhook lifecycle, optional /send relay via FIFO, and backpressure/rate-limit handling.
+- Security model: Discord bot token handling, webhook secrecy and rotation, least-privilege intents, guild/category scoping, network boundaries, audit/logging, and PII handling.
+- Failure modes: Discord outages, rate limits, webhook deletion, bot unavailability; recovery behavior and idempotency.
+- Assumptions and constraints: Discord limits, embed size, message rate caps, retries with jitter/backoff.
+- Definition of Done: architecture.md merged after peer review; diagrams and flows align with acceptance/perf plans.
+
+## 2. deploy.md: Bot setup, permissions, Helm install, sidecar injection, envs [pending]
+### Dependencies: 20.1
+### Description: Create deploy.md describing Discord bot creation, guild permissions, category setup, Helm chart install, sidecar injection, and environment configuration.
+### Details:
+- Prereqs: Discord application creation, token retrieval, sandbox guild access.
+- Guild setup: minimal intents, required permissions for channel/webhook management; create or detect "Agent Runs" category.
+- K8s: secrets for DISCORD_BOT_TOKEN, config maps/values, namespaces.
+- Helm: chart values (retention, category name, resources), install/upgrade/rollback commands.
+- Sidecar injection: how to attach watcher to target pods; env vars for webhook URL, FIFO paths, logging levels.
+- Validation steps: curl POST /run/create, confirm channel + webhook; smoke test event stream; /run/complete teardown.
+- Rollback and disaster recovery notes.
+- Definition of Done: deploy.md lets a new operator deploy to sandbox and verify end-to-end streaming.
+
+## 3. operations.md: Retention, webhook revocation, rate-limit/backoff, troubleshooting [pending]
+### Dependencies: 20.2
+### Description: Produce operations.md covering retention policies, webhook revocation/rotation, rate-limit/backoff guidance, observability, and troubleshooting playbooks.
+### Details:
+- Retention: archival vs delete timelines, channel cleanup, webhook deletion on run complete; manual overrides.
+- Webhook lifecycle: rotate/revoke procedures, incident response if URL leaked.
+- Rate limits: Discord headers, local backoff with jitter, safe retry policies, queuing behavior; how to tune.
+- Monitoring: logs, metrics, alerts (latency, error rates, rate-limit hits, CPU/RSS), dashboards.
+- Troubleshooting: common failures (permission errors, missing category, hitting embed limits, bot outage), step-by-step checks and remediation.
+- Runbooks for bot outage fallback (continue via static webhook), and for restarting watcher mid-run.
+- Definition of Done: operations.md peer-reviewed; runbooks validated in sandbox.
+
+## 4. formatting.md: Embed templates, truncation, diff behavior, parity-mode [pending]
+### Dependencies: 20.1
+### Description: Write formatting.md detailing message/embeds templates, truncation rules, diff presentation, and parity-mode for console equivalence.
+### Details:
+- Templates for: tool_use, assistant messages, errors/stdout, final summary; fields, color coding, footers, timestamps.
+- Limits: Discord message/embed constraints; truncation and overflow policy; attachment fallback when needed.
+- Diff behavior: how updates/edits are rendered; rules for collapsing/expanding; idempotent updates.
+- Parity-mode: toggles to mirror console logs; examples for each event type.
+- Examples: copy-pastable payloads for integration tests; expected render screenshots references.
+- Definition of Done: formatting.md approved; examples validated by test scripts.
+
+## 5. Acceptance tests: matrix and scripts (static webhook, lifecycle, optional input, hardening) [pending]
+### Dependencies: 20.2, 20.4
+### Description: Implement acceptance test matrix and scripts to validate visibility, bot lifecycle, optional /send input relay, and hardening scenarios.
+### Details:
+- Matrix definition with pass criteria:
+  - Basic visibility: pre-created static webhook; watcher streams tool_use, assistant, errors, final summary.
+  - Bot lifecycle: per-run channel+webhook creation; injection into pod; final summary; channel removal.
+  - Optional input: /send relayed to bridge; agent consumes text via FIFO.
+  - Hardening: rate-limit/backoff effectiveness; bot outage -> watcher continues via webhook.
+- Implement driver scripts to orchestrate runs, capture logs, and collect screenshots.
+- Mock agent or generator to emit representative events.
+- Artifacts: logs, screenshots, and a summary report mapping to PRD acceptance criteria.
+- Definition of Done: all acceptance tests pass with recorded evidence.
+
+## 6. Performance harness and synthetic generators; run and capture metrics [pending]
+### Dependencies: 20.2, 20.5
+### Description: Build and run performance harness with gen_transcript and latency measurement to meet thresholds: median ≤100ms, CPU <1%, RSS <64Mi; validate restart resilience.
+### Details:
+- Implement scripts/gen_transcript.rs to emit synthetic JSONL at configurable rates and sizes.
+- Implement scripts/measure_latency.rs using embedded Instant timestamps and webhook mock timestamps; compute median and distribution across 1000 events.
+- Load tests at realistic and peak rates; capture p50/p95 latency and error rates.
+- Resource measurement: CPU (<1%) and RSS (<64Mi) for watcher in a realistic run; document tooling (e.g., cgroup metrics, pidstat, kubectl top).
+- Reliability: restart watcher mid-run; verify resume without agent impact or slowdown.
+- Produce machine-readable metrics and a brief narrative summary.
+- Definition of Done: thresholds met with reproducible logs/metrics artifacts.
+
+## 7. Evidence packaging and new-hire dry-run checklist [pending]
+### Dependencies: 20.1, 20.2, 20.3, 20.4, 20.5, 20.6
+### Description: Assemble evidence (logs, screenshots, metrics) and create a new-hire dry-run checklist to go from zero to streaming in under 30 minutes.
+### Details:
+- Package artifacts: acceptance logs/screenshots, performance metrics, and reliability run outputs; index with context.
+- Create an evidence summary mapping each PRD acceptance and performance criterion to proof.
+- New-hire checklist: prerequisites, deploy steps, run acceptance basics, verify performance sampling; target completion <30 minutes.
+- Add links across docs (architecture/deploy/operations/formatting) and scripts.
+- Capture peer review sign-offs and any follow-up issues.
+- Definition of Done: evidence bundle published; checklist validated by a dry-run; all criteria satisfied.
+

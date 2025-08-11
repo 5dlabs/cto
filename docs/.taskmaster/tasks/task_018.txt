@@ -1,0 +1,21 @@
+# Task ID: 18
+# Title: Security and Isolation Hardening
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Ensure pods never hold bot tokens, validate run/channel mappings to prevent cross-run injection, revoke webhooks on completion, and neutralize mentions/content hazards.
+# Details:
+- Token isolation: Only the bot deployment stores DISCORD_BOT_TOKEN (K8s Secret). Sidecar watcher receives only DISCORD_WEBHOOK_URL.
+- Mapping validation: bot maintains ChannelId→Run mapping; message relay checks this map before forwarding. Add signature (HMAC) option for bridge requests if desired (shared secret via env) though not strictly required for loopback.
+- Webhook lifecycle: on /run/complete or after final summary, delete webhook via bot; sidecar optionally calls bot endpoint to signal completion.
+- Allowed mentions: Set allowed_mentions:{parse:[]} in all webhook payloads to prevent @ mentions.
+- Sanitization: escape triple backticks inside code blocks; strip ANSI control sequences from stdout/stderr to avoid unwanted formatting.
+- Permissions: channel permission overwrite to disallow everyone from posting if input disabled; allow only bot and maintainers role if configured.
+- Logging hygiene: never log tokens or webhook URLs; redact in logs.
+- Pseudo-code: payload.allowed_mentions = AllowedMentions::none(); strip_ansi(s): regex \x1B\[[0-9;]*[A-Za-z] -> "".
+
+# Test Strategy:
+- Verify watcher container envs do not include bot token (inspect pod spec).
+- Attempt cross-run injection: send message from different channel; ensure bot refuses.
+- Confirm mention suppression: post message with @everyone from agent output; ensure no actual mention in Discord.
+- Webhook revocation: after completion, trying to post should fail (410/404); ensure bot deleted webhook.

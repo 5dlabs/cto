@@ -1,0 +1,77 @@
+# Task ID: 12
+# Title: Implement Transcript JSONL Tailer and Event Parser (Watcher Core)
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Efficiently tail Claude’s append-only JSONL transcript with ≤100ms latency, parse events into structured internal types, and expose a stream to downstream formatting/posting pipeline.
+# Details:
+- Path resolution: prefer env WORKSPACE_PATH; else default ~/.claude/projects/<encoded-workspace>/<session>.jsonl. Provide discovery scan and retry with backoff.
+- Tailing approach: use tokio for async I/O; use notify crate (inotify/kqueue/FSEvents) to trigger reads; fallback to 100ms poll if events missed. Seek to end on startup (unless parity-mode) to avoid replay noise.
+- Robustness: handle file rotation or creation late. Reopen on rename/truncate.
+- Define event model in shared:
+  enum Event { ToolUse{kind:String, cmd:Option<String>, file:Option<String>, patch:Option<String>, cwd:Option<String>, ts:Option<String>}, Assistant{text:String, tokens_in:Option<u64>, tokens_out:Option<u64>, model:Option<String>, ts:Option<String>}, ToolResult{stdout:Option<String>, stderr:Option<String>, ts:Option<String>}, Completion{summary:Option<String>, totals:Option<Totals>, ts:Option<String>}, Error{message:String, ts:Option<String>} }
+  struct Totals{ tokens_in:u64, tokens_out:u64, tools:u64, errors:u64, duration_ms:Option<u64>, cost_usd:Option<f64>, model:Option<String> }
+- Parser: map Claude JSONL fields to Event, ignoring unknowns. Use serde_json::from_str per line, with defensive parsing to prevent crashes.
+- Filters from config (includeTools, includePatterns, minStdoutLength). Parity-mode bypasses filters and truncation decisions later.
+- Pseudo-code:
+  let mut file=open_and_seek(path, parity_mode);
+  let (tx, rx)=mpsc::channel(1024);
+  spawn(notify_watcher(path, tx.clone()));
+  loop { if let Some(line)=read_next_line(&mut file, 100ms)? { if let Ok(v)=serde_json::from_str::<Value>(&line) { if let Some(ev)=into_event(v) { if passes_filters(&ev) { tx.send(ev).await } } } } }
+- Performance: reuse buffers, avoid allocations; BufReader with capacity; parse small subset of fields.
+
+# Test Strategy:
+- Unit: feed synthetic JSONL lines for all event types; assert parsing correctness and filter behavior.
+- Integration: write to a temp file in another task simulating append every 50ms; ensure latency from write to rx.recv < 100ms avg (tokio time + Instant).
+- Rotation test: truncate/rename file mid-stream and continue.
+- Fuzz test parser with random junk lines to ensure no panics.
+
+# Subtasks:
+## 1. Path resolution and discovery [pending]
+### Dependencies: None
+### Description: Resolve transcript JSONL path via WORKSPACE_PATH or default discovery in ~/.claude/projects, with retry and backoff.
+### Details:
+Implement path resolution: check WORKSPACE_PATH env first; else derive default ~/.claude/projects/<encoded-workspace>/<session>.jsonl. Provide a discovery scan to find the most recent/active session file. Expand ~ and handle cross-platform path rules. Implement retry with exponential backoff when file not found, and surface a resolved PathBuf once available. Prepare helpers to locate parent directory for watcher setup.
+
+## 2. Async tailer core (tokio) with ≤100ms latency [pending]
+### Dependencies: 12.1, 12.5
+### Description: Build async tail loop that reads appended JSONL lines, parses into Events, and streams them via mpsc.
+### Details:
+Create tail_transcript(path, parity_mode) -> mpsc::Receiver<Event>. Use tokio async I/O with BufReader and reusable buffers to minimize allocations. Seek to end on startup unless parity_mode. Implement a loop that waits on a read-trigger (pluggable) or falls back to timed polling every 100ms; when data is available, read complete lines and parse via serde_json into Value then into Event. Apply a passes_filters() hook (no-op initially; wired in subtask 12.6). Expose a bounded channel (capacity ~1024) to downstream pipeline. Ensure graceful shutdown and backpressure handling.
+
+## 3. Filesystem notifications with fallback polling [pending]
+### Dependencies: 12.1
+### Description: Integrate notify crate to watch file and parent dir, with missed-event recovery and 100ms polling fallback.
+### Details:
+Set up notify watcher (inotify/kqueue/FSEvents) on the target file if present and its parent directory. Translate create, write, rename, remove, and truncate events into lightweight triggers for the tail loop. Coalesce bursts and handle spurious events. Provide a periodic 100ms timer to ensure progress if events are missed. Expose a Send + Sync trigger channel compatible with the tailer core.
+
+## 4. Rotation and late-creation handling [pending]
+### Dependencies: 12.1, 12.2, 12.3
+### Description: Detect and recover from file rename/truncate and handle files that appear after startup.
+### Details:
+Detect truncation (file size smaller than last offset) and seek to start or end based on parity_mode. On rename or removal, close the old handle and attempt to reopen the new path discovered via parent directory events or discovery scan. Support late file creation by waiting on parent notifications and opening when the file appears. Track inode/metadata to avoid duplicate reads. Preserve offsets across reopen events safely.
+
+## 5. Shared event model and defensive parser [pending]
+### Dependencies: None
+### Description: Define Event and Totals types and implement robust JSONL-to-Event mapping that ignores unknown fields.
+### Details:
+Add shared types: enum Event { ToolUse{kind, cmd?, file?, patch?, cwd?, ts?}, Assistant{text, tokens_in?, tokens_out?, model?, ts?}, ToolResult{stdout?, stderr?, ts?}, Completion{summary?, totals?, ts?}, Error{message, ts?} } and struct Totals{ tokens_in, tokens_out, tools, errors, duration_ms?, cost_usd?, model? }. Implement into_event(Value) -> Option<Event> and serde_json::from_str per line with defensive parsing: ignore unknowns, accept Option fields, clamp excessively large strings, and never panic on malformed input (log and skip).
+
+## 6. Configurable filters and parity-mode semantics [pending]
+### Dependencies: 12.5, 12.2
+### Description: Implement includeTools, includePatterns, minStdoutLength filters and parity-mode bypass.
+### Details:
+Define a Filters config struct: includeTools (bool), includePatterns (list of regex or glob patterns applied to text/stdout/stderr), minStdoutLength (usize). Implement passes_filters(&Event, &Filters, parity_mode) such that parity_mode disables all filtering. Wire this into the tailer core so only passing events are sent downstream. Ensure patterns compile once and are reused; handle invalid patterns gracefully.
+
+## 7. Performance profiling and optimizations [pending]
+### Dependencies: 12.2, 12.3, 12.4, 12.6
+### Description: Instrument latency and optimize allocations, buffer sizes, and channel capacities to meet ≤100ms target.
+### Details:
+Add tracing spans and Instant-based metrics for write-to-receive latency and parse duration. Tune BufReader capacity (e.g., 64–256 KiB) and reuse String/Vec buffers to avoid reallocations. Parse only required fields from JSON to minimize overhead. Set mpsc capacity to balance throughput and memory (e.g., 1024). Validate missed-event recovery path cost and adjust poll interval (default 100ms) via config. Document tunables and demonstrate reduced allocations via heap profiling where possible.
+
+## 8. Testing and DoD verification [pending]
+### Dependencies: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7
+### Description: Implement unit and integration tests, including rotation and fuzzing, and verify <100ms average tail latency.
+### Details:
+Unit tests: feed synthetic JSONL lines for every Event type and assert mapping correctness and filter behavior; ensure unknown fields are ignored and malformed lines do not panic. Integration tests: append to a temp file every ~50ms and assert average latency from write to rx.recv is <100ms across sustained runs. Rotation tests: simulate truncate and rename; verify tailing continues without duplication or loss. Fuzz tests: random and junk lines to ensure parser robustness. DoD: all tests pass and sustained average tail latency <100ms in integration.
+

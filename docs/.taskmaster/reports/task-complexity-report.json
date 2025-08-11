@@ -1,6 +1,6 @@
 {
 	"meta": {
-		"generatedAt": "2025-08-11T05:44:03.787Z",
+		"generatedAt": "2025-08-11T06:39:11.487Z",
 		"tasksAnalyzed": 10,
 		"totalTasks": 10,
 		"analysisCount": 10,
@@ -10,84 +10,84 @@
 	},
 	"complexityAnalysis": [
 		{
-			"taskId": 1,
-			"taskTitle": "Rust Watcher Project Setup and Config",
+			"taskId": 11,
+			"taskTitle": "Initialize Rust Monorepo and Project Scaffolding",
+			"complexityScore": 5,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand this task into 7 subtasks covering: 1) Workspace and crate skeleton (crates/watcher, bot, input-bridge, shared) with Cargo.toml workspace-level profiles (opt-level z, LTO, codegen-units=1 where applicable). 2) Dependencies and crate features wired (tokio, serde, reqwest, serenity, axum, tower, thiserror, tracing, anyhow, clap, notify, similar, time, governor optional, parking_lot, bytes; feature flags per crate as specified). 3) Dev tooling: rustfmt, clippy, editorconfig, dotenvy for dev only, RUSTFLAGS/target configs and size optimizations for watcher. 4) CI workflows (GitHub Actions) for fmt-check, clippy -D warnings, cargo test --all, build --release; cache setup. 5) Tracing/log setup (tracing-subscriber JSON optional), RUST_LOG guidance, example env files. 6) README with quickstart, workspace commands, run targets; CONTRIBUTING notes. 7) Baseline build and size check scripts (hello-world watcher run with /usr/bin/time) and makefile/scripts to orchestrate common tasks. Define DoD: all crates compile, CI green, README present, baseline sizes captured.",
+			"reasoning": "Moderate breadth across tooling, CI, and multi-crate setup but low algorithmic complexity; primary risk is wiring features and profiles correctly across crates."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Implement Transcript JSONL Tailer and Event Parser (Watcher Core)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Expand this task into 8 subtasks: 1) Path resolution and discovery (env WORKSPACE_PATH, default location scan, retry with backoff). 2) Async tailer core using tokio with BufReader, buffer reuse, ≤100ms latency target. 3) Filesystem notifications via notify with fallback timed polling and missed-event recovery. 4) Rotation/creation handling (reopen on rename/truncate, late file creation). 5) Shared event model types and serde mappings; defensive parsing that ignores unknowns. 6) Configurable filters (includeTools, includePatterns, minStdoutLength) and parity-mode semantics. 7) Performance profiling hooks and optimizations (allocation avoidance, capacities). 8) Testing: unit parsing, integration tailer with temp file appends, rotation test, and fuzzing junk lines to avoid panics. DoD: sustained tail latency avg <100ms in integration test; all tests pass.",
+			"reasoning": "Concurrency, file system edge cases, and robustness under rotation raise complexity; performance constraints and defensive parsing add non-trivial work."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Embed Formatting, Truncation, Diffing, and Batching Library",
+			"complexityScore": 8,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Expand this task into 9 subtasks: 1) Embed builders per event template with Discord limits enforced (fields, colors, content lengths). 2) Truncation helpers (trim_with_note) and content sanitization (code-fence escaping, zero-width space strategy). 3) Allowed mentions disabled in payload builder. 4) Diffing utilities: parse or compute diffs (similar::TextDiff), contextual hunk extraction (40–60 lines), formatting as ```diff. 5) Attachments pipeline for overflow content with attachment:// linking and size summaries. 6) Batching struct and logic: Batch and Batch::try_push, time/window-based flush policy. 7) Cost estimator mapping from model→rates with configuration and safe fallbacks. 8) Snapshot and boundary tests (insta) including field counts, truncation markers, fence closure, attachments. 9) Security tests (mention neutralization, ANSI stripping). DoD: snapshots stable, boundary tests green, and builder rejects payloads exceeding limits.",
+			"reasoning": "Multiple edge cases with Discord limits, diff formatting, and safe truncation; requires careful design and extensive tests to prevent message rejections."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Discord Webhook Client with Rate Limiting, Backoff, and Attachments",
 			"complexityScore": 7,
 			"recommendedSubtasks": 7,
-			"expansionPrompt": "Expand Task 1 into ~7 subtasks with deliverables and acceptance criteria. Cover: (1) crate/workspace skeleton with bin/lib layout per modules; (2) async runtime init (tokio) and graceful shutdown; (3) Config struct and precedence (CLI>env>file) using clap, config, envy; defaults (poll=100ms, batch=10), env keys per PRD; (4) transcript path discovery with --transcript override and ~/.claude/projects/<encoded>/<session>.jsonl fallback; (5) structured JSON logging via tracing_subscriber and log fields (runId/channelId); (6) release profile tuning (LTO, strip, codegen-units=1), MSRV gate, clippy/fmt; (7) tests: precedence, defaults, smoke runs (with/without webhook). Include risks (binary size/mem), owners, and estimates.",
-			"reasoning": "Multiple cross-cutting concerns (config precedence, logging, discovery, CI) but limited algorithmic depth; moderate complexity."
+			"expansionPrompt": "Expand this task into 7 subtasks: 1) Reqwest client factory (pooling, gzip, timeouts). 2) Payload builder for embeds + multipart attachments referencing attachment:// and pre-send validation of limits. 3) Queue + worker implementing batching (≤10 embeds) and 250ms flush window. 4) 429 handling: parse Retry-After/X-RateLimit-Reset-After, jittered sleeps, requeue. 5) Transient 5xx retry with capped exponential backoff; 4xx handling with logging and drop. 6) Telemetry (success/failure logs, retry counters, latency histograms). 7) Wiremock test suite for 200/429/5xx, coalescing concurrency, and attachment correctness. DoD: tests cover rate-limit/backoff paths; worker achieves near-real-time flush without exceeding limits.",
+			"reasoning": "Network error handling, rate-limit semantics, and multipart uploads add complexity; correctness depends on precise adherence to Discord’s behavior."
 		},
 		{
-			"taskId": 2,
-			"taskTitle": "Low-latency JSONL Tailer (≤100ms) with Inotify + Fallback",
+			"taskId": 15,
+			"taskTitle": "Watcher Binary Integration and Pipeline Orchestration",
 			"complexityScore": 8,
-			"recommendedSubtasks": 8,
-			"expansionPrompt": "Expand Task 2 into ~8 subtasks. Cover: (1) Tail struct with async read offset management; (2) inotify watcher for write/close/rename events; (3) polling fallback using tokio Interval; (4) session discovery: watch directory and reopen latest by mtime; (5) robust line splitting with partial-line buffering and minimal allocations (BufReader); (6) backpressure-safe mpsc to downstream; (7) file rotation/rename handling; (8) tests/benchmarks: latency ≤100ms avg, rotation, large lines, Linux-gated inotify. Define acceptance metrics (CPU <1% idle).",
-			"reasoning": "Event-driven file IO with rotation and latency guarantees is tricky, OS-specific, and timing-sensitive."
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Expand this task into 9 subtasks: 1) CLI/env config loader (clap + env) with validation and defaults. 2) Transcript path resolution with blocking retry until present. 3) Pipeline wiring: tailer_rx → formatter → batching queue → webhook client. 4) Initial header embed (run metadata) post logic. 5) Stats tracking (tokens, tools, errors, start_ts) and state updates per event. 6) Completion detection (Completion event or idle EOF) and final summary post; optional webhook revoke callback. 7) Health endpoints with Axum (/healthz; /metrics optional) and liveness checks of components. 8) Parity-mode behavior and minimal truncation path toggles. 9) End-to-end tests with wiremock + synthetic JSONL, failure recovery (late file, webhook outage). DoD: e2e test green with header and final summary; resource use within targets in synthetic run.",
+			"reasoning": "Cross-component orchestration with lifecycle events and resilience concerns; requires careful shutdown/finalization and health signaling."
 		},
 		{
-			"taskId": 3,
-			"taskTitle": "Event Parser, Filtering, and Embed Builder",
-			"complexityScore": 9,
-			"recommendedSubtasks": 10,
-			"expansionPrompt": "Expand Task 3 into ~10 subtasks. Cover: (1) serde models for transcript lines with tolerant parsing; (2) event mapping to enum kinds; (3) filters (includeTools, includePatterns, minStdoutLength); (4) parity mode bypass; (5) Discord limits enforcement (2000/4096/fields/embeds); (6) code fence sanitization and escaping; (7) diff generation using similar crate with hunk cap and attachment fallback; (8) embed templates per tool types with colors; (9) batching with idle flush and attachment production; (10) tests: boundary truncation, fuzz parser, diff correctness, parity pass-through.",
-			"reasoning": "High surface area: parsing resilience, complex formatting within strict limits, diffs, batching, and numerous edge cases."
-		},
-		{
-			"taskId": 4,
-			"taskTitle": "Webhook Sender with Rate Limiting, Backoff, and Attachments",
-			"complexityScore": 8,
-			"recommendedSubtasks": 8,
-			"expansionPrompt": "Expand Task 4 into ~8 subtasks. Cover: (1) bounded mpsc Message queue; (2) embed chunking (≤10 per request); (3) multipart builder for attachments with payload_json; (4) 429 handling using retry_after + X-RateLimit-*; (5) retry policy with decorrelated jitter and caps; (6) network timeouts and 5xx/timeout retries; (7) pressure policy (drop-oldest attachments) with logging; (8) test harness with mock Discord server for RL/429/multipart verification and stress test.",
-			"reasoning": "Distributed-system concerns (rate limits, retries, multipart correctness) and backpressure make this non-trivial."
-		},
-		{
-			"taskId": 5,
-			"taskTitle": "Statistics Aggregation and Final Summary Embed",
-			"complexityScore": 6,
-			"recommendedSubtasks": 6,
-			"expansionPrompt": "Expand Task 5 into ~6 subtasks. Cover: (1) Stats struct and update logic per event; (2) cost estimation from config tables with rounding; (3) tool/error counting rules; (4) finalizer logic on Summary or end-of-stream (Drop/guard); (5) summary embed builder (fields, footer, colors); (6) tests: math correctness, premature EOS finalization, snapshot of embed.",
-			"reasoning": "Straightforward aggregation and formatting, with some lifecycle edge cases around stream termination."
-		},
-		{
-			"taskId": 6,
+			"taskId": 16,
 			"taskTitle": "Discord Bot Service: Channel Lifecycle and Webhook Provisioning",
 			"complexityScore": 7,
-			"recommendedSubtasks": 9,
-			"expansionPrompt": "Expand Task 6 into ~9 subtasks. Cover: (1) REST API scaffold (fastify/express) with auth; (2) guild/category discovery/creation; (3) channel creation and naming/idempotency; (4) webhook creation and URL construction; (5) persistence (Redis/SQLite) schema for runs, TTL; (6) initial header embed via webhook; (7) retention worker (cron) to archive/delete; (8) rate limit awareness and retries; (9) integration tests against a test guild and cleanup. Include security notes (no bot token to pods).",
-			"reasoning": "External API orchestration plus persistence and lifecycle management; moderate complexity with operational nuances."
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Expand this task into 8 subtasks: 1) Serenity bot skeleton with minimal intents and HTTP client setup. 2) Axum HTTP API endpoints: POST /run/create and /run/complete with schemas. 3) Category discovery/creation and channel naming conventions. 4) Channel-scoped webhook creation and response payload {channelId, webhookUrl, webhookId}. 5) In-memory run map (DashMap) with optional lightweight persistence. 6) Retention worker that archives/deletes channels/webhooks past RETENTION_HOURS. 7) Permissions and safety (restrict @everyone send as configured). 8) Integration tests against sandbox guild for create/complete flows and idempotency. DoD: endpoints functional, channels/webhooks created and cleaned per retention, and no token leakage to clients.",
+			"reasoning": "Bot/channel lifecycle and an HTTP interface need coordinated Discord API use and state management; retention and permissions add operational complexity."
 		},
 		{
-			"taskId": 7,
-			"taskTitle": "Pod-local Input Bridge (Sidecar HTTP → Agent FIFO/stdin)",
+			"taskId": 17,
+			"taskTitle": "Optional Operator Input Pipeline (Bot Relay → Pod-local HTTP Bridge)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand this task into 7 subtasks: 1) Bot-side message/command handler restricted to known run channels (validate via run map). 2) HTTP bridge service (Axum) POST /input parsing JSON payload and writing newline-terminated UTF-8. 3) FIFO/stdin writer with nonblocking open, retry, and backpressure handling; configurable INPUT_FIFO. 4) Local-only binding and basic rate limiting (e.g., governor 10 r/s). 5) Ack/error feedback in channel and retry rules on bridge errors. 6) Configuration wiring and observability (logs, minimal metrics). 7) Unit/integration tests: channel validation, FIFO write with temp named pipe, end-to-end local flow. DoD: messages sent in run channel reach FIFO, out-of-channel ignored, rate limits enforced.",
+			"reasoning": "Bridges two processes with simple policies; main risks are correct scoping, local security, and reliable FIFO I/O behavior."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Security and Isolation Hardening",
 			"complexityScore": 7,
-			"recommendedSubtasks": 7,
-			"expansionPrompt": "Expand Task 7 into ~7 subtasks. Cover: (1) axum server and config (port, enable flag); (2) schema and validation for POST /input; (3) auth token verification (per-run secret); (4) writer task with bounded queue and non-blocking FIFO vs stdin modes; (5) backpressure policy (drop-oldest) and error mapping; (6) observability counters and tracing; (7) tests: FIFO integration, load, failure/backpressure, security.",
-			"reasoning": "Concurrency and IO coordination with security and backpressure; contained scope but multiple modes to support."
-		},
-		{
-			"taskId": 8,
-			"taskTitle": "Bot Message Forwarding and Cross-run Validation",
-			"complexityScore": 6,
 			"recommendedSubtasks": 6,
-			"expansionPrompt": "Expand Task 8 into ~6 subtasks. Cover: (1) messageCreate listener and filters (ignore bots/DMs); (2) channelId→runId mapping validation; (3) payload build with token and attachment refs; (4) HTTP forwarder with timeouts and exponential backoff; (5) user feedback (ack/fail reply) and truncation policy; (6) tests: non-run channel ignored, forwarding success, retry on 5xx, mapping prevents cross-run.",
-			"reasoning": "Event handling and HTTP forwarding with validation and retries; moderate complexity."
+			"expansionPrompt": "Expand this task into 6 subtasks: 1) Token isolation checks and CI/policy to prevent bot token in sidecar envs. 2) ChannelId→Run mapping enforcement in bot; optional HMAC signing for bridge requests and secret management. 3) Webhook lifecycle: deletion on completion; watcher callback to bot. 4) Payload safety: allowed_mentions none, escape backticks, strip ANSI sequences. 5) Permissions hardening in channels (when input disabled) and role-based overrides. 6) Logging redaction and secret scrubbing utilities. DoD: tests demonstrate blocked cross-run injection, mention suppression, revoked webhooks, and no secret leakage in logs.",
+			"reasoning": "Cross-cutting controls that must be consistent across components; correctness depends on policy enforcement and secure defaults."
 		},
 		{
-			"taskId": 9,
-			"taskTitle": "Kubernetes Sidecar Template and Helm Packaging",
+			"taskId": 19,
+			"taskTitle": "Kubernetes Sidecar and Helm Chart Packaging",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Expand this task into 8 subtasks: 1) Helm chart skeleton (charts/discord-monitor) and helpers. 2) Bot Deployment/Service/Secret templates with configurable retention and env. 3) Sidecar template snippet for target workloads with envs, probes, resources, parity-mode toggles. 4) Input-bridge container template scoped to 127.0.0.1 and FIFO volume mounts. 5) Values.yaml reflecting PRD (poll interval, batch size, filters, resources). 6) Probes and resource requests/limits; RBAC minimal if any. 7) NOTES.txt and documentation for integrating webhook creation/injection into workloads. 8) CI for helm lint/template and kubeval/kubeconform; kind smoke test. DoD: helm template produces valid manifests; kind install passes health checks; secrets scoped correctly.",
+			"reasoning": "Templating multiple components with configurable values and sidecar injection is non-trivial; validation across environments adds effort."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Documentation, Acceptance Tests, and Performance Validation",
 			"complexityScore": 6,
 			"recommendedSubtasks": 7,
-			"expansionPrompt": "Expand Task 9 into ~7 subtasks. Cover: (1) Helm chart for watcher sidecar with values schema (envs, filters, stats); (2) container spec with resources and securityContext; (3) probes wired to /healthz; (4) secrets/config injection and example Job/Pod templates; (5) optional NetworkPolicy for bridge; (6) separate chart for bot service + Redis + CronJob; (7) chart-testing and deploy docs. Include security review (no bot token in pods).",
-			"reasoning": "Packaging and templating across environments; not algorithmically complex but many integration details."
-		},
-		{
-			"taskId": 10,
-			"taskTitle": "Observability, Health Checks, and Hardening",
-			"complexityScore": 8,
-			"recommendedSubtasks": 9,
-			"expansionPrompt": "Expand Task 10 into ~9 subtasks. Cover: (1) metrics registry and Prometheus exporter with defined counters/gauges/histograms; (2) health endpoints (/healthz, /metrics) and readiness logic; (3) tracing spans/fields (runId/channelId) and error sampling; (4) auto-reconnect tailer and discovery retry loops; (5) webhook buffering on outage with bounded queue and DLQ; (6) centralized backoff/jitter config; (7) end-to-end latency benchmark tool and SLOs; (8) failure injection tests; (9) resource monitoring to ensure no agent slowdown.",
-			"reasoning": "Cross-cutting reliability and performance features that integrate multiple components and require careful testing."
+			"expansionPrompt": "Expand this task into 7 subtasks: 1) architecture.md (data flow, components, security model). 2) deploy.md (bot setup, permissions, Helm install, sidecar injection, envs). 3) operations.md (retention, webhook revocation, rate-limit/backoff guidance, troubleshooting). 4) formatting.md (embed templates, truncation, diff behavior, parity-mode). 5) Acceptance test matrix and scripts (static webhook, bot lifecycle, optional input, hardening). 6) Performance harness and synthetic generators (gen_transcript, latency measurement), run and capture metrics (≤100ms median, CPU/RSS targets). 7) Evidence packaging (logs, screenshots) and new-hire dry-run checklist. DoD: docs peer-reviewed; acceptance and performance criteria satisfied with recorded evidence.",
+			"reasoning": "Primarily coordination and thoroughness; complexity stems from breadth of scenarios and measurable performance validation rather than deep implementation."
 		}
 	]
 }

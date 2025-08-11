@@ -1,0 +1,68 @@
+# Task ID: 17
+# Title: Optional Operator Input Pipeline (Bot Relay → Pod-local HTTP Bridge)
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Enable operators to send ad-hoc guidance from the run’s channel to the running agent via a local HTTP bridge that writes to agent FIFO/stdin. Enforce channel scoping per run.
+# Details:
+- Bot relay (serenity EventHandler::message): accept messages or a slash command only in known run channels (validate against runs map). On command or message, POST to http://input-bridge/input with JSON {text, author, channelId, run:{taskId, attempt, shortId}}.
+- Reuse reqwest client; send acknowledgement in channel on success.
+- Bridge service (axum):
+  - POST /input -> reads JSON payload and writes a streaming line to FIFO/stdin.
+  - FIFO path from env INPUT_FIFO (default /agent/input.fifo). If FIFO not present, try to write to child process stdin file descriptor if exposed.
+  - Implement nonblocking open with retry; write newline-terminated UTF-8.
+  - Bind only 127.0.0.1; no external exposure.
+- Security: Bot validates message.channel_id belongs to a run; ignore others. Do not forward attachments (MVP). Rate limit bridge (e.g., 10 r/s) to protect agent.
+- Example bot handler:
+  if msg.channel_id == run.channel_id { if msg.content.starts_with("/send ") || cfg.accept_plain { let payload=...; client.post("http://input-bridge/input").json(&payload).send().await?; msg.channel_id.say(&ctx.http, "✅ forwarded").await?; } }
+
+
+# Test Strategy:
+- Unit: bot side - simulate Message events for in-channel and out-of-channel; assert only in-channel calls bridge.
+- Bridge: create a temp named pipe; POST JSON; confirm bytes written to FIFO.
+- End-to-end (local): run bridge and a dummy reader of FIFO; send bot command; observe message arrives.
+- Security: attempt POST from non-local interface (if forced) should be rejected; invalid JSON returns 400; bridge rate limit enforced.
+
+# Subtasks:
+## 1. Bot-side message/command handler scoped to run channels [pending]
+### Dependencies: None
+### Description: Implement a serenity EventHandler::message that only accepts operator input from channels associated with active runs, parses /send commands or plain messages (if enabled), and prepares payloads for the local HTTP bridge.
+### Details:
+Maintain a concurrent runs map keyed by channel_id with values {taskId, attempt, shortId}. In EventHandler::message, early-return unless msg.channel_id is in the runs map. Accept text when msg.content starts with "/send " or when config accept_plain=true; strip the command prefix and trim. Ignore attachments and non-text content for MVP. Construct payload JSON {text, author, channelId, run:{taskId, attempt, shortId}}. Reuse a single reqwest::Client across messages (e.g., in BotState). POST to http://input-bridge/input. Do not send acks/errors here; wire that in subtask 5.
+
+## 2. HTTP bridge service (Axum) with POST /input [pending]
+### Dependencies: 17.3
+### Description: Expose a local Axum service that accepts JSON payloads for operator input and writes newline-terminated UTF-8 to the agent input stream via the writer component.
+### Details:
+Define payload schema {text: String, author: String, channelId: String, run: {taskId: String, attempt: u32|String, shortId: String}} and validate text is non-empty and UTF-8 safe. Build Axum router with POST /input; on request, call a Writer trait to perform the write and map success to 200 OK with a minimal JSON body {status:"ok"}. Map writer errors to appropriate HTTP status (e.g., 429 from backpressure, 503 when agent input unavailable, 400 for invalid payload). Ensure newline termination added exactly once. Use Tower layers for error handling and JSON body size limits.
+
+## 3. FIFO/stdin writer with nonblocking open, retry, and backpressure [pending]
+### Dependencies: None
+### Description: Implement a writer that targets INPUT_FIFO when present or falls back to child process stdin, performing nonblocking open with retry and safe UTF-8 line writes.
+### Details:
+Read FIFO path from env INPUT_FIFO (default /agent/input.fifo). Attempt O_NONBLOCK open of FIFO for write; if reader not present, retry with exponential backoff up to a bounded deadline, then return a retriable error. If FIFO not found or open fails permanently, attempt to write to an exposed child stdin file descriptor/handle if available. Ensure each write appends a single trailing newline; handle partial writes; flush if using stdin. Implement backpressure-aware writes: if pipe returns EAGAIN/EWOULDBLOCK, retry with jitter and surface a 429-style error to caller after budget is exhausted. Provide a simple Writer trait with write_line(&str) -> Result<(), WriterError> and an implementation over FIFO/stdin.
+
+## 4. Local-only binding and basic rate limiting [pending]
+### Dependencies: 17.2, 17.3
+### Description: Restrict the bridge service to loopback and enforce per-process rate limiting to protect the agent input.
+### Details:
+Bind Axum server only to 127.0.0.1 with an explicit non-TLS HTTP listener; avoid container port exposure. Add a Tower layer using governor or tower-ratelimit to limit to ~10 requests per second with a small burst (configurable). Return 429 with a clear JSON error body when rate limited. Ensure rate limit applies before invoking the writer. Optionally add simple request size limits to prevent large inputs.
+
+## 5. Bot acknowledgements, error feedback, and retry policy [pending]
+### Dependencies: 17.1, 17.2
+### Description: Provide user-visible acks in the run channel on success, surface clear errors on failure, and implement limited retries to the bridge.
+### Details:
+On successful POST to the bridge, reply in the same channel with a short acknowledgement (e.g., "✅ forwarded"). On known errors, map to actionable messages: 429 -> "rate limited, try again shortly"; 503 -> "agent unavailable"; other -> generic failure with correlation ID. Implement retry with exponential backoff for transient errors (5xx, connect timeouts) up to a small cap (e.g., 3 attempts) and suppress duplicate acks. Ensure slash command responses or message replies do not ping everyone; respect Discord rate limits. Log errors with context (run ids, channel id, http status).
+
+## 6. Configuration wiring and observability [pending]
+### Dependencies: 17.1, 17.2, 17.3, 17.4
+### Description: Add configuration flags and minimal logging/metrics across bot and bridge components.
+### Details:
+Config: ACCEPT_PLAIN (bool), INPUT_BRIDGE_URL (default http://input-bridge/input) for bot; INPUT_FIFO, RATE_LIMIT_RPS (default 10), LOG_LEVEL for bridge. Use env vars or a small config struct. Observability: structured logs with run/channel context; count metrics for inputs accepted, forwarded, dropped (out-of-scope channel), rate-limited, writer errors. Expose a lightweight /health endpoint on loopback or rely on process health logs. Ensure sensitive data (tokens) not logged.
+
+## 7. Unit and integration tests [pending]
+### Dependencies: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6
+### Description: Validate channel scoping, FIFO write behavior, rate limiting, and the end-to-end local flow from bot to agent input.
+### Details:
+Bot unit tests: simulate Message events for in-run and out-of-channel; assert only in-channel attempts to call bridge; verify command parsing and payload content. Bridge tests: create a temp named pipe, run the Axum server bound to 127.0.0.1 with the FIFO writer, POST JSON, and assert bytes received and newline termination; test fallback when FIFO absent. Rate limit tests: hammer /input and assert 429s after the configured threshold. End-to-end local: start bridge, spawn a dummy FIFO reader, simulate bot handler call, and confirm the reader receives the line. Include negative tests for empty text, oversized payloads, and writer backpressure.
+
