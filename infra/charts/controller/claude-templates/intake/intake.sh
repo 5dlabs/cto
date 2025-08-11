@@ -439,7 +439,7 @@ fi
 echo "🤖 Configuring AI models..."
 
 if [ -n "$OPENAI_API_KEY" ]; then
-  # Use GPT-5 as primary when OpenAI key is available; keep Opus as research; fallback to GPT-5
+  # Use GPT-5 as primary when OpenAI key is available; keep Opus (or configured model) as research; fallback to GPT-5
   echo "✅ OPENAI_API_KEY detected; setting main=gpt-5, research=$MODEL, fallback=gpt-5"
   task-master models --set-main "gpt-5"
   task-master models --set-research "$MODEL"
