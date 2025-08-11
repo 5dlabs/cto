@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - feature/*
+      - feat/*
 
 env:
   REGISTRY: ghcr.io
