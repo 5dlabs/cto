@@ -214,6 +214,13 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
+      - name: Show GHCR controller tags
+        run: |
+          echo "🔎 Latest GHCR tags for controller:"
+          gh api -H "Accept: application/vnd.github+json" \
+            "/orgs/5dlabs/packages/container/cto%2Fcontroller/versions?per_page=1" \
+            | jq -r '.[0].metadata.container.tags'
+
   build-input-bridge:
     needs: [version]
     runs-on: [k8s-runner]
@@ -229,7 +236,10 @@ jobs:
         working-directory: ./input-bridge
         run: |
           echo "🏗️ Building input-bridge binary"
+          export RUSTC_WRAPPER=sccache
+          export CARGO_TARGET_DIR=/cache/target
           cargo build --release
+          sccache --show-stats || true
           cp target/release/input-bridge ./input-bridge
           ls -lh ./input-bridge
 
@@ -258,6 +268,13 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+
+      - name: Show GHCR input-bridge tags
+        run: |
+          echo "🔎 Latest GHCR tags for input-bridge:"
+          gh api -H "Accept: application/vnd.github+json" \
+            "/orgs/5dlabs/packages/container/cto%2Finput-bridge/versions?per_page=1" \
+            | jq -r '.[0].metadata.container.tags'
 
   # Deploy immediately
   deploy:
