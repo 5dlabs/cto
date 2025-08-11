@@ -492,8 +492,8 @@ if [ "$EXPAND_TASKS" = "true" ]; then
     }
 fi
 
-# Review and align tasks with architecture using Claude
-echo "🤖 Reviewing tasks against architecture with Claude..."
+# Review and align tasks with architecture using TaskMaster first (MCP/AI), then Claude as fallback
+echo "🤖 Reviewing tasks against architecture..."
 if [ -f ".taskmaster/docs/architecture.md" ]; then
     # Check if claude command is available
     if command -v claude &> /dev/null; then
@@ -523,18 +523,33 @@ Files to review:
 Make the necessary modifications directly to ensure the tasks and architecture are fully aligned.
 EOF
 
-        # Run Claude to review and update tasks
-        echo "🔍 Running Claude review..."
-        # Avoid interactive permission prompts by piping prompt content and skipping permissions
+        # Prefer TaskMaster AI update first to reduce Claude token usage
+        echo "🔁 Attempting TaskMaster AI update first (research mode)..."
         if [ -s "/tmp/review-prompt.md" ]; then
-          cat /tmp/review-prompt.md | claude -p --output-format stream-json --verbose --model "$MODEL" --dangerously-skip-permissions || {
-              echo "⚠️ Claude review failed, but continuing..."
+          task-master update \
+            --from "1" \
+            --prompt "$(cat /tmp/review-prompt.md)" \
+            --research \
+            --file "$TASKS_FILE" || echo "ℹ️ TaskMaster update did not apply; falling back to Claude"
+        fi
+
+        # Fallback: Run Claude review non-interactively without turn limit; guard with wall-time timeout
+        echo "🔍 Running Claude review (fallback)..."
+        if [ -s "/tmp/review-prompt.md" ]; then
+          timeout 600s sh -c "cat /tmp/review-prompt.md | claude -p \
+            --output-format json \
+            --verbose \
+            --model \"$MODEL\" \
+            --dangerously-skip-permissions \
+            --add-dir \"$PROJECT_DIR\" \
+            --add-dir \"$PROJECT_DIR/.taskmaster\"" || {
+              echo "⚠️ Claude review timed out or failed, continuing..."
           }
         else
           echo "⚠️ Review prompt file missing or empty; skipping Claude review"
         fi
-        
-        echo "✅ Task review complete"
+
+        echo "✅ Review step complete"
     else
         echo "⚠️ Claude command not found, skipping architecture alignment"
     fi
