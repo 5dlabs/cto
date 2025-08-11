@@ -1,1 +1,0 @@
-# Discord Agent Monitoring System - Independent Watcher\n\nSee docs/README.md for overview. Architecture file intentionally removed earlier in cleanup; using intake PRD only.
