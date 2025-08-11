@@ -1,0 +1,99 @@
+# Task ID: 8
+# Title: Bot Message Forwarding and Cross-run Validation
+# Status: pending
+# Dependencies: 6, 7
+# Priority: medium
+# Description: Extend the bot to forward messages from the run’s channel to the pod-local bridge with strict run/channel mapping validation.
+# Details:
+- Listen to MESSAGE_CREATE events in discord.js; only accept messages from channels registered for runs and ignore bot/self messages
+- Validation: map channelId -> runId; ensure message.channelId matches stored runId; prevent cross-run injection by refusing DMs or other channels
+- Payload build: { runId, channelId, userId, username, content, timestamp, token } where token is the per-run secret stored by the bot
+- Forward via HTTP POST to bridgeUrl with timeouts and retry on 5xx; exponential backoff; log failures
+- Slash commands (optional future): register /note and /input; for MVP, plain text messages only; respond with ephemeral ack via reply in channel if forwarding succeeded/failed
+- Respect content size; truncate if >4k chars and include a note; attachments: include URLs/filenames in payload array
+- Pseudo-code:
+  client.on('messageCreate', async (m)=>{ const run = runsByChannel.get(m.channel.id); if(!run) return; const body = {runId: run.id, channelId: m.channel.id, userId: m.author.id, username: m.author.username, content: m.content, timestamp: m.createdAt, token: run.bridgeToken}; await fetch(run.bridgeUrl+'/input',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}); });
+
+
+# Test Strategy:
+- Unit tests: messages in non-run channels are ignored; run channel messages are forwarded
+- Integration test with local bridge server: verify payload schema and auth token
+- Error handling test: simulate bridge 500/timeout and ensure retries with backoff and user feedback
+- Security test: attempt spoofed channelId in payload (should not be possible as bot constructs payload); ensure mapping prevents cross-run injection
+
+# Subtasks:
+## 1. Implement messageCreate listener and base filters [pending]
+### Dependencies: None
+### Description: Add a discord.js v14 client.on('messageCreate') handler and filter out ineligible messages.
+### Details:
+Scope: Listen to MESSAGE_CREATE and immediately ignore messages from bots/webhooks/self, system messages, and DMs. Ensure channel is a guild text channel or thread under a run channel if desired policy, but do not accept DMs. Prepare a safe message envelope (author, channelId, guildId, timestamps) to pass downstream.
+Implementation notes:
+- Check m.author?.bot, m.webhookId, m.system
+- Reject if !m.guildId (DM) or channel is not text-based
+- Do not mutate or reply here; simply emit to the next stage if eligible
+- Add structured logging for ignored cases for observability
+
+## 2. Run/channel mapping validation layer [pending]
+### Dependencies: 8.1
+### Description: Validate channelId → run mapping and prevent cross-run injection.
+### Details:
+Scope: Build/consume a runsByChannel Map<string, RunInfo> (populated by Task 6) and validate that the message.channelId is registered for a specific run. Enforce strict matching and refuse any message from unregistered channels or mismatched runs.
+Implementation notes:
+- Access runsByChannel.get(m.channel.id); if absent, return early
+- Confirm run.bridgeUrl and run.bridgeToken exist; if missing, log and ignore
+- Optionally support thread messages only if parent channel is registered (configuration-controlled)
+- Ensure no state leakage across runs; never infer run from content or username
+- Provide helper validateRunForMessage(message): RunInfo | null
+
+## 3. Payload builder with token, truncation, and attachments [pending]
+### Dependencies: 8.2
+### Description: Construct the JSON payload to send to the bridge with content policy and attachment references.
+### Details:
+Scope: Build the request body { runId, channelId, userId, username, content, timestamp, token, attachments? } per schema. Handle content > 4000 chars by truncating and appending a note. Include attachment URLs and filenames.
+Implementation notes:
+- content: m.content || ""
+- Truncate if content.length > 4000; keep first 4000, append " [truncated N chars]"
+- timestamp: m.createdAt.toISOString()
+- attachments: map m.attachments to array of { name, url, size, contentType }
+- token: run.bridgeToken; NEVER log token
+- Return { body, wasTruncated } for downstream feedback
+
+## 4. HTTP forwarder with timeouts and exponential backoff [pending]
+### Dependencies: 8.3
+### Description: POST payloads to run.bridgeUrl+'/input' with robust retry on 5xx/timeouts.
+### Details:
+Scope: Implement forwardToBridge(run, body) with fetch/axios. Configure request timeout and retry policy with exponential backoff and jitter. Only retry on network errors/timeouts and 5xx; never on 4xx.
+Implementation notes:
+- Endpoint: `${run.bridgeUrl.replace(/\/$/, '')}/input`
+- Headers: { 'content-type': 'application/json' }
+- Timeout: e.g., 5s per attempt (configurable)
+- Retry: maxAttempts=5, baseDelay=250ms, factor=2, jitter=±20%
+- Success: 2xx -> return ok
+- Failure: on 5xx/timeout -> retry; on 4xx -> fail fast
+- Log outcomes and final failures without sensitive data; include runId/channelId/messageId correlation IDs
+
+## 5. User feedback (ack/fail) and message lifecycle [pending]
+### Dependencies: 8.3, 8.4
+### Description: Reply in channel with success/failure and truncation notice; delete ack after short delay.
+### Details:
+Scope: After forwarding, reply to the user with an ephemeral-like acknowledgement. On success: short message indicating delivered (and whether truncated). On failure: notify and suggest retry; avoid leaking internal reasons or tokens. Delete ack after N seconds.
+Implementation notes:
+- Use message.reply({ content, allowedMentions: { parse: [] } })
+- Success: "Received and forwarded to agent." + " Note: content was truncated to 4000 characters." if wasTruncated
+- Failure: "Forwarding failed. Please try again shortly." Add correlation ID for support in logs
+- Delete ack after e.g., 5–10s if bot has Manage Messages; ignore errors
+- Ensure this behavior is disabled in DMs (already filtered) and respects channel permissions
+
+## 6. Test suite: forwarding and cross-run validation [pending]
+### Dependencies: 8.1, 8.2, 8.3, 8.4, 8.5
+### Description: Add unit/integration tests for filters, mapping, payload, retries, and user feedback.
+### Details:
+Coverage:
+- Non-run channel ignored: message in unrelated channel triggers no POST and no reply
+- Forwarding success: valid run channel posts correct payload (including attachments), ack sent
+- Retry on 5xx/timeout: simulate server errors; assert exponential backoff attempts and final outcome
+- Mapping prevents cross-run: attempts from other channels/DMs are rejected; no POST
+- Truncation policy: >4k content truncated with note; payload reflects truncated content
+- Token presence: payload includes token; ensure token never logged
+- Use mocked fetch/axios and stub discord.js message objects; add an integration test against a local test HTTP server
+

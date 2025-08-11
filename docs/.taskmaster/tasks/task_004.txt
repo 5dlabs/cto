@@ -1,0 +1,73 @@
+# Task ID: 4
+# Title: Webhook Sender with Rate Limiting, Backoff, and Attachments
+# Status: pending
+# Dependencies: 3
+# Priority: medium
+# Description: Implement robust Discord webhook posting with batching, 429 handling, retry_with_jitter, and file attachments.
+# Details:
+- Build a sender task with bounded mpsc channel receiving Message{embeds:Vec<Embed>, attachments:Vec<FilePart>}
+- Discord webhook endpoint: POST https://discord.com/api/v10/webhooks/{id}/{token}?wait=true (use returned message id if needed). For attachments, use multipart/form-data with files as file[0], file[1], and payload_json including embeds and attachment metadata
+- Respect 10 embeds per message; if more, split across multiple messages
+- Rate limit handling: on 429, read JSON {retry_after: seconds/ms, global}, and X-RateLimit-* headers; sleep for retry_after + jitter; also inspect X-RateLimit-Remaining to preemptively slow
+- Backoff policy: exponential with decorrelated jitter; max backoff 10s; cap retries per message (e.g., 5) then DLQ/log
+- Network resiliency: timeouts (connect 2s, total 10s), retries on 5xx/timeout; idempotency not required for webhook
+- Pseudo-code:
+  loop { msg = rx.recv().await; let chunks = chunk_embeds(msg.embeds, 10); for c in chunks { let res = post_webhook(c, msg.attachments).await; match res { Ok => continue, Err(RateLimit{retry_after})=>sleep(retry_after+jitter), Err(e)=>retry/backoff } } }
+- Ensure sender doesn’t block parser: channel size tuning; drop oldest attachments if pressure high and log warning
+
+
+# Test Strategy:
+- Mock Discord API with test server returning 429 and X-RateLimit-*; assert sender obeys retry_after
+- Test multipart payload correctness; verify attachments arrive in a real Discord test channel (manual/integration)
+- Stress test with 1000 embeds over 60s to ensure batching and throughput; no ordering issues
+- Chaos tests: inject timeouts, DNS failures; confirm retries and no panics
+
+# Subtasks:
+## 1. Bounded Message Queue and Sender Task Skeleton [pending]
+### Dependencies: None
+### Description: Create a bounded mpsc channel and a dedicated async sender task to consume Message items and drive webhook posting.
+### Details:
+Implement in Rust with tokio. Define core types: struct Message { embeds: Vec<Embed>, attachments: Vec<FilePart> }. FilePart { filename: String, bytes: bytes::Bytes, content_type: Option<String>, description: Option<String> }. Build tokio::sync::mpsc::channel(capacity from config, e.g., WEBHOOK_QUEUE_CAP default 100). Expose enqueue API that uses try_send where possible. Spawn a sender task: loop { if let Some(msg) = rx.recv().await { process_message(msg).await } }. process_message will chunk embeds and post via post_webhook. Wire webhook URL: https://discord.com/api/v10/webhooks/{id}/{token}?wait=true and build a reqwest::Client once and reuse. Add tracing logs for enqueue/dequeue and message ids returned (if used).
+
+## 2. Embed Chunking (≤10 per request) [pending]
+### Dependencies: 4.1
+### Description: Implement utility to split embeds into chunks of up to 10 for Discord webhook limits.
+### Details:
+Provide fn chunk_embeds(embeds: Vec<Embed>, max_per: usize) -> Vec<Vec<Embed>> with max_per default 10. Preserve order; return contiguous chunks; handle empty list. In the sender loop: let chunks = chunk_embeds(msg.embeds, 10); for each chunk, call post_webhook(chunk, msg.attachments.clone()). Keep attachments unchanged per chunk per the pseudocode. Unit test: 0, 1..9, 10, 11, 20 embeds produce expected chunk counts and sizes.
+
+## 3. Multipart Builder for Attachments and payload_json [pending]
+### Dependencies: 4.2
+### Description: Build multipart/form-data bodies with files as file[n] and payload_json containing embeds and attachment metadata.
+### Details:
+Implement fn build_multipart(chunk: &[Embed], attachments: &[FilePart]) -> reqwest::multipart::Form. For each attachment i: add part named format!("file[{}]", i) (per requirement) with Part::bytes(bytes.clone()).file_name(filename).mime_str(content_type or application/octet-stream). Build payload_json as a JSON string field: { "embeds": [..], "attachments": [{"id": i, "filename": filename, "description": optional}] }. Add .text("payload_json", serde_json::to_string(&payload).unwrap()). In post_webhook, send POST to ...?wait=true with this Form. Parse success JSON to capture returned message id (string) if needed for logging. Validate that when attachments are empty, still send payload_json without files.
+
+## 4. Rate Limit Handling (429 + X-RateLimit-* preemption) [pending]
+### Dependencies: 4.3
+### Description: On 429, honor retry_after plus jitter; use X-RateLimit-* headers to preempt when remaining is 0.
+### Details:
+Extend post_webhook to inspect responses: if status==429, parse body JSON { retry_after: number, global: bool }. Prefer X-RateLimit-Reset-After header (seconds.fraction) when present; else use retry_after (which may be seconds or ms per upstream; if >1000, treat as ms). Sleep for computed delay + small jitter (random 0..250ms). If global==true, apply a shared rate_limit_until Instant for all requests. Preemptive slow path: if X-RateLimit-Remaining=="0" and Reset-After present on a non-429 response, sleep Reset-After + jitter before next request in this sender. Track bucket key by URL (single webhook) and serialize sends accordingly.
+
+## 5. Retry Policy with Decorrelated Jitter and Caps [pending]
+### Dependencies: 4.4
+### Description: Implement transient error retries using decorrelated jitter, with max 10s backoff and max 5 attempts per chunk.
+### Details:
+Adopt the decorrelated jitter algorithm (AWS). Parameters: base=250ms, max_backoff=10s, attempts_max=5. Pseudocode: sleep = base; for attempt in 1..=attempts_max { let delay = min(max_backoff, rand(base..(sleep*3))); sleep = delay; wait(delay); try request; on success break }. Integrate with 429 handling: if 429, always sleep retry_after(+jitter) and count toward attempts. Retry on 5xx and timeouts; do not retry on non-429 4xx (400/401/403/404/413/415, etc.)—treat as permanent. On exhaust, DLQ/log: emit tracing::error with summary (embed count, attachment names) and store to an optional dead-letter channel/file if configured.
+
+## 6. HTTP Client Timeouts and Transient Error Mapping [pending]
+### Dependencies: 4.5
+### Description: Configure reqwest client timeouts and map timeouts/5xx to retryable errors.
+### Details:
+Create a single reqwest::Client with .connect_timeout(Duration::from_secs(2)) and .timeout(Duration::from_secs(10)). Set a descriptive User-Agent. Implement fn post_webhook(chunk, attachments) -> Result<ResponseOk, PostError>. Map reqwest timeouts (is_timeout()) and network errors to PostError::Transient. Map HTTP 5xx to Transient; 429 to RateLimited{retry_after, global, headers}; other 4xx to Permanent. Ensure response body parsing is resilient with its own small timeout; log bodies for 4xx (without leaking large payloads).
+
+## 7. Backpressure Policy: Drop-Oldest Attachments with Logging [pending]
+### Dependencies: 4.1, 4.6
+### Description: Implement a pressure policy so the sender never blocks the parser: when pressure is high, drop oldest attachments and warn.
+### Details:
+Introduce an intermediate bounded VecDeque<Message> buffer in front of the mpsc::Sender to implement custom pressure control. Producer enqueues into the deque; a background mover task drains the deque into the mpsc channel (try_send with yield). When deque length exceeds a high-water mark (configurable, default 2x channel capacity) or when try_send persistently fails, apply shedding: iterate from front and remove attachments (set msg.attachments = vec![]) on the oldest messages first until under threshold. Log tracing::warn with counts and filenames dropped; increment a metric counter. Never drop embeds. Ensure all operations are non-blocking (use async Mutex for the deque) and document the degradation policy.
+
+## 8. Test Harness: Mock Discord Server and Stress Tests [pending]
+### Dependencies: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7
+### Description: Build a mock server to validate 429 handling, X-RateLimit preemption, and multipart correctness; add stress tests.
+### Details:
+Use axum or wiremock to stand up a local HTTP server emulating Discord endpoints. Tests: (1) 429 path returns {retry_after: 1.5, global:false} with X-RateLimit-*; assert client delays ≈1.5s + jitter before retry. (2) Preemptive RL: respond with X-RateLimit-Remaining: 0 and X-RateLimit-Reset-After: 0.75; assert next send sleeps that long. (3) Multipart verification: inspect incoming multipart parts to ensure file[0], file[1], and payload_json exist; payload_json embeds and attachments metadata ids/filenames match files. (4) Transient 5xx then 200: verify decorrelated jitter backoff caps at 10s and attempts ≤5. (5) Timeout: delay server beyond 10s to trigger client timeout and retry. (6) Stress: enqueue 1000 embeds over 60s; assert requests == ceil(1000/10); no panics; throughput and no starvation. (7) Backpressure: simulate slow server; fill buffers; assert oldest attachments are dropped and warnings emitted. Optionally include a manual integration test against a real Discord test webhook (behind feature flag).
+
