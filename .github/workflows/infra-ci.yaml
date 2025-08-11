@@ -9,7 +9,7 @@ on:
     paths:
       - 'infra/gitops/**/*.yaml'
       - 'infra/charts/**/*'
-      - '.github/workflows/infra.yaml'
+      - '.github/workflows/infra-ci.yaml'
 
 env:
   ARGOCD_VERSION: v2.9.3
@@ -47,9 +47,11 @@ jobs:
           sudo mv yq /usr/local/bin/
           
           # Install kubeconform for standard K8s resource validation
-          wget -q https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
-          tar xf kubeconform-linux-amd64.tar.gz
-          sudo mv kubeconform /usr/local/bin/
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz -o kc.tgz
+          tar -xzf kc.tgz
+          if [ -f kubeconform ]; then sudo mv kubeconform /usr/local/bin/kubeconform; \
+          elif [ -f kubeconform-linux-amd64 ]; then sudo mv kubeconform-linux-amd64 /usr/local/bin/kubeconform; \
+          else echo "kubeconform binary not found in tarball" && exit 1; fi
       
       - name: Validate ArgoCD Application structure
         run: |
@@ -143,7 +145,7 @@ jobs:
   helm-validation:
     name: Helm Chart Validation
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'helm') || contains(github.event.pull_request.files.*.filename, 'charts/')
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -173,6 +175,9 @@ jobs:
       
       - name: Template Helm applications
         run: |
+          # Install yq for parsing before using it
+          curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o yq
+          chmod +x yq && sudo mv yq /usr/local/bin/yq
           # Parse ArgoCD apps using Helm and validate templating
           for app in infra/gitops/applications/*.yaml; do
             if grep -q "helm:" "$app"; then
