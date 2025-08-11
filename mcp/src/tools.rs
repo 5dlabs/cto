@@ -8,7 +8,10 @@ pub fn get_tool_schemas() -> Value {
             get_docs_schema(),
             get_task_schema(&HashMap::new()),
             get_export_schema(),
-            get_intake_schema()
+            get_intake_schema(),
+            get_jobs_schema(),
+            get_stop_job_schema(),
+            get_anthropic_message_schema()
         ]
     })
 }
@@ -20,7 +23,10 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, String>) -> Value {
             get_docs_schema(),
             get_task_schema(agents),
             get_export_schema(),
-            get_intake_schema()
+            get_intake_schema(),
+            get_jobs_schema(),
+            get_stop_job_schema(),
+            get_anthropic_message_schema()
         ]
     })
 }
@@ -168,6 +174,55 @@ fn get_intake_schema() -> Value {
                 }
             },
             "required": ["project_name"]
+        }
+    })
+}
+
+fn get_jobs_schema() -> Value {
+    json!({
+        "name": "jobs",
+        "description": "List running jobs across platform CRDs (CodeRun, DocsRun) and Argo Workflows (intake). Returns simplified status info.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "include": {"type": "array", "items": {"type": "string", "enum": ["code", "docs", "intake"]}, "description": "Filter which job types to include (default: all)"}
+            }
+        }
+    })
+}
+
+fn get_stop_job_schema() -> Value {
+    json!({
+        "name": "stop_job",
+        "description": "Stop a running job: CodeRun (code), DocsRun (docs), or Argo intake workflow (intake).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "job_type": {"type": "string", "enum": ["code", "docs", "intake"], "description": "Type of job to stop"},
+                "name": {"type": "string", "description": "Resource/workflow name"},
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"}
+            },
+            "required": ["job_type", "name"]
+        }
+    })
+}
+
+fn get_anthropic_message_schema() -> Value {
+    json!({
+        "name": "anthropic_message",
+        "description": "Send a message to Anthropic Messages API with optional JSON message input (input_json). Returns raw API response.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "model": {"type": "string", "description": "Claude model (e.g., claude-3-7-sonnet-latest)"},
+                "system": {"type": "string", "description": "Optional system prompt"},
+                "text": {"type": "string", "description": "Optional plain text user message"},
+                "input_json": {"type": "object", "description": "Optional JSON payload to send using Anthropic's input_json content type"},
+                "messages": {"type": "array", "description": "Optional raw messages array to send as-is (overrides text/input_json)", "items": {"type": "object"}},
+                "max_tokens": {"type": "integer", "description": "Max tokens (default: 1024)"}
+            },
+            "required": ["model"]
         }
     })
 }

@@ -1097,6 +1097,24 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
+                Ok("jobs") => Some(handle_jobs_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("stop_job") => Some(handle_stop_job_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("anthropic_message") => Some(handle_anthropic_message_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
                 Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))),
                 Err(e) => Some(Err(e)),
             }
@@ -1124,6 +1142,212 @@ fn handle_method(method: &str, params: Option<&Value>) -> Option<Result<Value>> 
     }
 
     Some(Err(anyhow!("Unknown method: {}", method)))
+}
+
+fn run_kubectl_json(args: &[&str]) -> Result<Value> {
+    let output = std::process::Command::new("kubectl").args(args).output()?;
+    if output.status.success() {
+        let stdout = String::from_utf8(output.stdout)?;
+        let v: Value = serde_json::from_str(&stdout)?;
+        Ok(v)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("kubectl failed: {}", stderr))
+    }
+}
+
+fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let namespace = arguments
+        .get("namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("agent-platform");
+
+    let include = arguments.get("include").and_then(|v| v.as_array());
+    let include_code = include.is_none()
+        || include
+            .unwrap()
+            .iter()
+            .any(|x| x.as_str() == Some("code"));
+    let include_docs = include.is_none()
+        || include
+            .unwrap()
+            .iter()
+            .any(|x| x.as_str() == Some("docs"));
+    let include_intake = include.is_none()
+        || include
+            .unwrap()
+            .iter()
+            .any(|x| x.as_str() == Some("intake"));
+
+    let mut jobs: Vec<Value> = Vec::new();
+
+    if include_code {
+        if let Ok(list) = run_kubectl_json(&["get", "coderuns.agents.platform", "-n", namespace, "-o", "json"]) {
+            if let Some(items) = list.get("items").and_then(|v| v.as_array()) {
+                for item in items {
+                    let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
+                    let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
+                    let message = item.get("status").and_then(|s| s.get("message")).and_then(|p| p.as_str());
+                    let job_name = item.get("status").and_then(|s| s.get("jobName")).and_then(|p| p.as_str());
+                    jobs.push(json!({
+                        "type": "code",
+                        "name": name,
+                        "namespace": namespace,
+                        "phase": phase,
+                        "message": message,
+                        "jobName": job_name
+                    }));
+                }
+            }
+        }
+    }
+
+    if include_docs {
+        if let Ok(list) = run_kubectl_json(&["get", "docsruns.agents.platform", "-n", namespace, "-o", "json"]) {
+            if let Some(items) = list.get("items").and_then(|v| v.as_array()) {
+                for item in items {
+                    let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
+                    let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
+                    let message = item.get("status").and_then(|s| s.get("message")).and_then(|p| p.as_str());
+                    let job_name = item.get("status").and_then(|s| s.get("jobName")).and_then(|p| p.as_str());
+                    jobs.push(json!({
+                        "type": "docs",
+                        "name": name,
+                        "namespace": namespace,
+                        "phase": phase,
+                        "message": message,
+                        "jobName": job_name
+                    }));
+                }
+            }
+        }
+    }
+
+    if include_intake {
+        if let Ok(list_str) = run_argo_cli(&["list", "-n", namespace, "-o", "json"]) {
+            if let Ok(v) = serde_json::from_str::<Value>(&list_str) {
+                if let Some(items) = v.get("items").and_then(|v| v.as_array()) {
+                    for item in items {
+                        let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
+                        let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
+                        jobs.push(json!({
+                            "type": "intake",
+                            "name": name,
+                            "namespace": namespace,
+                            "phase": phase
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(json!({
+        "success": true,
+        "namespace": namespace,
+        "count": jobs.len(),
+        "jobs": jobs
+    }))
+}
+
+fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let job_type = arguments
+        .get("job_type")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("job_type is required"))?;
+    let name = arguments
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("name is required"))?;
+    let namespace = arguments
+        .get("namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("agent-platform");
+
+    match job_type {
+        "code" => {
+            let out = std::process::Command::new("kubectl")
+                .args(["delete", "coderun", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
+                .output()
+                .context("Failed to execute kubectl delete coderun")?;
+            if out.status.success() {
+                Ok(json!({"success": true, "message": format!("Deleted CodeRun {name}"), "namespace": namespace}))
+            } else {
+                Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
+            }
+        }
+        "docs" => {
+            let out = std::process::Command::new("kubectl")
+                .args(["delete", "docsrun", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
+                .output()
+                .context("Failed to execute kubectl delete docsrun")?;
+            if out.status.success() {
+                Ok(json!({"success": true, "message": format!("Deleted DocsRun {name}"), "namespace": namespace}))
+            } else {
+                Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
+            }
+        }
+        "intake" => {
+            // Try to terminate first, then delete
+            let _ = run_argo_cli(&["terminate", name, "-n", namespace]);
+            match run_argo_cli(&["delete", name, "-n", namespace]) {
+                Ok(msg) => Ok(json!({"success": true, "message": msg, "namespace": namespace})),
+                Err(e) => Err(anyhow!(format!("Failed to delete workflow {name}: {e}")))
+            }
+        }
+        other => Err(anyhow!(format!("Unsupported job_type: {other}"))),
+    }
+}
+
+fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let api_key = std::env::var("ANTHROPIC_API_KEY")
+        .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
+    let model = arguments
+        .get("model")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("model is required"))?;
+    let system = arguments.get("system").and_then(|v| v.as_str());
+    let max_tokens = arguments
+        .get("max_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1024) as u32;
+
+    let messages = if let Some(raw) = arguments.get("messages").and_then(|v| v.as_array()) {
+        raw.clone()
+    } else {
+        let mut content_parts: Vec<Value> = Vec::new();
+        if let Some(input_json) = arguments.get("input_json") {
+            content_parts.push(json!({"type": "input_json", "input_json": input_json}));
+        }
+        if let Some(text) = arguments.get("text").and_then(|v| v.as_str()) {
+            content_parts.push(json!({"type": "text", "text": text}));
+        }
+        if content_parts.is_empty() {
+            return Err(anyhow!("Provide either messages, text, or input_json"));
+        }
+        vec![json!({"role": "user", "content": Value::Array(content_parts)})]
+    };
+
+    // Use blocking reqwest to avoid async changes in this server
+    let client = reqwest::blocking::Client::new();
+    let mut body = json!({
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens
+    });
+    if let Some(s) = system { body["system"] = json!(s); }
+
+    let resp = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .json(&body)
+        .send()
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| anyhow!(format!("Anthropic request failed: {e}")))?;
+
+    let json_resp: Value = resp.json().map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
+    Ok(json_resp)
 }
 
 #[allow(clippy::disallowed_macros)]
