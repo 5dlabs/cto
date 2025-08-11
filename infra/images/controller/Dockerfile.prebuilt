@@ -17,7 +17,7 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 WORKDIR /app
 
 # Copy pre-built binaries (these must exist in the build context)
-COPY agent-controller /app/agent-controller
+COPY controller/agent-controller /app/agent-controller
 
 # Make binaries executable and change ownership to app user  
 RUN chmod +x /app/agent-controller && \
@@ -35,3 +35,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Run the application
 CMD ["./agent-controller"]
+
+

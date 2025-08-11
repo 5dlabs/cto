@@ -184,9 +184,11 @@ jobs:
           ls -lh agent-controller
           file agent-controller
           
-          # Ensure binaries are in the current directory for Docker context
-          echo "📋 Binary ready in controller directory for Docker build"
-          ls -la agent-controller || true
+          # Ensure binary is in repo root for prebuilt Dockerfile path expectations
+          echo "📋 Moving binary to controller/ for Docker build context"
+          mv agent-controller ../agent-controller || true
+          mv ../agent-controller controller/agent-controller || true
+          ls -la controller/agent-controller || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -201,8 +203,8 @@ jobs:
       - name: Build and push Controller image
         uses: docker/build-push-action@v5
         with:
-          context: ./controller
-          file: ./controller/Dockerfile.prebuilt
+          context: .
+          file: ./infra/images/controller/Dockerfile.prebuilt
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
