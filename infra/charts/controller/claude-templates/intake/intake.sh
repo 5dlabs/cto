@@ -501,26 +501,22 @@ if [ -f ".taskmaster/docs/architecture.md" ]; then
         
         # Create a prompt for Claude to review tasks
         cat > /tmp/review-prompt.md <<'EOF'
-Please review the tasks.json file against the architecture.md document and ensure they are properly aligned.
+Review .taskmaster/tasks/tasks.json against .taskmaster/docs/architecture.md and align them.
 
-Your task is to:
-1. Cross-reference all tasks in tasks.json with the architecture diagram
-2. Identify any missing tasks that are implied by the architecture
-3. Identify any tasks that don't align with the architecture
-4. Update, add, or remove tasks as needed to ensure full alignment
+Do this in order of preference:
+1) Prefer using TaskMaster to apply changes (fewer tokens, auditable):
+   - Add/update tasks via TaskMaster (use research when helpful)
+   - Keep existing IDs when possible; add missing tasks with clear details
+   - Ensure dependencies reflect architectural flow
+2) Only if TaskMaster updates are not sufficient, make minimal direct edits to tasks.json.
 
-Important:
-- Make direct edits to the tasks.json file
+Requirements:
 - Ensure all architectural components have corresponding tasks
-- Ensure task dependencies match the architectural flow
-- Preserve the existing task structure and IDs where possible
-- Add clear details and implementation notes based on the architecture
+- Fix misaligned or redundant tasks
+- Preserve the existing task structure and IDs when possible
+- Add concise implementation details for new/changed tasks
 
-Files to review:
-- .taskmaster/tasks/tasks.json (the task list)
-- .taskmaster/docs/architecture.md (the architecture reference)
-
-Make the necessary modifications directly to ensure the tasks and architecture are fully aligned.
+Focus on correctness and completeness. Keep edits minimal but sufficient.
 EOF
 
         # Prefer TaskMaster AI update first to reduce Claude token usage

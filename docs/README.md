@@ -26,3 +26,9 @@ Auto-generated project from intake pipeline.
 
 - [Product Requirements](/.taskmaster/docs/prd.txt)
 - [Architecture](/.taskmaster/docs/architecture.md)
+
+## Notes
+
+- Intake alignment now prefers TaskMaster AI updates first (with `--research`) before falling back to Claude edits. This reduces token usage and keeps changes auditable.
+- We use the Claude Code SDK (CLI) alongside webhooks for streaming. The Discord bot is optional and used only for channel/webhook lifecycle when enabled.
+- The intake script pipes prompts to `claude -p` and sets `--output-format` explicitly. See the official docs for controlling output format.
