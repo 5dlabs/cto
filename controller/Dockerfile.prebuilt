@@ -18,10 +18,9 @@ WORKDIR /app
 
 # Copy pre-built binaries (these must exist in the build context)
 COPY agent-controller /app/agent-controller
-COPY input-bridge /app/input-bridge
 
 # Make binaries executable and change ownership to app user  
-RUN chmod +x /app/agent-controller /app/input-bridge && \
+RUN chmod +x /app/agent-controller && \
     chown -R app:app /app
 
 # Switch to non-root user

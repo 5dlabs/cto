@@ -7,8 +7,8 @@ WORKDIR /app
 COPY controller/Cargo.toml controller/Cargo.lock ./
 COPY controller/src ./src
 
-# Build both controller binaries
-RUN cargo build --release --bin agent-controller --bin input-bridge
+# Build controller binary only
+RUN cargo build --release --bin agent-controller
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -28,12 +28,11 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 # Set working directory
 WORKDIR /app
 
-# Copy the pre-built binaries from builder
+# Copy the pre-built binary from builder
 COPY --from=builder /app/target/release/agent-controller /app/agent-controller
-COPY --from=builder /app/target/release/input-bridge /app/input-bridge
 
-# Make binaries executable and change ownership to app user  
-RUN chmod +x /app/agent-controller /app/input-bridge && \
+# Make binary executable and change ownership to app user  
+RUN chmod +x /app/agent-controller && \
     chown -R app:app /app
 
 # Switch to non-root user

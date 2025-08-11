@@ -159,7 +159,7 @@ jobs:
 
                     # Build with detailed output
           echo "⏱️ Starting build..."
-          cargo build --release --bin agent-controller --bin input-bridge
+          cargo build --release --bin agent-controller
 
           # Show final sccache stats
           echo "📊 Final sccache stats:"
@@ -181,14 +181,12 @@ jobs:
 
           # Show binary info
           echo "📦 Built binary info:"
-          ls -lh agent-controller input-bridge
+          ls -lh agent-controller
           file agent-controller
-          file input-bridge
           
           # Ensure binaries are in the current directory for Docker context
-          echo "📋 Binaries are ready in controller directory for Docker build"
-          pwd
-          ls -la
+          echo "📋 Binary ready in controller directory for Docker build"
+          ls -la agent-controller || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -211,6 +209,43 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.short-sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+  build-input-bridge:
+    needs: [version]
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push input-bridge image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/images/input-bridge/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/input-bridge:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/input-bridge:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/input-bridge:${{ needs.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
