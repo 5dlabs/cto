@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-11T05:44:03.787Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Rust Watcher Project Setup and Config",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand Task 1 into ~7 subtasks with deliverables and acceptance criteria. Cover: (1) crate/workspace skeleton with bin/lib layout per modules; (2) async runtime init (tokio) and graceful shutdown; (3) Config struct and precedence (CLI>env>file) using clap, config, envy; defaults (poll=100ms, batch=10), env keys per PRD; (4) transcript path discovery with --transcript override and ~/.claude/projects/<encoded>/<session>.jsonl fallback; (5) structured JSON logging via tracing_subscriber and log fields (runId/channelId); (6) release profile tuning (LTO, strip, codegen-units=1), MSRV gate, clippy/fmt; (7) tests: precedence, defaults, smoke runs (with/without webhook). Include risks (binary size/mem), owners, and estimates.",
+			"reasoning": "Multiple cross-cutting concerns (config precedence, logging, discovery, CI) but limited algorithmic depth; moderate complexity."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Low-latency JSONL Tailer (≤100ms) with Inotify + Fallback",
+			"complexityScore": 8,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Expand Task 2 into ~8 subtasks. Cover: (1) Tail struct with async read offset management; (2) inotify watcher for write/close/rename events; (3) polling fallback using tokio Interval; (4) session discovery: watch directory and reopen latest by mtime; (5) robust line splitting with partial-line buffering and minimal allocations (BufReader); (6) backpressure-safe mpsc to downstream; (7) file rotation/rename handling; (8) tests/benchmarks: latency ≤100ms avg, rotation, large lines, Linux-gated inotify. Define acceptance metrics (CPU <1% idle).",
+			"reasoning": "Event-driven file IO with rotation and latency guarantees is tricky, OS-specific, and timing-sensitive."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Event Parser, Filtering, and Embed Builder",
+			"complexityScore": 9,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Expand Task 3 into ~10 subtasks. Cover: (1) serde models for transcript lines with tolerant parsing; (2) event mapping to enum kinds; (3) filters (includeTools, includePatterns, minStdoutLength); (4) parity mode bypass; (5) Discord limits enforcement (2000/4096/fields/embeds); (6) code fence sanitization and escaping; (7) diff generation using similar crate with hunk cap and attachment fallback; (8) embed templates per tool types with colors; (9) batching with idle flush and attachment production; (10) tests: boundary truncation, fuzz parser, diff correctness, parity pass-through.",
+			"reasoning": "High surface area: parsing resilience, complex formatting within strict limits, diffs, batching, and numerous edge cases."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Webhook Sender with Rate Limiting, Backoff, and Attachments",
+			"complexityScore": 8,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Expand Task 4 into ~8 subtasks. Cover: (1) bounded mpsc Message queue; (2) embed chunking (≤10 per request); (3) multipart builder for attachments with payload_json; (4) 429 handling using retry_after + X-RateLimit-*; (5) retry policy with decorrelated jitter and caps; (6) network timeouts and 5xx/timeout retries; (7) pressure policy (drop-oldest attachments) with logging; (8) test harness with mock Discord server for RL/429/multipart verification and stress test.",
+			"reasoning": "Distributed-system concerns (rate limits, retries, multipart correctness) and backpressure make this non-trivial."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Statistics Aggregation and Final Summary Embed",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Expand Task 5 into ~6 subtasks. Cover: (1) Stats struct and update logic per event; (2) cost estimation from config tables with rounding; (3) tool/error counting rules; (4) finalizer logic on Summary or end-of-stream (Drop/guard); (5) summary embed builder (fields, footer, colors); (6) tests: math correctness, premature EOS finalization, snapshot of embed.",
+			"reasoning": "Straightforward aggregation and formatting, with some lifecycle edge cases around stream termination."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Discord Bot Service: Channel Lifecycle and Webhook Provisioning",
+			"complexityScore": 7,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Expand Task 6 into ~9 subtasks. Cover: (1) REST API scaffold (fastify/express) with auth; (2) guild/category discovery/creation; (3) channel creation and naming/idempotency; (4) webhook creation and URL construction; (5) persistence (Redis/SQLite) schema for runs, TTL; (6) initial header embed via webhook; (7) retention worker (cron) to archive/delete; (8) rate limit awareness and retries; (9) integration tests against a test guild and cleanup. Include security notes (no bot token to pods).",
+			"reasoning": "External API orchestration plus persistence and lifecycle management; moderate complexity with operational nuances."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Pod-local Input Bridge (Sidecar HTTP → Agent FIFO/stdin)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand Task 7 into ~7 subtasks. Cover: (1) axum server and config (port, enable flag); (2) schema and validation for POST /input; (3) auth token verification (per-run secret); (4) writer task with bounded queue and non-blocking FIFO vs stdin modes; (5) backpressure policy (drop-oldest) and error mapping; (6) observability counters and tracing; (7) tests: FIFO integration, load, failure/backpressure, security.",
+			"reasoning": "Concurrency and IO coordination with security and backpressure; contained scope but multiple modes to support."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Bot Message Forwarding and Cross-run Validation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Expand Task 8 into ~6 subtasks. Cover: (1) messageCreate listener and filters (ignore bots/DMs); (2) channelId→runId mapping validation; (3) payload build with token and attachment refs; (4) HTTP forwarder with timeouts and exponential backoff; (5) user feedback (ack/fail reply) and truncation policy; (6) tests: non-run channel ignored, forwarding success, retry on 5xx, mapping prevents cross-run.",
+			"reasoning": "Event handling and HTTP forwarding with validation and retries; moderate complexity."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Kubernetes Sidecar Template and Helm Packaging",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand Task 9 into ~7 subtasks. Cover: (1) Helm chart for watcher sidecar with values schema (envs, filters, stats); (2) container spec with resources and securityContext; (3) probes wired to /healthz; (4) secrets/config injection and example Job/Pod templates; (5) optional NetworkPolicy for bridge; (6) separate chart for bot service + Redis + CronJob; (7) chart-testing and deploy docs. Include security review (no bot token in pods).",
+			"reasoning": "Packaging and templating across environments; not algorithmically complex but many integration details."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Observability, Health Checks, and Hardening",
+			"complexityScore": 8,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Expand Task 10 into ~9 subtasks. Cover: (1) metrics registry and Prometheus exporter with defined counters/gauges/histograms; (2) health endpoints (/healthz, /metrics) and readiness logic; (3) tracing spans/fields (runId/channelId) and error sampling; (4) auto-reconnect tailer and discovery retry loops; (5) webhook buffering on outage with bounded queue and DLQ; (6) centralized backoff/jitter config; (7) end-to-end latency benchmark tool and SLOs; (8) failure injection tests; (9) resource monitoring to ensure no agent slowdown.",
+			"reasoning": "Cross-cutting reliability and performance features that integrate multiple components and require careful testing."
+		}
+	]
+}

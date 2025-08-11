@@ -1,0 +1,120 @@
+# Task ID: 5
+# Title: Statistics Aggregation and Final Summary Embed
+# Status: pending
+# Dependencies: 3, 4
+# Priority: medium
+# Description: Track tokens, estimated cost, tools used, errors, duration; emit a final ✅ summary embed on completion or end-of-stream.
+# Details:
+- Maintain a Stats struct updated per event:
+  struct Stats { tokens_in:u64, tokens_out:u64, est_cost:f64, tool_counts:HashMap<String,u64>, error_count:u64, started_at:Instant, model:Option<String> }
+- Cost estimation: configurable per-model $/1K tokens; default table in config (overrideable) e.g., {"claude-3.5-sonnet":{"input":3.0,"output":15.0}}; compute cost = in/1000*input + out/1000*output; avoid vendor lock-in by making this config-driven
+- Increment tool_counts on tool_use; error_count on error/tool_result stderr non-empty
+- On Summary or when tail ends, build the ✅ Complete embed with fields: Cost, Duration, Tokens (total/in/out), Tools Used (aggregated), Model; color=0x27AE60
+- Include footer with runId/shortId and timestamps
+- Pseudo-code:
+  on_event(ev){ stats.update(ev); if matches Summary|Completion { let embeds = build_summary(stats); tx.send(embeds).await; } }
+
+
+# Test Strategy:
+- Unit tests for aggregation math including rounding; verify cost matches config tables
+- Test tools/error counting with mixed events
+- Simulate premature end-of-stream without explicit summary; ensure finalizer emits summary on drop
+- Snapshot test of final embed fields/formatting
+
+# Subtasks:
+## 1. Stats struct and per-event update logic [pending]
+### Dependencies: None
+### Description: Define a Stats aggregate and implement incremental update logic for all relevant stream events.
+### Details:
+- Data model: struct Stats { tokens_in: u64, tokens_out: u64, est_cost: f64, tool_counts: HashMap<String,u64>, error_count: u64, started_at: Instant, model: Option<String> }
+- API: Stats::new(started_at: Instant, model: Option<String>) -> Self; Stats::apply_event(&mut self, ev: EventRef);
+- Event mapping (non-exhaustive):
+  - ModelSelected(name) -> set self.model = Some(name)
+  - TokensIn(n) -> self.tokens_in = self.tokens_in.saturating_add(n)
+  - TokensOut(n) -> self.tokens_out = self.tokens_out.saturating_add(n)
+  - ToolUse { name } -> increment tool_counts[name]
+  - ToolResult { name, stderr } -> increment tool_counts[name] if desired (count attempts on ToolUse; see subtask 3); if stderr not empty increment error_count
+  - Error { .. } -> increment error_count
+  - Summary | Completion | StreamEnd -> no direct stat change; finalizer will react
+- Helpers: Stats::total_tokens() -> u64; Stats::duration(now: Instant) -> Duration
+- Safety: use saturating arithmetic for u64; ignore negative/invalid token deltas; tolerate missing fields.
+- Keep est_cost updated by calling a provided estimator (subtask 2) after token changes.
+
+## 2. Config-driven cost estimation with rounding policy [pending]
+### Dependencies: 5.1
+### Description: Implement per-model input/output $/1K token rates loaded from config and compute estimated cost.
+### Details:
+- Config shape (overrideable): { "pricing": { "claude-3.5-sonnet": { "input": 3.0, "output": 15.0 }, "default": { "input": 0.0, "output": 0.0 } } }
+- API: CostTable::from_config(cfg) -> Self; CostTable::estimate(model: Option<&str>, in_tokens: u64, out_tokens: u64) -> f64
+- Formula: cost = (in_tokens as f64 / 1000.0) * input_rate + (out_tokens as f64 / 1000.0) * output_rate
+- Model lookup: exact match -> rates; else fall back to "default" if present; else use zeros and log a warning.
+- Precision policy: store full-precision f64 in Stats.est_cost; presentation rounding occurs in embed (subtask 4). For tests, allow tolerance 1e-9.
+- Thread-safety: CostTable is Arc<CostTable> sharable; estimation is pure and lock-free.
+- Integrate: Stats::apply_event calls estimator after any token delta to refresh est_cost.
+
+## 3. Tool usage aggregation and error counting rules [pending]
+### Dependencies: 5.1
+### Description: Define consistent rules for counting tool invocations and errors across event types and implement them in Stats updates.
+### Details:
+- Tool counting:
+  - On ToolUse { name }: increment tool_counts[name] by 1 (counts attempts, including retries)
+  - On ToolResult { name }: do not increment tool_counts (avoids double count), unless ToolUse is absent in the stream (then increment defensively if needed)
+- Error counting:
+  - Increment error_count on any Error event
+  - Increment on ToolResult if stderr is non-empty or status indicates failure
+  - Optionally treat events with level="error" as errors
+- Normalization: trim and lowercase tool names for map keys; keep original case only for display aggregation if desired.
+- Idempotency: avoid double-incrementing on duplicate/replayed events by relying on event semantics (no de-dup here) and tests to verify expected counts.
+
+## 4. Summary embed builder [pending]
+### Dependencies: 5.1, 5.2, 5.3
+### Description: Build the ✅ completion embed from Stats with required fields, colors, and footer metadata.
+### Details:
+- API: build_summary_embed(stats: &Stats, run_id: &str, short_id: &str, finished_at: SystemTime) -> Embed
+- Formatting:
+  - Title: "✅ Run Complete"
+  - Color: 0x27AE60
+  - Fields:
+    - Cost: render as USD rounded to 4 decimals (e.g., "$0.0123"); also include rate source if useful
+    - Duration: humanized (e.g., "1m 23.456s"), rounded to milliseconds
+    - Tokens: "total=XYZ (in=A, out=B)"
+    - Tools Used: aggregated "name×count" comma-separated; render "—" if none
+    - Model: model name or "unknown"
+  - Footer: text "runId:<run_id> • shortId:<short_id> • started:<iso8601>"; set embed timestamp to finished_at
+- Robustness: cap field lengths to Discord limits; truncate Tools field if too long and add "+N more" suffix.
+- Output type: compatible with webhook sender (existing Embed struct in project).
+
+## 5. Finalizer guard for Summary or end-of-stream emission [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4
+### Description: Emit the summary embed on Summary/Completion event or on drop/end-of-stream to handle premature termination.
+### Details:
+- Design: SummaryFinalizer holds Arc<Mutex<Stats>>, tx: Sender<Embed>, run_id, short_id, and an AtomicBool sent flag.
+- API:
+  - on_event(ev): update stats (delegates to Stats::apply_event); if ev matches Summary|Completion, call maybe_emit(now)
+  - maybe_emit(now): if sent.swap(true) == false, build embed via build_summary_embed and tx.send(embed).await (or try_send with retry policy)
+  - Drop: if not sent, call maybe_emit(now) to ensure EOS emission
+- Concurrency:
+  - Make maybe_emit idempotent; guard against double-send under race (multiple Summary events or Drop + event)
+  - Handle channel closed gracefully (log, no panic)
+- Integration: wire into the event processing loop so all events pass through finalizer.
+- Time sources: started_at from Stats; finished_at is now at emission for timestamp and duration.
+
+## 6. Tests: aggregation math, finalization, and embed snapshot [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4, 5.5
+### Description: Comprehensive unit/integration tests for math correctness, lifecycle finalization, and embed rendering.
+### Details:
+- Math tests:
+  - Given pricing table and known in/out tokens, assert estimated cost matches formula within tolerance and rounds to 4 decimals in embed
+  - Verify token totals and duration formatting boundaries (sub-second, multi-hour)
+  - Unknown model fallback behavior
+- Tool/error tests:
+  - Mixed ToolUse/ToolResult with stderr cases; verify counts and error_count rules
+- Finalization tests:
+  - Summary event triggers exactly one embed
+  - Premature end-of-stream (no Summary) -> Drop emits embed exactly once
+  - Race: multiple Summary events + Drop do not double-send
+- Snapshot tests:
+  - Use insta (or similar) to snapshot embed JSON for stable fields/formatting (title, color, fields, footer)
+- Channel tests:
+  - Closed tx is handled without panic; log captured.
+

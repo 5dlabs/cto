@@ -1,0 +1,114 @@
+# Task ID: 10
+# Title: Observability, Health Checks, and Hardening
+# Status: pending
+# Dependencies: 2, 3, 4, 5, 6, 7, 8, 9
+# Priority: medium
+# Description: Add metrics, logging, health endpoints, and resilience features to meet non-functional requirements and risks.
+# Details:
+- Watcher metrics (Prometheus via metrics + prometheus_exporter): events_processed_total, embeds_sent_total, rate_limit_hits_total, webhook_retries_total, latency_ms (append->post), queue_depth, bytes_sent, truncations_total, cpu_mem_gauges
+- Health endpoints: /healthz (ready when webhook sender alive and tailer reading), /metrics for Prometheus; expose on localhost:9090
+- Robust error logging with tracing spans per runId and channelId; sample stack traces for unexpected errors
+- Reliability: auto-reconnect tail on errors; ensure independent restarts won’t impact agent; gracefully handle missing webhook (buffer for short time)
+- Backoff configurations centralized; jitter applied; DLQ/log file for permanently failed posts
+- Bot service: add basic metrics (forwarded_messages_total, bridge_errors_total), health route, and structured logs
+- Load/latency tests: measure end-to-end ≤100ms avg from append to post (network permitting); optimize if needed (e.g., coalesce small sleeps)
+- Risk mitigations: rate limit backoff already in Task 4; add discovery retry loop for transcript path variance
+
+
+# Test Strategy:
+- Unit tests for health state transitions (tailer disconnected -> not ready)
+- Benchmark end-to-end latency using a synthetic transcript appending tool and capturing post times
+- Metrics scrape test: ensure Prometheus can scrape /metrics
+- Failure injection tests: kill webhook network, rotate transcript file; validate automatic recovery
+- Verify no measurable slowdown on agent by comparing run times with/without watcher under load
+
+# Subtasks:
+## 1. Metrics Registry and Prometheus Exporter [pending]
+### Dependencies: None
+### Description: Introduce a metrics registry and Prometheus exporter with well-defined counters, gauges, and histograms for watcher and bot services.
+### Details:
+- Use metrics + prometheus_exporter to expose /metrics on localhost:9090.
+- Define watcher metrics: counters events_processed_total, embeds_sent_total, rate_limit_hits_total, webhook_retries_total, truncations_total; gauges queue_depth, cpu_mem_gauges, bytes_sent; histogram latency_ms (append->post) with buckets [5,10,20,50,100,200,500,1000].
+- Define bot service metrics: counters forwarded_messages_total, bridge_errors_total; reuse cpu_mem_gauges.
+- Add low-cardinality labels where safe (e.g., component="watcher|bot", outcome="ok|error"). Avoid high-cardinality labels like runId/channelId on metrics.
+- Implement process CPU/memory gauges via sysinfo or equivalent.
+- Document metric names, units, and semantics; add a sample Prometheus scrape config.
+
+## 2. Structured Tracing and Error Sampling [pending]
+### Dependencies: None
+### Description: Add tracing spans with runId/channelId fields and robust, structured error logging with sampling of unexpected stack traces.
+### Details:
+- Use tracing/tracing-subscriber with JSON formatter; include fields: runId, channelId, event_kind, attempt, error.kind.
+- Define span lifecycle across pipeline stages: tail->parse->build_embed->send_webhook. Propagate trace context through async tasks.
+- Configure log levels via config/env; default info, with per-module overrides.
+- Sample unexpected errors (e.g., 1%) with captured backtraces enabled; always log full context for fatal paths.
+- Correlate logs to metrics via outcome fields; do not put high-cardinality fields into metric labels.
+- Provide log redaction for secrets (webhook URL, tokens).
+
+## 3. Centralized Backoff and Jitter Configuration [pending]
+### Dependencies: None
+### Description: Create a shared backoff module and configuration for retries with jitter for network, webhook, and discovery operations.
+### Details:
+- Expose config: base_ms, max_ms, multiplier, jitter_pct, max_retries, per-category overrides (rate_limit, network, discovery, webhook_post).
+- Implement exponential backoff with full jitter; provide async sleep helper.
+- Emit metrics: backoff_attempts_total{category}, backoff_duration_ms histogram.
+- Use in retry wrappers so callers can compose: retry_async(category, op_fn).
+- Document defaults and guidance; ensure unit tests for bounds, jitter distribution, and max retry behavior.
+
+## 4. Auto-Reconnect Tailer and Discovery Retry Loops [pending]
+### Dependencies: 10.3
+### Description: Harden the tailer to auto-reconnect on errors and add discovery retry loops to handle transcript path variance and rotations.
+### Details:
+- Detect file handle invalidation, EOF stalls, and errors; auto-reopen with backoff from centralized config.
+- Implement directory discovery loop for ~/.claude/projects/<workspace>/ session files; pick latest mtime; retry with backoff on not-found.
+- Handle file rotation seamlessly: persist and restore read offsets where safe to avoid duplicates.
+- Emit metrics: tail_reconnects_total, discovery_retries_total; logs with reason and durations.
+- Ensure independent restarts do not disrupt the agent: idempotent initialization and safe resource cleanup.
+
+## 5. Webhook Outage Buffering with Bounded Queue and DLQ [pending]
+### Dependencies: 10.3
+### Description: Gracefully handle missing/unreachable webhook by buffering with bounds and persisting permanently failed posts to a DLQ.
+### Details:
+- Implement in-memory bounded queue sized by count and bytes; export queue_depth gauge; drop oldest or newest based on policy with truncations_total increments.
+- Retry sender with centralized backoff; apply jitter; respect rate-limit headers if present.
+- DLQ: append-only file for exhausted retries or payloads failing validation; include timestamp, reason; add DLQ rotation policy.
+- Background DLQ reprocessor with safe rate; metrics: dlq_writes_total, dlq_reprocess_total, webhook_retries_total{outcome}.
+- Guarantee at-least-once delivery semantics during transient outages; document trade-offs and ordering guarantees.
+
+## 6. Health Endpoints and Readiness Logic [pending]
+### Dependencies: 10.1, 10.4, 10.5
+### Description: Expose /healthz and /metrics; mark ready only when tailer is reading and webhook sender is healthy; include liveness.
+### Details:
+- Serve on localhost:9090 using the same HTTP server as /metrics; endpoints: /healthz (readiness), /livez (liveness), /metrics.
+- Readiness conditions: tailer connected and reading (recent activity or open handle), webhook sender not degraded (buffer below threshold, no sustained failures), config loaded.
+- Liveness: process responsive loop check.
+- Return JSON with component statuses and overall status; appropriate HTTP codes (200 ready, 503 not ready).
+- Unit tests for state transitions (tailer disconnect -> not ready; webhook outage -> not ready; recovery -> ready).
+
+## 7. End-to-End Latency Benchmark Tool and SLOs [pending]
+### Dependencies: 10.1, 10.4, 10.5, 10.6
+### Description: Build a synthetic benchmark to measure append-to-post latency and enforce ≤100ms average SLO under normal conditions.
+### Details:
+- Create a tool that appends synthetic transcript lines and timestamps when webhook post completes; record latency into latency_ms histogram.
+- Run warm/cold scenarios; report p50/p90/p99 and average; fail test if average >100ms (network permitting) with configurable guard.
+- Emit metrics for runs; save JSON report artifact; add CI job to execute against a local mock webhook server.
+- Optimize if needed (coalesce small sleeps, reduce allocations); document tuning knobs.
+
+## 8. Failure Injection and Resilience Tests [pending]
+### Dependencies: 10.4, 10.5, 10.6, 10.7
+### Description: Systematically inject failures to validate recovery paths, buffering, and health signaling.
+### Details:
+- Scenarios: drop webhook connectivity, simulate HTTP 429/5xx, slow responses, kill/restart process, rotate transcript mid-write, corrupt line, missing path.
+- Verify: auto-reconnect works, retries backoff, health toggles to 503 then recovers, DLQ captures permanent failures, no data loss beyond policy.
+- Provide fault toggles in code or via proxy (toxiproxy) and scripts; gather metrics/logs snapshots for each scenario.
+- Add assertions on metrics deltas (rate_limit_hits_total increments, webhook_retries_total outcomes) and log markers.
+
+## 9. Resource Monitoring and No-Slowdown Guardrails [pending]
+### Dependencies: 10.1, 10.7
+### Description: Monitor CPU/memory and event-loop health to ensure observability features do not slow the agent.
+### Details:
+- Track cpu_mem_gauges over time during benchmarks; add event loop lag metric (tick_jitter_ms) via periodic heartbeat and measuring drift.
+- Define thresholds (e.g., CPU < 20% avg, memory < 64Mi, lag < 10ms p99) and fail CI job if exceeded.
+- Optimize exporters/logging to be non-blocking and backpressure-aware; cap log rate with sampling.
+- Produce a short report comparing baseline vs with observability enabled; recommend config defaults if needed.
+
