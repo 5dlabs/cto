@@ -426,6 +426,21 @@ echo "✅ TaskMaster setup complete"
 echo "📂 Final .taskmaster contents:"
 ls -la .taskmaster/
 
+# Provide minimal Claude project settings to avoid interactive prompts and enable MCP discovery
+mkdir -p .claude
+cat > .claude/settings.json << 'EOF'
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "Bash","Edit","Read","Write","MultiEdit","Glob","Grep","LS","Task","ExitPlanMode","NotebookRead","NotebookEdit","WebFetch","WebSearch","TodoRead","TodoWrite"
+    ],
+    "deny": [],
+    "defaultMode": "acceptEdits"
+  }
+}
+EOF
+
 # Copy PRD and architecture files after initialization
 echo "📋 Copying PRD and architecture files..."
 # Ensure directories exist regardless of task-master version behavior
@@ -523,12 +538,19 @@ Files to review:
 Make the necessary modifications directly to ensure the tasks and architecture are fully aligned.
 EOF
 
-        # Run Claude to review and update tasks
+        # Run Claude to review and update tasks (non-interactive, bounded)
         echo "🔍 Running Claude review..."
-        # Avoid interactive permission prompts by piping prompt content and skipping permissions
+        # Allow Claude access to working directories and cap agentic turns + wall time
         if [ -s "/tmp/review-prompt.md" ]; then
-          cat /tmp/review-prompt.md | claude -p --output-format stream-json --verbose --model "$MODEL" --dangerously-skip-permissions || {
-              echo "⚠️ Claude review failed, but continuing..."
+          timeout 240s sh -c "cat /tmp/review-prompt.md | claude -p \
+            --output-format stream-json \
+            --verbose \
+            --model \"$MODEL\" \
+            --dangerously-skip-permissions \
+            --max-turns 3 \
+            --add-dir \"$PROJECT_DIR\" \
+            --add-dir \"$PROJECT_DIR/.taskmaster\"" || {
+              echo "⚠️ Claude review timed out or failed, continuing..."
           }
         else
           echo "⚠️ Review prompt file missing or empty; skipping Claude review"
