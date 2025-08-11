@@ -118,14 +118,24 @@ refresh_github_token_if_needed() {
         REPO_OWNER=$(echo "$REPO_URL" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
         REPO_NAME=$(echo "$REPO_URL" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
         
-        INSTALLATION_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+        INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
         
         INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
-        
+
+        if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+            echo "[Auto-save] ⚠️ Repo installation not found, trying org installation..."
+            ORG_INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation")
+            INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+        fi
+
         if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
             echo "[Auto-save] ❌ Failed to get installation ID"
+            echo "[Auto-save] Response (repo): $INSTALLATION_RESPONSE"
+            echo "[Auto-save] Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
             rm -f "$TEMP_KEY"
             return 1
         fi
