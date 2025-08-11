@@ -60,6 +60,13 @@ graph TB
     B -->|Shows| C
 ```
 
+### Intake Alignment Flow (SDK + TaskMaster)
+
+1. Intake script initializes TaskMaster and parses PRD/architecture
+2. Task alignment prefers TaskMaster AI update (`--research`) to modify tasks
+3. If needed, Claude Code SDK (CLI) is used as a fallback to review and make minimal edits
+4. Changes are committed on a new branch and opened as a PR
+
 ### 2. Data Flow
 
 ```json

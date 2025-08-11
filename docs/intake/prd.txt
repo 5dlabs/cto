@@ -21,10 +21,11 @@ Build a lightweight, zero-impact monitoring and control plane for headless AI ag
 - Sidecar Rust binary tails `~/.claude/projects/<encoded-workspace>/<session>.jsonl`
 - Formats significant transcript events into Discord embeds (⚡ tool_use, 💭 assistant text, ✅ completion, ❌ errors)
 - Uses a channel-specific Discord webhook for output
-- A Discord Bot (App) manages run channels and (optionally) forwards messages from that channel to an HTTP bridge in the pod for input
+- Claude Code SDK (CLI) is used for intake automation and task alignment; TaskMaster is preferred for applying task updates (with research mode) and Claude is used as a fallback for review.
+- A Discord Bot (App) is optional: it manages run channels and webhooks when lifecycle automation is desired; otherwise static webhooks are sufficient.
 
-### Discord Bot SDK (Rust)
-- Bot implementation uses the `serenity` crate for Discord API integration, slash commands, components, threads, and webhooks.
+### Discord Bot SDK (Rust) — Optional
+- Bot implementation uses the `serenity` crate for Discord API integration (channels/webhooks) when lifecycle automation is enabled. Otherwise, webhook-only operation is supported.
 - References: serenity library and examples [serenity-rs/serenity](https://github.com/serenity-rs/serenity)
 
 Example (message relay skeleton):
@@ -141,11 +142,11 @@ impl EventHandler for Handler {
 
 ## Deliverables (MVP)
 - Rust watcher binary with JSONL tailing, event parsing, embed formatting, batching, rate limiting
-- Discord bot service for channel lifecycle; creates channel + webhook and returns {channelId, webhookUrl}
+- Optional: Discord bot service for channel lifecycle; creates channel + webhook and returns {channelId, webhookUrl}
 - K8s sidecar deploy template; ENV: DISCORD_WEBHOOK_URL, WORKSPACE_PATH
 - Helm values for enabling the watcher and basic filters
 - Documentation (architecture.md, deploy steps)
- - Bot crate using serenity with minimal slash command and channel creation examples
+ - Bot crate using serenity with minimal slash command and channel creation examples (optional)
 
 ## Implementation Phases
 1) Basic Visibility
