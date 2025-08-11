@@ -134,7 +134,6 @@ impl EventHandler for Handler {
 │ Model: claude-3-opus                       │
 └────────────────────────────────────────────┘
 ```
-
 ## Non-Functional Requirements
 - Overhead: <1% CPU, <64Mi memory per watcher
 - Latency: ≤100ms average from transcript append to Discord post (network permitting)
