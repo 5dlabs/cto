@@ -147,9 +147,11 @@ impl<'a> DocsResourceManager<'a> {
                 .await?;
         }
 
-        // Ensure headless Service exists for input bridge discovery (docs jobs can also accept input)
-        let job_name = self.generate_job_name(docs_run);
-        self.ensure_headless_service_exists(docs_run, &job_name).await?;
+        // Ensure headless Service exists for input bridge discovery when enabled
+        if self.config.agent.input_bridge.enabled {
+            let job_name = self.generate_job_name(docs_run);
+            self.ensure_headless_service_exists(docs_run, &job_name).await?;
+        }
 
         Ok(Action::await_change())
     }
