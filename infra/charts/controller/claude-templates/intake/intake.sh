@@ -276,8 +276,8 @@ if ! command -v npm &> /dev/null; then
     fi
 fi
 
-# Install TaskMaster globally
-echo "📦 Installing TaskMaster..."
+# Install TaskMaster globally (pin to version with GPT-5 support)
+echo "📦 Installing TaskMaster (pinned version)..."
 echo "📋 Node version: $(node --version)"
 echo "📋 NPM version: $(npm --version)"
 
@@ -293,10 +293,11 @@ else
     NPM_BIN=$(npm bin -g 2>/dev/null || echo "/usr/local/bin")
 fi
 
-npm install -g task-master-ai@latest || {
-    echo "❌ TaskMaster installation failed"
+TASKMASTER_VERSION="0.24.0"
+npm install -g "task-master-ai@${TASKMASTER_VERSION}" || {
+    echo "❌ TaskMaster ${TASKMASTER_VERSION} installation failed"
     echo "🔍 Trying with --force flag..."
-    npm install -g task-master-ai@latest --force || exit 1
+    npm install -g "task-master-ai@${TASKMASTER_VERSION}" --force || exit 1
 }
 
 # Verify installation location
@@ -439,10 +440,10 @@ echo "🤖 Configuring AI models..."
 task-master models --set-main "$MODEL"
 task-master models --set-research "$MODEL"
 
-# If OpenAI key is present, set fallback to ChatGPT-5; otherwise keep claude sonnet fallback
+# If OpenAI key is present, set fallback to GPT-5; otherwise keep Claude Sonnet fallback
 if [ -n "$OPENAI_API_KEY" ]; then
-  echo "✅ OPENAI_API_KEY detected; using ChatGPT-5 as fallback"
-  task-master models --set-fallback "chatgpt-5"
+  echo "✅ OPENAI_API_KEY detected; using gpt-5 as fallback"
+  task-master models --set-fallback "gpt-5"
 else
   echo "ℹ️ OPENAI_API_KEY not set; using default Claude Sonnet fallback"
   task-master models --set-fallback "claude-3-5-sonnet-20241022"
