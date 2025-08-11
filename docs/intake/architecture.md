@@ -16,12 +16,6 @@ After evaluating status lines, hooks, and independent monitoring, we chose a **p
 - **No Configuration Required**: No need to modify Claude settings or hooks
 - **Standard Unix Pattern**: Simple file tailing, like `tail -f`
 
-### Why Not Status Line or Hooks?
-
-**Status Line**: Meant for display, not monitoring. 300ms throttle, must return single line.
-**Hooks**: Add complexity, can block Claude execution, require configuration for each event type.
-**Independent Watcher**: Just works. No Claude configuration, no performance impact, complete visibility.
-
 ## System Architecture
 
 ### 1. Core Components
@@ -47,7 +41,7 @@ graph TB
     end
     
     subgraph "Shared Volume"
-        J[/workspace]
+        J[/workspace/]
         K[.claude/projects/]
         L[session.jsonl]
     end
