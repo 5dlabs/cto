@@ -3,7 +3,7 @@ use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, Context, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
-    core::v1::{ConfigMap, PersistentVolumeClaim},
+    core::v1::{ConfigMap, PersistentVolumeClaim, Service},
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
@@ -102,6 +102,12 @@ impl<'a> CodeResourceManager<'a> {
         let job_ref = self.create_or_get_job(code_run, &cm_name).await?;
         info!("✅ Job creation completed");
 
+        // Ensure headless Service exists for input bridge discovery
+        if self.config.agent.input_bridge.enabled {
+            let job_name = self.generate_job_name(code_run);
+            self.ensure_headless_service_exists(code_run, &job_name).await?;
+        }
+
         // Update ConfigMap with Job as owner (for automatic cleanup on job deletion)
         if let Some(owner_ref) = job_ref {
             info!("🔗 Updating ConfigMap owner reference");
@@ -125,6 +131,80 @@ impl<'a> CodeResourceManager<'a> {
         self.cleanup_old_configmaps(code_run).await?;
 
         Ok(Action::await_change())
+    }
+
+    async fn ensure_headless_service_exists(&self, code_run: &CodeRun, job_name: &str) -> Result<()> {
+        let namespace = code_run
+            .metadata
+            .namespace
+            .as_deref()
+            .unwrap_or(&self.ctx.namespace);
+        let services: Api<Service> = Api::namespaced(self.ctx.client.clone(), namespace);
+
+        let svc_name = format!("{job_name}-bridge");
+
+        // Build labels for metadata and selector
+        let mut meta_labels = BTreeMap::new();
+        meta_labels.insert("agents.platform/jobType".to_string(), "code".to_string());
+        meta_labels.insert(
+            "agents.platform/name".to_string(),
+            code_run.name_any(),
+        );
+        meta_labels.insert(
+            "agents.platform/input".to_string(),
+            "bridge".to_string(),
+        );
+        meta_labels.insert(
+            "agents.platform/owner".to_string(),
+            "CodeRun".to_string(),
+        );
+
+        // Prefer github_user/app as user label if present
+        if let Some(user) = code_run
+            .spec
+            .github_app
+            .as_deref()
+            .or(code_run.spec.github_user.as_deref())
+        {
+            meta_labels.insert(
+                "agents.platform/user".to_string(),
+                self.sanitize_label_value(user),
+            );
+        }
+
+        let port = self.config.agent.input_bridge.port;
+
+        let svc_json = json!({
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": svc_name,
+                "labels": meta_labels
+            },
+            "spec": {
+                "clusterIP": "None",
+                "ports": [{ "name": "http", "port": port, "targetPort": port }],
+                "selector": { "job-name": job_name }
+            }
+        });
+
+        match services.create(&PostParams::default(), &serde_json::from_value(svc_json.clone())?)
+            .await
+        {
+            Ok(_) => {
+                info!("✅ Created headless Service: {}", svc_name);
+                Ok(())
+            }
+            Err(kube::Error::Api(ae)) if ae.code == 409 => {
+                // Exists: replace to ensure labels/ports are correct
+                services
+                    .replace(&svc_name, &PostParams::default(), &serde_json::from_value(svc_json)?)
+                    .await?;
+                info!("🔄 Updated headless Service: {}", svc_name);
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     async fn ensure_pvc_exists(&self, pvc_name: &str, service_name: &str) -> Result<()> {
@@ -555,32 +635,37 @@ impl<'a> CodeResourceManager<'a> {
         // Build containers array
         let mut containers = vec![container_spec];
 
-        // Add input-bridge sidecar for live JSONL input via HTTP
-        // This is configured via Helm values (agent.inputBridge)
-        let input_bridge = json!({
-            "name": "input-bridge",
-            "image": "ghcr.io/5dlabs/cto/input-bridge:latest",
-            "imagePullPolicy": "Always",
-            "env": [
-                {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
-                {"name": "PORT", "value": "8080"}
-            ],
-            "ports": [{"name": "http", "containerPort": 8080}],
-            "volumeMounts": [
-                {"name": "workspace", "mountPath": "/workspace"}
-            ],
-            "resources": {
-                "requests": {
-                    "cpu": "50m",
-                    "memory": "32Mi"
-                },
-                "limits": {
-                    "cpu": "100m",
-                    "memory": "64Mi"
+        // Add input-bridge sidecar for live JSONL input via HTTP (if enabled)
+        if self.config.agent.input_bridge.enabled {
+            let input_bridge_image = format!(
+                "{}:{}",
+                self.config.agent.input_bridge.image.repository, self.config.agent.input_bridge.image.tag
+            );
+            let input_bridge = json!({
+                "name": "input-bridge",
+                "image": input_bridge_image,
+                "imagePullPolicy": "Always",
+                "env": [
+                    {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
+                    {"name": "PORT", "value": self.config.agent.input_bridge.port.to_string()}
+                ],
+                "ports": [{"name": "http", "containerPort": self.config.agent.input_bridge.port}],
+                "volumeMounts": [
+                    {"name": "workspace", "mountPath": "/workspace"}
+                ],
+                "resources": {
+                    "requests": {
+                        "cpu": "50m",
+                        "memory": "32Mi"
+                    },
+                    "limits": {
+                        "cpu": "100m",
+                        "memory": "64Mi"
+                    }
                 }
-            }
-        });
-        containers.push(input_bridge);
+            });
+            containers.push(input_bridge);
+        }
 
         // Add Docker daemon if enabled
         if enable_docker {

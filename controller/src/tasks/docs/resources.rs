@@ -1,7 +1,7 @@
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
-use k8s_openapi::api::{batch::v1::Job, core::v1::ConfigMap};
+use k8s_openapi::api::{batch::v1::Job, core::v1::{ConfigMap, Service}};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
@@ -147,7 +147,61 @@ impl<'a> DocsResourceManager<'a> {
                 .await?;
         }
 
+        // Ensure headless Service exists for input bridge discovery (docs jobs can also accept input)
+        let job_name = self.generate_job_name(docs_run);
+        self.ensure_headless_service_exists(docs_run, &job_name).await?;
+
         Ok(Action::await_change())
+    }
+
+    async fn ensure_headless_service_exists(&self, docs_run: &DocsRun, job_name: &str) -> Result<()> {
+        let namespace = docs_run
+            .metadata
+            .namespace
+            .as_deref()
+            .unwrap_or(&self.ctx.namespace);
+        let services: Api<Service> = Api::namespaced(self.ctx.client.clone(), namespace);
+
+        let svc_name = format!("{job_name}-bridge");
+
+        let mut meta_labels = BTreeMap::new();
+        meta_labels.insert("agents.platform/jobType".to_string(), "docs".to_string());
+        meta_labels.insert("agents.platform/name".to_string(), docs_run.name_any());
+        meta_labels.insert("agents.platform/input".to_string(), "bridge".to_string());
+        meta_labels.insert("agents.platform/owner".to_string(), "DocsRun".to_string());
+
+        if let Some(user) = docs_run
+            .spec
+            .github_app
+            .as_deref()
+            .or(docs_run.spec.github_user.as_deref())
+        {
+            meta_labels.insert(
+                "agents.platform/user".to_string(),
+                self.sanitize_label_value(user),
+            );
+        }
+
+        let port = 8080u16;
+        let svc_json = json!({
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": { "name": svc_name, "labels": meta_labels },
+            "spec": {
+                "clusterIP": "None",
+                "ports": [{ "name": "http", "port": port, "targetPort": port }],
+                "selector": { "job-name": job_name }
+            }
+        });
+
+        match services.create(&PostParams::default(), &serde_json::from_value(svc_json.clone())?).await {
+            Ok(_) => Ok(()),
+            Err(kube::Error::Api(ae)) if ae.code == 409 => {
+                services.replace(&svc_name, &PostParams::default(), &serde_json::from_value(svc_json)?).await?;
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     pub async fn cleanup_resources(&self, docs_run: &Arc<DocsRun>) -> Result<Action> {
@@ -579,26 +633,6 @@ impl<'a> DocsResourceManager<'a> {
                             "args": ["/task-files/container.sh"],
                             "workingDir": "/workspace",
                              "volumeMounts": volume_mounts
-                        }, {
-                            "name": "input-bridge",
-                            "image": "ghcr.io/5dlabs/cto/input-bridge:latest",
-                            "imagePullPolicy": "Always",
-                            "env": [
-                                {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
-                                {"name": "PORT", "value": "8080"}
-                            ],
-                            "ports": [{"name": "http", "containerPort": 8080}],
-                            "volumeMounts": [{"name": "workspace", "mountPath": "/workspace"}],
-                            "resources": {
-                                "requests": {
-                                    "cpu": "50m",
-                                    "memory": "32Mi"
-                                },
-                                "limits": {
-                                    "cpu": "100m",
-                                    "memory": "64Mi"
-                                }
-                            }
                         }],
                         "volumes": volumes
                     }
