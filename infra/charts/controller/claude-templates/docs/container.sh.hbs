@@ -443,6 +443,7 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       # Keep a persistent writer open to avoid EOF
       exec 9>"$FIFO_PATH"
       if [ -f "prompt.md" ]; then
+          # Initial user turn from prompt.md only; system prompts are set via CLI flags, not streamed
           INITIAL_TEXT=$(jq -Rs . < "prompt.md")
           printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
           # Start Claude reading from FIFO (fd 9 stays open)
