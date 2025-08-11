@@ -3,12 +3,12 @@ FROM rust:latest AS builder
 
 WORKDIR /app
 
-# Copy controller source files (input-bridge is part of controller crate)
-COPY controller/Cargo.toml controller/Cargo.lock ./
-COPY controller/src ./src
+# Copy new standalone input-bridge crate
+COPY input-bridge/Cargo.toml ./Cargo.toml
+COPY input-bridge/src ./src
 
 # Build only the input-bridge binary
-RUN cargo build --release --bin input-bridge
+RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
