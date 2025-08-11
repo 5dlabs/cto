@@ -184,7 +184,8 @@ impl<'a> DocsResourceManager<'a> {
             );
         }
 
-        let port = 8080u16;
+        // Respect configured input bridge port
+        let port = self.config.agent.input_bridge.port;
         let svc_json = json!({
             "apiVersion": "v1",
             "kind": "Service",
@@ -199,7 +200,23 @@ impl<'a> DocsResourceManager<'a> {
         match services.create(&PostParams::default(), &serde_json::from_value(svc_json.clone())?).await {
             Ok(_) => Ok(()),
             Err(kube::Error::Api(ae)) if ae.code == 409 => {
-                services.replace(&svc_name, &PostParams::default(), &serde_json::from_value(svc_json)?).await?;
+                // Fetch existing to preserve resourceVersion on replace
+                let mut existing = services.get(&svc_name).await?;
+                if let Some(spec) = existing.spec.as_mut() {
+                    spec.cluster_ip = Some("None".to_string());
+                    spec.selector = Some(std::collections::BTreeMap::from([
+                        ("job-name".to_string(), job_name.to_string()),
+                    ]));
+                    spec.ports = Some(vec![k8s_openapi::api::core::v1::ServicePort {
+                        name: Some("http".to_string()),
+                        port: port as i32,
+                        target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(port as i32)),
+                        ..Default::default()
+                    }]);
+                }
+                let mut updated: k8s_openapi::api::core::v1::Service = serde_json::from_value(svc_json)?;
+                updated.metadata.resource_version = existing.metadata.resource_version.take();
+                services.replace(&svc_name, &PostParams::default(), &updated).await?;
                 Ok(())
             }
             Err(e) => Err(e.into()),

@@ -1272,10 +1272,11 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
 
     match job_type {
         "code" => {
+            // Use plural, group-qualified CRD to avoid alias issues
             let out = std::process::Command::new("kubectl")
-                .args(["delete", "coderun", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
+                .args(["delete", "coderuns.agents.platform", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
                 .output()
-                .context("Failed to execute kubectl delete coderun")?;
+                .context("Failed to execute kubectl delete coderuns.agents.platform")?;
             if out.status.success() {
                 Ok(json!({"success": true, "message": format!("Deleted CodeRun {name}"), "namespace": namespace}))
             } else {
@@ -1283,10 +1284,11 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
             }
         }
         "docs" => {
+            // Use plural, group-qualified CRD to avoid alias issues
             let out = std::process::Command::new("kubectl")
-                .args(["delete", "docsrun", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
+                .args(["delete", "docsruns.agents.platform", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
                 .output()
-                .context("Failed to execute kubectl delete docsrun")?;
+                .context("Failed to execute kubectl delete docsruns.agents.platform")?;
             if out.status.success() {
                 Ok(json!({"success": true, "message": format!("Deleted DocsRun {name}"), "namespace": namespace}))
             } else {

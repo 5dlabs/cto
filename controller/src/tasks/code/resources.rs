@@ -196,9 +196,13 @@ impl<'a> CodeResourceManager<'a> {
                 Ok(())
             }
             Err(kube::Error::Api(ae)) if ae.code == 409 => {
-                // Exists: replace to ensure labels/ports are correct
+                // Exists: fetch to preserve resourceVersion, then replace
+                let existing = services.get(&svc_name).await?;
+                let mut updated: k8s_openapi::api::core::v1::Service = serde_json::from_value(svc_json)?;
+                updated.metadata.resource_version = existing.metadata.resource_version;
+                
                 services
-                    .replace(&svc_name, &PostParams::default(), &serde_json::from_value(svc_json)?)
+                    .replace(&svc_name, &PostParams::default(), &updated)
                     .await?;
                 info!("🔄 Updated headless Service: {}", svc_name);
                 Ok(())
