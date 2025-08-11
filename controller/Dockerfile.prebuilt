@@ -1,16 +1,4 @@
-# Build stage
-FROM rust:latest AS builder
-
-WORKDIR /app
-
-# Copy controller source files
-COPY controller/Cargo.toml controller/Cargo.lock ./
-COPY controller/src ./src
-
-# Build both controller binaries
-RUN cargo build --release --bin agent-controller --bin input-bridge
-
-# Runtime stage
+# Runtime stage - expects pre-built binaries
 FROM debian:bookworm-slim
 
 # Install only essential runtime dependencies
@@ -28,9 +16,9 @@ RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
 # Set working directory
 WORKDIR /app
 
-# Copy the pre-built binaries from builder
-COPY --from=builder /app/target/release/agent-controller /app/agent-controller
-COPY --from=builder /app/target/release/input-bridge /app/input-bridge
+# Copy pre-built binaries (these must exist in the build context)
+COPY agent-controller /app/agent-controller
+COPY input-bridge /app/input-bridge
 
 # Make binaries executable and change ownership to app user  
 RUN chmod +x /app/agent-controller /app/input-bridge && \
