@@ -225,9 +225,14 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Verify input-bridge crate exists
+      - name: Build input-bridge binary
         run: |
-          ls -la input-bridge || (echo "input-bridge crate missing" && exit 1)
+          echo "🏗️ Building input-bridge binary"
+          cd input-bridge
+          cargo build --release
+          cd ..
+          cp /home/runner/work/cto/cto/input-bridge/target/release/input-bridge input-bridge/input-bridge
+          ls -lh input-bridge/input-bridge
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
