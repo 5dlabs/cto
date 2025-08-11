@@ -54,16 +54,26 @@ generate_github_token() {
     
     echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
     
-    # Get the installation access token
-    INSTALLATION_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+    # Try repository installation first (follow redirects)
+    INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
     
     INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+
+    # Fallback: try organization installation if repo lookup failed
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "⚠️ Repo installation not found, trying org installation..."
+        ORG_INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$REPO_OWNER/installation")
+        INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+    fi
     
     if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
         echo "❌ Failed to get installation ID for repository"
-        echo "Response: $INSTALLATION_RESPONSE"
+        echo "Response (repo): $INSTALLATION_RESPONSE"
+        echo "Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
         rm -f "$TEMP_KEY_FILE"
         exit 1
     fi

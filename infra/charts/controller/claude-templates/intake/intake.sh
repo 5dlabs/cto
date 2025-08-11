@@ -27,6 +27,21 @@ cat "$CONFIG_FILE" || echo "Failed to cat config file"
 echo ""
 echo "---"
 
+# Preview PRD and Architecture to verify correctness
+echo "📄 PRD file preview (first 40 lines):"
+if [ -f "$PRD_FILE" ]; then
+    head -40 "$PRD_FILE" || true
+else
+    echo "PRD file not found at $PRD_FILE"
+fi
+echo ""
+if [ -f "$ARCH_FILE" ]; then
+    echo "📐 Architecture file present: $ARCH_FILE"
+else
+    echo "📐 No architecture.md provided (optional)"
+fi
+echo "---"
+
 # Parse configuration
 echo "📋 Loading configuration from ConfigMap..."
 
@@ -119,12 +134,26 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         REPO_OWNER=$(echo "$REPOSITORY_URL" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
         REPO_NAME=$(echo "$REPOSITORY_URL" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
         
-        INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
-        
+        # Try repository installation first (follow redirects)
+        INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
+
+        INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+
+        # Fallback: try organization installation if repo lookup failed
+        if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+            echo "⚠️ Repo installation not found for $REPO_OWNER/$REPO_NAME, trying org installation..."
+            ORG_INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation")
+            INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+        fi
+
         if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
             echo "❌ Failed to get installation ID for $REPO_OWNER/$REPO_NAME"
+            echo "Response (repo): $INSTALLATION_RESPONSE"
+            echo "Response (org):  ${ORG_INSTALLATION_RESPONSE:-[none]}"
             return 1
         fi
         
@@ -314,7 +343,7 @@ echo "🔍 Attempting TaskMaster init with full flags..."
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
-    --rules "cursor" \
+    --rules "claude" \
     --skip-install \
     --aliases
 INIT_EXIT_CODE=$?
