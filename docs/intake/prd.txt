@@ -49,6 +49,45 @@ Build a lightweight, zero-impact monitoring and control plane for headless AI ag
    - One webhook per run; revoke by deleting webhook
    - Validate channel/run mapping in the bot to prevent cross-run injection
 
+## Discord Formatting & UX Requirements
+
+- General
+  - Every agent action should render clearly in Discord as it would appear in a terminal/editor, but formatted for readability.
+  - Prefer embeds for structure (title, description, fields, footer, timestamp, color) and standard Markdown for content.
+  - Batch up to 10 embeds per message to respect Discord limits; backoff on rate limits.
+
+- Code and Diffs
+  - Use fenced code blocks with language for syntax highlighting:
+    - Commands: ```bash
+    - JSON payloads: ```json
+    - Source snippets: ```ts, ```rs, ```py, etc. by file extension
+    - Diffs and patches: ```diff (use leading "+"/"-" for additions/removals)
+  - For Write/Edit events:
+    - Include a compact inline diff (contextual hunk; max ~40-60 lines).
+    - If larger, truncate and attach full diff as a file via webhook attachments; include a summary field linking filename and size.
+  - For stdout/stderr:
+    - Render significant output in ```text blocks; truncate beyond ~800-1200 chars with “(truncated)” note and attach full output.
+
+- Embed Templates (baseline)
+  - tool_use (Bash): title="⚡ Bash", fields: Command (code-fenced), Working Dir (inline), Tool Count (inline), color=0xF39C12
+  - tool_use (Write/Edit/Read): title="📝 Write"/"👁️ Read", fields: File, Summary, Tool Count, color=0xF39C12
+  - assistant significant message: title optional, description=message text (trimmed), fields: Tokens (In/Out), Session Cost, Model, color=0x3498DB
+  - tool_result error: title="❌ Error", description=stderr (trimmed, code-fenced), fields: Total Errors, color=0xE74C3C
+  - completion: title="✅ Complete", fields: Cost, Duration (if available), Tokens (total), Tools Used, color=0x27AE60
+
+- Limits & Truncation (to avoid render failures)
+  - Respect Discord constraints:
+    - Message content ~2000 chars; embed description up to 4096; at most 25 fields per embed; 10 embeds per message.
+  - Implement safe truncation with ellipses and file attachments for overflow.
+  - Sanitize code fences to avoid accidental fence termination.
+
+- Navigation & Threads (optional enhancements)
+  - Use threads for sub-topics (e.g., “Helper analysis”, “Long logs”).
+  - Add buttons/slash commands later for /pause, /resume, /note; keep MVP output-only.
+
+- Parity Mode
+  - Provide a configuration flag to emit “all events” (no filtering, minimal truncation) to mirror non-interactive console output as closely as possible.
+
 ## Non-Functional Requirements
 - Overhead: <1% CPU, <64Mi memory per watcher
 - Latency: ≤100ms average from transcript append to Discord post (network permitting)
