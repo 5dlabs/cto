@@ -23,6 +23,32 @@ Build a lightweight, zero-impact monitoring and control plane for headless AI ag
 - Uses a channel-specific Discord webhook for output
 - A Discord Bot (App) manages run channels and (optionally) forwards messages from that channel to an HTTP bridge in the pod for input
 
+### Discord Bot SDK (Rust)
+- Bot implementation uses the `serenity` crate for Discord API integration, slash commands, components, threads, and webhooks.
+- References: serenity library and examples [serenity-rs/serenity](https://github.com/serenity-rs/serenity)
+
+Example (message relay skeleton):
+```rust
+use serenity::{async_trait, prelude::*, model::channel::Message};
+
+struct Handler;
+
+#[async_trait]
+impl EventHandler for Handler {
+    async fn message(&self, ctx: Context, msg: Message) {
+        if msg.content.starts_with("/send ") {
+            let payload = msg.content[6..].to_string();
+            // forward to pod-local bridge (POST /input)
+            let _ = reqwest::Client::new()
+                .post("http://input-bridge/input")
+                .json(&serde_json::json!({"text": payload, "author": msg.author.name}))
+                .send().await;
+            let _ = msg.channel_id.say(&ctx.http, "✅ forwarded").await;
+        }
+    }
+}
+```
+
 ## Functional Requirements
 1) Channel Lifecycle
    - Create channel per run: `run-{taskId}-{attempt}-{shortId}` in “Agent Runs” category
@@ -99,6 +125,7 @@ Build a lightweight, zero-impact monitoring and control plane for headless AI ag
 - K8s sidecar deploy template; ENV: DISCORD_WEBHOOK_URL, WORKSPACE_PATH
 - Helm values for enabling the watcher and basic filters
 - Documentation (architecture.md, deploy steps)
+ - Bot crate using serenity with minimal slash command and channel creation examples
 
 ## Implementation Phases
 1) Basic Visibility
