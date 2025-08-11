@@ -183,10 +183,10 @@ jobs:
           ls -lh agent-controller
           file agent-controller
           
-          # Ensure binary is in controller/ for Docker build context
-          echo "📋 Placing binary in controller/ for Docker build context"
-          cp agent-controller ../controller/agent-controller
-          ls -la ../controller/agent-controller || true
+          # Verify binary is present for Docker build context (controller/agent-controller)
+          echo "📋 Verifying agent-controller binary for Docker build context"
+          test -f agent-controller && echo "agent-controller present in ./controller" || (echo "agent-controller missing" && exit 1)
+          ls -la agent-controller
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
