@@ -435,17 +435,20 @@ if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
     cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
 fi
 
-# Configure models with fallback (OpenAI GPT-5 if available)
+# Configure models with fallback
 echo "🤖 Configuring AI models..."
-task-master models --set-main "$MODEL"
-task-master models --set-research "$MODEL"
 
-# If OpenAI key is present, set fallback to GPT-5; otherwise keep Claude Sonnet fallback
 if [ -n "$OPENAI_API_KEY" ]; then
-  echo "✅ OPENAI_API_KEY detected; using gpt-5 as fallback"
+  # Use GPT-5 as primary when OpenAI key is available; keep Opus as research; fallback to GPT-5
+  echo "✅ OPENAI_API_KEY detected; setting main=gpt-5, research=$MODEL, fallback=gpt-5"
+  task-master models --set-main "gpt-5"
+  task-master models --set-research "$MODEL"
   task-master models --set-fallback "gpt-5"
 else
-  echo "ℹ️ OPENAI_API_KEY not set; using default Claude Sonnet fallback"
+  # No OpenAI key: use provided model for both roles; fallback to Claude Sonnet
+  echo "ℹ️ OPENAI_API_KEY not set; setting main=$MODEL, research=$MODEL, fallback=claude-3-5-sonnet-20241022"
+  task-master models --set-main "$MODEL"
+  task-master models --set-research "$MODEL"
   task-master models --set-fallback "claude-3-5-sonnet-20241022"
 fi
 
