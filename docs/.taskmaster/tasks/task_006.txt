@@ -1,0 +1,121 @@
+# Task ID: 6
+# Title: Discord Bot Service: Channel Lifecycle and Webhook Provisioning
+# Status: pending
+# Dependencies: 4
+# Priority: medium
+# Description: Build a Discord bot that creates per-run channels in the “Agent Runs” category, provisions one webhook per run, and returns {channelId, webhookUrl}.
+# Details:
+- Tech stack: Node.js 20+, discord.js v14, fastify/express for REST API, node-fetch/axios; persistent store (Redis or SQLite) for run mapping and retention
+- Bot permissions: Manage Channels, Manage Webhooks, Read/Send Messages, Create Public Threads (optional)
+- REST endpoints:
+  - POST /runs {taskId, attempt, shortId, guildId, categoryName="Agent Runs", retentionHours, bridgeUrl?, bridgeToken?} -> creates channel name run-{taskId}-{attempt}-{shortId} under category; creates webhook via POST /channels/{channel.id}/webhooks; stores mapping {runId, channelId, webhookId, webhookToken, expiresAt, bridgeUrl?, bridgeToken?}; returns {channelId, webhookUrl}
+  - POST /runs/{runId}/archive -> archive/move channel to “Archived Runs” or delete
+- Channel/category logic: find or create category by name
+- Security: bot token remains server-side only; do not emit to pods. Webhook URL is scoped per-channel
+- Rate limits: discord.js handles major RL; still respect retry_after in REST
+- Pseudo-code create:
+  const cat = findOrCreateCategory(guild, "Agent Runs");
+  const ch = await guild.channels.create({ name, parent: cat.id, type: 0 });
+  const hook = await ch.createWebhook({ name: `run-${shortId}` });
+  save({runId, ch.id, hook.id, hook.token, retention});
+  return { channelId: ch.id, webhookUrl: `https://discord.com/api/v10/webhooks/${hook.id}/${hook.token}` };
+- Post initial header embed via webhook with run metadata
+- Retention worker: cron job to archive/delete after TTL
+
+
+# Test Strategy:
+- Integration test against a Discord test guild: create, verify channel in category, verify webhook works, then cleanup
+- Unit tests for naming collisions and idempotency (same runId returns existing channel)
+- Retention test: advance time and ensure archive/delete occurs
+- Security check: ensure webhook URL is the only value exposed to pods
+
+# Subtasks:
+## 1. REST API scaffold with Fastify and auth [pending]
+### Dependencies: None
+### Description: Initialize Fastify REST server with config, JSON schema validation, and API key authentication.
+### Details:
+- Stack: Node.js 20+, Fastify, dotenv/config. Add structured logging.
+- Config: DISCORD_BOT_TOKEN (server-only), API_KEY, DEFAULT_CATEGORY="Agent Runs", ARCHIVE_CATEGORY="Archived Runs", TEST_GUILD_ID?, STORAGE_BACKEND=redis|sqlite.
+- Security: never log or expose DISCORD_BOT_TOKEN; keep it on the server only, not emitted to pods or clients.
+- Middleware: API key auth via header (e.g., Authorization: Bearer <API_KEY>), request body validation via Fastify schemas.
+- Endpoints scaffold: POST /runs, POST /runs/:runId/archive, GET /healthz.
+- Error handling: consistent error envelope with HTTP codes and safe messages.
+
+## 2. Discord client initialization and permission checks [pending]
+### Dependencies: 6.1
+### Description: Set up discord.js v14 client, log in, and verify required permissions on target guilds.
+### Details:
+- Initialize Client with minimal intents (Guilds) sufficient for channel/webhook management.
+- On ready: validate bot permissions on specified guild(s): Manage Channels, Manage Webhooks, Read/Send Messages.
+- Build utility to fetch guild by ID; fail fast if missing perms.
+- Add graceful shutdown (SIGINT/SIGTERM) to destroy client.
+- Security: never expose token in logs; redact sensitive headers.
+
+## 3. Persistence layer and run schema with TTL [pending]
+### Dependencies: 6.1
+### Description: Implement storage abstraction (Redis or SQLite) for run mapping, TTL, and status.
+### Details:
+- Storage selector: Redis client with TTL (EXPIRE) or SQLite (better-sqlite3/knex) with schema + cron cleanup.
+- Schema Run: { runId (pk), taskId, attempt, shortId, guildId, categoryId, channelId, webhookId, webhookToken, bridgeUrl?, bridgeToken?, createdAt, expiresAt, status: active|archived|deleted }.
+- Indices: unique(runId), index(channelId), index(expiresAt).
+- API: getByRunId(runId), getByChannelName/guild, upsertRun(run), markArchived(runId), markDeleted(runId), dueForRetention(now), with transactional/idempotent semantics.
+- Concurrency: unique constraints to prevent duplicate runs; retries on conflict.
+
+## 4. Guild category discovery/creation utilities [pending]
+### Dependencies: 6.2
+### Description: Implement find-or-create for categories: Agent Runs and Archived Runs.
+### Details:
+- Function: findOrCreateCategory(guild, name): search by name (type: GuildCategory), create if not found; return categoryId.
+- Handle optional categoryName override from request; default to config.
+- Cache category IDs per guild for short TTL to reduce API calls.
+- Error mapping: permission issues -> clear 403 for API layer.
+
+## 5. Deterministic channel creation and idempotency [pending]
+### Dependencies: 6.3, 6.4
+### Description: Create per-run text channels with deterministic naming and ensure idempotent behavior.
+### Details:
+- Name format: run-{taskId}-{attempt}-{shortId}; sanitize to [a-z0-9-], max 100 chars; collapse dashes.
+- Derive runId = `${taskId}:${attempt}:${shortId}`; if run exists in storage, return existing {channelId}.
+- If not exists: create channel under category with type 0 (text) and proper topic metadata.
+- Handle race: use storage unique(runId) to prevent dupes; on create conflict, fetch stored mapping and return it.
+- Store mapping (run -> channel) with expiresAt = now + retentionHours.
+
+## 6. Webhook provisioning and initial header embed [pending]
+### Dependencies: 6.5
+### Description: Create a per-run webhook, store credentials, construct URL, and post initial metadata embed.
+### Details:
+- Create webhook on the channel with name `run-{shortId}`; store {webhookId, webhookToken}.
+- Construct webhookUrl: https://discord.com/api/v10/webhooks/{webhookId}/{webhookToken}.
+- Post initial header embed via webhook with run metadata: taskId, attempt, shortId, runId, retention, timestamp, optional bridge presence.
+- Respect Discord limits: 1 embed initially, <= 6000 chars; redact secrets.
+- Update persistence with webhook info.
+
+## 7. Rate limit and retry utilities [pending]
+### Dependencies: 6.2
+### Description: Add centralized wrappers to respect Discord REST rate limits and retry_after semantics.
+### Details:
+- Wrap REST calls not covered by discord.js convenience methods (e.g., webhook POSTs) to handle 429 JSON retry_after and X-RateLimit-* headers.
+- Implement exponential backoff with jitter, max retries, and idempotent safeguards.
+- Log RL events with correlation IDs; surface retry-after to callers when appropriate.
+- Integrate wrappers into channel/webhook/create and embed posting paths.
+
+## 8. Retention worker (cron) to archive/delete [pending]
+### Dependencies: 6.3, 6.4, 6.7
+### Description: Implement scheduled job to enforce TTL by archiving/moving or deleting run channels.
+### Details:
+- Scheduler: node-cron or setInterval; runs every N minutes.
+- Query storage for dueForRetention(now): for each run, either move channel to Archived Runs category or delete per policy.
+- Use rate-limit wrappers; handle missing channels/webhooks gracefully; update status archived|deleted.
+- Ensure idempotency: safe to retry; skip if already archived/deleted.
+- Audit log actions; do not expose secrets.
+
+## 9. End-to-end and unit tests (create/idempotency/webhook/retention) [pending]
+### Dependencies: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8
+### Description: Write tests against a Discord test guild plus unit tests for naming/idempotency and retention.
+### Details:
+- E2E: create run via POST /runs; assert channel under category, webhook URL works (send test message), returns {channelId, webhookUrl}. Cleanup: archive/delete.
+- Idempotency: same payload twice returns same resources.
+- Retention: set short TTL; wait/advance time; assert archive/delete and status updated.
+- RL: simulate 429 (mock or burst) to validate retry behavior.
+- Security: ensure API never returns bot token or secrets; only channelId and webhookUrl.
+

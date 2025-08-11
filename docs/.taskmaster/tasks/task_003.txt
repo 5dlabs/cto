@@ -1,0 +1,142 @@
+# Task ID: 3
+# Title: Event Parser, Filtering, and Embed Builder
+# Status: pending
+# Dependencies: 1, 2
+# Priority: medium
+# Description: Parse transcript JSONL into typed events, apply filters/parity mode, and build Discord embed payloads with code fences, diffs, truncation, and batching.
+# Details:
+- Define serde models with flexible fields:
+  enum EventKind { ToolUse{tool:String, cmd:Option<String>, file:Option<String>, patch:Option<String>, cwd:Option<String>}, Assistant{text:String}, ToolResult{stdout:Option<String>, stderr:Option<String>}, Summary{result:Option<String>} , Error{message:String}}
+  #[derive(Deserialize)] struct TranscriptLine{ timestamp: DateTime<Utc>, event: String, model:Option<String>, tokens_in:Option<u64>, tokens_out:Option<u64>, cost_usd:Option<f64>, tool:Option<String>, data:serde_json::Value }
+- Map event strings to kinds: tool_use (Bash/Write/Edit/Read/WebSearch), assistant, tool_result, result/summary, error
+- Filters: includeTools, includePatterns, minStdoutLength; Parity mode bypasses filters and truncation thresholds (within Discord hard limits)
+- Truncation and sanitization:
+  - Enforce Discord limits: description ≤4096 chars, ≤25 fields, ≤10 embeds/message; message content ≤2000 chars
+  - Sanitize code blocks: escape triple backticks within content by zero-width joiner or by slicing into safe chunks
+  - For stdout/stderr: render in ```text blocks, truncate beyond ~1000 chars with “(truncated)” appended and prepare attachment
+  - For diffs: prefer event-provided patch; else compute inline diff via similar crate, include contextual hunk up to 60 lines; attach full diff if larger
+- Embed templates per PRD with colors:
+  - ⚡ Bash tool_use: title, fields (Command fenced as ```bash), Working Dir, Tool Count
+  - 📝 Write/Edit/👁️ Read: fields File, Summary, Tool Count
+  - 💭 Assistant: description trimmed, fields Tokens In/Out, Cost, Model
+  - ❌ Error: description code-fenced stderr, field Total Errors
+  - ✅ Complete: fields Cost, Duration, Tokens total, Tools Used
+- Batching: collect embeds; flush when size==batch_size or 250ms idle; produce optional attachments array for overflows
+- Pseudo-code build_embeds(ev): match ev { ToolUse{..} => vec![embed]; ToolResult{..} => vec![embed]; Assistant{..} => maybe split across 2 embeds if >4096; Summary => vec![final_embed] }
+
+
+# Test Strategy:
+- Unit tests: sample JSONL lines for each event type -> expected embed structure (title, fields, colors)
+- Truncation tests: inputs at boundaries 2000/4096/25 fields and ensure no panic; verify attachments prepared when exceeding limits
+- Diff tests: ensure inline hunk length cap; validate diff fenced with ```diff and +/-
+- Parity mode test: confirm minimal truncation and all events passed
+- Fuzz test parser with random JSON objects to ensure robustness
+
+# Subtasks:
+## 1. Serde models and tolerant JSONL parsing [pending]
+### Dependencies: None
+### Description: Define flexible serde models and a resilient JSONL reader to deserialize transcript lines into typed events.
+### Details:
+- Define enum EventKind { ToolUse{tool, cmd?, file?, patch?, cwd?}, Assistant{text}, ToolResult{stdout?, stderr?}, Summary{result?}, Error{message} }.
+- Define TranscriptLine { timestamp: DateTime<Utc>, event: String, model?, tokens_in?, tokens_out?, cost_usd?, tool?, data: Value } with serde default/flatten where appropriate.
+- Implement tolerant parsing: accept RFC3339 timestamps; default Option fields to None; collect unknown keys under data.
+- Provide JSONL reader that streams lines, deserializes per-line, logs and skips invalid rows without crashing.
+- Expose conversion helper: TranscriptLine -> CanonicalEvent { ts, meta {model, tokens_in/out, cost}, kind: EventKind }.
+
+## 2. Event string mapping to enum kinds [pending]
+### Dependencies: 3.1
+### Description: Map event string values to EventKind variants and extract fields from data with fallbacks.
+### Details:
+- Map event: "tool_use" (tools: Bash/Write/Edit/Read/WebSearch), "assistant", "tool_result", "result"|"summary", "error".
+- Extract fields from data: ToolUse {cmd, file, patch, cwd}; Assistant {text}; ToolResult {stdout, stderr}; Summary {result}; Error {message}.
+- Normalize tool names and accept case-insensitive aliases.
+- Robust error handling: if mapping fails, produce Error variant with message; never panic.
+- Provide EventMapper with fn map(line: TranscriptLine) -> CanonicalEvent.
+
+## 3. Filtering engine (includeTools, includePatterns, minStdoutLength) [pending]
+### Dependencies: 3.1, 3.2
+### Description: Implement configurable predicates to include/exclude events before embed building.
+### Details:
+- Config schema: includeTools: Option<Vec<String>>; includePatterns: Option<Vec<String>> (compiled to Regex); minStdoutLength: Option<usize>.
+- For ToolUse/ToolResult/Assistant/Summary/Error, define predicates:
+  - includeTools matches ToolUse.tool (case-insensitive) and ToolResult inferred tool chain.
+  - includePatterns apply to concatenated textual fields (cmd/file/stdout/stderr/text/result/message).
+  - minStdoutLength gate ToolResult.stdout length.
+- Pre-compile regexes; on invalid pattern, log and skip that pattern.
+- Expose fn allow(event: &CanonicalEvent, filters: &Filters) -> bool.
+
+## 4. Parity mode bypass switch [pending]
+### Dependencies: 3.3
+### Description: Add a global parity mode that bypasses filters and soft truncation thresholds while still respecting Discord hard limits.
+### Details:
+- Add ParityMode(bool) to pipeline context.
+- When enabled: skip Filters.allow, ignore minStdoutLength and diff/stdout soft truncation caps (~1000), but enforce Discord 2000/4096/25/10 limits.
+- Ensure attachments are always produced for over-limit content in parity mode.
+- Provide fn parity_wrap<T>(ctx, content, enforce_hard_limits_only: bool) to gate truncation behavior.
+
+## 5. Discord limits enforcement utilities [pending]
+### Dependencies: 3.1
+### Description: Implement character/field/embed limit enforcement and safe splitting/chunking helpers.
+### Details:
+- Constants: MESSAGE_MAX=2000, EMBED_DESC_MAX=4096, EMBED_FIELDS_MAX=25, EMBEDS_PER_MESSAGE_MAX=10.
+- Safe trimming by Unicode scalar values (avoid breaking multi-byte); consider unicode-segmentation for grapheme-safe cuts.
+- Helpers:
+  - fn trim_message_content(s) -> String
+  - fn trim_embed_description(s) -> String
+  - fn cap_fields(fields) -> (Vec<Field>, overflow_count)
+  - fn split_embeds(embeds) -> Vec<Vec<Embed>> sized to <=10 each
+- Attachment overflow producer: when content is trimmed, return AttachmentSpec { filename, bytes, note }.
+
+## 6. Code fence sanitization and escaping [pending]
+### Dependencies: 3.5
+### Description: Create robust code block wrapper that escapes internal triple backticks and guarantees balanced fences.
+### Details:
+- Implement sanitize_code_block(lang: &str, content: &str) -> String.
+- Strategy: escape ``` sequences by injecting zero-width joiner or by slicing into chunks between fences; ensure closing fence always present.
+- Normalize line endings to \n; strip trailing whitespace that could break fences.
+- Provide specialized wrappers: code_text(content), code_bash(cmd), code_diff(patch_snippet).
+
+## 7. Diff generation with hunk cap and attachment fallback [pending]
+### Dependencies: 3.1, 3.2
+### Description: Prefer provided patch; else compute inline diff with similar crate, cap context to 60 lines, and attach full diff if larger.
+### Details:
+- Input: file path, optional provided patch, optional before/after text from data.
+- If patch provided: validate minimal structure; use as full attachment; derive inline snippet by truncating to <=60 lines with hunk headers.
+- Else compute diff via similar::{TextDiff,...}, generate unified-like snippet, cap total visible lines to 60.
+- Return structure: { inline_snippet (for embed using code_diff), full_attachment (Option<bytes>), truncated: bool, filename_hint }.
+- Handle large outputs gracefully; never exceed embed limits after sanitization.
+
+## 8. Embed templates and builders per event type [pending]
+### Dependencies: 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
+### Description: Implement embed construction matching PRD templates and colors for all event kinds.
+### Details:
+- ToolUse (⚡ Bash): title with icon, fields: Command (```bash), Working Dir, Tool Count; color per PRD.
+- ToolUse (📝 Write/✏️ Edit/👁️ Read): fields: File, Summary (from data if present), Tool Count.
+- ToolResult: stdout/stderr rendered in ```text, truncate beyond ~1000 chars unless parity; produce attachment when truncated; include tool reference.
+- Assistant (💭): description trimmed to 4096; split into multiple embeds if >4096; fields: Tokens In/Out, Cost, Model.
+- Error (❌): description fenced stderr/message; field Total Errors.
+- Summary/Complete (✅): fields: Cost, Duration (if derivable), Tokens total, Tools Used; ensure final embed appearance.
+- All text through sanitize_code_block and Discord limits helpers; collect attachments for overflows and diffs.
+
+## 9. Batching, idle flush, and attachment aggregation [pending]
+### Dependencies: 3.8, 3.5
+### Description: Collect embeds into batches, flush on size or 250ms idle, and aggregate attachments for oversized content.
+### Details:
+- Queue builder outputs; flush when queue.len()==batch_size or idle_timer==250ms.
+- While flushing, split embeds into groups of <=10; attach per-group attachments; ensure message content stays <=2000.
+- Preserve event order; do not interleave different runs (if applicable) within a batch.
+- Provide backpressure-safe async interface; ready for webhook posting later.
+- Emit metrics hooks (counts/bytes) placeholders for Task 10.
+
+## 10. Comprehensive tests: parsing, limits, diffs, parity [pending]
+### Dependencies: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9
+### Description: Add unit/property tests covering parser resilience, boundary truncation, diff correctness, batching, and parity pass-through.
+### Details:
+- Parsing: sample JSONL for each event; fuzz malformed lines; ensure graceful skip with logs.
+- Limits: inputs at 2000/4096/25/10 boundaries; verify trimming without panic and attachment generation when over.
+- Code fences: strings containing triple backticks and unbalanced fences; ensure sanitized output renders correctly.
+- Diffs: validate 60-line cap, inline snippet format, and attachment fallback; parity mode disables soft caps.
+- Filters: includeTools/patterns/minStdoutLength matrix; ensure correct inclusion/exclusion.
+- Batching: size and idle flush behavior; embed splitting into <=10 per message; attachment aggregation.
+- Snapshot tests for embed JSON to catch regressions.
+

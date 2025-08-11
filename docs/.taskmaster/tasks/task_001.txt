@@ -1,0 +1,161 @@
+# Task ID: 1
+# Title: Rust Watcher Project Setup and Config
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Initialize the Rust sidecar watcher with async runtime, config loading, and CLI/env wiring to meet MVP deliverables.
+# Details:
+Implementation outline:
+- Tech stack: Rust 1.78+, tokio, serde/serde_json, reqwest (HTTP), tracing (logs), anyhow/thiserror (errors), clap (CLI), config + envy (env), notify/inotify (file tailing), similar (diff), regex, bytes, tokio-util, axum (for optional input bridge later)
+- Config sources (priority): CLI flags > env > config file. Env keys per PRD: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL_MS (default 100), BATCH_SIZE (default 10), PARITY_MODE (default false), FILTERS (includeTools/includePatterns/minStdoutLength), STATS toggles, MODEL_COSTS (map)
+- Define Config struct:
+  struct Config { webhook_url: Option<String>, workspace_path: PathBuf, poll_interval_ms: u64, batch_size: usize, parity_mode: bool, filters: Filters, stats: StatsCfg, resources: ResourceHints, }
+- Provide a discovery function for transcript file path override via CLI: --transcript <path>, else discover latest ~/.claude/projects/<encoded-workspace>/<session>.jsonl
+- Establish structured logging via tracing_subscriber with JSON logs for clusters
+- Prepare crate layout:
+  - bin/watcher.rs (main)
+  - lib modules: config.rs, tail.rs, parse.rs, embeds.rs, webhook.rs, stats.rs, trunc.rs, diff.rs, filters.rs, health.rs
+- Pseudo-code main:
+  fn main(){
+    let cfg = load_config(); init_tracing();
+    let tx = spawn_webhook_sender(cfg.webhook_url, cfg.batch_size);
+    let tail = Tail::new(discover_path(cfg.workspace_path)?, cfg.poll_interval_ms);
+    loop { for line in tail.next_line().await { if let Some(ev)=parse_event(&line,cfg.parity_mode,&cfg.filters){ let embeds = build_embeds(ev, &mut stats); tx.send(Message{embeds, attachments}).await; } } }
+  }
+- Ensure binary size small: build with strip, LTO; run with low memory via small allocations
+
+
+# Test Strategy:
+- Unit tests for config parsing precedence (CLI > env > file) using temp env and clap mock args
+- Verify default values match PRD (poll 100ms, batch 10)
+- Smoke run with no webhook_url (Phase 1: static pre-created) and with webhook_url set
+- Benchmark binary memory (<64Mi) via cargo-criterion or valgrind massif in CI
+- Lint/clippy and fmt; ensure MSRV gates and release profile (lto=true, codegen-units=1)
+
+# Subtasks:
+## 1. Crate and workspace skeleton with bin/lib layout [pending]
+### Dependencies: None
+### Description: Create the Rust project skeleton matching the specified module layout and minimal compile-ready stubs.
+### Details:
+Deliverables:
+- Cargo.toml with baseline deps: tokio, serde/serde_json, tracing, tracing-subscriber, anyhow, thiserror, clap, config, envy, reqwest (optional feature "webhook"), notify/inotify (optional feature "inotify"), similar, regex, bytes, tokio-util, axum (optional feature "bridge"). Default features minimal to keep binary small.
+- bin/watcher.rs entrypoint and src/lib with modules: config.rs, tail.rs, parse.rs, embeds.rs, webhook.rs, stats.rs, trunc.rs, diff.rs, filters.rs, health.rs; each module exports stub types/functions used by main.
+- Feature flags wired so non-MVP modules compile as stubs when disabled.
+- README with high-level overview and run instructions.
+Acceptance Criteria:
+- `cargo build` and `cargo run -- --help` succeed on Rust 1.78+.
+- Directory/file layout matches outline and compiles with stubbed modules.
+- No unused mandatory dependencies; optional deps behind features.
+Risks:
+- Early dependency bloat increases binary size. Mitigate via optional features and minimal default features.
+Owner: Rust Engineer A
+Estimate: 0.5 day
+
+## 2. Async runtime init (tokio) and graceful shutdown plumbing [pending]
+### Dependencies: 1.1
+### Description: Initialize tokio runtime, main loop skeleton, and implement graceful shutdown on SIGINT/SIGTERM with task coordination.
+### Details:
+Deliverables:
+- tokio::main entrypoint; initialize runtime with sensible worker/thread settings.
+- Graceful shutdown: listen for Ctrl+C and SIGTERM; broadcast shutdown via watch or broadcast channel; join tasks with a bounded timeout; ensure webhook sender channel drains with a deadline.
+- Main loop skeleton per pseudo-code: create config (stub), init_tracing (stub), spawn_webhook_sender (stub), Tail::new (stub), and an async loop that reads lines and no-ops parse when stubs are in place.
+- Backpressure-aware mpsc channel between parser and webhook sender; bounded size with metrics counters placeholders.
+Acceptance Criteria:
+- On SIGINT, process exits within 5s, logs shutdown start/complete, and no task leaks (all JoinHandles resolve).
+- Running with no webhook_url does not spawn HTTP client; with webhook_url set, a stub sender task is spawned and drained.
+- No panics when no transcript is available (pending later discovery implementation).
+Risks:
+- Task leaks or deadlocks during shutdown. Mitigate with timeouts and cancellation propagation.
+Owner: Rust Engineer B
+Estimate: 0.5 day
+
+## 3. Config struct and precedence (CLI > env > file) [pending]
+### Dependencies: 1.1
+### Description: Implement Config loading with clap, config, and envy; define defaults and environment key mapping per PRD.
+### Details:
+Deliverables:
+- Define Config struct: webhook_url: Option<String>, workspace_path: PathBuf, poll_interval_ms: u64 (default 100), batch_size: usize (default 10), parity_mode: bool (default false), filters: Filters, stats: StatsCfg, resources: ResourceHints.
+- CLI flags via clap: --webhook-url, --workspace <path>, --poll-interval-ms, --batch-size, --parity-mode, --filters.* (includeTools, includePatterns, minStdoutLength), --stats.* toggles, --model-costs <JSON or path>, --config <file>.
+- Env mapping via envy/config: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS (JSON or CSV), STATS_* toggles, MODEL_COSTS (JSON).
+- Config file support (TOML/YAML/JSON), loaded if --config provided or default watcher.(toml|yaml|json) present; implement merge order: defaults < file < env < CLI.
+- Provide load_config() returning fully merged Config with validation (paths exist when required; positive intervals/sizes; sane bounds).
+Acceptance Criteria:
+- Precedence behaves exactly as CLI > env > file; unspecified fields fall back to defaults.
+- Invalid inputs yield clear errors (e.g., negative values rejected, invalid JSON in FILTERS/ MODEL_COSTS).
+- `--help` shows all flags with defaults.
+Risks:
+- Ambiguous FILTERS/ MODEL_COSTS parsing. Mitigate by preferring JSON strings and documenting CSV fallback.
+Owner: Rust Engineer A
+Estimate: 1 day
+
+## 4. Transcript path discovery with --transcript override and fallback [pending]
+### Dependencies: 1.3
+### Description: Provide discovery function to resolve transcript JSONL path via CLI override or ~/.claude/projects/<encoded-workspace>/<session>.jsonl fallback.
+### Details:
+Deliverables:
+- CLI flag: --transcript <path> to directly specify the transcript file.
+- discover_transcript_path(workspace_path): resolves to latest .jsonl by mtime under ~/.claude/projects/<encoded-workspace>/, where <encoded-workspace> is percent-encoding of the absolute workspace path.
+- Handles missing dirs and empty directories gracefully with actionable error messages; logs diagnostics.
+- Expose in config flow so main uses resolved path if not overridden.
+Acceptance Criteria:
+- If --transcript is provided and exists, it is used verbatim.
+- Without --transcript, discovery selects the most recently modified .jsonl file under the computed directory.
+- If nothing found, the app exits with a clear error and non-zero code without panic.
+Risks:
+- Encoding mismatch vs. upstream generator. Mitigate by allowing an override and logging the computed path for troubleshooting.
+Owner: Rust Engineer B
+Estimate: 0.5 day
+
+## 5. Structured JSON logging via tracing_subscriber with runId/channelId fields [pending]
+### Dependencies: 1.1, 1.3
+### Description: Establish JSON-structured logging for cluster consumption with stable runId and optional channelId enrichment.
+### Details:
+Deliverables:
+- init_tracing(config): configure tracing-subscriber with JSON formatter to stdout; fields include ts, level, target, message, runId, channelId, component.
+- Generate a runId (ULID or UUID v4) at startup; attach as root span field and propagate via tracing.
+- Provide helper function to attach channelId to events where available; default null when unknown.
+- Log level configured via RUST_LOG and/or --log-level.
+Acceptance Criteria:
+- Logs are valid JSON; piping through `jq` works.
+- Every log line includes runId; channelId appears on events where present.
+- Switching log level at startup changes verbosity accordingly.
+Risks:
+- Excessive log volume impacting performance. Mitigate with sensible defaults and rate-limited debug logs.
+Owner: Rust Engineer C
+Estimate: 0.5 day
+
+## 6. Release profile tuning, MSRV gate, and lint/format CI [pending]
+### Dependencies: 1.1
+### Description: Optimize binary size and reliability: release profile (LTO, strip, codegen-units=1), set MSRV, and add clippy/fmt CI.
+### Details:
+Deliverables:
+- Cargo.toml: [profile.release] lto = "fat", codegen-units = 1, strip = true, opt-level = "z" (or "s"); consider panic = "abort" behind feature flag "tiny".
+- rust-version = "1.78" in Cargo.toml to enforce MSRV.
+- GitHub Actions workflow(s): build, test, clippy -D warnings, fmt --check, MSRV matrix (1.78 + stable) on Linux.
+- Document release build steps; verify stripped binary size and note memory targets.
+Acceptance Criteria:
+- CI green on main: build, test, clippy, fmt for MSRV and stable.
+- `cargo build --release` produces a stripped binary; size reduction observed vs. debug; target binary size reasonable for MVP (<10 MB on x86_64-unknown-linux-gnu, indicative not hard-fail).
+Risks:
+- LTO and panic=abort may complicate backtraces. Mitigate by disabling panic=abort by default and using it only for size-sensitive builds.
+Owner: DevOps Engineer
+Estimate: 0.5 day
+
+## 7. Tests: config precedence/defaults and smoke runs (with/without webhook) [pending]
+### Dependencies: 1.2, 1.3, 1.4, 1.5, 1.6
+### Description: Add unit/integration tests for config precedence and defaults; smoke tests for runtime with and without webhook; basic logging and discovery tests.
+### Details:
+Deliverables:
+- Unit tests: verify CLI > env > file for all primary fields; confirm defaults (poll 100ms, batch 10, parity false) when unspecified; validate FILTERS and MODEL_COSTS parsing.
+- Integration tests: smoke run without webhook_url (no HTTP attempts); with webhook_url using a local mock server if feature "webhook" enabled; ensure startup, log emission with runId, and graceful shutdown.
+- Discovery tests: temp directory with fake ~/.claude/projects structure; ensure latest mtime selection and override behavior.
+- Optional (ignored) memory check: ensure idle RSS under ~64 MiB on Linux by sampling /proc/self/status.
+Acceptance Criteria:
+- `cargo test` passes on MSRV and stable in CI; no flaky sleeps (use tokio time::pause where applicable).
+- Tests assert precedence, default values, and presence of runId in logs; discovery selects expected file.
+- Smoke tests exit cleanly within timeout and without panics.
+Risks:
+- Env leakage between tests and platform differences. Mitigate with tempdirs, serializing env tests, and conditional cfg for Linux-only checks.
+Owner: QA Engineer
+Estimate: 1 day
+

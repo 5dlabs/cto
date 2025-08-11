@@ -1,0 +1,151 @@
+# Task ID: 9
+# Title: Kubernetes Sidecar Template and Helm Packaging
+# Status: pending
+# Dependencies: 1, 4, 6, 7
+# Priority: medium
+# Description: Provide K8s manifests and Helm values to deploy the watcher as a sidecar and configure bot integration, filters, and resources.
+# Details:
+- K8s sidecar container spec:
+  - image: discord-monitor:latest
+  - env: DISCORD_WEBHOOK_URL (Phase 1), WORKSPACE_PATH, POLL_INTERVAL_MS=100, BATCH_SIZE=10, PARITY_MODE, FILTERS JSON, STATS toggles, AGENT_INPUT_FIFO, BRIDGE_PORT
+  - resources: requests {cpu: 10m, memory: 32Mi}, limits {cpu: 100m, memory: 64Mi}
+  - probes: liveness/readiness on /healthz (to be added in Task 10)
+- Helm chart values matching PRD sketch under discord.monitoring.* including filters and stats
+- Template example sidecar for a Job/Pod spec: inject env from a Secret/ConfigMap; bot service returns webhookUrl which the orchestrator places into the pod env before start
+- Optional NetworkPolicy to restrict bridge endpoint to bot egress IPs or cluster internal
+- Provide chart for bot service (separate deployment + Service) with secrets (BOT_TOKEN), Redis, and retention worker CronJob
+- Documentation snippet for architecture.md and deploy steps
+
+
+# Test Strategy:
+- Helm template unit tests with helm unittest or chart-testing; render manifests with provided values
+- Dry-run apply in a test cluster; verify sidecar starts, envs present, and watcher can read transcript path
+- Resource verification: measure memory/CPU in a sample run to confirm limits are sufficient
+- Security review: ensure no bot token ever appears in sidecar envs or logs
+
+# Subtasks:
+## 1. Helm values schema and base library chart for watcher sidecar [pending]
+### Dependencies: None
+### Description: Create a Helm library chart that defines the values model under discord.monitoring.* to configure the watcher sidecar.
+### Details:
+Deliverables:
+- Library chart name: discord-watcher-sidecar (type: library). Directory skeleton: Chart.yaml, values.yaml, values.schema.json, templates/_sidecar.tpl, templates/_helpers.tpl.
+- Values namespace: discord.monitoring.sidecar.* with defaults:
+  - image: repository, tag=discord-monitor:latest, pullPolicy
+  - env: webhookUrl: (string, optional), webhookUrlSecretRef: {name, key}, workspacePath (default: /workspace), pollIntervalMs (default: 100), batchSize (default: 10), parityMode (enum: full|parity), filters (object/JSON), stats: {enabled: bool, tokens: bool, costs: bool}
+  - bridge: {enabled: bool (default: false), port: 8088}
+  - resources: requests {cpu: 10m, memory: 32Mi}, limits {cpu: 100m, memory: 64Mi}
+  - securityContext defaults: runAsNonRoot=true, runAsUser=65532, readOnlyRootFilesystem=true, allowPrivilegeEscalation=false, capabilities.drop=["ALL"]
+  - probes: {enabled: true, path: /healthz, port: 8088, initialDelaySeconds: 5, periodSeconds: 10, timeoutSeconds: 2, failureThreshold: 3, startupProbe: {enabled: true, failureThreshold: 30, periodSeconds: 5}}
+  - networkPolicy: {enabled: false, allowFromBotSelector: {namespaceSelector: {}, podSelector: {}}, allowedIngressCIDRs: [], allowedEgressCIDRs: [], restrictIngressToCluster: true}
+- values.schema.json:
+  - Types and validation for all above keys; enums for parityMode; integer ranges (pollIntervalMs >= 50, batchSize 1..50); conditionals for webhookUrl vs webhookUrlSecretRef.
+- Document mapping between values and container envs: DISCORD_WEBHOOK_URL, WORKSPACE_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS, STATS_*, AGENT_INPUT_FIFO, BRIDGE_PORT.
+- Ensure no fields reference bot token; webhook URL only.
+
+## 2. Sidecar container template with resources and securityContext [pending]
+### Dependencies: 9.1
+### Description: Implement the reusable container spec template that consumes the values schema and sets resources and hardened securityContext.
+### Details:
+Deliverables:
+- templates/_sidecar.tpl: define a Helm include that renders a complete sidecar container:
+  - name: discord-watcher
+  - image, imagePullPolicy from values
+  - env:
+    - DISCORD_WEBHOOK_URL from value or secretRef
+    - WORKSPACE_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE
+    - FILTERS (as JSON string from .Values or configMap key), STATS_* booleans
+    - AGENT_INPUT_FIFO (optional), BRIDGE_PORT (if bridge.enabled)
+  - ports: containerPort for bridge/health (name: health, port from values) exposed regardless of bridge.enabled to support probes
+  - volumeMounts: mount shared workspace volume at WORKSPACE_PATH (value-driven mountPath); do not mount any credentials except webhook secret if used
+  - resources from values defaults; allow override per workload via values
+  - securityContext per values (runAsNonRoot, readOnlyRootFilesystem, drop ALL caps, no privilege escalation)
+  - terminationMessagePolicy=FallbackToLogsOnError
+- Helper to easily inject this container into Pod/Job specs via include.
+
+## 3. Wire liveness/readiness/startup probes to /healthz [pending]
+### Dependencies: 9.2
+### Description: Add configurable HTTP probes on /healthz using the designated port; safe defaults anticipating Task 10 implementation.
+### Details:
+Deliverables:
+- In _sidecar.tpl, conditionally render probes when .Values.discord.monitoring.sidecar.probes.enabled is true:
+  - readinessProbe: httpGet path=/healthz, port from values; initialDelaySeconds, periodSeconds, timeoutSeconds, failureThreshold from values
+  - livenessProbe: same path/port; slightly larger initialDelaySeconds if needed
+  - startupProbe: optional; enabled via values; generous failureThreshold/period to avoid flapping until /healthz is implemented in Task 10
+- Ensure the container exposes the health port even if bridge.enabled=false, so probes can bind.
+- Notes: /healthz endpoint will be implemented in Task 10; set defaults to avoid false restarts (e.g., startupProbe enabled by default).
+
+## 4. Secrets/Config injection and example Job/Pod templates [pending]
+### Dependencies: 9.1, 9.2, 9.3
+### Description: Provide Secret/ConfigMap templates and example workload manifests demonstrating sidecar injection and env sourcing.
+### Details:
+Deliverables:
+- Template(s):
+  - secret-watcher-webhook.yaml: optionally create a Secret with webhookUrl when .Values provides secretData; otherwise support referencing an existing secret via webhookUrlSecretRef
+  - configmap-watcher.yaml: optional ConfigMap to hold FILTERS JSON and STATS toggles; sidecar env can source via valueFrom configMapKeyRef
+- Example library templates:
+  - _job-with-watcher.tpl and _pod-with-watcher.tpl: show how to include the sidecar container next to an app container; mount a shared emptyDir volume at WORKSPACE_PATH for both containers
+  - Demonstrate envFrom secretRef/configMapRef for filters/stats; DISCORD_WEBHOOK_URL sourced only from Secret or direct value if orchestrator supplies it
+- Usage examples in comments for two patterns:
+  - Orchestrator sets DISCORD_WEBHOOK_URL directly in Pod env prior to start
+  - Orchestrator writes the webhook URL into a Secret which the Pod references
+- Security note: explicitly prohibit injecting BOT_TOKEN into these pods; validate in schema/docs that only webhook URL is accepted.
+
+## 5. Optional NetworkPolicy to restrict bridge ingress [pending]
+### Dependencies: 9.1, 9.2
+### Description: Create a NetworkPolicy that limits ingress to the sidecar bridge port to bot service egress IPs or cluster-internal traffic.
+### Details:
+Deliverables:
+- networkpolicy-bridge.yaml: rendered only if .Values.discord.monitoring.sidecar.bridge.enabled and .Values.discord.monitoring.sidecar.networkPolicy.enabled
+- Policy behavior:
+  - Ingress allowed to the sidecar's bridge/health port from either:
+    - namespaceSelector/podSelector matching the bot service (values: allowFromBotSelector)
+    - allowedIngressCIDRs (optional)
+    - if restrictIngressToCluster=true, allow only same-namespace traffic unless selectors override
+  - Deny all other ingress to the bridge port
+- Egress:
+  - Optionally render an egress policy allowing traffic to allowedEgressCIDRs for Discord webhook endpoints; if empty, do not render egress rules to avoid unintentionally blocking outbound webhooks
+- Label selectors: base on a stable label (e.g., app.kubernetes.io/name for the workload that includes the sidecar) with clear documentation on how to set it.
+
+## 6. Separate bot service chart with Redis and retention CronJob [pending]
+### Dependencies: 9.1
+### Description: Provide a standalone Helm chart for the bot service, its secrets, optional Redis, and a retention worker CronJob.
+### Details:
+Deliverables:
+- New chart: discord-bot (application chart)
+  - Deployment: bot container image, env for BOT_TOKEN (from Secret), bridge and API configs, resource and securityContext hardening
+  - Service: ClusterIP if needed (for internal diagnostics or readiness)
+  - Secret: bot-token (stringData.BOT_TOKEN), mounted only in bot pods; never referenced by watcher pods (security review)
+  - Redis: add as dependency (e.g., bitnami/redis) or lightweight StatefulSet, with values to enable/disable and to use an existing external Redis
+  - CronJob: retention worker that prunes Redis keys/channels based on retention policy in values
+  - NetworkPolicy (optional): egress to watcher bridge ports via namespace/pod selectors consistent with subtask 5
+- Values and schema:
+  - discord.bot.* including image, resources, securityContext, redis.enabled/external, retention.schedule, retention.ttl, networkPolicy settings
+- Security review:
+  - Ensure BOT_TOKEN is scoped to bot namespace and pods only
+  - Validate that watcher sidecar charts have no references to BOT_TOKEN
+  - Recommendation to separate namespaces and limit RBAC to prevent secret leakage.
+
+## 7. Chart testing, validation, and deployment documentation [pending]
+### Dependencies: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6
+### Description: Set up chart unit tests and chart-testing, and write deploy steps and architecture notes.
+### Details:
+Deliverables:
+- Tests:
+  - helm-unittest suites for sidecar library: validate env mapping, probes rendered, securityContext, resources, and NetworkPolicy selectors
+  - helm-unittest for bot chart: ensure BOT_TOKEN secret is only mounted in bot pods; Redis and CronJob toggles
+  - ct configuration (chart-testing) with lint and template checks; optional kind-based install test using sample values
+- Sample values files:
+  - examples/sidecar-values.yaml with filters/stats, bridge enabled, networkPolicy enabled
+  - examples/bot-values.yaml with redis.enabled, retention schedule, and networkPolicy to reach sidecars
+- Deployment docs (architecture.md snippet and deploy steps):
+  - Explain sidecar pattern, envs, filters/stats, parity mode, and bridge flow
+  - Security considerations: no bot token in worker pods; webhook URL only; how NetworkPolicy confines bridge access
+  - Step-by-step:
+    1) Install bot chart and create bot-token Secret
+    2) Install or integrate the sidecar library into workloads; set DISCORD_WEBHOOK_URL via orchestrator or Secret
+    3) Optionally enable bridge and NetworkPolicy
+    4) Verify with helm template/dry-run and kubectl get pods; check envs and resources
+    5) After Task 10, confirm /healthz reports OK
+- CI snippet for running ct and helm-unittest on PRs.
+
