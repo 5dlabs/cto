@@ -30,7 +30,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "-lc", "set -e; FIFO=/workspace/agent-input.jsonl; rm -f $FIFO; mkfifo $FIFO; exec 9> $FIFO; echo '{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Agent ready. Send input.\"}]}}' >&9; exec claude -p --output-format stream-json --input-format stream-json --verbose < $FIFO"]
-          env: {{- toYaml .Values.env | nindent 12 }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
           ports:
             - name: ssh
               containerPort: 22
@@ -47,7 +48,7 @@ spec:
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           env:
             - name: FIFO_PATH
-              value: {{ .Values.persistence.mountPath | quote }}/agent-input.jsonl
+              value: "{{ .Values.persistence.mountPath }}/agent-input.jsonl"
             - name: PORT
               value: {{ .Values.api.port | quote }}
           ports:
