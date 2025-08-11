@@ -962,12 +962,36 @@ Before starting implementation, you MUST read and follow the task-specific tool 
             echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
         fi
 
-        # Seed initial user turn from prompt.md
+        # Seed system prompt + toolman prefix, then initial user turn from prompt.md via a FIFO
         FIFO_PATH="/workspace/agent-input.jsonl"
         rm -f "$FIFO_PATH" 2>/dev/null || true
         mkfifo "$FIFO_PATH"
+        # Keep a persistent writer open to avoid EOF on reader
+        exec 9>"$FIFO_PATH"
+
+        # Build system seed: PROMPT_PREFIX + agent system prompt (or fallback)
+        SEED_SYSTEM_FILE=""
+        if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+          SEED_SYSTEM_FILE="/config/agents/{{github_app}}_system-prompt.md"
+        elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
+          SEED_SYSTEM_FILE="/task-files/{{github_app}}_system-prompt.md"
+        fi
+
+        if [ -n "$SEED_SYSTEM_FILE" ]; then
+          SEED_SYSTEM_BODY=$(cat "$SEED_SYSTEM_FILE")
+        else
+          # Use inline fallback SYSTEM_PROMPT defined above
+          SEED_SYSTEM_BODY="$SYSTEM_PROMPT"
+        fi
+        COMBINED_SYSTEM_TEXT="${PROMPT_PREFIX}${SEED_SYSTEM_BODY}"
+        SEED_JSON=$(printf "%s" "$COMBINED_SYSTEM_TEXT" | jq -Rs .)
+        printf '{"type":"system","message":{"content":[{"type":"text","text":%s}]}}\n' "$SEED_JSON" >&9
+
+        # Initial user turn from prompt.md
         INITIAL_TEXT=$(jq -Rs . < "$CLAUDE_WORK_DIR/task/prompt.md")
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" > "$FIFO_PATH" &
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
+
+        # Start Claude reading from FIFO (fd 9 stays open)
         $CLAUDE_CMD < "$FIFO_PATH"
     else
         echo "❌ ERROR: No prompt.md found from docs service"
