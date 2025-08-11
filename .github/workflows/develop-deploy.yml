@@ -236,11 +236,20 @@ jobs:
         working-directory: ./input-bridge
         run: |
           echo "🏗️ Building input-bridge binary"
-          export RUSTC_WRAPPER=sccache
+          # Use sccache if available
+          if command -v sccache >/dev/null 2>&1; then
+            echo "Using sccache"
+            export RUSTC_WRAPPER=sccache
+            sccache --start-server || true
+          else
+            echo "sccache not found; building without wrapper"
+          fi
+          # Use shared target directory for better cache hits
+          mkdir -p /cache/target
           export CARGO_TARGET_DIR=/cache/target
           cargo build --release
-          sccache --show-stats || true
-          cp target/release/input-bridge ./input-bridge
+          command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+          cp /cache/target/release/input-bridge ./input-bridge
           ls -lh ./input-bridge
 
       - name: Set up Docker Buildx
