@@ -1,0 +1,78 @@
+# Task ID: 5
+# Title: Webhook Sender with Batching, Backoff, and Rate-Limit Handling
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Implement Discord webhook posting layer using twilight-http, supporting up to 10 embeds per request, handling 429s with backoff and retries.
+# Details:
+Implementation:
+- Parse webhook URL into (id, token): https://discord.com/api/webhooks/{id}/{token}. Store securely in memory.
+- Use twilight_http::Client (no bot token needed for webhook execution). ExecuteWebhook(id, token) with embeds, allowed_mentions none, and files.
+- Batch queue: bounded channel receives PostItem { embeds, files }. Coalesce until size limit or timeout (e.g., 50ms) then send.
+- Handle rate limiting: twilight-http handles bucketed limits. Also implement jittered exponential backoff for network errors and global 429s.
+- Retry policy: max 5 attempts, exponential backoff starting at 250ms with jitter, log and drop on exhaustion.
+- Idempotency: not required; but avoid duplicate on retry by not reusing attachments across attempts unless buffered.
+- Respect Discord limits: ≤10 embeds per message; if more pending, split into multiple requests.
+- Telemetry: success/failure counters, last 429 info, queue depth, send latency.
+Pseudo-code:
+loop { batch = collect_items(); let resp = client.execute_webhook(id, token).embeds(batch.embeds).attachments(files).await; match resp { Ok(_) => ok, Err(HttpError::Ratelimited(r)) => sleep(r.retry_after), Err(e) => backoff_retry; } }
+
+
+# Test Strategy:
+Integration test with a mocked Discord API using wiremock-rs to simulate 200, 429 (with retry_after), and transient 5xx. Assert batching respects limits and retries obey backoff. Unit test webhook URL parser with varied URL formats.
+
+# Subtasks:
+## 1. Webhook URL Parser and Validator [pending]
+### Dependencies: None
+### Description: Extract and validate (id, token) from Discord webhook URLs; support common URL variants and add unit tests.
+### Details:
+Implement parse_webhook_url(&str) -> Result<WebhookAuth>. Accept https://discord.com/api/webhooks/{id}/{token}, https://discordapp.com, https://ptb.discord.com, https://canary.discord.com, with or without trailing slashes and optional query params. Validate id is a u64-like snowflake and token is non-empty. Return a struct storing id and token securely in memory (no logging; redact token with last 4 chars when needed). Provide comprehensive unit tests for valid/invalid cases.
+
+## 2. Configuration and Tunables [pending]
+### Dependencies: None
+### Description: Expose batch, retry, and timeout settings via env/clap with sensible defaults and validation.
+### Details:
+Define config: batch_window_ms (default 50), queue_bound (e.g., 1024), max_embeds_per_message (10), max_attempts (5), initial_backoff_ms (250), max_backoff_ms (8000), jitter (true), http_timeout_ms (10000), file_in_memory_limit_mb (8), proxy (optional). Load from env and CLI (clap), validate ranges, and make available to components via Arc<Config>.
+
+## 3. Twilight HTTP Client Initialization [pending]
+### Dependencies: 5.2
+### Description: Initialize twilight_http::Client for webhook execution with timeouts and optional proxy.
+### Details:
+Build a shared Arc<Client> with configured connector/timeout and optional proxy from Config. No bot token required. Set a descriptive user-agent. Ensure the client honors bucketed rate limits built into twilight-http. Provide a small wrapper with execute_webhook(id, token) helper to encapsulate common options.
+
+## 4. Bounded Queue and Batcher [pending]
+### Dependencies: 5.2
+### Description: Implement a bounded mpsc queue and coalescing batcher that flushes by size or timeout.
+### Details:
+Define PostItem { embeds: Vec<Embed>, files: Vec<FileAttachment> }. Create a bounded tokio::mpsc channel (capacity from Config). Batcher task collects items until: adding next would exceed 10 embeds, attachments limit, or bytes budget; or batch_window_ms elapses. Use select! with timeout to flush. Ensure graceful shutdown and backpressure handling when queue is full.
+
+## 5. Request Construction and Dispatch [pending]
+### Dependencies: 5.1, 5.3, 5.4
+### Description: Build webhook requests from batches respecting Discord limits and dispatch via twilight.
+### Details:
+Split batches into one or more messages so each request has ≤10 embeds. Construct ExecuteWebhook with allowed_mentions set to none. Attach files from batch, mapping to twilight attachment types. Measure send latency per request. Provide a send_batch(batch, auth) -> Result that returns granular outcomes for retry logic, including which segments were sent.
+
+## 6. Rate-Limit and Retry/Backoff Handling [pending]
+### Dependencies: 5.2, 5.5
+### Description: Implement jittered exponential backoff for network/5xx and respect 429 retry-after, with max attempts.
+### Details:
+Wrap dispatch with retry loop: Ok => success; HttpError::Ratelimited(r) => sleep(r.retry_after) and retry; network/timeout/5xx => exponential backoff starting at initial_backoff_ms with full jitter, capped at max_backoff_ms, up to max_attempts. Honor twilight buckets implicitly; handle global 429s (r.global) by pausing all sends. On exhaustion, log and drop. Idempotency not required; avoid duplicate attachments by coordinating with attachment buffering.
+
+## 7. Attachment Streaming and Retry Safety [pending]
+### Dependencies: 5.4, 5.5
+### Description: Ensure file attachments are safe to retry without duplication or stream reuse issues.
+### Details:
+Represent attachments as retryable sources: in-memory Bytes for small files (<= file_in_memory_limit_mb), or reopenable file handles with pre-read buffers. For retries, clone Bytes or re-seek/reopen files. If an attachment cannot be safely retried (too large/unseekable), mark the send as single-attempt or buffer explicitly. Verify that no consumed streams are reused across attempts.
+
+## 8. Telemetry: Metrics, Logging, and Tracing [pending]
+### Dependencies: 5.4, 5.5, 5.6
+### Description: Emit counters, gauges, histograms, and structured logs for observability, redacting secrets.
+### Details:
+Metrics: counters (messages_sent, messages_failed, batches_flushed), gauge (queue_depth), histograms (batch_embeds_count, send_latency_ms, attempts_per_send). Track last_429_at and last_retry_after_ms. Add tracing spans for batch lifecycle and per-request attempts; redact webhook token. Expose optional Prometheus metrics if available; otherwise rely on tracing.
+
+## 9. Integration Tests with Wiremock and Operational Docs [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8
+### Description: Add wiremock-based tests for 200/429/5xx, batching, and backoff; write tuning and operations docs.
+### Details:
+Wiremock: mock /api/webhooks/{id}/{token} for 200, 429 with Retry-After, and transient 5xx. Assert batching flush by size (≤10 embeds) and time (≈50ms), retry/backoff timing with tokio::time::pause, and global 429 waits. Unit-test URL parser edge cases. Document configuration, tuning guidance (batch window, queue size, retries), interpreting telemetry, and common failure scenarios (invalid token, deleted channel, persistent 429s).
+

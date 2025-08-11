@@ -1,0 +1,115 @@
+# Task ID: 9
+# Title: Kubernetes Sidecar Template and Helm Packaging
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Provide K8s manifests and Helm charts for deploying the watcher as a sidecar and the bot as a central service, including configurable values from the PRD.
+# Details:
+Implementation:
+- Helm chart values per PRD sketch:
+discord.monitoring.enabled, image, polling.interval (ms), polling.batchSize, filters.includeTools/includePatterns/minStdoutLength, stats.trackCost/tokens/errors, resources (requests/limits).
+- Sidecar container:
+  - Env: DISCORD_WEBHOOK_URL (from bot), WORKSPACE_PATH or TRANSCRIPT_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS JSON, LOG_LEVEL.
+  - Liveness/readiness probes (HTTP or exec to watcher --health).
+  - SecurityContext: runAsNonRoot, readOnlyRootFilesystem where possible.
+- Bot deployment:
+  - Secret for DISCORD_BOT_TOKEN and PUBLIC_KEY.
+  - Service and Ingress for /runs and /interactions endpoints (mTLS or IP allow-list recommended).
+- Optional bridge:
+  - Expose localhost-only port inside the pod; no Service.
+- RBAC not required beyond defaults; no tokens mounted into agent pods.
+- Templates for channel retention window config.
+- Provide example values.yaml matching PRD defaults.
+
+
+# Test Strategy:
+helm template and kubeval to validate manifests. Kind-based e2e: deploy bot, then a sample job with watcher sidecar; run a mocked transcript to verify Discord posts. Verify resource usage via metrics-server stays within limits. Confirm environment variables propagate.
+
+# Subtasks:
+## 1. Helm chart scaffolding and layout [pending]
+### Dependencies: None
+### Description: Create umbrella and subchart structure for watcher sidecar and bot service with shared helpers.
+### Details:
+• Create charts/discord-monitoring (umbrella), charts/watcher-sidecar, charts/bot-service
+• Add Chart.yaml, values.yaml, .helmignore for each; set versions/appVersion
+• Add common templates/_helpers.tpl (name, labels, image, resources, feature flags)
+• Gate renders with .Values.discord.monitoring.enabled where appropriate
+• Provide NOTES.txt stubs and standard labels/annotations
+
+## 2. Values schema and PRD defaults [pending]
+### Dependencies: 9.1
+### Description: Define values.schema.json and defaults aligning with PRD; provide example values.yaml.
+### Details:
+• Add values.schema.json enforcing keys: discord.monitoring.enabled, image.{repository,tag,pullPolicy}, polling.intervalMs, polling.batchSize, filters.{includeTools,includePatterns,minStdoutLength}, stats.{trackCost,tokens,errors}, resources.{requests,limits}, parityMode, logging.level, retention.channelHours
+• Bot settings: service.ports, ingress, networkPolicy, secrets (existingSecret or inline), probes
+• Sidecar settings: transcript volume, probes, securityContext, bridge options
+• Provide example-values.yaml matching PRD defaults
+
+## 3. Watcher sidecar container template and injection helpers [pending]
+### Dependencies: 9.2
+### Description: Implement sidecar container spec with env wiring and volume mounts, exposed as a reusable Helm include.
+### Details:
+• Add templates/_sidecar.tpl rendering a Container with image, args, env, resources
+• Env: DISCORD_WEBHOOK_URL (from existingSecret or value), WORKSPACE_PATH or TRANSCRIPT_PATH, POLL_INTERVAL_MS, BATCH_SIZE, PARITY_MODE, FILTERS (JSON), LOG_LEVEL
+• Support transcript volume and mount via values (existingClaim, hostPath, emptyDir)
+• Provide helper to inject sidecar into user workloads (library chart pattern) with examples
+
+## 4. Watcher liveness/readiness probes [pending]
+### Dependencies: 9.3
+### Description: Add configurable HTTP or exec probes for the watcher sidecar.
+### Details:
+• values: watcher.probes.type (http|exec), http.port, http.path, exec.command, initialDelaySeconds, periodSeconds, timeoutSeconds, failureThreshold
+• If http: expose containerPort and configure probes; if exec: run watcher --health (or configured command)
+• Template into sidecar container via _sidecar.tpl
+
+## 5. Security context and pod hardening for sidecar [pending]
+### Dependencies: 9.3
+### Description: Apply secure-by-default settings for sidecar and pods.
+### Details:
+• Container securityContext: runAsNonRoot=true, runAsUser=65532 (configurable), readOnlyRootFilesystem=true, allowPrivilegeEscalation=false, capabilities drop: [ALL]
+• PodSecurityContext: seccompProfile=RuntimeDefault; optional fsGroup if needed by volume
+• Set automountServiceAccountToken=false for workloads using sidecar (toggle via values)
+
+## 6. Bot Deployment, Service, Ingress, and Secrets [pending]
+### Dependencies: 9.2
+### Description: Create bot service chart with secure defaults and configurable networking.
+### Details:
+• Deployment with env from Secret (DISCORD_BOT_TOKEN, PUBLIC_KEY); support existingSecret and stringData
+• Service exposing /runs and /interactions; ports configurable; health probes
+• Optional Ingress with TLS; support IP allow-list annotations; document mTLS recommendation
+• Optional NetworkPolicy restricting ingress/egress
+• Resources, image, logging, and replica settings via values
+
+## 7. Optional localhost bridge container [pending]
+### Dependencies: 9.3
+### Description: Support optional bridge sidecar exposing a localhost-only port with no Service.
+### Details:
+• Add bridge.enabled, image, port, args in values
+• Render optional bridge container; no Service created; hostNetwork=false; containerPort only
+• Wire watcher BRIDGE_URL env to http://127.0.0.1:<port> when enabled
+
+## 8. Retention window configuration templates [pending]
+### Dependencies: 9.3, 9.6
+### Description: Template retention settings for channels and propagate to components.
+### Details:
+• Add retention.channelHours to values and schema
+• Provide ConfigMap or direct env for bot and watcher to consume retention settings
+• If retained via FILTERS, include computed duration; else pass dedicated env RETENTION_HOURS
+
+## 9. CI validation: linting and schema conformance [pending]
+### Dependencies: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8
+### Description: Automate helm lint/template and kubeconform checks in CI.
+### Details:
+• GitHub Actions workflow: setup-helm, helm lint, helm template
+• Run kubeval/kubeconform against multiple Kubernetes versions
+• Optionally use chart-testing (ct) lint steps; produce packaged charts artifacts
+
+## 10. Kind e2e tests and example deployments [pending]
+### Dependencies: 9.9
+### Description: Validate charts on Kind with a sample workload and mock endpoints; provide docs.
+### Details:
+• Spin up Kind with metrics-server; install bot-service and sample job/deployment using watcher sidecar include
+• Deploy mock Discord webhook receiver (e.g., httpbin/wiremock); point DISCORD_WEBHOOK_URL to it
+• Provide mock transcript via ConfigMap/initContainer; verify posts arrive; verify probes succeed; check resources within limits
+• Add README with deployment steps and example-values.yaml; map checks to acceptance criteria
+
