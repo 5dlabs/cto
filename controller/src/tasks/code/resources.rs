@@ -105,7 +105,8 @@ impl<'a> CodeResourceManager<'a> {
         // Ensure headless Service exists for input bridge discovery
         if self.config.agent.input_bridge.enabled {
             let job_name = self.generate_job_name(code_run);
-            self.ensure_headless_service_exists(code_run, &job_name).await?;
+            self.ensure_headless_service_exists(code_run, &job_name)
+                .await?;
         }
 
         // Update ConfigMap with Job as owner (for automatic cleanup on job deletion)
@@ -133,7 +134,11 @@ impl<'a> CodeResourceManager<'a> {
         Ok(Action::await_change())
     }
 
-    async fn ensure_headless_service_exists(&self, code_run: &CodeRun, job_name: &str) -> Result<()> {
+    async fn ensure_headless_service_exists(
+        &self,
+        code_run: &CodeRun,
+        job_name: &str,
+    ) -> Result<()> {
         let namespace = code_run
             .metadata
             .namespace
@@ -146,18 +151,9 @@ impl<'a> CodeResourceManager<'a> {
         // Build labels for metadata and selector
         let mut meta_labels = BTreeMap::new();
         meta_labels.insert("agents.platform/jobType".to_string(), "code".to_string());
-        meta_labels.insert(
-            "agents.platform/name".to_string(),
-            code_run.name_any(),
-        );
-        meta_labels.insert(
-            "agents.platform/input".to_string(),
-            "bridge".to_string(),
-        );
-        meta_labels.insert(
-            "agents.platform/owner".to_string(),
-            "CodeRun".to_string(),
-        );
+        meta_labels.insert("agents.platform/name".to_string(), code_run.name_any());
+        meta_labels.insert("agents.platform/input".to_string(), "bridge".to_string());
+        meta_labels.insert("agents.platform/owner".to_string(), "CodeRun".to_string());
 
         // Prefer github_user/app as user label if present
         if let Some(user) = code_run
@@ -188,7 +184,11 @@ impl<'a> CodeResourceManager<'a> {
             }
         });
 
-        match services.create(&PostParams::default(), &serde_json::from_value(svc_json.clone())?)
+        match services
+            .create(
+                &PostParams::default(),
+                &serde_json::from_value(svc_json.clone())?,
+            )
             .await
         {
             Ok(_) => {
@@ -198,9 +198,10 @@ impl<'a> CodeResourceManager<'a> {
             Err(kube::Error::Api(ae)) if ae.code == 409 => {
                 // Exists: fetch to preserve resourceVersion, then replace
                 let existing = services.get(&svc_name).await?;
-                let mut updated: k8s_openapi::api::core::v1::Service = serde_json::from_value(svc_json)?;
+                let mut updated: k8s_openapi::api::core::v1::Service =
+                    serde_json::from_value(svc_json)?;
                 updated.metadata.resource_version = existing.metadata.resource_version;
-                
+
                 services
                     .replace(&svc_name, &PostParams::default(), &updated)
                     .await?;
@@ -643,7 +644,8 @@ impl<'a> CodeResourceManager<'a> {
         if self.config.agent.input_bridge.enabled {
             let input_bridge_image = format!(
                 "{}:{}",
-                self.config.agent.input_bridge.image.repository, self.config.agent.input_bridge.image.tag
+                self.config.agent.input_bridge.image.repository,
+                self.config.agent.input_bridge.image.tag
             );
             let input_bridge = json!({
                 "name": "input-bridge",

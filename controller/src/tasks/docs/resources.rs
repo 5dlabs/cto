@@ -1,7 +1,10 @@
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
-use k8s_openapi::api::{batch::v1::Job, core::v1::{ConfigMap, Service}};
+use k8s_openapi::api::{
+    batch::v1::Job,
+    core::v1::{ConfigMap, Service},
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
@@ -150,13 +153,18 @@ impl<'a> DocsResourceManager<'a> {
         // Ensure headless Service exists for input bridge discovery when enabled
         if self.config.agent.input_bridge.enabled {
             let job_name = self.generate_job_name(docs_run);
-            self.ensure_headless_service_exists(docs_run, &job_name).await?;
+            self.ensure_headless_service_exists(docs_run, &job_name)
+                .await?;
         }
 
         Ok(Action::await_change())
     }
 
-    async fn ensure_headless_service_exists(&self, docs_run: &DocsRun, job_name: &str) -> Result<()> {
+    async fn ensure_headless_service_exists(
+        &self,
+        docs_run: &DocsRun,
+        job_name: &str,
+    ) -> Result<()> {
         let namespace = docs_run
             .metadata
             .namespace
@@ -197,26 +205,40 @@ impl<'a> DocsResourceManager<'a> {
             }
         });
 
-        match services.create(&PostParams::default(), &serde_json::from_value(svc_json.clone())?).await {
+        match services
+            .create(
+                &PostParams::default(),
+                &serde_json::from_value(svc_json.clone())?,
+            )
+            .await
+        {
             Ok(_) => Ok(()),
             Err(kube::Error::Api(ae)) if ae.code == 409 => {
                 // Fetch existing to preserve resourceVersion on replace
                 let mut existing = services.get(&svc_name).await?;
                 if let Some(spec) = existing.spec.as_mut() {
                     spec.cluster_ip = Some("None".to_string());
-                    spec.selector = Some(std::collections::BTreeMap::from([
-                        ("job-name".to_string(), job_name.to_string()),
-                    ]));
+                    spec.selector = Some(std::collections::BTreeMap::from([(
+                        "job-name".to_string(),
+                        job_name.to_string(),
+                    )]));
                     spec.ports = Some(vec![k8s_openapi::api::core::v1::ServicePort {
                         name: Some("http".to_string()),
                         port: port as i32,
-                        target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(port as i32)),
+                        target_port: Some(
+                            k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(
+                                port as i32,
+                            ),
+                        ),
                         ..Default::default()
                     }]);
                 }
-                let mut updated: k8s_openapi::api::core::v1::Service = serde_json::from_value(svc_json)?;
+                let mut updated: k8s_openapi::api::core::v1::Service =
+                    serde_json::from_value(svc_json)?;
                 updated.metadata.resource_version = existing.metadata.resource_version.take();
-                services.replace(&svc_name, &PostParams::default(), &updated).await?;
+                services
+                    .replace(&svc_name, &PostParams::default(), &updated)
+                    .await?;
                 Ok(())
             }
             Err(e) => Err(e.into()),

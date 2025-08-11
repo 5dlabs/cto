@@ -81,8 +81,12 @@ pub struct InputBridgeConfig {
     pub port: u16,
 }
 
-fn default_input_bridge_enabled() -> bool { true }
-fn default_input_bridge_port() -> u16 { 8080 }
+fn default_input_bridge_enabled() -> bool {
+    true
+}
+fn default_input_bridge_port() -> u16 {
+    8080
+}
 
 /// Secrets configuration - only what we actually use
 #[derive(Debug, Clone, Deserialize, Serialize)]
