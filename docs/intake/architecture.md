@@ -47,7 +47,7 @@ graph TB
     end
     
     subgraph "Shared Volume"
-        J[/workspace]
+        J[/workspace/]
         K[.claude/projects/]
         L[session.jsonl]
     end
