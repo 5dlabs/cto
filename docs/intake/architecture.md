@@ -32,7 +32,7 @@ graph TB
         D[File Watcher]
         E[JSONL Parser]
         F[Event Filter]
-        G[Discord Client]
+        G[Discord Client (Twilight HTTP)]
     end
     
     subgraph "Claude Agent Pod"
@@ -55,7 +55,7 @@ graph TB
     D -->|New Lines| E
     E -->|Parse Events| F
     F -->|Format| G
-    G -->|POST| A
+    G -->|POST (twilight-http)| A
     A -->|Display In| B
     B -->|Shows| C
 ```
@@ -418,7 +418,7 @@ impl TranscriptWatcher {
     }
     
     async fn send_to_discord(&self, events: Vec<DiscordEmbed>) {
-        // Use timeout to ensure we don't block
+// Use timeout to ensure we don't block
         let _ = timeout(Duration::from_secs(2), async {
             let client = reqwest::Client::new();
             let webhook = DiscordWebhook { 
@@ -503,6 +503,34 @@ reqwest = { version = "0.11", features = ["json"] }
 [[bin]]
 name = "discord-monitor"
 path = "src/main.rs"
+```
+
+### Discord Integration (Twilight)
+
+For bot and gallery management via Discord REST:
+
+```toml
+# controller/Cargo.toml (excerpt)
+[dependencies]
+twilight-http = "0.16"
+twilight-model = "0.16"
+# Optional if/when we need gateway events
+# twilight-gateway = "0.16"
+# twilight-cache-inmemory = "0.16"
+```
+
+```rust
+use std::sync::Arc;
+use twilight_http::Client as DiscordHttp;
+use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, MessageMarker};
+
+async fn update_gallery_tile(http: Arc<DiscordHttp>, channel_id: Id<ChannelMarker>, message_id: Id<MessageMarker>, content: String) -> anyhow::Result<()> {
+    http.update_message(channel_id, message_id)
+        .content(Some(&content))?
+        .await?;
+    Ok(())
+}
 ```
 
 ### Container Deployment
