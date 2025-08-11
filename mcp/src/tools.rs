@@ -11,8 +11,7 @@ pub fn get_tool_schemas() -> Value {
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_anthropic_message_schema(),
-            get_send_job_input_schema()
+            get_input_schema()
         ]
     })
 }
@@ -27,8 +26,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, String>) -> Value {
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_anthropic_message_schema(),
-            get_send_job_input_schema()
+            get_input_schema()
         ]
     })
 }
@@ -210,39 +208,21 @@ fn get_stop_job_schema() -> Value {
     })
 }
 
-fn get_anthropic_message_schema() -> Value {
+fn get_input_schema() -> Value {
     json!({
-        "name": "anthropic_message",
-        "description": "Send a message to Anthropic Messages API with optional JSON message input (input_json). Returns raw API response.",
+        "name": "input",
+        "description": "Send a live user message to a running Claude job via stream-json. Route by explicit job name or by user label.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "model": {"type": "string", "description": "Claude model (e.g., claude-3-7-sonnet-latest)"},
-                "system": {"type": "string", "description": "Optional system prompt"},
-                "text": {"type": "string", "description": "Optional plain text user message"},
-                "input_json": {"type": "object", "description": "Optional JSON payload to send using Anthropic's input_json content type"},
-                "messages": {"type": "array", "description": "Optional raw messages array to send as-is (overrides text/input_json)", "items": {"type": "object"}},
-                "max_tokens": {"type": "integer", "description": "Max tokens (default: 1024)"}
-            },
-            "required": ["model"]
-        }
-    })
-}
-
-fn get_send_job_input_schema() -> Value {
-    json!({
-        "name": "send_job_input",
-        "description": "Append a user message (stream-json format) to a running job's input FIFO without restarting the service.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "job_type": {"type": "string", "enum": ["code", "docs"], "description": "Target job type"},
-                "name": {"type": "string", "description": "Name of the CodeRun/DocsRun resource"},
-                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
                 "text": {"type": "string", "description": "Plain text to send as a user message"},
-                "fifo_path": {"type": "string", "description": "FIFO path inside container (default: /workspace/agent-input.jsonl)"}
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "fifo_path": {"type": "string", "description": "FIFO path inside container (default: /workspace/agent-input.jsonl)"},
+                "job_type": {"type": "string", "enum": ["code", "docs"], "description": "Optional job type filter when routing by user"},
+                "name": {"type": "string", "description": "Optional CodeRun/DocsRun resource name when routing by explicit job"},
+                "user": {"type": "string", "description": "Optional user label (agents.platform/user) to route to active job"}
             },
-            "required": ["job_type", "name", "text"]
+            "required": ["text"]
         }
     })
 }

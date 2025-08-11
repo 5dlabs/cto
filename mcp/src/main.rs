@@ -1109,13 +1109,7 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("anthropic_message") => Some(handle_anthropic_message_tool(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("send_job_input") => Some(handle_send_job_input(&arguments).map(|result| json!({
+                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -1307,6 +1301,7 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
     }
 }
 
+#[allow(dead_code)]
 fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
     let api_key = std::env::var("ANTHROPIC_API_KEY")
         .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
@@ -1359,14 +1354,7 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
 }
 
 fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
-    let job_type = arguments
-        .get("job_type")
-        .and_then(|v| v.as_str())
-        .ok_or(anyhow!("job_type is required"))?;
-    let name = arguments
-        .get("name")
-        .and_then(|v| v.as_str())
-        .ok_or(anyhow!("name is required"))?;
+    // Inputs
     let namespace = arguments
         .get("namespace")
         .and_then(|v| v.as_str())
@@ -1380,13 +1368,33 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .and_then(|v| v.as_str())
         .unwrap_or("/workspace/agent-input.jsonl");
 
-    // Find pod by owner label
-    let label_selector = match job_type {
-        "code" => format!("agents.platform/CodeRun={}", name),
-        "docs" => format!("agents.platform/DocsRun={}", name),
-        other => return Err(anyhow!(format!("Unsupported job_type: {other}"))),
+    // Routing: explicit name + job_type, or by user label (optionally filtered by job_type)
+    let job_type = arguments.get("job_type").and_then(|v| v.as_str());
+    let name = arguments.get("name").and_then(|v| v.as_str());
+    let user = arguments.get("user").and_then(|v| v.as_str());
+
+    let (selector, pod_ns) = if let (Some(jt), Some(nm)) = (job_type, name) {
+        // route by explicit resource name
+        let label_selector = match jt {
+            "code" => format!("agents.platform/CodeRun={}", nm),
+            "docs" => format!("agents.platform/DocsRun={}", nm),
+            other => return Err(anyhow!(format!("Unsupported job_type: {other}"))),
+        };
+        (label_selector, namespace)
+    } else if let Some(user_label) = user {
+        // route by user label (with optional job_type filter)
+        let mut label_selector = format!("agents.platform/user={}", user_label);
+        if let Some(jt) = job_type {
+            label_selector.push(',');
+            label_selector.push_str(&format!("agents.platform/jobType={}", jt));
+        }
+        (label_selector, namespace)
+    } else {
+        return Err(anyhow!("Provide either (job_type + name) or user label for routing"));
     };
-    let pods_json = run_kubectl_json(&["get", "pods", "-n", namespace, "-l", &label_selector, "-o", "json"])?.to_string();
+
+    // Find pod by labels
+    let pods_json = run_kubectl_json(&["get", "pods", "-n", pod_ns, "-l", &selector, "-o", "json"])?.to_string();
     let pods: Value = serde_json::from_str(&pods_json)?;
     let pod_name = pods
         .get("items")
@@ -1395,7 +1403,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .and_then(|item| item.get("metadata"))
         .and_then(|m| m.get("name"))
         .and_then(|n| n.as_str())
-        .ok_or(anyhow!("No running pod found for job"))?;
+        .ok_or(anyhow!("No running pod found for routing selector"))?;
 
     // Format a stream-json user message line (one JSON object per line)
     let line = json!({
