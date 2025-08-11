@@ -525,9 +525,14 @@ EOF
 
         # Run Claude to review and update tasks
         echo "🔍 Running Claude review..."
-        claude -p --output-format stream-json --verbose --model "$MODEL" /tmp/review-prompt.md || {
-            echo "⚠️ Claude review failed, but continuing..."
-        }
+        # Avoid interactive permission prompts by piping prompt content and skipping permissions
+        if [ -s "/tmp/review-prompt.md" ]; then
+          cat /tmp/review-prompt.md | claude -p --output-format stream-json --verbose --model "$MODEL" --dangerously-skip-permissions || {
+              echo "⚠️ Claude review failed, but continuing..."
+          }
+        else
+          echo "⚠️ Review prompt file missing or empty; skipping Claude review"
+        fi
         
         echo "✅ Task review complete"
     else
