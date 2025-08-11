@@ -135,7 +135,9 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         REPO_NAME=$(echo "$REPOSITORY_URL" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
         
         # Try repository installation first (follow redirects)
-        INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
+        INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+            --connect-timeout 5 --max-time 12 \
+            -H "Authorization: Bearer $JWT_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
 
@@ -144,7 +146,9 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         # Fallback: try organization installation if repo lookup failed
         if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
             echo "⚠️ Repo installation not found for $REPO_OWNER/$REPO_NAME, trying org installation..."
-            ORG_INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
+            ORG_INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+                --connect-timeout 5 --max-time 12 \
+                -H "Authorization: Bearer $JWT_TOKEN" \
                 -H "Accept: application/vnd.github+json" \
                 "https://api.github.com/orgs/$REPO_OWNER/installation")
             INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
@@ -160,7 +164,9 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         echo "Installation ID: $INSTALLATION_ID"
         
         # Generate installation access token
-        GITHUB_TOKEN=$(curl -s -X POST \
+        GITHUB_TOKEN=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
+            --connect-timeout 5 --max-time 12 \
+            -X POST \
             -H "Authorization: Bearer $JWT_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
@@ -428,11 +434,19 @@ if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
     cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
 fi
 
-# Configure models
+# Configure models with fallback (OpenAI GPT-5 if available)
 echo "🤖 Configuring AI models..."
 task-master models --set-main "$MODEL"
-task-master models --set-research "$MODEL"  # Use same model for research to avoid Perplexity requirement
-task-master models --set-fallback "claude-3-5-sonnet-20241022"
+task-master models --set-research "$MODEL"
+
+# If OpenAI key is present, set fallback to ChatGPT-5; otherwise keep claude sonnet fallback
+if [ -n "$OPENAI_API_KEY" ]; then
+  echo "✅ OPENAI_API_KEY detected; using ChatGPT-5 as fallback"
+  task-master models --set-fallback "chatgpt-5"
+else
+  echo "ℹ️ OPENAI_API_KEY not set; using default Claude Sonnet fallback"
+  task-master models --set-fallback "claude-3-5-sonnet-20241022"
+fi
 
 # Parse PRD
 echo "📄 Parsing PRD to generate tasks..."
