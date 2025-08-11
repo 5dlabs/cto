@@ -25,6 +25,14 @@ env:
         name: agent-platform-secrets
         key: ANTHROPIC_API_KEY
 
+persistance: # deprecated spelling guard, ignored
+
+persistence:
+  enabled: true
+  storageClassName: "local-path"
+  size: 20Gi
+  mountPath: "/workspace"
+
 nodeSelector: {}
 affinity: {}
 tolerations: []
