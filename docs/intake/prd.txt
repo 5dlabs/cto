@@ -59,7 +59,7 @@ impl EventHandler for Handler {
    - Tail transcript JSONL with at most 100ms latency
    - Filter/format events:
      - tool_use (Bash/Write/Edit/Read/WebSearch)
-     - assistant text (significant messages only)
+     - assistant text (stream the agent's dialogue/thoughts as they appear)
      - tool_result (stdout/stderr)
      - result/summary (final)
    - Include fields: tokens in/out, estimated cost, tool counts, error counts, timestamps, model
@@ -97,7 +97,7 @@ impl EventHandler for Handler {
 - Embed Templates (baseline)
   - tool_use (Bash): title="⚡ Bash", fields: Command (code-fenced), Working Dir (inline), Tool Count (inline), color=0xF39C12
   - tool_use (Write/Edit/Read): title="📝 Write"/"👁️ Read", fields: File, Summary, Tool Count, color=0xF39C12
-  - assistant significant message: title optional, description=message text (trimmed), fields: Tokens (In/Out), Session Cost, Model, color=0x3498DB
+  - assistant message: title optional, description=message text (trimmed), fields: Tokens (In/Out), Session Cost, Model, color=0x3498DB
   - tool_result error: title="❌ Error", description=stderr (trimmed, code-fenced), fields: Total Errors, color=0xE74C3C
   - completion: title="✅ Complete", fields: Cost, Duration (if available), Tokens (total), Tools Used, color=0x27AE60
 
@@ -113,6 +113,27 @@ impl EventHandler for Handler {
 
 - Parity Mode
   - Provide a configuration flag to emit “all events” (no filtering, minimal truncation) to mirror non-interactive console output as closely as possible.
+
+### Assistant Dialogue Example
+
+```text
+┌────────────────────────────────────────────┐
+│ 💭 "Analyzing repository structure…"        │
+├────────────────────────────────────────────┤
+│ Tokens: In: 1,204 | Out: 256               │
+│ Session Cost: $0.002134                    │
+│ Model: claude-3-opus                       │
+└────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────┐
+│ 💭 "I will install task-master and parse   │
+│     the PRD next."                         │
+├────────────────────────────────────────────┤
+│ Tokens: In: 1,478 | Out: 190               │
+│ Session Cost: $0.002821                    │
+│ Model: claude-3-opus                       │
+└────────────────────────────────────────────┘
+```
 
 ## Non-Functional Requirements
 - Overhead: <1% CPU, <64Mi memory per watcher
