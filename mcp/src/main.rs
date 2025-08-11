@@ -1368,6 +1368,17 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .and_then(|v| v.as_str())
         .unwrap_or("/workspace/agent-input.jsonl");
 
+    // Validate fifo_path to prevent command injection: must be an absolute path with safe characters
+    // Allowed: a-zA-Z0-9, '/', '-', '_', '.', (no spaces, quotes, semicolons, pipes, etc.)
+    if !(fifo_path.starts_with('/')
+        && fifo_path.len() <= 256
+        && fifo_path
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '-' || c == '_' || c == '.'))
+    {
+        return Err(anyhow!("Invalid fifo_path; must be absolute and contain only [a-zA-Z0-9/_-.]"));
+    }
+
     // Routing: explicit name + job_type, or by user label (optionally filtered by job_type)
     let job_type = arguments.get("job_type").and_then(|v| v.as_str());
     let name = arguments.get("name").and_then(|v| v.as_str());
@@ -1415,9 +1426,10 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     })
     .to_string();
 
-    // Append via stdin to avoid quoting issues; ensure newline for JSONL framing
+    // Stream input safely using tee without invoking a shell; pass fifo_path as an argument
+    // This avoids shell interpolation entirely
     let mut child = std::process::Command::new("kubectl")
-        .args(["-n", namespace, "exec", "-i", pod_name, "--", "/bin/sh", "-lc", &format!("cat >> {}", fifo_path)])
+        .args(["-n", namespace, "exec", "-i", pod_name, "--", "tee", "-a", fifo_path])
         .env("KUBECONFIG", std::env::var("KUBECONFIG").unwrap_or_default())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
