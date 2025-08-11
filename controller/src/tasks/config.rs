@@ -212,16 +212,15 @@ impl ControllerConfig {
         }
 
         // If input bridge is enabled, ensure its image is configured
-        if self.agent.input_bridge.enabled {
-            if self.agent.input_bridge.image.repository.trim().is_empty()
+        if self.agent.input_bridge.enabled
+            && (self.agent.input_bridge.image.repository.trim().is_empty()
                 || self.agent.input_bridge.image.tag.trim().is_empty()
                 || self.agent.input_bridge.image.repository == "MISSING_IMAGE_CONFIG"
-                || self.agent.input_bridge.image.tag == "MISSING_IMAGE_CONFIG"
-            {
-                return Err(anyhow::anyhow!(
-                    "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
-                ));
-            }
+                || self.agent.input_bridge.image.tag == "MISSING_IMAGE_CONFIG")
+        {
+            return Err(anyhow::anyhow!(
+                "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
+            ));
         }
         Ok(())
     }
