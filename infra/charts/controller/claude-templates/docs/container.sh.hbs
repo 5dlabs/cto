@@ -394,10 +394,10 @@ echo "✓ Started background token refresh process (PID: $TOKEN_REFRESH_PID)"
 trap "kill $TOKEN_REFRESH_PID 2>/dev/null || true" EXIT
 
 # Claude execution
-echo "Starting Claude execution..."
+echo "Starting Claude execution (stream-json via FIFO)..."
 
 # Check if system prompt file exists and add to command if available
-CLAUDE_CMD="claude -p --output-format stream-json --verbose"
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
 # Look for agent-specific system prompt file from agents ConfigMap
 # The system prompt should be in the agents ConfigMap if configured
@@ -417,25 +417,44 @@ fi
 # Safe mode toggle for debugging (prevents token consumption)
 SAFE_MODE="false"  # Set to "false" for full docs generation
 
-if [ "$SAFE_MODE" = "true" ]; then
-    echo "🛡️ SAFE MODE ENABLED - Running simple test instead of full docs generation"
-    echo "What time is it? Please answer this simple question and exit immediately." | $CLAUDE_CMD
-    CLAUDE_EXIT_CODE=$?
+  if [ "$SAFE_MODE" = "true" ]; then
+      echo "🛡️ SAFE MODE ENABLED - Running simple test instead of full docs generation"
+      FIFO_PATH="/workspace/agent-input.jsonl"
+      rm -f "$FIFO_PATH" 2>/dev/null || true
+      mkfifo "$FIFO_PATH"
+      # Keep a persistent writer open; start Claude in background, then send one message and close
+      exec 9>"$FIFO_PATH"
+      $CLAUDE_CMD < "$FIFO_PATH" &
+      CLAUDE_PID=$!
+      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
+      # Close writer so reader gets EOF and exits
+      exec 9>&-
+      wait $CLAUDE_PID
+      CLAUDE_EXIT_CODE=$?
     echo "Safe mode test completed with exit code: $CLAUDE_EXIT_CODE"
     
     # Exit successfully to prevent PR creation in safe mode
     echo "✅ Safe mode test complete, exiting without changes"
     exit 0
-else
-    if [ -f "prompt.md" ]; then
-        $CLAUDE_CMD "$(cat prompt.md)"
-        CLAUDE_EXIT_CODE=$?
-        echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
-    else
-        echo "❌ No prompt.md found"
-        exit 1
-    fi
-fi
+  else
+      FIFO_PATH="/workspace/agent-input.jsonl"
+      rm -f "$FIFO_PATH" 2>/dev/null || true
+      mkfifo "$FIFO_PATH"
+      # Keep a persistent writer open to avoid EOF
+      exec 9>"$FIFO_PATH"
+      if [ -f "prompt.md" ]; then
+          # Initial user turn from prompt.md only; system prompts are set via CLI flags, not streamed
+          INITIAL_TEXT=$(jq -Rs . < "prompt.md")
+          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
+          # Start Claude reading from FIFO (fd 9 stays open)
+          $CLAUDE_CMD < "$FIFO_PATH"
+          CLAUDE_EXIT_CODE=$?
+          echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
+      else
+          echo "❌ No prompt.md found"
+          exit 1
+      fi
+  fi
 
 # PR creation
 echo "Creating pull request..."

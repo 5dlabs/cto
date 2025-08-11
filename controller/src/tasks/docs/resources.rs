@@ -1,7 +1,7 @@
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
-use k8s_openapi::api::{batch::v1::Job, core::v1::ConfigMap};
+use k8s_openapi::api::{batch::v1::Job, core::v1::{ConfigMap, Service}};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
@@ -147,7 +147,80 @@ impl<'a> DocsResourceManager<'a> {
                 .await?;
         }
 
+        // Ensure headless Service exists for input bridge discovery when enabled
+        if self.config.agent.input_bridge.enabled {
+            let job_name = self.generate_job_name(docs_run);
+            self.ensure_headless_service_exists(docs_run, &job_name).await?;
+        }
+
         Ok(Action::await_change())
+    }
+
+    async fn ensure_headless_service_exists(&self, docs_run: &DocsRun, job_name: &str) -> Result<()> {
+        let namespace = docs_run
+            .metadata
+            .namespace
+            .as_deref()
+            .unwrap_or(&self.ctx.namespace);
+        let services: Api<Service> = Api::namespaced(self.ctx.client.clone(), namespace);
+
+        let svc_name = format!("{job_name}-bridge");
+
+        let mut meta_labels = BTreeMap::new();
+        meta_labels.insert("agents.platform/jobType".to_string(), "docs".to_string());
+        meta_labels.insert("agents.platform/name".to_string(), docs_run.name_any());
+        meta_labels.insert("agents.platform/input".to_string(), "bridge".to_string());
+        meta_labels.insert("agents.platform/owner".to_string(), "DocsRun".to_string());
+
+        if let Some(user) = docs_run
+            .spec
+            .github_app
+            .as_deref()
+            .or(docs_run.spec.github_user.as_deref())
+        {
+            meta_labels.insert(
+                "agents.platform/user".to_string(),
+                self.sanitize_label_value(user),
+            );
+        }
+
+        // Respect configured input bridge port
+        let port = self.config.agent.input_bridge.port;
+        let svc_json = json!({
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": { "name": svc_name, "labels": meta_labels },
+            "spec": {
+                "clusterIP": "None",
+                "ports": [{ "name": "http", "port": port, "targetPort": port }],
+                "selector": { "job-name": job_name }
+            }
+        });
+
+        match services.create(&PostParams::default(), &serde_json::from_value(svc_json.clone())?).await {
+            Ok(_) => Ok(()),
+            Err(kube::Error::Api(ae)) if ae.code == 409 => {
+                // Fetch existing to preserve resourceVersion on replace
+                let mut existing = services.get(&svc_name).await?;
+                if let Some(spec) = existing.spec.as_mut() {
+                    spec.cluster_ip = Some("None".to_string());
+                    spec.selector = Some(std::collections::BTreeMap::from([
+                        ("job-name".to_string(), job_name.to_string()),
+                    ]));
+                    spec.ports = Some(vec![k8s_openapi::api::core::v1::ServicePort {
+                        name: Some("http".to_string()),
+                        port: port as i32,
+                        target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(port as i32)),
+                        ..Default::default()
+                    }]);
+                }
+                let mut updated: k8s_openapi::api::core::v1::Service = serde_json::from_value(svc_json)?;
+                updated.metadata.resource_version = existing.metadata.resource_version.take();
+                services.replace(&svc_name, &PostParams::default(), &updated).await?;
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
     }
 
     pub async fn cleanup_resources(&self, docs_run: &Arc<DocsRun>) -> Result<Action> {
@@ -578,7 +651,7 @@ impl<'a> DocsResourceManager<'a> {
                             "command": ["/bin/bash"],
                             "args": ["/task-files/container.sh"],
                             "workingDir": "/workspace",
-                            "volumeMounts": volume_mounts
+                             "volumeMounts": volume_mounts
                         }],
                         "volumes": volumes
                     }

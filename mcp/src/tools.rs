@@ -8,7 +8,10 @@ pub fn get_tool_schemas() -> Value {
             get_docs_schema(),
             get_task_schema(&HashMap::new()),
             get_export_schema(),
-            get_intake_schema()
+            get_intake_schema(),
+            get_jobs_schema(),
+            get_stop_job_schema(),
+            get_input_schema()
         ]
     })
 }
@@ -20,7 +23,10 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, String>) -> Value {
             get_docs_schema(),
             get_task_schema(agents),
             get_export_schema(),
-            get_intake_schema()
+            get_intake_schema(),
+            get_jobs_schema(),
+            get_stop_job_schema(),
+            get_input_schema()
         ]
     })
 }
@@ -168,6 +174,55 @@ fn get_intake_schema() -> Value {
                 }
             },
             "required": ["project_name"]
+        }
+    })
+}
+
+fn get_jobs_schema() -> Value {
+    json!({
+        "name": "jobs",
+        "description": "List running jobs across platform CRDs (CodeRun, DocsRun) and Argo Workflows (intake). Returns simplified status info.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "include": {"type": "array", "items": {"type": "string", "enum": ["code", "docs", "intake"]}, "description": "Filter which job types to include (default: all)"}
+            }
+        }
+    })
+}
+
+fn get_stop_job_schema() -> Value {
+    json!({
+        "name": "stop_job",
+        "description": "Stop a running job: CodeRun (code), DocsRun (docs), or Argo intake workflow (intake).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "job_type": {"type": "string", "enum": ["code", "docs", "intake"], "description": "Type of job to stop"},
+                "name": {"type": "string", "description": "Resource/workflow name"},
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"}
+            },
+            "required": ["job_type", "name"]
+        }
+    })
+}
+
+fn get_input_schema() -> Value {
+    json!({
+        "name": "input",
+        "description": "Send a live user message to a running Claude job via stream-json. Route by explicit job name or by user label.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Plain text to send as a user message"},
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "fifo_path": {"type": "string", "description": "FIFO path inside container (default: /workspace/agent-input.jsonl)"},
+                "job_type": {"type": "string", "enum": ["code", "docs"], "description": "Optional job type filter when routing by user"},
+                "name": {"type": "string", "description": "Optional CodeRun/DocsRun resource name when routing by explicit job"},
+                "user": {"type": "string", "description": "Optional user label (agents.platform/user) to route to active job"}
+            },
+            "required": ["text"]
         }
     })
 }

@@ -50,10 +50,14 @@ pub struct AgentConfig {
     /// Image pull secrets for private registries
     #[serde(default, rename = "imagePullSecrets")]
     pub image_pull_secrets: Vec<String>,
+
+    /// Optional input bridge sidecar configuration
+    #[serde(default, rename = "inputBridge")]
+    pub input_bridge: InputBridgeConfig,
 }
 
 /// Image configuration
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ImageConfig {
     /// Image repository (e.g., "ghcr.io/5dlabs/claude")
     pub repository: String,
@@ -61,6 +65,24 @@ pub struct ImageConfig {
     /// Image tag (e.g., "latest", "v2.1.0")
     pub tag: String,
 }
+
+/// Input bridge configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct InputBridgeConfig {
+    /// Whether the input bridge sidecar is enabled
+    #[serde(default = "default_input_bridge_enabled")]
+    pub enabled: bool,
+
+    /// Input bridge image configuration
+    pub image: ImageConfig,
+
+    /// HTTP port for the input bridge sidecar
+    #[serde(default = "default_input_bridge_port")]
+    pub port: u16,
+}
+
+fn default_input_bridge_enabled() -> bool { true }
+fn default_input_bridge_port() -> u16 { 8080 }
 
 /// Secrets configuration - only what we actually use
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -188,6 +210,18 @@ impl ControllerConfig {
                 Please ensure the 'agent.image.repository' and 'agent.image.tag' are set in the Helm values."
             ));
         }
+
+        // If input bridge is enabled, ensure its image is configured
+        if self.agent.input_bridge.enabled
+            && (self.agent.input_bridge.image.repository.trim().is_empty()
+                || self.agent.input_bridge.image.tag.trim().is_empty()
+                || self.agent.input_bridge.image.repository == "MISSING_IMAGE_CONFIG"
+                || self.agent.input_bridge.image.tag == "MISSING_IMAGE_CONFIG")
+        {
+            return Err(anyhow::anyhow!(
+                "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
+            ));
+        }
         Ok(())
     }
 
@@ -235,6 +269,14 @@ impl Default for ControllerConfig {
                     tag: "MISSING_IMAGE_CONFIG".to_string(),
                 },
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
+                input_bridge: InputBridgeConfig {
+                    enabled: true,
+                    image: ImageConfig {
+                        repository: "ghcr.io/5dlabs/cto/input-bridge".to_string(),
+                        tag: "latest".to_string(),
+                    },
+                    port: 8080,
+                },
             },
             secrets: SecretsConfig {
                 api_key_secret_name: "orchestrator-secrets".to_string(),
