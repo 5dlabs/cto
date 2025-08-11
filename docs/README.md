@@ -26,3 +26,9 @@ Auto-generated project from intake pipeline.
 
 - [Product Requirements](/.taskmaster/docs/prd.txt)
 - [Architecture](/.taskmaster/docs/architecture.md)
+
+## Notes
+
+- Discord integration uses the Twilight ecosystem. We start REST-first with `twilight-http` + `twilight-model` for gallery messages, threads, and interaction callbacks. Add `twilight-gateway` only if needed.
+- Intake alignment prefers TaskMaster AI (`--research`) first; Claude CLI is a fallback.
+- We use the Claude Code SDK (CLI) alongside webhooks for streaming. The Discord bot/service is optional and used for channel/webhook lifecycle when enabled.

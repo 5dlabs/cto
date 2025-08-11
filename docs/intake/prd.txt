@@ -23,31 +23,13 @@ Build a lightweight, zero-impact monitoring and control plane for headless AI ag
 - Uses a channel-specific Discord webhook for output
 - A Discord Bot (App) manages run channels and (optionally) forwards messages from that channel to an HTTP bridge in the pod for input
 
-### Discord Bot SDK (Rust)
-- Bot implementation uses the `serenity` crate for Discord API integration, slash commands, components, threads, and webhooks.
-- References: serenity library and examples [serenity-rs/serenity](https://github.com/serenity-rs/serenity)
+### Discord SDK (Rust)
+- We use the Twilight ecosystem for Discord integration. Initial phase uses `twilight-http` and `twilight-model` (REST-first) to create/update messages, components, threads, and webhooks. The `twilight-gateway` and `twilight-cache-inmemory` crates are optional if we later require real-time gateway events.
+- Reference: [twilight-rs/twilight](https://github.com/twilight-rs/twilight)
 
-Example (message relay skeleton):
-```rust
-use serenity::{async_trait, prelude::*, model::channel::Message};
-
-struct Handler;
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content.starts_with("/send ") {
-            let payload = msg.content[6..].to_string();
-            // forward to pod-local bridge (POST /input)
-            let _ = reqwest::Client::new()
-                .post("http://input-bridge/input")
-                .json(&serde_json::json!({"text": payload, "author": msg.author.name}))
-                .send().await;
-            let _ = msg.channel_id.say(&ctx.http, "✅ forwarded").await;
-        }
-    }
-}
-```
+Guidance:
+- Prefer REST via `twilight-http` for gallery tiles, thread linking, and slash-command interaction callbacks.
+- Add the gateway only if we need event-driven flows beyond interaction webhooks.
 
 ## Functional Requirements
 1) Channel Lifecycle
@@ -145,7 +127,7 @@ impl EventHandler for Handler {
 - K8s sidecar deploy template; ENV: DISCORD_WEBHOOK_URL, WORKSPACE_PATH
 - Helm values for enabling the watcher and basic filters
 - Documentation (architecture.md, deploy steps)
- - Bot crate using serenity with minimal slash command and channel creation examples
+  - Bot/service using Twilight (`twilight-http`, `twilight-model`) with minimal slash command handling and channel/webhook creation examples; gateway optional
 
 ## Implementation Phases
 1) Basic Visibility
