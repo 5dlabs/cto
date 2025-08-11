@@ -16,4 +16,9 @@ spec:
     - name: {{ .Values.service.name }}
       port: {{ .Values.service.port }}
       targetPort: ssh
+    {{- if .Values.api.enabled }}
+    - name: {{ .Values.api.name }}
+      port: {{ .Values.api.port }}
+      targetPort: http
+    {{- end }}
 

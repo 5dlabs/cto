@@ -578,7 +578,27 @@ impl<'a> DocsResourceManager<'a> {
                             "command": ["/bin/bash"],
                             "args": ["/task-files/container.sh"],
                             "workingDir": "/workspace",
-                            "volumeMounts": volume_mounts
+                             "volumeMounts": volume_mounts
+                        }, {
+                            "name": "input-bridge",
+                            "image": "ghcr.io/5dlabs/cto/input-bridge:latest",
+                            "imagePullPolicy": "Always",
+                            "env": [
+                                {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
+                                {"name": "PORT", "value": "8080"}
+                            ],
+                            "ports": [{"name": "http", "containerPort": 8080}],
+                            "volumeMounts": [{"name": "workspace", "mountPath": "/workspace"}],
+                            "resources": {
+                                "requests": {
+                                    "cpu": "50m",
+                                    "memory": "32Mi"
+                                },
+                                "limits": {
+                                    "cpu": "100m",
+                                    "memory": "64Mi"
+                                }
+                            }
                         }],
                         "volumes": volumes
                     }

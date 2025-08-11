@@ -24,13 +24,24 @@ spec:
         - name: claude-agent
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["/bin/bash", "-lc", "while true; do sleep 3600; done"]
+          command: ["/bin/bash", "-lc", "set -e; FIFO=/workspace/agent-input.jsonl; rm -f $FIFO; mkfifo $FIFO; echo '{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Agent ready. Send input.\"}]}}' > $FIFO & claude -p --output-format stream-json --input-format stream-json --verbose < $FIFO"]
           env: {{- toYaml .Values.env | nindent 12 }}
           ports:
             - name: ssh
               containerPort: 22
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: workspace
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- end }}
+        - name: input-bridge
+          image: alpine:3.20
+          command: ["/bin/sh", "-lc", "apk add --no-cache busybox-extras curl jq; mkfifo -m 666 /workspace/agent-input.jsonl 2>/dev/null || true; printf 'HTTP/1.1 200 OK\r\n\r\n' > /dev/null; while true; do nc -l -p {{ .Values.api.port }} -e /bin/sh -c 'read line; while [ "$line" != $'\r' ]; do read line; done; body=$(cat); text=$(echo "$body" | jq -r .text 2>/dev/null); if [ -n "$text" ]; then printf "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":%s}]}}\n" "$(echo "$text" | jq -Rs .)" >> /workspace/agent-input.jsonl; fi; printf 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{"ok":true}''; done"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.port }}
           volumeMounts:
             {{- if .Values.persistence.enabled }}
             - name: workspace

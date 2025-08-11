@@ -77,6 +77,10 @@ path = "src/bin/agent_controller.rs"  # Snake-case file name (Rust convention)
 name = "test-templates"
 path = "src/bin/test_templates.rs"
 
+[[bin]]
+name = "input-bridge"
+path = "src/bin/input_bridge.rs"
+
 [dev-dependencies]
 tokio-test = "0.4"
 mockall = { workspace = true }

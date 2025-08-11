@@ -158,7 +158,7 @@ jobs:
 
                     # Build with detailed output
           echo "⏱️ Starting build..."
-          cargo build --release --bin agent-controller
+          cargo build --release --bin agent-controller --bin input-bridge
 
           # Show final sccache stats
           echo "📊 Final sccache stats:"
@@ -170,15 +170,19 @@ jobs:
           ls -la target/release/ || echo "target/release/ not found"
           ls -la /cache/target/release/ || echo "/cache/target/release/ not found"
           find target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in target/"
+          find /cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in target/"
           find /cache/target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in /cache/target/"
+          find /cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in /cache/target/"
 
-          # Copy binary from cache target dir (where CARGO_TARGET_DIR points)
+          # Copy binaries from cache target dir (where CARGO_TARGET_DIR points)
           cp /cache/target/release/agent-controller agent-controller
+          cp /cache/target/release/input-bridge input-bridge
 
           # Show binary info
           echo "📦 Built binary info:"
-          ls -lh agent-controller
+          ls -lh agent-controller input-bridge
           file agent-controller
+          file input-bridge
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

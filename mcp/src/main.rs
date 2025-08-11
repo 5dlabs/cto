@@ -1115,6 +1115,12 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
+                Ok("send_job_input") => Some(handle_send_job_input(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
                 Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))),
                 Err(e) => Some(Err(e)),
             }
@@ -1348,6 +1354,75 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
 
     let json_resp: Value = resp.json().map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
     Ok(json_resp)
+}
+
+fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+    let job_type = arguments
+        .get("job_type")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("job_type is required"))?;
+    let name = arguments
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("name is required"))?;
+    let namespace = arguments
+        .get("namespace")
+        .and_then(|v| v.as_str())
+        .unwrap_or("agent-platform");
+    let text = arguments
+        .get("text")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("text is required"))?;
+    let fifo_path = arguments
+        .get("fifo_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("/workspace/agent-input.jsonl");
+
+    // Find pod by owner label
+    let label_selector = match job_type {
+        "code" => format!("agents.platform/CodeRun={}", name),
+        "docs" => format!("agents.platform/DocsRun={}", name),
+        other => return Err(anyhow!(format!("Unsupported job_type: {other}"))),
+    };
+    let pods_json = run_kubectl_json(&["get", "pods", "-n", namespace, "-l", &label_selector, "-o", "json"])?.to_string();
+    let pods: Value = serde_json::from_str(&pods_json)?;
+    let pod_name = pods
+        .get("items")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.get(0))
+        .and_then(|item| item.get("metadata"))
+        .and_then(|m| m.get("name"))
+        .and_then(|n| n.as_str())
+        .ok_or(anyhow!("No running pod found for job"))?;
+
+    // Format a stream-json user message line
+    let line = json!({
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [ { "type": "text", "text": text } ]
+        }
+    })
+    .to_string();
+
+    // Use kubectl exec to append to FIFO
+    let cmd = format!(
+        "kubectl -n {} exec {} -- /bin/sh -lc 'printf %s >> {}'",
+        namespace,
+        pod_name,
+        fifo_path
+    );
+    let out = std::process::Command::new("/bin/sh")
+        .arg("-lc")
+        .arg(cmd)
+        .env("KUBECONFIG", std::env::var("KUBECONFIG").unwrap_or_default())
+        .output()
+        .context("Failed to exec into pod")?;
+    if out.status.success() {
+        Ok(json!({"success": true, "pod": pod_name, "fifo": fifo_path}))
+    } else {
+        Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
+    }
 }
 
 #[allow(clippy::disallowed_macros)]

@@ -16,6 +16,15 @@ agent:
     repository: ghcr.io/5dlabs/cto/claude
     tag: "latest"
     pullPolicy: Always
+  
+  # Input bridge sidecar configuration for live input to running jobs
+  inputBridge:
+    enabled: true
+    image:
+      repository: ghcr.io/5dlabs/cto/input-bridge
+      tag: "latest"
+      pullPolicy: Always
+    port: 8080
 
 # Storage configuration for workspace PVCs
 storage:

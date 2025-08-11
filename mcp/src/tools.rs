@@ -11,7 +11,8 @@ pub fn get_tool_schemas() -> Value {
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_anthropic_message_schema()
+            get_anthropic_message_schema(),
+            get_send_job_input_schema()
         ]
     })
 }
@@ -26,7 +27,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, String>) -> Value {
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_anthropic_message_schema()
+            get_anthropic_message_schema(),
+            get_send_job_input_schema()
         ]
     })
 }
@@ -223,6 +225,24 @@ fn get_anthropic_message_schema() -> Value {
                 "max_tokens": {"type": "integer", "description": "Max tokens (default: 1024)"}
             },
             "required": ["model"]
+        }
+    })
+}
+
+fn get_send_job_input_schema() -> Value {
+    json!({
+        "name": "send_job_input",
+        "description": "Append a user message (stream-json format) to a running job's input FIFO without restarting the service.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "job_type": {"type": "string", "enum": ["code", "docs"], "description": "Target job type"},
+                "name": {"type": "string", "description": "Name of the CodeRun/DocsRun resource"},
+                "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
+                "text": {"type": "string", "description": "Plain text to send as a user message"},
+                "fifo_path": {"type": "string", "description": "FIFO path inside container (default: /workspace/agent-input.jsonl)"}
+            },
+            "required": ["job_type", "name", "text"]
         }
     })
 }

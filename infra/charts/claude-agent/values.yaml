@@ -18,6 +18,11 @@ service:
   port: 22
   name: ssh
 
+api:
+  enabled: true
+  port: 8080
+  name: http
+
 env:
   - name: ANTHROPIC_API_KEY
     valueFrom:

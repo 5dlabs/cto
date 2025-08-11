@@ -552,8 +552,37 @@ impl<'a> CodeResourceManager<'a> {
             container_spec["envFrom"] = json!(env_from);
         }
 
-        // Build containers array - add Docker daemon if enabled
+        // Build containers array
         let mut containers = vec![container_spec];
+
+        // Add input-bridge sidecar for live JSONL input via HTTP
+        // This is configured via Helm values (agent.inputBridge)
+        let input_bridge = json!({
+            "name": "input-bridge",
+            "image": "ghcr.io/5dlabs/cto/input-bridge:latest",
+            "imagePullPolicy": "Always",
+            "env": [
+                {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
+                {"name": "PORT", "value": "8080"}
+            ],
+            "ports": [{"name": "http", "containerPort": 8080}],
+            "volumeMounts": [
+                {"name": "workspace", "mountPath": "/workspace"}
+            ],
+            "resources": {
+                "requests": {
+                    "cpu": "50m",
+                    "memory": "32Mi"
+                },
+                "limits": {
+                    "cpu": "100m",
+                    "memory": "64Mi"
+                }
+            }
+        });
+        containers.push(input_bridge);
+
+        // Add Docker daemon if enabled
         if enable_docker {
             let docker_daemon_spec = json!({
                 "name": "docker-daemon",
