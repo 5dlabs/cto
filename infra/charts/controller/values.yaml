@@ -21,7 +21,7 @@ agent:
   inputBridge:
     enabled: true
     image:
-      repository: ghcr.io/5dlabs/cto/input-bridge
+      repository: ghcr.io/5dlabs/cto/sidecar
       tag: "latest"
       pullPolicy: Always
     port: 8080

@@ -9,12 +9,12 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 appuser
 
 # Copy prebuilt binary from repository context
-COPY input-bridge/input-bridge /usr/local/bin/input-bridge
+COPY input-bridge/input-bridge /usr/local/bin/sidecar
 
-RUN chmod +x /usr/local/bin/input-bridge && chown -R appuser:appuser /usr/local/bin/input-bridge
+RUN chmod +x /usr/local/bin/sidecar && chown -R appuser:appuser /usr/local/bin/sidecar
 
 USER appuser
 
 EXPOSE 8080
 
-ENTRYPOINT ["/usr/local/bin/input-bridge"]
+ENTRYPOINT ["/usr/local/bin/sidecar"]

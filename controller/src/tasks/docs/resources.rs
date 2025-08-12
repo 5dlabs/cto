@@ -635,7 +635,7 @@ impl<'a> DocsResourceManager<'a> {
             "volumeMounts": volume_mounts
         })];
 
-        // Optionally add input-bridge sidecar when enabled
+        // Optionally add sidecar when enabled (input bridge and future tools)
         if self.config.agent.input_bridge.enabled {
             let input_bridge_image = format!(
                 "{}:{}",
@@ -643,7 +643,7 @@ impl<'a> DocsResourceManager<'a> {
                 self.config.agent.input_bridge.image.tag
             );
             containers.push(json!({
-                "name": "input-bridge",
+                "name": "sidecar",
                 "image": input_bridge_image,
                 "imagePullPolicy": "Always",
                 "env": [

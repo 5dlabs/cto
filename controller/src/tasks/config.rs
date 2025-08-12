@@ -66,14 +66,14 @@ pub struct ImageConfig {
     pub tag: String,
 }
 
-/// Input bridge configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct InputBridgeConfig {
-    /// Whether the input bridge sidecar is enabled
+    /// Sidecar (auxiliary tools) configuration
+    #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+    pub struct InputBridgeConfig {
+    /// Whether the sidecar is enabled
     #[serde(default = "default_input_bridge_enabled")]
     pub enabled: bool,
 
-    /// Input bridge image configuration
+    /// Sidecar image configuration
     pub image: ImageConfig,
 
     /// HTTP port for the input bridge sidecar

@@ -640,7 +640,7 @@ impl<'a> CodeResourceManager<'a> {
         // Build containers array
         let mut containers = vec![container_spec];
 
-        // Add input-bridge sidecar for live JSONL input via HTTP (if enabled)
+        // Add sidecar for live JSONL input via HTTP and future tools (if enabled)
         if self.config.agent.input_bridge.enabled {
             let input_bridge_image = format!(
                 "{}:{}",
@@ -648,7 +648,7 @@ impl<'a> CodeResourceManager<'a> {
                 self.config.agent.input_bridge.image.tag
             );
             let input_bridge = json!({
-                "name": "input-bridge",
+                "name": "sidecar",
                 "image": input_bridge_image,
                 "imagePullPolicy": "Always",
                 "env": [
@@ -673,7 +673,7 @@ impl<'a> CodeResourceManager<'a> {
             containers.push(input_bridge);
         }
 
-        // Add Docker daemon if enabled
+        // Add Docker daemon if enabled (kept as-is for DIND workflows)
         if enable_docker {
             let docker_daemon_spec = json!({
                 "name": "docker-daemon",

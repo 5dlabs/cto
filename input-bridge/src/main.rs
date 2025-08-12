@@ -98,7 +98,7 @@ async fn main() {
     let fifo_path = std::env::var("FIFO_PATH").unwrap_or_else(|_| "/workspace/agent-input.jsonl".to_string());
     let fifo_path = PathBuf::from(fifo_path);
 
-    info!("Starting input-bridge server, FIFO path: {:?}", fifo_path);
+    info!("Starting sidecar server, FIFO path: {:?}", fifo_path);
 
     let mut attempts = 0;
     while !fifo_path.exists() && attempts < 60 {
