@@ -15,7 +15,8 @@ use tracing::{error, info, warn};
 
 #[derive(Clone)]
 struct AppState {
-    fifo_writer: Arc<Mutex<std::fs::File>>, // Persistent writer to keep FIFO open and serialize writes
+    fifo_path: PathBuf,                    // Path to the FIFO
+    write_lock: Arc<Mutex<()>>,            // Serialize writes to avoid interleaving
 }
 
 #[derive(Deserialize)]
@@ -47,8 +48,8 @@ async fn handle_input(
     State(state): State<AppState>,
     Json(payload): Json<InputMessage>,
 ) -> impl IntoResponse {
-    // Lock the persistent writer to serialize writes and keep the FIFO open
-    let file_guard = state.fifo_writer.lock().await;
+    // Serialize writes so multiple requests don't interleave JSON lines
+    let _guard = state.write_lock.lock().await;
 
     let message = StreamJsonEvent::User {
         message: StreamJsonUserMessage {
@@ -57,7 +58,7 @@ async fn handle_input(
         },
     };
 
-    match write_to_fifo(&file_guard, &message).await {
+    match write_to_fifo(&state.fifo_path, &message).await {
         Ok(_) => (StatusCode::OK, "Message sent successfully"),
         Err(e) => {
             error!("Failed to write to FIFO: {}", e);
@@ -66,13 +67,17 @@ async fn handle_input(
     }
 }
 
-async fn write_to_fifo(file: &std::fs::File, message: &StreamJsonEvent<'_>) -> Result<(), Box<dyn std::error::Error>> {
+async fn write_to_fifo(
+    fifo_path: &PathBuf,
+    message: &StreamJsonEvent<'_>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let json_line = serde_json::to_string(message)? + "\n";
-    // Clone the file handle so we can move it into the blocking task
-    let mut writer = file.try_clone()?;
+    let path = fifo_path.clone();
     tokio::task::spawn_blocking(move || {
+        // Open FIFO for write-only; this will block until a reader is present (the main container)
+        let mut writer = OpenOptions::new().write(true).open(path)?;
         writer.write_all(json_line.as_bytes())?;
-        writer.flush()?;
+        writer.flush()?; // Closing the file drops writer, allowing EOF when no other writers are open
         Ok::<_, std::io::Error>(())
     })
     .await??;
@@ -107,44 +112,9 @@ async fn main() {
         std::process::exit(1);
     }
 
-    // Open a persistent writer (read-write to avoid open() blocking) and keep it for the lifetime of the process
-    // Retry to avoid race with chmod in main container
-    let persistent_file = {
-        let p = fifo_path.clone();
-        let mut tries: u32 = 0;
-        loop {
-            match tokio::task::spawn_blocking({
-                let p2 = p.clone();
-                move || OpenOptions::new().read(true).write(true).append(true).open(p2)
-            })
-            .await
-            {
-                Ok(Ok(f)) => break f,
-                Ok(Err(e)) => {
-                    tries += 1;
-                    if tries % 5 == 0 {
-                        warn!("Retrying opening FIFO (attempt {}): {}", tries, e);
-                    }
-                    if tries > 120 {
-                        error!("Failed to open FIFO after {} attempts: {}", tries, e);
-                        panic!("Failed to open FIFO for persistent writer: {}", e);
-                    }
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                    continue;
-                }
-                Err(join_err) => {
-                    tries += 1;
-                    if tries > 120 {
-                        panic!("Join error repeatedly when opening FIFO writer: {}", join_err);
-                    }
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                    continue;
-                }
-            }
-        }
-    };
-
-    let state = AppState { fifo_writer: Arc::new(Mutex::new(persistent_file)) };
+    // Do NOT keep a persistent writer open. Holding a writer open prevents EOF on the reader,
+    // which causes the main container's `wait $CLAUDE_PID` to hang. We open-write-close per request instead.
+    let state = AppState { fifo_path: fifo_path.clone(), write_lock: Arc::new(Mutex::new(())) };
 
     let app = Router::new().route("/input", post(handle_input)).route("/health", get(health_check)).with_state(state);
 
