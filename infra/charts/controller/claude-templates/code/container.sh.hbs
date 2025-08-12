@@ -912,6 +912,7 @@ if [ "$SAFE_MODE" = "true" ]; then
     FIFO_PATH="/workspace/agent-input.jsonl"
     rm -f "$FIFO_PATH" 2>/dev/null || true
     mkfifo "$FIFO_PATH"
+    chmod 666 "$FIFO_PATH" || true
     # Keep a persistent writer open and start Claude in background to avoid EOF race
     exec 9>"$FIFO_PATH"
     $CLAUDE_CMD < "$FIFO_PATH" &
@@ -972,6 +973,7 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         FIFO_PATH="/workspace/agent-input.jsonl"
         rm -f "$FIFO_PATH" 2>/dev/null || true
         mkfifo "$FIFO_PATH"
+        chmod 666 "$FIFO_PATH" || true
         # Keep a persistent writer open to avoid EOF on reader
         exec 9>"$FIFO_PATH"
 

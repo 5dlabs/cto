@@ -422,6 +422,7 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       FIFO_PATH="/workspace/agent-input.jsonl"
       rm -f "$FIFO_PATH" 2>/dev/null || true
       mkfifo "$FIFO_PATH"
+      chmod 666 "$FIFO_PATH" || true
       # Keep a persistent writer open; start Claude in background, then send one message and close
       exec 9>"$FIFO_PATH"
       $CLAUDE_CMD < "$FIFO_PATH" &
@@ -440,6 +441,7 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       FIFO_PATH="/workspace/agent-input.jsonl"
       rm -f "$FIFO_PATH" 2>/dev/null || true
       mkfifo "$FIFO_PATH"
+      chmod 666 "$FIFO_PATH" || true
       # Start Claude in background, send initial message, then close writer so it can exit
       exec 9>"$FIFO_PATH"
       if [ -f "prompt.md" ]; then
