@@ -175,7 +175,7 @@ ENV CC=clang \
     RUSTFLAGS="-C link-arg=-fuse-ld=mold"
 
 # Prepare npm global and permissions
-RUN mkdir -p /usr/local/share/npm-global && chown -R node:node /usr/local/share
+RUN mkdir -p /usr/local/share/npm-global && chown -R 1000:1000 /usr/local/share
 
 # Persist bash history for convenience
 ARG USERNAME=node
@@ -229,7 +229,7 @@ ENV DEVCONTAINER=true
 
 # Rust dev tooling for node user (install via cargo) - ensure ownership first
 USER root
-RUN chown -R node:node /home/node/.cache /home/node/.cargo || true
+RUN chown -R 1000:1000 /home/node/.cache /home/node/.cargo || true
 USER node
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   set -eux; \
