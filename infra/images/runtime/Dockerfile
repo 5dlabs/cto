@@ -199,11 +199,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 
 # Switch to non-root and install Rust for node as well
 USER node
-<<<<<<< HEAD
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
-=======
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
->>>>>>> 96d49713b35ca4c304ee81c9b04b291df1c3a795
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
@@ -231,7 +227,6 @@ USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true
 
-<<<<<<< HEAD
 # Rust dev tooling for node user (install via cargo) - ensure ownership first
 USER root
 RUN chown -R 1000:1000 /home/node/.cache /home/node/.cargo || true
@@ -242,14 +237,6 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
   cargo --version; \
   cargo install \
-=======
-# Rust dev tooling for node user (fast installs via cargo-binstall)
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
-  set -eux; \
-  . $HOME/.cargo/env; \
-  curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
-  cargo binstall -y \
->>>>>>> 96d49713b35ca4c304ee81c9b04b291df1c3a795
     sccache \
     cargo-edit \
     cargo-nextest \
@@ -257,12 +244,8 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
     cargo-outdated \
     cargo-watch \
     cargo-expand \
-<<<<<<< HEAD
     cargo-udeps || true
-=======
-    cargo-udeps || true; \
-  mkdir -p "$HOME/.cache/sccache"
->>>>>>> 96d49713b35ca4c304ee81c9b04b291df1c3a795
+    cargo-udeps || true
 
 # Prefer sccache and mold for faster Rust builds
 ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \
