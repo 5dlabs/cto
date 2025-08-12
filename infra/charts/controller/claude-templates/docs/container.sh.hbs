@@ -409,10 +409,20 @@ CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --v
 if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
     echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
     CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
+    if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
+        echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] ----"
+    fi
 elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
     # Fallback to task-files if included inline
     echo "✓ Found system prompt in task ConfigMap for {{github_app}}"
     CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{github_app}}_system-prompt.md"
+    if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
+        echo "[DEBUG] System prompt path: /task-files/{{github_app}}_system-prompt.md"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] ----"
+    fi
 else
     echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
 fi
