@@ -7,7 +7,7 @@ ENV TZ="$TZ"
 ARG USERNAME=node
 ENV DEVCONTAINER=true
 RUN mkdir -p /workspace /home/node/.claude && \
-  chown -R node:node /workspace /home/node/.claude
+  chown -R 1000:1000 /workspace /home/node/.claude
 WORKDIR /workspace
 USER node
 
