@@ -304,20 +304,25 @@ fi
 # Ensure docs directory exists
 mkdir -p "$CLAUDE_WORK_DIR/.taskmaster/docs"
 
-# Handle task files - support both JSON and individual file formats
+## Handle task files - support both JSON and individual file formats
 echo "Setting up task files..."
 if [ -f "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" ]; then
   echo "📋 Found tasks.json, generating individual task files..."
-  
-  # Use jq to extract tasks and create individual files (handle null values safely)
-  jq -r '.tasks[]? | select(.id != null) | "\(.id // "")|\(.title // "No Title")|\(.description // "")|\(.details // "")|\(.testStrategy // "")"' \
-    "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" | while IFS='|' read -r task_id title description details test_strategy; do
-    
-    if [ -n "$task_id" ] && [ "$task_id" != "null" ]; then
+
+  # Robust extraction: base64-encode each task to keep one line per task, then decode fields
+  gen_count=0
+  jq -c '.tasks[]? | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" \
+    | while IFS= read -r row; do
+      _decode() { printf '%s' "$row" | base64 -d | jq -r "$1"; }
+      task_id=$(_decode '.id')
+      [ -n "$task_id" ] && [ "$task_id" != "null" ] || continue
+      title=$(_decode '.title // "No Title"')
+      description=$(_decode '.description // ""')
+      details=$(_decode '.details // ""')
+      test_strategy=$(_decode '.testStrategy // ""')
+
       task_dir="$CLAUDE_WORK_DIR/.taskmaster/docs/task-$task_id"
       mkdir -p "$task_dir"
-      
-      # Create task.txt with formatted content (source file)
       cat > "$task_dir/task.txt" << EOF
 # Task $task_id: $title
 
@@ -330,10 +335,10 @@ $details
 ## Test Strategy
 $test_strategy
 EOF
-      
-      echo "✓ Generated docs/task-$task_id/task.txt (source file for Claude)"
-    fi
-  done
+      gen_count=$((gen_count+1))
+      echo "✓ Generated docs/task-$task_id/task.txt"
+    done
+  echo "Generated $gen_count task files from tasks.json"
 elif [ -d "$CLAUDE_WORK_DIR/.taskmaster/tasks" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/.taskmaster/tasks" 2>/dev/null)" ]; then
   echo "📋 Found individual task files, copying to docs directory..."
   
@@ -404,10 +409,20 @@ CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --v
 if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
     echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
     CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
+    if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
+        echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] ----"
+    fi
 elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
     # Fallback to task-files if included inline
     echo "✓ Found system prompt in task ConfigMap for {{github_app}}"
     CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{github_app}}_system-prompt.md"
+    if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
+        echo "[DEBUG] System prompt path: /task-files/{{github_app}}_system-prompt.md"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] ----"
+    fi
 else
     echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
 fi
