@@ -11,6 +11,8 @@ on:
     branches:
       - feature/*
       - feat/*
+      - fix/*
+      - hotfix/*
 
 env:
   REGISTRY: ghcr.io
