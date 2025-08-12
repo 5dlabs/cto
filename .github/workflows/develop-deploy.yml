@@ -221,7 +221,7 @@ jobs:
             "/orgs/5dlabs/packages/container/cto%2Fcontroller/versions?per_page=1" \
             | jq -r '.[0].metadata.container.tags'
 
-  build-input-bridge:
+  build-sidecar:
     needs: [version]
     runs-on: [k8s-runner]
     permissions:
@@ -232,10 +232,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Build input-bridge binary
-        working-directory: ./input-bridge
+      - name: Build sidecar binary
+        working-directory: ./sidecar
         run: |
-          echo "🏗️ Building input-bridge binary"
+          echo "🏗️ Building sidecar binary"
           # Use sccache if available
           if command -v sccache >/dev/null 2>&1; then
             echo "Using sccache"
@@ -249,8 +249,8 @@ jobs:
           export CARGO_TARGET_DIR=/cache/target
           cargo build --release
           command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
-          cp /cache/target/release/input-bridge ./input-bridge
-          ls -lh ./input-bridge
+          cp /cache/target/release/sidecar ./sidecar
+          ls -lh ./sidecar
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -262,27 +262,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push input-bridge image
+      - name: Build and push sidecar image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./infra/images/input-bridge/Dockerfile
+          file: ./infra/images/sidecar/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/input-bridge:${{ needs.version.outputs.version }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/input-bridge:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/input-bridge:${{ needs.version.outputs.short-sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
-      - name: Show GHCR input-bridge tags
+      - name: Show GHCR sidecar tags
         run: |
-          echo "🔎 Latest GHCR tags for input-bridge:"
+          echo "🔎 Latest GHCR tags for sidecar:"
           gh api -H "Accept: application/vnd.github+json" \
-            "/orgs/5dlabs/packages/container/cto%2Finput-bridge/versions?per_page=1" \
+            "/orgs/5dlabs/packages/container/cto%2Fsidecar/versions?per_page=1" \
             | jq -r '.[0].metadata.container.tags'
 
   # Deploy immediately
