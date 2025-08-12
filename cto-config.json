@@ -12,14 +12,14 @@
       "githubApp": "5DLabs-Morgan"
     },
     "code": {
-      "model": "claude-4-sonnet-20250219",
+      "model": "claude-sonnet-4-20250514",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
       "overwriteMemory": false,
-      "repository": "https://github.com/5dlabs/agent-docs",
-      "docsRepository": "https://github.com/5dlabs/projects",
-      "docsProjectDirectory": "agent-docs",
+      "repository": "5dlabs/agent-docs",
+      "docsRepository": "5dlabs/projects",
+      "docsProjectDirectory": "docs",
       "service": "agent-docs"
     }
   },
