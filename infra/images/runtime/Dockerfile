@@ -245,7 +245,6 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     cargo-watch \
     cargo-expand \
     cargo-udeps || true
-    cargo-udeps || true
 
 # Prefer sccache and mold for faster Rust builds
 ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \
