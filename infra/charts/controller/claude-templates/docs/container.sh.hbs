@@ -438,10 +438,11 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       rm -f "$FIFO_PATH" 2>/dev/null || true
       mkfifo "$FIFO_PATH"
       chmod 666 "$FIFO_PATH" || true
-      # Keep a persistent writer open; start Claude in background, then send one message and close
-      exec 9>"$FIFO_PATH"
+      # Start Claude (reader) first to avoid blocking on writer open
       $CLAUDE_CMD < "$FIFO_PATH" &
       CLAUDE_PID=$!
+      # Now open persistent writer and send one message
+      exec 9>"$FIFO_PATH"
       printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
       # Close writer so reader gets EOF and exits
       exec 9>&-
@@ -457,14 +458,14 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       rm -f "$FIFO_PATH" 2>/dev/null || true
       mkfifo "$FIFO_PATH"
       chmod 666 "$FIFO_PATH" || true
-      # Start Claude in background, send initial message, then close writer so it can exit
-      exec 9>"$FIFO_PATH"
+      # Start Claude (reader) first to avoid blocking on writer open
+      $CLAUDE_CMD < "$FIFO_PATH" &
+      CLAUDE_PID=$!
+      # Now open writer and send initial message, then close so Claude can exit
       if [ -f "prompt.md" ]; then
           INITIAL_TEXT=$(jq -Rs . < "prompt.md")
-          $CLAUDE_CMD < "$FIFO_PATH" &
-          CLAUDE_PID=$!
+          exec 9>"$FIFO_PATH"
           printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
-          # Close writer so Claude receives EOF after processing and exits
           exec 9>&-
           wait $CLAUDE_PID
           CLAUDE_EXIT_CODE=$?
