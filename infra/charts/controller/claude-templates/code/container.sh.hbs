@@ -1033,12 +1033,32 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
 
-        # Open a persistent writer and send initial user turn, prefixed with PROMPT_PREFIX guidance
+        # Open writer, send initial user turn, then CLOSE to allow EOF when no other writers remain
         exec 9>"$FIFO_PATH"
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
         printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+        # Critical: close writer fd 9 so Claude can receive EOF when sidecar is not writing
+        exec 9>&-
 
-        # Keep fd 9 open to prevent EOF; wait on Claude process (long-running)
+        # Optional debug: dump FIFO holders if requested
+        if [ "${DEBUG_FIFO:-false}" = "true" ]; then
+          echo "[DEBUG] Dumping FIFO holders for $FIFO_PATH"
+          for p in /proc/[0-9]*; do
+            pid=${p##*/}
+            [ -d "$p/fd" ] || continue
+            for fd in "$p"/fd/*; do
+              tgt=$(readlink "$fd" 2>/dev/null || true)
+              case "$tgt" in *agent-input.jsonl*)
+                fdnum=${fd##*/}
+                comm=$(cat "$p/comm" 2>/dev/null || echo "?")
+                echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt"
+              ;;
+              esac
+            done
+          done
+        fi
+
+        # Wait for Claude process to complete
         wait $CLAUDE_PID
     else
         echo "❌ ERROR: No prompt.md found from docs service"
