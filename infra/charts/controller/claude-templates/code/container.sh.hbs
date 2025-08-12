@@ -234,12 +234,27 @@ echo "════════════════════════�
 DOCS_BRANCH="{{docs_branch}}"
 GITHUB_APP="{{github_app}}"
 
-# Extract repository names from org/repo format
-DOCS_REPO_NAME="{{docs_repository_url}}"
-TARGET_REPO_NAME="{{repository_url}}"
-# Convert to directory-safe names
-DOCS_REPO_DIR=$(echo "$DOCS_REPO_NAME" | sed 's/\//-/g')
-TARGET_REPO_DIR=$(echo "$TARGET_REPO_NAME" | sed 's/\//-/g')
+# Helper: derive safe workspace directory name from repo input (URL, SSH, or slug)
+sanitize_repo_dir() {
+    input="$1"
+    if echo "$input" | grep -qE '^https://github.com/'; then
+        owner=$(echo "$input" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        name=$(echo "$input" | sed -E 's|https://github.com/[^/]+/([^/]+)(\\.git)?|\1|')
+        printf '%s-%s' "$owner" "$name"
+    elif echo "$input" | grep -qE '^git@github.com:'; then
+        owner=$(echo "$input" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
+        name=$(echo "$input" | sed -E 's|git@github.com:[^/]+/([^/]+)(\\.git)?|\1|')
+        printf '%s-%s' "$owner" "$name"
+    else
+        # Assume owner/repo (optionally with .git)
+        slug=$(echo "$input" | sed -E 's|\\.git$||')
+        echo "$slug" | tr '/' '-'
+    fi
+}
+
+# Derive workspace directory names (owner-repo)
+DOCS_REPO_DIR=$(sanitize_repo_dir "{{docs_repository_url}}")
+TARGET_REPO_DIR=$(sanitize_repo_dir "{{repository_url}}")
 
 echo "=== REPOSITORY SETUP ==="
 echo "Docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
