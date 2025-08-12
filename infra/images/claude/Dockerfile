@@ -10,8 +10,8 @@ USER root
 RUN mkdir -p /workspace /home/node/.claude && \
   chown -R 1000:1000 /home/node/.claude
 WORKDIR /workspace
-USER node
 
-# Install Claude (generic VERSION only)
+# Install Claude (generic VERSION only) as root, then drop to node
 ARG VERSION=latest
 RUN npm install -g @anthropic-ai/claude-code@${VERSION}
+USER node
