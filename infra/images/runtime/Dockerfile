@@ -21,8 +21,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
 
-# Create non-root user 'node' to match existing agents
-RUN id -u node >/dev/null 2>&1 || (groupadd node && useradd --shell /bin/bash --create-home node --gid node)
+# Create non-root user 'node' with stable UID/GID 1000 to match cache mounts
+RUN id -u node >/dev/null 2>&1 || (groupadd -g 1000 node && useradd --shell /bin/bash --create-home -u 1000 -g 1000 node)
 
 # Install Node.js directly (not via nvm) for better compatibility
 RUN --mount=type=cache,target=/root/.cache \
@@ -188,7 +188,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 
 # Switch to non-root and install Rust for node as well
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
@@ -220,7 +220,7 @@ ENV DEVCONTAINER=true
 USER root
 RUN chown -R node:node /home/node/.cache /home/node/.cargo || true
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   set -eux; \
   . $HOME/.cargo/env; \
   mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
