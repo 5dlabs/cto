@@ -1,8 +1,8 @@
 ARG BASE_IMAGE=ghcr.io/5dlabs/cto/runtime:latest
 FROM ${BASE_IMAGE}
 
-# Ensure working directories exist (base image sets /workspace and user=node)
-USER node
+# Use root for global install; base image has node user
+USER root
 WORKDIR /workspace
 
 # Install Grok CLI globally (supports generic VERSION but defaults to latest)
@@ -10,10 +10,11 @@ ARG VERSION=latest
 RUN npm install -g @vibe-kit/grok-cli@"${VERSION}"
 
 # Copy any custom Grok configuration scripts
-COPY --chown=node:node scripts/ /workspace/scripts/
+COPY --chown=1000:1000 scripts/ /workspace/scripts/
 RUN chmod +x /workspace/scripts/*.sh
 
-# Environment
+# Drop privileges for runtime
+USER node
 ENV NODE_ENV=production
 ENV GROK_API_KEY=""
 

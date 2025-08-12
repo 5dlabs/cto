@@ -1409,17 +1409,17 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     let (selector, pod_ns) = if let (Some(jt), Some(nm)) = (job_type, name) {
         // route by explicit resource name
         let label_selector = match jt {
-            "code" => format!("agents.platform/CodeRun={}", nm),
-            "docs" => format!("agents.platform/DocsRun={}", nm),
+            "code" => format!("agents.platform/CodeRun={nm}"),
+            "docs" => format!("agents.platform/DocsRun={nm}"),
             other => return Err(anyhow!(format!("Unsupported job_type: {other}"))),
         };
         (label_selector, namespace)
     } else if let Some(user_label) = user {
         // route by user label (with optional job_type filter)
-        let mut label_selector = format!("agents.platform/user={}", user_label);
+        let mut label_selector = format!("agents.platform/user={user_label}");
         if let Some(jt) = job_type {
             label_selector.push(',');
-            label_selector.push_str(&format!("agents.platform/jobType={}", jt));
+            label_selector.push_str(&format!("agents.platform/jobType={jt}"));
         }
         (label_selector, namespace)
     } else {
@@ -1432,7 +1432,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     let pod_name = pods
         .get("items")
         .and_then(|v| v.as_array())
-        .and_then(|arr| arr.get(0))
+        .and_then(|arr| arr.first())
         .and_then(|item| item.get("metadata"))
         .and_then(|m| m.get("name"))
         .and_then(|n| n.as_str())
@@ -1461,7 +1461,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     if let Some(stdin) = child.stdin.as_mut() {
         use std::io::Write as _;
         stdin
-            .write_all(format!("{}\n", line).as_bytes())
+            .write_all(format!("{line}\n").as_bytes())
             .context("Failed writing input to kubectl exec")?;
     }
     let out = child.wait_with_output()?;

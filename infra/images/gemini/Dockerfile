@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bc \
   && rm -rf /var/lib/apt/lists/*
 
-# Switch back to non-root node user provided by base image
-USER node
+# Switch to root for npm global install, then drop back to node
+USER root
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
 
@@ -22,6 +22,9 @@ ENV PATH=$PATH:/usr/local/share/npm-global/bin
 ARG VERSION=latest
 RUN npm install -g @google/gemini-cli@${VERSION} && \
     npm cache clean --force
+
+# Drop privileges for runtime
+USER node
 
 # Default entrypoint
 CMD ["gemini"]

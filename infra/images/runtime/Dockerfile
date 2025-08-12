@@ -21,8 +21,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
 
-# Create non-root user 'node' to match existing agents
-RUN id -u node >/dev/null 2>&1 || (groupadd node && useradd --shell /bin/bash --create-home node --gid node)
+# Create non-root user 'node' with stable UID/GID 1000 to match cache mounts (robust if GID/UID exist)
+RUN if ! id -u node >/dev/null 2>&1; then \
+      if getent group 1000 >/dev/null; then \
+        GN=$(getent group 1000 | cut -d: -f1); \
+      else \
+        groupadd -g 1000 node; GN=node; \
+      fi; \
+      if getent passwd 1000 >/dev/null; then \
+        useradd --shell /bin/bash --create-home -g "$GN" node; \
+      else \
+        useradd --shell /bin/bash --create-home -u 1000 -g "$GN" node; \
+      fi; \
+    fi
 
 # Install Node.js directly (not via nvm) for better compatibility
 RUN --mount=type=cache,target=/root/.cache \
@@ -164,7 +175,7 @@ ENV CC=clang \
     RUSTFLAGS="-C link-arg=-fuse-ld=mold"
 
 # Prepare npm global and permissions
-RUN mkdir -p /usr/local/share/npm-global && chown -R node:node /usr/local/share
+RUN mkdir -p /usr/local/share/npm-global && chown -R 1000:1000 /usr/local/share
 
 # Persist bash history for convenience
 ARG USERNAME=node
@@ -188,7 +199,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 
 # Switch to non-root and install Rust for node as well
 USER node
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
@@ -216,12 +227,16 @@ USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true
 
-# Rust dev tooling for node user (fast installs via cargo-binstall)
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
+# Rust dev tooling for node user (install via cargo) - ensure ownership first
+USER root
+RUN chown -R 1000:1000 /home/node/.cache /home/node/.cargo || true
+USER node
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   set -eux; \
   . $HOME/.cargo/env; \
-  curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
-  cargo binstall -y \
+  mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
+  cargo --version; \
+  cargo install \
     sccache \
     cargo-edit \
     cargo-nextest \
@@ -229,8 +244,7 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
     cargo-outdated \
     cargo-watch \
     cargo-expand \
-    cargo-udeps || true; \
-  mkdir -p "$HOME/.cache/sccache"
+    cargo-udeps || true
 
 # Prefer sccache and mold for faster Rust builds
 ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \

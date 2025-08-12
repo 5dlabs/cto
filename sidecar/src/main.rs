@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
@@ -68,11 +68,11 @@ async fn handle_input(
 }
 
 async fn write_to_fifo(
-    fifo_path: &PathBuf,
+    fifo_path: &Path,
     message: &StreamJsonEvent<'_>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let json_line = serde_json::to_string(message)? + "\n";
-    let path = fifo_path.clone();
+    let path = fifo_path.to_path_buf();
     tokio::task::spawn_blocking(move || {
         // Open FIFO for write-only; this will block until a reader is present (the main container)
         let mut writer = OpenOptions::new().write(true).open(path)?;
@@ -117,9 +117,9 @@ async fn main() {
     let app = Router::new().route("/input", post(handle_input)).route("/health", get(health_check)).with_state(state);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    info!("Input bridge listening on {}", addr);
+    info!("Sidecar listening on {addr}");
     axum::serve(listener, app).await.unwrap();
 }
 
