@@ -217,7 +217,7 @@ WORKDIR /workspace
 ENV DEVCONTAINER=true
 
 # Rust dev tooling for node user (install via cargo)
-RUN --mount=type=cache,target=/home/node/.cache \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
   set -eux; \
   . $HOME/.cargo/env; \
   mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
