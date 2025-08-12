@@ -6,6 +6,7 @@ ENV TZ="$TZ"
 
 ARG USERNAME=node
 ENV DEVCONTAINER=true
+USER root
 RUN mkdir -p /workspace /home/node/.cursor && \
   chown -R 1000:1000 /home/node/.cursor
 WORKDIR /workspace
