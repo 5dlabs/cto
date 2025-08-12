@@ -64,11 +64,10 @@ spec:
 
   # Sync policy
   syncPolicy:
-    # TEMPORARILY DISABLED: Auto sync disabled for manual control during fixes
-    # automated:
-    #   prune: true
-    #   selfHeal: true
-    #   allowEmpty: false
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
 
     syncOptions:
       - CreateNamespace=true
@@ -80,7 +79,7 @@ spec:
     retry:
       limit: 5
       backoff:
-        duration: 5s
+        duration: 1s
         factor: 2
         maxDuration: 3m
 
