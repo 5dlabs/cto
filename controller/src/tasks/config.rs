@@ -51,7 +51,7 @@ pub struct AgentConfig {
     #[serde(default, rename = "imagePullSecrets")]
     pub image_pull_secrets: Vec<String>,
 
-    /// Optional input bridge sidecar configuration
+    /// Optional sidecar configuration
     #[serde(default, rename = "inputBridge")]
     pub input_bridge: InputBridgeConfig,
 }
@@ -76,7 +76,7 @@ pub struct ImageConfig {
     /// Sidecar image configuration
     pub image: ImageConfig,
 
-    /// HTTP port for the input bridge sidecar
+    /// HTTP port for the sidecar
     #[serde(default = "default_input_bridge_port")]
     pub port: u16,
 }
