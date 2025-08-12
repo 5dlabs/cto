@@ -1033,12 +1033,21 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
 
-        # Open writer, send initial user turn, then CLOSE to allow EOF when no other writers remain
-        exec 9>"$FIFO_PATH"
+        # Compose initial user turn
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-        # Critical: close writer fd 9 so Claude can receive EOF when sidecar is not writing
-        exec 9>&-
+
+        # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
+        if curl -sS -X POST http://127.0.0.1:8080/input \
+             -H 'Content-Type: application/json' \
+             -d "{\"text\": ${USER_COMBINED}}" >/dev/null 2>&1; then
+          echo "✓ Initial prompt sent via sidecar /input"
+        else
+          echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+          # Fallback: write directly to FIFO and immediately close writer
+          exec 9>"$FIFO_PATH"
+          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+          exec 9>&-
+        fi
 
         # Optional debug: dump FIFO holders if requested
         if [ "${DEBUG_FIFO:-false}" = "true" ]; then
@@ -1058,8 +1067,24 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           done
         fi
 
-        # Wait for Claude process to complete
-        wait $CLAUDE_PID
+        # Optional hang diagnostics without enforcing a timeout
+        if [ -n "${HANG_DIAG_SECONDS:-}" ] && [ "$HANG_DIAG_SECONDS" -gt 0 ] 2>/dev/null; then
+          (
+            sleep "$HANG_DIAG_SECONDS"
+            if kill -0 "$CLAUDE_PID" 2>/dev/null; then
+              echo "[DEBUG] Hang diag after ${HANG_DIAG_SECONDS}s: dumping FIFO holders and ps"
+              for p in /proc/[0-9]*; do
+                pid=${p##*/}; [ -d "$p/fd" ] || continue
+                for fd in "$p"/fd/*; do tgt=$(readlink "$fd" 2>/dev/null || true); case "$tgt" in *agent-input.jsonl*) fdnum=${fd##*/}; comm=$(cat "$p/comm" 2>/dev/null || echo "?"); echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt";; esac; done
+              done
+              ps -eo pid,ppid,comm,args | head -200 || true
+            fi
+          ) & HANG_DIAG_PID=$!
+        fi
+
+        # Wait for Claude process to complete, then stop diagnostics if running
+        wait "$CLAUDE_PID"
+        if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
     else
         echo "❌ ERROR: No prompt.md found from docs service"
         echo "The docs service should always provide task/prompt.md"
