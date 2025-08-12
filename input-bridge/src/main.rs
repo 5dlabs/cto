@@ -108,13 +108,41 @@ async fn main() {
     }
 
     // Open a persistent writer (read-write to avoid open() blocking) and keep it for the lifetime of the process
-    let persistent_file = tokio::task::spawn_blocking({
+    // Retry to avoid race with chmod in main container
+    let persistent_file = {
         let p = fifo_path.clone();
-        move || OpenOptions::new().read(true).write(true).append(true).open(p)
-    })
-    .await
-    .expect("Join error opening FIFO writer")
-    .expect("Failed to open FIFO for persistent writer");
+        let mut tries: u32 = 0;
+        loop {
+            match tokio::task::spawn_blocking({
+                let p2 = p.clone();
+                move || OpenOptions::new().read(true).write(true).append(true).open(p2)
+            })
+            .await
+            {
+                Ok(Ok(f)) => break f,
+                Ok(Err(e)) => {
+                    tries += 1;
+                    if tries % 5 == 0 {
+                        warn!("Retrying opening FIFO (attempt {}): {}", tries, e);
+                    }
+                    if tries > 120 {
+                        error!("Failed to open FIFO after {} attempts: {}", tries, e);
+                        panic!("Failed to open FIFO for persistent writer: {}", e);
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    continue;
+                }
+                Err(join_err) => {
+                    tries += 1;
+                    if tries > 120 {
+                        panic!("Join error repeatedly when opening FIFO writer: {}", join_err);
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    continue;
+                }
+            }
+        }
+    };
 
     let state = AppState { fifo_writer: Arc::new(Mutex::new(persistent_file)) };
 
