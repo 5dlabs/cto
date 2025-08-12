@@ -739,6 +739,12 @@ impl<'a> CodeResourceManager<'a> {
                     },
                     "spec": {
                         "restartPolicy": "Never",
+                        "securityContext": {
+                            "runAsUser": 1000,
+                            "runAsGroup": 1000,
+                            "fsGroup": 1000,
+                            "fsGroupChangePolicy": "OnRootMismatch"
+                        },
                         "containers": containers,
                         "volumes": volumes
                     }
