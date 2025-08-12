@@ -216,7 +216,10 @@ USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true
 
-# Rust dev tooling for node user (install via cargo)
+# Rust dev tooling for node user (install via cargo) - ensure ownership first
+USER root
+RUN chown -R node:node /home/node/.cache /home/node/.cargo || true
+USER node
 RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
   set -eux; \
   . $HOME/.cargo/env; \
