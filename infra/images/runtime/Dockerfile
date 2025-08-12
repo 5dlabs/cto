@@ -21,8 +21,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
 
-# Create non-root user 'node' with stable UID/GID 1000 to match cache mounts
-RUN id -u node >/dev/null 2>&1 || (groupadd -g 1000 node && useradd --shell /bin/bash --create-home -u 1000 -g 1000 node)
+# Create non-root user 'node' with stable UID/GID 1000 to match cache mounts (robust if GID/UID exist)
+RUN if ! id -u node >/dev/null 2>&1; then \
+      if getent group 1000 >/dev/null; then \
+        GN=$(getent group 1000 | cut -d: -f1); \
+      else \
+        groupadd -g 1000 node; GN=node; \
+      fi; \
+      if getent passwd 1000 >/dev/null; then \
+        useradd --shell /bin/bash --create-home -g "$GN" node; \
+      else \
+        useradd --shell /bin/bash --create-home -u 1000 -g "$GN" node; \
+      fi; \
+    fi
 
 # Install Node.js directly (not via nvm) for better compatibility
 RUN --mount=type=cache,target=/root/.cache \
