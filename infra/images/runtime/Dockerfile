@@ -17,8 +17,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   redis-tools tree build-essential pkg-config libssl-dev lldb lld clang \
   python3 python3-venv python3-pip python-is-python3 \
   strace lsof htop psmisc ripgrep fd-find bat httpie openssl \
-  # Rust development essentials
-  cmake ninja-build protobuf-compiler libprotobuf-dev libclang-dev llvm-dev mold \
   && rm -rf /var/lib/apt/lists/* \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
