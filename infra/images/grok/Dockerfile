@@ -10,7 +10,7 @@ ARG VERSION=latest
 RUN npm install -g @vibe-kit/grok-cli@"${VERSION}"
 
 # Copy any custom Grok configuration scripts
-COPY --chown=node:node scripts/ /workspace/scripts/
+COPY --chown=1000:1000 scripts/ /workspace/scripts/
 RUN chmod +x /workspace/scripts/*.sh
 
 # Environment

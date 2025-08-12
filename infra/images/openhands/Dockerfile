@@ -20,7 +20,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Create workspace and config directories and set permissions
 RUN mkdir -p /workspace /home/node/.openhands \
-  && chown -R node:node /workspace /home/node/.openhands
+  && chown -R 1000:1000 /home/node/.openhands
 
 # Drop privileges back to non-root user provided by base image
 USER node
