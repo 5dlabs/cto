@@ -693,6 +693,11 @@ impl<'a> DocsResourceManager<'a> {
                             "name": "fix-workspace-perms",
                             "image": "busybox:1.36",
                             "command": ["/bin/sh", "-lc", "chown -R 1000:1000 /workspace && chmod -R ug+rwX /workspace || true"],
+                            "securityContext": {
+                                "runAsUser": 0,
+                                "runAsGroup": 0,
+                                "allowPrivilegeEscalation": false
+                            },
                             "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ]
                         }],
                         "containers": containers,
