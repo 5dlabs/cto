@@ -7,7 +7,7 @@ ENV TZ="$TZ"
 ARG USERNAME=node
 ENV DEVCONTAINER=true
 RUN mkdir -p /workspace /home/node/.cursor && \
-  chown -R node:node /workspace /home/node/.cursor
+  chown -R 1000:1000 /home/node/.cursor
 WORKDIR /workspace
 
 # Install Cursor CLI (as root), then place binary in /usr/local/bin for all users
