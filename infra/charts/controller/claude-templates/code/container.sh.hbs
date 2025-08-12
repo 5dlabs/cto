@@ -984,15 +984,18 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         rm -f "$FIFO_PATH" 2>/dev/null || true
         mkfifo "$FIFO_PATH"
         chmod 666 "$FIFO_PATH" || true
-        # Keep a persistent writer open to avoid EOF on reader
-        exec 9>"$FIFO_PATH"
 
-        # Initial user turn from prompt.md, prefixed with PROMPT_PREFIX guidance
+        # Start Claude (reader) first in background to avoid writer-open blocking
+        $CLAUDE_CMD < "$FIFO_PATH" &
+        CLAUDE_PID=$!
+
+        # Open a persistent writer and send initial user turn, prefixed with PROMPT_PREFIX guidance
+        exec 9>"$FIFO_PATH"
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
         printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
 
-        # Start Claude reading from FIFO (fd 9 stays open)
-        $CLAUDE_CMD < "$FIFO_PATH"
+        # Keep fd 9 open to prevent EOF; wait on Claude process (long-running)
+        wait $CLAUDE_PID
     else
         echo "❌ ERROR: No prompt.md found from docs service"
         echo "The docs service should always provide task/prompt.md"
