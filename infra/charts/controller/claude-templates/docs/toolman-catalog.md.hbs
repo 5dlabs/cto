@@ -80,7 +80,7 @@ Remote tools are available via MCP servers running in the cluster.
 
 ### Configuration Format
 
-**🚨 CRITICAL: toolman-config.json MUST use this EXACT format - nothing else!**
+**🚨 CRITICAL: client-config.json MUST use this EXACT format - nothing else!**
 
 ```json
 {
@@ -105,7 +105,7 @@ Remote tools are available via MCP servers running in the cluster.
 - `tool_configuration`, `technical_requirements`, `testing_requirements`
 - Complex nested objects or metadata
 
-**✅ ONLY generate simple client configuration with:**
+**✅ ONLY generate simple MCP client configuration with:**
 - `remoteTools` array (tool names from this catalog)
 - `localServers` object (exact command/args shown above)
 

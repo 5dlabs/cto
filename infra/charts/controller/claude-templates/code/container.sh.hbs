@@ -446,11 +446,11 @@ else
         echo "✅ Copying prompt.md..."
         cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
         
-        echo "✅ Copying toolman-config.json..."
-        if [ -f "$TASK_DIR/toolman-config.json" ]; then
-            cp "$TASK_DIR/toolman-config.json" "$CLAUDE_WORK_DIR/toolman-config.json" && echo "✓ toolman-config.json copied to Claude working directory" || echo "❌ toolman-config.json copy failed"
+        echo "✅ Copying client-config.json..."
+        if [ -f "$TASK_DIR/client-config.json" ]; then
+            cp "$TASK_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
         else
-            echo "⚠️ toolman-config.json not found - toolman may not work correctly"
+            echo "⚠️ client-config.json not found - MCP client may not be configured"
         fi
         
         echo "✅ Copying toolman-guide.md..."
@@ -709,11 +709,11 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
             cp "$CLAUDE_WORK_DIR/task/task.txt" "$CLAUDE_WORK_DIR/task/task.md" && echo "✓ task.txt copied as task.md" || echo "❌ task.txt copy failed"
         fi
         
-        # Move toolman-config.json to Claude working directory (not in task/ subdirectory)
-        if [ -f "$CLAUDE_WORK_DIR/task/toolman-config.json" ]; then
-            mv "$CLAUDE_WORK_DIR/task/toolman-config.json" "$CLAUDE_WORK_DIR/toolman-config.json" && echo "✓ toolman-config.json moved to Claude working directory" || echo "❌ toolman-config.json move failed"
+        # Move client-config.json to Claude working directory (not in task/ subdirectory)
+        if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
+            mv "$CLAUDE_WORK_DIR/task/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Claude working directory" || echo "❌ client-config.json move failed"
         else
-            echo "⚠️ toolman-config.json not found - toolman may not work correctly"
+            echo "⚠️ client-config.json not found - MCP client may not be configured"
         fi
         
         echo "✓ Task {{task_id}} files copied from preserved temporary location"
@@ -738,17 +738,17 @@ else
     echo "✓ Task documentation copied from docs repository during multi-repo setup"
 fi
 
-# Verify toolman-config.json is available in Claude's working directory
+# Verify client-config.json is available in Claude's working directory
 echo "=== TOOLMAN CONFIG SETUP ==="
-CLAUDE_CONFIG="$CLAUDE_WORK_DIR/toolman-config.json"
+CLAUDE_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
 
 if [ -f "$CLAUDE_CONFIG" ]; then
-  echo "✓ toolman-config.json found in Claude working directory"
-  # Set TOOLMAN_CONFIG_PATH environment variable for MCP server
-  export TOOLMAN_CONFIG_PATH="$CLAUDE_CONFIG"
-  echo "✓ TOOLMAN_CONFIG_PATH set to: $TOOLMAN_CONFIG_PATH"
+  echo "✓ client-config.json found in Claude working directory"
+  # Set MCP_CLIENT_CONFIG environment variable for MCP server/bridge
+  export MCP_CLIENT_CONFIG="$CLAUDE_CONFIG"
+  echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
 else
-  echo "⚠️ toolman-config.json not found in Claude working directory - toolman may not work correctly"
+  echo "⚠️ client-config.json not found in Claude working directory - MCP client may not work correctly"
 fi
 
 echo '=== WORKSPACE VALIDATION ==='
@@ -975,14 +975,14 @@ else
         echo "startingTask:{{task_id}}"
         echo ""
         
-        # DEBUG: Print TOOLMAN_CONFIG_PATH for troubleshooting tool filter issues
-        echo "🔍 DEBUG: TOOLMAN_CONFIG_PATH is set to: '$TOOLMAN_CONFIG_PATH'"
-        if [ -f "$TOOLMAN_CONFIG_PATH" ]; then
-            echo "🔍 DEBUG: TOOLMAN_CONFIG_PATH file exists and is readable"
-            echo "🔍 DEBUG: First few lines of toolman config:"
-            head -10 "$TOOLMAN_CONFIG_PATH" 2>/dev/null || echo "Could not read toolman config file"
+        # DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
+        echo "🔍 DEBUG: MCP_CLIENT_CONFIG is set to: '$MCP_CLIENT_CONFIG'"
+        if [ -f "$MCP_CLIENT_CONFIG" ]; then
+            echo "🔍 DEBUG: MCP_CLIENT_CONFIG file exists and is readable"
+            echo "🔍 DEBUG: First few lines of client config:"
+            head -10 "$MCP_CLIENT_CONFIG" 2>/dev/null || echo "Could not read client config file"
         else
-            echo "🔍 DEBUG: TOOLMAN_CONFIG_PATH file does NOT exist or is not readable"
+            echo "🔍 DEBUG: MCP_CLIENT_CONFIG file does NOT exist or is not readable"
         fi
         echo ""
 

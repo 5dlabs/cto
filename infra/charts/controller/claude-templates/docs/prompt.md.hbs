@@ -51,7 +51,7 @@ Before processing any task, check if ALL required files already exist:
 - `task.md` 
 - `prompt.md`
 - `acceptance-criteria.md`
-- `toolman-config.json`
+- `client-config.json`
 - `toolman-guide.md`
 
 If ALL five files exist and have substantial content (not just stubs), SKIP that task to save tokens and time.
@@ -63,7 +63,7 @@ For each task that needs documentation (process ALL incomplete tasks, no excepti
 - `task.md` - Comprehensive task overview and implementation guide
 - `prompt.md` - Autonomous prompt for AI agents
 - `acceptance-criteria.md` - Clear acceptance criteria and test cases
-- `toolman-config.json` - Task-specific tool configuration for code implementation agents
+- `client-config.json` - MCP client configuration for code implementation agents
 - `toolman-guide.md` - Task-specific guide explaining which tools to use and when
 
 **Progress Requirements:**
@@ -75,9 +75,9 @@ Place all documentation in `.taskmaster/docs/task-{id}/` directories.
 
 ### Step 2.1: Toolman Configuration Generation (MANDATORY)
 
-**🔧 CRITICAL: Generate Simple Tool Client Configuration**
+**🔧 CRITICAL: Generate Simple MCP Client Configuration**
 
-For each task, you MUST create a `toolman-config.json` file that is a **SIMPLE CLIENT CONFIGURATION** - NOT a task specification document.
+For each task, you MUST create a `client-config.json` file that is a **SIMPLE CLIENT CONFIGURATION** - NOT a task specification document.
 
 **🚨 IMPORTANT: This is a CLIENT CONFIG FILE, not a detailed task document!**
 
@@ -165,7 +165,7 @@ For each task, you MUST create a comprehensive `toolman-guide.md` file that expl
 
 ---
 
-**Note**: All configuration format details, selection guidelines, examples, and validation requirements are provided in the tool catalog section above. Use that information to generate appropriate toolman-config.json files for each task.
+**Note**: All configuration format details, selection guidelines, examples, and validation requirements are provided in the tool catalog section above. Use that information to generate appropriate `client-config.json` files for each task.
 
 ### Step 3: Complete Documentation Generation
 **⚠️ CRITICAL: You MUST generate ALL documentation files as specified above.**
@@ -200,7 +200,7 @@ For each task, you MUST create a comprehensive `toolman-guide.md` file that expl
 ```
 🎉 DOCUMENTATION GENERATION COMPLETE 🎉
 ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
-✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, toolman-config.json, toolman-guide.md)
+✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, client-config.json, toolman-guide.md)
 📋 Total files created: [COUNT]
 🔧 Generated task-specific Toolman configurations for code implementation
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook
