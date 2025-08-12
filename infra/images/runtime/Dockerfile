@@ -17,6 +17,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   redis-tools tree build-essential pkg-config libssl-dev lldb lld clang \
   python3 python3-venv python3-pip python-is-python3 \
   strace lsof htop psmisc ripgrep fd-find bat httpie openssl \
+  # Rust development essentials
+  cmake ninja-build protobuf-compiler libprotobuf-dev libclang-dev llvm-dev mold \
   && rm -rf /var/lib/apt/lists/* \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
@@ -158,6 +160,11 @@ RUN --mount=type=cache,target=/root/.cache \
   && rustup component add rustfmt clippy rust-analyzer
 ENV PATH="/root/.cargo/bin:${PATH}"
 
+# Configure mold and sccache defaults (will also apply to node later)
+ENV CC=clang \
+    CXX=clang++ \
+    RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+
 # Prepare npm global and permissions
 RUN mkdir -p /usr/local/share/npm-global && chown -R node:node /usr/local/share
 
@@ -210,5 +217,30 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true
+
+# Rust dev tooling for node user (fast installs via cargo-binstall)
+RUN --mount=type=cache,target=/home/node/.cache \
+  set -eux; \
+  . $HOME/.cargo/env; \
+  curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
+  cargo binstall -y --no-confirm \
+    sccache \
+    cargo-edit \
+    cargo-nextest \
+    cargo-deny \
+    cargo-outdated \
+    cargo-watch \
+    cargo-expand \
+    cargo-udeps || true; \
+  mkdir -p /home/node/.cache/sccache
+
+# Prefer sccache and mold for faster Rust builds
+ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \
+    SCCACHE_DIR=/home/node/.cache/sccache \
+    SCCACHE_CACHE_SIZE=10G \
+    CC=clang \
+    CXX=clang++ \
+    RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
+    CARGO_TERM_COLOR=always
 
 
