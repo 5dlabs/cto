@@ -216,12 +216,13 @@ USER node
 WORKDIR /workspace
 ENV DEVCONTAINER=true
 
-# Rust dev tooling for node user (fast installs via cargo-binstall)
-RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
+# Rust dev tooling for node user (install via cargo)
+RUN --mount=type=cache,target=/home/node/.cache \
   set -eux; \
   . $HOME/.cargo/env; \
-  curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
-  cargo binstall -y \
+  mkdir -p "$HOME/.cache/sccache" "$HOME/.cargo/bin"; \
+  cargo --version; \
+  cargo install \
     sccache \
     cargo-edit \
     cargo-nextest \
@@ -229,8 +230,7 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
     cargo-outdated \
     cargo-watch \
     cargo-expand \
-    cargo-udeps || true; \
-  mkdir -p "$HOME/.cache/sccache"
+    cargo-udeps || true
 
 # Prefer sccache and mold for faster Rust builds
 ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \
