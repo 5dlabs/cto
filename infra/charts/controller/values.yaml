@@ -19,7 +19,7 @@ agent:
   
   # Input bridge sidecar configuration for live input to running jobs
   inputBridge:
-    enabled: false
+    enabled: true
     image:
       repository: ghcr.io/5dlabs/cto/input-bridge
       tag: "latest"
