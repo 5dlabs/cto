@@ -1037,16 +1037,16 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
 
         # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
-        if curl -sS -X POST http://127.0.0.1:8080/input \
-             -H 'Content-Type: application/json' \
-             -d "{\"text\": ${USER_COMBINED}}" >/dev/null 2>&1; then
+        if printf '{"text":%s}\n' "$USER_COMBINED" | \
+             curl -fsS -X POST http://127.0.0.1:8080/input \
+               -H 'Content-Type: application/json' \
+               --data-binary @- >/dev/null 2>&1; then
           echo "✓ Initial prompt sent via sidecar /input"
         else
           echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-          # Fallback: write directly to FIFO and immediately close writer
+          # Fallback: open FIFO writer and keep it open until Claude exits
           exec 9>"$FIFO_PATH"
           printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-          exec 9>&-
         fi
 
         # Optional debug: dump FIFO holders if requested
@@ -1085,6 +1085,8 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         # Wait for Claude process to complete, then stop diagnostics if running
         wait "$CLAUDE_PID"
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
+        # Close FIFO writer if it was opened (in fallback) now that Claude has exited
+        exec 9>&- 2>/dev/null || true
     else
         echo "❌ ERROR: No prompt.md found from docs service"
         echo "The docs service should always provide task/prompt.md"
