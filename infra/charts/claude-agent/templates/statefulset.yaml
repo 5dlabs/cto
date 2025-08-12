@@ -43,7 +43,7 @@ spec:
               mountPath: {{ .Values.persistence.mountPath }}
             {{- end }}
         # Replaced inline BusyBox HTTP shim with Rust sidecar to avoid YAML parsing issues
-        - name: input-bridge
+        - name: sidecar
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           env:

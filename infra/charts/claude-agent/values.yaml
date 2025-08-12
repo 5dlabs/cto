@@ -23,7 +23,7 @@ api:
   port: 8080
   name: http
   image:
-    repository: ghcr.io/5dlabs/cto/input-bridge
+    repository: ghcr.io/5dlabs/cto/sidecar
     tag: latest
     pullPolicy: IfNotPresent
 

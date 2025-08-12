@@ -17,8 +17,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   redis-tools tree build-essential pkg-config libssl-dev lldb lld clang \
   python3 python3-venv python3-pip python-is-python3 \
   strace lsof htop psmisc ripgrep fd-find bat httpie openssl \
-  # Rust development essentials
-  cmake ninja-build protobuf-compiler libprotobuf-dev libclang-dev llvm-dev mold \
   && rm -rf /var/lib/apt/lists/* \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
@@ -190,7 +188,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 
 # Switch to non-root and install Rust for node as well
 USER node
-RUN --mount=type=cache,target=/home/node/.cache \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
@@ -219,11 +217,11 @@ WORKDIR /workspace
 ENV DEVCONTAINER=true
 
 # Rust dev tooling for node user (fast installs via cargo-binstall)
-RUN --mount=type=cache,target=/home/node/.cache \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000 \
   set -eux; \
   . $HOME/.cargo/env; \
   curl -fsSL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash; \
-  cargo binstall -y --no-confirm \
+  cargo binstall -y \
     sccache \
     cargo-edit \
     cargo-nextest \
@@ -232,7 +230,7 @@ RUN --mount=type=cache,target=/home/node/.cache \
     cargo-watch \
     cargo-expand \
     cargo-udeps || true; \
-  mkdir -p /home/node/.cache/sccache
+  mkdir -p "$HOME/.cache/sccache"
 
 # Prefer sccache and mold for faster Rust builds
 ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \
