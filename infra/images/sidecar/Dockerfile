@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -m -u 1000 appuser
 
-# Copy prebuilt binary from repository context
-COPY sidecar/target/release/sidecar /usr/local/bin/sidecar
+# Copy prebuilt binary from repository context (produced by CI into sidecar/sidecar)
+COPY sidecar/sidecar /usr/local/bin/sidecar
 
 RUN chmod +x /usr/local/bin/sidecar && chown -R appuser:appuser /usr/local/bin/sidecar
 
