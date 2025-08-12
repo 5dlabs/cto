@@ -306,19 +306,24 @@ fn get_git_repository_url_in_dir(dir: Option<&Path>) -> Result<String> {
 
 /// Validate repository URL format
 fn validate_repository_url(repo_url: &str) -> Result<()> {
-    if !repo_url.starts_with("https://github.com/") {
-        return Err(anyhow!(
-            "Repository URL must be a GitHub HTTPS URL (e.g., 'https://github.com/org/repo')"
-        ));
-    }
-
-    // Basic validation - should have org/repo structure
-    let path = repo_url.trim_start_matches("https://github.com/");
-    let parts: Vec<&str> = path.trim_end_matches(".git").split('/').collect();
-    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
-        return Err(anyhow!(
-            "Repository URL must be in format 'https://github.com/org/repo'"
-        ));
+    // Accept both formats: "org/repo" and "https://github.com/org/repo"
+    if repo_url.starts_with("https://github.com/") {
+        // Validate HTTPS URL format
+        let path = repo_url.trim_start_matches("https://github.com/");
+        let parts: Vec<&str> = path.trim_end_matches(".git").split('/').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(anyhow!(
+                "Repository URL must be in format 'https://github.com/org/repo'"
+            ));
+        }
+    } else {
+        // Validate org/repo format
+        let parts: Vec<&str> = repo_url.split('/').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(anyhow!(
+                "Repository must be in format 'org/repo' or 'https://github.com/org/repo'"
+            ));
+        }
     }
 
     Ok(())
@@ -746,11 +751,28 @@ fn handle_task_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("context-version=0"), // Auto-assign by controller
     ];
 
-    // Check for requirements.yaml file in the task directory
-    let requirements_path = format!("{docs_project_directory}/task-{task_id}/requirements.yaml");
+    // Check for requirements.yaml file - priority order:
+    // 1. Task-specific: {docs_project_directory}/task-{task_id}/requirements.yaml
+    // 2. Project-level: {docs_project_directory}/requirements.yaml  
+    // 3. TaskMaster system: {docs_project_directory}/.taskmaster/requirements.yaml
+    let task_requirements_path = format!("{docs_project_directory}/task-{task_id}/requirements.yaml");
+    let project_requirements_path = format!("{docs_project_directory}/requirements.yaml");
+    let taskmaster_requirements_path = format!("{docs_project_directory}/.taskmaster/requirements.yaml");
 
-    if Path::new(&requirements_path).exists() {
-        eprintln!("📋 Found requirements.yaml for task {task_id}");
+    let requirements_path = if Path::new(&task_requirements_path).exists() {
+        eprintln!("📋 Found task-specific requirements.yaml for task {task_id}");
+        task_requirements_path
+    } else if Path::new(&project_requirements_path).exists() {
+        eprintln!("📋 Found project-level requirements.yaml for task {task_id}");
+        project_requirements_path
+    } else if Path::new(&taskmaster_requirements_path).exists() {
+        eprintln!("📋 Found TaskMaster requirements.yaml for task {task_id}");
+        taskmaster_requirements_path
+    } else {
+        String::new() // No requirements file found
+    };
+
+    if !requirements_path.is_empty() {
         let requirements_content = std::fs::read_to_string(&requirements_path).context(format!(
             "Failed to read requirements file: {requirements_path}"
         ))?;

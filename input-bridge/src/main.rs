@@ -112,8 +112,6 @@ async fn main() {
         std::process::exit(1);
     }
 
-    // Do NOT keep a persistent writer open. Holding a writer open prevents EOF on the reader,
-    // which causes the main container's `wait $CLAUDE_PID` to hang. We open-write-close per request instead.
     let state = AppState { fifo_path: fifo_path.clone(), write_lock: Arc::new(Mutex::new(())) };
 
     let app = Router::new().route("/input", post(handle_input)).route("/health", get(health_check)).with_state(state);
