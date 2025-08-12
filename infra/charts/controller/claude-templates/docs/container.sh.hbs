@@ -440,14 +440,16 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       FIFO_PATH="/workspace/agent-input.jsonl"
       rm -f "$FIFO_PATH" 2>/dev/null || true
       mkfifo "$FIFO_PATH"
-      # Keep a persistent writer open to avoid EOF
+      # Start Claude in background, send initial message, then close writer so it can exit
       exec 9>"$FIFO_PATH"
       if [ -f "prompt.md" ]; then
-          # Initial user turn from prompt.md only; system prompts are set via CLI flags, not streamed
           INITIAL_TEXT=$(jq -Rs . < "prompt.md")
+          $CLAUDE_CMD < "$FIFO_PATH" &
+          CLAUDE_PID=$!
           printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
-          # Start Claude reading from FIFO (fd 9 stays open)
-          $CLAUDE_CMD < "$FIFO_PATH"
+          # Close writer so Claude receives EOF after processing and exits
+          exec 9>&-
+          wait $CLAUDE_PID
           CLAUDE_EXIT_CODE=$?
           echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
       else

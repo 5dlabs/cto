@@ -610,6 +610,55 @@ impl<'a> DocsResourceManager<'a> {
             "{}:{}",
             self.config.agent.image.repository, self.config.agent.image.tag
         );
+
+        // Build primary docs container spec
+        let mut containers = vec![json!({
+            "name": "claude-docs",
+            "image": image,
+            "env": [
+                {
+                    "name": "GITHUB_APP_PRIVATE_KEY",
+                    "valueFrom": { "secretKeyRef": { "name": github_app_secret_name(docs_run.spec.github_app.as_deref().or(docs_run.spec.github_user.as_deref()).unwrap_or("")), "key": "private-key" } }
+                },
+                {
+                    "name": "GITHUB_APP_ID",
+                    "valueFrom": { "secretKeyRef": { "name": github_app_secret_name(docs_run.spec.github_app.as_deref().or(docs_run.spec.github_user.as_deref()).unwrap_or("")), "key": "app-id" } }
+                },
+                {
+                    "name": "ANTHROPIC_API_KEY",
+                    "valueFrom": { "secretKeyRef": { "name": self.config.secrets.api_key_secret_name, "key": self.config.secrets.api_key_secret_key } }
+                }
+            ],
+            "command": ["/bin/bash"],
+            "args": ["/task-files/container.sh"],
+            "workingDir": "/workspace",
+            "volumeMounts": volume_mounts
+        })];
+
+        // Optionally add input-bridge sidecar when enabled
+        if self.config.agent.input_bridge.enabled {
+            let input_bridge_image = format!(
+                "{}:{}",
+                self.config.agent.input_bridge.image.repository,
+                self.config.agent.input_bridge.image.tag
+            );
+            containers.push(json!({
+                "name": "input-bridge",
+                "image": input_bridge_image,
+                "imagePullPolicy": "Always",
+                "env": [
+                    {"name": "FIFO_PATH", "value": "/workspace/agent-input.jsonl"},
+                    {"name": "PORT", "value": self.config.agent.input_bridge.port.to_string()}
+                ],
+                "ports": [{"name": "http", "containerPort": self.config.agent.input_bridge.port}],
+                "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ],
+                "resources": {
+                    "requests": { "cpu": "50m", "memory": "32Mi" },
+                    "limits":   { "cpu": "100m", "memory": "64Mi" }
+                }
+            }));
+        }
+
         let job_spec = json!({
             "apiVersion": "batch/v1",
             "kind": "Job",
@@ -634,47 +683,7 @@ impl<'a> DocsResourceManager<'a> {
                     },
                     "spec": {
                         "restartPolicy": "Never",
-                        "containers": [{
-                            "name": "claude-docs",
-                            "image": image,
-                            "env": [
-                                {
-                                    "name": "GITHUB_APP_PRIVATE_KEY",
-                                    "valueFrom": {
-                                        "secretKeyRef": {
-                                            "name": github_app_secret_name(docs_run.spec.github_app.as_deref()
-                                                .or(docs_run.spec.github_user.as_deref())
-                                                .unwrap_or("")),
-                                            "key": "private-key"
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "GITHUB_APP_ID",
-                                    "valueFrom": {
-                                        "secretKeyRef": {
-                                            "name": github_app_secret_name(docs_run.spec.github_app.as_deref()
-                                                .or(docs_run.spec.github_user.as_deref())
-                                                .unwrap_or("")),
-                                            "key": "app-id"
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "ANTHROPIC_API_KEY",
-                                    "valueFrom": {
-                                        "secretKeyRef": {
-                                            "name": self.config.secrets.api_key_secret_name,
-                                            "key": self.config.secrets.api_key_secret_key
-                                        }
-                                    }
-                                }
-                            ],
-                            "command": ["/bin/bash"],
-                            "args": ["/task-files/container.sh"],
-                            "workingDir": "/workspace",
-                             "volumeMounts": volume_mounts
-                        }],
+                        "containers": containers,
                         "volumes": volumes
                     }
                 }
