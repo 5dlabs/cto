@@ -14,7 +14,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
   git procps sudo fzf zsh man-db unzip gnupg2 gh iproute2 dnsutils jq \
   netcat-openbsd ca-certificates curl wget docker.io postgresql-client \
-  redis-tools tree build-essential pkg-config libssl-dev lldb lld clang \
+  redis-tools tree build-essential binutils pkg-config libssl-dev lldb lld clang mold \
+  libpq-dev \
   python3 python3-venv python3-pip python-is-python3 \
   strace lsof htop psmisc ripgrep fd-find bat httpie openssl \
   && rm -rf /var/lib/apt/lists/* \
@@ -34,6 +35,10 @@ RUN if ! id -u node >/dev/null 2>&1; then \
         useradd --shell /bin/bash --create-home -u 1000 -g "$GN" node; \
       fi; \
     fi
+
+# Passwordless sudo for the non-root user (node)
+RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
+  && chmod 0440 /etc/sudoers.d/99-node-nopasswd
 
 # Install Node.js directly (not via nvm) for better compatibility
 RUN --mount=type=cache,target=/root/.cache \
@@ -168,6 +173,10 @@ RUN --mount=type=cache,target=/root/.cache \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
 ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Optional: sccache for root as well (helpful for scripts running as root)
+RUN --mount=type=cache,target=/root/.cache \
+  . $HOME/.cargo/env && cargo install sccache || true
 
 # Configure mold and sccache defaults (will also apply to node later)
 ENV CC=clang \
