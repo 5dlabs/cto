@@ -745,6 +745,7 @@ impl<'a> CodeResourceManager<'a> {
                         "labels": labels
                     },
                     "spec": {
+                        "shareProcessNamespace": true,
                         "restartPolicy": "Never",
                         "securityContext": {
                             "runAsUser": 1000,

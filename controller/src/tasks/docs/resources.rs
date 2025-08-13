@@ -687,6 +687,7 @@ impl<'a> DocsResourceManager<'a> {
                         "labels": labels
                     },
                     "spec": {
+                        "shareProcessNamespace": true,
                         "restartPolicy": "Never",
                         "securityContext": {
                             "runAsUser": 1000,
