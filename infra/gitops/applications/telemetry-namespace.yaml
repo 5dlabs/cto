@@ -1,0 +1,31 @@
+---
+# Argo CD Application to manage telemetry Namespace labels (PSA)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: telemetry-namespace
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: telemetry-namespace
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: main
+    path: infra/cluster-config
+    directory:
+      recurse: false
+      include: telemetry-namespace.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: telemetry
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
