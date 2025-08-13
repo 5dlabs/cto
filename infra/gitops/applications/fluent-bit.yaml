@@ -1,0 +1,111 @@
+---
+# Argo CD Application for Fluent Bit (Kubernetes stdout → OTEL Collector)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fluent-bit
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://fluent.github.io/helm-charts
+    chart: fluent-bit
+    targetRevision: 0.47.7
+    helm:
+      values: |
+        fullnameOverride: fluent-bit
+        namespaceOverride: telemetry
+        serviceAccount:
+          create: true
+        tolerations: []
+        nodeSelector: {}
+        podAnnotations: {}
+
+        # Use raw Fluent Bit config for portability
+        config:
+          service: |
+            [SERVICE]
+                Flush           1
+                Daemon          Off
+                Log_Level       info
+                Parsers_File    parsers.conf
+                HTTP_Server     On
+                HTTP_Listen     0.0.0.0
+                HTTP_Port       2020
+
+          inputs: |
+            [INPUT]
+                Name              tail
+                Tag               kube.*
+                Path              /var/log/containers/*.log
+                Exclude_Path      /var/log/containers/fluent-bit-*.log
+                Parser            cri
+                Mem_Buf_Limit     50MB
+                Skip_Long_Lines   On
+                Refresh_Interval  5
+
+          filters: |
+            # Enrich with Kubernetes metadata
+            [FILTER]
+                Name                kubernetes
+                Match               kube.*
+                Kube_URL            https://kubernetes.default.svc:443
+                Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+                Kube_Tag_Prefix     kube.var.log.containers.
+                Merge_Log           On
+                Keep_Log            Off
+                Labels              On
+                Annotations         Off
+
+            # Optionally trim excessively long records
+            [FILTER]
+                Name                modify
+                Match               kube.*
+                # Example: set a static cluster name attribute for queries
+                Add                 cluster.name  telemetry-dev
+
+          outputs: |
+            # Send to OTEL Collector (which already exports to VictoriaLogs)
+            [OUTPUT]
+                Name                opentelemetry
+                Match               kube.*
+                Host                otel-collector.telemetry.svc.cluster.local
+                Port                4318
+                TLS                 Off
+                Logs_uri            /v1/logs
+                # Map the log record into the OTEL body field
+                Log_Body_Key        log
+                # Include Kubernetes attributes
+                Add_Label           service.namespace ${kubernetes['namespace_name']}
+                Add_Label           service.pod ${kubernetes['pod_name']}
+                Add_Label           service.container ${kubernetes['container_name']}
+
+          customParsers: |
+            [PARSER]
+                Name        cri
+                Format      regex
+                Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<log>.*)$
+                Time_Key    time
+                Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+        # Mount container logs
+        hostTail:
+          enabled: true
+          path: /var/log/containers
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: telemetry
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
