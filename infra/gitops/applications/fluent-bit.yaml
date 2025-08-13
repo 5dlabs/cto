@@ -8,6 +8,8 @@ metadata:
   labels:
     app.kubernetes.io/name: fluent-bit
     app.kubernetes.io/part-of: platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
