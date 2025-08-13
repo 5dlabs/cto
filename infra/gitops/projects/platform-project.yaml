@@ -24,6 +24,7 @@ spec:
     - 'https://5dlabs.github.io/cto'
     - 'https://github.com/5dlabs/*'
     - 'https://argoproj.github.io/argo-helm'
+    - 'https://fluent.github.io/helm-charts'
     - 'https://prometheus-community.github.io/helm-charts'
     - 'https://grafana.github.io/helm-charts'
     - 'https://open-telemetry.github.io/opentelemetry-helm-charts'
