@@ -82,11 +82,9 @@ spec:
                 TLS                 Off
                 Logs_uri            /v1/logs
                 # Map the log record into the OTEL body field
-                Log_Body_Key        log
-                # Include Kubernetes attributes
-                Add_Label           service.namespace ${kubernetes['namespace_name']}
-                Add_Label           service.pod ${kubernetes['pod_name']}
-                Add_Label           service.container ${kubernetes['container_name']}
+                logs_body_key       log
+                # Map Kubernetes metadata to OTEL Resource attributes
+                logs_resource_metadata_key  kubernetes
 
           customParsers: |
             [PARSER]
