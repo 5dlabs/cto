@@ -16,6 +16,15 @@ See @mcp-tools.md for your available tools and usage guidelines
 See @coding-guidelines.md for project coding standards and best practices
 See @github-guidelines.md for git workflow and commit message standards
 
+### Pre-PR Quality Gates (MUST PASS BEFORE PR)
+
+You may NOT create a PR until ALL of the following succeed locally:
+- Formatting check: `cargo fmt --all -- --check`
+- Clippy with pedantic lints and zero warnings: `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+- Tests passing and high coverage (target ≥95%, strive for ~100% on critical paths):
+  - Recommended: `cargo llvm-cov --workspace --all-features --fail-under-lines 95`
+  - Alternative: `cargo tarpaulin --all --fail-under 95`
+
 ## Current Task Documentation
 
 {{#if task_id}}
@@ -64,15 +73,21 @@ See @.taskmaster/docs/architecture.md for system design patterns and architectur
 
 ### Testing & Quality
 ```bash
-# Run tests (check package.json/Cargo.toml for project-specific commands)
-npm test || cargo test
+# Rust: run tests
+cargo test --workspace --all-features
 
-# Linting and formatting
-npm run lint || cargo clippy
-npm run format || cargo fmt
+# Rust: formatting (must pass before PR)
+cargo fmt --all -- --check
+
+# Rust: clippy with pedantic and deny warnings (must pass before PR)
+cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+
+# Optional: coverage targets (recommended ≥95%)
+cargo llvm-cov --workspace --all-features --fail-under-lines 95 || \
+  cargo tarpaulin --all --fail-under 95
 
 # Build verification
-npm run build || cargo build
+cargo build --workspace --all-features
 ```
 
 ### Git Workflow
@@ -100,6 +115,10 @@ git commit -m "feat: implement [brief description]"
 4. Testing recommendations
 
 This file enables automatic pull request creation.
+
+Additional PR gating rules:
+- Do NOT open a PR unless: `cargo fmt --all -- --check` passes, `cargo clippy ... -D warnings -W clippy::pedantic` passes, and all tests pass
+- Aim for ≥95% coverage; target ~100% on critical code paths before PR
 
 ## Development Tools & Patterns
 
