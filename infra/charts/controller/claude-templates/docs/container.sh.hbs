@@ -461,15 +461,30 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       # Start Claude (reader) first to avoid blocking on writer open
       $CLAUDE_CMD < "$FIFO_PATH" &
       CLAUDE_PID=$!
-      # Now open writer and send initial message, then close so Claude can exit
+      # Send initial prompt via sidecar HTTP when possible; fallback to FIFO
       if [ -f "prompt.md" ]; then
           INITIAL_TEXT=$(jq -Rs . < "prompt.md")
-          exec 9>"$FIFO_PATH"
-          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
-          exec 9>&-
+          if printf '{"text":%s}\n' "$INITIAL_TEXT" | \
+               curl -fsS -X POST http://127.0.0.1:8080/input \
+                 -H 'Content-Type: application/json' \
+                 --data-binary @- >/dev/null 2>&1; then
+            echo "✓ Initial prompt sent via sidecar /input"
+          else
+            echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+            exec 9>"$FIFO_PATH"
+            printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
+          fi
+
+          # Wait for Claude to complete, then close any fallback writer and request sidecar shutdown
           wait $CLAUDE_PID
           CLAUDE_EXIT_CODE=$?
           echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
+          exec 9>&- 2>/dev/null || true
+          if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+            echo "✓ Requested sidecar shutdown"
+          else
+            echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
+          fi
       else
           echo "❌ No prompt.md found"
           exit 1

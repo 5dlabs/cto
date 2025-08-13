@@ -1,3 +1,4 @@
+---
 name: Agent Images
 
 # Automatically build latest agent images (Claude Code, Grok, etc.)

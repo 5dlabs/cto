@@ -659,6 +659,13 @@ impl<'a> CodeResourceManager<'a> {
                 "volumeMounts": [
                     {"name": "workspace", "mountPath": "/workspace"}
                 ],
+                "lifecycle": {
+                    "preStop": {
+                        "exec": {
+                            "command": ["/bin/sh", "-lc", "curl -fsS -X POST http://127.0.0.1:8080/shutdown || true"]
+                        }
+                    }
+                },
                 "resources": {
                     "requests": {
                         "cpu": "50m",
@@ -738,6 +745,7 @@ impl<'a> CodeResourceManager<'a> {
                         "labels": labels
                     },
                     "spec": {
+                        "shareProcessNamespace": true,
                         "restartPolicy": "Never",
                         "securityContext": {
                             "runAsUser": 1000,

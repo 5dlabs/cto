@@ -652,6 +652,11 @@ impl<'a> DocsResourceManager<'a> {
                 ],
                 "ports": [{"name": "http", "containerPort": self.config.agent.input_bridge.port}],
                 "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ],
+                "lifecycle": {
+                    "preStop": {
+                        "exec": {"command": ["/bin/sh", "-lc", "curl -fsS -X POST http://127.0.0.1:8080/shutdown || true"]}
+                    }
+                },
                 "resources": {
                     "requests": { "cpu": "50m", "memory": "32Mi" },
                     "limits":   { "cpu": "100m", "memory": "64Mi" }
@@ -682,6 +687,7 @@ impl<'a> DocsResourceManager<'a> {
                         "labels": labels
                     },
                     "spec": {
+                        "shareProcessNamespace": true,
                         "restartPolicy": "Never",
                         "securityContext": {
                             "runAsUser": 1000,
