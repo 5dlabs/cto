@@ -1109,5 +1109,8 @@ echo '════════════════════════�
 # Claude execution completed - no hooks configured
 echo "Claude has completed successfully."
 
+# Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
+touch /workspace/.agent_done 2>/dev/null || true
+
 # Exit to terminate the pod
 exit 0

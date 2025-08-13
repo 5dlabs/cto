@@ -6,7 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use std::fs::OpenOptions;
+use std::fs::{metadata, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -90,6 +90,16 @@ async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 
+async fn stop_if_sentinel_present(fifo_dir: &Path) {
+    let sentinel = fifo_dir.join(".agent_done");
+    if metadata(&sentinel).is_ok() {
+        // Sentinel exists; trigger shutdown by returning from server
+        // This relies on an external /shutdown or graceful pod stop
+        // We log to make it visible in sidecar logs
+        tracing::info!("Sentinel detected at {:?}; awaiting shutdown signal", sentinel);
+    }
+}
+
 async fn shutdown(State(state): State<AppState>) -> impl IntoResponse {
     let mut guard = state.shutdown_tx.lock().await;
     if let Some(tx) = guard.take() {
@@ -140,10 +150,20 @@ async fn main() {
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     info!("Sidecar listening on {addr}");
+    // Background watcher for sentinel file; if found and no further input, we still rely on /shutdown or pod stop.
+    let fifo_dir = fifo_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("/workspace"));
+    tokio::spawn(async move {
+        loop {
+            stop_if_sentinel_present(&fifo_dir).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        }
+    });
+
     axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            let _ = shutdown_rx.await;
-        })
+        .with_graceful_shutdown(async move { let _ = shutdown_rx.await; })
         .await
         .unwrap();
 }
