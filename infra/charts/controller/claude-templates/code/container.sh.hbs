@@ -1087,6 +1087,13 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
         # Close FIFO writer if it was opened (in fallback) now that Claude has exited
         exec 9>&- 2>/dev/null || true
+        
+        # Gracefully stop sidecar to allow Job to complete (all containers must exit)
+        if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+          echo "✓ Requested sidecar shutdown"
+        else
+          echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
+        fi
     else
         echo "❌ ERROR: No prompt.md found from docs service"
         echo "The docs service should always provide task/prompt.md"

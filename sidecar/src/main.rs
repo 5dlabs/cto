@@ -10,13 +10,14 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 use tracing::{error, info, warn};
 
 #[derive(Clone)]
 struct AppState {
     fifo_path: PathBuf,                    // Path to the FIFO
     write_lock: Arc<Mutex<()>>,            // Serialize writes to avoid interleaving
+    shutdown_tx: Arc<Mutex<Option<oneshot::Sender<()>>>>, // Signal for graceful shutdown
 }
 
 #[derive(Deserialize)]
@@ -89,6 +90,16 @@ async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 
+async fn shutdown(State(state): State<AppState>) -> impl IntoResponse {
+    let mut guard = state.shutdown_tx.lock().await;
+    if let Some(tx) = guard.take() {
+        let _ = tx.send(());
+        (StatusCode::OK, "Shutting down")
+    } else {
+        (StatusCode::OK, "Already shutting down")
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -112,15 +123,29 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let state = AppState { fifo_path: fifo_path.clone(), write_lock: Arc::new(Mutex::new(())) };
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+    let state = AppState {
+        fifo_path: fifo_path.clone(),
+        write_lock: Arc::new(Mutex::new(())),
+        shutdown_tx: Arc::new(Mutex::new(Some(shutdown_tx))),
+    };
 
-    let app = Router::new().route("/input", post(handle_input)).route("/health", get(health_check)).with_state(state);
+    let app = Router::new()
+        .route("/input", post(handle_input))
+        .route("/health", get(health_check))
+        .route("/shutdown", post(shutdown))
+        .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     info!("Sidecar listening on {addr}");
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            let _ = shutdown_rx.await;
+        })
+        .await
+        .unwrap();
 }
 
 

@@ -470,6 +470,12 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
           wait $CLAUDE_PID
           CLAUDE_EXIT_CODE=$?
           echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
+# Gracefully stop sidecar so pod can terminate cleanly (all containers must exit)
+if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+  echo "✓ Requested sidecar shutdown"
+else
+  echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
+fi
       else
           echo "❌ No prompt.md found"
           exit 1
