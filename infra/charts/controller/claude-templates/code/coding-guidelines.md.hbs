@@ -2,6 +2,22 @@
 
 This document provides coding standards and best practices for Rust development in this project.
 
+## Pre-PR Quality Gates (MANDATORY)
+
+Before opening any pull request or requesting merge:
+
+- Ensure formatting passes:
+  - Run: `cargo fmt --all -- --check`
+- Ensure Clippy passes with pedantic lints and no warnings:
+  - Run: `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+  - If a pedantic lint must be allowed, use the narrowest scope with `#[allow(clippy::lint_name)]` and include a short justification above the code. Avoid crate-wide allows.
+- Ensure tests pass and coverage is very high (strive for ~100% on critical code paths):
+  - Run: `cargo test --workspace --all-features`
+  - Recommended coverage tools:
+    - If available: `cargo llvm-cov --workspace --all-features --fail-under-lines 95`
+    - Alternatively: `cargo tarpaulin --all --fail-under 95`
+- Do not create a PR until all gates above are green locally.
+
 ## Code Quality Standards
 
 ### Error Handling
@@ -233,3 +249,12 @@ impl Drop for Database {
 ```
 
 Remember: These guidelines promote code that is safe, performant, and maintainable. When in doubt, choose clarity over cleverness.
+
+## Documentation-Driven Implementation
+
+When implementing or modifying code covered by these guidelines and when an internal document server is available:
+
+- Always query the document server for the recommended, best-practice approach before significant implementation work.
+- Prefer patterns and examples from the document server to reduce rework and testing iteration.
+- If a divergence from the recommended approach is necessary, document the rationale in the PR description and in code comments above the relevant implementation.
+- Re-check the document server for updates when addressing review feedback or refactoring.

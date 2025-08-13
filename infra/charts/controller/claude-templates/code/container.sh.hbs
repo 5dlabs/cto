@@ -948,6 +948,10 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
 ## ⚠️ EXECUTION REQUIREMENTS
 
 - **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
+- **Pre-PR quality gates (MANDATORY)**: Do NOT open a PR unless all of these pass locally:
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+  - `cargo test --workspace --all-features` and high coverage (aim ≥95%, target ~100% on critical paths)
 - **GitHub workflow**: Read @github-guidelines.md for commit standards and **🚨 MANDATORY: CREATE A PULL REQUEST USING `gh pr create` - THE TASK IS NOT COMPLETE WITHOUT THIS STEP 🚨**
 - **Verify continuously**: Run tests and checks after each significant change
 - **Commit incrementally**: Don'\''t save all changes for the end

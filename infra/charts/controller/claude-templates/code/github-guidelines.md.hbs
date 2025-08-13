@@ -100,7 +100,21 @@ Comment in your PR: "Need help resolving merge conflicts in [file names]" and de
 
 **THE TASK IS NOT COMPLETE UNTIL YOU CREATE A PULL REQUEST. NO EXCEPTIONS.**
 
-When you have completed implementation and met all acceptance criteria:
+When you have completed implementation and met all acceptance criteria, and ONLY after all pre-PR quality gates are green locally:
+
+### ✅ Pre-PR Quality Gates (must pass locally)
+```bash
+# Formatting
+cargo fmt --all -- --check
+
+# Clippy with pedantic and deny warnings
+cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+
+# Tests and coverage (aim for ≥95%, target ~100% on critical paths)
+cargo test --workspace --all-features
+cargo llvm-cov --workspace --all-features --fail-under-lines 95 || \
+  cargo tarpaulin --all --fail-under 95
+```
 
 ### **✅ MANDATORY: Submit a Pull Request Using GitHub CLI:**
 ```bash
