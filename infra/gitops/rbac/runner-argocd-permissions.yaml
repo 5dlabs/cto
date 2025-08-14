@@ -12,6 +12,11 @@ rules:
   resources: ["secrets"]
   verbs: ["get", "list"]
   resourceNames: ["argocd-initial-admin-secret"]
+
+  # Allow runners to manage Helm release secrets in target namespaces
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: [""]
   resources: ["pods", "services", "deployments"]
   verbs: ["get", "list", "watch"]
