@@ -31,6 +31,7 @@ spec:
       - PrunePropagationPolicy=foreground
       - PruneLast=true
       - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
 
   revisionHistoryLimit: 5
 
