@@ -85,8 +85,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
       server: https://kubernetes.default.svc
-    - namespace: ngrok-operator
-      server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
   clusterResourceWhitelist:

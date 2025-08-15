@@ -1,0 +1,46 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: github-demo-sensor
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-any
+      eventSourceName: github
+      eventName: org
+  triggers:
+    - template:
+        name: log-event
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                generateName: github-event-
+                namespace: argo
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: echo
+                    image: busybox:1.36
+                    command: ["/bin/sh", "-c"]
+                    args: ["echo Received GitHub event: $(cat /payload) && sleep 5"]
+                    volumeMounts:
+                      - name: payload
+                        mountPath: /payload
+                        subPath: payload
+                volumes:
+                  - name: payload
+                    configMap:
+                      name: github-event-payload
+          parameters:
+            - src:
+                dependencyName: github-any
+                dataKey: body
+              dest: spec.volumes.0.configMap.data.payload
+
