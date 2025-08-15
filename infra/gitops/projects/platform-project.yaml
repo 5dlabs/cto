@@ -102,6 +102,10 @@ spec:
       kind: MutatingWebhookConfiguration
     - group: 'admissionregistration.k8s.io'
       kind: ValidatingWebhookConfiguration
+    - group: 'networking.k8s.io'
+      kind: IngressClass
+    - group: 'gateway.networking.k8s.io'
+      kind: GatewayClass
     - group: 'agents.platform'
       kind: '*'
     - group: 'actions.github.com'
@@ -125,6 +129,8 @@ spec:
     - group: 'extensions'
       kind: '*'
     - group: 'networking.k8s.io'
+      kind: '*'
+    - group: 'gateway.networking.k8s.io'
       kind: '*'
     - group: 'rbac.authorization.k8s.io'
       kind: '*'
