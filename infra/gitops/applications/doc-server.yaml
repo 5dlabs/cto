@@ -38,5 +38,3 @@ spec:
         factor: 2
         maxDuration: 2m
   revisionHistoryLimit: 5
-
-
