@@ -14,10 +14,8 @@ spec:
         targetPort: 12000
   github:
     main:
-      repositories:
-        - owner: 5dlabs
-          names:
-            - cto
+      organizations:
+        - 5dlabs
       webhook:
         endpoint: /github/webhook
         port: "12000"
