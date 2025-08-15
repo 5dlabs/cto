@@ -1,6 +1,7 @@
 ---
-# Staging App-of-Apps - Deploys staging applications from develop branch
-# This allows testing changes in develop before they reach production (main)
+# App of Apps Pattern for Staging (develop)
+# This root application watches only staging manifests on the develop branch.
+# With an empty staging dir, nothing is deployed until files are added under infra/gitops/applications/staging/.
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -10,48 +11,31 @@ metadata:
   labels:
     app.kubernetes.io/name: app-of-apps-staging
     app.kubernetes.io/part-of: platform
-    environment: staging
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  # Project configuration
   project: platform
 
-  # Source configuration - Deploy any staging applications from develop branch
   source:
     repoURL: https://github.com/5dlabs/cto
-    targetRevision: develop  # Track develop branch for staging deployments
-    path: infra/gitops/applications/staging
-
-    # Directory configuration - Deploy whatever staging apps exist
+    targetRevision: develop
+    path: infra/gitops
     directory:
-      recurse: false  # Only files in staging directory
-      include: "*.yaml"  # Any YAML files
-      exclude: "{README.md,*example*,*template*,*test*}"  # Exclude docs and templates
+      recurse: true
+      include: "applications/staging/*.yaml"
+      exclude: "*.md"
 
-  # Destination configuration
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
 
-  # Sync policy
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
-
+      allowEmpty: true
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
-
-    retry:
-      limit: 3
-      backoff:
-        duration: 10s
-        factor: 2
-        maxDuration: 1m
-
-  # Revision history
-  revisionHistoryLimit: 10
+  revisionHistoryLimit: 5

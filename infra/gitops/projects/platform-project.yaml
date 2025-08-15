@@ -32,6 +32,8 @@ spec:
     - 'https://actions-runner-controller.github.io/actions-runner-controller'
     - 'https://twingate.github.io/helm-charts'
     - 'https://github.com/actions/actions-runner-controller'
+    - 'https://charts.ngrok.com'
+    - 'https://github.com/kubernetes-sigs/gateway-api'
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
@@ -58,6 +60,8 @@ spec:
     - namespace: secret-store
       server: https://kubernetes.default.svc
     - namespace: external-secrets
+      server: https://kubernetes.default.svc
+    - namespace: ngrok-operator
       server: https://kubernetes.default.svc
     - namespace: kube-system
       server: https://kubernetes.default.svc

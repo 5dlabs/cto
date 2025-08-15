@@ -55,3 +55,21 @@ kubectl get externalsecret -n arc-runners
 kubectl get secret github-pat -n arc-system
 kubectl get secret github-pat -n arc-runners
 ```
+
+## ngrok Operator Credentials
+
+Source secret lives in the `secret-store` namespace as a key/value bag named `ngrok-credentials`.
+
+Populate it locally from your `.env` file (do not commit the file):
+
+```bash
+# create/update source secret in secret-store (no commit required)
+kubectl -n secret-store create secret generic ngrok-credentials \
+  --from-env-file=./ngrok.env \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# verify
+kubectl -n secret-store get secret ngrok-credentials -o yaml | grep -E 'NGROK_API_KEY|NGROK_AUTH_TOKEN'
+```
+
+The external secret at `infra/secret-store/ngrok-operator-external-secrets.yaml` projects these keys into the `ngrok-operator` namespace as `API_KEY` and `AUTHTOKEN`, matching the Helm chart expectations.

@@ -42,4 +42,3 @@ subjects:
     name: argocd-application-controller
     namespace: argocd
 
-
