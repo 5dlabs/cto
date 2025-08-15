@@ -82,3 +82,5 @@ agent_*.md
 # Task files
 # tasks.json
 # tasks/ 
+# Local temp working dir for ephemeral clones
+.tmp/

@@ -17,8 +17,14 @@ spec:
     targetRevision: main
     path: agent-docs
     helm:
-      valueFiles:
-        - values.yaml
+      values: |
+        env:
+          # Keep chart defaults for non-secret settings
+          RUST_LOG: "info,doc_server=debug"
+          PORT: "3001"
+          MCP_HOST: "0.0.0.0"
+        secret:
+          existingSecret: doc-server-secrets
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
@@ -31,6 +37,7 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - ServerSideApply=true
     retry:
       limit: 3
       backoff:
