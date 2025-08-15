@@ -34,4 +34,17 @@ spec:
 
   revisionHistoryLimit: 5
 
+  ignoreDifferences:
+    # Secret data is managed externally (External Secrets projects it)
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+    # ExternalSecret status is controller-managed; refreshInterval may be defaulted
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jsonPointers:
+        - /status
+        - /spec/refreshInterval
+
 
