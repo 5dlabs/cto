@@ -1,3 +1,131 @@
-# Minimal PRD Stub
+# Multi-Agent, Event-Driven Orchestration (Argo-Only) — Product Requirements Document
 
-This stub replaces the large PRD for test runs.
+## 1. Summary
+Build an Argo-centric, event-driven, multi-agent orchestration that can “press play” on a backlog and autonomously progress tasks to Done (merged). We explicitly remove the CodeRun/DocsRun CRD layer and instead run agent containers directly via Argo Workflows (DAGs) triggered by Argo Events from GitHub.
+
+Decision: Do not use custom CRDs for job submission. Orchestration and execution will be expressed entirely in Argo constructs plus GitHub Actions/Argo CD for CI/CD. Agents are realized as profiles with dedicated system prompts and shared runtime.
+
+## 2. Goals
+- Orchestrate tasks across specialized agents (authoring → clippy/lint → testing → deploy → acceptance) until merged.
+- React to GitHub events to resume or branch workflows (PR comments, issues, CI failures, merges, pushes).
+- Batch and parallelize independent tasks safely with rate limits.
+- Keep prompts configurable per agent profile without code changes; rely on agents ConfigMap and Workflow parameters.
+- Provide clear acceptance gating, observability, and auditability.
+
+## 3. Non-goals
+- No new custom resources for orchestration or execution.
+- No dependence on the current CodeRun/DocsRun controllers for new workflows.
+- No immediate auto-merge policies that bypass required reviews.
+
+## 4. Users and scenarios
+- Platform engineer: triggers “press play” to process backlog across repos/services.
+- Reviewer: leaves PR comments → remediation agent applies fixes.
+- CI system: failing checks → failure remediator agent creates fix branch/commits.
+- Product owner: files GitHub issues → triage/implementation agent starts work.
+
+## 5. Functional requirements (FR)
+FR1. Press Play: A single manual trigger starts a project DAG that sequences/batches tasks.
+FR2. Agent chain per task: author → clippy/lint (pedantic, 0 warnings) → tests (add/fix) → deploy (GH Actions/Argo CD) → acceptance.
+FR3. Event reactions: PR comments, issues opened, check_run/workflow_run failures, and merges resume/launch the right subflow.
+FR4. Parallelism: Independent tasks run concurrently with configurable concurrency controls.
+FR5. Prompting: Task prompt comes from `task/prompt.md`; step role is driven by selected agent profile’s system prompt.
+FR6. Artifacts: Each step emits logs/links (PR URL, GH Actions run URL, deployment status) as workflow outputs.
+FR7. Idempotency/resume: Safe re-entry on retries and event-based resumes; no duplicate work.
+FR8. Compliance gates: Enforce fmt/clippy pedantic/zero warnings and tests passing before PR or deploy steps proceed.
+
+## 6. Non-functional requirements (NFR)
+- Reliability: Recoverable from controller/runner restarts; no stuck state.
+- Security: GitHub App auth only; no PATs. Secrets via External Secrets.
+- Observability: OTEL traces and metrics; logs easy to correlate by repo/PR/task.
+- Cost control: Concurrency limits, batching windows.
+
+## 7. Architecture (high level)
+- Argo Events: GitHub EventSource + Sensors map events to Workflow parameters (repo, PR, branch, taskId, agent type).
+- Argo Workflows (primary orchestrator): DAG expresses agent steps. No CR creation; steps are containers using the agent image.
+- Agents ConfigMap: Declarative agent profiles in Helm values render to `controller-agents` ConfigMap with `*_system-prompt.md` files.
+- GitHub Actions + Argo CD: CI builds and deploys; Argo CD syncs from `main`. Preview environments optional per PR.
+- Telemetry: OTEL collector, Grafana/Victoria Dashboards already present in `infra/telemetry`.
+
+Example DAG sketch:
+```yaml
+entrypoint: project-dag
+templates:
+  - name: project-dag
+    dag:
+      tasks:
+        - name: author
+          template: agent-step
+          arguments: { parameters: [{ name: agent, value: rex-author }, ...] }
+
+        - name: clippy
+          dependencies: [author]
+          template: agent-step
+          arguments: { parameters: [{ name: agent, value: rex-clippy }, ...] }
+
+        - name: tests
+          dependencies: [clippy]
+          template: agent-step
+          arguments: { parameters: [{ name: agent, value: rex-tests }, ...] }
+
+        - name: deploy
+          dependencies: [tests]
+          template: agent-step
+          arguments: { parameters: [{ name: agent, value: rex-deploy }, ...] }
+
+        - name: acceptance
+          dependencies: [deploy]
+          template: agent-step
+          arguments: { parameters: [{ name: agent, value: rex-acceptance }, ...] }
+```
+
+The reusable `agent-step` template mounts agents/system prompts and runs the same agent image with different `agent` parameter.
+
+## 8. Prompting strategy
+- System prompts: Per-agent `systemPrompt` in Helm `values.yaml -> agents[*]` rendered into `controller-agents` ConfigMap and mounted.
+- User prompt: `task/prompt.md` from docs service. The step reads it and streams to the agent at start.
+- Optional override: a `prompt_mod` workflow parameter can prepend context for specific runs (no controller change required).
+
+## 9. Event mapping
+- PR comment → remediation subflow on the active branch/PR.
+- check_run/workflow_run failure → CI Failure Remediator agent targeting the failing job.
+- issues:opened → triage (convert to task) then author chain.
+- push/merge → orchestrator resumes next task(s) or closes out workflow.
+
+## 10. Security
+- Use GitHub App secrets (app-id, private-key) from External Secrets.
+- Least-privilege scopes; avoid long-lived tokens.
+
+## 11. Observability
+- Emit span/metric per agent step with correlation labels: repo, prNumber, taskId, agent.
+- Surface links to PRs, Actions runs, and deployments as workflow outputs.
+
+## 12. Migration: remove CRDs
+M1. Stop creating CodeRun/DocsRun from any workflows; introduce `agent-step` template.
+M2. Remove CRD templates from Helm chart (`infra/charts/controller/crds/*`) and CRD-based WorkflowTemplates.
+M3. Remove controller deployment and RBAC once no references remain.
+M4. Update GitOps apps to drop CRDs/controllers; keep agents ConfigMap.
+M5. Cleanup labels/metrics expecting CRD fields; migrate to Workflow labels/params.
+
+## 13. Deliverables
+- Reusable `agent-step` WorkflowTemplate with parameters: repo, branch, workingDirectory, agent, model, taskId, etc.
+- Orchestrator DAG WorkflowTemplate covering author → clippy → tests → deploy → acceptance.
+- Event Sensors for PR comments, CI failures, issues.
+- Helm values for agents (system prompts) and concurrency controls.
+- Documentation in `docs/.taskmaster/docs/architecture.md` and this PRD.
+
+## 14. Acceptance criteria
+- Press Play runs a DAG that completes a sample task end-to-end with zero manual intervention.
+- Clippy pedantic = 0 warnings; `cargo fmt --check` passes; tests pass.
+- PR created and updated by agents; deploy completes; acceptance checks pass.
+- PR comment triggers remediation agent and results in new commits.
+- CI failure triggers failure remediator agent and results in a fix commit or actionable failure report.
+
+## 15. Risks and mitigations
+- Orchestrator complexity: Start with a single-task DAG; add parallelism later.
+- Event storms: Add debounce and per-repo concurrency limits.
+- Secret sprawl: Centralize via External Secrets; minimize env leak in logs.
+
+## 16. Open questions
+- Automatic preview environment per PR vs. reuse staging; cost vs speed.
+- Standard schema for acceptance criteria in `requirements.yaml`.
+- Auto-merge policy after acceptance while respecting required reviews.
