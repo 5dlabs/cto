@@ -7,10 +7,3 @@ resources:
   - sensor.yaml
   - externalsecret.yaml
 
-secretGenerator:
-  - name: github-webhook-secret
-    namespace: argo
-    literals: []
-generatorOptions:
-  disableNameSuffixHash: true
-
