@@ -2,16 +2,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argo-events-staging
+  name: argo-events
   namespace: argocd
   labels:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: platform
-    environment: staging
-  annotations:
-    argocd.argoproj.io/sync-wave: "8"
 spec:
-  project: platform-staging
+  project: platform
 
   source:
     repoURL: https://argoproj.github.io/argo-helm
@@ -45,5 +42,3 @@ spec:
       - SkipDryRunOnMissingResource=true
 
   revisionHistoryLimit: 5
-
-

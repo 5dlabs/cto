@@ -9,8 +9,6 @@ metadata:
       - /status
       - /metadata/annotations
       - /metadata/managedFields
-  labels:
-    environment: staging
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
@@ -30,4 +28,3 @@ spec:
           name: github-eventsource-svc
           port: 12000
           weight: 1
-

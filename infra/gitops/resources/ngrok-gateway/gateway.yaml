@@ -3,8 +3,6 @@ kind: Gateway
 metadata:
   name: public-gateway
   namespace: default
-  labels:
-    environment: staging
 spec:
   gatewayClassName: ngrok
   listeners:
