@@ -20,9 +20,6 @@ spec:
         endpoint: /github/webhook
         port: "12000"
         method: POST
-      webhookSecret:
-        name: github-webhook-secret
-        key: secret
       events:
         - "*"
 
