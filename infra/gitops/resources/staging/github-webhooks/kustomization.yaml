@@ -4,4 +4,5 @@ resources:
   - httproute.yaml
   - eventsource.yaml
   - secret.yaml
+  - eventbus.yaml
 
