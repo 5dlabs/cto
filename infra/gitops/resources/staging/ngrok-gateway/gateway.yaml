@@ -15,4 +15,11 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: github
+      protocol: HTTPS
+      port: 443
+      hostname: "github.public.5dlabs.ai"
+      allowedRoutes:
+        namespaces:
+          from: All
 

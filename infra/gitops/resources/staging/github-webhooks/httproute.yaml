@@ -12,7 +12,7 @@ spec:
       name: public-gateway
       namespace: default
   hostnames:
-    - "public.5dlabs.ai"
+    - "github.public.5dlabs.ai"
   rules:
     - matches:
         - path:
