@@ -21,7 +21,7 @@ spec:
         - values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: agent-platform
+    namespace: mcp
   syncPolicy:
     automated:
       prune: true
