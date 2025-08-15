@@ -11,7 +11,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
-  project: platform
+  project: platform-staging
 
   source:
     repoURL: https://charts.ngrok.com

@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/part-of: platform
     environment: staging
 spec:
-  project: platform
+  project: platform-staging
 
   source:
     repoURL: https://github.com/kubernetes-sigs/gateway-api
