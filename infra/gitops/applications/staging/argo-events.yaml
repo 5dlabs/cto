@@ -1,0 +1,49 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-events-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: platform
+    environment: staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: platform-staging
+
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-events
+    targetRevision: 2.4.16
+    helm:
+      values: |
+        serviceAccount:
+          create: true
+          name: argo-events-sa
+        singleNamespace: true
+        controller:
+          replicas: 1
+        gateway:
+          enabled: true
+        sensor:
+          enabled: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+
+  revisionHistoryLimit: 5
+
+
