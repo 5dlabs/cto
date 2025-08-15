@@ -6,5 +6,11 @@ resources:
   - eventbus.yaml
   - sensor.yaml
   - externalsecret.yaml
-  - secret.yaml
+
+secretGenerator:
+  - name: github-webhook-secret
+    namespace: argo
+    literals: []
+generatorOptions:
+  disableNameSuffixHash: true
 
