@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/name: platform-staging-project
     app.kubernetes.io/part-of: platform
     environment: staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
