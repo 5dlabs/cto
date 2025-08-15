@@ -18,11 +18,14 @@ spec:
   sourceRepos:
     - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
+    - 'https://github.com/5dlabs/cto'
 
   destinations:
     - namespace: ngrok-operator
       server: https://kubernetes.default.svc
     - namespace: kube-system
+      server: https://kubernetes.default.svc
+    - namespace: default
       server: https://kubernetes.default.svc
 
   clusterResourceWhitelist:
