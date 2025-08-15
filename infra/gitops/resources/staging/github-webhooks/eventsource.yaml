@@ -6,6 +6,7 @@ metadata:
   labels:
     environment: staging
 spec:
+  eventBusName: default
   service:
     ports:
       - name: github
