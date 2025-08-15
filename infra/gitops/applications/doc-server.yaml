@@ -18,6 +18,8 @@ spec:
     path: agent-docs
     helm:
       values: |
+        serviceAccount:
+          create: false
         env:
           # Keep chart defaults for non-secret settings
           RUST_LOG: "info,doc_server=debug"
