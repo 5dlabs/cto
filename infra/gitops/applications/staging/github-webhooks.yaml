@@ -36,26 +36,24 @@ spec:
   revisionHistoryLimit: 5
 
   ignoreDifferences:
-    # Secret data is managed externally (External Secrets projects it)
     - group: ""
       kind: Secret
       jsonPointers:
         - /data
-    # ExternalSecret status is controller-managed; refreshInterval may be defaulted
+        - /metadata/annotations
+        - /metadata/managedFields
     - group: external-secrets.io
       kind: ExternalSecret
       jsonPointers:
         - /status
         - /spec/refreshInterval
-      managedFieldsManagers:
-        - external-secrets
-        - external-secrets-operator
-    # HTTPRoute status is controller-managed
+        - /metadata/annotations
+        - /metadata/managedFields
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       jsonPointers:
         - /status
-      managedFieldsManagers:
-        - ngrok-operator
+        - /metadata/annotations
+        - /metadata/managedFields
 
 
