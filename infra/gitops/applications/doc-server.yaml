@@ -35,6 +35,9 @@ spec:
           existingSecret: doc-server-secrets
         migrations:
           serviceAccountName: default
+          # Ensure chart uses correct binary path and migrate-only args
+          command: ["/app/http_server"]
+          args: ["--migrate-only"]
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
