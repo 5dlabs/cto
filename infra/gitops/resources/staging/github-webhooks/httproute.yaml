@@ -20,6 +20,6 @@ spec:
             value: /github/webhook
       backendRefs:
         - kind: Service
-          name: github-eventsource
+          name: github-eventsource-svc
           port: 12000
 
