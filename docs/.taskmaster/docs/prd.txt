@@ -1,9 +1,9 @@
-# Multi-Agent, Event-Driven Orchestration (Argo-Only) — Product Requirements Document
+# Multi-Agent, Event-Driven Orchestration — Product Requirements Document
 
 ## 1. Summary
-Build an Argo-centric, event-driven, multi-agent orchestration that can “press play” on a backlog and autonomously progress tasks to Done (merged). We explicitly remove the CodeRun/DocsRun CRD layer and instead run agent containers directly via Argo Workflows (DAGs) triggered by Argo Events from GitHub.
+Build an Argo-centric, event-driven, multi-agent orchestration that can "press play" on a backlog and autonomously progress tasks to Done (merged). We continue using the existing CodeRun/DocsRun CRDs for job execution while orchestrating them via Argo Workflows (DAGs) triggered by Argo Events from GitHub.
 
-Decision: Do not use custom CRDs for job submission. Orchestration and execution will be expressed entirely in Argo constructs plus GitHub Actions/Argo CD for CI/CD. Agents are realized as profiles with dedicated system prompts and shared runtime.
+Decision: Do not introduce NEW orchestration CRDs (like TaskSequence). Continue using existing CodeRun/DocsRun CRDs as the execution primitives. Orchestration logic lives entirely in Argo Workflows + Events. Agents are realized as profiles with dedicated system prompts and shared runtime.
 
 ## 2. Goals
 - Orchestrate tasks across specialized agents (authoring → clippy/lint → testing → deploy → acceptance) until merged.
@@ -13,8 +13,8 @@ Decision: Do not use custom CRDs for job submission. Orchestration and execution
 - Provide clear acceptance gating, observability, and auditability.
 
 ## 3. Non-goals
-- No new custom resources for orchestration or execution.
-- No dependence on the current CodeRun/DocsRun controllers for new workflows.
+- No new custom resources for orchestration (e.g., no TaskSequence CRD).
+- No changes to existing CodeRun/DocsRun CRDs or their controllers.
 - No immediate auto-merge policies that bypass required reviews.
 
 ## 4. Users and scenarios
@@ -41,7 +41,8 @@ FR8. Compliance gates: Enforce fmt/clippy pedantic/zero warnings and tests passi
 
 ## 7. Architecture (high level)
 - Argo Events: GitHub EventSource + Sensors map events to Workflow parameters (repo, PR, branch, taskId, agent type).
-- Argo Workflows (primary orchestrator): DAG expresses agent steps. No CR creation; steps are containers using the agent image.
+- Argo Workflows (primary orchestrator): DAG expresses agent steps. Each step creates CodeRun CRs which the existing controller executes.
+- CodeRun/DocsRun CRDs: Existing execution primitives remain unchanged; controller handles job lifecycle.
 - Agents ConfigMap: Declarative agent profiles in Helm values render to `controller-agents` ConfigMap with `*_system-prompt.md` files.
 - GitHub Actions + Argo CD: CI builds and deploys; Argo CD syncs from `main`. Preview environments optional per PR.
 - Telemetry: OTEL collector, Grafana/Victoria Dashboards already present in `infra/telemetry`.
@@ -54,31 +55,31 @@ templates:
     dag:
       tasks:
         - name: author
-          template: agent-step
-          arguments: { parameters: [{ name: agent, value: rex-author }, ...] }
+          templateRef: { name: coderun-template, template: coderun-main }
+          arguments: { parameters: [{ name: github-app, value: rex-author }, ...] }
 
         - name: clippy
           dependencies: [author]
-          template: agent-step
-          arguments: { parameters: [{ name: agent, value: rex-clippy }, ...] }
+          templateRef: { name: coderun-template, template: coderun-main }
+          arguments: { parameters: [{ name: github-app, value: rex-clippy }, ...] }
 
         - name: tests
           dependencies: [clippy]
-          template: agent-step
-          arguments: { parameters: [{ name: agent, value: rex-tests }, ...] }
+          templateRef: { name: coderun-template, template: coderun-main }
+          arguments: { parameters: [{ name: github-app, value: rex-tests }, ...] }
 
         - name: deploy
           dependencies: [tests]
-          template: agent-step
-          arguments: { parameters: [{ name: agent, value: rex-deploy }, ...] }
+          templateRef: { name: coderun-template, template: coderun-main }
+          arguments: { parameters: [{ name: github-app, value: rex-deploy }, ...] }
 
         - name: acceptance
           dependencies: [deploy]
-          template: agent-step
-          arguments: { parameters: [{ name: agent, value: rex-acceptance }, ...] }
+          templateRef: { name: coderun-template, template: coderun-main }
+          arguments: { parameters: [{ name: github-app, value: rex-acceptance }, ...] }
 ```
 
-The reusable `agent-step` template mounts agents/system prompts and runs the same agent image with different `agent` parameter.
+The existing `coderun-template` creates CodeRun CRs; different `github-app` values select different agent profiles/system prompts.
 
 ## 8. Prompting strategy
 - System prompts: Per-agent `systemPrompt` in Helm `values.yaml -> agents[*]` rendered into `controller-agents` ConfigMap and mounted.
@@ -99,18 +100,18 @@ The reusable `agent-step` template mounts agents/system prompts and runs the sam
 - Emit span/metric per agent step with correlation labels: repo, prNumber, taskId, agent.
 - Surface links to PRs, Actions runs, and deployments as workflow outputs.
 
-## 12. Migration: remove CRDs
-M1. Stop creating CodeRun/DocsRun from any workflows; introduce `agent-step` template.
-M2. Remove CRD templates from Helm chart (`infra/charts/controller/crds/*`) and CRD-based WorkflowTemplates.
-M3. Remove controller deployment and RBAC once no references remain.
-M4. Update GitOps apps to drop CRDs/controllers; keep agents ConfigMap.
-M5. Cleanup labels/metrics expecting CRD fields; migrate to Workflow labels/params.
+## 12. Implementation steps
+I1. Define agent profiles (author, clippy, tests, deploy, acceptance) in Helm values with appropriate system prompts.
+I2. Create orchestrator DAG WorkflowTemplate that chains CodeRun creations with different github-app parameters.
+I3. Configure Argo Events sensors to map GitHub events to orchestrator Workflow submissions.
+I4. Add semaphore-based concurrency controls to prevent resource exhaustion.
+I5. Update telemetry to track orchestration metrics alongside existing CodeRun metrics.
 
 ## 13. Deliverables
-- Reusable `agent-step` WorkflowTemplate with parameters: repo, branch, workingDirectory, agent, model, taskId, etc.
-- Orchestrator DAG WorkflowTemplate covering author → clippy → tests → deploy → acceptance.
+- Orchestrator DAG WorkflowTemplate that chains CodeRun CRs with different agent profiles.
+- Agent profiles in Helm values with specialized system prompts for each role.
 - Event Sensors for PR comments, CI failures, issues.
-- Helm values for agents (system prompts) and concurrency controls.
+- Semaphore configurations for concurrency controls.
 - Documentation in `docs/.taskmaster/docs/architecture.md` and this PRD.
 
 ## 14. Acceptance criteria
