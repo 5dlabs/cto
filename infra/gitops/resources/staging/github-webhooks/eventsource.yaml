@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github
+  namespace: argo
+  labels:
+    environment: staging
+spec:
+  # Expose a service for receiving GitHub webhooks
+  service:
+    ports:
+      - name: github
+        port: 12000
+        targetPort: 12000
+  github:
+    receiver:
+      # We'll manually configure the GitHub webhook to point at
+      # https://public.5dlabs.ai/github/webhook
+      events:
+        - "*"
+      webhook:
+        endpoint: /github/webhook
+        port: "12000"
+        method: "POST"
+      # HMAC secret used to verify X-Hub-Signature-256
+      secret:
+        name: github-webhook-secret
+        key: secret
+
