@@ -6,4 +6,5 @@ resources:
   - secret.yaml
   - eventbus.yaml
   - sensor.yaml
+  - externalsecret.yaml
 
