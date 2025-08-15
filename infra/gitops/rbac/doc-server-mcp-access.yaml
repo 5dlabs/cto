@@ -1,0 +1,45 @@
+---
+# RBAC to allow Argo CD application controller to deploy doc-server into mcp namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: doc-server-deployer
+  namespace: mcp
+rules:
+  # Core namespace-scoped resources
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Workload resources
+  - apiGroups: ["apps", "extensions"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Jobs/CronJobs
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Ingress/network policies
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Allow managing roles/bindings within the namespace if chart defines them
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: doc-server-deployer-binding
+  namespace: mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: doc-server-deployer
+subjects:
+  - kind: ServiceAccount
+    name: argocd-application-controller
+    namespace: argocd
+
+
