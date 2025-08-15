@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/name: gateway-api-crds
     app.kubernetes.io/part-of: platform
     environment: staging
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: platform-staging
 
@@ -21,6 +23,9 @@ spec:
     namespace: kube-system
 
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - ServerSideApply=true
       - PrunePropagationPolicy=foreground
