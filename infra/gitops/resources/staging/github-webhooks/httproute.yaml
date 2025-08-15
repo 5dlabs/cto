@@ -1,0 +1,25 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: github-webhooks
+  namespace: argo
+  labels:
+    environment: staging
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: public-gateway
+      namespace: default
+  hostnames:
+    - "public.5dlabs.ai"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /github/webhook
+      backendRefs:
+        - kind: Service
+          name: github-eventsource
+          port: 12000
+
