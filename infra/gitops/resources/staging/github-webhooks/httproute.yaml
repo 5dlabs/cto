@@ -3,6 +3,12 @@ kind: HTTPRoute
 metadata:
   name: github-webhooks
   namespace: argo
+  annotations:
+    argocd.argoproj.io/ignore-differences: |
+      jsonPointers:
+      - /status
+      - /metadata/annotations
+      - /metadata/managedFields
   labels:
     environment: staging
 spec:
@@ -19,7 +25,9 @@ spec:
             type: PathPrefix
             value: /github/webhook
       backendRefs:
-        - kind: Service
+        - group: ""
+          kind: Service
           name: github-eventsource-svc
           port: 12000
+          weight: 1
 
