@@ -33,11 +33,15 @@ spec:
     - 'https://twingate.github.io/helm-charts'
     - 'https://github.com/actions/actions-runner-controller'
     - 'https://charts.ngrok.com'
+    - 'https://github.com/kubernetes-sigs/gateway-api'
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
     - 'https://github.com/questdb/questdb-operator'
+<<<<<<< HEAD
     - 'https://github.com/kubernetes-sigs/gateway-api'
+=======
+>>>>>>> ea1b702 (staging: add ngrok operator + Gateway API CRDs under app-of-apps-staging; wire secrets via ExternalSecret)
     - 'https://charts.ngrok.com'
 
   # Destinations that applications in this project can deploy to
@@ -85,8 +89,6 @@ spec:
     - namespace: redis-operator-staging
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
-      server: https://kubernetes.default.svc
-    - namespace: ngrok-operator
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
       server: https://kubernetes.default.svc
