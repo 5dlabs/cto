@@ -34,13 +34,17 @@ spec:
     server: https://kubernetes.default.svc
     namespace: argocd
 
-  # Sync policy - Manual sync for safety
+  # Sync policy
   syncPolicy:
-    # No automated sync - manual control for staging deployments
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+
     syncOptions:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
-      - RespectIgnoreDifferences=true
+      - PruneLast=true
 
     retry:
       limit: 3
