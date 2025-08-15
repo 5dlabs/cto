@@ -13,9 +13,9 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://github.com/5dlabs/agent-docs
+    repoURL: https://github.com/5dlabs/charts
     targetRevision: main
-    path: helm/doc-server
+    path: agent-docs
     helm:
       valueFiles:
         - values.yaml
