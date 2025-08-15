@@ -38,15 +38,6 @@ spec:
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
     - 'https://github.com/questdb/questdb-operator'
-<<<<<<< HEAD
-<<<<<<< HEAD
-    - 'https://github.com/kubernetes-sigs/gateway-api'
-=======
->>>>>>> ea1b702 (staging: add ngrok operator + Gateway API CRDs under app-of-apps-staging; wire secrets via ExternalSecret)
-=======
-    - 'https://github.com/kubernetes-sigs/gateway-api'
->>>>>>> dbe601e (staging: Argo project allows ngrok and gateway-api repos; add staging apps for ngrok-operator and Gateway API CRDs)
-    - 'https://charts.ngrok.com'
 
   # Destinations that applications in this project can deploy to
   destinations:
@@ -93,8 +84,6 @@ spec:
     - namespace: redis-operator-staging
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
-      server: https://kubernetes.default.svc
-    - namespace: ngrok-operator
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
       server: https://kubernetes.default.svc
