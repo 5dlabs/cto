@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - httproute.yaml
   - eventsource.yaml
-  - secret.yaml
   - eventbus.yaml
   - sensor.yaml
   - externalsecret.yaml
