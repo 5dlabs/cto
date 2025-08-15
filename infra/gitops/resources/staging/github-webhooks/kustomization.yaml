@@ -5,4 +5,5 @@ resources:
   - eventsource.yaml
   - secret.yaml
   - eventbus.yaml
+  - sensor.yaml
 
