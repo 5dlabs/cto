@@ -46,10 +46,15 @@ spec:
       jsonPointers:
         - /status
         - /spec/refreshInterval
+      managedFieldsManagers:
+        - external-secrets
+        - external-secrets-operator
     # HTTPRoute status is controller-managed
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       jsonPointers:
         - /status
+      managedFieldsManagers:
+        - ngrok-operator
 
 
