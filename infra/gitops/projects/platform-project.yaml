@@ -37,6 +37,7 @@ spec:
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
     - 'https://github.com/questdb/questdb-operator'
+    - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://charts.ngrok.com'
 
   # Destinations that applications in this project can deploy to
@@ -84,6 +85,8 @@ spec:
     - namespace: redis-operator-staging
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
+      server: https://kubernetes.default.svc
+    - namespace: ngrok-operator
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
       server: https://kubernetes.default.svc
