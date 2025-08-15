@@ -20,6 +20,9 @@ spec:
       values: |
         serviceAccount:
           create: false
+          name: default
+        imagePullSecrets:
+          - name: ghcr-secret
         env:
           # Keep chart defaults for non-secret settings
           RUST_LOG: "info,doc_server=debug"
@@ -27,6 +30,8 @@ spec:
           MCP_HOST: "0.0.0.0"
         secret:
           existingSecret: doc-server-secrets
+        migrations:
+          serviceAccountName: default
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
