@@ -1,0 +1,41 @@
+---
+# App of Apps Pattern for Staging (develop)
+# This root application watches only staging manifests on the develop branch.
+# With an empty staging dir, nothing is deployed until files are added under infra/gitops/applications/staging/.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: app-of-apps-staging
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  source:
+    repoURL: https://github.com/5dlabs/cto
+    targetRevision: develop
+    path: infra/gitops
+    directory:
+      recurse: true
+      include: "applications/staging/*.yaml"
+      exclude: "*.md"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+  revisionHistoryLimit: 5
