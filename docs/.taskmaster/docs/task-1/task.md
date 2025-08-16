@@ -8,18 +8,18 @@ Platform alignment:
 - Do NOT re-implement functionality that already exists. Extend existing assets instead.
 - We already install and manage charts with Argo CD. Helm is used for prompts/config only; orchestration is in Argo Workflows/Events with CodeRun/DocsRun CRDs.
 - We already have `agents-configmap.yaml` that renders `agents.yaml` and per-agent `*_system-prompt.md` from `.Values.agents.<key>.systemPrompt`. Do not create a new chart.
-- This task focuses on improving prompts, adding the Clippy GitHub App, and wiring names consistently.
+- This task focuses on improving prompts, adding the Cleo/Tess/Stitch agents, and wiring names consistently.
 - Scope: Rust-only. Multi-language support is out of scope for this phase.
  - Administrative operations (creating apps/resources in GitHub/Kubernetes/Argo CD) must use the `agent-admin-secrets` secret; role-specific agent operations use their own GitHub App secrets via ExternalSecrets.
 
 ## Technical Context
 
-The system uses multiple specialized AI agents, each with distinct personas and responsibilities:
-- **Rex**: Primary implementation agent
-- **Cleo**: Formatting and pedantic warnings agent (Clippy role)
-- **Tess**: Testing-only agent with strict Kubernetes verification requirements (QA role)
-- **Stitch**: CI failure remediation agent (Triage role)
-- **Onyx**: Security vulnerability remediation agent (Security role)
+The system uses multiple specialized AI agents, each with distinct personas and responsibilities. We standardize GitHub App names as "Persona (5DLabs)" to match current org conventions (e.g., "Rex (5DLabs)", "Morgan (5DLabs)"):
+- **Rex**: Primary implementation agent → GitHub App: "Rex (5DLabs)"
+- **Cleo**: Formatting and pedantic warnings agent (Clippy role) → GitHub App: "Cleo (5DLabs)"
+- **Tess**: Testing-only agent with strict Kubernetes verification requirements (QA role) → GitHub App: "Tess (5DLabs)"
+- **Stitch**: CI failure remediation agent (Triage role) → GitHub App: "Stitch (5DLabs)"
+- **Security**: Security vulnerability remediation role → GitHub App: reuse existing "Cipher (5DLabs)" (no new Security app)
 
 Each agent requires:
 1. A unique system prompt defining its persona and constraints
@@ -35,12 +35,12 @@ Do NOT re-implement functionality that already exists. Extend the existing asset
 - This secret is NOT used by role-specific agents; those use their own GitHub App secrets via ExternalSecrets.
 
 ### External Secrets for GitHub Apps (per-agent credentials)
-- Extend existing ExternalSecrets under `infra/secret-store/agent-secrets-external-secrets.yaml` (do not create a new file) to add the four new agents introduced in this task.
-- Existing pattern already covers several apps (e.g., Rex/Blaze/Morgan/Cipher). Add entries for the new ones:
-  - Clippy
-  - QA
-  - Triage
-  - Security
+- Extend existing ExternalSecrets under `infra/secret-store/agent-secrets-external-secrets.yaml` (do not create a new file) to add the three new agents introduced in this task.
+- Existing pattern already covers several apps (Rex/Blaze/Morgan/Cipher). Add entries for the new ones:
+  - Cleo (GitHub App: "Cleo (5DLabs)")
+  - Tess (GitHub App: "Tess (5DLabs)")
+  - Stitch (GitHub App: "Stitch (5DLabs)")
+- For the Security role, reuse the existing GitHub App: "Cipher (5DLabs)" (no new app to create)
 - Follow the established naming and `ClusterSecretStore` reference (our cluster-wide store is `secret-store`). Target Kubernetes `Secret`s should contain at least:
   - `appId`: GitHub App ID
   - `privateKey`: GitHub App private key (PEM)
@@ -60,26 +60,23 @@ If any of these tools are not accessible, STOP and report the issue before proce
 
 **IMPORTANT**: The Argo Workflows CLI (`argo`) is different from Argo CD CLI (`argocd`). Both are available in the container.
 
-## CRITICAL REQUIREMENT: GitHub App Creation
+## PREREQUISITE: GitHub Apps Must Exist
 
-**YOU MUST CREATE ORGANIZATION-LEVEL GITHUB APPS** as part of this task. This is not optional configuration - it's a core deliverable.
+**ASSUMPTION**: GitHub Apps follow the naming convention "Persona (5DLabs)" and are configured at the organization level.
 
-### Required GitHub Apps to Create:
-1. **5DLabs-Clippy** - Code quality and formatting specialist
-2. **5DLabs-QA** - Quality assurance and testing specialist  
-3. **5DLabs-Triage** - CI/CD failure remediation specialist
-4. **5DLabs-Security** - Security vulnerability remediation specialist
+### Required GitHub Apps (Pre-created or to be created manually):
+1. **Cleo (5DLabs)** - Code quality and formatting specialist
+2. **Tess (5DLabs)** - Quality assurance and testing specialist  
+3. **Stitch (5DLabs)** - CI/CD failure remediation specialist
+4. **Cipher (5DLabs)** - Security vulnerability remediation specialist (already exists; reused for Security role)
 
-### GitHub App Creation Requirements:
-- **Organization Level**: Apps must be created in the 5DLabs GitHub organization (not personal account)
-- **Permissions**: Each app needs repository access (Contents: Read/Write, Pull Requests: Read/Write, Issues: Read/Write)
-- **Installation**: Apps must be installed on the organization with appropriate repository access
-- **Credentials**: App ID and private key must be stored in the external secret store
-- **Validation**: Apps must be visible at `https://github.com/organizations/5dlabs/settings/apps`
+### GitHub App Validation Requirements:
+- **Verify Existence**: Apps must be visible at `https://github.com/organizations/5dlabs/settings/apps`
+- **Verify Installation**: Apps must be installed on the organization with repository access
+- **Verify Permissions**: Each app must have proper repository permissions (Contents: Read/Write, Pull Requests: Read/Write, Issues: Read/Write)
+- **Verify Credentials**: App ID and private key must be available in the external secret store
 
-**ACCEPTANCE CRITERIA**: The task is NOT complete until all four GitHub Apps are created, installed, and visible in the GitHub organization settings.
-
-**DO NOT** mark this task as complete or create a PR saying "Next Steps: Create GitHub Apps". The GitHub Apps MUST be created as part of the task execution. Use the `GITHUB_ADMIN_TOKEN` environment variable to create them via GitHub CLI or API calls.
+**TASK SCOPE**: This task focuses on Helm configuration, ExternalSecrets setup, and system integration. GitHub App creation is handled separately as a manual prerequisite.
 
 ## Implementation Guide
 
@@ -89,13 +86,13 @@ If any of these tools are not accessible, STOP and report the issue before proce
 
 **Location**: `infra/charts/controller/values.yaml` (existing)
 
-Use the existing map/object structure under `.Values.agents` (keys are agent identifiers; the `name` field is the friendly display name):
+Use the existing map/object structure under `.Values.agents` (keys are agent identifiers; the `name` field is the friendly display name). The `githubApp` must be the exact GitHub App name using the convention "Persona (5DLabs)":
 
 ```yaml
 agents:
   rex:
     name: "Rex"
-    githubApp: "5DLabs-Rex"
+    githubApp: "Rex (5DLabs)"
     role: "Senior Backend Architect & Systems Engineer"
     systemPrompt: |
       # Rex system prompt (truncated)
@@ -103,7 +100,7 @@ agents:
 
   clippy:
     name: "Cleo"
-    githubApp: "5DLabs-Clippy"
+    githubApp: "Cleo (5DLabs)"
     role: "Formatting & Code Quality Specialist"
     systemPrompt: |
       # Cleo system prompt (truncated)
@@ -111,7 +108,7 @@ agents:
 
   qa:
     name: "Tess"
-    githubApp: "5DLabs-QA"
+    githubApp: "Tess (5DLabs)"
     role: "Quality Assurance & Testing Specialist"
     systemPrompt: |
       # Tess system prompt (truncated)
@@ -119,7 +116,7 @@ agents:
 
   triage:
     name: "Stitch"
-    githubApp: "5DLabs-Triage"
+    githubApp: "Stitch (5DLabs)"
     role: "CI/CD Triage & Remediation Specialist"
     systemPrompt: |
       # Stitch system prompt (truncated)
@@ -127,7 +124,7 @@ agents:
 
   security:
     name: "Onyx"
-    githubApp: "5DLabs-Security"
+    githubApp: "Cipher (5DLabs)"  # Reuse existing app for security role
     role: "Security & Vulnerability Specialist"
     systemPrompt: |
       # Onyx system prompt (truncated)
@@ -225,12 +222,12 @@ description: Brief description of the agent's role and when to use it
 [Agent's detailed system prompt content here]
 ```
 
-The prompts will be rendered as:
-- `5DLabs-Rex_system-prompt.md` (existing)
-- `5DLabs-Clippy_system-prompt.md` (new - Cleo)
-- `5DLabs-QA_system-prompt.md` (new - Tess)
-- `5DLabs-Triage_system-prompt.md` (new - Stitch)
-- `5DLabs-Security_system-prompt.md` (new - Onyx)
+The prompts will be rendered using the GitHub App name for each agent, for example:
+- `Rex (5DLabs)_system-prompt.md`
+- `Cleo (5DLabs)_system-prompt.md`
+- `Tess (5DLabs)_system-prompt.md`
+- `Stitch (5DLabs)_system-prompt.md`
+- `Cipher (5DLabs)_system-prompt.md` (Security)
 
  
 
@@ -273,7 +270,7 @@ kubectl -n agent-platform get cm controller-agents -o yaml | head -n 80
 
 ### Integration Testing
 ```bash
-Use Workflows that mount the `controller-agents` ConfigMap and verify the path `/etc/agents/${GITHUB_APP}_system-prompt.md` resolves.
+Use Workflows that mount the `controller-agents` ConfigMap and verify the path `/etc/agents/${GITHUB_APP}_system-prompt.md` resolves. `${GITHUB_APP}` must equal the exact GitHub App name (e.g., `Rex (5DLabs)`).
 ```
 
 ### Validation Checks
