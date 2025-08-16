@@ -747,8 +747,13 @@ impl<'a> CodeResourceManager<'a> {
                         "volumes": volumes
         });
 
-        // Set serviceAccountName only if provided on the CRD (backward compatible)
-        if let Some(sa_name) = &code_run.spec.service_account_name {
+        // Set serviceAccountName only if provided and non-empty on the CRD (backward compatible)
+        if let Some(sa_name) = code_run
+            .spec
+            .service_account_name
+            .as_ref()
+            .filter(|s| !s.trim().is_empty())
+        {
             pod_spec["serviceAccountName"] = json!(sa_name.clone());
         }
 

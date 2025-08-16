@@ -98,7 +98,10 @@ spec:
             continueSession: {{`{{workflow.parameters.continue-session}}`}}
             overwriteMemory: {{`{{workflow.parameters.overwrite-memory}}`}}
             docsBranch: "{{`{{workflow.parameters.docs-branch}}`}}"
-            {{- if .Values.rbac.submitter.clusterAdminServiceAccount.create }}
+            {{- /* Allow explicit override; else use cluster admin SA if created; else omit */ -}}
+            {{- if .Values.agent.serviceAccountName }}
+            serviceAccountName: "{{ .Values.agent.serviceAccountName }}"
+            {{- else if .Values.rbac.submitter.clusterAdminServiceAccount.create }}
             serviceAccountName: "{{ .Values.rbac.submitter.clusterAdminServiceAccount.name }}"
             {{- end }}
             contextVersion: 1
