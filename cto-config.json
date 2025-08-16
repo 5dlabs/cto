@@ -5,7 +5,7 @@
       "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
-      "sourceBranch": "feature/docs-job-run"
+      "sourceBranch": "main"
     },
     "intake": {
       "model": "claude-opus-4-20250514",
@@ -17,10 +17,10 @@
       "continueSession": false,
       "workingDirectory": ".",
       "overwriteMemory": false,
-      "repository": "5dlabs/agent-docs",
-      "docsRepository": "5dlabs/projects",
+      "repository": "5dlabs/cto",
+      "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
-      "service": "agent-docs"
+      "service": "cto"
     }
   },
   "agents": {
