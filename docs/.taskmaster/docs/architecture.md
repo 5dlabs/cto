@@ -18,7 +18,7 @@ This document describes the technical architecture for a multi-agent, event-driv
     - **Morgan**: PM agent with awareness of all other agents
     - **Rex**: Primary implementation agent
     - **Clippy Agent**: Formatting (`cargo fmt`) and pedantic warnings
-    - **QA Agent**: Tests only (cannot modify implementation, leaves comments)
+    - **QA Agent**: Tests only (cannot modify implementation, leaves comments); MUST observe feature working in Kubernetes with proof (logs, request/response); can approve PRs (but not merge)
     - **Triage Agent**: CI failure remediation
     - **Security Agent**: Reads vulnerability reports and fixes issues
     - **PR Comment Agent**: Addresses review comments
@@ -44,7 +44,7 @@ This document describes the technical architecture for a multi-agent, event-driv
    - Workflow creates CodeRun CR with appropriate `github-app` parameter (selects agent persona)
    - Controller reconciles CR, creates Job with mounted system prompt from agents ConfigMap
    - Job container reads `task/prompt.md` and executes with selected agent profile
-   - QA Agent can only add tests; if implementation changes needed, leaves comments
+   - QA Agent can only add tests; MUST verify in Kubernetes environment with proof (logs/responses); can approve PR if criteria met
 4) CodeRun status updates (phase, pullRequestUrl) are monitored by Workflow for progression.
 5) On success, the DAG advances to next CodeRun; on failure, retry with backoff or surface actionable error.
 
@@ -72,7 +72,7 @@ This document describes the technical architecture for a multi-agent, event-driv
 - Orchestrator DAG patterns:
   - Linear chain of CodeRun creations for single task
   - Fan-out/fan-in for independent tasks using Argo DAG dependencies
-  - Parallel execution using git worktrees or separate directories on same PVC
+  - Parallel execution: Each agent gets a git worktree as working directory (or separate PVC for complete isolation)
   - Semaphore-based rate limiting (per repo/org/global)
   - Dependency analysis from TaskMaster to determine parallelizable work
 
@@ -101,16 +101,13 @@ This document describes the technical architecture for a multi-agent, event-driv
 6. **PR flow first**: Implement Clippy → QA flow for pull requests.
 7. **Orchestrator DAG**: Create WorkflowTemplate chaining `coderun-template` with different agents.
 8. **Event sensors**: Configure for PR, issue, comment, and CI failure events.
-9. **Parallel execution**: Implement worktree/directory isolation.
+9. **Parallel execution**: Git worktrees as working directories (or separate PVCs for isolation).
 10. **Security remediation**: Integrate vulnerability report reading and fixing.
 
 ## Open items
-- Best approach for git worktrees with agent containers?
-- How to handle QA agent comments when implementation changes needed?
-- Optimal PR comment retrieval method (MCP vs GitHub API)?
-- Security report formats and integration points?
-- Morgan (PM agent) coordination patterns with other agents?
-- Auto-merge policies after all agents approve?
-- Preview env strategy (namespaced app vs. shared staging)?
-- Standardize acceptance criteria schema in `requirements.yaml`?
-- Guardrails for event storm control and resume semantics?
+- Git worktree implementation: worktree root as working directory vs separate PVCs
+- Comment retrieval: Extract from webhook payload vs GitHub MCP tool (document in prompt)
+- Security reports: Use GitHub CLI with CodeQL (`gh api` commands)
+- Morgan PM agent: Out of scope for current sprint
+- Preview environments: Use existing namespaces to avoid secret duplication
+- Event storm guardrails: Address if/when it becomes a problem

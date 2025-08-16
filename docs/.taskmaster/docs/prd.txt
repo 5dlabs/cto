@@ -23,19 +23,19 @@ Decision: Do not introduce NEW orchestration CRDs (like TaskSequence). Continue 
 - CI system: failing checks → Triage agent attempts fixes.
 - Product owner: files GitHub issues → Issue agent converts to implementation.
 - Security team: vulnerability reports generated → Security agent remediates issues.
-- QA: PR opened → Clippy formats/fixes warnings → QA agent adds tests (cannot modify implementation).
+- QA: PR opened → Clippy formats/fixes warnings → QA agent adds tests, MUST verify in K8s with proof (logs/responses), can approve PRs.
 
 ## 5. Functional requirements (FR)
 FR1. Press Play: A single manual trigger starts a project DAG that sequences/batches tasks.
 FR2. PR flow: Clippy (format + pedantic fixes) → QA (test-only, leaves comments if implementation needs changes).
 FR3. Task/Issue flow: Rex (implement) → Clippy → QA → deploy → acceptance.
 FR4. Event reactions: PR comments trigger Rex with downloaded comments; CI failures trigger Triage agent; security scans trigger Security agent.
-FR5. Parallelism: Independent tasks run concurrently using git worktrees on same PVC.
+FR5. Parallelism: Independent tasks run concurrently using git worktrees as working directories (or separate PVCs).
 FR6. Prompting: Task prompt from `task/prompt.md`; agent persona from system prompt based on `github-app` parameter.
 FR7. Simplified API: Auto-detect parameters to reduce to 1-2 required arguments.
 FR8. Project-wide MCP tools: Tool configuration at project level in requirements (not per-task).
 FR9. Comment retrieval: Easy MCP tool/API for PR comment downloading.
-FR10. Compliance gates: Enforce fmt/clippy pedantic/zero warnings and tests passing.
+FR10. Compliance gates: Enforce fmt/clippy pedantic/zero warnings; QA must verify in K8s with proof before approval.
 
 ## 6. Non-functional requirements (NFR)
 - Reliability: Recoverable from controller/runner restarts; no stuck state.
@@ -92,7 +92,7 @@ Agent personas:
 - **Morgan**: PM orchestrator with awareness of all agents
 - **Rex**: Primary implementation
 - **Clippy**: Formatting + pedantic warnings
-- **QA**: Tests only (cannot modify implementation)
+- **QA**: Tests only, strict verification in K8s environment with proof, can approve PRs
 - **Triage**: CI failure remediation
 - **Security**: Vulnerability remediation
 
@@ -128,7 +128,7 @@ I5. **Comment retrieval**: Implement MCP tool/API for efficient PR comment downl
 I6. **PR flow**: Implement Clippy → QA validation flow for pull requests.
 I7. **Orchestrator DAG**: Create WorkflowTemplate chaining CodeRun CRs with agent personas.
 I8. **Event sensors**: Configure for PR, issue, comment, CI failure, security events.
-I9. **Parallel execution**: Implement git worktrees on shared PVC.
+I9. **Parallel execution**: Git worktrees as working directories (or separate PVCs).
 I10. **Telemetry**: Track orchestration metrics alongside CodeRun metrics.
 
 ## 13. Deliverables
@@ -137,18 +137,19 @@ I10. **Telemetry**: Track orchestration metrics alongside CodeRun metrics.
 - Specialized system prompts for each agent persona in Helm values.
 - Event Sensors for PRs, issues, comments, CI failures, security scans.
 - MCP tool/API for PR comment retrieval.
-- Git worktree support for parallel execution on shared PVC.
+- Git worktree support (worktree root as working directory) or separate PVCs for isolation.
 - Simplified CodeRun API with auto-detection (1-2 required args).
 - Project-wide MCP tool configuration in requirements.yaml.
 - Documentation in `docs/.taskmaster/docs/architecture.md` and this PRD.
 
 ## 14. Acceptance criteria
-- PR flow: Clippy formats and fixes warnings, QA adds tests (leaves comments if implementation changes needed).
+- PR flow: Clippy formats and fixes warnings, QA adds tests and MUST verify in Kubernetes with proof (logs/responses).
+- QA agent can approve PRs (but not merge) after strict verification.
 - Task flow: Rex implements, Clippy cleans, QA tests, deploys, validates acceptance.
 - PR comment triggers Rex with downloaded comments and results in fixes.
 - CI failure triggers Triage agent and results in fix commits.
 - Security scan triggers Security agent to remediate vulnerabilities.
-- Parallel tasks execute using git worktrees without conflicts.
+- Parallel tasks execute using git worktrees as working directories (or separate PVCs).
 - API simplified to 1-2 required arguments with high success rate.
 - All agents have distinct personas and specialized prompts.
 
@@ -158,10 +159,12 @@ I10. **Telemetry**: Track orchestration metrics alongside CodeRun metrics.
 - Secret sprawl: Centralize via External Secrets; minimize env leak in logs.
 
 ## 16. Open questions
-- Best approach for git worktrees with agent containers?
-- How to handle QA agent comments when implementation changes needed?
-- Optimal PR comment retrieval method (MCP vs GitHub API)?
-- Security report formats and integration points?
-- Morgan (PM agent) coordination patterns with other agents?
-- Auto-merge policies after all agents approve?
-- Preview environment strategy (per-PR vs. shared staging)?
+- Git worktree: Use worktree root as working directory vs separate PVCs for complete isolation?
+- Comment retrieval: Extract from webhook payload vs GitHub MCP tool (document in prompt)?
+- Security reports: Use GitHub CLI with CodeQL (`gh api` commands)?
+
+## 17. Decisions made
+- No auto-merge: QA agent can approve but not merge
+- Morgan PM: Out of scope for current sprint
+- Preview environments: Use existing namespaces (avoid secret duplication)
+- Event storm guardrails: Address if/when it becomes a problem
