@@ -54,6 +54,10 @@ pub struct AgentConfig {
     /// Optional sidecar configuration
     #[serde(default, rename = "inputBridge")]
     pub input_bridge: InputBridgeConfig,
+
+    /// Optional default ServiceAccount name to use for CodeRun jobs
+    #[serde(default, rename = "serviceAccountName")]
+    pub service_account_name: Option<String>,
 }
 
 /// Image configuration

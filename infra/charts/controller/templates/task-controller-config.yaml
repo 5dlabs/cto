@@ -19,6 +19,11 @@ data:
       image:
         repository: {{ .Values.agent.image.repository | quote }}
         tag: {{ .Values.agent.image.tag | quote }}
+      {{- if .Values.agent.serviceAccountName }}
+      serviceAccountName: {{ .Values.agent.serviceAccountName | quote }}
+      {{- else if .Values.rbac.submitter.clusterAdminServiceAccount.create }}
+      serviceAccountName: {{ .Values.rbac.submitter.clusterAdminServiceAccount.name | quote }}
+      {{- end }}
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - {{ .name | quote }}
