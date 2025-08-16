@@ -276,48 +276,33 @@ if ! command -v npm &> /dev/null; then
     fi
 fi
 
-# Install TaskMaster globally (pin to version with GPT-5 support)
-echo "📦 Installing TaskMaster (pinned version)..."
+# TaskMaster is pre-installed in the agent image
+echo "📦 TaskMaster is pre-installed in the agent image"
 echo "📋 Node version: $(node --version)"
 echo "📋 NPM version: $(npm --version)"
 
-# Use user-specific npm global directory to avoid permission issues
-export NPM_CONFIG_PREFIX="/home/node/.npm-global"
-export PATH="/home/node/.npm-global/bin:$PATH"
-NPM_BIN="/home/node/.npm-global/bin"
-
-# Create the directory if it doesn't exist
-mkdir -p "$NPM_CONFIG_PREFIX"
-
-TASKMASTER_VERSION="0.24.0"
-npm install -g "task-master-ai@${TASKMASTER_VERSION}" || {
-    echo "❌ TaskMaster ${TASKMASTER_VERSION} installation failed"
-    echo "🔍 Trying with --force flag..."
-    npm install -g "task-master-ai@${TASKMASTER_VERSION}" --force || exit 1
-}
-
-# Verify installation location
-echo "🔍 NPM global bin directory: $NPM_BIN"
-echo "🔍 Current PATH: $PATH"
-
-# Add npm global bin to PATH if not already there
-if [[ ":$PATH:" != *":$NPM_BIN:"* ]]; then
-    export PATH="$NPM_BIN:$PATH"
-    echo "🔍 Added $NPM_BIN to PATH"
-fi
-
-# Verify installation
+# Verify TaskMaster is available
 if ! command -v task-master &> /dev/null; then
-    echo "❌ task-master command not found after installation"
+    echo "❌ task-master command not found in agent image"
     echo "🔍 PATH: $PATH"
-    echo "🔍 Looking for task-master in npm bin:"
-    ls -la "$NPM_BIN" | grep -i task || echo "Not found in $NPM_BIN"
-    exit 1
+    echo "🔍 Looking for task-master in common locations:"
+    for path in /usr/local/bin /usr/bin /home/node/.npm-global/bin; do
+        if [ -f "$path/task-master" ]; then
+            echo "✅ Found task-master at: $path/task-master"
+            export PATH="$path:$PATH"
+            break
+        fi
+    done
+    
+    if ! command -v task-master &> /dev/null; then
+        echo "❌ task-master not found after checking common locations"
+        exit 1
+    fi
 fi
 
 # Get the actual path to task-master
 TASK_MASTER_PATH=$(which task-master)
-echo "✅ TaskMaster installed at: $TASK_MASTER_PATH"
+echo "✅ TaskMaster found at: $TASK_MASTER_PATH"
 echo "✅ TaskMaster version: $(task-master --version 2>/dev/null || echo 'version check failed')"
 
 # Change to project directory
@@ -434,15 +419,31 @@ fi
 # Configure models with fallback
 echo "🤖 Configuring AI models..."
 
+# Test if OpenAI API key is valid by making a simple API call
+OPENAI_VALID=false
 if [ -n "$OPENAI_API_KEY" ]; then
-  # Use GPT-5 as primary when OpenAI key is available; keep Opus (or configured model) as research; fallback to GPT-5
-  echo "✅ OPENAI_API_KEY detected; setting main=gpt-5, research=$MODEL, fallback=gpt-5"
+  echo "🔍 Testing OpenAI API key validity..."
+  # Test the API key with a simple models call
+  if curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
+          -H "Content-Type: application/json" \
+          "https://api.openai.com/v1/models" > /dev/null 2>&1; then
+    echo "✅ OpenAI API key is valid"
+    OPENAI_VALID=true
+  else
+    echo "⚠️ OpenAI API key is invalid or expired, falling back to Claude"
+    OPENAI_VALID=false
+  fi
+fi
+
+if [ "$OPENAI_VALID" = true ]; then
+  # Use GPT-5 as primary when OpenAI key is valid; keep Opus (or configured model) as research; fallback to GPT-5
+  echo "✅ Using OpenAI; setting main=gpt-5, research=$MODEL, fallback=gpt-5"
   task-master models --set-main "gpt-5"
   task-master models --set-research "$MODEL"
   task-master models --set-fallback "gpt-5"
 else
-  # No OpenAI key: use provided model for both roles; fallback to Claude Sonnet
-  echo "ℹ️ OPENAI_API_KEY not set; setting main=$MODEL, research=$MODEL, fallback=claude-3-5-sonnet-20241022"
+  # No valid OpenAI key: use provided model for both roles; fallback to Claude Sonnet
+  echo "ℹ️ Using Claude only; setting main=$MODEL, research=$MODEL, fallback=claude-3-5-sonnet-20241022"
   task-master models --set-main "$MODEL"
   task-master models --set-research "$MODEL"
   task-master models --set-fallback "claude-3-5-sonnet-20241022"
