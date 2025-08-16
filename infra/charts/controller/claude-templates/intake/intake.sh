@@ -281,17 +281,13 @@ echo "📦 Installing TaskMaster (pinned version)..."
 echo "📋 Node version: $(node --version)"
 echo "📋 NPM version: $(npm --version)"
 
-# Check if we're in the Claude Code container
-if [ -d "/usr/local/share/npm-global" ] && [ -w "/usr/local/share/npm-global" ]; then
-    echo "✅ Detected Claude Code container environment"
-    export NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-    export PATH=$PATH:/usr/local/share/npm-global/bin
-    NPM_BIN="/usr/local/share/npm-global/bin"
-else
-    echo "🔍 Using default npm global location"
-    # Let npm use its default global location
-    NPM_BIN=$(npm bin -g 2>/dev/null || echo "/usr/local/bin")
-fi
+# Use user-specific npm global directory to avoid permission issues
+export NPM_CONFIG_PREFIX="/home/node/.npm-global"
+export PATH="/home/node/.npm-global/bin:$PATH"
+NPM_BIN="/home/node/.npm-global/bin"
+
+# Create the directory if it doesn't exist
+mkdir -p "$NPM_CONFIG_PREFIX"
 
 TASKMASTER_VERSION="0.24.0"
 npm install -g "task-master-ai@${TASKMASTER_VERSION}" || {
