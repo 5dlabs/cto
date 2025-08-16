@@ -21,74 +21,96 @@ These will remain the atomic execution units. The “orchestrator” composes th
 
 ### Proposed high‑level architecture
 - **Orchestrator Workflow (Argo)**
-  - A DAG that composes multiple `CodeRun`/`DocsRun` invocations and waits for their statuses.
-  - Stores orchestration state in Workflow and/or a new CRD (see “Orchestration CRD” below).
+  - A DAG that composes multiple `CodeRun` invocations and waits for their statuses.
+  - Uses existing CodeRun/DocsRun CRDs (no new orchestration CRDs).
   - Uses Argo Events to start/resume based on GitHub events.
 
-- **Agents (specialized CodeRun modes)**
-  - **Authoring Agent**: writes code for the task based on `requirements.yaml`.
-  - **Clippy & Lint Fixer Agent**: enforces 100% green including `-D warnings` and `-W clippy::pedantic`.
-  - **Test Runner/Remediator Agent**: ensures unit/integration tests pass; adds/fixes tests as needed.
-  - **Deployer Agent**: triggers build + deploy (GitHub Actions + Argo CD) and validates runtime health.
-  - **Acceptance Agent**: verifies acceptance criteria (functional checks, endpoints healthy, dashboards, etc.).
-  - **PR Comment Remediator Agent**: responds to PR comments with targeted changes.
-  - **CI Failure Remediator Agent**: triggered by failing checks to fix the cause.
-  - **Issue Triage/Implementation Agent**: reacts to new Issues to implement or groom.
+- **Agent Personas & GitHub Apps**
+  - **Morgan (PM Agent)**: Product Manager, orchestrates and has awareness of all other agents
+  - **Rex (Implementation Agent)**: Primary code author, writes initial implementation
+  - **Clippy Agent**: Fixes clippy pedantic warnings + handles formatting (`cargo fmt`)
+  - **QA Agent**: Adds tests only (cannot modify implementation), leaves comments if implementation needs changes
+  - **Triage Agent**: Responds to CI failures (clippy/format/test failures) and attempts fixes
+  - **Security Agent**: Downloads security reports and remediates vulnerabilities
+  - **PR Comment Agent**: Downloads and addresses PR review comments (with easy MCP/API for comment retrieval)
+  - **Issue Agent**: Converts issues to implementations through the same test pipeline
 
-Each “agent” can remain a `CodeRun` with a different prompt/profile and tool set, avoiding a proliferation of CRDs.
+Each agent is a different GitHub App with its own character/persona and specialized system prompt.
 
 ### Event‑driven orchestration
 - **Event sources (Argo Events)**
-  - GitHub: `pull_request`, `issue_comment`, `pull_request_review_comment`, `check_run`, `workflow_run`, `issues`, `push`.
-  - Optional: internal webhooks from controller, CI, or observability signals.
+  - GitHub webhooks: `pull_request`, `issue_comment`, `pull_request_review_comment`, `check_run`, `workflow_run`, `issues`, `push`.
+  - Security scanning webhooks for vulnerability reports.
+- **Event → Agent mapping**
+  - `pull_request` opened/updated → Clippy Agent → QA Agent (test in real environment)
+  - `issue_comment` or `pull_request_review_comment` → Rex (Implementation Agent) re-invoked with comments
+  - `workflow_run` failure → Triage Agent (attempts to fix failures)
+  - `issues` opened → Issue Agent → same testing pipeline
+  - Security scan complete → Security Agent
 - **Sensors**
-  - Map events to DAG entrypoints or `resume` paths via labels/parameters (e.g., repo, PR number, task id).
-  - Correlate using keys such as `(repo, PR, task-id)` stored as Workflow/CRD labels and annotations.
+  - Map events to DAG entrypoints or `resume` paths via labels/parameters.
+  - Correlate using keys such as `(repo, PR, task-id)` stored as Workflow labels.
 
-### Orchestration CRD (optional)
-- Introduce `TaskSequence` (namespaced) to define a graph for a backlog or project slice:
-  - Spec: tasks, dependencies, batch groups, acceptance criteria, concurrency policy, repo/branches, service id.
-  - Status: per‑task phases, artifacts (PRs), last event processed, resumable cursor.
-- The Orchestrator Workflow reconciles `TaskSequence` → emits `CodeRun`/`DocsRun` as needed.
-- Alternative: encode everything directly in Argo Workflow parameters and labels (no new CRD). Start with Workflow‑only; add CRD if state becomes too complex.
+### Configuration improvements
+- **Simplified arguments**: Reduce CodeRun parameters through auto-detection:
+  - Auto-detect repository from git context
+  - Infer working directory from task context
+  - Default model selection based on task type
+  - Goal: 1-2 required arguments maximum
+- **Project-wide settings**:
+  - MCP tool configuration at project level (not per-task)
+  - Shared requirements.yaml with tool allowlist
+  - Common environment variables and secrets
+- **Workspace management**:
+  - Persistent PVCs per service/project
+  - Git worktrees for parallel execution
+  - Shared cache directories for dependencies
 
-### DAG sketch (conceptual)
+### DAG flows
+
+**PR Flow:**
 ```yaml
-entrypoint: project-dag
-templates:
-  - name: project-dag
-    dag:
-      tasks:
-        - name: author
-          templateRef: { name: coderun-template, template: coderun-main }
-          arguments: { parameters: [...] }
+# Triggered on pull_request event
+- name: pr-validation
+  dag:
+    tasks:
+      - name: clippy-format
+        templateRef: { name: coderun-template }
+        arguments: { parameters: [{ name: github-app, value: "clippy-agent" }] }
+        
+      - name: qa-testing
+        dependencies: [clippy-format]
+        templateRef: { name: coderun-template }
+        arguments: { parameters: [{ name: github-app, value: "qa-agent" }] }
+```
 
-        - name: clippy-fix
-          dependencies: [author]
-          templateRef: { name: coderun-template, template: coderun-main }
-          arguments: { parameters: [{ name: prompt-mod, value: "Fix all clippy pedantic; -D warnings" }, ...] }
-
-        - name: tests
-          dependencies: [clippy-fix]
-          templateRef: { name: coderun-template, template: coderun-main }
-          arguments: { parameters: [{ name: prompt-mod, value: "Ensure tests pass; add missing tests" }, ...] }
-
-        - name: deploy
-          dependencies: [tests]
-          templateRef: { name: coderun-template, template: coderun-main }
-          arguments: { parameters: [{ name: prompt-mod, value: "Trigger GH Actions, ensure rollout healthy" }, ...] }
-
-        - name: acceptance
-          dependencies: [deploy]
-          templateRef: { name: coderun-template, template: coderun-main }
-          arguments: { parameters: [{ name: prompt-mod, value: "Validate acceptance criteria" }, ...] }
+**Issue/Task Flow:**
+```yaml
+# Triggered on issue or task creation
+- name: implementation
+  dag:
+    tasks:
+      - name: implement
+        templateRef: { name: coderun-template }
+        arguments: { parameters: [{ name: github-app, value: "rex" }] }
+        
+      - name: clippy-format
+        dependencies: [implement]
+        templateRef: { name: coderun-template }
+        arguments: { parameters: [{ name: github-app, value: "clippy-agent" }] }
+        
+      - name: qa-testing
+        dependencies: [clippy-format]
+        templateRef: { name: coderun-template }
+        arguments: { parameters: [{ name: github-app, value: "qa-agent" }] }
 ```
 
 ### Batch and parallel processing
-- Parse `docs/examples/example-requirements.yaml`‑like inputs to build a dependency graph.
-- Identify independent tasks and run their “author → clippy → tests” chains in parallel using DAG fan‑out.
-- Use Argo `synchronization` (semaphores) to rate‑limit shared resources (e.g., runners, clusters).
-- Optionally implement “batch windows” to group similar tasks (e.g., repo‑level changes) to reduce churn.
+- **Dependency analysis**: Parse TaskMaster output to identify task dependencies and determine parallelizable work.
+- **Parallel execution**: Independent tasks run their full chains in parallel using DAG fan‑out.
+- **Workspace isolation**: Use git worktrees or separate directories on same PVC for parallel work (separate runs, shared PVC).
+- **Resource management**: Argo semaphores to rate‑limit shared resources (runners, API calls).
+- **Batch windows**: Group related changes to reduce PR churn.
 
 ### Quality gates (Rust example)
 - Editor agent should not attempt to be perfect; downstream agents own gates:
@@ -124,17 +146,22 @@ templates:
 - Surface metrics to Grafana dashboards (`infra/telemetry`).
 - Log links to PRs, Actions runs, and Argo Workflows in CRD status.
 
-### Incremental path
-1) Add agent profiles (prompts/tools) for Clippy Fixer, Test Remediator, Deployer, Acceptance.
-2) Create an initial Orchestrator Workflow DAG that chains these for a single task.
-3) Add Argo Events for GitHub comments and CI failures → trigger remediators.
-4) Add parallelization for multiple independent tasks.
-5) (Optional) Introduce `TaskSequence` CRD if state management in Workflow becomes cumbersome.
+### Implementation priorities
+1) **Simplify API**: Auto-detect more parameters, reduce to 1-2 required arguments for better agent success rate.
+2) **Unified project structure**: Docs in same project (no separate docs repo) is working well - standardize this.
+3) **Project-wide MCP tools**: Move tool configuration from per-task to project-wide in requirements (less tedious).
+4) **Agent profiles**: Create GitHub Apps and system prompts for each persona (Morgan, Rex, Clippy, QA, etc.).
+5) **Comment retrieval**: Add MCP tool or simple API for downloading PR comments efficiently.
+6) **PR flow first**: Implement Clippy → QA flow for PRs.
+7) **Parallel execution**: Implement worktree/directory isolation for parallel tasks.
+8) **Security scanning**: Integrate security report download and remediation agent.
 
 ### Open questions
-- Where do we define acceptance criteria? Enforce a schema in `requirements.yaml`?
-- Ephemeral env strategy: GH Actions‑only vs. Argo CD preview Apps vs. both.
-- How to gate merges automatically while respecting required reviews?
-- Back‑pressure policies when event rate spikes.
+- Best approach for git worktrees with agent containers?
+- How to handle QA agent comments when implementation changes needed?
+- Optimal PR comment retrieval method (MCP vs GitHub API)?
+- Security scanning integration points and report formats?
+- Morgan (PM agent) coordination patterns with other agents?
+- Auto-merge policies after all agents approve?
 
 
