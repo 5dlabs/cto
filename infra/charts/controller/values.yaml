@@ -17,7 +17,7 @@ agent:
     tag: "latest"
     pullPolicy: Always
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
-  serviceAccountName: null
+  # serviceAccountName: ""
   
   # Input bridge sidecar configuration for live input to running jobs
   inputBridge:

@@ -25,6 +25,20 @@ This document defines the acceptance criteria for implementing Helm values and A
   - [ ] `systemPrompt`: Robust technical prompt (inline in values, using Anthropic format)
 - [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey`
 
+### 2.1. GitHub App Creation (Organization Level) ✓
+- [ ] **CRITICAL**: Create org-level GitHub Apps in the 5DLabs GitHub organization
+- [ ] Four new GitHub Apps must be created and visible in GitHub organization settings:
+  - [ ] `5DLabs-Clippy` - Code quality and formatting specialist
+  - [ ] `5DLabs-QA` - Quality assurance and testing specialist  
+  - [ ] `5DLabs-Triage` - CI/CD failure remediation specialist
+  - [ ] `5DLabs-Security` - Security vulnerability remediation specialist
+- [ ] Each GitHub App must have:
+  - [ ] Proper permissions for repository access (Contents: Read/Write, Pull Requests: Read/Write, Issues: Read/Write)
+  - [ ] Organization-level installation (not user-level)
+  - [ ] Generated App ID and private key stored in external secret store
+- [ ] **VALIDATION**: Apps must be visible at `https://github.com/organizations/5dlabs/settings/apps`
+- [ ] **VALIDATION**: Each app must be installed on the organization with appropriate repository access
+
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure
 - [ ] Schema requires all mandatory fields
