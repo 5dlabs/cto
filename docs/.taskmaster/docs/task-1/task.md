@@ -7,7 +7,7 @@ This task implements the foundational configuration management for the multi-age
 Platform alignment:
 - Do NOT re-implement functionality that already exists. Extend existing assets instead.
 - We already install and manage charts with Argo CD. Helm is used for prompts/config only; orchestration is in Argo Workflows/Events with CodeRun/DocsRun CRDs.
-- We already have `agents-configmap.yaml` that renders `agents.yaml` and per-agent `*_system-prompt.md` from `.Values.agents[*].systemPrompt`. Do not create a new chart.
+- We already have `agents-configmap.yaml` that renders `agents.yaml` and per-agent `*_system-prompt.md` from `.Values.agents.<key>.systemPrompt`. Do not create a new chart.
 - This task focuses on improving prompts, adding the Clippy GitHub App, and wiring names consistently.
 - Scope: Rust-only. Multi-language support is out of scope for this phase.
  - Administrative operations (creating apps/resources in GitHub/Kubernetes/Argo CD) must use the `agent-admin-secrets` secret; role-specific agent operations use their own GitHub App secrets via ExternalSecrets.
@@ -100,23 +100,44 @@ containers:
 
 **Location**: `infra/charts/controller/values.yaml` (existing)
 
+Use the existing map/object structure under `.Values.agents` (keys are agent identifiers; the `name` field is the friendly display name):
+
 ```yaml
 agents:
-  - name: rex
-    githubApp: rex-agent
-    systemPromptFile: rex_system-prompt.md
-  - name: clippy
-    githubApp: clippy-agent
-    systemPromptFile: clippy_system-prompt.md
-  - name: qa
-    githubApp: qa-agent
-    systemPromptFile: qa_system-prompt.md
-  - name: triage
-    githubApp: triage-agent
-    systemPromptFile: triage_system-prompt.md
-  - name: security
-    githubApp: security-agent
-    systemPromptFile: security_system-prompt.md
+  rex:
+    name: "Rex"
+    githubApp: "5DLabs-Rex"
+    systemPrompt: |
+      # Rex system prompt (truncated)
+      ...
+
+  clippy:
+    name: "Cleo"            # friendly name
+    githubApp: "5DLabs-Clippy"
+    systemPrompt: |
+      # Cleo system prompt (truncated)
+      ...
+
+  qa:
+    name: "Tess"            # friendly name
+    githubApp: "5DLabs-QA"
+    systemPrompt: |
+      # Tess system prompt (truncated)
+      ...
+
+  triage:
+    name: "Stitch"          # friendly name
+    githubApp: "5DLabs-Triage"
+    systemPrompt: |
+      # Stitch system prompt (truncated)
+      ...
+
+  security:
+    name: "Onyx"            # friendly name
+    githubApp: "5DLabs-Security"
+    systemPrompt: |
+      # Onyx system prompt (truncated)
+      ...
 ```
 
 #### 1.2 Add JSON Schema Validation
@@ -129,17 +150,16 @@ If needed, update schema validation to reflect added fields (optional for now).
   "type": "object",
   "properties": {
     "agents": {
-      "type": "array",
-      "items": {
+      "type": "object",
+      "additionalProperties": {
         "type": "object",
-        "required": ["name", "githubApp", "systemPromptFile"],
+        "required": ["name", "githubApp", "systemPrompt"],
         "properties": {
           "name": {"type": "string", "minLength": 1},
           "githubApp": {"type": "string", "minLength": 1},
-          "systemPromptFile": {"type": "string", "pattern": "^.+\\.md$"}
+          "systemPrompt": {"type": "string", "minLength": 1}
         }
-      },
-      "minItems": 1
+      }
     }
   },
   "required": ["agents"]

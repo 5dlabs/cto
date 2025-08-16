@@ -79,24 +79,34 @@ Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml`
 - Managed by Argo CD; avoid local Helm installs
 
 ### 2. Values Configuration
-Update `infra/charts/controller/values.yaml`:
+Update `infra/charts/controller/values.yaml` (map/object keys with friendly names in `name` field):
 ```yaml
 agents:
-  - name: rex
-    githubApp: rex-agent
-    systemPromptFile: rex_system-prompt.md
-  - name: clippy
-    githubApp: clippy-agent  
-    systemPromptFile: clippy_system-prompt.md
-  - name: qa
-    githubApp: qa-agent
-    systemPromptFile: qa_system-prompt.md
-  - name: triage
-    githubApp: triage-agent
-    systemPromptFile: triage_system-prompt.md
-  - name: security
-    githubApp: security-agent
-    systemPromptFile: security_system-prompt.md
+  rex:
+    name: "Rex"
+    githubApp: "5DLabs-Rex"
+    systemPrompt: |
+      ...
+  clippy:
+    name: "Cleo"
+    githubApp: "5DLabs-Clippy"
+    systemPrompt: |
+      ...
+  qa:
+    name: "Tess"
+    githubApp: "5DLabs-QA"
+    systemPrompt: |
+      ...
+  triage:
+    name: "Stitch"
+    githubApp: "5DLabs-Triage"
+    systemPrompt: |
+      ...
+  security:
+    name: "Onyx"
+    githubApp: "5DLabs-Security"
+    systemPrompt: |
+      ...
 ```
 
 Testing via Argo CD:
