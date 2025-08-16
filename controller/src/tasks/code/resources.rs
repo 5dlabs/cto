@@ -722,7 +722,7 @@ impl<'a> CodeResourceManager<'a> {
             containers.push(docker_daemon_spec);
         }
 
-        // Build Pod spec and optionally set ServiceAccountName
+        // Build Pod spec and set ServiceAccountName (required by CRD)
         let mut pod_spec = json!({
             "shareProcessNamespace": true,
             "restartPolicy": "Never",

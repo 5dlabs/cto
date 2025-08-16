@@ -71,7 +71,7 @@ metadata:
     app.kubernetes.io/component: workflow-rbac
 
 ---
-# High-privilege ServiceAccount for CodeRun jobs (optional)
+# High-privilege ServiceAccount for CodeRun jobs
 {{- if .Values.rbac.submitter.clusterAdminServiceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
