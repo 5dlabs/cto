@@ -179,12 +179,25 @@ data:
 
 #### 4.1 Agent Prompt Files
 
-Prompts are supplied inline via `.Values.agents[*].systemPrompt` in `infra/charts/controller/values.yaml`. Update those strings to the improved versions below.
-- `rex_system-prompt.md`
-- `clippy_system-prompt.md`
-- `qa_system-prompt.md`
-- `triage_system-prompt.md`
-- `security_system-prompt.md`
+Prompts are supplied inline via `.Values.agents.<key>.systemPrompt` in `infra/charts/controller/values.yaml`. 
+
+Each system prompt should follow the Anthropic documentation format with YAML frontmatter:
+```yaml
+---
+name: AgentName
+description: Brief description of the agent's role and when to use it
+# tools: omitted to inherit all available tools
+---
+
+[Agent's detailed system prompt content here]
+```
+
+The prompts will be rendered as:
+- `5DLabs-Rex_system-prompt.md` (existing)
+- `5DLabs-Clippy_system-prompt.md` (new - Cleo)
+- `5DLabs-QA_system-prompt.md` (new - Tess)
+- `5DLabs-Triage_system-prompt.md` (new - Stitch)
+- `5DLabs-Security_system-prompt.md` (new - Onyx)
 
  
 
