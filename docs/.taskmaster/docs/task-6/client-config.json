@@ -1,0 +1,55 @@
+{
+  "remoteTools": [
+    {
+      "name": "argo-events-api",
+      "description": "Argo Events management API for EventSources and Sensors",
+      "baseUrl": "https://argo-events.argo-events.svc.cluster.local:7777",
+      "endpoints": [
+        {
+          "path": "/api/v1/namespaces/{namespace}/eventsources",
+          "method": "GET",
+          "description": "List EventSources"
+        },
+        {
+          "path": "/api/v1/namespaces/{namespace}/sensors",
+          "method": "GET", 
+          "description": "List Sensors"
+        }
+      ]
+    },
+    {
+      "name": "github-webhook-endpoint",
+      "description": "GitHub webhook receiver endpoint",
+      "baseUrl": "https://events.example.com",
+      "endpoints": [
+        {
+          "path": "/events",
+          "method": "POST",
+          "description": "Receive GitHub webhooks",
+          "parameters": {
+            "X-GitHub-Event": "GitHub event type header",
+            "X-Hub-Signature-256": "Webhook signature for validation"
+          }
+        }
+      ]
+    }
+  ],
+  "localServers": {
+    "webhook-tester": {
+      "command": ["./scripts/test-webhooks.sh"],
+      "args": ["--endpoint", "https://events.example.com/events", "--events", "all"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "WEBHOOK_SECRET": "${WEBHOOK_SECRET}"
+      }
+    },
+    "event-simulator": {
+      "command": ["./scripts/simulate-github-events.sh"], 
+      "args": ["--output-dir", "./test-events", "--types", "pr,issues,comments"],
+      "env": {
+        "REPO_OWNER": "test-org",
+        "REPO_NAME": "test-repo"
+      }
+    }
+  }
+}

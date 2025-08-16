@@ -1,0 +1,155 @@
+{
+  "remoteTools": [
+    {
+      "name": "argo-workflows-api",
+      "description": "Argo Workflows API for template and workflow management",
+      "baseUrl": "https://argo-workflows.workflows.svc.cluster.local:2746",
+      "endpoints": [
+        {
+          "path": "/api/v1/workflow-templates/{namespace}",
+          "method": "GET",
+          "description": "List WorkflowTemplates in namespace"
+        },
+        {
+          "path": "/api/v1/workflow-templates/{namespace}/{name}",
+          "method": "GET",
+          "description": "Get specific WorkflowTemplate"
+        },
+        {
+          "path": "/api/v1/workflows/{namespace}",
+          "method": "POST",
+          "description": "Submit workflow from template",
+          "parameters": {
+            "namespace": "Target namespace",
+            "workflow": "Workflow specification with template reference"
+          }
+        },
+        {
+          "path": "/api/v1/workflows/{namespace}/{name}",
+          "method": "GET",
+          "description": "Get workflow status and details"
+        },
+        {
+          "path": "/api/v1/workflows/{namespace}/{name}/log",
+          "method": "GET",
+          "description": "Get workflow logs"
+        }
+      ]
+    },
+    {
+      "name": "coderun-template-api",
+      "description": "Direct interface to coderun-template for simplified CodeRun creation",
+      "baseUrl": "https://argo-workflows.workflows.svc.cluster.local:2746",
+      "endpoints": [
+        {
+          "path": "/api/v1/workflows/{namespace}/submit",
+          "method": "POST",
+          "description": "Submit coderun-template workflow",
+          "parameters": {
+            "workflowTemplateRef": "coderun-template",
+            "github-app": "GitHub App name (rex, clippy, qa, triage, security)",
+            "event": "Optional GitHub event payload JSON",
+            "taskRef": "Optional task reference"
+          }
+        }
+      ]
+    },
+    {
+      "name": "docsrun-template-api", 
+      "description": "Direct interface to docsrun-template for simplified DocsRun creation",
+      "baseUrl": "https://argo-workflows.workflows.svc.cluster.local:2746",
+      "endpoints": [
+        {
+          "path": "/api/v1/workflows/{namespace}/submit",
+          "method": "POST",
+          "description": "Submit docsrun-template workflow",
+          "parameters": {
+            "workflowTemplateRef": "docsrun-template",
+            "github-app": "GitHub App name for documentation tasks",
+            "event": "Optional GitHub event payload JSON",
+            "taskRef": "Optional documentation task reference"
+          }
+        }
+      ]
+    },
+    {
+      "name": "kubernetes-cr-api",
+      "description": "Kubernetes API for managing CodeRun and DocsRun Custom Resources",
+      "baseUrl": "https://kubernetes.default.svc",
+      "endpoints": [
+        {
+          "path": "/apis/taskmaster.io/v1/namespaces/{namespace}/coderuns",
+          "method": "GET",
+          "description": "List CodeRun resources"
+        },
+        {
+          "path": "/apis/taskmaster.io/v1/namespaces/{namespace}/coderuns/{name}",
+          "method": "GET",
+          "description": "Get specific CodeRun resource"
+        },
+        {
+          "path": "/apis/taskmaster.io/v1/namespaces/{namespace}/docsruns",
+          "method": "GET",
+          "description": "List DocsRun resources"
+        },
+        {
+          "path": "/apis/taskmaster.io/v1/namespaces/{namespace}/docsruns/{name}",
+          "method": "GET",
+          "description": "Get specific DocsRun resource"
+        }
+      ]
+    },
+    {
+      "name": "event-payload-processor",
+      "description": "Utility service for processing GitHub event payloads",
+      "baseUrl": "http://event-processor.workflows.svc.cluster.local:8080",
+      "endpoints": [
+        {
+          "path": "/process-event",
+          "method": "POST",
+          "description": "Process GitHub event payload and extract parameters",
+          "parameters": {
+            "event": "GitHub webhook event payload JSON"
+          }
+        },
+        {
+          "path": "/validate-event",
+          "method": "POST", 
+          "description": "Validate GitHub event payload structure"
+        },
+        {
+          "path": "/extract-context",
+          "method": "POST",
+          "description": "Extract repository context from event payload"
+        }
+      ]
+    }
+  ],
+  "localServers": {
+    "template-tester": {
+      "command": ["./scripts/test-templates.sh"],
+      "args": ["--namespace", "workflows", "--templates", "coderun-template,docsrun-template"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config",
+        "ARGO_SERVER": "localhost:2746",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "event-simulator": {
+      "command": ["./scripts/simulate-events.sh"],
+      "args": ["--output-dir", "./test-events", "--format", "json"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "TEST_REPO": "test-org/test-repo"
+      }
+    },
+    "batch-processor": {
+      "command": ["./scripts/run-press-play.sh"],
+      "args": ["--backlog-file", "./config/test-backlog.json", "--dry-run"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config",
+        "PARALLELISM": "3"
+      }
+    }
+  }
+}

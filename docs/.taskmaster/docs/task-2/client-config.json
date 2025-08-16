@@ -1,0 +1,83 @@
+{
+  "remoteTools": [
+    {
+      "name": "github-app-token-generator",
+      "description": "Secure GitHub App token generation service for PAT-free authentication",
+      "baseUrl": "http://github-app-token-gen.workflows.svc.cluster.local:8080",
+      "endpoints": [
+        {
+          "path": "/generate-token",
+          "method": "POST",
+          "description": "Generate installation token for specified GitHub App",
+          "parameters": {
+            "app_id": "GitHub App ID",
+            "installation_id": "Optional installation ID (auto-discovered if omitted)",
+            "private_key": "Base64 encoded private key"
+          }
+        },
+        {
+          "path": "/health",
+          "method": "GET", 
+          "description": "Health check endpoint"
+        },
+        {
+          "path": "/installations/{app_id}",
+          "method": "GET",
+          "description": "List installations for a GitHub App"
+        }
+      ]
+    },
+    {
+      "name": "external-secrets-api",
+      "description": "External Secrets Operator API for secret sync status",
+      "baseUrl": "https://kubernetes.default.svc",
+      "endpoints": [
+        {
+          "path": "/apis/external-secrets.io/v1beta1/namespaces/workflows/externalsecrets",
+          "method": "GET",
+          "description": "List ExternalSecret resources"
+        },
+        {
+          "path": "/apis/external-secrets.io/v1beta1/namespaces/workflows/externalsecrets/{name}/status",
+          "method": "GET", 
+          "description": "Get ExternalSecret sync status"
+        }
+      ]
+    },
+    {
+      "name": "kubernetes-secrets-api",
+      "description": "Kubernetes API for GitHub App secret management",
+      "baseUrl": "https://kubernetes.default.svc",
+      "endpoints": [
+        {
+          "path": "/api/v1/namespaces/workflows/secrets",
+          "method": "GET",
+          "description": "List GitHub App secrets"
+        },
+        {
+          "path": "/api/v1/namespaces/workflows/secrets/{secret-name}",
+          "method": "GET",
+          "description": "Get specific GitHub App secret"
+        }
+      ]
+    }
+  ],
+  "localServers": {
+    "token-generator": {
+      "command": ["./scripts/run-token-generator.sh"],
+      "args": ["--port", "8080", "--config", "./config/token-gen.yaml"],
+      "env": {
+        "LOG_LEVEL": "info",
+        "GITHUB_API_URL": "https://api.github.com",
+        "OUTPUT_DIR": "/tmp/tokens"
+      }
+    },
+    "secret-sync-monitor": {
+      "command": ["./scripts/monitor-secrets.sh"],
+      "args": ["--namespace", "workflows", "--interval", "30s"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config"
+      }
+    }
+  }
+}
