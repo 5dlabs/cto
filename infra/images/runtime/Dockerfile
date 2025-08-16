@@ -119,7 +119,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         gunzip -c "/tmp/argo-linux-${DL_ARCH}.gz" > /usr/local/bin/argo && \
         chmod +x /usr/local/bin/argo && \
         rm -f "/tmp/argo-linux-${DL_ARCH}.gz" && \
-        argo version --short --client && break || \
+        argo version --short && break || \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
