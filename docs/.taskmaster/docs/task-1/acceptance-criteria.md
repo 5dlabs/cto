@@ -5,6 +5,12 @@ This document defines the acceptance criteria for implementing Helm values and A
 
 ## Core Acceptance Criteria
 
+### 0. Prerequisites Verification ✓
+- [ ] kubectl access verified (`kubectl cluster-info` works)
+- [ ] Argo CD CLI access verified (`argocd app list` works after login)
+- [ ] GitHub access verified (can create apps via UI or API)
+- [ ] All required environment variables are set and valid
+
 ### 1. Helm Chart Structure ✓
 - [ ] Use existing controller chart at `infra/charts/controller`
 - [ ] Do not create a new chart; extend existing values and prompts only

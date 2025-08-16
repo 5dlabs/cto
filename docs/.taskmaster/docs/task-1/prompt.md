@@ -256,27 +256,52 @@ Update or create `docs/.taskmaster/architecture.md` with:
 
 ## Implementation Steps
 
-1. **Create chart structure**:
-   ```bash
-   # N/A: chart already exists under infra/charts/controller
-   ```
+### 0. **CRITICAL: Verify Access Before Starting**
 
-2. **Implement core updates**:
+Before writing any code, verify you have access to both kubectl and Argo CD:
+
+```bash
+# Verify kubectl access
+kubectl cluster-info
+kubectl get nodes
+kubectl -n agent-platform get pods
+
+# If kubectl fails, check your KUBECONFIG environment variable
+echo $KUBECONFIG_B64 | base64 -d > /tmp/kubeconfig
+export KUBECONFIG=/tmp/kubeconfig
+kubectl cluster-info
+
+# Verify Argo CD access
+argocd version --client
+argocd login $ARGOCD_SERVER --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD
+argocd app list
+argocd app get controller
+
+# If these commands fail, STOP and report the issue - you cannot proceed without cluster access
+```
+
+### 1. **Create GitHub Apps**:
+   Use the GitHub web UI or API to create the new GitHub Apps (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security)
+
+### 2. **Implement core updates**:
    - Update `infra/charts/controller/values.yaml` agents
-   - (Optional) templates/workflowtemplates/agent-mount-smoke.yaml
+   - Add ExternalSecrets to `infra/secret-store/agent-secrets-external-secrets.yaml`
 
-3. **Validate implementation**:
+### 3. **Validate implementation**:
    ```bash
-   # Use Argo CD instead of local Helm
-   argocd app sync controller && argocd app get controller
+   # Use Argo CD to sync and verify
+   argocd app sync controller
+   argocd app get controller
+   kubectl -n agent-platform get cm controller-agents -o yaml
    ```
 
-4. **Test deployment**:
+### 4. **Test deployment**:
    ```bash
-   kubectl create ns dev || true
-   # Use Argo Workflows/DocsRun/CodeRun to validate mounts; avoid local Helm
-   kubectl -n dev get cm controller-agents
-   kubectl -n dev create wf --from=wftmpl/agent-mount-smoke
+   # Verify the ConfigMap contains new agents
+   kubectl -n agent-platform get cm controller-agents -o yaml | grep -E "Cleo|Tess|Stitch|Onyx"
+   
+   # Check ExternalSecrets are synced
+   kubectl -n agent-platform get externalsecrets | grep github-app-5dlabs
    ```
 
 ## Success Criteria
