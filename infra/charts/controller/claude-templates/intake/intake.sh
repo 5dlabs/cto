@@ -593,7 +593,9 @@ $([ "$ANALYZE_COMPLEXITY" = "true" ] && echo "- Complexity analysis performed")
 "
 
 # Create branch and push
-BRANCH_NAME="intake/$PROJECT_NAME-$(date +%Y%m%d-%H%M%S)"
+# Use a hyphenated prefix to avoid collisions when a flat ref named 'intake' exists remotely
+# Also prefer the sanitized, lowercase project directory name for the branch component
+BRANCH_NAME="intake-${PROJECT_DIR_NAME}-$(date +%Y%m%d-%H%M%S)"
 echo "🌿 Creating branch: $BRANCH_NAME"
 git checkout -b "$BRANCH_NAME"
 git push -u origin "$BRANCH_NAME"
