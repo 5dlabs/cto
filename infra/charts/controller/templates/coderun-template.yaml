@@ -43,6 +43,9 @@ spec:
       - name: task-requirements
         description: "Base64-encoded requirements.yaml content"
         default: ""
+      - name: service-account-name
+        description: "Kubernetes ServiceAccount to run the CodeRun job"
+        default: ""
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
@@ -98,6 +101,9 @@ spec:
             continueSession: {{`{{workflow.parameters.continue-session}}`}}
             overwriteMemory: {{`{{workflow.parameters.overwrite-memory}}`}}
             docsBranch: "{{`{{workflow.parameters.docs-branch}}`}}"
+            {{`{{- if workflow.parameters.service-account-name }}`}}
+            serviceAccountName: "{{`{{workflow.parameters.service-account-name}}`}}"
+            {{`{{- end }}`}}
             contextVersion: 1
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             

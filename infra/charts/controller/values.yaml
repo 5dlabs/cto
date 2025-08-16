@@ -329,6 +329,11 @@ rbac:
         resources: ["workflows"]
         verbs: ["get", "list", "watch"]
 
+    # Optional high-privilege ServiceAccount for CodeRun jobs
+    clusterAdminServiceAccount:
+      create: true
+      name: coderun-cluster-admin
+
 # Health checks
 healthCheck:
   enabled: true
