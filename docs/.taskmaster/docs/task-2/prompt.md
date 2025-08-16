@@ -26,7 +26,7 @@ This system replaces insecure PAT-based authentication with a proper GitHub App 
 2. **Token Generator Service**
    - Build lightweight container (Node.js or Go preferred)
    - Create RS256 JWT with proper claims structure
-   - Auto-discover installation IDs when not provided  
+   - Auto-discover installation IDs when not provided
    - Exchange JWT for installation tokens via GitHub API
    - Write tokens atomically with 0600 permissions
    - Handle rate limiting and API errors gracefully
@@ -63,7 +63,7 @@ spec:
   data:
     - secretKey: appId
       remoteRef: { key: /github-apps/{APP_NAME}/appId }
-    - secretKey: privateKey  
+    - secretKey: privateKey
       remoteRef: { key: /github-apps/{APP_NAME}/privateKey }
 ```
 
@@ -155,11 +155,11 @@ async function getInstallationToken(jwt, installationId) {
       }
     }
   );
-  
+
   if (!response.ok) {
     throw new Error(`Token exchange failed: ${response.status}`);
   }
-  
+
   const data = await response.json();
   return data.token;
 }
@@ -211,9 +211,9 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
-  resourceNames: 
+  resourceNames:
     - "github-app-rex"
-    - "github-app-clippy" 
+    - "github-app-clippy"
     - "github-app-qa"
     - "github-app-triage"
     - "github-app-security"
@@ -248,7 +248,7 @@ roleRef:
    - Test installation ID auto-discovery
    - Verify token permissions scope
 
-3. **Workflow Integration Testing**  
+3. **Workflow Integration Testing**
    - Run dry-run workflow with token mounting
    - Verify `gh auth status` works with generated tokens
    - Test parameterized GitHub App selection
@@ -295,7 +295,7 @@ argo submit --from workflowtemplate/test-github-app \
 
 **Required Metrics:**
 - Token generation success/failure rates
-- JWT expiration warnings  
+- JWT expiration warnings
 - Secret sync status
 - API rate limit consumption
 - Authentication error rates
@@ -323,7 +323,7 @@ Your implementation is complete when:
 
 Create these files in the task directory:
 - Working Kubernetes manifests
-- Container source code and Dockerfile  
+- Container source code and Dockerfile
 - CI/CD pipeline configuration
 - Test suite with all validation cases
 - Operational documentation and runbooks
