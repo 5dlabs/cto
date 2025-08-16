@@ -31,7 +31,7 @@ These will remain the atomic execution units. The “orchestrator” composes th
   - **Clippy Agent**: Fixes clippy pedantic warnings + handles formatting (`cargo fmt`)
   - **QA Agent**: Adds tests only (cannot modify implementation), leaves comments if implementation needs changes
   - **Triage Agent**: Responds to CI failures (clippy/format/test failures) and attempts fixes
-  - **Security Agent**: Downloads security reports and remediates vulnerabilities
+  - **Security Agent**: Reads existing vulnerability reports and remediates the identified security issues in code
   - **PR Comment Agent**: Downloads and addresses PR review comments (with easy MCP/API for comment retrieval)
   - **Issue Agent**: Converts issues to implementations through the same test pipeline
 
@@ -40,7 +40,7 @@ Each agent is a different GitHub App with its own character/persona and speciali
 ### Event‑driven orchestration
 - **Event sources (Argo Events)**
   - GitHub webhooks: `pull_request`, `issue_comment`, `pull_request_review_comment`, `check_run`, `workflow_run`, `issues`, `push`.
-  - Security scanning webhooks for vulnerability reports.
+  - Security scan completion events (vulnerability reports already generated).
 - **Event → Agent mapping**
   - `pull_request` opened/updated → Clippy Agent → QA Agent (test in real environment)
   - `issue_comment` or `pull_request_review_comment` → Rex (Implementation Agent) re-invoked with comments
@@ -154,7 +154,7 @@ Each agent is a different GitHub App with its own character/persona and speciali
 5) **Comment retrieval**: Add MCP tool or simple API for downloading PR comments efficiently.
 6) **PR flow first**: Implement Clippy → QA flow for PRs.
 7) **Parallel execution**: Implement worktree/directory isolation for parallel tasks.
-8) **Security scanning**: Integrate security report download and remediation agent.
+8) **Security remediation**: Agent that reads vulnerability reports and fixes identified issues.
 
 ### Open questions
 - Best approach for git worktrees with agent containers?
