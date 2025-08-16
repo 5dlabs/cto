@@ -16,6 +16,8 @@ agent:
     repository: ghcr.io/5dlabs/cto/claude
     tag: "latest"
     pullPolicy: Always
+  # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
+  serviceAccountName: ""
   
   # Input bridge sidecar configuration for live input to running jobs
   inputBridge:
@@ -328,6 +330,11 @@ rbac:
       - apiGroups: ["argoproj.io"]
         resources: ["workflows"]
         verbs: ["get", "list", "watch"]
+
+    # High-privilege ServiceAccount for CodeRun jobs
+    clusterAdminServiceAccount:
+      create: true
+      name: coderun-cluster-admin
 
 # Health checks
 healthCheck:

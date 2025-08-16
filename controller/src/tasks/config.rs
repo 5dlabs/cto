@@ -54,6 +54,10 @@ pub struct AgentConfig {
     /// Optional sidecar configuration
     #[serde(default, rename = "inputBridge")]
     pub input_bridge: InputBridgeConfig,
+
+    /// Optional default ServiceAccount name to use for CodeRun jobs
+    #[serde(default, rename = "serviceAccountName")]
+    pub service_account_name: Option<String>,
 }
 
 /// Image configuration
@@ -281,6 +285,7 @@ impl Default for ControllerConfig {
                     },
                     port: 8080,
                 },
+                service_account_name: None,
             },
             secrets: SecretsConfig {
                 api_key_secret_name: "orchestrator-secrets".to_string(),

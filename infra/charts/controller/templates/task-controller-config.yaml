@@ -19,6 +19,16 @@ data:
       image:
         repository: {{ .Values.agent.image.repository | quote }}
         tag: {{ .Values.agent.image.tag | quote }}
+      {{- /* Compute effective ServiceAccount: prefer non-empty agent.serviceAccountName; else cluster-admin SA if created; else omit */ -}}
+      {{- $explicitSA := (trim (default "" .Values.agent.serviceAccountName)) -}}
+      {{- $fallbackSA := "" -}}
+      {{- if .Values.rbac.submitter.clusterAdminServiceAccount.create -}}
+      {{- $fallbackSA = .Values.rbac.submitter.clusterAdminServiceAccount.name -}}
+      {{- end -}}
+      {{- $effectiveSA := coalesce $explicitSA $fallbackSA -}}
+      {{- if $effectiveSA }}
+      serviceAccountName: {{ $effectiveSA | quote }}
+      {{- end }}
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - {{ .name | quote }}

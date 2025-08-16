@@ -114,6 +114,10 @@ pub struct CodeRunSpec {
     /// Base64-encoded YAML containing task requirements (secrets and environment variables)
     #[serde(default, rename = "taskRequirements")]
     pub task_requirements: Option<String>,
+
+    /// Kubernetes ServiceAccount name for the Job pods created to execute this CodeRun
+    #[serde(default, rename = "serviceAccountName")]
+    pub service_account_name: Option<String>,
 }
 
 /// Status of the `CodeRun`

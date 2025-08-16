@@ -98,6 +98,7 @@ spec:
             continueSession: {{`{{workflow.parameters.continue-session}}`}}
             overwriteMemory: {{`{{workflow.parameters.overwrite-memory}}`}}
             docsBranch: "{{`{{workflow.parameters.docs-branch}}`}}"
+            # serviceAccountName is optional; controller will default from its config if not provided
             contextVersion: 1
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             

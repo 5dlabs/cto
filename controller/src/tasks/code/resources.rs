@@ -722,29 +722,8 @@ impl<'a> CodeResourceManager<'a> {
             containers.push(docker_daemon_spec);
         }
 
-        let job_spec = json!({
-            "apiVersion": "batch/v1",
-            "kind": "Job",
-            "metadata": {
-                "name": job_name,
-                "labels": labels,
-                "ownerReferences": [{
-                    "apiVersion": owner_ref.api_version,
-                    "kind": owner_ref.kind,
-                    "name": owner_ref.name,
-                    "uid": owner_ref.uid,
-                    "controller": owner_ref.controller,
-                    "blockOwnerDeletion": owner_ref.block_owner_deletion
-                }]
-            },
-            "spec": {
-                "backoffLimit": 0,
-                "ttlSecondsAfterFinished": 30,
-                "template": {
-                    "metadata": {
-                        "labels": labels
-                    },
-                    "spec": {
+        // Build Pod spec and set ServiceAccountName (required by CRD)
+        let mut pod_spec = json!({
                         "shareProcessNamespace": true,
                         "restartPolicy": "Never",
                         "securityContext": {
@@ -766,7 +745,47 @@ impl<'a> CodeResourceManager<'a> {
                         }],
                         "containers": containers,
                         "volumes": volumes
-                    }
+        });
+
+        // Prefer CRD-provided ServiceAccountName; else use controller default if set
+        if let Some(sa_name) = code_run
+            .spec
+            .service_account_name
+            .as_ref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            pod_spec["serviceAccountName"] = json!(sa_name.clone());
+        } else if let Some(default_sa) = self
+            .config
+            .agent
+            .service_account_name
+            .as_ref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            pod_spec["serviceAccountName"] = json!(default_sa.clone());
+        }
+
+        let job_spec = json!({
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": job_name,
+                "labels": labels,
+                "ownerReferences": [{
+                    "apiVersion": owner_ref.api_version,
+                    "kind": owner_ref.kind,
+                    "name": owner_ref.name,
+                    "uid": owner_ref.uid,
+                    "controller": owner_ref.controller,
+                    "blockOwnerDeletion": owner_ref.block_owner_deletion
+                }]
+            },
+            "spec": {
+                "backoffLimit": 0,
+                "ttlSecondsAfterFinished": 30,
+                "template": {
+                    "metadata": { "labels": labels },
+                    "spec": pod_spec
                 }
             }
         });
