@@ -48,6 +48,15 @@ Do NOT re-implement functionality that already exists. Extend the existing asset
 ### Token Generation (already implemented)
 The container template (`infra/charts/controller/claude-templates/code/container.sh.hbs`) already handles all GitHub App authentication and token generation. No changes needed - the existing pattern will automatically work with the new agents once their ExternalSecrets are in place.
 
+## Prerequisites
+
+Before starting implementation, verify access to required tools:
+- **kubectl**: Must have access to the Kubernetes cluster (via `KUBECONFIG_B64` environment variable)
+- **Argo CD CLI**: Must be able to login and sync applications (via `ARGOCD_SERVER`, `ARGOCD_USERNAME`, `ARGOCD_PASSWORD`)
+- **GitHub CLI or API access**: For creating GitHub Apps (via `GITHUB_ADMIN_TOKEN`)
+
+If any of these tools are not accessible, STOP and report the issue before proceeding.
+
 ## Implementation Guide
 
 ### Phase 1: Chart Structure Setup
