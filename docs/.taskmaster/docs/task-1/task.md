@@ -51,46 +51,8 @@ Do NOT re-implement functionality that already exists. Extend the existing asset
   - `appId`: GitHub App ID
   - `privateKey`: GitHub App private key (PEM)
 
-### Token Generation Flow (existing pattern)
-Containers mint GitHub App installation tokens inside the container. No separate token microservice.
-1. InitContainer (or entrypoint) reads `appId`/`privateKey` from the mounted Secret
-2. Creates RS256 JWT for the GitHub App
-3. Exchanges JWT for an installation access token
-4. Writes token to a shared volume at `/var/run/github/token` with 0600 permissions
-5. Main container reads token from `/var/run/github/token`
-
-### Workflow Integration Pattern (reference)
-Ensure workflows mount the per-agent Secret and expose a shared volume for the token file.
-```yaml
-initContainers:
-- name: gh-token
-  image: ghcr.io/5dlabs/cto/runtime:latest
-  env:
-    - name: APP_ID
-      valueFrom:
-        secretKeyRef:
-          name: github-app-<agent>
-          key: appId
-    - name: PRIVATE_KEY
-      valueFrom:
-        secretKeyRef:
-          name: github-app-<agent>
-          key: privateKey
-    - name: OUTPUT_PATH
-      value: /var/run/github/token
-  volumeMounts:
-    - name: github-tmp
-      mountPath: /var/run/github
-
-containers:
-- name: runner
-  env:
-    - name: GITHUB_TOKEN_FILE
-      value: /var/run/github/token
-  volumeMounts:
-    - name: github-tmp
-      mountPath: /var/run/github
-```
+### Token Generation (already implemented)
+The container template (`infra/charts/controller/claude-templates/code/container.sh.hbs`) already handles all GitHub App authentication and token generation. No changes needed - the existing pattern will automatically work with the new agents once their ExternalSecrets are in place.
 
 ## Implementation Guide
 

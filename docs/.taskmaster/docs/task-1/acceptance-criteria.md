@@ -53,9 +53,8 @@ This document defines the acceptance criteria for implementing Helm values and A
 ### 7. Workflow Integration ✓
 - [ ] Existing WorkflowTemplates mount:
   - [ ] `/etc/agents/${GITHUB_APP}_system-prompt.md` for prompts
- 
 - [ ] Validation performed via Argo CD/Workflows, not local Helm
- - [ ] Token file `/var/run/github/token` is produced by init pattern and consumed by runners
+- [ ] Token generation already handled by container template (`container.sh.hbs`) - no changes needed
 
 ### 8. Documentation ✓
 - [ ] Architecture document exists at `docs/.taskmaster/architecture.md`
@@ -89,7 +88,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 **When**: Inspect container filesystem  
 **Then**:
 - `/etc/agents/${GITHUB_APP}_system-prompt.md` exists
- - `/var/run/github/token` exists with 0600 perms and is readable by main container
+- Token generation handled automatically by existing container template
 
 ### Test Case 5: Mount Point Verification
 **Given**: Deployed chart  

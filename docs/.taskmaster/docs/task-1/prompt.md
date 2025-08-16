@@ -29,9 +29,9 @@ Reality alignment with our platform:
 What to do in this task:
 - Create new GitHub Apps for Clippy, QA, Triage, and Security using admin env vars (KUBECONFIG_B64, ARGOCD_SERVER/USERNAME/PASSWORD, GITHUB_ADMIN_TOKEN). Store their credentials in the secret store and materialize them via ExternalSecrets in `agent-platform` with names `github-app-5dlabs-{clippy,qa,triage,security}`.
 - Wire the new Apps into `infra/charts/controller/values.yaml` under `.Values.agents`.
-- Improve each agent’s system prompt to be more technical/specific (see Guidance below).
-- Define friendly agent names to match Morgan/Rex style and document the mapping (Clippy → “Cleo”, QA → “Tess”, Triage → “Stitch”, Security → “Onyx”).
- - Ensure containers mint GitHub App installation tokens inside the container using mounted `appId`/`privateKey` and write to `/var/run/github/token` (existing pattern).
+- Improve each agent's system prompt to be more technical/specific (see Guidance below).
+- Define friendly agent names to match Morgan/Rex style and document the mapping (Clippy → "Cleo", QA → "Tess", Triage → "Stitch", Security → "Onyx").
+- Note: Token generation is already fully implemented in the container template (`infra/charts/controller/claude-templates/code/container.sh.hbs`) - no changes needed there.
 
 Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml` under `.Values.agents[*].systemPrompt`)
 
@@ -152,6 +152,7 @@ Update prompts inline under `.Values.agents[*].systemPrompt` in `infra/charts/co
   - `github-app-5dlabs-security`
 - Ensure each target Secret exposes `appId` and `privateKey` keys.
 - Confirm `ClusterSecretStore` is `secret-store` and namespace is `agent-platform`.
+- The existing container template will automatically handle token generation using these secrets - no additional implementation needed.
 
 ### 7. Smoke Test WorkflowTemplate (optional)
 Create `templates/workflowtemplates/agent-mount-smoke.yaml` to validate mount points:
