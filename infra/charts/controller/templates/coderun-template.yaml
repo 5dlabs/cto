@@ -98,7 +98,9 @@ spec:
             continueSession: {{`{{workflow.parameters.continue-session}}`}}
             overwriteMemory: {{`{{workflow.parameters.overwrite-memory}}`}}
             docsBranch: "{{`{{workflow.parameters.docs-branch}}`}}"
+            {{- if .Values.rbac.submitter.clusterAdminServiceAccount.create }}
             serviceAccountName: "{{ .Values.rbac.submitter.clusterAdminServiceAccount.name }}"
+            {{- end }}
             contextVersion: 1
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             
