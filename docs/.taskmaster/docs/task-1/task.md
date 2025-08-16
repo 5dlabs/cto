@@ -16,16 +16,10 @@ Platform alignment:
 
 The system uses multiple specialized AI agents, each with distinct personas and responsibilities:
 - **Rex**: Primary implementation agent
-- **Clippy**: Formatting and pedantic warnings agent  
-- **QA**: Testing-only agent with strict Kubernetes verification requirements
-- **Triage**: CI failure remediation agent
-- **Security**: Vulnerability remediation agent
-
-Friendly names mapping (use consistently across docs and values):
-- Clippy → Cleo
-- QA → Tess
-- Triage → Stitch
-- Security → Onyx
+- **Cleo**: Formatting and pedantic warnings agent (Clippy role)
+- **Tess**: Testing-only agent with strict Kubernetes verification requirements (QA role)
+- **Stitch**: CI failure remediation agent (Triage role)
+- **Onyx**: Security vulnerability remediation agent (Security role)
 
 Each agent requires:
 1. A unique system prompt defining its persona and constraints
@@ -69,34 +63,39 @@ agents:
   rex:
     name: "Rex"
     githubApp: "5DLabs-Rex"
+    role: "Senior Backend Architect & Systems Engineer"
     systemPrompt: |
       # Rex system prompt (truncated)
       ...
 
   clippy:
-    name: "Cleo"            # friendly name
+    name: "Cleo"
     githubApp: "5DLabs-Clippy"
+    role: "Formatting & Code Quality Specialist"
     systemPrompt: |
       # Cleo system prompt (truncated)
       ...
 
   qa:
-    name: "Tess"            # friendly name
+    name: "Tess"
     githubApp: "5DLabs-QA"
+    role: "Quality Assurance & Testing Specialist"
     systemPrompt: |
       # Tess system prompt (truncated)
       ...
 
   triage:
-    name: "Stitch"          # friendly name
+    name: "Stitch"
     githubApp: "5DLabs-Triage"
+    role: "CI/CD Triage & Remediation Specialist"
     systemPrompt: |
       # Stitch system prompt (truncated)
       ...
 
   security:
-    name: "Onyx"            # friendly name
+    name: "Onyx"
     githubApp: "5DLabs-Security"
+    role: "Security & Vulnerability Specialist"
     systemPrompt: |
       # Onyx system prompt (truncated)
       ...

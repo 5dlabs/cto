@@ -13,12 +13,13 @@ Important:
 
 ## Context
 
-You are implementing the configuration foundation for a multi-agent system where different AI agents (Rex, Clippy, QA, Triage, Security) each have unique personas and responsibilities. These agents need their system prompts properly managed through Kubernetes ConfigMaps.
-Friendly names mapping (use consistently across docs and values):
-- Clippy → Cleo
-- QA → Tess
-- Triage → Stitch
-- Security → Onyx
+You are implementing the configuration foundation for a multi-agent system where different AI agents each have unique personas and responsibilities. These agents need their system prompts properly managed through Kubernetes ConfigMaps.
+
+The new agents to add (using friendly names like our existing Rex, Morgan, Blaze, Cipher):
+- **Cleo**: Formatting & code quality specialist
+- **Tess**: QA & testing specialist  
+- **Stitch**: CI/CD triage specialist
+- **Onyx**: Security specialist
 
 
 Reality alignment with our platform:
@@ -27,15 +28,16 @@ Reality alignment with our platform:
 - Charts are installed and reconciled by Argo CD. Testing is done by pushing a PR and observing Argo CD sync/health, not by local `helm upgrade`.
 
 What to do in this task:
-- Create new GitHub Apps for Clippy, QA, Triage, and Security using admin env vars (KUBECONFIG_B64, ARGOCD_SERVER/USERNAME/PASSWORD, GITHUB_ADMIN_TOKEN). Store their credentials in the secret store and materialize them via ExternalSecrets in `agent-platform` with names `github-app-5dlabs-{clippy,qa,triage,security}`.
-- Wire the new Apps into `infra/charts/controller/values.yaml` under `.Values.agents`.
-- Improve each agent's system prompt to be more technical/specific (see Guidance below).
-- Define friendly agent names to match Morgan/Rex style and document the mapping (Clippy → "Cleo", QA → "Tess", Triage → "Stitch", Security → "Onyx").
+- Create new GitHub Apps (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security) using admin env vars (KUBECONFIG_B64, ARGOCD_SERVER/USERNAME/PASSWORD, GITHUB_ADMIN_TOKEN). Store their credentials in the secret store and materialize them via ExternalSecrets in `agent-platform` with names `github-app-5dlabs-{clippy,qa,triage,security}`.
+- Add the new agents to `infra/charts/controller/values.yaml` under `.Values.agents` with keys `clippy`, `qa`, `triage`, `security`.
+- Set their friendly names in the `name` field: Cleo, Tess, Stitch, Onyx.
+- Add a `role` field describing their specialty (following the existing pattern).
+- Write robust, technical system prompts for each agent (see Guidance below).
 - Note: Token generation is already fully implemented in the container template (`infra/charts/controller/claude-templates/code/container.sh.hbs`) - no changes needed there.
 
-Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml` under `.Values.agents[*].systemPrompt`)
+Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml` under `.Values.agents.<key>.systemPrompt`)
 
-- Clippy (Cleo):
+- Cleo (clippy key):
   - Purpose: formatting, lint fixes, and pedantic conformance ONLY. Never change runtime behavior.
   - Rust focus:
     - Enforce cargo fmt; rustfmt defaults; no custom style deviations
@@ -45,7 +47,7 @@ Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml`
     - Do not refactor or reorder logic; produce minimal, mechanical diffs
   - If any change would alter semantics, STOP and propose a PR comment instead
 
-- QA (Tess):
+- Tess (qa key):
   - You ONLY add tests and test scaffolding; you never change implementation code.
   - Rust testing practice:
     - Prefer unit/integration tests in Rust; clear arrange-act-assert
@@ -60,13 +62,13 @@ Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml`
     - Publish logs/evidence/artifacts; mark pass/fail clearly, and approve PR only if all criteria pass
   - Approve PRs when acceptance criteria are proven; do not merge.
 
-- Triage (Stitch):
+- Stitch (triage key):
   - Focus on reproducing CI failures and making the SMALLEST viable fix to turn red → green.
   - Scope control:
     - Update tests if they are wrong; otherwise touch the fewest lines possible
     - Avoid broad refactors and stylistic changes; keep diffs surgical
 
-- Security (Onyx):
+- Onyx (security key):
   - Read security reports (CodeQL, Dependabot). Apply least-privilege remediations.
   - Avoid introducing new secrets; remove accidental secret exposure
   - Document CVE references, affected packages, version ranges, and remediation rationale in PR body

@@ -12,14 +12,12 @@ This document defines the acceptance criteria for implementing Helm values and A
 
 ### 2. Values Configuration ✓
 - [ ] `infra/charts/controller/values.yaml` uses a map under `.Values.agents` with keys `rex`, `clippy`, `qa`, `triage`, `security`
-- [ ] Each agent entry sets `name` to the friendly name:
-  - [ ] Rex → "Rex"
-  - [ ] Clippy → "Cleo"
-  - [ ] QA → "Tess"
-  - [ ] Triage → "Stitch"
-  - [ ] Security → "Onyx"
-- [ ] Each agent has: `name` (friendly), `githubApp`, and a robust technical `systemPrompt` (inline in values)
- - [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey`
+- [ ] Each new agent entry has:
+  - [ ] `name`: Friendly name (Cleo, Tess, Stitch, Onyx)
+  - [ ] `githubApp`: GitHub App name (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security)
+  - [ ] `role`: Description of their specialty
+  - [ ] `systemPrompt`: Robust technical prompt (inline in values)
+- [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey`
 
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure
