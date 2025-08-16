@@ -8,7 +8,8 @@ This document defines the acceptance criteria for implementing Helm values and A
 ### 0. Prerequisites Verification ✓
 - [ ] kubectl access verified (`kubectl cluster-info` works)
 - [ ] Argo CD CLI access verified (`argocd app list` works after login)
-- [ ] GitHub access verified (can create apps via UI or API)
+- [ ] **Argo Workflows CLI access verified** (`argo version --short` works - CLI is at `/usr/local/bin/argo`)
+- [ ] GitHub access verified (can create apps via UI or API using `GITHUB_ADMIN_TOKEN`)
 - [ ] All required environment variables are set and valid
 
 ### 1. Helm Chart Structure ✓
@@ -38,6 +39,7 @@ This document defines the acceptance criteria for implementing Helm values and A
   - [ ] Generated App ID and private key stored in external secret store
 - [ ] **VALIDATION**: Apps must be visible at `https://github.com/organizations/5dlabs/settings/apps`
 - [ ] **VALIDATION**: Each app must be installed on the organization with appropriate repository access
+- [ ] **CRITICAL**: GitHub Apps must be ACTUALLY CREATED during task execution, not left as "next steps"
 
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure
