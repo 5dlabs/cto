@@ -2,23 +2,26 @@
 
 ## Overview
 
-This task creates a reusable WorkflowTemplate that encapsulates the creation of CodeRun/DocsRun Custom Resources, auto-detects parameters from event payloads, and reduces required arguments to 1-2 parameters as per the Product Requirements Document (PRD). This significantly simplifies workflow invocation while maintaining full functionality.
+This task extends our existing WorkflowTemplates that create CodeRun/DocsRun Custom Resources, focusing on parameter simplification and auto-detection from event payloads. We already have coderun/docsrun templates installed by the controller chart; refine rather than reinvent.
+
+Important:
+- Do NOT re-implement functionality that already exists. Extend the existing templates under `infra/charts/controller/templates/`.
+- Testing/verification via Argo tools (Argo CD and Argo Workflows), not Helm.
+- Scope: Rust-only for this phase; multi-language support is out of scope.
 
 ## Architecture
 
 The solution provides three main components:
 
-1. **coderun-template**: A WorkflowTemplate that creates CodeRun CRs with minimal parameters
-2. **docsrun-template**: A WorkflowTemplate that creates DocsRun CRs for documentation tasks  
-3. **press-play**: An orchestrator workflow that fans out over backlog items with concurrency controls
+1. **coderun-template (existing)**: Creates CodeRun CRs
+2. **docsrun-template (existing)**: Creates DocsRun CRs for documentation tasks  
+3. **press-play (optional)**: Orchestrator DAG can remain out-of-scope; focus on simplifying inputs to the existing templates
 
 ## Key Features
 
-### Simplified API
-- **Required Parameters**: Only `github-app` parameter is required
-- **Auto-Detection**: Automatically infers repo, owner, ref, PR number from event payloads
-- **Smart Defaults**: Falls back to git context or sensible defaults when event data is missing
-- **Flexible Inputs**: Supports both Argo Events payloads and manual parameters
+### Simplified API (incremental)
+- Reduce required parameters where safe; keep compatibility with templates in `infra/charts/controller/templates/`
+- Auto-detect owner/repo/ref/PR number from Argo Events payloads when present; otherwise use existing parameters
 
 ### Event Payload Processing
 - **Pull Requests**: Extracts owner, repo, ref, PR number from pull_request events
@@ -29,7 +32,7 @@ The solution provides three main components:
 
 ### Resource Management
 - **Workspace Preparation**: Sets up `/work/src` workspace directory
-- **MCP Requirements**: Mounts MCP tools configuration at `/work/requirements.yaml`
+- **MCP Requirements**: Mounts MCP tools configuration at `/work/requirements.yaml` (provided by project-level `docs/requirements.yaml`; per-task `@client-config.json` unification will be handled in a separate task)
 - **System Prompts**: Resolves GitHub App-specific system prompts from ConfigMap
 - **Token Integration**: Integrates with GitHub App token generator from Task 2
 
@@ -87,9 +90,9 @@ SHA=$(jq -r '.pull_request.head.sha // .after // .workflow_run.head_sha // empty
 [ -z "$REF" ] && REF=main
 ```
 
-### System Prompt Resolution
+### System Prompt Resolution (existing)
 
-The system resolves GitHub App-specific system prompts from a controller-agents ConfigMap:
+Prompts are resolved from the `controller-agents` ConfigMap rendered by Helm:
 
 ```bash
 SYSTEM="/etc/agents/${GITHUB_APP}_system-prompt.md"
@@ -97,7 +100,7 @@ SYSTEM="/etc/agents/${GITHUB_APP}_system-prompt.md"
 [ -f "$SYSTEM" ] || { echo "missing prompt" >&2; exit 2; }
 ```
 
-### Volume and Secret Mounting
+### Volume and Secret Mounting (existing)
 
 ```yaml
 volumes:
@@ -129,9 +132,7 @@ volumeMounts:
     mountPath: /var/run/github
 ```
 
-## CodeRun CR Generation
-
-The final step creates a CodeRun Custom Resource with all auto-detected and configured parameters:
+## CodeRun CR Generation (unchanged)
 
 ```yaml
 apiVersion: taskmaster.io/v1
@@ -153,9 +154,7 @@ spec:
   taskRef: "{{inputs.parameters.taskRef}}"
 ```
 
-## docsrun-template Implementation
-
-Similar to coderun-template but creates DocsRun CRs for documentation tasks:
+## docsrun-template (unchanged)
 
 ```yaml
 apiVersion: taskmaster.io/v1

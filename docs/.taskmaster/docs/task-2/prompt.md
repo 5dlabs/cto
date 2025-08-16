@@ -4,6 +4,11 @@
 
 You are implementing a secure, PAT-free GitHub App authentication system. Your goal is to create a production-ready solution that sources GitHub App credentials from External Secrets and provides installation tokens to workflows without using Personal Access Tokens.
 
+Important:
+- Do NOT re-implement functionality that already exists. Extend the existing assets instead.
+- We already use External Secrets and in-container token minting; focus on adding the new apps and wiring.
+- Scope: Rust-only for now; multi-language support is out of scope.
+
 ## Context
 
 This system replaces insecure PAT-based authentication with a proper GitHub App credential management system. The implementation must handle five GitHub Apps (rex, clippy, qa, triage, security) and provide tokens to Argo Workflows via shared volumes.
