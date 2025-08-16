@@ -1,8 +1,8 @@
-# Task 1: Helm Values and Agents ConfigMap for Personas and Project-wide Tools
+# Task 1: Helm Values and Agents ConfigMap for Personas
 
 ## Overview
 
-This task implements the foundational configuration management for the multi-agent orchestration system. It establishes Helm values and templates to render agent personas' system prompts into ConfigMaps and defines project-wide MCP (Model Context Protocol) tools configuration.
+This task implements the foundational configuration management for the multi-agent orchestration system. It establishes Helm values and templates to render agent personas' system prompts into ConfigMaps.
 
 Platform alignment:
 - Do NOT re-implement functionality that already exists. Extend existing assets instead.
@@ -29,8 +29,68 @@ Friendly names mapping (use consistently across docs and values):
 
 Each agent requires:
 1. A unique system prompt defining its persona and constraints
-2. Access to project-wide MCP tools configuration
-3. Proper mounting of these configurations into workflow pods
+2. Proper mounting of these prompts into workflow pods
+
+## Secret Management and GitHub App Authentication
+
+Do NOT re-implement functionality that already exists. Extend the existing assets instead.
+
+### Admin Secret (for administrative operations)
+- Use a single admin secret named `agent-admin-secrets` for administrative operations (cluster and Argo CD administration, and a repo/org-level GitHub admin PAT when absolutely necessary).
+- Expected keys (already documented in `docs/requirements.yaml`): `KUBECONFIG_B64`, `ARGOCD_SERVER`, `ARGOCD_USERNAME`/`ARGOCD_PASSWORD` (or `ARGOCD_AUTH_TOKEN`), and `GITHUB_ADMIN_TOKEN`.
+- This secret is NOT used by role-specific agents; those use their own GitHub App secrets via ExternalSecrets.
+
+### External Secrets for GitHub Apps (per-agent credentials)
+- Extend existing ExternalSecrets under `infra/secret-store/agent-secrets-external-secrets.yaml` (do not create a new file) to add the four new agents introduced in this task.
+- Existing pattern already covers several apps (e.g., Rex/Blaze/Morgan/Cipher). Add entries for the new ones:
+  - Clippy
+  - QA
+  - Triage
+  - Security
+- Follow the established naming and `ClusterSecretStore` reference (our cluster-wide store is `secret-store`). Target Kubernetes `Secret`s should contain at least:
+  - `appId`: GitHub App ID
+  - `privateKey`: GitHub App private key (PEM)
+
+### Token Generation Flow (existing pattern)
+Containers mint GitHub App installation tokens inside the container. No separate token microservice.
+1. InitContainer (or entrypoint) reads `appId`/`privateKey` from the mounted Secret
+2. Creates RS256 JWT for the GitHub App
+3. Exchanges JWT for an installation access token
+4. Writes token to a shared volume at `/var/run/github/token` with 0600 permissions
+5. Main container reads token from `/var/run/github/token`
+
+### Workflow Integration Pattern (reference)
+Ensure workflows mount the per-agent Secret and expose a shared volume for the token file.
+```yaml
+initContainers:
+- name: gh-token
+  image: ghcr.io/5dlabs/cto/runtime:latest
+  env:
+    - name: APP_ID
+      valueFrom:
+        secretKeyRef:
+          name: github-app-<agent>
+          key: appId
+    - name: PRIVATE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: github-app-<agent>
+          key: privateKey
+    - name: OUTPUT_PATH
+      value: /var/run/github/token
+  volumeMounts:
+    - name: github-tmp
+      mountPath: /var/run/github
+
+containers:
+- name: runner
+  env:
+    - name: GITHUB_TOKEN_FILE
+      value: /var/run/github/token
+  volumeMounts:
+    - name: github-tmp
+      mountPath: /var/run/github
+```
 
 ## Implementation Guide
 
@@ -57,9 +117,6 @@ agents:
   - name: security
     githubApp: security-agent
     systemPromptFile: security_system-prompt.md
-
-mcp:
-  requirementsFile: requirements.yaml
 ```
 
 #### 1.2 Add JSON Schema Validation
@@ -83,16 +140,9 @@ If needed, update schema validation to reflect added fields (optional for now).
         }
       },
       "minItems": 1
-    },
-    "mcp": {
-      "type": "object",
-      "properties": {
-        "requirementsFile": {"type": "string", "minLength": 1}
-      },
-      "required": ["requirementsFile"]
     }
   },
-  "required": ["agents", "mcp"]
+  "required": ["agents"]
 }
 ```
 
@@ -112,18 +162,11 @@ No new helpers required; we’re extending existing values/prompts.
 - name: agents-prompts
   configMap:
     name: controller-agents
-- name: mcp-requirements
-  configMap:
-    name: mcp-requirements
 {{- end -}}
 
 {{- define "platform.agentVolumeMounts" -}}
 - name: agents-prompts
   mountPath: /etc/agents
-  readOnly: true
-- name: mcp-requirements
-  mountPath: /work/requirements.yaml
-  subPath: requirements.yaml
   readOnly: true
 {{- end -}}
 ```
@@ -149,9 +192,7 @@ data:
 {{- end }}
 ```
 
-#### 3.2 MCP Requirements (out of scope)
-
-Project-level MCP tools are out of scope for Task 1 and handled in a later task.
+ 
 
 ### Phase 4: Package Files
 
@@ -164,19 +205,7 @@ Prompts are supplied inline via `.Values.agents[*].systemPrompt` in `infra/chart
 - `triage_system-prompt.md`
 - `security_system-prompt.md`
 
-#### 4.2 MCP Requirements
-
-Project-level MCP requirements live at `docs/requirements.yaml`. Extend it to define a safe admin tool that reads `${GITHUB_ADMIN_TOKEN}` from env (sourced via External Secrets) rather than embedding tokens.
-
-```yaml
-tools:
-  - name: github-comments
-    transport: http
-    endpoint: http://mcp-github-comments:8080
-  - name: k8s-verify
-    transport: exec
-    command: [/bin/kubectl, version, --client]
-```
+ 
 
 ### Phase 5: WorkflowTemplate Integration
 
@@ -233,6 +262,10 @@ echo "Verify prompt sizes in values.yaml if adding large blocks"
 - External Secrets Operator (for GitHub App secrets)
 - Proper RBAC permissions for ConfigMap creation
 
+Additionally for secrets:
+- ClusterSecretStore set up (`secret-store`)
+- Access to external secret backend with GitHub App credentials
+
 ## Risk Mitigation
 
 ### ConfigMap Size Limits
@@ -256,15 +289,15 @@ echo "Verify prompt sizes in values.yaml if adding large blocks"
 This task establishes the configuration foundation for the multi-agent orchestration system:
 
 1. **Agent Personas**: Each agent's system prompt defines its role, constraints, and behavior
-2. **MCP Tools**: Project-wide tool configuration enables consistent agent capabilities
-3. **Workflow Integration**: Volume mounts make configurations available to all workflow pods
+2. **Per-agent Authentication**: GitHub App credentials delivered via ExternalSecrets; tokens minted in-container
+3. **Workflow Integration**: Volume mounts make prompts and tokens available to workflow pods
 4. **Environment Flexibility**: Helm values allow per-environment customization
 
 ## Next Steps
 
 After completing this task:
-1. Task 2 will define/extend GitHub App secrets via External Secrets and (optionally) an installation-token helper, and add the new Clippy App.
-2. Task 3 extends existing workflow templates (we already have them) rather than creating new ones; focus on parameter simplification and prompt/requirements mounts.
+1. GitHub App ExternalSecrets and in-container token minting are included here (Task 2 merged into Task 1). Any monitoring/rotation hardening can be a follow-up.
+2. Task 3 extends existing workflow templates (we already have them) rather than creating new ones; focus on parameter simplification and prompt mounts.
 3. Task 4 will implement event sensors that trigger workflows with appropriate agent selections
 
 ## References

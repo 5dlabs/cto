@@ -30,7 +30,8 @@ What to do in this task:
 - Create new GitHub Apps for Clippy, QA, Triage, and Security using admin env vars (KUBECONFIG_B64, ARGOCD_SERVER/USERNAME/PASSWORD, GITHUB_ADMIN_TOKEN). Store their credentials in the secret store and materialize them via ExternalSecrets in `agent-platform` with names `github-app-5dlabs-{clippy,qa,triage,security}`.
 - Wire the new Apps into `infra/charts/controller/values.yaml` under `.Values.agents`.
 - Improve each agent’s system prompt to be more technical/specific (see Guidance below).
-- Define friendly agent names to match Morgan/Rex style and document the mapping (Clippy → “Cleo”, QA → “Quinn”, Triage → “Patch”, Security → “Sable”).
+- Define friendly agent names to match Morgan/Rex style and document the mapping (Clippy → “Cleo”, QA → “Tess”, Triage → “Stitch”, Security → “Onyx”).
+ - Ensure containers mint GitHub App installation tokens inside the container using mounted `appId`/`privateKey` and write to `/var/run/github/token` (existing pattern).
 
 Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml` under `.Values.agents[*].systemPrompt`)
 
@@ -123,17 +124,24 @@ Implement in `templates/_helpers.tpl`:
 
  
 
-### 6. File Packaging
+### 6. Values Updates and Secrets
 
 #### Agent Prompts
-Create placeholder prompt files in `files/agents/`:
-- `rex_system-prompt.md`: "You are Rex, the primary implementation agent..."
-- `clippy_system-prompt.md`: "You are Clippy, responsible for formatting and pedantic warnings..."
-- `qa_system-prompt.md`: "You are QA agent. You can ONLY add tests, never modify implementation..."
-- `triage_system-prompt.md`: "You are Triage agent, specialized in CI failure remediation..."
-- `security_system-prompt.md`: "You are Security agent, focused on vulnerability remediation..."
+Update prompts inline under `.Values.agents[*].systemPrompt` in `infra/charts/controller/values.yaml` (no chart files created):
+- `rex_system-prompt.md` content → `.Values.agents[name==rex].systemPrompt`
+- `clippy_system-prompt.md` content → `.Values.agents[name==clippy].systemPrompt`
+- `qa_system-prompt.md` content → `.Values.agents[name==qa].systemPrompt`
+- `triage_system-prompt.md` content → `.Values.agents[name==triage].systemPrompt`
+- `security_system-prompt.md` content → `.Values.agents[name==security].systemPrompt`
 
- 
+#### ExternalSecrets (update existing manifests)
+- Extend `infra/secret-store/agent-secrets-external-secrets.yaml` to include:
+  - `github-app-5dlabs-clippy`
+  - `github-app-5dlabs-qa`
+  - `github-app-5dlabs-triage`
+  - `github-app-5dlabs-security`
+- Ensure each target Secret exposes `appId` and `privateKey` keys.
+- Confirm `ClusterSecretStore` is `secret-store` and namespace is `agent-platform`.
 
 ### 7. Smoke Test WorkflowTemplate (optional)
 Create `templates/workflowtemplates/agent-mount-smoke.yaml` to validate mount points:
@@ -222,5 +230,5 @@ argo -n dev logs @latest
 
 - This task sets up the configuration foundation for all subsequent tasks
 - Agent prompts will be refined as the system evolves
- 
+
 - Environment-specific overrides use standard Helm values patterns

@@ -1,7 +1,7 @@
 # Task 1: Acceptance Criteria
 
 ## Overview
-This document defines the acceptance criteria for implementing Helm values and Agents ConfigMap for personas and project-wide MCP tools configuration.
+This document defines the acceptance criteria for implementing Helm values and Agents ConfigMap for personas.
 
 ## Core Acceptance Criteria
 
@@ -17,6 +17,7 @@ This document defines the acceptance criteria for implementing Helm values and A
   - [ ] Stitch (Triage)
   - [ ] Onyx (Security)
 - [ ] Each agent has: friendly `name` (Cleo/Tess/Stitch/Onyx), `githubApp`, and a robust technical `systemPrompt` (inline in values)
+ - [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey`
 
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure
@@ -41,8 +42,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 - [ ] Preserves formatting and newlines from source files
 - [ ] Labels follow Kubernetes conventions
 
-#### MCP Requirements
-- [ ] Requirements provided at `docs/requirements.yaml` and mounted by jobs (no Helm ConfigMap required)
+ 
 
 ### 6. Prompts ✓
 - [ ] Prompts are defined inline under `.Values.agents[*].systemPrompt`
@@ -51,8 +51,9 @@ This document defines the acceptance criteria for implementing Helm values and A
 ### 7. Workflow Integration ✓
 - [ ] Existing WorkflowTemplates mount:
   - [ ] `/etc/agents/${GITHUB_APP}_system-prompt.md` for prompts
-  - [ ] `/work/requirements.yaml` for MCP config
+ 
 - [ ] Validation performed via Argo CD/Workflows, not local Helm
+ - [ ] Token file `/var/run/github/token` is produced by init pattern and consumed by runners
 
 ### 8. Documentation ✓
 - [ ] Architecture document exists at `docs/.taskmaster/architecture.md`
@@ -79,7 +80,6 @@ This document defines the acceptance criteria for implementing Helm values and A
 **When**: Inspect ConfigMap data  
 **Then**:
 - controller-agents has 5 keys (one per agent)
-- mcp-requirements has requirements.yaml key
 - Content matches source files
 
 ### Test Case 4: Workflow Mount Test
@@ -87,7 +87,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 **When**: Inspect container filesystem  
 **Then**:
 - `/etc/agents/${GITHUB_APP}_system-prompt.md` exists
-- `/work/requirements.yaml` exists
+ - `/var/run/github/token` exists with 0600 perms and is readable by main container
 
 ### Test Case 5: Mount Point Verification
 **Given**: Deployed chart  
@@ -131,7 +131,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 ## Security Criteria
 
 - [ ] ConfigMaps are read-only when mounted
-- [ ] No sensitive data in prompts or requirements
+- [ ] No sensitive data in prompts or ConfigMaps
 - [ ] Proper RBAC for ConfigMap access
 - [ ] Files mounted with appropriate permissions
 
@@ -153,11 +153,10 @@ Rollback is achieved via Git revert/PR merge; Argo CD will rollback on sync.
 ## Validation Commands
 
 ```bash
-# Quick validation suite
-helm lint charts/platform && \
-helm template charts/platform > /tmp/rendered.yaml && \
-yq '. | select(.kind=="ConfigMap") | .metadata.name' /tmp/rendered.yaml | grep -E "(controller-agents|mcp-requirements)" && \
-find charts/platform/files -type f -printf '%s\n' | awk '{s+=$1} END {print s" bytes total (must be < 900000)"}' && \
+# Quick validation suite (Argo CD + kubectl)
+argocd app sync controller | cat
+kubectl -n agent-platform get cm controller-agents -o yaml | head -n 40
+kubectl -n agent-platform get externalsecrets | grep github-app-5dlabs || true
 echo "✅ All quick validations passed"
 ```
 
