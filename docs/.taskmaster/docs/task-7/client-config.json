@@ -1,0 +1,30 @@
+{
+  "remoteTools": [
+    {
+      "name": "mcp-github-comments",
+      "description": "GitHub PR and issue comment retrieval service",
+      "baseUrl": "http://mcp-github-comments.workflows.svc.cluster.local",
+      "endpoints": [
+        {
+          "path": "/repos/{owner}/{repo}/pulls/{number}/comments/combined",
+          "method": "GET",
+          "description": "Get all PR comments with optional summarization",
+          "parameters": {
+            "summarize": "none|brief|compact",
+            "include": "review,issue,timeline",
+            "max_items": "2000"
+          }
+        }
+      ]
+    }
+  ],
+  "localServers": {
+    "comment-tester": {
+      "command": ["./scripts/test-comment-retrieval.sh"],
+      "args": ["--pr", "123", "--mode", "combined"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}

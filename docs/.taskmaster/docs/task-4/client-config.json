@@ -1,0 +1,139 @@
+{
+  "remoteTools": [
+    {
+      "name": "pr-validation-dag",
+      "description": "PR validation DAG workflow for compliance gates and QA verification",
+      "baseUrl": "https://argo-workflows.workflows.svc.cluster.local:2746",
+      "endpoints": [
+        {
+          "path": "/api/v1/workflows/{namespace}",
+          "method": "POST",
+          "description": "Submit PR validation workflow",
+          "parameters": {
+            "workflowTemplateRef": "pr-validation",
+            "owner": "Repository owner",
+            "repo": "Repository name",
+            "prNumber": "Pull request number",
+            "ref": "Branch reference",
+            "event": "GitHub event payload"
+          }
+        },
+        {
+          "path": "/api/v1/workflows/{namespace}/{name}",
+          "method": "GET",
+          "description": "Get workflow status and gate results"
+        }
+      ]
+    },
+    {
+      "name": "compliance-verification-api",
+      "description": "Multi-language compliance verification service",
+      "baseUrl": "http://compliance-verifier.workflows.svc.cluster.local:8080",
+      "endpoints": [
+        {
+          "path": "/verify",
+          "method": "POST",
+          "description": "Verify code compliance for multiple languages",
+          "parameters": {
+            "language": "Programming language (rust, node, go, python, shell)",
+            "workspaceDir": "Directory containing source code",
+            "config": "Optional .pr-validation.yml configuration"
+          }
+        },
+        {
+          "path": "/detect-language",
+          "method": "POST",
+          "description": "Auto-detect project language from file patterns"
+        },
+        {
+          "path": "/validate-config",
+          "method": "POST",
+          "description": "Validate .pr-validation.yml configuration file"
+        }
+      ]
+    },
+    {
+      "name": "qa-evidence-validator",
+      "description": "Kubernetes QA evidence collection and validation service",
+      "baseUrl": "http://qa-evidence.workflows.svc.cluster.local:8080",
+      "endpoints": [
+        {
+          "path": "/collect-evidence",
+          "method": "POST",
+          "description": "Collect Kubernetes evidence for QA validation",
+          "parameters": {
+            "namespace": "Kubernetes namespace to collect from",
+            "outputDir": "Directory to save evidence files"
+          }
+        },
+        {
+          "path": "/validate-evidence", 
+          "method": "POST",
+          "description": "Validate QA evidence completeness and structure",
+          "parameters": {
+            "evidenceDir": "Directory containing evidence files",
+            "summaryFile": "Path to summary.json file"
+          }
+        },
+        {
+          "path": "/generate-verification",
+          "method": "POST",
+          "description": "Generate verification.json summary"
+        }
+      ]
+    },
+    {
+      "name": "kubernetes-api",
+      "description": "Kubernetes API for resource access and log collection",
+      "baseUrl": "https://kubernetes.default.svc",
+      "endpoints": [
+        {
+          "path": "/api/v1/namespaces/{namespace}/pods",
+          "method": "GET",
+          "description": "List pods in namespace for evidence collection"
+        },
+        {
+          "path": "/api/v1/namespaces/{namespace}/services",
+          "method": "GET",
+          "description": "List services in namespace"
+        },
+        {
+          "path": "/api/v1/namespaces/{namespace}/events",
+          "method": "GET",
+          "description": "Get events for audit trail"
+        },
+        {
+          "path": "/api/v1/namespaces/{namespace}/pods/{name}/log",
+          "method": "GET",
+          "description": "Get pod logs for evidence collection"
+        }
+      ]
+    }
+  ],
+  "localServers": {
+    "compliance-tester": {
+      "command": ["./scripts/test-compliance.sh"],
+      "args": ["--languages", "rust,node,go,python", "--test-dir", "./test-projects"],
+      "env": {
+        "CI_MULTILANG_IMAGE": "ghcr.io/myorg/ci-multilang:latest",
+        "TEST_MODE": "comprehensive"
+      }
+    },
+    "evidence-simulator": {
+      "command": ["./scripts/simulate-qa-evidence.sh"],
+      "args": ["--namespace", "test-pr-123", "--output-dir", "./test-evidence"],
+      "env": {
+        "KUBECONFIG": "${HOME}/.kube/config",
+        "KUBECTL_VERSION": "1.30"
+      }
+    },
+    "dag-validator": {
+      "command": ["./scripts/validate-pr-dag.sh"],
+      "args": ["--template", "pr-validation.yaml", "--test-scenarios", "all"],
+      "env": {
+        "ARGO_SERVER": "localhost:2746",
+        "NAMESPACE": "workflows"
+      }
+    }
+  }
+}

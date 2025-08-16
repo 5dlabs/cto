@@ -1,0 +1,289 @@
+# Task ID: 3
+# Title: Common Argo WorkflowTemplate wrapper for CodeRun/DocsRun with simplified API
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Create a reusable WorkflowTemplate that encapsulates creation of CodeRun/DocsRun CRs, auto-detects parameters from event payloads, and reduces required arguments to 1-2 per PRD.
+# Details:
+Implementation:
+- Create a WorkflowTemplate named coderun-template with a template coderun-main using a resource template to create CodeRun CRs. Expose minimal params: github-app (required), taskRef (optional), repo/ref inferred.
+- Auto-detection logic:
+  - Read event payload from Argo Events (passed via workflow.parameters.event) to infer repo, owner, ref/branch, prNumber, issueNumber, workflowRunId, etc.
+  - If not provided, infer from git in workspace (git rev-parse --abbrev-ref HEAD).
+  - Mount controller-agents ConfigMap to locate the system prompt file based on github-app param.
+- Create an init step to prepare workspace and MCP tools; then resource step applies CodeRun CR:
+  templates:
+  - name: coderun-main
+    inputs:
+      parameters:
+        - name: github-app
+        - name: event
+          default: "{}"
+        - name: taskRef
+          default: ""
+    script:
+      image: alpine/git:latest
+      command: [sh]
+      source: |
+        echo "$event" > /tmp/event.json
+        OWNER=$(jq -r '.repository.owner.login // .organization.login // empty' /tmp/event.json)
+        REPO=$(jq -r '.repository.name // empty' /tmp/event.json)
+        REF=$(jq -r '.pull_request.head.ref // .ref // .workflow_run.head_branch // "main"' /tmp/event.json)
+        PRNR=$(jq -r '.pull_request.number // empty' /tmp/event.json)
+        echo "owner=$OWNER repo=$REPO ref=$REF pr=$PRNR" > /tmp/ctx
+    - name: create-coderun
+      resource:
+        action: create
+        manifest: |
+          apiVersion: taskmaster.io/v1
+          kind: CodeRun
+          metadata:
+            generateName: coderun-
+          spec:
+            repo: {{=sprig.jsonPath .workflow.parameters.event "$.repository.full_name"}}
+            ref: {{inputs.parameters.ref}}
+            prompts:
+              system: /etc/agents/{{inputs.parameters.github-app}}_system-prompt.md
+              user: task/prompt.md
+            mcpRequirementsFile: /work/requirements.yaml
+            github:
+              appName: {{inputs.parameters.github-app}}
+              tokenFile: /var/run/github/token
+            workspace:
+              path: /work/src
+            taskRef: {{inputs.parameters.taskRef}}
+- Additionally create a docsrun-template for documentation/deploy/acceptance tasks using DocsRun CRD.
+- Provide a separate Workflow called press-play that accepts a project list and creates child workflows for each backlog item, relying on coderun-template; include concurrency controls via spec.parallelism.
+- Ensure no CRDs changed; only create them via resource templates.
+
+# Test Strategy:
+Unit-test the parameter auto-detection by feeding synthetic event payloads (PR, issue, workflow_run, push) and asserting inferred values. Integration: Submit a workflow referencing coderun-template and verify a CodeRun CR is created and reconciled by the existing controller. Validate minimal arguments work (only github-app provided). Negative tests: malformed events should gracefully default or fail with clear message.
+
+# Subtasks:
+## 1. Define coderun-template WorkflowTemplate skeleton and minimal parameters [pending]
+### Dependencies: None
+### Description: Create the base WorkflowTemplate named coderun-template with entrypoint coderun-main and minimal inputs.
+### Details:
+- Name: coderun-template; entrypoint: coderun-main
+- Inputs (coderun-main):
+  - parameters:
+    - name: github-app (required)
+    - name: event (default: "{}")
+    - name: taskRef (default: "")
+- High-level templates (filled in by later subtasks):
+  - coderun-context (script) -> validate-prompt (script) -> create-coderun (resource)
+- Apply via kubectl and ensure argo recognizes the template.
+Acceptance criteria:
+- argo template list shows coderun-template with template coderun-main.
+- Only parameter required in happy path is github-app; event and taskRef have safe defaults.
+
+## 2. Implement event payload ingestion and jq-based inference [pending]
+### Dependencies: 3.1
+### Description: Add coderun-context script template to parse Argo Events payload and infer repo/owner/ref/PR/issue/workflow_run/sha with fallbacks.
+### Details:
+- Template name: coderun-context (script)
+- Image: alpine:3.19; install jq and git (apk add --no-cache jq git)
+- Inputs: parameters.event
+- Behavior:
+  - Write event to /tmp/event.json
+  - Infer values with jq; fallback to git in workspace (/work/src) or defaults (ref=main):
+    OWNER=$(jq -r '.repository.owner.login // .organization.login // empty' /tmp/event.json)
+    REPO=$(jq -r '.repository.name // empty' /tmp/event.json)
+    FULL=$(jq -r '.repository.full_name // empty' /tmp/event.json)
+    REF=$(jq -r '.pull_request.head.ref // .ref // .workflow_run.head_branch // empty' /tmp/event.json)
+    PRNR=$(jq -r '.pull_request.number // empty' /tmp/event.json)
+    ISSNR=$(jq -r '.issue.number // empty' /tmp/event.json)
+    WRID=$(jq -r '.workflow_run.id // empty' /tmp/event.json)
+    SHA=$(jq -r '.pull_request.head.sha // .after // .workflow_run.head_sha // empty' /tmp/event.json)
+    [ -z "$REF" ] && [ -d /work/src/.git ] && REF=$(cd /work/src && git rev-parse --abbrev-ref HEAD || true)
+    [ -z "$FULL" ] && [ -n "$OWNER" ] && [ -n "$REPO" ] && FULL="$OWNER/$REPO"
+    [ -z "$REF" ] && REF=main
+  - Emit outputs.parameters: repoFullName, owner, repo, ref, prNumber, issueNumber, workflowRunId, sha, isPR (1 if PRNR set else 0)
+- Artifact: /tmp/event.json for debugging
+Acceptance criteria:
+- Given synthetic PR/issue/workflow_run/push payloads, outputs are correctly populated with sane defaults when fields are missing.
+
+## 3. Workspace preparation and MCP requirements mounting [pending]
+### Dependencies: 3.1
+### Description: Prepare /work directories, mount MCP requirements and tokens, and ensure tools are available to subsequent steps.
+### Details:
+- Volumes/mounts on coderun-main:
+  - ConfigMap controller-agents -> mountPath: /etc/agents (readOnly: true)
+  - ConfigMap mcp-requirements (key: requirements.yaml) -> mountPath: /work/requirements.yaml (subPath)
+  - Secret github-app-token (populated by Task 2) -> mountPath: /var/run/github/token (file)
+  - EmptyDir workspace -> mountPath: /work/src
+- Init step template: init-workspace (script, alpine:3.19)
+  - mkdir -p /work/src
+  - If git URL derivable from event, optional shallow clone can be skipped; CodeRun controller will manage workspace.
+  - Verify jq/git present or install as needed.
+- Standardize paths for downstream:
+  - Workspace: /work/src
+  - MCP requirements: /work/requirements.yaml
+  - System prompts: /etc/agents
+  - GitHub token: /var/run/github/token
+Acceptance criteria:
+- Workflow pod mounts all paths; files /etc/agents/*_system-prompt.md and /work/requirements.yaml are readable; /var/run/github/token exists.
+
+## 4. System prompt resolution via controller-agents ConfigMap [pending]
+### Dependencies: 3.1
+### Description: Derive the system prompt path from github-app and validate the file exists before creating CRs.
+### Details:
+- Add validate-prompt (script) between coderun-context and create-coderun:
+  - PATH: /etc/agents
+  - FILE: /etc/agents/${GITHUB_APP}_system-prompt.md
+  - If not found, check /etc/agents/default_system-prompt.md; if neither exists, exit non-zero with clear message.
+- Inputs: parameter github-app; env GITHUB_APP sourced from inputs
+- Outputs: parameter systemPromptPath
+- Example snippet:
+  SYSTEM="/etc/agents/${GITHUB_APP}_system-prompt.md"; [ -f "$SYSTEM" ] || SYSTEM="/etc/agents/default_system-prompt.md"; [ -f "$SYSTEM" ] || { echo "missing prompt" >&2; exit 2; }; echo -n "$SYSTEM" > /tmp/system.txt
+- Use this path in CR manifests (subtask 5/6)
+Acceptance criteria:
+- For any valid github-app, the resolved prompt path points to an existing file; workflow fails fast if none exist.
+
+## 5. Resource template to create CodeRun CR with simplified API [pending]
+### Dependencies: 3.2, 3.3, 3.4
+### Description: Emit a CodeRun CR using resource template with minimal params (github-app required, taskRef optional) and inferred repo/ref.
+### Details:
+- Add create-coderun (resource) in coderun-template:
+  apiVersion: argoproj.io/v1alpha1
+  kind: WorkflowTemplate
+  ... templates:
+    - name: coderun-main
+      inputs:
+        parameters:
+          - name: github-app
+          - name: event
+            value: "{}"
+          - name: taskRef
+            value: ""
+      steps:
+        - - name: context
+            template: coderun-context
+            arguments: {parameters: [{name: event, value: '{{inputs.parameters.event}}'}]}
+          - name: validate-prompt
+            template: validate-prompt
+            arguments: {parameters: [{name: github-app, value: '{{inputs.parameters.github-app}}'}]}
+        - - name: create
+            template: create-coderun
+            arguments:
+              parameters:
+                - {name: github-app, value: '{{inputs.parameters.github-app}}'}
+                - {name: taskRef, value: '{{inputs.parameters.taskRef}}'}
+    - name: create-coderun
+      inputs:
+        parameters:
+          - name: github-app
+          - name: taskRef
+      resource:
+        action: create
+        manifest: |
+          apiVersion: taskmaster.io/v1
+          kind: CodeRun
+          metadata:
+            generateName: coderun-
+          spec:
+            repo: "{{steps.context.outputs.parameters.repoFullName}}"
+            ref: "{{steps.context.outputs.parameters.ref}}"
+            prompts:
+              system: "{{steps.validate-prompt.outputs.parameters.systemPromptPath}}"
+              user: "task/prompt.md"
+            mcpRequirementsFile: "/work/requirements.yaml"
+            github:
+              appName: "{{inputs.parameters.github-app}}"
+              tokenFile: "/var/run/github/token"
+            workspace:
+              path: "/work/src"
+            taskRef: "{{inputs.parameters.taskRef}}"
+- Ensure no CRDs are modified; only instantiated via resource action create.
+Acceptance criteria:
+- argo submit --from workflowtemplate/coderun-template -p github-app=clippy creates a CodeRun CR with repo/ref inferred from provided event or defaults.
+
+## 6. Create docsrun-template for DocsRun CRD [pending]
+### Dependencies: 3.2, 3.3, 3.4
+### Description: Provide a parallel WorkflowTemplate for DocsRun tasks with the same simplified API and inference.
+### Details:
+- Name: docsrun-template; entrypoint: docsrun-main
+- Parameters: github-app (required), event (default: "{}"), taskRef (default: "")
+- Reuse coderun-context and validate-prompt via templateRef or duplicate templates for isolation.
+- Resource manifest snippet:
+  apiVersion: taskmaster.io/v1
+  kind: DocsRun
+  metadata:
+    generateName: docsrun-
+  spec:
+    repo: "{{steps.context.outputs.parameters.repoFullName}}"
+    ref: "{{steps.context.outputs.parameters.ref}}"
+    prompts:
+      system: "{{steps.validate-prompt.outputs.parameters.systemPromptPath}}"
+      user: "docs/task.md"
+    github:
+      appName: "{{inputs.parameters.github-app}}"
+      tokenFile: "/var/run/github/token"
+    workspace:
+      path: "/work/src"
+    taskRef: "{{inputs.parameters.taskRef}}"
+    docs:
+      path: "docs/"
+      action: "build-preview"
+Acceptance criteria:
+- argo submit --from workflowtemplate/docsrun-template -p github-app=clippy creates a DocsRun CR with inferred repo/ref and no other required params.
+
+## 7. Press-play orchestrator workflow with concurrency controls [pending]
+### Dependencies: 3.5, 3.6
+### Description: Create a Workflow that fans out over a backlog list and invokes coderun-template for each item with parallelism limits.
+### Details:
+- Name: press-play (Workflow)
+- Parameters:
+  - backlog (JSON array of items: [{"githubApp":"clippy","taskRef":"task/format"}, ...])
+  - parallelism (default: 3)
+  - event (optional, default: "{}")
+- spec.parallelism: "{{workflow.parameters.parallelism}}"
+- Template: run-backlog (steps or DAG) with withParam over {{workflow.parameters.backlog}}:
+  - Each item submits coderun-template via templateRef:
+    templateRef: {name: coderun-template, template: coderun-main}
+    arguments:
+      parameters:
+        - {name: github-app, value: '{{item.githubApp}}'}
+        - {name: taskRef, value: '{{item.taskRef}}'}
+        - {name: event, value: '{{workflow.parameters.event}}'}
+- Optional: retryStrategy for transient errors; pod GC policy to clean completed pods.
+Acceptance criteria:
+- Submitting press-play with N backlog items starts N CodeRuns, capped by parallelism; all succeed when coderun-template succeeds.
+
+## 8. Negative-path handling and robust defaults [pending]
+### Dependencies: 3.2, 3.5
+### Description: Define and implement failure modes and safe defaults when inference fails; prevent malformed CR creation.
+### Details:
+- In coderun-context:
+  - If repoFullName is empty and cannot be constructed from owner/repo and no git remote present, write a clear error and exit 78.
+  - Ensure ref defaults to main when not found.
+  - Validate github-app is non-empty in coderun-main; fail fast otherwise.
+- In validate-prompt:
+  - Fail clearly if no prompt files found; include searched paths in message.
+- In create-coderun:
+  - Add successCondition and failureCondition (if using k8s resource template) to surface CR creation errors:
+    successCondition: status.phase in (Created,Queued,Running)
+    failureCondition: status.phase in (Error,Failed)
+- Logging: echo resolved context (owner/repo/ref/pr/issue/sha) for audit.
+Acceptance criteria:
+- With empty/invalid event and no git context, workflow fails before creating a CR with actionable error.
+- With missing prompt file, workflow fails in validate-prompt step.
+- With missing ref, defaults to main and proceeds.
+
+## 9. Unit/integration tests with synthetic events and documentation [pending]
+### Dependencies: 3.5, 3.6, 3.7, 3.8
+### Description: Add tests for inference and end-to-end CR creation; provide README and examples.
+### Details:
+- Unit tests (scripted):
+  - Run coderun-context locally/in a Job with examples/events/*.json for: pull_request, issue_comment, workflow_run, push.
+  - Assert outputs: repoFullName, ref, prNumber, etc., and defaults.
+- Integration:
+  - argo submit --from workflowtemplate/coderun-template -p github-app=clippy -p event="$(cat examples/events/pr.opened.json)" --watch; verify k get coderuns shows a new CR with expected spec.
+  - argo submit --from workflowtemplate/docsrun-template -p github-app=clippy --watch; verify DocsRun CR created.
+  - argo submit press-play -p backlog='[{"githubApp":"clippy","taskRef":"task/format"},{"githubApp":"qa","taskRef":"task/verify"}]' -p parallelism=2
+- Documentation:
+  - README.md covering parameters, default resolution, required mounts/paths, examples, and acceptance criteria (only github-app required in happy path).
+  - Place sample payloads under examples/events/ and command cheatsheet under examples/README.md.
+Acceptance criteria:
+- All unit tests pass; CRs are created in integration runs; docs clearly show that only github-app is required for happy path.
+
