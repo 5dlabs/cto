@@ -53,9 +53,33 @@ The container template (`infra/charts/controller/claude-templates/code/container
 Before starting implementation, verify access to required tools:
 - **kubectl**: Must have access to the Kubernetes cluster (via `KUBECONFIG_B64` environment variable)
 - **Argo CD CLI**: Must be able to login and sync applications (via `ARGOCD_SERVER`, `ARGOCD_USERNAME`, `ARGOCD_PASSWORD`)
+- **Argo Workflows CLI**: Available at `/usr/local/bin/argo` - test with `argo version --short` (should show v3.7.1+)
 - **GitHub CLI or API access**: For creating GitHub Apps (via `GITHUB_ADMIN_TOKEN`)
 
 If any of these tools are not accessible, STOP and report the issue before proceeding.
+
+**IMPORTANT**: The Argo Workflows CLI (`argo`) is different from Argo CD CLI (`argocd`). Both are available in the container.
+
+## CRITICAL REQUIREMENT: GitHub App Creation
+
+**YOU MUST CREATE ORGANIZATION-LEVEL GITHUB APPS** as part of this task. This is not optional configuration - it's a core deliverable.
+
+### Required GitHub Apps to Create:
+1. **5DLabs-Clippy** - Code quality and formatting specialist
+2. **5DLabs-QA** - Quality assurance and testing specialist  
+3. **5DLabs-Triage** - CI/CD failure remediation specialist
+4. **5DLabs-Security** - Security vulnerability remediation specialist
+
+### GitHub App Creation Requirements:
+- **Organization Level**: Apps must be created in the 5DLabs GitHub organization (not personal account)
+- **Permissions**: Each app needs repository access (Contents: Read/Write, Pull Requests: Read/Write, Issues: Read/Write)
+- **Installation**: Apps must be installed on the organization with appropriate repository access
+- **Credentials**: App ID and private key must be stored in the external secret store
+- **Validation**: Apps must be visible at `https://github.com/organizations/5dlabs/settings/apps`
+
+**ACCEPTANCE CRITERIA**: The task is NOT complete until all four GitHub Apps are created, installed, and visible in the GitHub organization settings.
+
+**DO NOT** mark this task as complete or create a PR saying "Next Steps: Create GitHub Apps". The GitHub Apps MUST be created as part of the task execution. Use the `GITHUB_ADMIN_TOKEN` environment variable to create them via GitHub CLI or API calls.
 
 ## Implementation Guide
 
