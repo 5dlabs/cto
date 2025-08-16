@@ -40,7 +40,7 @@ spec:
         properties:
           spec:
             type: object
-            required: ["taskId", "service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model"]
+            required: ["taskId", "service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model", "serviceAccountName"]
             properties:
               taskId:
                 type: integer
@@ -127,7 +127,8 @@ spec:
                 description: "Base64-encoded YAML containing task requirements (secrets and environment variables)"
               serviceAccountName:
                 type: string
-                description: "Optional Kubernetes ServiceAccount for Job pods executing this CodeRun"
+                minLength: 1
+                description: "Kubernetes ServiceAccount for Job pods executing this CodeRun"
           status:
             type: object
             properties:

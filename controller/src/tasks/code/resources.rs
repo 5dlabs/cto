@@ -747,13 +747,8 @@ impl<'a> CodeResourceManager<'a> {
             "volumes": volumes
         });
 
-        // Always set a service account: prefer the one provided in CodeRun.spec, otherwise use default
-        let sa_name = code_run
-            .spec
-            .service_account_name
-            .as_deref()
-            .unwrap_or("coderun-cluster-admin");
-        pod_spec["serviceAccountName"] = json!(sa_name);
+        // Always set the service account from the CRD field (now required)
+        pod_spec["serviceAccountName"] = json!(code_run.spec.service_account_name.clone());
 
         let job_spec = json!({
             "apiVersion": "batch/v1",

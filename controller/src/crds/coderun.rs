@@ -115,10 +115,9 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "taskRequirements")]
     pub task_requirements: Option<String>,
 
-    /// Optional Kubernetes ServiceAccount name for the Job pods created to execute this CodeRun
-    /// If not provided, the controller may fall back to a default service account configured via Helm values
-    #[serde(default, rename = "serviceAccountName")]
-    pub service_account_name: Option<String>,
+    /// Kubernetes ServiceAccount name for the Job pods created to execute this CodeRun
+    #[serde(rename = "serviceAccountName")]
+    pub service_account_name: String,
 }
 
 /// Status of the `CodeRun`
