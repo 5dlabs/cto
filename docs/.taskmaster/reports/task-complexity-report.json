@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-16T01:51:53.195Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Helm values and Agents ConfigMap for personas and project-wide tools",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Decompose this task into 6 subtasks that deliver: (1) Helm values.yaml schema and helpers, (2) ConfigMap templates rendering system prompts via a renderPrompt helper, (3) packaging of prompt files under charts files/agents and a project-level MCP requirements.yaml, (4) mounting controller-agents ConfigMap and requirements.yaml into WorkflowTemplates at /etc/agents/*.md and /work/requirements.yaml, (5) docs/.taskmaster/architecture.md skeleton referencing the PRD, (6) validation and linting (helm lint/template, dev deploy, size/encoding checks). For each subtask, specify: exact file paths, templating snippets to add, chart name/location, acceptance criteria, test commands, and risks (e.g., large prompts, nindent pitfalls). Ensure compatibility with helm template and helm install/upgrade flows and keep values overridable per environment.",
+			"reasoning": "Moderate Helm templating with file inclusions, ConfigMap mounts, and docs. Clear boundaries but multiple touchpoints (charts, files/, WorkflowTemplates)."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "External Secrets for GitHub App credentials and token generation pattern",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break into 8 subtasks covering: (1) SecretStore wiring and ExternalSecret manifests for each GitHub App (rex, clippy, qa, triage, security), (2) minimal token generator implementation (Go/Node) that creates App JWT and exchanges for installation token, (3) containerization and CI publish for the generator, (4) Workflow/initContainer/sidecar integration writing token to /var/run/github/token with emptyDir, (5) env/secret mounts and parameterization (APP_ID, PRIVATE_KEY, INSTALLATION_ID), (6) RBAC scoping for reading secrets only, (7) rotation and failure handling (fast-fail, retries, backoff), (8) tests and docs (dry-run workflow printing gh auth status, rotation test). Provide manifests, command lines, API endpoints used, security notes (no PATs, key handling), and acceptance criteria.",
+			"reasoning": "Touches secret management, custom image build, auth flows with GitHub Apps, RBAC, and workflow integration; security and rotation add complexity."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Common Argo WorkflowTemplate wrapper for CodeRun/DocsRun with simplified API",
+			"complexityScore": 7,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Plan 9 subtasks: (1) define coderun-template WorkflowTemplate with coderun-main, (2) event payload ingestion and jq-based inference for repo/owner/ref/PR/issue/workflow_run, (3) workspace prep and MCP requirements mounting, (4) resource template for CodeRun CR with minimal params (github-app, taskRef), (5) system prompt resolution using controller-agents ConfigMap paths, (6) docsrun-template for DocsRun CR, (7) press-play orchestrator workflow with concurrency controls, (8) negative-path handling and defaults when inference fails, (9) unit/integration tests with synthetic events and documentation. Include concrete parameter names, manifest snippets, artifact paths, and acceptance criteria that only github-app is required in the happy path.",
+			"reasoning": "Non-trivial event inference and templating for two CRDs, plus orchestration and robust defaults; multiple integration points but bounded scope."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "PR validation DAG WorkflowTemplate (Clippy → QA) with compliance gates",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Expand into 7 subtasks: (1) DAG skeleton with clippy-format → qa-testing tasks via coderun-template, (2) verify-compliance template enforcing fmt/clippy (or language-specific equivalents) with language detection/config, (3) verify-k8s-proof template validating QA artifacts (/artifacts/qa/proof/summary.json, evidence logs), (4) artifact wiring and outputs (links to PR, CI runs, artifact paths), (5) failure policies so both verify-* gates block success, (6) test data and E2E scenarios (warnings introduced/clean, missing artifacts), (7) documentation of required repo configs. Provide container images, commands, artifact schemas, and acceptance criteria.",
+			"reasoning": "DAG composition and two custom verification steps with artifact checks. Moderate complexity; language detection and artifact schema add care."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Implementation DAG WorkflowTemplate (Rex → Clippy → QA → Deploy → Acceptance)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Create 9 subtasks: (1) DAG definition with task dependencies Rex→Clippy→QA→Deploy→Acceptance, (2) coderun-template invocations for Rex/Clippy/QA, (3) deploy template using DocsRun to helm upgrade/install to preview namespace, (4) acceptance template performing black-box checks and collecting artifacts, (5) environment discovery and parameterization (namespace naming, release naming), (6) rollback/cleanup logic on failure, (7) outputs (preview URLs, artifact paths), (8) security/secret reuse (no duplication) and access controls, (9) E2E tests and docs. Include manifest snippets, commands, artifact schema, cleanup strategies, and acceptance criteria.",
+			"reasoning": "Multi-stage DAG with deployment and acceptance plus cleanup. Several moving parts and environment nuances increase complexity."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Argo Events GitHub EventSource and Sensors mapping to workflows",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Outline 8 subtasks: (1) GitHub EventSource with webhook secret from External Secrets, (2) Sensor for PR events → pr-validation, (3) Sensors for issue_comment/review_comment → coderun-template (rex) with comment payload, (4) Sensors for workflow_run/check_run failures → coderun-template (triage), (5) Sensors for issues opened → implementation DAG, and security/scans → security agent, (6) parameter mapping (pass full event body as workflow parameter), (7) concurrencyPolicy/rate limiting and SA/RBAC minimal permissions, (8) integration tests and documentation. Provide exact manifests, trigger.template refs, filters, and acceptance criteria (correct workflow triggers per event).",
+			"reasoning": "Multiple event types and routing, security considerations, rate limiting, and parameter wiring. Integration-heavy but clear deliverables."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "MCP tool/API for efficient PR comment retrieval",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Define 7 subtasks: (1) service design and OpenAPI-lite for endpoints (review comments, issue comments, optional timeline), (2) GitHub API integration using installation token from /var/run/github/token with pagination and ETag handling, (3) normalization/merge of comment streams and optional summarization, (4) containerization and Kubernetes Deployment/Service (ClusterIP mcp-github-comments), (5) add tool entry to requirements.yaml and integrate call in coderun-template when event is a comment, (6) rate limiting, error handling, and logging redaction, (7) unit/integration tests and docs. Include endpoint paths, response schema, and acceptance criteria.",
+			"reasoning": "Small service with external API calls, normalization, and workflow integration. Moderate complexity due to pagination and reliability concerns."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Parallelism and workspace isolation using git worktrees or PVCs",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Propose 8 subtasks: (1) init step to prepare base clone and create unique git worktrees per task/PR, (2) parameterization of TASK_ID/REF and workspace.path in CodeRun spec, (3) optional PVC isolation using volumeClaimTemplates gated by usePVC param, (4) concurrency controls (spec.parallelism, semaphores/mutex per repo/branch), (5) cleanup logic for worktrees and PVCs, (6) rate limiting/debounce at Sensors, (7) performance testing vs full clones and correctness under N parallel runs, (8) documentation and operational runbook. Provide exact commands, volume specs, semaphore config, and acceptance criteria.",
+			"reasoning": "Combines git worktree mechanics, storage isolation, and concurrency controls. Coordination and cleanup make it moderately complex."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Observability: OTEL traces/metrics and correlated logging",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break down into 8 subtasks: (1) tracer shim/entrypoint wrapper emitting OTLP spans with attributes (repo, prNumber, ref, taskId, agent, workflowName, nodeId), (2) metrics (duration, success counters) via OTLP or Prometheus sidecar, (3) inject OTEL env vars into workflow pods and verify collector endpoint, (4) pod annotations/labels for log correlation, (5) workflow outputs with URLs (PR, Actions, preview), (6) Grafana dashboard updates and exemplars, (7) resiliency tests (restarts mid-run) and validation in tracing backend, (8) documentation. Include env var list, attribute keys, dashboard panels, and acceptance criteria.",
+			"reasoning": "Instrumentation across steps, metrics, and dashboards plus reliability testing. Integration with existing OTEL stack drives complexity."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "QA Kubernetes verification and PR approval action (no auto-merge)",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Create 7 subtasks: (1) refine QA agent prompt and artifact contract (/artifacts/qa/proof/*, summary.json schema), (2) ensure verify-k8s-proof gating precedes any approval, (3) implement approve-pr step using GitHub App token (POST reviews with event=APPROVE), (4) evidence collection and optional upload to object store, (5) summary comment with artifact links and context, (6) branch protection/merge policy verification (no auto-merge), (7) E2E tests (pass/fail paths) and docs. Provide API calls, required env vars, artifact schemas, and acceptance criteria.",
+			"reasoning": "Integrates artifact-based verification with a controlled approval action. Moderate complexity with GitHub API usage and strict gating."
+		}
+	]
+}
