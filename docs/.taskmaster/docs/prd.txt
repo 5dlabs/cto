@@ -1,3 +1,170 @@
-# Minimal PRD Stub
+# Multi-Agent, Event-Driven Orchestration — Product Requirements Document
 
-This stub replaces the large PRD for test runs.
+## 1. Summary
+Build an Argo-centric, event-driven, multi-agent orchestration that can "press play" on a backlog and autonomously progress tasks to Done (merged). We continue using the existing CodeRun/DocsRun CRDs for job execution while orchestrating them via Argo Workflows (DAGs) triggered by Argo Events from GitHub.
+
+Decision: Do not introduce NEW orchestration CRDs (like TaskSequence). Continue using existing CodeRun/DocsRun CRDs as the execution primitives. Orchestration logic lives entirely in Argo Workflows + Events. Agents are realized as profiles with dedicated system prompts and shared runtime.
+
+## 2. Goals
+- Orchestrate tasks across specialized agents (authoring → clippy/lint → testing → deploy → acceptance) until merged.
+- React to GitHub events to resume or branch workflows (PR comments, issues, CI failures, merges, pushes).
+- Batch and parallelize independent tasks safely with rate limits.
+- Keep prompts configurable per agent profile without code changes; rely on agents ConfigMap and Workflow parameters.
+- Provide clear acceptance gating, observability, and auditability.
+
+## 3. Non-goals
+- No new custom resources for orchestration (e.g., no TaskSequence CRD).
+- No changes to existing CodeRun/DocsRun CRDs or their controllers.
+- No immediate auto-merge policies that bypass required reviews.
+
+## 4. Users and scenarios
+- Platform engineer: triggers "press play" to process backlog across repos/services.
+- Reviewer: leaves PR comments → Rex (implementation agent) re-invoked with comments to apply fixes.
+- CI system: failing checks → Triage agent attempts fixes.
+- Product owner: files GitHub issues → Issue agent converts to implementation.
+- Security team: vulnerability reports generated → Security agent remediates issues.
+- QA: PR opened → Clippy formats/fixes warnings → QA agent adds tests, MUST verify in K8s with proof (logs/responses), can approve PRs.
+
+## 5. Functional requirements (FR)
+FR1. Press Play: A single manual trigger starts a project DAG that sequences/batches tasks.
+FR2. PR flow: Clippy (format + pedantic fixes) → QA (test-only, leaves comments if implementation needs changes).
+FR3. Task/Issue flow: Rex (implement) → Clippy → QA → deploy → acceptance.
+FR4. Event reactions: PR comments trigger Rex with downloaded comments; CI failures trigger Triage agent; security scans trigger Security agent.
+FR5. Parallelism: Independent tasks run concurrently using git worktrees as working directories (or separate PVCs).
+FR6. Prompting: Task prompt from `task/prompt.md`; agent persona from system prompt based on `github-app` parameter.
+FR7. Simplified API: Auto-detect parameters to reduce to 1-2 required arguments.
+FR8. Project-wide MCP tools: Tool configuration at project level in requirements (not per-task).
+FR9. Comment retrieval: Easy MCP tool/API for PR comment downloading.
+FR10. Compliance gates: Enforce fmt/clippy pedantic/zero warnings; QA must verify in K8s with proof before approval.
+
+## 6. Non-functional requirements (NFR)
+- Reliability: Recoverable from controller/runner restarts; no stuck state.
+- Security: GitHub App auth only; no PATs. Secrets via External Secrets.
+- Observability: OTEL traces and metrics; logs easy to correlate by repo/PR/task.
+- Cost control: Concurrency limits, batching windows.
+
+## 7. Architecture (high level)
+- Argo Events: GitHub EventSource + Sensors map events to Workflow parameters (repo, PR, branch, taskId, agent type).
+- Argo Workflows (primary orchestrator): DAG expresses agent steps. Each step creates CodeRun CRs which the existing controller executes.
+- CodeRun/DocsRun CRDs: Existing execution primitives remain unchanged; controller handles job lifecycle.
+- Agents ConfigMap: Declarative agent profiles in Helm values render to `controller-agents` ConfigMap with `*_system-prompt.md` files.
+- GitHub Actions + Argo CD: CI builds and deploys; Argo CD syncs from `main`. Preview environments optional per PR.
+- Telemetry: OTEL collector, Grafana/Victoria Dashboards already present in `infra/telemetry`.
+
+Example DAG flows:
+
+**PR Validation Flow:**
+```yaml
+- name: pr-validation
+  dag:
+    tasks:
+      - name: clippy-format
+        templateRef: { name: coderun-template, template: coderun-main }
+        arguments: { parameters: [{ name: github-app, value: clippy-agent }, ...] }
+        
+      - name: qa-testing
+        dependencies: [clippy-format]
+        templateRef: { name: coderun-template, template: coderun-main }
+        arguments: { parameters: [{ name: github-app, value: qa-agent }, ...] }
+```
+
+**Task/Issue Implementation Flow:**
+```yaml
+- name: implementation
+  dag:
+    tasks:
+      - name: implement
+        templateRef: { name: coderun-template, template: coderun-main }
+        arguments: { parameters: [{ name: github-app, value: rex }, ...] }
+        
+      - name: clippy-format
+        dependencies: [implement]
+        templateRef: { name: coderun-template, template: coderun-main }
+        arguments: { parameters: [{ name: github-app, value: clippy-agent }, ...] }
+        
+      - name: qa-testing
+        dependencies: [clippy-format]
+        templateRef: { name: coderun-template, template: coderun-main }
+        arguments: { parameters: [{ name: github-app, value: qa-agent }, ...] }
+```
+
+Agent personas:
+- **Morgan**: PM orchestrator with awareness of all agents
+- **Rex**: Primary implementation
+- **Clippy**: Formatting + pedantic warnings
+- **QA**: Tests only, strict verification in K8s environment with proof, can approve PRs
+- **Triage**: CI failure remediation
+- **Security**: Vulnerability remediation
+
+## 8. Prompting strategy
+- System prompts: Per-agent persona in Helm `values.yaml -> agents[*]` rendered into `controller-agents` ConfigMap.
+- Each GitHub App has distinct character/persona with specialized system prompt.
+- User prompt: `task/prompt.md` from docs service (same for all agents working on task).
+- Project-wide MCP tools: Defined in requirements.yaml at project level (not per-task).
+- Simplified arguments: Auto-detect most parameters to reduce to 1-2 required args.
+
+## 9. Event mapping
+- `pull_request` opened/updated → Clippy Agent → QA Agent flow.
+- `issue_comment` or `pull_request_review_comment` → Rex re-invoked with downloaded comments.
+- `workflow_run`/`check_run` failure → Triage Agent attempts fixes.
+- `issues` opened → Issue Agent → implementation flow.
+- Security scan complete → Security Agent reads reports and remediates.
+- `push`/merge → orchestrator resumes next task(s) or closes workflow.
+
+## 10. Security
+- Use GitHub App secrets (app-id, private-key) from External Secrets.
+- Least-privilege scopes; avoid long-lived tokens.
+
+## 11. Observability
+- Emit span/metric per agent step with correlation labels: repo, prNumber, taskId, agent.
+- Surface links to PRs, Actions runs, and deployments as workflow outputs.
+
+## 12. Implementation steps
+I1. **Simplify API**: Auto-detect parameters, reduce to 1-2 required arguments.
+I2. **Standardize structure**: Use docs in same project (no separate docs repo).
+I3. **Project-wide tools**: Move MCP configuration to project-level requirements.yaml.
+I4. **Define agent personas**: Create GitHub Apps for Morgan, Rex, Clippy, QA, Triage, Security, etc.
+I5. **Comment retrieval**: Implement MCP tool/API for efficient PR comment downloading.
+I6. **PR flow**: Implement Clippy → QA validation flow for pull requests.
+I7. **Orchestrator DAG**: Create WorkflowTemplate chaining CodeRun CRs with agent personas.
+I8. **Event sensors**: Configure for PR, issue, comment, CI failure, security events.
+I9. **Parallel execution**: Git worktrees as working directories (or separate PVCs).
+I10. **Telemetry**: Track orchestration metrics alongside CodeRun metrics.
+
+## 13. Deliverables
+- Orchestrator DAG WorkflowTemplates for PR flow and implementation flow.
+- Agent personas/GitHub Apps: Morgan, Rex, Clippy, QA, Triage, Security, PR Comment, Issue.
+- Specialized system prompts for each agent persona in Helm values.
+- Event Sensors for PRs, issues, comments, CI failures, security scans.
+- MCP tool/API for PR comment retrieval.
+- Git worktree support (worktree root as working directory) or separate PVCs for isolation.
+- Simplified CodeRun API with auto-detection (1-2 required args).
+- Project-wide MCP tool configuration in requirements.yaml.
+- Documentation in `docs/.taskmaster/docs/architecture.md` and this PRD.
+
+## 14. Acceptance criteria
+- PR flow: Clippy formats and fixes warnings, QA adds tests and MUST verify in Kubernetes with proof (logs/responses).
+- QA agent can approve PRs (but not merge) after strict verification.
+- Task flow: Rex implements, Clippy cleans, QA tests, deploys, validates acceptance.
+- PR comment triggers Rex with downloaded comments and results in fixes.
+- CI failure triggers Triage agent and results in fix commits.
+- Security scan triggers Security agent to remediate vulnerabilities.
+- Parallel tasks execute using git worktrees as working directories (or separate PVCs).
+- API simplified to 1-2 required arguments with high success rate.
+- All agents have distinct personas and specialized prompts.
+
+## 15. Risks and mitigations
+- Orchestrator complexity: Start with a single-task DAG; add parallelism later.
+- Event storms: Add debounce and per-repo concurrency limits.
+- Secret sprawl: Centralize via External Secrets; minimize env leak in logs.
+
+## 16. Open questions
+- Git worktree: Use worktree root as working directory vs separate PVCs for complete isolation?
+- Comment retrieval: Extract from webhook payload vs GitHub MCP tool (document in prompt)?
+- Security reports: Use GitHub CLI with CodeQL (`gh api` commands)?
+
+## 17. Decisions made
+- No auto-merge: QA agent can approve but not merge
+- Morgan PM: Out of scope for current sprint
+- Preview environments: Use existing namespaces (avoid secret duplication)
+- Event storm guardrails: Address if/when it becomes a problem
