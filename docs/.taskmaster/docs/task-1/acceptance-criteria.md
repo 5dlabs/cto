@@ -140,14 +140,14 @@ Rollback is achieved via Git revert/PR merge; Argo CD will rollback on sync.
 
 ## Definition of Done
 
-- [x] All acceptance criteria met
-- [x] All test cases passing
-- [x] Documentation complete and accurate
-- [x] Code reviewed and approved
-- [x] Deployed successfully to dev environment
-- [x] Smoke tests passing consistently
-- [x] No critical issues or blockers
-- [x] Performance and security criteria satisfied
+- [ ] All acceptance criteria met
+- [ ] All test cases passing
+- [ ] Documentation complete and accurate
+- [ ] Code reviewed and approved
+- [ ] Deployed successfully to dev environment
+- [ ] Smoke tests passing consistently
+- [ ] No critical issues or blockers
+- [ ] Performance and security criteria satisfied
 
 ## Validation Commands
 
