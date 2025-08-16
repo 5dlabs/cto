@@ -747,8 +747,10 @@ impl<'a> CodeResourceManager<'a> {
                         "volumes": volumes
         });
 
-        // Always set the service account from the CRD field (now required)
-        pod_spec["serviceAccountName"] = json!(code_run.spec.service_account_name.clone());
+        // Set serviceAccountName only if provided on the CRD (backward compatible)
+        if let Some(sa_name) = &code_run.spec.service_account_name {
+            pod_spec["serviceAccountName"] = json!(sa_name.clone());
+        }
 
         let job_spec = json!({
             "apiVersion": "batch/v1",

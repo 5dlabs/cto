@@ -116,8 +116,8 @@ pub struct CodeRunSpec {
     pub task_requirements: Option<String>,
 
     /// Kubernetes ServiceAccount name for the Job pods created to execute this CodeRun
-    #[serde(rename = "serviceAccountName")]
-    pub service_account_name: String,
+    #[serde(default, rename = "serviceAccountName")]
+    pub service_account_name: Option<String>,
 }
 
 /// Status of the `CodeRun`
