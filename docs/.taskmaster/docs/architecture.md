@@ -108,6 +108,5 @@ This document describes the technical architecture for a multi-agent, event-driv
 - Git worktree implementation: worktree root as working directory vs separate PVCs
 - Comment retrieval: Extract from webhook payload vs GitHub MCP tool (document in prompt)
 - Security reports: Use GitHub CLI with CodeQL (`gh api` commands)
-- Morgan PM agent: Out of scope for current sprint
 - Preview environments: Use existing namespaces to avoid secret duplication
 - Event storm guardrails: Address if/when it becomes a problem
