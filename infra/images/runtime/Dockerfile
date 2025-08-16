@@ -110,6 +110,19 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
+# Install Argo Workflows CLI
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    for i in 1 2 3; do \
+        curl -fsSL -o "/tmp/argo-linux-${DL_ARCH}.gz" "https://github.com/argoproj/argo-workflows/releases/latest/download/argo-linux-${DL_ARCH}.gz" && \
+        gunzip -c "/tmp/argo-linux-${DL_ARCH}.gz" > /usr/local/bin/argo && \
+        chmod +x /usr/local/bin/argo && \
+        rm -f "/tmp/argo-linux-${DL_ARCH}.gz" && \
+        argo version --short --client && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
+
 # Install talosctl
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     ARCH=$(dpkg --print-architecture) && \
