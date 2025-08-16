@@ -1,9 +1,15 @@
 # Task 1: Acceptance Criteria
 
 ## Overview
-This document defines the acceptance criteria for implementing Helm values and Agents ConfigMap for personas and project-wide MCP tools configuration.
+This document defines the acceptance criteria for implementing Helm values and Agents ConfigMap for personas.
 
 ## Core Acceptance Criteria
+
+### 0. Prerequisites Verification ✓
+- [ ] kubectl access verified (`kubectl cluster-info` works)
+- [ ] Argo CD CLI access verified (`argocd app list` works after login)
+- [ ] GitHub access verified (can create apps via UI or API)
+- [ ] All required environment variables are set and valid
 
 ### 1. Helm Chart Structure ✓
 - [ ] Use existing controller chart at `infra/charts/controller`
@@ -11,12 +17,13 @@ This document defines the acceptance criteria for implementing Helm values and A
 - [ ] Managed and installed by Argo CD (not local Helm)
 
 ### 2. Values Configuration ✓
-- [ ] `infra/charts/controller/values.yaml` contains `agents` entries for the new agents with friendly names:
-  - [ ] Cleo (Clippy)
-  - [ ] Tess (QA)
-  - [ ] Stitch (Triage)
-  - [ ] Onyx (Security)
-- [ ] Each agent has: friendly `name` (Cleo/Tess/Stitch/Onyx), `githubApp`, and a robust technical `systemPrompt` (inline in values)
+- [ ] Add four new agents to `infra/charts/controller/values.yaml` under `.Values.agents`
+- [ ] Each new agent entry has:
+  - [ ] `name`: Friendly name (Cleo, Tess, Stitch, Onyx)
+  - [ ] `githubApp`: GitHub App name (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security)
+  - [ ] `role`: Description of their specialty
+  - [ ] `systemPrompt`: Robust technical prompt (inline in values, using Anthropic format)
+- [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey`
 
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure
@@ -41,8 +48,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 - [ ] Preserves formatting and newlines from source files
 - [ ] Labels follow Kubernetes conventions
 
-#### MCP Requirements
-- [ ] Requirements provided at `docs/requirements.yaml` and mounted by jobs (no Helm ConfigMap required)
+ 
 
 ### 6. Prompts ✓
 - [ ] Prompts are defined inline under `.Values.agents[*].systemPrompt`
@@ -51,8 +57,8 @@ This document defines the acceptance criteria for implementing Helm values and A
 ### 7. Workflow Integration ✓
 - [ ] Existing WorkflowTemplates mount:
   - [ ] `/etc/agents/${GITHUB_APP}_system-prompt.md` for prompts
-  - [ ] `/work/requirements.yaml` for MCP config
 - [ ] Validation performed via Argo CD/Workflows, not local Helm
+- [ ] Token generation already handled by container template (`container.sh.hbs`) - no changes needed
 
 ### 8. Documentation ✓
 - [ ] Architecture document exists at `docs/.taskmaster/architecture.md`
@@ -79,7 +85,6 @@ This document defines the acceptance criteria for implementing Helm values and A
 **When**: Inspect ConfigMap data  
 **Then**:
 - controller-agents has 5 keys (one per agent)
-- mcp-requirements has requirements.yaml key
 - Content matches source files
 
 ### Test Case 4: Workflow Mount Test
@@ -87,7 +92,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 **When**: Inspect container filesystem  
 **Then**:
 - `/etc/agents/${GITHUB_APP}_system-prompt.md` exists
-- `/work/requirements.yaml` exists
+- Token generation handled automatically by existing container template
 
 ### Test Case 5: Mount Point Verification
 **Given**: Deployed chart  
@@ -131,7 +136,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 ## Security Criteria
 
 - [ ] ConfigMaps are read-only when mounted
-- [ ] No sensitive data in prompts or requirements
+- [ ] No sensitive data in prompts or ConfigMaps
 - [ ] Proper RBAC for ConfigMap access
 - [ ] Files mounted with appropriate permissions
 
@@ -141,23 +146,22 @@ Rollback is achieved via Git revert/PR merge; Argo CD will rollback on sync.
 
 ## Definition of Done
 
-- [x] All acceptance criteria met
-- [x] All test cases passing
-- [x] Documentation complete and accurate
-- [x] Code reviewed and approved
-- [x] Deployed successfully to dev environment
-- [x] Smoke tests passing consistently
-- [x] No critical issues or blockers
-- [x] Performance and security criteria satisfied
+- [ ] All acceptance criteria met
+- [ ] All test cases passing
+- [ ] Documentation complete and accurate
+- [ ] Code reviewed and approved
+- [ ] Deployed successfully to dev environment
+- [ ] Smoke tests passing consistently
+- [ ] No critical issues or blockers
+- [ ] Performance and security criteria satisfied
 
 ## Validation Commands
 
 ```bash
-# Quick validation suite
-helm lint charts/platform && \
-helm template charts/platform > /tmp/rendered.yaml && \
-yq '. | select(.kind=="ConfigMap") | .metadata.name' /tmp/rendered.yaml | grep -E "(controller-agents|mcp-requirements)" && \
-find charts/platform/files -type f -printf '%s\n' | awk '{s+=$1} END {print s" bytes total (must be < 900000)"}' && \
+# Quick validation suite (Argo CD + kubectl)
+argocd app sync controller | cat
+kubectl -n agent-platform get cm controller-agents -o yaml | head -n 40
+kubectl -n agent-platform get externalsecrets | grep github-app-5dlabs || true
 echo "✅ All quick validations passed"
 ```
 

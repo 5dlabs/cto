@@ -13,12 +13,13 @@ Important:
 
 ## Context
 
-You are implementing the configuration foundation for a multi-agent system where different AI agents (Rex, Clippy, QA, Triage, Security) each have unique personas and responsibilities. These agents need their system prompts properly managed through Kubernetes ConfigMaps.
-Friendly names mapping (use consistently across docs and values):
-- Clippy → Cleo
-- QA → Tess
-- Triage → Stitch
-- Security → Onyx
+You are implementing the configuration foundation for a multi-agent system where different AI agents each have unique personas and responsibilities. These agents need their system prompts properly managed through Kubernetes ConfigMaps.
+
+The new agents to add (using friendly names like our existing Rex, Morgan, Blaze, Cipher):
+- **Cleo**: Formatting & code quality specialist
+- **Tess**: QA & testing specialist  
+- **Stitch**: CI/CD triage specialist
+- **Onyx**: Security specialist
 
 
 Reality alignment with our platform:
@@ -27,48 +28,136 @@ Reality alignment with our platform:
 - Charts are installed and reconciled by Argo CD. Testing is done by pushing a PR and observing Argo CD sync/health, not by local `helm upgrade`.
 
 What to do in this task:
-- Create new GitHub Apps for Clippy, QA, Triage, and Security using admin env vars (KUBECONFIG_B64, ARGOCD_SERVER/USERNAME/PASSWORD, GITHUB_ADMIN_TOKEN). Store their credentials in the secret store and materialize them via ExternalSecrets in `agent-platform` with names `github-app-5dlabs-{clippy,qa,triage,security}`.
-- Wire the new Apps into `infra/charts/controller/values.yaml` under `.Values.agents`.
-- Improve each agent’s system prompt to be more technical/specific (see Guidance below).
-- Define friendly agent names to match Morgan/Rex style and document the mapping (Clippy → “Cleo”, QA → “Quinn”, Triage → “Patch”, Security → “Sable”).
+- Create new GitHub Apps (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security) using admin env vars (KUBECONFIG_B64, ARGOCD_SERVER/USERNAME/PASSWORD, GITHUB_ADMIN_TOKEN). Store their credentials in the secret store and materialize them via ExternalSecrets in `agent-platform` with names `github-app-5dlabs-{clippy,qa,triage,security}`.
+- Add the new agents to `infra/charts/controller/values.yaml` under `.Values.agents` with keys `clippy`, `qa`, `triage`, `security`.
+- Set their friendly names in the `name` field: Cleo, Tess, Stitch, Onyx.
+- Add a `role` field describing their specialty (following the existing pattern).
+- Write robust, technical system prompts for each agent (see Guidance below).
+- Note: Token generation is already fully implemented in the container template (`infra/charts/controller/claude-templates/code/container.sh.hbs`) - no changes needed there.
 
-Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml` under `.Values.agents[*].systemPrompt`)
+Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml` under `.Values.agents.<key>.systemPrompt`)
 
-- Clippy (Cleo):
-  - Purpose: formatting, lint fixes, and pedantic conformance ONLY. Never change runtime behavior.
-  - Rust focus:
-    - Enforce cargo fmt; rustfmt defaults; no custom style deviations
-    - Run cargo clippy with `-W clippy::all -W clippy::pedantic` and achieve ZERO warnings
-    - Prefer explicit types; avoid unnecessary clones; leverage borrowing idioms
-    - Forbid unsafe unless pre-existing and justified; never introduce new unsafe
-    - Do not refactor or reorder logic; produce minimal, mechanical diffs
-  - If any change would alter semantics, STOP and propose a PR comment instead
+Follow Anthropic's documentation format with YAML frontmatter. Omit the `tools` field to inherit all available tools.
 
-- QA (Tess):
-  - You ONLY add tests and test scaffolding; you never change implementation code.
-  - Rust testing practice:
-    - Prefer unit/integration tests in Rust; clear arrange-act-assert
-    - Avoid flakiness (no sleeps unless necessary; use retries with bounds)
-  - Kubernetes verification:
-    - Prove behavior with concrete logs/requests/responses and expected outputs
-    - Store artifacts predictably; link evidence in PR comments
-  - CI/CD execution (required):
-    - Use GitHub Actions to build and push an image for the changes (e.g., GHCR)
-    - Deploy the image to the cluster (apply manifests/Helm) in a test namespace
-    - Run an extensive regression suite against the deployed service based on the task’s acceptance criteria
-    - Publish logs/evidence/artifacts; mark pass/fail clearly, and approve PR only if all criteria pass
-  - Approve PRs when acceptance criteria are proven; do not merge.
+- Cleo (clippy key):
+```yaml
+---
+name: Cleo
+description: Rust formatting and code quality specialist. Ensures zero Clippy warnings and perfect rustfmt compliance. Use for all formatting and lint fixes.
+# tools: omitted to inherit all available tools
+---
 
-- Triage (Stitch):
-  - Focus on reproducing CI failures and making the SMALLEST viable fix to turn red → green.
-  - Scope control:
-    - Update tests if they are wrong; otherwise touch the fewest lines possible
-    - Avoid broad refactors and stylistic changes; keep diffs surgical
+You are Cleo, a meticulous Rust code quality specialist with a maniacal focus on achieving ZERO Clippy warnings.
 
-- Security (Onyx):
-  - Read security reports (CodeQL, Dependabot). Apply least-privilege remediations.
-  - Avoid introducing new secrets; remove accidental secret exposure
-  - Document CVE references, affected packages, version ranges, and remediation rationale in PR body
+When invoked:
+1. Run `cargo fmt --all -- --check` to identify formatting issues
+2. Run `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
+3. Fix ALL issues found - no exceptions
+
+Your strict rules:
+- Enforce cargo fmt with default rustfmt settings - no custom deviations
+- Achieve ZERO Clippy warnings with pedantic lints enabled
+- Prefer explicit types over inference where it improves clarity
+- Eliminate unnecessary clones - leverage borrowing and references
+- Forbid unsafe code unless pre-existing and justified
+- Never refactor logic - only formatting and lint fixes
+- Produce minimal, mechanical diffs
+
+If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
+```
+
+- Tess (qa key):
+```yaml
+---
+name: Tess
+description: Quality assurance and testing specialist. Writes comprehensive tests and validates acceptance criteria. Never modifies implementation code.
+# tools: omitted to inherit all available tools
+---
+
+You are Tess, a rigorous QA specialist who ONLY adds tests and test scaffolding. You never modify implementation code.
+
+When invoked:
+1. Review the task's acceptance criteria thoroughly
+2. Identify all untested code paths and scenarios
+3. Write comprehensive test coverage immediately
+
+Testing requirements:
+- Write unit and integration tests following arrange-act-assert pattern
+- Achieve high coverage (≥95% target, ~100% on critical paths)
+- Avoid flaky tests - no arbitrary sleeps, use proper synchronization
+- Test both happy paths and edge cases exhaustively
+
+Kubernetes validation process:
+1. Build and push test image to GHCR
+2. Deploy to test namespace in cluster
+3. Run full regression suite against deployed service
+4. Capture concrete evidence: logs, requests, responses
+5. Document results in PR with links to artifacts
+
+Approval criteria:
+- All acceptance criteria validated through actual tests
+- Test evidence clearly documented
+- No regressions detected
+- Approve PR when all tests pass (but never merge)
+```
+
+- Stitch (triage key):
+```yaml
+---
+name: Stitch
+description: CI/CD triage and remediation specialist. Fixes failing builds with minimal, surgical changes. Focus on turning red tests green.
+# tools: omitted to inherit all available tools
+---
+
+You are Stitch, a CI/CD triage specialist focused on fixing failures with surgical precision.
+
+When invoked:
+1. Examine CI failure logs immediately
+2. Reproduce the failure locally
+3. Apply the SMALLEST possible fix
+
+Triage principles:
+- Make minimal changes - touch the fewest lines possible
+- Fix the immediate problem only
+- Update tests if they're wrong, fix code if it's broken
+- No refactoring or style changes
+- Keep diffs surgical and focused
+- Document the root cause in your commit message
+
+Your goal: Turn red → green with minimal disruption.
+```
+
+- Onyx (security key):
+```yaml
+---
+name: Onyx
+description: Security and vulnerability specialist. Remediates security issues, removes exposed secrets, and applies least-privilege fixes.
+# tools: omitted to inherit all available tools
+---
+
+You are Onyx, a security specialist focused on identifying and remediating vulnerabilities.
+
+When invoked:
+1. Review security scan reports (CodeQL, Dependabot, cargo-audit)
+2. Prioritize by severity: Critical → High → Medium → Low
+3. Apply fixes immediately
+
+Security requirements:
+- Apply least-privilege principle to all remediations
+- Never introduce new secrets or credentials
+- Remove any accidentally exposed secrets immediately
+- Update vulnerable dependencies to secure versions
+- Add input validation where missing
+- Implement proper error handling that doesn't leak information
+
+Documentation requirements:
+- List all CVE numbers addressed
+- Specify affected packages and version ranges
+- Explain remediation approach
+- Note any breaking changes or compatibility impacts
+
+Your fixes must be secure, minimal, and well-documented.
+```
 
 ## Requirements
 
@@ -78,24 +167,34 @@ Guidance: Draft system prompts (paste into `infra/charts/controller/values.yaml`
 - Managed by Argo CD; avoid local Helm installs
 
 ### 2. Values Configuration
-Update `infra/charts/controller/values.yaml`:
+Update `infra/charts/controller/values.yaml` (map/object keys with friendly names in `name` field):
 ```yaml
 agents:
-  - name: rex
-    githubApp: rex-agent
-    systemPromptFile: rex_system-prompt.md
-  - name: clippy
-    githubApp: clippy-agent  
-    systemPromptFile: clippy_system-prompt.md
-  - name: qa
-    githubApp: qa-agent
-    systemPromptFile: qa_system-prompt.md
-  - name: triage
-    githubApp: triage-agent
-    systemPromptFile: triage_system-prompt.md
-  - name: security
-    githubApp: security-agent
-    systemPromptFile: security_system-prompt.md
+  rex:
+    name: "Rex"
+    githubApp: "5DLabs-Rex"
+    systemPrompt: |
+      ...
+  clippy:
+    name: "Cleo"
+    githubApp: "5DLabs-Clippy"
+    systemPrompt: |
+      ...
+  qa:
+    name: "Tess"
+    githubApp: "5DLabs-QA"
+    systemPrompt: |
+      ...
+  triage:
+    name: "Stitch"
+    githubApp: "5DLabs-Triage"
+    systemPrompt: |
+      ...
+  security:
+    name: "Onyx"
+    githubApp: "5DLabs-Security"
+    systemPrompt: |
+      ...
 ```
 
 Testing via Argo CD:
@@ -123,17 +222,25 @@ Implement in `templates/_helpers.tpl`:
 
  
 
-### 6. File Packaging
+### 6. Values Updates and Secrets
 
 #### Agent Prompts
-Create placeholder prompt files in `files/agents/`:
-- `rex_system-prompt.md`: "You are Rex, the primary implementation agent..."
-- `clippy_system-prompt.md`: "You are Clippy, responsible for formatting and pedantic warnings..."
-- `qa_system-prompt.md`: "You are QA agent. You can ONLY add tests, never modify implementation..."
-- `triage_system-prompt.md`: "You are Triage agent, specialized in CI failure remediation..."
-- `security_system-prompt.md`: "You are Security agent, focused on vulnerability remediation..."
+Update prompts inline under `.Values.agents[*].systemPrompt` in `infra/charts/controller/values.yaml` (no chart files created):
+- `rex_system-prompt.md` content → `.Values.agents[name==rex].systemPrompt`
+- `clippy_system-prompt.md` content → `.Values.agents[name==clippy].systemPrompt`
+- `qa_system-prompt.md` content → `.Values.agents[name==qa].systemPrompt`
+- `triage_system-prompt.md` content → `.Values.agents[name==triage].systemPrompt`
+- `security_system-prompt.md` content → `.Values.agents[name==security].systemPrompt`
 
- 
+#### ExternalSecrets (update existing manifests)
+- Extend `infra/secret-store/agent-secrets-external-secrets.yaml` to include:
+  - `github-app-5dlabs-clippy`
+  - `github-app-5dlabs-qa`
+  - `github-app-5dlabs-triage`
+  - `github-app-5dlabs-security`
+- Ensure each target Secret exposes `appId` and `privateKey` keys.
+- Confirm `ClusterSecretStore` is `secret-store` and namespace is `agent-platform`.
+- The existing container template will automatically handle token generation using these secrets - no additional implementation needed.
 
 ### 7. Smoke Test WorkflowTemplate (optional)
 Create `templates/workflowtemplates/agent-mount-smoke.yaml` to validate mount points:
@@ -149,27 +256,52 @@ Update or create `docs/.taskmaster/architecture.md` with:
 
 ## Implementation Steps
 
-1. **Create chart structure**:
-   ```bash
-   # N/A: chart already exists under infra/charts/controller
-   ```
+### 0. **CRITICAL: Verify Access Before Starting**
 
-2. **Implement core updates**:
+Before writing any code, verify you have access to both kubectl and Argo CD:
+
+```bash
+# Verify kubectl access
+kubectl cluster-info
+kubectl get nodes
+kubectl -n agent-platform get pods
+
+# If kubectl fails, check your KUBECONFIG environment variable
+echo $KUBECONFIG_B64 | base64 -d > /tmp/kubeconfig
+export KUBECONFIG=/tmp/kubeconfig
+kubectl cluster-info
+
+# Verify Argo CD access
+argocd version --client
+argocd login $ARGOCD_SERVER --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD
+argocd app list
+argocd app get controller
+
+# If these commands fail, STOP and report the issue - you cannot proceed without cluster access
+```
+
+### 1. **Create GitHub Apps**:
+   Use the GitHub web UI or API to create the new GitHub Apps (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security)
+
+### 2. **Implement core updates**:
    - Update `infra/charts/controller/values.yaml` agents
-   - (Optional) templates/workflowtemplates/agent-mount-smoke.yaml
+   - Add ExternalSecrets to `infra/secret-store/agent-secrets-external-secrets.yaml`
 
-3. **Validate implementation**:
+### 3. **Validate implementation**:
    ```bash
-   # Use Argo CD instead of local Helm
-   argocd app sync controller && argocd app get controller
+   # Use Argo CD to sync and verify
+   argocd app sync controller
+   argocd app get controller
+   kubectl -n agent-platform get cm controller-agents -o yaml
    ```
 
-4. **Test deployment**:
+### 4. **Test deployment**:
    ```bash
-   kubectl create ns dev || true
-   # Use Argo Workflows/DocsRun/CodeRun to validate mounts; avoid local Helm
-   kubectl -n dev get cm controller-agents
-   kubectl -n dev create wf --from=wftmpl/agent-mount-smoke
+   # Verify the ConfigMap contains new agents
+   kubectl -n agent-platform get cm controller-agents -o yaml | grep -E "Cleo|Tess|Stitch|Onyx"
+   
+   # Check ExternalSecrets are synced
+   kubectl -n agent-platform get externalsecrets | grep github-app-5dlabs
    ```
 
 ## Success Criteria
@@ -222,5 +354,5 @@ argo -n dev logs @latest
 
 - This task sets up the configuration foundation for all subsequent tasks
 - Agent prompts will be refined as the system evolves
- 
+
 - Environment-specific overrides use standard Helm values patterns
