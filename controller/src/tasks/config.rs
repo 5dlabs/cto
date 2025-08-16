@@ -285,6 +285,7 @@ impl Default for ControllerConfig {
                     },
                     port: 8080,
                 },
+                service_account_name: None,
             },
             secrets: SecretsConfig {
                 api_key_secret_name: "orchestrator-secrets".to_string(),
