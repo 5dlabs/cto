@@ -6,20 +6,17 @@ This document defines the acceptance criteria for implementing Helm values and A
 ## Core Acceptance Criteria
 
 ### 1. Helm Chart Structure ✓
-- [ ] Chart exists at `charts/platform` with proper directory structure
-- [ ] Contains valid Chart.yaml with appropriate metadata
-- [ ] Follows Helm 3.x standards and best practices
+- [ ] Use existing controller chart at `infra/charts/controller`
+- [ ] Do not create a new chart; extend existing values and prompts only
+- [ ] Managed and installed by Argo CD (not local Helm)
 
 ### 2. Values Configuration ✓
-- [ ] `values.yaml` contains `agents` array with 5 agent definitions:
-  - [ ] rex (rex-agent)
-  - [ ] clippy (clippy-agent)
-  - [ ] qa (qa-agent)
-  - [ ] triage (triage-agent)
-  - [ ] security (security-agent)
-- [ ] Each agent has: name, githubApp, systemPromptFile
-- [ ] `mcp.requirementsFile` points to `requirements.yaml`
-- [ ] Values are overrideable via `-f` or `--set`
+- [ ] `infra/charts/controller/values.yaml` contains `agents` entries for the new agents with friendly names:
+  - [ ] Cleo (Clippy)
+  - [ ] Tess (QA)
+  - [ ] Stitch (Triage)
+  - [ ] Onyx (Security)
+- [ ] Each agent has: friendly `name` (Cleo/Tess/Stitch/Onyx), `githubApp`, and a robust technical `systemPrompt` (inline in values)
 
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure
@@ -44,30 +41,18 @@ This document defines the acceptance criteria for implementing Helm values and A
 - [ ] Preserves formatting and newlines from source files
 - [ ] Labels follow Kubernetes conventions
 
-#### MCP Requirements ConfigMap
-- [ ] Template generates `mcp-requirements` ConfigMap
-- [ ] Contains `requirements.yaml` key with tools configuration
-- [ ] Properly indented and formatted YAML content
-- [ ] Labels follow Kubernetes conventions
+#### MCP Requirements
+- [ ] Requirements provided at `docs/requirements.yaml` and mounted by jobs (no Helm ConfigMap required)
 
-### 6. File Packaging ✓
-- [ ] All agent prompt files exist in `files/agents/`:
-  - [ ] rex_system-prompt.md
-  - [ ] clippy_system-prompt.md
-  - [ ] qa_system-prompt.md
-  - [ ] triage_system-prompt.md
-  - [ ] security_system-prompt.md
-- [ ] `files/requirements.yaml` exists with MCP tools config
-- [ ] Files are UTF-8 encoded
-- [ ] Total size < 900KB
+### 6. Prompts ✓
+- [ ] Prompts are defined inline under `.Values.agents[*].systemPrompt`
+- [ ] Content is UTF-8 and follows technical guidance per agent
 
-### 7. WorkflowTemplate Integration ✓
-- [ ] Smoke test template `agent-mount-smoke` exists
-- [ ] Uses helper functions for volumes and mounts
-- [ ] Mounts at correct paths:
-  - [ ] `/etc/agents` for prompts
+### 7. Workflow Integration ✓
+- [ ] Existing WorkflowTemplates mount:
+  - [ ] `/etc/agents/${GITHUB_APP}_system-prompt.md` for prompts
   - [ ] `/work/requirements.yaml` for MCP config
-- [ ] Outputs "OK" when successful
+- [ ] Validation performed via Argo CD/Workflows, not local Helm
 
 ### 8. Documentation ✓
 - [ ] Architecture document exists at `docs/.taskmaster/architecture.md`
@@ -77,18 +62,17 @@ This document defines the acceptance criteria for implementing Helm values and A
 
 ## Test Cases
 
-### Test Case 1: Helm Linting
-**Given**: Complete chart structure  
-**When**: Run `helm lint charts/platform`  
-**Then**: Command succeeds with no errors or warnings
+### Test Case 1: Argo CD Sync
+**Given**: PR merged to main  
+**When**: Argo CD syncs `infra/charts/controller`  
+**Then**: App shows Healthy/Synced; `controller-agents` ConfigMap updated
 
-### Test Case 2: Template Rendering
-**Given**: Valid values.yaml  
-**When**: Run `helm template charts/platform`  
+### Test Case 2: Config Verification
+**Given**: Synced app  
+**When**: `kubectl -n agent-platform get cm controller-agents -o yaml`  
 **Then**: 
-- Both ConfigMaps are generated
-- No template errors occur
-- Output contains expected resources
+- Prompt keys exist and contain updated content
+- Agents metadata matches values
 
 ### Test Case 3: ConfigMap Content Validation
 **Given**: Rendered templates  
@@ -98,13 +82,12 @@ This document defines the acceptance criteria for implementing Helm values and A
 - mcp-requirements has requirements.yaml key
 - Content matches source files
 
-### Test Case 4: Deployment Test
-**Given**: Kubernetes cluster with dev namespace  
-**When**: Run `helm upgrade --install platform charts/platform -n dev`  
+### Test Case 4: Workflow Mount Test
+**Given**: Running DocsRun/CodeRun  
+**When**: Inspect container filesystem  
 **Then**:
-- Installation succeeds
-- ConfigMaps created in cluster
-- No pod errors or crashes
+- `/etc/agents/${GITHUB_APP}_system-prompt.md` exists
+- `/work/requirements.yaml` exists
 
 ### Test Case 5: Mount Point Verification
 **Given**: Deployed chart  
@@ -141,10 +124,9 @@ This document defines the acceptance criteria for implementing Helm values and A
 
 ## Performance Criteria
 
-- [ ] Helm template renders in < 2 seconds
+- [ ] Argo CD sync completes successfully
 - [ ] ConfigMap updates propagate in < 30 seconds
-- [ ] Smoke test completes in < 10 seconds
-- [ ] Total ConfigMap size < 900KB
+- [ ] Total prompt content remains within Kubernetes ConfigMap size limits
 
 ## Security Criteria
 
@@ -155,11 +137,7 @@ This document defines the acceptance criteria for implementing Helm values and A
 
 ## Rollback Criteria
 
-The implementation must support rollback if:
-- [ ] Helm upgrade can revert to previous version
-- [ ] ConfigMap changes are tracked in version control
-- [ ] No destructive operations on existing resources
-- [ ] Backward compatibility maintained
+Rollback is achieved via Git revert/PR merge; Argo CD will rollback on sync.
 
 ## Definition of Done
 

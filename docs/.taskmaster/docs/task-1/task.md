@@ -4,6 +4,14 @@
 
 This task implements the foundational configuration management for the multi-agent orchestration system. It establishes Helm values and templates to render agent personas' system prompts into ConfigMaps and defines project-wide MCP (Model Context Protocol) tools configuration.
 
+Platform alignment:
+- Do NOT re-implement functionality that already exists. Extend existing assets instead.
+- We already install and manage charts with Argo CD. Helm is used for prompts/config only; orchestration is in Argo Workflows/Events with CodeRun/DocsRun CRDs.
+- We already have `agents-configmap.yaml` that renders `agents.yaml` and per-agent `*_system-prompt.md` from `.Values.agents[*].systemPrompt`. Do not create a new chart.
+- This task focuses on improving prompts, adding the Clippy GitHub App, and wiring names consistently.
+- Scope: Rust-only. Multi-language support is out of scope for this phase.
+ - Administrative operations (creating apps/resources in GitHub/Kubernetes/Argo CD) must use the `agent-admin-secrets` secret; role-specific agent operations use their own GitHub App secrets via ExternalSecrets.
+
 ## Technical Context
 
 The system uses multiple specialized AI agents, each with distinct personas and responsibilities:
@@ -12,6 +20,12 @@ The system uses multiple specialized AI agents, each with distinct personas and 
 - **QA**: Testing-only agent with strict Kubernetes verification requirements
 - **Triage**: CI failure remediation agent
 - **Security**: Vulnerability remediation agent
+
+Friendly names mapping (use consistently across docs and values):
+- Clippy → Cleo
+- QA → Tess
+- Triage → Stitch
+- Security → Onyx
 
 Each agent requires:
 1. A unique system prompt defining its persona and constraints
@@ -24,7 +38,7 @@ Each agent requires:
 
 #### 1.1 Define Helm Values Schema
 
-**Location**: `charts/platform/values.yaml`
+**Location**: `infra/charts/controller/values.yaml` (existing)
 
 ```yaml
 agents:
@@ -50,7 +64,7 @@ mcp:
 
 #### 1.2 Add JSON Schema Validation
 
-**Location**: `charts/platform/values.schema.json`
+If needed, update schema validation to reflect added fields (optional for now).
 
 ```json
 {
@@ -86,7 +100,7 @@ mcp:
 
 #### 2.1 Create Helm Helper Functions
 
-**Location**: `charts/platform/templates/_helpers.tpl`
+No new helpers required; we’re extending existing values/prompts.
 
 ```yaml
 {{- define "platform.renderPrompt" -}}
@@ -118,7 +132,7 @@ mcp:
 
 #### 3.1 Controller Agents ConfigMap
 
-**Location**: `charts/platform/templates/controller-agents-configmap.yaml`
+Already implemented as `infra/charts/controller/templates/agents-configmap.yaml`.
 
 ```yaml
 apiVersion: v1
@@ -135,28 +149,15 @@ data:
 {{- end }}
 ```
 
-#### 3.2 MCP Requirements ConfigMap
+#### 3.2 MCP Requirements (out of scope)
 
-**Location**: `charts/platform/templates/mcp-requirements-configmap.yaml`
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mcp-requirements
-  labels:
-    app.kubernetes.io/name: mcp-requirements
-    app.kubernetes.io/part-of: platform
-data:
-  requirements.yaml: |-
-{{ .Files.Get (printf "%s" .Values.mcp.requirementsFile) | nindent 6 }}
-```
+Project-level MCP tools are out of scope for Task 1 and handled in a later task.
 
 ### Phase 4: Package Files
 
 #### 4.1 Agent Prompt Files
 
-Create system prompt files under `charts/platform/files/agents/`:
+Prompts are supplied inline via `.Values.agents[*].systemPrompt` in `infra/charts/controller/values.yaml`. Update those strings to the improved versions below.
 - `rex_system-prompt.md`
 - `clippy_system-prompt.md`
 - `qa_system-prompt.md`
@@ -165,7 +166,7 @@ Create system prompt files under `charts/platform/files/agents/`:
 
 #### 4.2 MCP Requirements
 
-**Location**: `charts/platform/files/requirements.yaml`
+Project-level MCP requirements live at `docs/requirements.yaml`. Extend it to define a safe admin tool that reads `${GITHUB_ADMIN_TOKEN}` from env (sourced via External Secrets) rather than embedding tokens.
 
 ```yaml
 tools:
@@ -181,7 +182,7 @@ tools:
 
 #### 5.1 Smoke Test Template
 
-**Location**: `charts/platform/templates/workflowtemplates/agent-mount-smoke.yaml`
+Optional. Validation should primarily be via Argo CD sync + checking rendered ConfigMap content.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -195,7 +196,7 @@ spec:
       container:
         image: alpine:3.20
         command: ['sh', '-c']
-        args: ['ls -l /etc/agents && test -f /work/requirements.yaml && echo OK']
+        args: ['ls -l /etc/agents && echo OK']
         volumeMounts:
 {{ include "platform.agentVolumeMounts" . | nindent 10 }}
   volumes:
@@ -206,38 +207,23 @@ spec:
 
 ### Unit Testing
 ```bash
-# Validate schema
-helm lint charts/platform
-
-# Render templates
-helm template charts/platform | head -n 50
-
-# Check ConfigMap generation
-helm template charts/platform | yq '. | select(.kind=="ConfigMap")' -o yaml
+Using Argo CD (source of truth):
+```bash
+argocd app sync controller
+argocd app get controller
+kubectl -n agent-platform get cm controller-agents -o yaml | head -n 80
+```
 ```
 
 ### Integration Testing
 ```bash
-# Deploy to dev namespace
-kubectl create ns dev || true
-helm upgrade --install platform charts/platform -n dev
-
-# Verify ConfigMaps
-kubectl -n dev get cm controller-agents -o yaml
-kubectl -n dev get cm mcp-requirements -o yaml
-
-# Run smoke test
-kubectl -n dev create wf --from=wftmpl/agent-mount-smoke
-argo -n dev logs @latest
+Use Workflows that mount the `controller-agents` ConfigMap and verify the path `/etc/agents/${GITHUB_APP}_system-prompt.md` resolves.
 ```
 
 ### Validation Checks
 ```bash
-# Size constraints (< 900KB total)
-find charts/platform/files/agents -type f -printf '%s\n' | awk '{s+=$1} END {print s}'
-
-# UTF-8 encoding
-file -I charts/platform/files/agents/*.md | grep -v 'charset=utf-8'
+# Prompts are inline in values; ensure combined prompt content stays well under the ConfigMap size limit (~1MiB)
+echo "Verify prompt sizes in values.yaml if adding large blocks"
 ```
 
 ## Dependencies
@@ -277,8 +263,8 @@ This task establishes the configuration foundation for the multi-agent orchestra
 ## Next Steps
 
 After completing this task:
-1. Task 2 will create the Orchestrator DAG WorkflowTemplate using these configurations
-2. Task 3 will simplify the CodeRun API to leverage these mounted configurations
+1. Task 2 will define/extend GitHub App secrets via External Secrets and (optionally) an installation-token helper, and add the new Clippy App.
+2. Task 3 extends existing workflow templates (we already have them) rather than creating new ones; focus on parameter simplification and prompt/requirements mounts.
 3. Task 4 will implement event sensors that trigger workflows with appropriate agent selections
 
 ## References

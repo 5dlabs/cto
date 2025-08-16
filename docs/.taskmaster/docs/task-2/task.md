@@ -2,15 +2,43 @@
 
 ## Overview
 
-This task implements a secure, PAT-free authentication system for GitHub App credentials using External Secrets Operator and a lightweight token generator. The system sources GitHub App credentials from external secret stores and provides installation tokens to workflows without using Personal Access Tokens.
+This task extends our existing, PAT-free authentication using External Secrets and in-container token minting. We source GitHub App credentials via External Secrets and mint installation tokens inside running containers (no separate token service).
+
+Reality alignment with our platform:
+- Do NOT re-implement functionality that already exists. Extend the existing assets instead.
+- We already manage GitHub App secrets for Morgan, Rex, Blaze, and Cipher via External Secrets at `infra/secret-store/agent-secrets-external-secrets.yaml`.
+- Our agent containers already mint GitHub App installation tokens inside the container when credentials are present (no separate token microservice required).
+- What remains is to add new GitHub Apps and ExternalSecrets for the additional agents introduced in Task 1 (Clippy, QA, Triage, Security), and wire them into Helm values.
+
+Admin secret (separate from per-agent GitHub Apps):
+- We use a single admin secret named `agent-admin-secrets` for administrative operations (cluster and Argo CD administration, and a repo/org-level GitHub admin PAT when absolutely necessary).
+- Contents typically include: `KUBECONFIG` (or `KUBECONFIG_B64`), `ARGOCD_SERVER`, `ARGOCD_AUTH_TOKEN` (or password), and `GITHUB_ADMIN_TOKEN`.
+- This secret is not used by role-specific agents; those use their own GitHub App secrets via ExternalSecrets.
+
+Existing ExternalSecrets (under `infra/secret-store/agent-secrets-external-secrets.yaml`):
+- `github-app-5dlabs-rex`
+- `github-app-5dlabs-blaze`
+- `github-app-5dlabs-morgan`
+- `github-app-5dlabs-cipher`
+Extend with:
+- `github-app-5dlabs-clippy`
+- `github-app-5dlabs-qa`
+- `github-app-5dlabs-triage`
+- `github-app-5dlabs-security`
+
+Naming carried over from Task 1 (friendly → GitHub App):
+- Clippy → 5DLabs-Clippy
+- QA → 5DLabs-QA
+- Triage → 5DLabs-Triage
+- Security → 5DLabs-Security
 
 ## Architecture
 
 The solution consists of three main components:
 
-1. **External Secrets Integration**: Syncs GitHub App credentials (appId, privateKey) from external secret stores to Kubernetes Secrets
-2. **Token Generator**: A minimal service that creates GitHub App JWTs and exchanges them for installation tokens
-3. **Workflow Integration**: Templates that consume the generated tokens via shared volumes
+1. **External Secrets Integration**: Syncs GitHub App credentials (appId, privateKey) to Kubernetes Secrets
+2. **Token Generation (existing)**: Containers mint installation tokens from mounted secrets
+3. **Workflow Integration**: Templates consume tokens via shared volumes
 
 ## Implementation Overview
 
@@ -58,7 +86,7 @@ Each secret contains:
 
 ## Key Components
 
-### External Secrets Configuration
+### External Secrets Configuration (example)
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -69,8 +97,8 @@ metadata:
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    name: aws-secrets
-    kind: SecretStore
+    name: cluster-secret-store
+    kind: ClusterSecretStore
   target:
     name: github-app-rex
     template:
@@ -82,30 +110,16 @@ spec:
       remoteRef: { key: /github-apps/rex/privateKey }
 ```
 
-### Token Generator Implementation
+### Token Generation (existing)
 
-The token generator is implemented as a lightweight Node.js or Go service:
-
-**Key Features:**
-- Reads APP_ID and PRIVATE_KEY from environment or mounted volumes
-- Creates RS256 JWT with proper claims (iss, iat, exp)
-- Auto-discovers installation ID if not provided
-- Exchanges JWT for installation token via GitHub API
-- Writes token atomically with proper permissions
-
-**Environment Variables:**
-- `APP_ID`: GitHub App ID
-- `PRIVATE_KEY`: GitHub App private key (PEM format)
-- `INSTALLATION_ID`: Optional installation ID
-- `OUTPUT_PATH`: Token output path (default: `/var/run/github/token`)
-- `GITHUB_API_URL`: GitHub API base URL (default: `https://api.github.com`)
+We reuse container-embedded token minting already present in our images/templates (intake/docs/code). Ensure the new GitHub App secrets are mounted where required. Tokens are written to `/var/run/github/token` with 0600 perms.
 
 ### Workflow Integration Pattern
 
 ```yaml
 initContainers:
 - name: gh-token
-  image: ghcr.io/ORG/ghapp-token-gen:TAG
+  image: ghcr.io/5dlabs/cto/runtime:latest
   env:
     - name: APP_ID
       valueFrom:
@@ -136,16 +150,13 @@ containers:
 ## Implementation Steps
 
 ### Phase 1: External Secrets Setup
-1. Configure SecretStore for your chosen provider (AWS Secrets Manager, Azure Key Vault, etc.)
-2. Create ExternalSecret resources for each GitHub App
-3. Verify Kubernetes Secrets are created and synced
-4. Test secret rotation by updating backend values
+1. Create/extend ExternalSecret resources for each GitHub App using our existing ClusterSecretStore (`secret-store`)
+2. Verify Kubernetes Secrets are created and synced
+3. Test secret rotation by updating backend values
 
-### Phase 2: Token Generator Development
-1. Implement JWT creation and GitHub API integration
-2. Add retry logic with exponential backoff
-3. Containerize with security best practices
-4. Set up CI pipeline for automated builds
+### Phase 2: Token Generation (reuse existing)
+1. Confirm containers mint tokens from mounted secrets and write to `/var/run/github/token`
+2. Validate permissions (0600) and error handling
 
 ### Phase 3: Workflow Integration
 1. Create parameterized WorkflowTemplate mounting patterns
@@ -154,10 +165,9 @@ containers:
 4. Test end-to-end token generation and usage
 
 ### Phase 4: Production Hardening
-1. Implement comprehensive monitoring and alerting
-2. Add rotation automation and failure handling
-3. Create operational runbooks and documentation
-4. Conduct security review and penetration testing
+1. Monitoring and alerting for ExternalSecrets sync and token usage
+2. Rotation and failure handling
+3. Operational runbooks
 
 ## Security Considerations
 
