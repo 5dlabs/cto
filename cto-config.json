@@ -12,7 +12,7 @@
       "githubApp": "5DLabs-Morgan"
     },
     "code": {
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
