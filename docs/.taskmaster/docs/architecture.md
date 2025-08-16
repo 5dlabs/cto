@@ -14,8 +14,17 @@ This document describes the technical architecture for a multi-agent, event-driv
   - No changes to CRD schemas or controller logic.
 - Agent runtime
   - Single agent image reused for all CodeRun jobs; mounts `controller-agents` ConfigMap for system prompts.
-  - Different `github-app` parameter selects different agent profiles (author, clippy, tests, deploy, acceptance).
+  - Different `github-app` parameter selects different agent profiles/personas:
+    - **Morgan**: PM agent with awareness of all other agents
+    - **Rex**: Primary implementation agent
+    - **Clippy Agent**: Formatting (`cargo fmt`) and pedantic warnings
+    - **QA Agent**: Tests only (cannot modify implementation, leaves comments)
+    - **Triage Agent**: CI failure remediation
+    - **Security Agent**: Reads vulnerability reports and fixes issues
+    - **PR Comment Agent**: Addresses review comments
+    - **Issue Agent**: Converts issues to implementations
   - Reads `task/prompt.md` as user prompt input; uses MCP tool config when available.
+  - Project-wide MCP tool configuration (not per-task) for simpler management.
 - CI/CD
   - GitHub Actions performs build/test/deploy; Argo CD syncs deployments from `main`.
 - Secrets and config
@@ -24,15 +33,18 @@ This document describes the technical architecture for a multi-agent, event-driv
   - OTEL collector exports traces/metrics; Grafana dashboards surface step status and throughput.
 
 ## Control flow
-1) Event arrives (e.g., PR comment). Sensor submits an orchestrator Workflow with params such as repo, branch, prNumber, taskId.
+1) Event arrives (e.g., PR opened). Sensor submits an orchestrator Workflow with params such as repo, branch, prNumber, taskId.
 2) Orchestrator DAG runs the appropriate path:
-   - Fresh task: creates CodeRun CRs in sequence (author → clippy → tests → deploy → acceptance)
-   - PR comment: creates remediation CodeRun on the task branch
-   - CI failure: creates failure remediator CodeRun
+   - **Pull Request**: Clippy Agent → QA Agent (test in real environment)
+   - **Issue/Task**: Rex (implement) → Clippy → QA → deploy → acceptance
+   - **PR/Issue comment**: Rex re-invoked with downloaded comments
+   - **CI failure**: Triage Agent attempts fixes
+   - **Security scan complete**: Security Agent remediates vulnerabilities
 3) Each CodeRun step:
-   - Workflow creates CodeRun CR with appropriate `github-app` parameter (selects agent profile)
+   - Workflow creates CodeRun CR with appropriate `github-app` parameter (selects agent persona)
    - Controller reconciles CR, creates Job with mounted system prompt from agents ConfigMap
    - Job container reads `task/prompt.md` and executes with selected agent profile
+   - QA Agent can only add tests; if implementation changes needed, leaves comments
 4) CodeRun status updates (phase, pullRequestUrl) are monitored by Workflow for progression.
 5) On success, the DAG advances to next CodeRun; on failure, retry with backoff or surface actionable error.
 
@@ -60,7 +72,9 @@ This document describes the technical architecture for a multi-agent, event-driv
 - Orchestrator DAG patterns:
   - Linear chain of CodeRun creations for single task
   - Fan-out/fan-in for independent tasks using Argo DAG dependencies
+  - Parallel execution using git worktrees or separate directories on same PVC
   - Semaphore-based rate limiting (per repo/org/global)
+  - Dependency analysis from TaskMaster to determine parallelizable work
 
 ## Prompt management
 - System prompts are declared in Helm values under `agents[*].systemPrompt`; rendered to `controller-agents` ConfigMap as `GITHUB_APP_system-prompt.md`.
@@ -79,13 +93,24 @@ This document describes the technical architecture for a multi-agent, event-driv
 - Log links to PRs and Actions runs as Workflow outputs.
 
 ## Implementation plan
-1. Define agent profiles in Helm values with specialized system prompts (author, clippy, tests, deploy, acceptance).
-2. Create `orchestrator-dag` WorkflowTemplate that chains existing `coderun-template` calls with different `github-app` parameters.
-3. Configure Argo Events sensors to submit orchestrator Workflows based on GitHub events.
-4. Add semaphores for concurrency control at repo/org level.
-5. Update dashboards to show orchestration-level metrics alongside existing CodeRun metrics.
+1. **Simplify API**: Auto-detect parameters to reduce to 1-2 required arguments for better agent success.
+2. **Standardize structure**: Docs in same project (no separate docs repo).
+3. **Project-wide MCP tools**: Move tool configuration from per-task to project-wide in requirements.
+4. **Define agent personas**: Create GitHub Apps and system prompts for each (Morgan, Rex, Clippy, QA, etc.).
+5. **Comment retrieval**: Add MCP tool or API for efficient PR comment downloading.
+6. **PR flow first**: Implement Clippy → QA flow for pull requests.
+7. **Orchestrator DAG**: Create WorkflowTemplate chaining `coderun-template` with different agents.
+8. **Event sensors**: Configure for PR, issue, comment, and CI failure events.
+9. **Parallel execution**: Implement worktree/directory isolation.
+10. **Security remediation**: Integrate vulnerability report reading and fixing.
 
 ## Open items
-- Decide on preview env strategy (namespaced app vs. shared staging).
-- Standardize acceptance criteria schema in `requirements.yaml`.
-- Guardrails for event storm control and resume semantics.
+- Best approach for git worktrees with agent containers?
+- How to handle QA agent comments when implementation changes needed?
+- Optimal PR comment retrieval method (MCP vs GitHub API)?
+- Security report formats and integration points?
+- Morgan (PM agent) coordination patterns with other agents?
+- Auto-merge policies after all agents approve?
+- Preview env strategy (namespaced app vs. shared staging)?
+- Standardize acceptance criteria schema in `requirements.yaml`?
+- Guardrails for event storm control and resume semantics?
