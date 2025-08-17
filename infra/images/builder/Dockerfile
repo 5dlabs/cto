@@ -82,23 +82,22 @@ RUN --mount=type=cache,target=/tmp/downloads \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/
 
-# Install Helm (with caching) - use GitHub releases to avoid get.helm.sh SSL issues
+# Install Helm (with caching) - copy secure approach from runtime image
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
-    HELM_VERSION="v3.16.1" && \
-    # Try GitHub releases first (more reliable than get.helm.sh) \
-    (curl --retry 3 --retry-delay 2 --retry-connrefused \
-          --tlsv1.2 --proto '=https' --location --fail --silent --show-error \
-          -O "https://github.com/helm/helm/releases/download/${HELM_VERSION}/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
-     || \
-     # Fallback to get.helm.sh with more permissive SSL \
-     curl --retry 3 --retry-delay 2 --retry-connrefused \
-          --insecure --location --fail --silent --show-error \
-          -O "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz") && \
-    tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
-    mv linux-amd64/helm /usr/local/bin/helm && \
-    chmod +x /usr/local/bin/helm && \
-    helm version --client
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    HELM_VERSION=$(curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r '.tag_name') && \
+    HELM_TAR="helm-${HELM_VERSION}-linux-${DL_ARCH}.tar.gz" && \
+    for i in 1 2 3; do \
+        curl -fsSL -o "${HELM_TAR}" "https://get.helm.sh/${HELM_TAR}" && \
+        tar -xzf "${HELM_TAR}" && \
+        mv "linux-${DL_ARCH}/helm" /usr/local/bin/helm && \
+        chmod +x /usr/local/bin/helm && \
+        rm -f "${HELM_TAR}" && \
+        helm version --client && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
 
 # Install GitHub CLI (separate layer for better caching)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
