@@ -163,7 +163,10 @@ jobs:
           echo "📊 Initial sccache stats:"
           sccache --show-stats
 
-                    # Build with detailed output
+          # Set CARGO_TARGET_DIR to use cache directory
+          export CARGO_TARGET_DIR=$HOME/cache/target
+
+          # Build with detailed output
           echo "⏱️ Starting build..."
           cargo build --release --bin agent-controller
 
