@@ -100,9 +100,20 @@ spec:
               - name: stage
                 value: "implementation"
           
+          # Update stage after implementation completes
+          - name: update-to-waiting-pr
+            dependencies: [implementation-work]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-pr-created"
+              - name: verify-update
+                value: "true"
+          
           # Suspend point 1: Wait for PR creation
           - name: wait-pr-created
-            dependencies: [implementation-work]
+            dependencies: [update-to-waiting-pr]
             template: suspend-for-event
             arguments:
               parameters:
@@ -128,9 +139,20 @@ spec:
               - name: pr-number
                 value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
           
+          # Update stage after quality work completes
+          - name: update-to-waiting-qa
+            dependencies: [quality-work]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-ready-for-qa"
+              - name: verify-update
+                value: "true"
+          
           # Suspend point 2: Wait for ready-for-qa label
           - name: wait-ready-for-qa
-            dependencies: [quality-work]
+            dependencies: [update-to-waiting-qa]
             template: suspend-for-event
             arguments:
               parameters:
@@ -158,9 +180,20 @@ spec:
               - name: qa-ready
                 value: "true"
           
+          # Update stage after testing work completes
+          - name: update-to-waiting-approval
+            dependencies: [testing-work]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-pr-approved"
+              - name: verify-update
+                value: "true"
+          
           # Suspend point 3: Wait for PR approval
           - name: wait-pr-approved
-            dependencies: [testing-work]
+            dependencies: [update-to-waiting-approval]
             template: suspend-for-event
             arguments:
               parameters:
@@ -244,6 +277,115 @@ spec:
           duration: "30s"
           factor: 2
           maxDuration: "5m"
+
+    # Template for atomic workflow stage updates
+    - name: update-workflow-stage
+      inputs:
+        parameters:
+        - name: new-stage
+          description: "The new stage to transition to"
+        - name: verify-update
+          description: "Whether to verify the update succeeded"
+          default: "true"
+      outputs:
+        parameters:
+        - name: update-status
+          valueFrom:
+            path: /tmp/update-status.txt
+          default: "unknown"
+      script:
+        image: bitnami/kubectl:1.31
+        command: [bash]
+        source: |
+          #!/bin/bash
+          set -e
+          
+          echo "========================================="
+          echo "Updating Workflow Stage"
+          echo "========================================="
+          echo "Workflow: {{`{{workflow.name}}`}}"
+          echo "Current Task: {{`{{workflow.parameters.task-id}}`}}"
+          echo "New Stage: {{`{{inputs.parameters.new-stage}}`}}"
+          echo ""
+          
+          # Prepare the JSON patch for atomic label update
+          PATCH_JSON='{
+            "metadata": {
+              "labels": {
+                "current-stage": "{{`{{inputs.parameters.new-stage}}`}}",
+                "task-id": "{{`{{workflow.parameters.task-id}}`}}",
+                "repository": "{{`{{workflow.parameters.repository}}`}}",
+                "updated-at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+              }
+            }
+          }'
+          
+          echo "Applying patch:"
+          echo "$PATCH_JSON" | jq .
+          
+          # Apply the patch with retry logic
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          UPDATE_SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo ""
+            echo "Attempt $((RETRY_COUNT+1)) of $MAX_RETRIES..."
+            
+            if kubectl patch workflow "{{`{{workflow.name}}`}}" \
+              --type='merge' \
+              --patch="$PATCH_JSON" \
+              -n {{ .Release.Namespace }}; then
+              
+              UPDATE_SUCCESS=true
+              echo "✅ Stage update successful"
+              break
+            else
+              echo "⚠️ Stage update failed, retrying..."
+              RETRY_COUNT=$((RETRY_COUNT+1))
+              sleep 2
+            fi
+          done
+          
+          # Verify the update if requested
+          if [ "{{`{{inputs.parameters.verify-update}}`}}" = "true" ]; then
+            echo ""
+            echo "Verifying stage update..."
+            
+            CURRENT_STAGE=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
+              -n {{ .Release.Namespace }} \
+              -o jsonpath='{.metadata.labels.current-stage}')
+            
+            if [ "$CURRENT_STAGE" = "{{`{{inputs.parameters.new-stage}}`}}" ]; then
+              echo "✅ Verification successful: Stage is now '$CURRENT_STAGE'"
+              echo "success" > /tmp/update-status.txt
+            else
+              echo "❌ Verification failed: Expected '{{`{{inputs.parameters.new-stage}}`}}', got '$CURRENT_STAGE'"
+              echo "failed" > /tmp/update-status.txt
+              exit 1
+            fi
+          else
+            if [ "$UPDATE_SUCCESS" = true ]; then
+              echo "success" > /tmp/update-status.txt
+            else
+              echo "failed" > /tmp/update-status.txt
+              exit 1
+            fi
+          fi
+          
+          # Log final state
+          echo ""
+          echo "Stage transition completed:"
+          kubectl get workflow "{{`{{workflow.name}}`}}" \
+            -n {{ .Release.Namespace }} \
+            -o jsonpath='{.metadata.labels}' | jq .
+      retryStrategy:
+        limit: 2
+        retryPolicy: "OnFailure"
+        backoff:
+          duration: "5s"
+          factor: 2
+          maxDuration: "30s"
 
     # Template for suspend points waiting for external events
     - name: suspend-for-event
