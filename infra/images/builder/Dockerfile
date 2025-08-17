@@ -70,22 +70,34 @@ RUN --mount=type=cache,target=/tmp/downloads \
     echo 'exec clang -fuse-ld=/usr/local/bin/mold "$@"' >> /usr/local/bin/clang-mold && \
     chmod +x /usr/local/bin/clang-mold
 
-# Install kubectl (with caching)
+# Install kubectl (with caching) - robust download with retries
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    # Get latest stable version with retries \
+    KUBECTL_VERSION=$(curl --retry 3 --retry-delay 1 -L -s https://dl.k8s.io/release/stable.txt) && \
+    # Download kubectl with robust options \
+    curl --retry 5 --retry-delay 2 --retry-connrefused \
+         --tlsv1.2 --proto '=https' --location --fail --silent --show-error \
+         -O "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/
 
-# Install Helm (with caching) - direct binary download for reliability
+# Install Helm (with caching) - copy secure approach from runtime image
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
-    HELM_VERSION="v3.16.1" && \
-    curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
-    tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
-    mv linux-amd64/helm /usr/local/bin/helm && \
-    chmod +x /usr/local/bin/helm && \
-    helm version --client
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    HELM_VERSION=$(curl -s https://api.github.com/repos/helm/helm/releases/latest | jq -r '.tag_name') && \
+    HELM_TAR="helm-${HELM_VERSION}-linux-${DL_ARCH}.tar.gz" && \
+    for i in 1 2 3; do \
+        curl -fsSL -o "${HELM_TAR}" "https://get.helm.sh/${HELM_TAR}" && \
+        tar -xzf "${HELM_TAR}" && \
+        mv "linux-${DL_ARCH}/helm" /usr/local/bin/helm && \
+        chmod +x /usr/local/bin/helm && \
+        rm -f "${HELM_TAR}" && \
+        helm version --client && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
 
 # Install GitHub CLI (separate layer for better caching)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

@@ -1,15 +1,15 @@
 # PostgreSQL with pgvector Extension
 
 Custom PostgreSQL image that combines:
-- **Bitnami PostgreSQL 16.3.0** - Production-ready with security optimizations
+- **Zalando Spilo PostgreSQL 16** - Operator-compatible with cluster management features
 - **pgvector extension** - Vector similarity search and high-dimensional vector support
 
 ## Features
 
 - ✅ **High-dimensional vector support** - Supports 3072-dimension vectors for text-embedding-3-large compatibility
-- ✅ **Bitnami compatibility** - Works with Bitnami PostgreSQL Helm charts and operators
-- ✅ **Security optimized** - Runs as non-root user (1001) with proper permissions
-- ✅ **Production ready** - Based on Bitnami's production-hardened PostgreSQL image
+- ✅ **Operator compatibility** - Works with Zalando postgres operator and Spilo clusters
+- ✅ **Cluster management** - Full support for HA, streaming replication, and automated failover
+- ✅ **Production ready** - Based on Zalando's production-tested Spilo image
 
 ## Usage
 
@@ -49,8 +49,8 @@ Used by the `vector-postgres` PostgreSQL cluster in the `databases` namespace fo
 
 ## Architecture
 
-This image solves the compatibility issue between:
-- **pgvector/pgvector** - Provides the pgvector extension
-- **bitnami/postgresql** - Provides production-ready PostgreSQL with security hardening
+This image extends the official Zalando Spilo image with pgvector:
+- **ghcr.io/zalando/spilo-16** - Provides PostgreSQL 16 with operator compatibility
+- **postgresql-16-pgvector** - Installed from PostgreSQL APT repository
 
-The multi-stage build copies pgvector extension files to Bitnami's expected directory structure while maintaining proper permissions for non-root operation.
+This approach maintains full compatibility with the Zalando postgres operator while adding vector search capabilities.
