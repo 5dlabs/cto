@@ -70,18 +70,26 @@ RUN --mount=type=cache,target=/tmp/downloads \
     echo 'exec clang -fuse-ld=/usr/local/bin/mold "$@"' >> /usr/local/bin/clang-mold && \
     chmod +x /usr/local/bin/clang-mold
 
-# Install kubectl (with caching)
+# Install kubectl (with caching) - robust download with retries
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    # Get latest stable version with retries \
+    KUBECTL_VERSION=$(curl --retry 3 --retry-delay 1 -L -s https://dl.k8s.io/release/stable.txt) && \
+    # Download kubectl with robust options \
+    curl --retry 5 --retry-delay 2 --retry-connrefused \
+         --tlsv1.2 --proto '=https' --location --fail --silent --show-error \
+         -O "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/
 
-# Install Helm (with caching) - direct binary download for reliability
+# Install Helm (with caching) - robust download with retries for network issues
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
     HELM_VERSION="v3.16.1" && \
-    curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
+    # Use robust curl options with retries for SSL connection issues \
+    curl --retry 5 --retry-delay 2 --retry-connrefused \
+         --tlsv1.2 --proto '=https' --location --fail --silent --show-error \
+         -O "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
     tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
     mv linux-amd64/helm /usr/local/bin/helm && \
     chmod +x /usr/local/bin/helm && \
