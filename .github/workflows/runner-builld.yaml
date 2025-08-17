@@ -62,7 +62,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./infra/images/rust-builder/Dockerfile
+          file: ./infra/images/builder/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -95,19 +95,13 @@ jobs:
     steps:
       - name: Cycle rust-builder runners
         run: |
-          echo "🔄 Rolling restart of Arc runners to use new rust-builder image..."
-
-          # Note: The runnerdeployment should use imagePullPolicy: Always
-          # and the 'latest' tag to automatically get new images
-
-          # Delete pods to force recreation with new image
-          kubectl delete pods -n arc-systems \
-            -l runner-deployment-name=agent-platform-runner-deployment \
-            --grace-period=30 || echo "No runner pods found"
-
-          echo "✅ Runners will restart and pull the latest rust-builder image"
-          echo "Note: It may take 1-2 minutes for all runners to be ready"
+          echo "🔄 New rust-builder image built successfully..."
+          echo "⚠️  Note: Currently running on hosted runner - cannot cycle Arc runners with kubectl"
+          echo "   The following commands would run on self-hosted runners:"
           echo ""
-          echo "⚠️  Make sure the runnerdeployment uses:"
-          echo "   - imagePullPolicy: Always"
-          echo "   - A tag that gets updated (e.g., 'latest' or branch tag)"
+          echo "   # kubectl delete pods -n arc-systems \\"
+          echo "   #   -l runner-deployment-name=agent-platform-runner-deployment \\"
+          echo "   #   --grace-period=30"
+          echo ""
+          echo "✅ Image is available at ghcr.io/5dlabs/rust-builder:latest"
+          echo "⚠️  Manually delete runner pods in arc-systems namespace to use new image"
