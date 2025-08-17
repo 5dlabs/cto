@@ -1,0 +1,102 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ready-for-qa-label
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-labeled
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+        # Filter for pull_request labeled events
+        - path: headers.X-Github-Event
+          type: string
+          value: ["pull_request"]
+        - path: body.action
+          type: string
+          value: ["labeled"]
+        # Check for ready-for-qa label
+        - path: body.label.name
+          type: string
+          value: ["ready-for-qa"]
+        # Verify label was added by Cleo
+        - path: body.sender.login
+          type: string
+          value: ["5DLabs-Cleo[bot]", "5DLabs-Cleo"]
+  triggers:
+    - template:
+        name: resume-after-cleo
+        conditions: "github-pr-labeled"
+        argoWorkflow:
+          operation: resume
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                name: ""  # Will be determined by label selector
+                namespace: argo
+              spec: {}
+          parameters:
+            # Extract task ID from PR labels
+            - src:
+                dependencyName: github-pr-labeled
+                dataTemplate: |
+                  {{ range $index, $label := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $parts := splitList "-" $label.name }}
+                      {{ if gt (len $parts) 1 }}
+                        {{ index $parts 1 }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: taskId
+            # Extract PR number for correlation
+            - src:
+                dependencyName: github-pr-labeled
+                dataKey: body.pull_request.number
+              dest: prNumber
+            # Get repository name
+            - src:
+                dependencyName: github-pr-labeled
+                dataKey: body.repository.name
+              dest: repoName
+        k8s:
+          operation: patch
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                namespace: argo
+              spec: {}
+          parameters:
+            # Task ID for label selector
+            - src:
+                dependencyName: github-pr-labeled
+                dataTemplate: |
+                  {{ range $index, $label := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $parts := splitList "-" $label.name }}
+                      {{ if gt (len $parts) 1 }}
+                        {{ index $parts 1 }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: taskId
+          # Use label selector to find and resume the correct workflow
+          labelSelector:
+            matchLabels:
+              workflow-type: play-orchestration
+              task-id: "{{taskId}}"
+              current-stage: waiting-ready-for-qa
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1

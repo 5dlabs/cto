@@ -1,0 +1,95 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: multi-agent-workflow-resume
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-created
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+        # Filter for pull_request opened events
+        - path: headers.X-Github-Event
+          type: string
+          value: ["pull_request"]
+        - path: body.action
+          type: string
+          value: ["opened"]
+        # Ensure PR has task label
+        - path: body.pull_request.labels
+          type: array
+          comparator: ">"
+          value:
+            - "0"
+  triggers:
+    - template:
+        name: resume-after-implementation
+        conditions: "github-pr-created"
+        argoWorkflow:
+          operation: resume
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                name: ""  # Will be determined by label selector
+                namespace: argo
+              spec: {}
+          parameters:
+            # Extract task ID from PR labels
+            - src:
+                dependencyName: github-pr-created
+                dataTemplate: |
+                  {{ range $index, $label := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $parts := splitList "-" $label.name }}
+                      {{ if gt (len $parts) 1 }}
+                        {{ index $parts 1 }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: taskId
+            # Extract and validate branch name matches task pattern
+            - src:
+                dependencyName: github-pr-created
+                dataKey: body.pull_request.head.ref
+              dest: branchName
+        k8s:
+          operation: patch
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                namespace: argo
+              spec: {}
+          parameters:
+            # Task ID for label selector
+            - src:
+                dependencyName: github-pr-created
+                dataTemplate: |
+                  {{ range $index, $label := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $parts := splitList "-" $label.name }}
+                      {{ if gt (len $parts) 1 }}
+                        {{ index $parts 1 }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: taskId
+          # Use label selector to find and resume the correct workflow
+          labelSelector:
+            matchLabels:
+              workflow-type: play-orchestration
+              task-id: "{{taskId}}"
+              current-stage: waiting-pr-created
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1

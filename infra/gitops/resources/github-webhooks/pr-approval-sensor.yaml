@@ -1,0 +1,107 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pr-approval
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-review
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+        # Filter for pull_request_review events
+        - path: headers.X-Github-Event
+          type: string
+          value: ["pull_request_review"]
+        - path: body.action
+          type: string
+          value: ["submitted"]
+        # Check for approval state
+        - path: body.review.state
+          type: string
+          value: ["approved"]
+        # Verify approval comes from Tess
+        - path: body.review.user.login
+          type: string
+          value: ["5DLabs-Tess[bot]", "5DLabs-Tess"]
+  triggers:
+    - template:
+        name: resume-after-tess
+        conditions: "github-pr-review"
+        argoWorkflow:
+          operation: resume
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                name: ""  # Will be determined by label selector
+                namespace: argo
+              spec: {}
+          parameters:
+            # Extract task ID from PR labels
+            - src:
+                dependencyName: github-pr-review
+                dataTemplate: |
+                  {{ range $index, $label := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $parts := splitList "-" $label.name }}
+                      {{ if gt (len $parts) 1 }}
+                        {{ index $parts 1 }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: taskId
+            # Extract PR number
+            - src:
+                dependencyName: github-pr-review
+                dataKey: body.pull_request.number
+              dest: prNumber
+            # Get repository name
+            - src:
+                dependencyName: github-pr-review
+                dataKey: body.repository.name
+              dest: repoName
+            # Get review ID for tracking
+            - src:
+                dependencyName: github-pr-review
+                dataKey: body.review.id
+              dest: reviewId
+        k8s:
+          operation: patch
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                namespace: argo
+              spec: {}
+          parameters:
+            # Task ID for label selector
+            - src:
+                dependencyName: github-pr-review
+                dataTemplate: |
+                  {{ range $index, $label := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $parts := splitList "-" $label.name }}
+                      {{ if gt (len $parts) 1 }}
+                        {{ index $parts 1 }}
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: taskId
+          # Use label selector to find and resume the correct workflow
+          labelSelector:
+            matchLabels:
+              workflow-type: play-orchestration
+              task-id: "{{taskId}}"
+              current-stage: waiting-pr-approved
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
