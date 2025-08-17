@@ -57,7 +57,8 @@ When implementing Argo Events sensors/triggers, **ALWAYS** reference these offic
 
 3. **For workflow operations:**
    - Use `special-workflow-trigger.yaml` for submit/resume operations
-   - Use `dest: metadata.name` for dynamic workflow targeting
+   - For `submit`: parameterize `metadata.name`/`generateName` and spec args
+   - For `resume`: pass the existing workflow name via `args` (equivalent to `argo resume <name>`); avoid dynamic `labelSelector`
 
 4. **For resource deletion/cleanup:**
    - Create cleanup workflows with `argoWorkflow.operation: submit` 
