@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/part-of: platform
     agents.platform/template-type: coderun
 spec:
-  # Define input parameters that match the MCP server interface  
+  # Define input parameters that match the MCP server interface
   # Note: 'default' values are for documentation/IDE hints only - MCP server always provides explicit values
   arguments:
     parameters:
@@ -46,13 +46,13 @@ spec:
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
-  
+
   # Workflow timeout (3 hours)
   activeDeadlineSeconds: 10800
-  
+
   # Main workflow entry point
   entrypoint: coderun-main
-  
+
   templates:
     # Main CodeRun execution - create CRD and wait for completion
     - name: coderun-main
@@ -65,7 +65,7 @@ spec:
             parameters:
             - name: coderun-name
               value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
-          
+
     - name: create-coderun-resource
       outputs:
         parameters:
@@ -101,7 +101,7 @@ spec:
             # serviceAccountName is optional; controller will default from its config if not provided
             contextVersion: 1
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
-            
+
     - name: wait-coderun-completion
       inputs:
         parameters:
@@ -116,12 +116,13 @@ spec:
             namespace: {{ .Release.Namespace }}
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
-            
+
   # Cleanup policy - reasonable cleanup for long-running AI tasks
   ttlStrategy:
     secondsAfterCompletion: 300    # Keep completed workflows for 5 minutes
     secondsAfterFailure: 10800     # Keep failed workflows for 3 hours
-  
+
   # Pod garbage collection
   podGC:
     strategy: OnPodCompletion      # Delete pods immediately when they complete{{- end }}
+

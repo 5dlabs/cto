@@ -72,3 +72,4 @@ subjects:
 - kind: ServiceAccount
   name: external-secrets
   namespace: external-secrets-system
+

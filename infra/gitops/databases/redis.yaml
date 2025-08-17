@@ -54,3 +54,4 @@ spec:
 
   auth:
     secretPath: redis-auth
+

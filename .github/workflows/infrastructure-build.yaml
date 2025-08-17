@@ -1,14 +1,11 @@
 ---
 name: Infrastructure Images
-
 # Build infrastructure images like databases, caching systems, etc.
 # Separate from agent images to maintain logical separation
-
 on:
   schedule:
     # Daily at 7 AM UTC (after agents build)
     - cron: '0 7 * * *'
-
   push:
     branches:
       - '**'
@@ -17,7 +14,6 @@ on:
       - 'infra/images/redis/**'
       - 'infra/images/builder/**'
       - '.github/workflows/infrastructure-build.yaml'
-
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -29,11 +25,9 @@ on:
         description: 'Specific image to build (postgresql, rust-builder, or leave blank for all)'
         required: false
         type: string
-
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
-
 jobs:
   # Build infrastructure images
   build-infrastructure:
@@ -60,7 +54,6 @@ jobs:
             description: "Rust development environment with pre-warmed dependencies for CI/CD"
     steps:
       - uses: actions/checkout@v4
-      
       - name: Check if should build this image
         id: should-build
         run: |
@@ -71,7 +64,6 @@ jobs:
             echo "build=false" >> $GITHUB_OUTPUT
             echo "⏭️ Skipping ${{ matrix.name }} (building ${{ github.event.inputs.image }} only)"
           fi
-
       - name: Log in to Container Registry
         if: steps.should-build.outputs.build == 'true'
         uses: docker/login-action@v3
@@ -79,7 +71,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Generate version tag
         if: steps.should-build.outputs.build == 'true'
         id: version
@@ -88,11 +79,9 @@ jobs:
           VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 ${{ matrix.name }} version: $VERSION"
-
       - name: Set up Docker Buildx
         if: steps.should-build.outputs.build == 'true'
         uses: docker/setup-buildx-action@v3
-
       - name: Build and push ${{ matrix.name }} image
         if: steps.should-build.outputs.build == 'true'
         uses: docker/build-push-action@v5
@@ -110,7 +99,6 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
       - name: Show GHCR tags for ${{ matrix.name }}
         if: steps.should-build.outputs.build == 'true'
         run: |
@@ -118,7 +106,6 @@ jobs:
           gh api -H "Accept: application/vnd.github+json" \
             "/orgs/${{ env.IMAGE_BASE }}/packages/container/${{ matrix.image }}/versions?per_page=3" \
             | jq -r '.[].metadata.container.tags' || echo "Package not found or no access"
-
       - name: Image build summary
         if: steps.should-build.outputs.build == 'true'
         run: |
@@ -127,7 +114,6 @@ jobs:
           echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/${{ matrix.image }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Tags**: \`latest\`, \`${{ matrix.version }}\`, \`v${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Description**: ${{ matrix.description }}" >> $GITHUB_STEP_SUMMARY
-
   # Cycle Arc runners when rust-builder image is updated (only on main branch)
   cycle-runners:
     needs: build-infrastructure
@@ -145,16 +131,14 @@ jobs:
             echo "rust_builder_changed=false" >> $GITHUB_OUTPUT
             echo "⏭️  rust-builder unchanged, skipping runner cycling"
           fi
-
       - name: Cycle rust-builder runners
         if: steps.check-rust-builder.outputs.rust_builder_changed == 'true'
         run: |
           echo "🔄 Cycling Arc runners to use new rust-builder image..."
-          
           # Delete Arc runner pods to force them to pull new image
           kubectl delete pods -n arc-runners \
             -l runner-deployment-name=k8s-runner \
             --grace-period=30 || true
-          
           echo "✅ Runner pods deleted - new pods will use updated rust-builder image"
           echo "⏱️  Wait ~2-3 minutes for new runners to become available"
+

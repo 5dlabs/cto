@@ -2,9 +2,7 @@
 # DEPRECATED: This workflow has been moved to infrastructure-build.yaml
 # The rust-builder image is now built as part of the infrastructure workflow
 # Use the infrastructure-build.yaml workflow with image=rust-builder parameter
-
 name: Build Rust Builder Image (DEPRECATED)
-
 on:
   # Workflow disabled - moved to infrastructure-build.yaml
   workflow_dispatch:
@@ -13,11 +11,9 @@ on:
         description: 'This workflow is deprecated. Use infrastructure-build.yaml with image=rust-builder'
         required: false
         type: string
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: 5dlabs/rust-builder
-
 jobs:
   deprecated-notice:
     runs-on: ubuntu-latest
@@ -38,5 +34,5 @@ jobs:
           echo "gh workflow run infrastructure-build.yaml -f image=rust-builder"
           echo ""
           echo "⚠️  This workflow will be removed in a future update."
-          
           exit 1  # Fail the job to make it clear this is deprecated
+

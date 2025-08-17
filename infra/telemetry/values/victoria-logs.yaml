@@ -4,13 +4,13 @@
 server:
   # Enable single server mode
   enabled: true
-  
+
   # Image configuration
   image:
     repository: victoriametrics/victoria-logs
     tag: v1.24.0-victorialogs
     pullPolicy: IfNotPresent
-  
+
   # Resource allocation - adjusted for development environment
   resources:
     limits:
@@ -19,33 +19,33 @@ server:
     requests:
       cpu: 1000m
       memory: 2Gi
-  
+
   # Data retention period
   retentionPeriod: 6M  # 6 months
-  
+
   # Storage configuration
   persistentVolume:
     enabled: true
     size: 20Gi
     storageClass: local-path  # Using local-path provisioner
-    
+
   # Extra arguments for VictoriaLogs
   extraArgs:
     httpListenAddr: ":9428"
     retentionPeriod: "6"
     loggerLevel: "INFO"
     search.maxQueryDuration: "30s"
-    
+
   # Service configuration
   service:
     type: ClusterIP
     servicePort: 9428
-    
+
   # Security context
   securityContext:
     runAsNonRoot: true
     runAsUser: 65534
-    
+
   # Liveness and readiness probes
   livenessProbe:
     httpGet:
@@ -53,10 +53,10 @@ server:
       port: 9428
     initialDelaySeconds: 30
     periodSeconds: 30
-    
+
   readinessProbe:
     httpGet:
-      path: /health  
+      path: /health
       port: 9428
     initialDelaySeconds: 5
     periodSeconds: 5

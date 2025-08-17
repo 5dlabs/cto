@@ -1,4 +1,5 @@
 {{- if .Values.agents }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -17,7 +18,7 @@ data:
         appId: {{ $agent.appId | quote }}
         clientId: {{ $agent.clientId | quote }}
         role: {{ $agent.role | quote }}
-        expertise: 
+        expertise:
           {{- range $expertise := $agent.expertise }}
           - {{ $expertise | quote }}
           {{- end }}
@@ -33,8 +34,9 @@ data:
     description: {{ $agent.description }}
     # tools: omitted to inherit all available tools
     ---
-    
+
 {{ $agent.systemPrompt | nindent 4 }}
   {{- end }}
   {{- end }}
 {{- end }}
+

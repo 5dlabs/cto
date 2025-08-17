@@ -19,7 +19,7 @@ spec:
           names:
             - argo-events
             - argo-workflows
-      # Github application auth. Instead of using personal token `apiToken` use app PEM            
+      # Github application auth. Instead of using personal token `apiToken` use app PEM
 #     githubApp:
 #       privateKey:
 #         name: github-app-pem
@@ -69,7 +69,7 @@ spec:
       active: true
       # The media type used to serialize the payloads
       contentType: json
-      
+
     example-without-api-credentials:
       owner: "argoproj"
       repository: "argo"
@@ -114,3 +114,4 @@ spec:
 #      insecure: true
 #      active: true
 #      contentType: "json"
+

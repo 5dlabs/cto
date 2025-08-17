@@ -39,3 +39,4 @@ spec:
       - PrunePropagationPolicy=foreground
       - PruneLast=true
   revisionHistoryLimit: 5
+

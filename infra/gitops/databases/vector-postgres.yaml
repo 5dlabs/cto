@@ -141,3 +141,4 @@ spec:
   # Maintenance windows
   maintenanceWindows:
     - "03:00-04:00"
+

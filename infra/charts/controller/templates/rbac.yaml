@@ -1,5 +1,5 @@
 {{- if .Values.rbac.create -}}
-
+---
 {{/* Controller RBAC */}}
 {{- if .Values.rbac.controller }}
 {{- if .Values.rbac.controller.namespaced }}
@@ -214,3 +214,4 @@ subjects:
 {{- end }}
 
 {{- end }}
+

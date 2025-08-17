@@ -26,7 +26,7 @@ spec:
   # Reference the workflow template
   workflowTemplateRef:
     name: play-workflow-template
-  
+
   # Override specific parameters for this instance
   arguments:
     parameters:
@@ -37,7 +37,7 @@ spec:
         value: "5dlabs/cto"
       - name: service
         value: "cto"
-      
+
       # Agent selection (can use different agents)
       - name: implementation-agent
         value: "5DLabs-Rex"
@@ -45,7 +45,7 @@ spec:
         value: "5DLabs-Cleo"
       - name: testing-agent
         value: "5DLabs-Tess"
-      
+
       # Model configuration
       - name: model
         value: "claude-3-5-sonnet-20241022"
@@ -65,7 +65,7 @@ metadata:
 spec:
   workflowTemplateRef:
     name: play-workflow-template
-  
+
   arguments:
     parameters:
       - name: task-id
@@ -74,7 +74,7 @@ spec:
         value: "5dlabs/cto"
       - name: service
         value: "cto"
-      
+
       # Using Blaze instead of Rex for implementation
       - name: implementation-agent
         value: "5DLabs-Blaze"
@@ -82,6 +82,6 @@ spec:
         value: "5DLabs-Cleo"
       - name: testing-agent
         value: "5DLabs-Tess"
-      
+
       - name: model
         value: "claude-3-5-sonnet-20241022"

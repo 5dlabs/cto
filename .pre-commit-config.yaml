@@ -35,7 +35,7 @@ repos:
     hooks:
       - id: kube-score
         files: ^infra/gitops/databases/.*\.yaml$
-        exclude: ^infra/gitops/databases/(examples|README).*
+        exclude: ^infra/gitops/databases/(examples|README)\..*
 
   # Security scanning with detect-secrets
   - repo: https://github.com/Yelp/detect-secrets
@@ -57,29 +57,29 @@ repos:
     hooks:
       - id: argocd-app-validation
         name: Validate ArgoCD Applications
-        entry: bash -c 'for f in infra/gitops/applications/*.yaml; do [ -f "$f" ] || continue; grep -q "kind: Application" "$f" || (echo "Not an Application: $f" && exit 1); done'
+        entry: scripts/check-argocd-apps.sh
         language: system
         files: ^infra/gitops/applications/.*\.yaml$
         pass_filenames: false
 
       - id: check-resource-limits
         name: Check Resource Limits
-        entry: bash -c 'for f in infra/gitops/databases/*.yaml; do [ -f "$f" ] || continue; [[ "$f" == *"examples"* ]] && continue; grep -q "resources:" "$f" || echo "Warning: No resource limits in $f"; done'
+        entry: scripts/check-resource-limits.sh
         language: system
         files: ^infra/gitops/databases/.*\.yaml$
-        exclude: ^infra/gitops/databases/(examples|README).*
+        exclude: ^infra/gitops/databases/(examples|README)\..*
         pass_filenames: false
 
       - id: no-hardcoded-passwords
         name: Check for Hardcoded Passwords
-        entry: bash -c 'grep -r "password:" infra/gitops --include="*.yaml" | grep -v "secretKeyRef" | grep -v "CHANGE_THIS" | grep -v "PASSWORD" && (echo "Found hardcoded password!" && exit 1) || exit 0'
+        entry: scripts/check-passwords.sh
         language: system
         files: ^infra/gitops/.*\.yaml$
         pass_filenames: false
 
       - id: required-labels
         name: Check Required Labels
-        entry: bash -c 'for f in infra/gitops/applications/*.yaml; do [ -f "$f" ] || continue; grep -q "app.kubernetes.io/name:" "$f" || (echo "Missing required label in $f" && exit 1); done'
+        entry: scripts/check-required-labels.sh
         language: system
         files: ^infra/gitops/applications/.*\.yaml$
         pass_filenames: false
@@ -101,3 +101,4 @@ exclude: |
     vendor/.*|
     node_modules/.*
   )$
+

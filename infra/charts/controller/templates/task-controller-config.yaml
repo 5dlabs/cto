@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -95,3 +96,4 @@ data:
       completedJobDelayMinutes: {{ .Values.cleanup.completedJobDelayMinutes | default 5 }}
       failedJobDelayMinutes: {{ .Values.cleanup.failedJobDelayMinutes | default 60 }}
       deleteConfigMap: {{ .Values.cleanup.deleteConfigMap | default true }}
+

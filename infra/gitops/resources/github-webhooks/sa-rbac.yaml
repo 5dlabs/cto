@@ -27,3 +27,4 @@ subjects:
     name: argo-events-sa
     namespace: argo
 
+

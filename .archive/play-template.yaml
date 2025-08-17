@@ -1,4 +1,3 @@
-{{- if .Values.argo.enabled }}
 ---
 # Argo Workflow Template for Multi-Task Orchestration ("Press Play")
 # This template processes all pending tasks sequentially with full agent pipeline
@@ -22,13 +21,13 @@ spec:
       - name: docs-repository-url
         description: "Documentation repository URL in org/repo format"
         default: "{{workflow.parameters.repository-url}}"
-      - name: docs-project-directory  
+      - name: docs-project-directory
         description: "Project directory within docs repository"
         default: "projects/cto"
       - name: working-directory
         description: "Working directory within target repository"
         default: "."
-      
+
       # Model and session parameters
       - name: model
         description: "Claude model to use for execution"
@@ -42,7 +41,7 @@ spec:
       - name: docs-branch
         description: "Documentation branch to work from"
         default: "main"
-      
+
       # Orchestration parameters
       - name: task-requirements
         description: "Base64-encoded requirements.yaml content"
@@ -56,13 +55,13 @@ spec:
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
-  
+
   # Workflow timeout (6 hours - longer for multi-task execution)
   activeDeadlineSeconds: 21600
-  
+
   # Main workflow entry point
   entrypoint: play-main
-  
+
   templates:
     # Main play orchestration - discover and process tasks sequentially
     - name: play-main
@@ -94,40 +93,40 @@ spec:
         - |
           set -e
           echo "Discovering pending tasks..."
-          
+
           # Create task list in JSON format for withParam
           TASKS="["
           FIRST=true
-          
+
           # Find all task directories, sort numerically
           for task_dir in $(find /work/docs/.taskmaster/docs/ -name 'task-*' -type d | sort -V); do
             if [ -d "$task_dir" ] && [ -f "$task_dir/task.md" ]; then
               task_name=$(basename "$task_dir")
               task_number=${task_name#task-}
-              
+
               if [ "$FIRST" = true ]; then
                 FIRST=false
               else
                 TASKS="$TASKS,"
               fi
-              
+
               TASKS="$TASKS{\"taskId\":\"$task_number\",\"taskName\":\"$task_name\",\"taskDir\":\"$task_dir\"}"
             fi
           done
-          
+
           TASKS="$TASKS]"
-          
+
           # Output task list and count
           echo "$TASKS" > /tmp/task-list.json
           echo "$TASKS" | jq length > /tmp/task-count.txt
-          
+
           TASK_COUNT=$(cat /tmp/task-count.txt)
           echo "Found $TASK_COUNT pending tasks"
           echo "Task list: $TASKS"
         volumeMounts:
         - name: workspace
           mountPath: /work
-          
+
     # Process tasks sequentially (withParam ensures ordering when parallelism=1)
     - name: task-loop
       inputs:
@@ -152,7 +151,7 @@ spec:
             - name: completed-task-name
               value: "{{item.taskName}}"
           withParam: "{{inputs.parameters.task-list}}"
-          
+
     # Full agent pipeline for a single task: Rex -> Cleo -> Tess
     - name: full-task-pipeline
       inputs:
@@ -191,7 +190,7 @@ spec:
               value: "{{workflow.parameters.docs-branch}}"
             - name: task-requirements
               value: "{{workflow.parameters.task-requirements}}"
-              
+
       # Step 2: Code Quality & Formatting (Cleo)
       - - name: format-and-quality
           templateRef:
@@ -222,7 +221,7 @@ spec:
               value: "{{workflow.parameters.docs-branch}}"
             - name: task-requirements
               value: "{{workflow.parameters.task-requirements}}"
-              
+
       # Step 3: Testing & Quality Assurance (Tess)
       - - name: test-and-validate
           templateRef:
@@ -266,12 +265,12 @@ spec:
         - |
           set -e
           TASK_NAME="{{inputs.parameters.completed-task-name}}"
-          
+
           echo "Marking task $TASK_NAME as completed..."
-          
+
           # Create .completed directory if it doesn't exist
           mkdir -p /work/docs/.taskmaster/docs/.completed
-          
+
           # Move completed task to .completed directory
           if [ -d "/work/docs/.taskmaster/docs/$TASK_NAME" ]; then
             mv "/work/docs/.taskmaster/docs/$TASK_NAME" "/work/docs/.taskmaster/docs/.completed/"
@@ -279,7 +278,7 @@ spec:
           else
             echo "Warning: Task directory $TASK_NAME not found"
           fi
-          
+
           # Log completion
           echo "$(date): Completed $TASK_NAME" >> /work/docs/.taskmaster/docs/.completed/completion.log
         volumeMounts:
@@ -290,12 +289,12 @@ spec:
     volumes:
     - name: workspace
       emptyDir: {}
-            
-  # Cleanup policy - keep workflows longer for debugging multi-task execution  
+
+  # Cleanup policy - keep workflows longer for debugging multi-task execution
   ttlStrategy:
     secondsAfterCompletion: 1800     # Keep completed workflows for 30 minutes
     secondsAfterFailure: 10800       # Keep failed workflows for 3 hours
-  
+
   # Pod garbage collection
   podGC:
-    strategy: OnPodCompletion        # Delete pods immediately when they complete{{- end }}
+    strategy: OnPodCompletion        # Delete pods immediately when they complete

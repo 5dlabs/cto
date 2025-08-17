@@ -87,11 +87,11 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-pr-created"
                         echo "PR Number: {{ .Input.body.pull_request.number }}"
-                        
+
                         # Extract task ID from PR labels
                         TASK_ID=""
                         {{- range $i, $label := .Input.body.pull_request.labels }}
@@ -103,27 +103,27 @@ spec:
                             fi
                           {{- end }}
                         {{- end }}
-                        
+
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
                           exit 1
                         fi
-                        
+
                         echo "Task ID: $TASK_ID"
                         WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
-                        
+
                         # Find workflow with matching stage and task
                         echo "Looking for workflow: $WORKFLOW_NAME at stage: waiting-pr-created"
-                        
+
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
                           -n argo \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
-                        
+
                         if [ "$CURRENT_STAGE" = "waiting-pr-created" ]; then
                           echo "Found workflow at correct stage, resuming..."
-                          
+
                           # Update workflow parameters with PR details
                           kubectl patch workflow $WORKFLOW_NAME \
                             -n argo \
@@ -138,10 +138,10 @@ spec:
                                 }
                               }
                             }'
-                          
+
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n argo
-                          
+
                           echo "✅ Workflow resumed successfully"
                         else
                           echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
@@ -179,19 +179,19 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-ready-for-qa"
                         echo "Label Added: {{ .Input.body.label.name }}"
                         echo "Added By: {{ .Input.body.sender.login }}"
-                        
+
                         # Verify label was added by Cleo
                         SENDER="{{ .Input.body.sender.login }}"
                         if [[ ! "$SENDER" =~ 5DLabs-Cleo ]]; then
                           echo "Label not added by Cleo, ignoring..."
                           exit 0
                         fi
-                        
+
                         # Extract task ID from PR labels
                         TASK_ID=""
                         {{- range $i, $label := .Input.body.pull_request.labels }}
@@ -203,24 +203,24 @@ spec:
                             fi
                           {{- end }}
                         {{- end }}
-                        
+
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
                           exit 1
                         fi
-                        
+
                         echo "Task ID: $TASK_ID"
                         WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
-                        
+
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
                           -n argo \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
-                        
+
                         if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
                           echo "Found workflow at correct stage, resuming..."
-                          
+
                           # Update workflow parameters
                           kubectl patch workflow $WORKFLOW_NAME \
                             -n argo \
@@ -234,10 +234,10 @@ spec:
                                 }
                               }
                             }'
-                          
+
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n argo
-                          
+
                           echo "✅ Workflow resumed successfully"
                         else
                           echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
@@ -275,19 +275,19 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-pr-approved"
                         echo "Reviewer: {{ .Input.body.review.user.login }}"
                         echo "Review State: {{ .Input.body.review.state }}"
-                        
+
                         # Verify approval is from Tess
                         REVIEWER="{{ .Input.body.review.user.login }}"
                         if [[ ! "$REVIEWER" =~ 5DLabs-Tess ]]; then
                           echo "Approval not from Tess, ignoring..."
                           exit 0
                         fi
-                        
+
                         # Extract task ID from PR labels
                         TASK_ID=""
                         {{- range $i, $label := .Input.body.pull_request.labels }}
@@ -299,24 +299,24 @@ spec:
                             fi
                           {{- end }}
                         {{- end }}
-                        
+
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
                           exit 1
                         fi
-                        
+
                         echo "Task ID: $TASK_ID"
                         WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
-                        
+
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
                           -n argo \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
-                        
+
                         if [ "$CURRENT_STAGE" = "waiting-pr-approved" ]; then
                           echo "Found workflow at correct stage, resuming..."
-                          
+
                           # Update workflow parameters
                           kubectl patch workflow $WORKFLOW_NAME \
                             -n argo \
@@ -331,10 +331,10 @@ spec:
                                 }
                               }
                             }'
-                          
+
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n argo
-                          
+
                           echo "✅ Workflow resumed successfully"
                         else
                           echo "Workflow not at expected stage (current: $CURRENT_STAGE)"

@@ -56,12 +56,12 @@ config:
       timeout: 10s
       send_batch_size: 1024
       send_batch_max_size: 2048
-    
+
     memory_limiter:
       check_interval: 1s
       limit_mib: 1500
       spike_limit_mib: 512
-    
+
     resource:
       attributes:
         - key: cluster.name
@@ -70,7 +70,7 @@ config:
         - key: deployment.environment
           value: development
           action: insert
-    
+
     # Transform metric names from dots to underscores for Prometheus compatibility
     # NOTE: Claude Code emits metrics WITHOUT the claude_code prefix!
     transform/metrics:
@@ -90,7 +90,7 @@ config:
     prometheus:
       endpoint: "0.0.0.0:8889"
       send_timestamps: true
-    
+
     # VictoriaMetrics native OpenTelemetry exporter
     otlphttp/victoriametrics:
       metrics_endpoint: http://victoria-metrics-victoria-metrics-single-server:8428/opentelemetry/v1/metrics
@@ -104,7 +104,7 @@ config:
         initial_interval: 5s
         max_interval: 30s
         max_elapsed_time: 300s
-    
+
     # VictoriaLogs exporter using OTLP/HTTP
     otlphttp:
       logs_endpoint: http://victoria-logs-victoria-logs-single-server:9428/insert/opentelemetry/v1/logs
@@ -117,7 +117,7 @@ config:
         max_elapsed_time: 300s
       headers:
         VL-Stream-Fields: "cluster.name,deployment.environment,service.name,service.namespace"
-    
+
     # Debug exporter for troubleshooting
     debug:
       verbosity: detailed

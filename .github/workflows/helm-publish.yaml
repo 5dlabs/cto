@@ -126,3 +126,4 @@ jobs:
           echo "- **Chart Repository**: https://5dlabs.github.io/platform" >> $GITHUB_STEP_SUMMARY
           echo "- **Chart Version**: \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Published URL**: ${{ steps.deployment.outputs.page_url }}" >> $GITHUB_STEP_SUMMARY
+

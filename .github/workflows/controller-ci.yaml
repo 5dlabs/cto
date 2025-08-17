@@ -143,9 +143,9 @@ jobs:
   integration-tests:
     needs: [changes, lint-rust, test-rust]
     if: |
-      always() && !cancelled() && 
-      (needs.changes.outputs.controller == 'true' || 
-       needs.changes.outputs.taskrun == 'true' || 
+      always() && !cancelled() &&
+      (needs.changes.outputs.controller == 'true' ||
+       needs.changes.outputs.taskrun == 'true' ||
        needs.changes.outputs.infra == 'true' ||
        github.event_name == 'push')
     runs-on: ubuntu-22.04
@@ -208,7 +208,7 @@ jobs:
             --namespace=test-platform \
             --from-literal=private-key="mock-private-key" \
             --from-literal=app-id="123456" || true
-          
+
           # Create mock API key secret
           kubectl create secret generic anthropic-api-key \
             --namespace=test-platform \
@@ -217,7 +217,7 @@ jobs:
           # Apply test CodeRun and DocsRun instances
           echo "🧪 Applying test CRD instances..."
           kubectl apply -f infra/test-resources/crds/ -n test-platform || true
-          
+
           # Wait a moment for resources to be created
           sleep 5
 
@@ -226,10 +226,10 @@ jobs:
           echo "🔍 Verifying CRD definitions..."
           kubectl get crd coderuns.agents.platform
           kubectl get crd docsruns.agents.platform
-          
+
           echo "🔍 Verifying CRD instances..."
           kubectl get coderuns,docsruns -n test-platform
-          
+
           echo "🔍 Describing test instances..."
           kubectl describe coderun test-coderun-ci -n test-platform || true
           kubectl describe docsrun test-docsrun-ci -n test-platform || true
@@ -335,3 +335,4 @@ jobs:
             controller/lcov.info
             controller/coverage-html/
             controller/coverage-summary.md
+

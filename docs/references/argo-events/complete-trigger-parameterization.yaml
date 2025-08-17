@@ -76,3 +76,4 @@ spec:
           dest: k8s.source.s3.endpoint
           # Append the port to the existing source.s3.endpoint value
           operation: append
+

@@ -1,21 +1,17 @@
 ---
 # GitHub Actions workflow for validating ArgoCD applications
 # Runs on every PR that modifies GitOps files
-
 name: Validate ArgoCD Applications
-
 on:
   pull_request:
     paths:
       - 'infra/gitops/**/*.yaml'
       - 'infra/charts/**/*'
       - '.github/workflows/infra-ci.yaml'
-
 env:
   ARGOCD_VERSION: v2.9.3
   KUBECONFORM_VERSION: v0.6.4
   OPA_VERSION: v0.60.0
-
 jobs:
   yaml-lint:
     name: YAML Linting
@@ -23,7 +19,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
       - name: Run yamllint
         uses: karancode/yamllint-github-action@v2.1.1
         with:
@@ -31,37 +26,31 @@ jobs:
           yamllint_config_filepath: '.yamllint.yaml'
           yamllint_strict: false
           yamllint_comment: true
-
   schema-validation:
     name: Schema Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
       - name: Setup tools
         run: |
           # Install yq for YAML parsing
           wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O yq
           chmod +x yq
           sudo mv yq /usr/local/bin/
-          
           # Install kubeconform for standard K8s resource validation
           curl -fsSL https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz -o kc.tgz
           tar -xzf kc.tgz
           if [ -f kubeconform ]; then sudo mv kubeconform /usr/local/bin/kubeconform; \
           elif [ -f kubeconform-linux-amd64 ]; then sudo mv kubeconform-linux-amd64 /usr/local/bin/kubeconform; \
           else echo "kubeconform binary not found in tarball" && exit 1; fi
-      
       - name: Validate ArgoCD Application structure
         run: |
           echo "Validating ArgoCD Application manifests..."
           EXIT_CODE=0
-          
           for file in infra/gitops/applications/*.yaml; do
             [ -f "$file" ] || continue
             echo "Checking: $file"
-            
             # Check if it's an ArgoCD Application
             KIND=$(yq eval '.kind' "$file")
             if [ "$KIND" != "Application" ]; then
@@ -69,53 +58,44 @@ jobs:
               EXIT_CODE=1
               continue
             fi
-            
             # Check API version
             API_VERSION=$(yq eval '.apiVersion' "$file")
             if [ "$API_VERSION" != "argoproj.io/v1alpha1" ]; then
               echo "  ❌ Error: Invalid apiVersion: $API_VERSION (expected: argoproj.io/v1alpha1)"
               EXIT_CODE=1
             fi
-            
             # Check required fields
             NAME=$(yq eval '.metadata.name' "$file")
             if [ "$NAME" == "null" ]; then
               echo "  ❌ Error: Missing metadata.name"
               EXIT_CODE=1
             fi
-            
             NAMESPACE=$(yq eval '.metadata.namespace' "$file")
             if [ "$NAMESPACE" == "null" ]; then
               echo "  ⚠️  Warning: Missing metadata.namespace (will default to 'default')"
             fi
-            
             DEST_SERVER=$(yq eval '.spec.destination.server' "$file")
             DEST_NAME=$(yq eval '.spec.destination.name' "$file")
             if [ "$DEST_SERVER" == "null" ] && [ "$DEST_NAME" == "null" ]; then
               echo "  ❌ Error: Missing spec.destination.server or spec.destination.name"
               EXIT_CODE=1
             fi
-            
             SOURCE=$(yq eval '.spec.source' "$file")
             SOURCES=$(yq eval '.spec.sources' "$file")
             if [ "$SOURCE" == "null" ] && [ "$SOURCES" == "null" ]; then
               echo "  ❌ Error: Missing spec.source or spec.sources"
               EXIT_CODE=1
             fi
-            
             PROJECT=$(yq eval '.spec.project' "$file")
             if [ "$PROJECT" == "null" ]; then
               echo "  ⚠️  Warning: Missing spec.project (will default to 'default')"
             fi
-            
             # If all checks pass for this file
             if [ $EXIT_CODE -eq 0 ]; then
               echo "  ✅ Valid ArgoCD Application"
             fi
           done
-          
           exit $EXIT_CODE
-      
       - name: Validate Kubernetes resources
         run: |
           echo "Validating standard Kubernetes resources..."
@@ -126,10 +106,8 @@ jobs:
             if [[ "$file" == *"examples"* ]]; then
               continue
             fi
-            
             # Check the kind
             KIND=$(yq eval '.kind' "$file" 2>/dev/null || echo "unknown")
-            
             # Only validate standard K8s resources
             case "$KIND" in
               Service|ConfigMap|Secret|Deployment|StatefulSet|DaemonSet|Job|CronJob|Ingress|PersistentVolumeClaim)
@@ -141,7 +119,6 @@ jobs:
                 ;;
             esac
           done
-
   helm-validation:
     name: Helm Chart Validation
     runs-on: ubuntu-latest
@@ -149,12 +126,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
       - name: Setup Helm
         uses: azure/setup-helm@v3
         with:
           version: 'latest'
-      
       - name: Add Helm repositories
         run: |
           # Add required Helm repos
@@ -163,7 +138,6 @@ jobs:
           helm repo add grafana https://grafana.github.io/helm-charts
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
-      
       - name: Lint local charts
         run: |
           for chart in infra/charts/*/; do
@@ -172,7 +146,6 @@ jobs:
               helm lint "$chart"
             fi
           done
-      
       - name: Template Helm applications
         run: |
           # Install yq for parsing before using it
@@ -187,29 +160,24 @@ jobs:
               yq eval '.spec.source.helm' "$app" > /dev/null || exit 1
             fi
           done
-
   policy-validation:
     name: OPA Policy Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
       - name: Setup OPA
         run: |
           curl -sL -o opa https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_linux_amd64_static
           chmod +x opa
           sudo mv opa /usr/local/bin/
-      
       - name: Create OPA policies
         run: |
           mkdir -p /tmp/policies
           cat > /tmp/policies/argocd.rego << 'EOF'
           package argocd.validation
-          
           import future.keywords.contains
           import future.keywords.if
-          
           # Check for required labels
           deny[msg] {
               input.kind == "Application"
@@ -219,14 +187,12 @@ jobs:
               count(missing) > 0
               msg := sprintf("Application '%s' missing required labels: %v", [input.metadata.name, missing])
           }
-          
           # Ensure namespace is specified
           deny[msg] {
               input.kind == "Application"
               not input.spec.destination.namespace
               msg := sprintf("Application '%s' must specify destination namespace", [input.metadata.name])
           }
-          
           # Check sync policy for production
           deny[msg] {
               input.kind == "Application"
@@ -236,7 +202,6 @@ jobs:
               msg := sprintf("Application '%s' has auto-prune enabled without explicit approval label", [input.metadata.name])
           }
           EOF
-      
       - name: Run OPA validation
         run: |
           for file in infra/gitops/applications/*.yaml; do
@@ -247,14 +212,12 @@ jobs:
               -f pretty "data.argocd.validation.deny[msg]" \
               --stdin-input || true
           done
-
   security-scan:
     name: Security Scanning
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
       - name: Run Trivy security scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -262,12 +225,10 @@ jobs:
           scan-ref: 'infra/gitops'
           format: 'sarif'
           output: 'trivy-results.sarif'
-      
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-
   diff-preview:
     name: Generate Diff Preview
     runs-on: ubuntu-latest
@@ -277,13 +238,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
       - name: Generate diff summary
         id: diff
         run: |
           echo "## 📋 GitOps Changes Summary" > diff-summary.md
           echo "" >> diff-summary.md
-          
           # List modified applications
           echo "### Modified Applications:" >> diff-summary.md
           git diff --name-only origin/main...HEAD -- 'infra/gitops/applications/*.yaml' | while read -r file; do
@@ -292,7 +251,6 @@ jobs:
               echo "- \`$app_name\`" >> diff-summary.md
             fi
           done
-          
           # List modified databases
           echo "" >> diff-summary.md
           echo "### Modified Database Resources:" >> diff-summary.md
@@ -302,7 +260,6 @@ jobs:
               echo "- \`$resource_name\`" >> diff-summary.md
             fi
           done
-          
           # Show actual diff for applications
           echo "" >> diff-summary.md
           echo "<details>" >> diff-summary.md
@@ -312,26 +269,22 @@ jobs:
           git diff origin/main...HEAD -- 'infra/gitops/**/*.yaml' | head -500 >> diff-summary.md
           echo '```' >> diff-summary.md
           echo "</details>" >> diff-summary.md
-      
       - name: Comment PR with diff
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const diffSummary = fs.readFileSync('diff-summary.md', 'utf8');
-            
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
               comment.body.includes('GitOps Changes Summary')
             );
-            
             if (botComment) {
               // Update existing comment
               await github.rest.issues.updateComment({
@@ -349,7 +302,6 @@ jobs:
                 body: diffSummary
               });
             }
-
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
@@ -366,3 +318,4 @@ jobs:
           echo "| Schema Validation | ${{ needs.schema-validation.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Policy Validation | ${{ needs.policy-validation.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+

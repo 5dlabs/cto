@@ -3,7 +3,7 @@
 
 # Runner labels for GitHub Actions targeting
 githubConfigSecret: github-pat
-runnerLabels: 
+runnerLabels:
   - k8s-runner
 
 template:
