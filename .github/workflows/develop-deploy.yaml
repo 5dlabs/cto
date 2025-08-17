@@ -22,14 +22,14 @@ env:
 jobs:
   # Version determination
   version:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       version: ${{ steps.version.outputs.version }}
       short-sha: ${{ steps.version.outputs.short-sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Set version from tag
         id: version
@@ -50,7 +50,7 @@ jobs:
   # Build only controller (skip Claude Code for now)
   build-controller:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     # No container needed - the Arc runners now have the rust-builder image!
     permissions:
       contents: read
@@ -58,141 +58,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
-      - name: Setup optimized Rust environment
-        run: |
-          echo "🚀 Setting up ULTRA-OPTIMIZED Rust build environment..."
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: controller -> target
+          shared-key: "rust-cache-deploy"
 
-          # Add cargo bin to PATH for this step and all subsequent steps
-          echo "/home/runner/.cargo/bin" >> $GITHUB_PATH
-          export PATH="/home/runner/.cargo/bin:$PATH"
-
-          # Set up Rust toolchain (required for rust-builder image)
-          echo "🦀 Setting up Rust toolchain..."
-          rustup default stable
-          rustup update stable
-
-          # Custom image already has most tools pre-installed, just verify
-          echo "🔍 Verifying pre-installed tools..."
-          rustc --version || echo "⚠️ Rust not found"
-          cargo --version || echo "⚠️ Cargo not found"
-          sccache --version || echo "⚠️ sccache not found"
-          mold --version || echo "⚠️ mold not found"
-          clang --version || echo "⚠️ clang not found"
-          pkg-config --version || echo "⚠️ pkg-config not found"
-          openssl version || echo "⚠️ openssl not found"
-
-          # Show available resources
-          echo "💾 Available resources:"
-          echo "CPU cores: $(nproc)"
-          echo "Memory: $(free -h | grep '^Mem:' | awk '{print $2}')"
-          echo "Disk space: $(df -h . | tail -1 | awk '{print $4}')"
-
-          # Show cache locations
-          echo "📁 Cache locations:"
-          echo "CARGO_HOME: ${CARGO_HOME:-$HOME/.cargo}"
-          echo "SCCACHE_DIR: ${SCCACHE_DIR:-$HOME/.cache/sccache}"
-          echo "RUSTUP_HOME: ${RUSTUP_HOME:-$HOME/.rustup}"
-
-      - name: Setup sccache
-        run: |
-          echo "🗄️ Setting up sccache for ULTRA-FAST builds..."
-
-          # Ensure cargo bin is in PATH
-          export PATH="/home/runner/.cargo/bin:$PATH"
-
-          # Configure sccache
-          export SCCACHE_CACHE_SIZE="50G"
-          export SCCACHE_IDLE_TIMEOUT="0"
-
-          # Ensure sccache is running
-          sccache --stop-server 2>/dev/null || true
-          sccache --start-server
-
-          echo "📊 Initial sccache stats:"
-          sccache --show-stats
-
-          # Verify mold is available
-          echo "🔗 Verifying mold linker:"
-          mold --version
-
-      - name: Verify pre-warmed dependencies
-        run: |
-          echo "🗂️ Checking pre-warmed dependency cache..."
-
-          # Check if dependencies are pre-warmed in the image
-          if [ -d "$CARGO_HOME/registry" ] && [ "$(ls -A $CARGO_HOME/registry 2>/dev/null)" ]; then
-            echo "✅ Pre-warmed dependencies found in image"
-            echo "Registry cache size: $(du -sh $CARGO_HOME/registry 2>/dev/null || echo '0B')"
-            echo "Git cache size: $(du -sh $CARGO_HOME/git 2>/dev/null || echo '0B')"
-            echo "📦 Sample pre-warmed packages:"
-            find $CARGO_HOME/registry -name "*.crate" 2>/dev/null | head -5 | xargs -I {} basename {} .crate || echo "Unable to list packages"
-          else
-            echo "⚠️ No pre-warmed dependencies found - will download at build time"
-            echo "CARGO_HOME contents:"
-            ls -la $CARGO_HOME/ 2>/dev/null || echo "CARGO_HOME not found"
-          fi
-
-      - name: Build release binary (ultra-fast)
+      - name: Build release binary
         working-directory: ./controller
-        env:
-          CARGO_INCREMENTAL: "0"  # Disable for better sccache hits
-          RUSTC_WRAPPER: "sccache"
-          SCCACHE_CACHE_SIZE: "50G"
-          SCCACHE_IDLE_TIMEOUT: "0"
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-          CARGO_TARGET_DIR: "$HOME/cache/target"  # Build to cache directory for persistence
         run: |
-          echo "🏗️ Building controller binary with pre-warmed dependencies..."
-          
-          # Create cache directory
-          mkdir -p $HOME/cache/target
-
-          # Show build environment
-          echo "Build environment:"
-          echo "Available cores: $(nproc)"
-          echo "RUSTFLAGS: $RUSTFLAGS"
-          echo "RUSTC_WRAPPER: $RUSTC_WRAPPER"
-          echo "CARGO_HOME: ${CARGO_HOME:-$HOME/.cargo}"
-          echo "SCCACHE_DIR: ${SCCACHE_DIR:-$HOME/.cache/sccache}"
-
-          # Pre-warm sccache
-          sccache --start-server || true
-          echo "📊 Initial sccache stats:"
-          sccache --show-stats
-
-                    # Build with detailed output
-          echo "⏱️ Starting build..."
+          echo "🏗️ Building controller binary..."
           cargo build --release --bin agent-controller
-
-          # Show final sccache stats
-          echo "📊 Final sccache stats:"
-          sccache --show-stats
-
-          # Debug: Show what's in the target directory
-          echo "🔍 Checking target directory contents:"
-          echo "CARGO_TARGET_DIR is: ${CARGO_TARGET_DIR:-not set}"
-          ls -la target/release/ || echo "target/release/ not found"
-          ls -la $HOME/cache/target/release/ || echo "$HOME/cache/target/release/ not found"
-          find target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in target/"
-          find $HOME/cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in target/"
-          find $HOME/cache/target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in $HOME/cache/target/"
-          find $HOME/cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in $HOME/cache/target/"
-
-          # Copy binary from cache target dir (where CARGO_TARGET_DIR points)
-          cp $HOME/cache/target/release/agent-controller agent-controller
-
-          # Show binary info
+          
+          # Copy binary to expected location for Docker build
+          cp target/release/agent-controller agent-controller
+          
           echo "📦 Built binary info:"
           ls -lh agent-controller
           file agent-controller
-          
-          # Verify binary is present for Docker build context (controller/agent-controller)
-          echo "📋 Verifying agent-controller binary for Docker build context"
-          test -f agent-controller && echo "agent-controller present in ./controller" || (echo "agent-controller missing" && exit 1)
-          ls -la agent-controller
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -229,33 +114,31 @@ jobs:
 
   build-sidecar:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sidecar -> target
+          shared-key: "rust-cache-sidecar-deploy"
 
       - name: Build sidecar binary
         working-directory: ./sidecar
         run: |
-          echo "🏗️ Building sidecar binary"
-          # Use sccache if available
-          if command -v sccache >/dev/null 2>&1; then
-            echo "Using sccache"
-            export RUSTC_WRAPPER=sccache
-            sccache --start-server || true
-          else
-            echo "sccache not found; building without wrapper"
-          fi
-          # Use shared target directory for better cache hits
-          mkdir -p $HOME/cache/target
-          export CARGO_TARGET_DIR=$HOME/cache/target
+          echo "🏗️ Building sidecar binary..."
           cargo build --release
-          command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
-          cp $HOME/cache/target/release/sidecar ./sidecar
+          
+          # Copy binary to expected location for Docker build
+          cp target/release/sidecar ./sidecar
+          
+          echo "📦 Built binary info:"
           ls -lh ./sidecar
 
       - name: Set up Docker Buildx
@@ -294,7 +177,7 @@ jobs:
   # Deploy immediately
   deploy:
     needs: [version, build-controller]
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
         with:
