@@ -95,3 +95,21 @@ Create a checksum for the toolman catalog ConfigMap to force pod restart when it
 {{- "not-found" }}
 {{- end }}
 {{- end }}
+
+{{/*
+Define volumes for agent prompts ConfigMap
+*/}}
+{{- define "platform.agentVolumes" -}}
+- name: agents-prompts
+  configMap:
+    name: {{ include "controller.fullname" . }}-agents
+{{- end }}
+
+{{/*
+Define volume mounts for agent prompts
+*/}}
+{{- define "platform.agentVolumeMounts" -}}
+- name: agents-prompts
+  mountPath: /etc/agents
+  readOnly: true
+{{- end }}
