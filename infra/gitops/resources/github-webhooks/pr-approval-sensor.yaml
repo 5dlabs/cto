@@ -39,7 +39,6 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                name: ""  # Will be determined by label selector
                 namespace: argo
               spec: {}
           parameters:
@@ -71,37 +70,15 @@ spec:
                 dependencyName: github-pr-review
                 dataKey: body.review.id
               dest: reviewId
-        k8s:
-          operation: patch
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                namespace: argo
-              spec: {}
-          parameters:
-            # Task ID for label selector
-            - src:
-                dependencyName: github-pr-review
-                dataTemplate: |
-                  {{ range $index, $label := .Input.body.pull_request.labels }}
-                    {{ if hasPrefix "task-" $label.name }}
-                      {{ $parts := splitList "-" $label.name }}
-                      {{ if gt (len $parts) 1 }}
-                        {{ index $parts 1 }}
-                      {{ end }}
-                    {{ end }}
-                  {{ end }}
-              dest: taskId
           # Use label selector to find and resume the correct workflow
           labelSelector:
             matchLabels:
               workflow-type: play-orchestration
-              task-id: "{{taskId}}"
+              task-id: "{{.Input.parameters.taskId}}"
               current-stage: waiting-pr-approved
       retryStrategy:
         steps: 3
         duration: "10s"
         factor: 2
         jitter: 0.1
+

@@ -31,7 +31,7 @@ spec:
             comparator: "~"
             value: "refs/heads/task-.*"
   triggers:
-    # Trigger 1: Cancel running quality/testing agent CodeRun CRDs
+    # Trigger 1: Cancel running Cleo/Tess CodeRun CRDs
     - template:
         name: cancel-running-quality-agents
         conditions: "implementation-push-event"
@@ -78,7 +78,7 @@ spec:
             matchExpressions:
               - key: task-id
                 operator: In
-                values: ["{{taskId}}"]
+                values: ["{{.Input.parameters.taskId}}"]
               - key: github-app
                 operator: NotIn
                 values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]  # Exclude all implementation agents
@@ -87,3 +87,52 @@ spec:
         duration: "5s"
         factor: 2
         jitter: 0.1
+    # Trigger 2: Log the remediation event for monitoring
+    - template:
+        name: log-remediation-event
+        conditions: "implementation-push-event"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: v1
+              kind: Event
+              metadata:
+                generateName: implementation-remediation-
+                namespace: argo
+              involvedObject:
+                apiVersion: agents.platform/v1
+                kind: CodeRun
+                name: task-remediation
+                namespace: argo
+              type: Normal
+              reason: "AgentPushDetected"
+              message: "Implementation agent pushed to task branch, restarting QA pipeline"
+          parameters:
+            - src:
+                dependencyName: implementation-push-event
+                dataTemplate: |
+                  {{ $login := .Input.body.sender.login }}
+                  {{ if hasPrefix $login "5DLabs-" }}
+                    {{ $agent := trimPrefix "5DLabs-" $login }}
+                    {{ $agent := trimSuffix "[bot]" $agent }}
+                    {{ lower $agent }}
+                  {{ else }}
+                    unknown
+                  {{ end }}
+              dest: pushingAgent
+            - src:
+                dependencyName: implementation-push-event
+                dataTemplate: |
+                  {{ $ref := .Input.body.ref }}
+                  {{ if hasPrefix $ref "refs/heads/task-" }}
+                    {{ $branch := trimPrefix "refs/heads/task-" $ref }}
+                    {{ $parts := splitList "-" $branch }}
+                    {{ if gt (len $parts) 0 }}
+                      {{ index $parts 0 }}
+                    {{ end }}
+                  {{ else }}
+                    0
+                  {{ end }}
+              dest: taskId
+
