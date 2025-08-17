@@ -19,7 +19,7 @@ spec:
             value: ["pull_request"]
           - path: body.action
             type: string
-            value: ["opened"]
+            value: ["opened", "reopened"]
           # Skip label filtering for now - will be validated in dataTemplate
           # - path: body.pull_request.labels.#.name
           #   type: string
@@ -31,10 +31,15 @@ spec:
         conditions: "github-pr-created"
         argoWorkflow:
           operation: resume
-          # Resume specific workflow by name via args
-          args: []
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                name: ""
+                namespace: argo
+              spec: {}
           parameters:
-            # Extract task ID from PR labels and construct workflow name for targeting
             - src:
                 dependencyName: github-pr-created
                 dataTemplate: |
@@ -46,7 +51,7 @@ spec:
                   {{ else }}
                     play-task-unknown-workflow
                   {{ end }}
-              dest: args.0
+              dest: metadata.name
       retryStrategy:
         steps: 3
         duration: "10s"
