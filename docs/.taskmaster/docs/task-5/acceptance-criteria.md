@@ -1,4 +1,4 @@
-# Acceptance Criteria: Create GitHub Webhook Correlation Logic
+# Acceptance Criteria: Create GitHub Webhook Correlation Logic (Aligned with Supported Argo Events Patterns)
 
 ## Functional Requirements
 
@@ -10,10 +10,10 @@
 - [ ] Edge cases handled gracefully
 
 ### 2. Correlation Mechanism
-- [ ] LabelSelector patterns correctly target workflows
-- [ ] Task-id, workflow-type, and stage matching accurate
-- [ ] Dynamic parameterization using Argo Events v1.9+
-- [ ] Workflow stage labels updated after resumption
+- [ ] Deterministic workflow name targeting used (no templated labelSelector)
+- [ ] Workflow name format: `play-task-{{task-id}}-workflow`
+- [ ] Resume operation targets workflow by `metadata.name`
+- [ ] Stage awareness handled within workflow logic (labels may be updated post-resume)
 - [ ] No false positive correlations
 
 ### 3. Event Type Handling
@@ -39,20 +39,23 @@
   ```
 - [ ] Fallback branch extraction tested:
   ```jq
-  .pull_request.head.ref | capture("task-(?<id>[0-9]+)") | .id
+  .pull_request.head.ref | capture("^task-(?<id>[0-9]+)") | .id
   ```
 - [ ] Empty result handling implemented
 - [ ] Multiple matches resolved to single ID
 
-### Label Selector Configuration
-- [ ] Workflow targeting accurate:
+### Deterministic Name Targeting (No labelSelector templating)
+- [ ] Workflow name constructed as `play-task-{{extracted-task-id}}-workflow`
+- [ ] Argo Events trigger sets:
   ```yaml
-  workflow-type=play-orchestration
-  task-id={{extracted-task-id}}
-  current-stage={{target-stage}}
+  parameters:
+    - src:
+        dependencyName: <github-event-dep>
+        dataTemplate: |
+          play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
+      dest: argoWorkflow.source.resource.metadata.name
   ```
-- [ ] Dynamic stage determination working
-- [ ] Concurrent workflow discrimination
+- [ ] Strictly avoid templating within `labelSelector` fields
 
 ## Test Cases
 
@@ -70,9 +73,10 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Extracts task ID "5"
-- Targets workflow with labels: `task-id=5,current-stage=waiting-pr-created`
+- Constructs workflow name `play-task-5-workflow`
+- Resumes workflow by metadata.name
 
 ### Test Case 2: Multiple Labels
 **Objective**: Handle PR with multiple labels including task label
@@ -90,9 +94,9 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Correctly extracts "8" from task-8 label
-- Ignores non-task labels
+- Targets `play-task-8-workflow` by name
 
 ### Test Case 3: Branch Name Fallback
 **Objective**: Extract task ID from branch when label missing
@@ -107,9 +111,10 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Falls back to branch extraction
 - Extracts task ID "12"
+- Targets `play-task-12-workflow` by name
 
 ### Test Case 4: Ready-for-QA Label Event
 **Objective**: Handle PR labeling for Cleo completion
@@ -125,9 +130,9 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Detects ready-for-qa label addition
-- Targets workflow with `current-stage=waiting-ready-for-qa`
+- Targets `play-task-3-workflow` by name
 
 ### Test Case 5: PR Approval Event
 **Objective**: Handle PR review approval from Tess
@@ -146,9 +151,9 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Detects approval from Tess
-- Targets workflow with `current-stage=waiting-pr-approved`
+- Targets `play-task-7-workflow` by name
 
 ### Test Case 6: Rex Push Remediation
 **Objective**: Detect Rex push and trigger remediation
@@ -161,10 +166,10 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Identifies Rex as pusher
 - Extracts task ID "9"
-- Triggers workflow cancellation and restart
+- Cancels/resubmits `play-task-9-workflow` as remediation
 
 ### Test Case 7: Malformed Task Label
 **Objective**: Handle invalid task label format
@@ -178,7 +183,7 @@
 }
 ```
 
-**Expected**: 
+**Expected**:
 - Extraction fails gracefully
 - Falls back to branch name
 - Logs warning about malformed label
@@ -187,13 +192,12 @@
 **Objective**: Target correct workflow among multiple suspended
 
 **Setup**:
-- Three suspended workflows: task-1, task-2, task-3
-- All at stage `waiting-pr-created`
+- Three suspended workflows by name: `play-task-1-workflow`, `play-task-2-workflow`, `play-task-3-workflow`
 
 **Input**: PR created event with label "task-2"
 
-**Expected**: 
-- Only workflow for task-2 resumed
+**Expected**:
+- Only `play-task-2-workflow` resumed
 - Other workflows remain suspended
 
 ## Performance Criteria
@@ -209,7 +213,7 @@
 - [ ] Webhook signatures verified
 - [ ] No arbitrary code execution from payloads
 - [ ] Task IDs validated as integers only
-- [ ] No SQL injection in label selectors
+- [ ] No SQL injection in parameters
 - [ ] Rate limiting enforced
 
 ## Monitoring & Observability

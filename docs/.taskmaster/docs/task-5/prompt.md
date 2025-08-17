@@ -1,4 +1,4 @@
-# Autonomous Agent Prompt: Create GitHub Webhook Correlation Logic
+# Autonomous Agent Prompt: Create GitHub Webhook Correlation Logic (Aligned)
 
 ## 🚨 CRITICAL: Argo Events Reference Documentation
 
@@ -16,18 +16,17 @@
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
-**✅ SUPPORTED Operations:**
+**✅ SUPPORTED Patterns:**
 - `operation: create` (k8s resources)
 - `operation: submit` (Argo Workflows)
 - `operation: resume` (Argo Workflows)
-- `dest: metadata.name` (dynamic targeting)
+- Setting `dest: metadata.name` deterministically
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 
-
 ## Mission
 
-Implement sophisticated Argo Events Sensor logic to extract task IDs from GitHub webhook payloads and correlate them with suspended workflows. This correlation mechanism is critical for the multi-agent orchestration pipeline.
+Implement Argo Events Sensor logic to extract task IDs from GitHub webhook payloads and correlate them with suspended workflows using deterministic workflow names (no templated labelSelectors), enabling precise event-driven coordination.
 
 ## Context
 
@@ -41,9 +40,9 @@ The multi-agent workflow uses GitHub events to trigger stage transitions. Rex cr
    - Handle multiple labels and edge cases
 
 2. **Create Correlation Mechanisms**
-   - Use labelSelector for precise workflow targeting
-   - Match task-id, workflow-type, and current-stage
-   - Implement fallback strategies for missing labels
+   - Use deterministic workflow names: `play-task-{{task-id}}-workflow`
+   - Resume workflows by `metadata.name`
+   - Implement fallback strategies for missing labels (branch parsing)
 
 3. **Handle Multiple Event Types**
    - PR opened events for post-Rex resumption
@@ -54,7 +53,7 @@ The multi-agent workflow uses GitHub events to trigger stage transitions. Rex cr
 4. **Implement Dynamic Parameterization**
    - Use Argo Events v1.9+ features for dynamic targeting
    - Pass extracted task IDs to workflow operations
-   - Update workflow stage labels after resumption
+   - Update workflow stage labels after resumption (if needed)
 
 ## Technical Requirements
 
@@ -64,15 +63,29 @@ The multi-agent workflow uses GitHub events to trigger stage transitions. Rex cr
 .pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]
 
 # Fallback extraction from branch name
-.pull_request.head.ref | capture("task-(?<id>[0-9]+)") | .id
+.pull_request.head.ref | capture("^task-(?<id>[0-9]+)") | .id
 ```
 
-### Label Selector Pattern
+### Deterministic Workflow Name Targeting (No labelSelector templating)
 ```yaml
-labelSelector: |
-  workflow-type=play-orchestration,
-  task-id={{extracted-task-id}},
-  current-stage={{target-stage}}
+triggers:
+- template:
+    name: resume-workflow
+    argoWorkflow:
+      operation: resume
+      source:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            # Deterministic name computed from payload
+            name: "PLACEHOLDER_REPLACED_BY_PARAMETER"
+      parameters:
+        - src:
+            dependencyName: github-pr-event
+            dataTemplate: |
+              play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
+          dest: argoWorkflow.source.resource.metadata.name
 ```
 
 ### Event Type Mapping
@@ -87,7 +100,7 @@ labelSelector: |
 Develop reusable Sensor templates with:
 - Event dependency configuration
 - JQ extraction logic
-- Workflow targeting parameters
+- Deterministic workflow name targeting via metadata.name
 - Error handling for edge cases
 
 ### Step 2: Implement Extraction Logic
@@ -97,9 +110,8 @@ Develop reusable Sensor templates with:
 - Handling of missing or malformed data
 
 ### Step 3: Configure Correlation
-- Define labelSelector patterns
-- Implement stage-specific targeting
-- Handle concurrent workflow scenarios
+- Use computed metadata.name to target the workflow
+- Handle concurrent workflow scenarios by unique names
 - Add logging for debugging
 
 ### Step 4: Test Edge Cases
@@ -126,7 +138,7 @@ spec:
       - path: action
         type: string
         value: ["opened", "labeled"]
-  
+
   triggers:
   - template:
       name: resume-workflow
@@ -136,14 +148,17 @@ spec:
           resource:
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
-            selector:
-              matchLabels:
-                workflow-type: play-orchestration
-                task-id: "{{steps.extract-task-id.outputs.result}}"
-                current-stage: "{{steps.determine-stage.outputs.result}}"
+            metadata:
+              name: "TO_BE_SET"
+        parameters:
+        - src:
+            dependencyName: pr-event
+            dataTemplate: |
+              play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
+          dest: argoWorkflow.source.resource.metadata.name
 ```
 
-### JQ Extraction Step
+### JQ Extraction Step (Inline Example)
 ```yaml
 - name: extract-task-id
   inline:
@@ -158,7 +173,7 @@ spec:
 ## Success Criteria
 
 - Task IDs correctly extracted from all webhook types
-- Workflows accurately targeted based on correlation
+- Workflows accurately targeted by deterministic name
 - Fallback mechanisms work when primary extraction fails
 - No false positive correlations
 - Proper handling of concurrent workflows
@@ -180,4 +195,4 @@ spec:
 - Document all JQ expressions thoroughly
 - Consider rate limiting and webhook replay scenarios
 
-Your implementation must be robust enough to handle production webhook traffic while maintaining precise workflow correlation.
+Your implementation must be robust enough to handle production webhook traffic while maintaining precise workflow correlation using supported Argo Events patterns.

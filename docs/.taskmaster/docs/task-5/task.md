@@ -1,12 +1,12 @@
-# Task 5: Create GitHub Webhook Correlation Logic
+# Task 5: Create GitHub Webhook Correlation Logic (Aligned)
 
 ## Overview
 
-Implement Argo Events Sensor logic to extract task IDs from webhook payloads and correlate with suspended workflows using precise label selectors, enabling event-driven coordination between GitHub events and multi-agent workflows.
+Implement Argo Events Sensor logic to extract task IDs from webhook payloads and correlate with suspended workflows using deterministic workflow names (no templated label selectors), enabling event-driven coordination between GitHub events and multi-agent workflows.
 
 ## Technical Context
 
-The multi-agent orchestration system requires sophisticated correlation logic to map GitHub webhook events to specific suspended workflows. This task implements the critical link between external GitHub events (PR creation, labeling, approval) and internal workflow state transitions.
+The multi-agent orchestration system requires correlation logic to map GitHub webhook events to specific suspended workflows. This task implements the link between external GitHub events (PR creation, labeling, approval) and internal workflow state transitions using supported Argo Events patterns.
 
 ## Implementation Guide
 
@@ -19,7 +19,7 @@ The multi-agent orchestration system requires sophisticated correlation logic to
        dependencyName: github-pr-event
        dataTemplate: |
          {{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}
-     dest: spec.arguments.parameters.task-id
+     dest: parameters.task-id
    ```
 
 2. **Fallback Branch Name Parsing**
@@ -29,12 +29,12 @@ The multi-agent orchestration system requires sophisticated correlation logic to
        dependencyName: github-pr-event
        dataTemplate: |
          {{jq '.pull_request.head.ref | capture("^task-(?<id>[0-9]+)-.*").id // empty'}}
-     dest: spec.arguments.parameters.branch-task-id
+     dest: parameters.branch-task-id
    ```
 
 ### Phase 2: Workflow Correlation Implementation
 
-1. **Label Selector Construction**
+1. **Deterministic Workflow Name Construction**
    ```yaml
    triggers:
    - template:
@@ -46,21 +46,25 @@ The multi-agent orchestration system requires sophisticated correlation logic to
              apiVersion: argoproj.io/v1alpha1
              kind: Workflow
              metadata:
-               labelSelector: |
-                 workflow-type=play-orchestration,
-                 task-id={{task-id}},
-                 current-stage=waiting-pr-created
+               name: TO_BE_SET
+         parameters:
+           - src:
+               dependencyName: github-pr-event
+               dataTemplate: |
+                 play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
+             dest: argoWorkflow.source.resource.metadata.name
    ```
 
-2. **Multi-Stage Targeting**
+2. **Multi-Stage Targeting (Handled Internally)**
    ```yaml
-   # Different events target different workflow stages
-   - name: pr-created-correlation
-     targetStage: "waiting-pr-created"
-   - name: ready-for-qa-correlation  
-     targetStage: "waiting-ready-for-qa"
-   - name: pr-approved-correlation
-     targetStage: "waiting-pr-approved"
+   # Events target well-known stages; post-resume, workflow updates its labels
+   stages:
+     - name: pr-created-correlation
+       targetStage: "waiting-pr-created"
+     - name: ready-for-qa-correlation  
+       targetStage: "waiting-ready-for-qa"
+     - name: pr-approved-correlation
+       targetStage: "waiting-pr-approved"
    ```
 
 ### Phase 3: Event Type Processing
@@ -76,12 +80,6 @@ The multi-agent orchestration system requires sophisticated correlation logic to
        - path: action
          type: string
          value: "opened"
-       - path: pull_request.labels
-         type: []
-         template: |
-           {{ range .pull_request.labels }}
-           {{- if hasPrefix .name "task-" }}true{{ end }}
-           {{ end }}
    ```
 
 2. **PR Labeling Events**
@@ -120,7 +118,6 @@ The multi-agent orchestration system requires sophisticated correlation logic to
 
 1. **Multi-Method Validation**
    ```yaml
-   # Validate task ID correlation using both methods
    - name: validate-correlation
      script:
        image: alpine:latest
@@ -129,7 +126,7 @@ The multi-agent orchestration system requires sophisticated correlation logic to
          LABEL_TASK="{{task-id}}"
          BRANCH_TASK="{{branch-task-id}}"
          
-         if [ "$LABEL_TASK" != "$BRANCH_TASK" ] && [ -n "$BRANCH_TASK" ]; then
+         if [ -n "$BRANCH_TASK" ] && [ "$LABEL_TASK" != "$BRANCH_TASK" ]; then
            echo "ERROR: Task ID mismatch - Label: $LABEL_TASK, Branch: $BRANCH_TASK"
            exit 1
          fi
@@ -139,7 +136,6 @@ The multi-agent orchestration system requires sophisticated correlation logic to
 
 2. **Workflow Existence Validation**
    ```yaml
-   # Verify target workflow exists before resume
    - name: verify-target-workflow
      resource:
        action: get
@@ -147,10 +143,7 @@ The multi-agent orchestration system requires sophisticated correlation logic to
          apiVersion: argoproj.io/v1alpha1
          kind: Workflow
          metadata:
-           labelSelector: |
-             workflow-type=play-orchestration,
-             task-id={{task-id}},
-             current-stage={{target-stage}}
+           name: play-task-{{task-id}}-workflow
    ```
 
 ## Code Examples
@@ -202,39 +195,36 @@ spec:
       name: correlate-and-resume
       argoWorkflow:
         operation: resume
-        parameters:
-        - src:
-            dependencyName: github-pr-created
-            dataTemplate: |
-              {{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}
-          dest: spec.arguments.parameters.task-id
         source:
           resource:
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
             metadata:
-              labelSelector: |
-                workflow-type=play-orchestration,
-                task-id={{task-id}},
-                current-stage=waiting-pr-created
+              name: TO_BE_SET
+        parameters:
+        - src:
+            dependencyName: github-pr-created
+            dataTemplate: |
+              play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
+          dest: argoWorkflow.source.resource.metadata.name
 ```
 
 ### Task ID Extraction Functions
 ```bash
 # JQ expressions for different payload structures
 extract_task_from_labels() {
-  echo '$payload' | jq -r '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'
+  echo "$payload" | jq -r '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'
 }
 
 extract_task_from_branch() {
-  echo '$payload' | jq -r '.pull_request.head.ref | capture("^task-(?<id>[0-9]+)-.*").id // empty'
+  echo "$payload" | jq -r '.pull_request.head.ref | capture("^task-(?<id>[0-9]+)-.*").id // empty'
 }
 
 validate_task_correlation() {
   LABEL_TASK=$(extract_task_from_labels)
   BRANCH_TASK=$(extract_task_from_branch)
   
-  if [ "$LABEL_TASK" != "$BRANCH_TASK" ] && [ -n "$BRANCH_TASK" ]; then
+  if [ -n "$BRANCH_TASK" ] && [ "$LABEL_TASK" != "$BRANCH_TASK" ]; then
     echo "ERROR: Task correlation mismatch"
     return 1
   fi
@@ -243,36 +233,30 @@ validate_task_correlation() {
 }
 ```
 
-### Conditional Workflow Targeting
+### Deterministic Workflow Targeting
 ```yaml
-# Dynamic stage targeting based on event type
 - template:
     name: dynamic-workflow-resume
-    conditions: |
-      {{ if eq .Input.action "opened" }}
-      waiting-pr-created
-      {{ else if eq .Input.label.name "ready-for-qa" }}
-      waiting-ready-for-qa  
-      {{ else if eq .Input.review.state "approved" }}
-      waiting-pr-approved
-      {{ end }}
     argoWorkflow:
       operation: resume
       source:
         resource:
-          labelSelector: |
-            workflow-type=play-orchestration,
-            task-id={{task-id}},
-            current-stage={{target-stage}}
+          metadata:
+            name: TO_BE_SET
+      parameters:
+      - src:
+          dependencyName: github-event
+          dataTemplate: |
+            play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
+        dest: argoWorkflow.source.resource.metadata.name
 ```
 
 ## Architecture Patterns
 
 ### Event-Driven Correlation
-The correlation system implements a sophisticated mapping between:
-1. **GitHub Events**: PR actions, label changes, review submissions
-2. **Workflow State**: Suspended workflows waiting for specific events
-3. **Task Association**: Multiple validation methods ensure accurate correlation
+- GitHub Events: PR actions, label changes, review submissions
+- Workflow State: Suspended workflows waiting for specific events
+- Task Association: Multiple validation methods ensure accurate correlation
 
 ### Multi-Method Validation Strategy
 ```yaml
@@ -284,32 +268,15 @@ Validation Hierarchy:
 ```
 
 ### Precise Workflow Targeting
-- **Label Selectors**: Combine multiple criteria for exact workflow matching
-- **Stage Awareness**: Different events target workflows in specific stages
-- **Namespace Isolation**: Workflow targeting respects namespace boundaries
-
-## Key Implementation Details
-
-### Webhook Payload Processing
-- **JQ Expressions**: Robust JSON field extraction from complex payloads
-- **Error Handling**: Graceful failure when expected fields are missing
-- **Type Safety**: Validate extracted data types before processing
-
-### Correlation Accuracy
-- **False Positive Prevention**: Multi-method validation prevents wrong correlations
-- **Race Condition Handling**: Atomic operations prevent concurrent conflicts
-- **Idempotency**: Repeated events don't cause duplicate resumptions
-
-### Performance Considerations
-- **Efficient Filtering**: Use Argo Events filters to reduce processing load
-- **Label Indexing**: Kubernetes label selectors are efficient for workflow lookup
-- **Payload Size**: Minimize data extraction and processing overhead
+- Deterministic `metadata.name` targeting for ArgoWorkflow triggers
+- Avoid templating within `labelSelector` fields
+- Namespace isolation respected by Sensor
 
 ## Testing Strategy
 
 ### Unit Testing
 1. **JQ Expression Testing**: Validate extraction with various payload formats
-2. **Label Selector Validation**: Test targeting accuracy with mock workflows
+2. **Name Targeting Validation**: Ensure correct construction of workflow names
 3. **Error Condition Testing**: Verify handling of malformed payloads
 4. **Performance Testing**: Benchmark extraction and correlation speed
 
