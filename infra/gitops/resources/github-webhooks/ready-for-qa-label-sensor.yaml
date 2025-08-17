@@ -13,21 +13,21 @@ spec:
       eventName: org
       filters:
         data:
-        # Filter for pull_request labeled events
-        - path: headers.X-Github-Event
-          type: string
-          value: ["pull_request"]
-        - path: body.action
-          type: string
-          value: ["labeled"]
-        # Check for ready-for-qa label
-        - path: body.label.name
-          type: string
-          value: ["ready-for-qa"]
-        # Verify label was added by Cleo
-        - path: body.sender.login
-          type: string
-          value: ["5DLabs-Cleo[bot]", "5DLabs-Cleo"]
+          # Filter for pull_request labeled events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["labeled"]
+          # Check for ready-for-qa label
+          - path: body.label.name
+            type: string
+            value: ["ready-for-qa"]
+          # Verify label was added by Cleo
+          - path: body.sender.login
+            type: string
+            value: ["5DLabs-Cleo[bot]", "5DLabs-Cleo"]
   triggers:
     - template:
         name: resume-after-cleo

@@ -54,21 +54,23 @@ This directory contains four specialized Argo Events Sensors that enable event-d
   - `task-id={extracted-id}`
   - `current-stage=waiting-pr-approved`
 
-### 4. Rex Remediation Sensor (`rex-remediation-sensor.yaml`)
+### 4. Implementation Agent Remediation Sensor (`implementation-agent-remediation-sensor.yaml`)
 
-**Purpose**: Detects Rex push events to cancel running agents and restart QA pipeline.
+**Purpose**: Detects push events from any implementation agent (Rex, Blaze, Morgan, etc.) to cancel running quality/testing agents and restart QA pipeline.
 
 **Triggers On**:
-- GitHub push events
-- Push must be from `5DLabs-Rex[bot]` or `5DLabs-Rex`
+- GitHub push events  
+- Push must be from any `5DLabs-{Agent}[bot]` or `5DLabs-{Agent}` implementation agent
+- Supported agents: Rex, Blaze, Morgan (extensible via regex pattern)
 - Branch must match pattern `task-*`
 
 **Actions**:
 - Extracts task ID from branch name
+- Extracts pushing agent name for logging and monitoring
 - Deletes CodeRun CRDs with labels:
   - `task-id={extracted-id}`
-  - `github-app!=5DLabs-Rex`
-- Would also remove "ready-for-qa" labels and reset workflow state (additional configuration needed)
+  - `github-app` NOT IN `["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]`
+- Supports multiple implementation agents without code duplication
 
 ## Infrastructure Dependencies
 
@@ -100,8 +102,11 @@ kubectl get sensors -n argo
 # Check sensor pods
 kubectl get pods -n argo --selector controller=sensor-controller
 
-# View sensor logs
+# View sensor logs (example for multi-agent workflow resume sensor)
 kubectl logs -f $(kubectl get pods -n argo -l sensor-name=multi-agent-workflow-resume -o name | head -1) -n argo
+
+# View implementation agent remediation sensor logs
+kubectl logs -f $(kubectl get pods -n argo -l sensor-name=implementation-agent-remediation -o name | head -1) -n argo
 
 # Use test script
 ./test-sensors.sh
@@ -124,10 +129,11 @@ kubectl logs -f $(kubectl get pods -n argo -l sensor-name=multi-agent-workflow-r
    - Verify pr-approval sensor processes event
    - Check workflow completion trigger
 
-4. **Rex Push Test**:
-   - Push to `task-*` branch as Rex user
-   - Verify rex-remediation sensor processes event
-   - Check CodeRun CRD cancellation
+4. **Implementation Agent Push Test**:
+   - Push to `task-*` branch as any implementation agent (Rex, Blaze, Morgan)
+   - Verify implementation-agent-remediation sensor processes event
+   - Check CodeRun CRD cancellation for quality/testing agents
+   - Verify agent name extraction and logging works correctly
 
 ## Webhook Payload Processing
 
@@ -227,6 +233,40 @@ kubectl get sensor multi-agent-workflow-resume -n argo -o yaml
 3. **RBAC**: Service account has minimal required permissions
 4. **Namespace Isolation**: All resources deployed in `argo` namespace
 
+## Adding New Implementation Agents
+
+The implementation agent remediation sensor is designed to easily support new implementation agents. To add a new agent (e.g., "Nova"):
+
+### 1. Update Sensor Regex Pattern
+Edit `implementation-agent-remediation-sensor.yaml`:
+```yaml
+# Add "Nova" to the regex pattern
+- path: body.sender.login
+  type: string
+  comparator: "~"
+  value: "5DLabs-(Rex|Blaze|Morgan|Nova)\\[bot\\]|5DLabs-(Rex|Blaze|Morgan|Nova)"
+```
+
+### 2. Update Agent Exclusion List
+```yaml
+# Add "5DLabs-Nova" to the exclusion list
+labelSelector:
+  matchExpressions:
+  - key: github-app
+    operator: NotIn
+    values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan", "5DLabs-Nova"]
+```
+
+### 3. Create GitHub App
+- Create new GitHub App with name "5DLabs-Nova"
+- Configure appropriate permissions (code read/write, PR management)
+- Generate private key and configure secrets
+
+### 4. Update Agent Configuration
+- Add agent entry to controller values.yaml
+- Configure External Secrets for Nova's credentials  
+- Deploy updates and verify sensor recognizes new agent
+
 ## Future Enhancements
 
 1. Add metrics for sensor processing
@@ -234,3 +274,4 @@ kubectl get sensor multi-agent-workflow-resume -n argo -o yaml
 3. Add support for PR comment triggers
 4. Enhance error handling and retry logic
 5. Add support for multiple repository configurations
+6. Make agent list configurable via ConfigMap
