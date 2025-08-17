@@ -1,0 +1,76 @@
+{
+  "remoteTools": [
+    {
+      "name": "external_secrets_operator",
+      "description": "External Secrets Operator for dynamic secret management",
+      "endpoint": "https://external-secrets-operator.taskmaster.local/api/v1"
+    },
+    {
+      "name": "aws_secrets_manager",
+      "description": "AWS Secrets Manager for secure credential storage",
+      "endpoint": "https://secretsmanager.us-west-2.amazonaws.com"
+    },
+    {
+      "name": "postgres_admin",
+      "description": "PostgreSQL administrative interface for database operations",
+      "endpoint": "postgresql://postgres-admin.taskmaster.local:5432"
+    },
+    {
+      "name": "redis_admin",
+      "description": "Redis administrative interface for cache and session management",
+      "endpoint": "redis://redis-admin.taskmaster.local:6379"
+    },
+    {
+      "name": "argocd_admin",
+      "description": "Argo CD administrative API for application deployment management",
+      "endpoint": "https://argocd.taskmaster.local/api/v1"
+    },
+    {
+      "name": "cert_manager",
+      "description": "Cert Manager for TLS certificate lifecycle management",
+      "endpoint": "https://cert-manager.taskmaster.local/api/v1"
+    },
+    {
+      "name": "kubernetes_api",
+      "description": "Kubernetes API server for cluster resource management",
+      "endpoint": "https://kubernetes.default.svc"
+    }
+  ],
+  "localServers": {
+    "postgres_client": {
+      "command": ["psql"],
+      "args": ["--version"],
+      "description": "PostgreSQL client for database administration and queries"
+    },
+    "redis_client": {
+      "command": ["redis-cli"],
+      "args": ["--version"],
+      "description": "Redis client for cache administration and operations"
+    },
+    "argocd_client": {
+      "command": ["argocd"],
+      "args": ["version", "--client"],
+      "description": "Argo CD CLI for application and project management"
+    },
+    "kubectl": {
+      "command": ["kubectl"],
+      "args": ["version", "--client"],
+      "description": "Kubernetes CLI for cluster resource operations"
+    },
+    "openssl": {
+      "command": ["openssl"],
+      "args": ["version"],
+      "description": "OpenSSL for TLS certificate operations and validation"
+    },
+    "jq": {
+      "command": ["jq"],
+      "args": ["--version"],
+      "description": "JSON processor for parsing API responses and configurations"
+    },
+    "curl": {
+      "command": ["curl"],
+      "args": ["--version"],
+      "description": "HTTP client for API operations and health checks"
+    }
+  }
+}

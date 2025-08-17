@@ -1,0 +1,96 @@
+{
+  "remoteTools": [
+    {
+      "name": "prometheus",
+      "description": "Prometheus monitoring system for metrics collection and alerting",
+      "endpoint": "https://prometheus.taskmaster.local:9090"
+    },
+    {
+      "name": "grafana",
+      "description": "Grafana dashboards for workflow monitoring visualization",
+      "endpoint": "https://grafana.taskmaster.local:3000"
+    },
+    {
+      "name": "alertmanager",
+      "description": "AlertManager for alert routing and notification management",
+      "endpoint": "https://alertmanager.taskmaster.local:9093"
+    },
+    {
+      "name": "argo_workflows",
+      "description": "Argo Workflows API for workflow status and metrics collection",
+      "endpoint": "https://argo-workflows.taskmaster.local:2746"
+    },
+    {
+      "name": "kubernetes_metrics",
+      "description": "Kubernetes Metrics Server for pod and node resource metrics",
+      "endpoint": "https://kubernetes.default.svc/apis/metrics.k8s.io/v1beta1"
+    },
+    {
+      "name": "pushgateway",
+      "description": "Prometheus Pushgateway for ephemeral job metrics",
+      "endpoint": "https://pushgateway.taskmaster.local:9091"
+    },
+    {
+      "name": "s3_archive",
+      "description": "S3-compatible storage for workflow archival and compliance",
+      "endpoint": "https://s3.taskmaster.local"
+    },
+    {
+      "name": "pagerduty_api",
+      "description": "PagerDuty API for incident management and escalation",
+      "endpoint": "https://api.pagerduty.com/v2"
+    },
+    {
+      "name": "slack_api",
+      "description": "Slack API for team notifications and operational alerts",
+      "endpoint": "https://slack.com/api"
+    },
+    {
+      "name": "jaeger",
+      "description": "Jaeger distributed tracing for workflow correlation and analysis",
+      "endpoint": "https://jaeger.taskmaster.local:16686"
+    }
+  ],
+  "localServers": {
+    "kubectl": {
+      "command": ["kubectl"],
+      "args": ["version", "--client"],
+      "description": "Kubernetes CLI for cluster resource management and workflow operations"
+    },
+    "prometheus_client": {
+      "command": ["promtool"],
+      "args": ["--version"],
+      "description": "Prometheus CLI tools for rule validation and query testing"
+    },
+    "python_metrics": {
+      "command": ["python3"],
+      "args": ["-c", "import prometheus_client; print('Prometheus client available')"],
+      "description": "Python Prometheus client for custom metrics collection"
+    },
+    "docker_client": {
+      "command": ["docker"],
+      "args": ["--version"],
+      "description": "Docker client for container health checks and metrics collection"
+    },
+    "aws_cli": {
+      "command": ["aws"],
+      "args": ["--version"],
+      "description": "AWS CLI for S3 archival operations and resource management"
+    },
+    "jq": {
+      "command": ["jq"],
+      "args": ["--version"],
+      "description": "JSON processor for parsing API responses and metric data"
+    },
+    "curl": {
+      "command": ["curl"],
+      "args": ["--version"],
+      "description": "HTTP client for API health checks and webhook operations"
+    },
+    "psutil": {
+      "command": ["python3"],
+      "args": ["-c", "import psutil; print('psutil available for resource monitoring')"],
+      "description": "Python system monitoring library for resource usage collection"
+    }
+  }
+}

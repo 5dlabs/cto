@@ -1,0 +1,51 @@
+{
+  "remoteTools": [
+    {
+      "name": "argo_workflows",
+      "description": "Argo Workflows management for task validation workflows",
+      "endpoint": "https://argo-workflows.taskmaster.local/api/v1"
+    },
+    {
+      "name": "argo_events", 
+      "description": "Argo Events sensor configuration for PR webhook handling",
+      "endpoint": "https://argo-events.taskmaster.local/api/v1"
+    },
+    {
+      "name": "github_api",
+      "description": "GitHub API for PR label validation and comment creation",
+      "endpoint": "https://api.github.com"
+    },
+    {
+      "name": "prometheus",
+      "description": "Prometheus metrics collection for validation monitoring",
+      "endpoint": "https://prometheus.taskmaster.local/api/v1"
+    },
+    {
+      "name": "kubernetes_api",
+      "description": "Kubernetes API for secret and configmap management",
+      "endpoint": "https://kubernetes.default.svc"
+    }
+  ],
+  "localServers": {
+    "json_processor": {
+      "command": ["jq"],
+      "args": ["--version"],
+      "description": "JSON processing for webhook payload parsing"
+    },
+    "git_operations": {
+      "command": ["git"],
+      "args": ["--version"], 
+      "description": "Git operations for marker file management"
+    },
+    "yaml_validator": {
+      "command": ["yq"],
+      "args": ["--version"],
+      "description": "YAML validation for Argo workflow configurations"
+    },
+    "regex_processor": {
+      "command": ["grep"],
+      "args": ["--version"],
+      "description": "Regex processing for branch name validation"
+    }
+  }
+}

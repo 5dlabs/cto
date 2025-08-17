@@ -1,0 +1,11 @@
+# Task ID: 11
+# Title: Setup Tess Kubernetes RBAC
+# Status: pending
+# Dependencies: 9
+# Priority: low
+# Description: Configure comprehensive RBAC permissions for Tess agent to perform live Kubernetes testing and deployments
+# Details:
+Create ServiceAccount 'coderun-tess' in agent-platform namespace. Define ClusterRole with extensive permissions for testing (initially cluster-admin for lab, refine later). Create ClusterRoleBinding linking ServiceAccount to ClusterRole. Configure controller to use agent-specific ServiceAccounts based on github_app. Update CodeRun CRD spec to reference serviceAccountName. Consider using Kubernetes RBAC aggregation for maintainability.
+
+# Test Strategy:
+Test Tess can create/read/update/delete test resources. Verify other agents don't have excessive permissions. Validate ServiceAccount token mounting in pods. Test permission boundaries with various K8s operations.

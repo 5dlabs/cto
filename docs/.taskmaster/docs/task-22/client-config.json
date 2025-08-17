@@ -1,0 +1,39 @@
+{
+  "remoteTools": [
+    "kubernetes_listResources",
+    "kubernetes_describeResource",
+    "kubernetes_createResource",
+    "kubernetes_updateResource",
+    "kubernetes_deleteResource",
+    "kubernetes_listPods",
+    "kubernetes_getPodLogs",
+    "brave-search_brave_web_search",
+    "memory_create_entities",
+    "memory_query_entities"
+  ],
+  "localServers": {
+    "prometheus-metrics": {
+      "command": "python3",
+      "args": ["./tools/prometheus-client.py"],
+      "env": {
+        "PROMETHEUS_URL": "${PROMETHEUS_URL}",
+        "GRAFANA_URL": "${GRAFANA_URL}"
+      }
+    },
+    "resource-analyzer": {
+      "command": "python3",
+      "args": ["./tools/resource-analyzer.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}"
+      }
+    },
+    "autoscaler-manager": {
+      "command": "python3",
+      "args": ["./tools/autoscaler-manager.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "METRICS_SERVER_URL": "${METRICS_SERVER_URL}"
+      }
+    }
+  }
+}

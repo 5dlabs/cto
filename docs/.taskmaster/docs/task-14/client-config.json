@@ -1,0 +1,21 @@
+{
+  "remoteTools": [
+    "brave-search_brave_web_search",
+    "memory_create_entities",
+    "memory_query_entities"
+  ],
+  "localServers": {
+    "mcp-memory": {
+      "command": "mcp-memory-server",
+      "args": ["--storage-path", "/workspace/memory"]
+    },
+    "mcp-kubernetes": {
+      "command": "mcp-kubernetes-client",
+      "args": ["--kubeconfig", "/etc/kube/config"],
+      "env": {
+        "KUBECONFIG": "/etc/kube/config",
+        "KUBE_NAMESPACE": "argo"
+      }
+    }
+  }
+}

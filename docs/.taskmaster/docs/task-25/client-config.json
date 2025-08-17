@@ -1,0 +1,43 @@
+{
+  "remoteTools": [
+    "kubernetes_listResources",
+    "kubernetes_describeResource",
+    "kubernetes_createResource",
+    "kubernetes_updateResource",
+    "kubernetes_deleteResource",
+    "kubernetes_listPods",
+    "kubernetes_getPodLogs",
+    "brave-search_brave_web_search",
+    "memory_create_entities",
+    "memory_query_entities"
+  ],
+  "localServers": {
+    "argocd-manager": {
+      "command": "python3",
+      "args": ["./tools/argocd-manager.py"],
+      "env": {
+        "ARGOCD_SERVER": "${ARGOCD_SERVER}",
+        "ARGOCD_TOKEN": "${ARGOCD_TOKEN}",
+        "GIT_REPO_URL": "${GIT_REPO_URL}"
+      }
+    },
+    "deployment-analyzer": {
+      "command": "python3",
+      "args": ["./tools/deployment-analyzer.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "PROMETHEUS_URL": "${PROMETHEUS_URL}",
+        "GRAFANA_URL": "${GRAFANA_URL}"
+      }
+    },
+    "canary-controller": {
+      "command": "python3",
+      "args": ["./tools/canary-controller.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "ARGO_ROLLOUTS_API": "${ARGO_ROLLOUTS_API}",
+        "PROMETHEUS_URL": "${PROMETHEUS_URL}"
+      }
+    }
+  }
+}

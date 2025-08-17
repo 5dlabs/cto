@@ -1,0 +1,73 @@
+{
+  "remoteTools": [
+    {
+      "name": "cargo",
+      "description": "Rust build tool with coverage extensions",
+      "capabilities": ["build", "test", "llvm-cov", "install"]
+    },
+    {
+      "name": "rustup",
+      "description": "Rust toolchain installer for LLVM tools",
+      "capabilities": ["component", "install", "update"]
+    },
+    {
+      "name": "git",
+      "description": "Version control for code analysis and PR handling",
+      "capabilities": ["clone", "diff", "log", "checkout", "fetch"]
+    },
+    {
+      "name": "curl",
+      "description": "HTTP client for GitHub API integration",
+      "capabilities": ["get", "post", "put", "delete", "headers"]
+    },
+    {
+      "name": "jq",
+      "description": "JSON processor for coverage data manipulation",
+      "capabilities": ["parse", "filter", "transform", "validate"]
+    },
+    {
+      "name": "python3",
+      "description": "Python interpreter for coverage analysis scripts",
+      "capabilities": ["script", "json", "file-processing", "api-client"]
+    },
+    {
+      "name": "github-cli",
+      "description": "GitHub CLI for advanced PR operations",
+      "capabilities": ["pr", "review", "comment", "status"]
+    }
+  ],
+  "localServers": {
+    "coverage-analyzer": {
+      "command": "cargo",
+      "args": ["watch", "-x", "llvm-cov --workspace --html"],
+      "cwd": "./test-project",
+      "env": {
+        "CARGO_LLVM_COV_TARGET_DIR": "/tmp/coverage-dev"
+      }
+    },
+    "tess-workflow-dev": {
+      "command": "bash",
+      "args": ["-x", "templates/container-tess.sh.hbs"],
+      "cwd": "./",
+      "env": {
+        "GITHUB_TOKEN": "dev-token",
+        "REPO_URL": "https://github.com/test/sample-repo",
+        "PR_NUMBER": "123",
+        "COVERAGE_THRESHOLD_EXISTING": "90",
+        "COVERAGE_THRESHOLD_NEW": "95"
+      }
+    },
+    "github-api-mock": {
+      "command": "python3",
+      "args": ["-m", "http.server", "8080"],
+      "cwd": "./test-fixtures/github-mock",
+      "env": {}
+    },
+    "coverage-report-server": {
+      "command": "python3",
+      "args": ["-m", "http.server", "8081", "--directory", "/tmp/coverage-html"],
+      "cwd": "./",
+      "env": {}
+    }
+  }
+}

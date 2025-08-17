@@ -1,0 +1,11 @@
+# Task ID: 10
+# Title: Implement Ready-for-QA Label Logic
+# Status: pending
+# Dependencies: 6, 7
+# Priority: medium
+# Description: Add logic for Cleo to add 'ready-for-qa' label to PRs through container-cleo.sh.hbs script as explicit handoff signal to Tess
+# Details:
+Implement ready-for-qa labeling directly in container-cleo.sh.hbs script. Workflow sequence: 1) Run code quality checks (Clippy, rustfmt) 2) Push fixes to same branch 3) Wait for CI tests to pass 4) Add 'ready-for-qa' label via GitHub API 5) Complete successfully. This label serves as explicit handoff signal to trigger Tess stage in multi-agent workflow. Include GitHub API authentication and label management directly in Cleo's container script. Create Sensor trigger for pull_request.labeled events where label.name='ready-for-qa'. Resume workflow at waiting-ready-for-qa suspend point. Ensure idempotent label addition (check before adding).
+
+# Test Strategy:
+Verify container-cleo.sh.hbs successfully adds label after quality checks and CI pass. Test that script waits for CI tests before labeling. Confirm GitHub API authentication works in container context. Test Sensor correctly detects label addition event. Confirm workflow resumes at correct suspension point. Test duplicate label addition handling. Validate explicit handoff to Tess stage.
