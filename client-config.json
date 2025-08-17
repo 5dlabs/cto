@@ -2,19 +2,14 @@
   "remoteTools": [
     "memory_create_entities",
     "memory_add_observations",
-    "brave_web_search"
+    "brave_web_search",
+    "rustdocs_query_rust_docs"
   ],
   "localServers": {
     "filesystem": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
       "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"],
-      "workingDirectory": "project_root"
-    },
-    "kubernetes": {
-      "command": "npx", 
-      "args": ["-y", "@kubernetes/mcp-server-kubernetes"],
-      "tools": ["listResources", "describeResource", "createResource", "deleteResource", "applyResource"],
       "workingDirectory": "project_root"
     }
   }
