@@ -1,3 +1,4 @@
+use super::agent::AgentClassifier;
 use crate::crds::CodeRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, Context, Result};
@@ -43,11 +44,47 @@ impl<'a> CodeResourceManager<'a> {
         let name = code_run.name_any();
         info!("🚀 Creating/updating code resources for: {}", name);
 
-        // Ensure PVC exists for code tasks (persistent workspace)
+        // Determine PVC name based on agent classification
         let service_name = &code_run.spec.service;
-        let pvc_name = format!("workspace-{service_name}");
+        let classifier = AgentClassifier::new();
+
+        // Get the appropriate PVC name based on agent type
+        let pvc_name = if let Some(github_app) = &code_run.spec.github_app {
+            match classifier.get_pvc_name(service_name, github_app) {
+                Ok(name) => {
+                    // Log the agent classification for visibility
+                    match classifier.extract_agent_name(github_app) {
+                        Ok(agent_name) => {
+                            if classifier.is_implementation_agent(&agent_name) {
+                                info!("🤝 Agent '{}' identified as implementation agent, using shared workspace", agent_name);
+                            } else {
+                                info!("🔒 Agent '{}' identified as non-implementation agent, using isolated workspace", agent_name);
+                            }
+                        }
+                        Err(e) => {
+                            info!("⚠️ Could not extract agent name: {}", e);
+                        }
+                    }
+                    name
+                }
+                Err(e) => {
+                    // Fallback to default naming if extraction fails
+                    error!(
+                        "Failed to determine agent-specific PVC name: {}, using default",
+                        e
+                    );
+                    format!("workspace-{service_name}")
+                }
+            }
+        } else {
+            // No GitHub App specified, use default naming
+            info!("No GitHub App specified, using default PVC naming");
+            format!("workspace-{service_name}")
+        };
+
         info!("📦 Ensuring PVC exists: {}", pvc_name);
-        self.ensure_pvc_exists(&pvc_name, service_name).await?;
+        self.ensure_pvc_exists(&pvc_name, service_name, code_run.spec.github_app.as_deref())
+            .await?;
         info!("✅ PVC check completed");
 
         // Don't cleanup resources at start - let idempotent creation handle it
@@ -212,7 +249,12 @@ impl<'a> CodeResourceManager<'a> {
         }
     }
 
-    async fn ensure_pvc_exists(&self, pvc_name: &str, service_name: &str) -> Result<()> {
+    async fn ensure_pvc_exists(
+        &self,
+        pvc_name: &str,
+        service_name: &str,
+        github_app: Option<&str>,
+    ) -> Result<()> {
         match self.pvcs.get(pvc_name).await {
             Ok(_) => {
                 info!("PVC {} already exists", pvc_name);
@@ -220,7 +262,7 @@ impl<'a> CodeResourceManager<'a> {
             }
             Err(kube::Error::Api(ae)) if ae.code == 404 => {
                 info!("Creating PVC: {}", pvc_name);
-                let pvc = self.build_pvc_spec(pvc_name, service_name);
+                let pvc = self.build_pvc_spec(pvc_name, service_name, github_app);
                 match self.pvcs.create(&PostParams::default(), &pvc).await {
                     Ok(_) => {
                         info!("Successfully created PVC: {}", pvc_name);
@@ -237,7 +279,12 @@ impl<'a> CodeResourceManager<'a> {
         }
     }
 
-    fn build_pvc_spec(&self, pvc_name: &str, service_name: &str) -> PersistentVolumeClaim {
+    fn build_pvc_spec(
+        &self,
+        pvc_name: &str,
+        service_name: &str,
+        github_app: Option<&str>,
+    ) -> PersistentVolumeClaim {
         let mut spec = json!({
             "accessModes": ["ReadWriteOnce"],
             "resources": {
@@ -252,16 +299,33 @@ impl<'a> CodeResourceManager<'a> {
             spec["storageClassName"] = json!(storage_class);
         }
 
+        // Determine labels based on agent classification
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "orchestrator".to_string());
+        labels.insert("component".to_string(), "code-runner".to_string());
+        labels.insert("service".to_string(), service_name.to_string());
+
+        // Add agent-specific labels if GitHub App is provided
+        if let Some(app) = github_app {
+            let classifier = AgentClassifier::new();
+            if let Ok(agent_name) = classifier.extract_agent_name(app) {
+                labels.insert("agent".to_string(), agent_name.clone());
+
+                // Add workspace type label
+                if classifier.is_implementation_agent(&agent_name) {
+                    labels.insert("workspace-type".to_string(), "shared".to_string());
+                } else {
+                    labels.insert("workspace-type".to_string(), "isolated".to_string());
+                }
+            }
+        }
+
         let pvc_spec = json!({
             "apiVersion": "v1",
             "kind": "PersistentVolumeClaim",
             "metadata": {
                 "name": pvc_name,
-                "labels": {
-                    "app": "orchestrator",
-                    "component": "code-runner",
-                    "service": service_name
-                }
+                "labels": labels
             },
             "spec": spec
         });
@@ -530,7 +594,20 @@ impl<'a> CodeResourceManager<'a> {
         }));
 
         // PVC workspace volume for code (persistent across sessions)
-        let pvc_name = format!("workspace-{}", code_run.spec.service);
+        // Use conditional naming based on agent classification
+        let classifier = AgentClassifier::new();
+        let pvc_name = if let Some(github_app) = &code_run.spec.github_app {
+            match classifier.get_pvc_name(&code_run.spec.service, github_app) {
+                Ok(name) => name,
+                Err(e) => {
+                    error!("Failed to determine agent-specific PVC name for volume mount: {}, using default", e);
+                    format!("workspace-{}", code_run.spec.service)
+                }
+            }
+        } else {
+            format!("workspace-{}", code_run.spec.service)
+        };
+
         volumes.push(json!({
             "name": "workspace",
             "persistentVolumeClaim": {

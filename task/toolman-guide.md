@@ -1,322 +1,296 @@
-# Toolman Guide: Design Multi-Agent Workflow DAG Structure
+# Toolman Guide: Implement Agent-Specific PVC Naming
 
 ## Overview
 
-This task requires comprehensive Kubernetes workflow design capabilities combined with file operations for YAML configuration management. The selected tools focus on Argo Workflows template creation, DAG structure design, and workflow validation.
+This task requires Rust development capabilities combined with filesystem operations for code modification and testing. The selected tools focus on Rust code analysis, development, and validation for controller modification.
 
 ## Core Tools
 
-### Kubernetes Operations
-The kubernetes server provides essential tools for Argo Workflows management:
-
-#### `createResource`
-- **Purpose**: Deploy WorkflowTemplate and test workflow instances
-- **When to Use**: Creating the play-workflow-template and validating deployment
-- **Example Usage**: Create WorkflowTemplate from YAML manifest
-- **Best Practice**: Use `--dry-run=server` for validation before actual creation
-
-#### `listResources`
-- **Purpose**: Discover existing Argo Workflows resources and validate deployments
-- **When to Use**: Checking WorkflowTemplate registration and workflow instances
-- **Example Usage**: `listResources kind=WorkflowTemplate namespace=argo`
-- **Best Practice**: Verify resource creation and monitor workflow status
-
-#### `describeResource`
-- **Purpose**: Examine detailed workflow configurations and status
-- **When to Use**: Debugging template issues and monitoring workflow execution
-- **Example Usage**: Describe specific workflow instances for troubleshooting
-- **Best Practice**: Use to understand workflow state and identify issues
-
-#### `applyResource`
-- **Purpose**: Update WorkflowTemplate configurations iteratively
-- **When to Use**: Refining template structure and making configuration adjustments
-- **Example Usage**: Apply updated template YAML with configuration changes
-- **Best Practice**: Use for iterative development and template refinement
-
-#### `deleteResource`
-- **Purpose**: Clean up test resources and failed workflow instances
-- **When to Use**: Removing test workflows and cleaning development environment
-- **Example Usage**: Delete specific workflow instances during testing
-- **Best Practice**: Clean up resources to prevent cluster clutter
-
 ### Filesystem Operations
-The filesystem server handles YAML configuration and documentation:
-
-#### `write_file`
-- **Purpose**: Create WorkflowTemplate YAML and configuration files
-- **When to Use**: Writing play-workflow-template.yaml and related configurations
-- **Example Usage**: Create comprehensive workflow template with DAG structure
-- **Best Practice**: Follow Argo Workflows YAML conventions and include proper metadata
+The filesystem server provides essential tools for Rust development:
 
 #### `read_file`
-- **Purpose**: Examine existing workflow templates and reference materials
-- **When to Use**: Studying existing templates and Argo Workflows documentation
-- **Example Usage**: Read example templates to understand DAG patterns
-- **Best Practice**: Use existing templates as foundation for new designs
+- **Purpose**: Read existing controller source files and understand current implementation
+- **When to Use**: Examining `controller/src/tasks/code/resources.rs` and related files
+- **Example Usage**: Read PVC creation logic and controller reconciliation patterns
+- **Best Practice**: Start by understanding existing code structure before modifications
+
+#### `write_file`
+- **Purpose**: Implement agent name extraction logic and modify PVC creation functions
+- **When to Use**: Adding new functions and updating existing controller code
+- **Example Usage**: Create `extract_agent_name()` function and update PVC naming logic
+- **Best Practice**: Make incremental changes and preserve existing functionality
 
 #### `search_files`
-- **Purpose**: Find existing Argo workflow configurations and examples
-- **When to Use**: Locating reference templates and workflow patterns
-- **Example Usage**: Search for `*.yaml` files with WorkflowTemplate resources
-- **Best Practice**: Study working examples for template design patterns
+- **Purpose**: Find relevant code patterns and PVC-related functions across codebase
+- **When to Use**: Locating PVC creation logic and controller integration points
+- **Example Usage**: Search for `PersistentVolumeClaim` usage and workspace patterns
+- **Best Practice**: Understand all code locations that need modification
 
 #### `directory_tree`
-- **Purpose**: Understand project structure for configuration organization
-- **When to Use**: Mapping workflow template locations and organization
-- **Example Usage**: Explore Argo configuration directories
-- **Best Practice**: Follow established patterns for template organization
+- **Purpose**: Map controller source structure and understand code organization
+- **When to Use**: Understanding controller architecture and file dependencies
+- **Example Usage**: Explore `controller/src/` structure and module relationships
+- **Best Practice**: Understand module structure before making changes
 
 #### `list_directory`
-- **Purpose**: Inventory existing templates and configuration files
-- **When to Use**: Checking for existing workflow templates and configurations
-- **Example Usage**: List contents of workflow template directories
-- **Best Practice**: Ensure no naming conflicts with existing templates
+- **Purpose**: Inventory controller source files and identify modification targets
+- **When to Use**: Cataloging files that need updates for agent-specific naming
+- **Example Usage**: List files in `controller/src/tasks/code/` directory
+- **Best Practice**: Ensure all relevant files are identified for modification
 
 ## Supporting Tools
+
+### Rust Documentation Access
+
+#### `rustdocs_query_rust_docs`
+- **Purpose**: Access Rust documentation for kube-rs and related crates
+- **When to Use**: Understanding PersistentVolumeClaim API and Kubernetes resource management
+- **Example Usage**: Query documentation for `kube::Api<PersistentVolumeClaim>` usage
+- **Best Practice**: Understand API patterns before implementing new functionality
 
 ### Knowledge Management
 
 #### `memory_create_entities`
-- **Purpose**: Create knowledge graph nodes for workflow components and patterns
-- **When to Use**: Recording DAG structure, template patterns, and design decisions
-- **Example Usage**: Create entities for "WorkflowTemplate", "DAG Structure", "Suspend Points"
-- **Best Practice**: Document complex workflow relationships and dependencies
+- **Purpose**: Create knowledge graph nodes for controller components and modifications
+- **When to Use**: Recording discovered code patterns and implementation decisions
+- **Example Usage**: Create entities for "PVC Creation", "Agent Name Extraction", "Controller Integration"
+- **Best Practice**: Document complex controller logic and modification relationships
 
 #### `memory_add_observations`
-- **Purpose**: Add detailed findings about workflow design and implementation
-- **When to Use**: Recording specific template patterns and configuration details
-- **Example Usage**: Add observations about parameter propagation and event correlation
-- **Best Practice**: Include YAML snippets and configuration examples
+- **Purpose**: Add detailed findings about controller implementation and changes
+- **When to Use**: Recording specific code patterns and modification approaches
+- **Example Usage**: Add observations about reconciliation patterns and error handling
+- **Best Practice**: Include code snippets and implementation details
 
 ### Research Tools
 
 #### `brave_web_search`
-- **Purpose**: Research Argo Workflows best practices and advanced patterns
-- **When to Use**: Finding documentation on DAG design, suspend/resume, and template features
-- **Example Usage**: Search for "Argo Workflows DAG suspend resume patterns"
-- **Best Practice**: Validate findings against official Argo documentation
+- **Purpose**: Research Rust patterns, kube-rs usage, and Kubernetes controller best practices
+- **When to Use**: Finding examples of PVC management and controller modification patterns
+- **Example Usage**: Search for "kube-rs PersistentVolumeClaim creation patterns"
+- **Best Practice**: Validate findings against official documentation and existing codebase
 
 ## Implementation Flow
 
-### Phase 1: Template Foundation
-1. Use `search_files` to find existing WorkflowTemplate examples
-2. Use `read_file` to study current template patterns and structures
-3. Create knowledge entities for workflow architecture components
-4. Use `directory_tree` to understand template organization
+### Phase 1: Code Discovery and Analysis
+1. Use `directory_tree` to map controller source structure
+2. Use `search_files` to locate PVC-related code and patterns
+3. Use `read_file` to examine current PVC creation logic
+4. Create knowledge entities for controller architecture components
+5. Document current implementation patterns and constraints
 
-### Phase 2: DAG Design and Structure
-1. Use `write_file` to create base WorkflowTemplate with metadata
-2. Design DAG structure with proper task dependencies
-3. Implement parameterized agent selection system
-4. Create suspend point templates for event coordination
+### Phase 2: Agent Name Extraction Development
+1. Use `rustdocs_query_rust_docs` to understand regex and string manipulation patterns
+2. Use `write_file` to implement `extract_agent_name()` function
+3. Create comprehensive unit tests for extraction logic
+4. Add validation for Kubernetes naming constraints
+5. Test with various GitHub App naming patterns
 
-### Phase 3: Template Development
-1. Build agent-coderun template for CodeRun CRD creation
-2. Implement suspend-for-event templates
-3. Create task-completion template with cleanup logic
-4. Add comprehensive labeling and correlation system
+### Phase 3: PVC Logic Modification
+1. Use `read_file` to understand existing PVC creation functions
+2. Modify PVC naming logic to use agent-specific patterns
+3. Implement idempotent PVC creation with kube-rs
+4. Add proper error handling and recovery mechanisms
+5. Create integration tests for PVC management
 
-### Phase 4: Deployment and Validation
-1. Use `createResource` with dry-run to validate template syntax
-2. Deploy template to Argo namespace
-3. Use `listResources` to verify template registration
-4. Use `describeResource` to examine template details
+### Phase 4: Controller Integration
+1. Update reconciliation logic to use new PVC naming
+2. Modify pod creation to mount agent-specific workspaces
+3. Implement backward compatibility for existing workflows
+4. Add comprehensive logging and error handling
+5. Test controller integration end-to-end
 
-### Phase 5: Testing and Refinement
-1. Create test workflow instances to validate functionality
-2. Monitor workflow execution and suspend behavior
-3. Test parameter propagation and agent substitution
-4. Refine template based on testing results
+### Phase 5: Testing and Validation
+1. Create unit tests for all new functions
+2. Implement integration tests for controller behavior
+3. Test backward compatibility scenarios
+4. Validate performance impact measurements
+5. Document changes and update technical documentation
 
-## Workflow Template Design Patterns
+## Rust Development Patterns
 
-### Base Template Structure
-```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: play-workflow-template
-  namespace: argo
-spec:
-  activeDeadlineSeconds: 1209600  # 14 days
-  entrypoint: main
-  arguments:
-    parameters:
-    - name: implementation-agent
-      value: "5DLabs-Rex"
-    - name: quality-agent
-      value: "5DLabs-Cleo"
-    - name: testing-agent
-      value: "5DLabs-Tess"
-    - name: task-id
-      value: ""
-```
+### Agent Name Extraction Function
+```rust
+use regex::Regex;
 
-### DAG Task Dependencies
-```yaml
-- name: main
-  dag:
-    tasks:
-    - name: implementation-work
-      template: agent-coderun
-      arguments:
-        parameters:
-        - name: github-app
-          value: "{{workflow.parameters.implementation-agent}}"
+fn extract_agent_name(github_app: &str) -> Result<String, String> {
+    let re = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
     
-    - name: wait-pr-created
-      dependencies: [implementation-work]
-      template: suspend-for-event
+    if let Some(caps) = re.captures(github_app) {
+        let agent_name = caps.get(1).unwrap().as_str().to_lowercase();
+        
+        // Validate Kubernetes naming constraints
+        validate_k8s_name(&agent_name)?;
+        Ok(agent_name)
+    } else {
+        Err(format!("Cannot extract agent name from: {}", github_app))
+    }
+}
+
+fn validate_k8s_name(name: &str) -> Result<(), String> {
+    if name.len() > 63 {
+        return Err("Name exceeds Kubernetes limit".to_string());
+    }
     
-    - name: quality-work
-      dependencies: [wait-pr-created]
-      template: agent-coderun
-      arguments:
-        parameters:
-        - name: github-app
-          value: "{{workflow.parameters.quality-agent}}"
+    if !name.chars().all(|c| c.is_alphanumeric() || c == '-') {
+        return Err("Name contains invalid characters".to_string());
+    }
+    
+    Ok(())
+}
 ```
 
-### Agent CodeRun Template
-```yaml
-- name: agent-coderun
-  inputs:
-    parameters:
-    - name: github-app
-    - name: task-id
-    - name: stage
-  resource:
-    action: create
-    manifest: |
-      apiVersion: agents.platform/v1
-      kind: CodeRun
-      metadata:
-        generateName: coderun-{{inputs.parameters.stage}}-
-        labels:
-          task-id: "{{inputs.parameters.task-id}}"
-          github-app: "{{inputs.parameters.github-app}}"
-          workflow-name: "{{workflow.name}}"
-      spec:
-        github_app: "{{inputs.parameters.github-app}}"
-        service: "cto"
-        model: "claude-3-5-sonnet-20241022"
-        continue_session: true
+### PVC Creation with kube-rs
+```rust
+use kube::api::{Api, PostParams};
+use k8s_openapi::api::core::v1::PersistentVolumeClaim;
+
+async fn ensure_agent_pvc(
+    code_run: &CodeRun,
+    client: &kube::Client,
+) -> Result<String, kube::Error> {
+    let agent_name = extract_agent_name(&code_run.spec.github_app)
+        .map_err(|e| kube::Error::Api(ErrorResponse::default()))?;
+        
+    let pvc_name = format!(
+        "workspace-{}-{}",
+        code_run.spec.service,
+        agent_name
+    );
+    
+    let namespace = code_run.metadata.namespace.as_ref().unwrap();
+    let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
+    
+    match pvc_api.get(&pvc_name).await {
+        Ok(_) => Ok(pvc_name),
+        Err(kube::Error::Api(e)) if e.code == 404 => {
+            let pvc_spec = create_pvc_spec(&pvc_name, &code_run.spec.service, &agent_name);
+            pvc_api.create(&PostParams::default(), &pvc_spec).await?;
+            Ok(pvc_name)
+        }
+        Err(e) => Err(e),
+    }
+}
 ```
 
-### Suspend Point Implementation
-```yaml
-- name: suspend-for-event
-  inputs:
-    parameters:
-    - name: event-type
-  suspend: {}
-  metadata:
-    labels:
-      current-stage: "waiting-{{inputs.parameters.event-type}}"
-      task-id: "{{workflow.parameters.task-id}}"
-      workflow-type: play-orchestration
+### Controller Integration Pattern
+```rust
+// In reconcile function
+async fn reconcile(
+    code_run: Arc<CodeRun>,
+    ctx: Arc<Context>,
+) -> Result<Action, Error> {
+    let client = &ctx.client;
+    
+    // Extract agent name early
+    let agent_name = match extract_agent_name(&code_run.spec.github_app) {
+        Ok(name) => name,
+        Err(e) => {
+            error!("Failed to extract agent name: {}", e);
+            update_status_with_error(&code_run, &e, client).await?;
+            return Ok(Action::requeue(Duration::from_secs(60)));
+        }
+    };
+    
+    // Ensure agent-specific PVC exists
+    let pvc_name = ensure_agent_pvc(&code_run, client).await?;
+    
+    // Create pod with agent workspace
+    create_agent_pod(&code_run, &pvc_name, &agent_name, client).await?;
+    
+    Ok(Action::requeue(Duration::from_secs(30)))
+}
 ```
 
 ## Best Practices
 
-### Template Design Principles
-- Use parameterized configuration for all agent references
-- Implement proper task dependencies and execution order
-- Design indefinite suspend points for event-driven coordination
-- Include comprehensive labeling for workflow correlation
+### Code Development Principles
+- Read and understand existing code before making modifications
+- Implement incremental changes with comprehensive testing
+- Maintain backward compatibility during transition periods
+- Add proper error handling and logging throughout
 
-### YAML Configuration Standards
-- Follow Kubernetes YAML formatting conventions
-- Use consistent indentation (2 spaces) throughout
-- Include descriptive names and comments
-- Validate syntax with dry-run before deployment
+### Rust-Specific Patterns
+- Use Result types for proper error handling
+- Implement idempotent operations for Kubernetes resources
+- Follow Rust naming conventions and ownership patterns
+- Add comprehensive unit tests for all new functions
 
-### Parameter Management
-- Provide sensible default values for all parameters
-- Use descriptive parameter names and documentation
-- Ensure parameters propagate correctly to all templates
-- Validate parameter types and constraints
+### Controller Development Standards
+- Maintain reconciliation idempotency
+- Implement proper status updates and error reporting
+- Add structured logging for operational visibility
+- Consider performance impact of modifications
 
-### Event Correlation Design
-- Implement dynamic label management for stage tracking
-- Use consistent label naming conventions
-- Design precise label selectors for workflow targeting
-- Test correlation accuracy with various scenarios
+### Testing Strategy
+- Create unit tests for agent name extraction logic
+- Implement integration tests for PVC management
+- Test backward compatibility scenarios thoroughly
+- Validate performance impact with benchmarks
 
 ## Testing Strategy
 
-### Template Validation Testing
-1. **Syntax Validation**: Use `argo template create --dry-run`
-2. **Parameter Testing**: Validate with different agent combinations
-3. **DAG Structure**: Verify task dependencies and execution order
-4. **Resource Creation**: Test CodeRun CRD creation with various parameters
+### Unit Testing Approach
+1. **Agent Name Extraction**: Test all supported GitHub App patterns
+2. **Validation Logic**: Test Kubernetes naming constraint compliance
+3. **Error Handling**: Verify appropriate error messages and recovery
+4. **Edge Cases**: Test malformed inputs and boundary conditions
 
-### Functional Testing Patterns
-1. **Suspend/Resume**: Test indefinite suspend and manual resume
-2. **Parameter Propagation**: Verify data flows between workflow stages
-3. **Agent Integration**: Test template with Rex, Blaze, Cleo, and Tess
-4. **Label Management**: Validate workflow correlation and targeting
+### Integration Testing Pattern
+1. **PVC Creation**: Test with real Kubernetes cluster
+2. **Controller Flow**: Validate complete reconciliation process
+3. **Multi-Agent Scenarios**: Test concurrent agent operations
+4. **Migration Testing**: Validate backward compatibility
 
-### Integration Testing Approach
-1. **End-to-End Flow**: Complete workflow execution from start to finish
-2. **Event Coordination**: Test with actual GitHub webhook triggers
-3. **Concurrent Workflows**: Multiple task workflows running simultaneously
-4. **Error Scenarios**: Agent failures, timeout conditions, and recovery
+### Performance Testing Requirements
+1. **Extraction Speed**: Benchmark agent name extraction performance
+2. **Memory Usage**: Monitor controller memory consumption
+3. **Reconciliation Impact**: Measure reconciliation timing changes
+4. **Concurrent Operations**: Test with multiple simultaneous requests
 
 ## Common Patterns
 
-### Multi-Agent Workflow Pattern
-1. Start with parameterized template foundation
-2. Design sequential DAG with proper dependencies  
-3. Implement suspend points for event coordination
-4. Add comprehensive labeling for correlation
-5. Include cleanup and progression logic
+### Controller Modification Pattern
+1. Analyze existing code structure and patterns
+2. Implement new functionality with proper error handling
+3. Integrate with existing reconciliation logic
+4. Add comprehensive testing and validation
+5. Document changes and update technical specifications
 
-### Suspend/Resume Pattern
-1. Create suspend template with indefinite duration
-2. Add correlation labels for event targeting
-3. Design parameter passing for resume data
-4. Test manual resume and event-driven resume
-
-### Parameter Propagation Pattern
-1. Define workflow-level parameters with defaults
-2. Pass parameters through all template calls
-3. Use parameter substitution in resource manifests
-4. Validate parameter flow with test workflows
+### Error Handling Pattern
+1. Use Result types for all potentially failing operations
+2. Provide specific error messages for troubleshooting
+3. Implement graceful fallback mechanisms where appropriate
+4. Add structured logging for operational visibility
 
 ## Troubleshooting
 
-### Template Deployment Issues
-- Verify YAML syntax and Kubernetes API versions
-- Check namespace permissions and RBAC configuration
-- Validate template references and dependencies
-- Use dry-run testing for early validation
+### Development Issues
+- Use `rustdocs_query_rust_docs` for API documentation questions
+- Search existing codebase for similar patterns and implementations
+- Test changes incrementally to isolate issues
+- Use unit tests to validate individual function behavior
 
-### DAG Structure Problems
-- Verify task dependencies are correctly specified
-- Check template references resolve properly
-- Validate parameter passing between tasks
-- Test execution order with simple workflows
+### Integration Problems
+- Verify Kubernetes API permissions for PVC operations
+- Check namespace and resource naming constraints
+- Validate controller RBAC permissions
+- Test with actual Kubernetes cluster for integration validation
 
-### Parameter Issues
-- Verify parameter defaults and types are correct
-- Check parameter substitution syntax
-- Test with various parameter combinations
-- Validate parameter propagation to child resources
-
-### Suspend/Resume Problems
-- Verify suspend templates have proper correlation labels
-- Check workflow targeting with label selectors
-- Test manual resume functionality first
-- Validate event correlation logic
+### Performance Concerns
+- Benchmark critical paths before and after modifications
+- Monitor memory usage during extended operations
+- Test concurrent operations to identify bottlenecks
+- Profile code execution for optimization opportunities
 
 ## Notes
 
-This task focuses on Argo Workflows template design with emphasis on:
-- Multi-agent coordination through DAG structure
-- Parameterized configuration for flexible agent selection
-- Event-driven workflow control through suspend/resume
-- Comprehensive labeling for workflow correlation
-- Extended runtime support for realistic development cycles
+This task focuses on Rust controller development with emphasis on:
+- Agent-specific workspace isolation through PVC naming
+- Robust parsing and validation of GitHub App identifiers
+- Idempotent Kubernetes resource management
+- Backward compatibility and migration support
+- Comprehensive testing and performance validation
 
-The tool selection enables comprehensive workflow design while maintaining operational visibility and validation capabilities throughout the development process.
+The tool selection enables comprehensive Rust development while maintaining access to documentation and research capabilities essential for controller modification.
