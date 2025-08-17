@@ -22,14 +22,14 @@ env:
 jobs:
   # Version determination
   version:
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     outputs:
       version: ${{ steps.version.outputs.version }}
       short-sha: ${{ steps.version.outputs.short-sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Set version from tag
         id: version
@@ -50,7 +50,7 @@ jobs:
   # Build only controller (skip Claude Code for now)
   build-controller:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     # No container needed - the Arc runners now have the rust-builder image!
     permissions:
       contents: read
@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Setup optimized Rust environment
         run: |
@@ -229,14 +229,14 @@ jobs:
 
   build-sidecar:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Build sidecar binary
         working-directory: ./sidecar
@@ -294,7 +294,7 @@ jobs:
   # Deploy immediately
   deploy:
     needs: [version, build-controller]
-    runs-on: ubuntu-latest
+    runs-on: [k8s-runner]
     steps:
       - uses: actions/checkout@v4
         with:
