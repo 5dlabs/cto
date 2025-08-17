@@ -19,8 +19,8 @@
 **✅ SUPPORTED Operations:**
 - `operation: create` (k8s resources)
 - `operation: submit` (Argo Workflows)
-- `operation: resume` (Argo Workflows)
-- `dest: metadata.name` (dynamic targeting)
+- `operation: resume` (Argo Workflows via args: `[workflow-name]`)
+- `dest: metadata.name` (for submit paths; for resume prefer args)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 

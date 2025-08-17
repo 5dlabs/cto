@@ -420,16 +420,20 @@ spec:
       name: resume-workflow-on-event
       argoWorkflow:
         operation: resume
-        source:
-          resource:
-            apiVersion: argoproj.io/v1alpha1
-            kind: Workflow
-            # Correlation via task labels from webhook payload
+        args: []
         parameters:
         - src:
-            dependencyName: github-pr-created
-            dataKey: body.pull_request.labels[?(@.name | startswith('task-'))].name
-          dest: spec.arguments.parameters.taskId
+            # Derive task ID from PR branch name and construct deterministic workflow name
+            dataTemplate: |
+              {{ $ref := .Input.body.pull_request.head.ref }}
+              {{ if hasPrefix $ref "task-" }}
+                {{ $branch := trimPrefix "task-" $ref }}
+                {{ $parts := splitList "-" $branch }}
+                play-task-{{ index $parts 0 }}-workflow
+              {{ else }}
+                play-task-unknown-workflow
+              {{ end }}
+          dest: args.0
 ```
 
 ### Event Correlation Strategy
