@@ -38,6 +38,7 @@ impl AgentClassifier {
     ///
     /// # Examples
     /// ```
+    /// use controller::tasks::code::agent::AgentClassifier;
     /// let classifier = AgentClassifier::new();
     /// assert_eq!(classifier.extract_agent_name("5DLabs-Rex").unwrap(), "rex");
     /// assert_eq!(classifier.extract_agent_name("5DLabs-Cleo[bot]").unwrap(), "cleo");
@@ -98,13 +99,16 @@ impl AgentClassifier {
         if pvc_name.len() > 63 {
             // Truncate while preserving agent suffix if present
             if self.requires_isolated_workspace(&agent_name) {
-                let prefix_max_len = 63 - agent_name.len() - 1; // -1 for hyphen
-                let truncated_prefix = if service.len() > prefix_max_len {
-                    &service[..prefix_max_len]
+                let workspace_prefix = "workspace-";
+                let max_total_len: usize = 63;
+                let suffix_len = agent_name.len() + 1; // hyphen before agent
+                let service_max_len = max_total_len.saturating_sub(workspace_prefix.len() + suffix_len);
+                let truncated_service = if service.len() > service_max_len {
+                    &service[..service_max_len]
                 } else {
                     service
                 };
-                Ok(format!("{}-{}", truncated_prefix, agent_name))
+                Ok(format!("{}{}-{}", workspace_prefix, truncated_service, agent_name))
             } else {
                 Ok(pvc_name[..63].to_string())
             }
@@ -302,6 +306,7 @@ mod tests {
             .get_pvc_name(long_service, "5DLabs-Cleo")
             .unwrap();
         assert!(result.len() <= 63);
+        assert!(result.starts_with("workspace-"));
         assert!(result.ends_with("-cleo"));
 
         // Shared workspace should just truncate
