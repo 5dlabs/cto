@@ -44,9 +44,10 @@
 - [ ] Proper correlation labels for event targeting
 - [ ] Resume capability preserves workflow state and parameters
 
-### 6. Workflow Label Management
+### 6. Workflow Label & Naming Management
 - [ ] Workflow-level labels: `workflow-type=play-orchestration`
 - [ ] Dynamic `task-id` label from workflow parameter
+- [ ] Deterministic instance name: `name: play-task-{{workflow.parameters.task-id}}-workflow`
 - [ ] `current-stage` label updates at each workflow phase
 - [ ] Repository label for multi-repo support
 - [ ] Labels propagate to child resources (CodeRuns, PVCs)
