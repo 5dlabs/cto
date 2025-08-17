@@ -441,19 +441,6 @@
         "subtasks": []
       },
       {
-        "id": 15,
-        "title": "Create Workflow Monitoring Dashboard",
-        "description": "Develop Grafana dashboard to monitor multi-agent workflow progress, agent performance, and system health",
-        "details": "Create Grafana dashboard using existing telemetry stack (Victoria Metrics). Track metrics: workflow duration by stage, agent success rates, suspension wait times, task completion rates. Use PromQL queries against Argo Workflows metrics. Add alerts for stuck workflows (>24h at same stage). Visualize agent-specific performance (Rex vs Blaze comparison). Include GitHub webhook processing metrics. Reference existing infra/telemetry/telemetry-dashboards/.",
-        "testStrategy": "Verify metrics collected from all workflow stages. Test dashboard updates in real-time. Validate alerts trigger correctly. Load test with multiple concurrent workflows. Check dashboard performance with historical data.",
-        "priority": "low",
-        "dependencies": [
-          3
-        ],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
         "id": 16,
         "title": "Implement Controller Template Loading",
         "description": "Update Rust controller to select agent-specific container scripts based on github_app field for different workflow types",
@@ -703,9 +690,7 @@
         "details": "Set resource requests/limits for agent pods (CPU: 2-4 cores, Memory: 8-16Gi based on model). Configure PVC size limits per agent (start with 10Gi). Implement workflow-level resource quotas. Setup HPA for controller deployment. Configure pod priority classes for critical workflows. Implement resource monitoring and alerting. Consider using Kubernetes VPA for right-sizing.",
         "testStrategy": "Test agents run within resource limits. Verify OOM handling and recovery. Test autoscaling under load. Validate quota enforcement. Monitor resource utilization patterns. Test priority scheduling under contention.",
         "priority": "low",
-        "dependencies": [
-          15
-        ],
+        "dependencies": [],
         "status": "pending",
         "subtasks": []
       },
@@ -787,7 +772,6 @@
         "status": "pending",
         "dependencies": [
           3,
-          15,
           22,
           23
         ],
