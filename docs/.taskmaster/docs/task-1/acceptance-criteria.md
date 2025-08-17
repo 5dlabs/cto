@@ -18,28 +18,31 @@ This document defines the acceptance criteria for implementing Helm values and A
 - [ ] Managed and installed by Argo CD (not local Helm)
 
 ### 2. Values Configuration ✓
-- [ ] Add four new agents to `infra/charts/controller/values.yaml` under `.Values.agents`
-- [ ] Each new agent entry has:
-  - [ ] `name`: Friendly name (Cleo, Tess, Stitch, Onyx)
-  - [ ] `githubApp`: GitHub App name (5DLabs-Clippy, 5DLabs-QA, 5DLabs-Triage, 5DLabs-Security)
+- [ ] Add three new agents to `infra/charts/controller/values.yaml` under `.Values.agents` (Cleo, Tess, Stitch). Reuse existing Cipher for Security.
+- [ ] Each agent entry has:
+  - [ ] `name`: Friendly persona name (Rex, Cleo, Tess, Stitch, Onyx)
+  - [ ] `githubApp`: Exact GitHub App name using convention "Persona (5DLabs)" (e.g., `Rex (5DLabs)`, `Cleo (5DLabs)`)
   - [ ] `role`: Description of their specialty
   - [ ] `systemPrompt`: Robust technical prompt (inline in values, using Anthropic format)
-- [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey`
+- [ ] ExternalSecrets for new agents exist and corresponding Kubernetes Secrets are synced with `appId` and `privateKey` (reuse existing `Cipher (5DLabs)` for Security)
 
-### 2.1. GitHub App Creation (Organization Level) ✓
-- [ ] **CRITICAL**: Create org-level GitHub Apps in the 5DLabs GitHub organization
-- [ ] Four new GitHub Apps must be created and visible in GitHub organization settings:
-  - [ ] `5DLabs-Clippy` - Code quality and formatting specialist
-  - [ ] `5DLabs-QA` - Quality assurance and testing specialist  
-  - [ ] `5DLabs-Triage` - CI/CD failure remediation specialist
-  - [ ] `5DLabs-Security` - Security vulnerability remediation specialist
-- [ ] Each GitHub App must have:
+### 2.1. GitHub App Validation (Pre-existing) ✓
+- [ ] **PREREQUISITE**: Verify org-level GitHub Apps exist in the 5DLabs GitHub organization using the naming convention "Persona (5DLabs)"
+- [ ] Required GitHub Apps visible in organization settings:
+  - [ ] `Rex (5DLabs)` - Senior Backend Architecture Agent
+  - [ ] `Blaze (5DLabs)` - Performance Optimization Agent
+  - [ ] `Morgan (5DLabs)` - Documentation/PM Agent (docs)
+  - [ ] `Cipher (5DLabs)` - Security
+  - [ ] `Cleo (5DLabs)` - Code quality and formatting specialist (new)
+  - [ ] `Tess (5DLabs)` - Quality assurance and testing specialist (new)  
+  - [ ] `Stitch (5DLabs)` - CI/CD failure remediation specialist (new)
+- [ ] Each GitHub App must have (pre-configured):
   - [ ] Proper permissions for repository access (Contents: Read/Write, Pull Requests: Read/Write, Issues: Read/Write)
   - [ ] Organization-level installation (not user-level)
-  - [ ] Generated App ID and private key stored in external secret store
+  - [ ] Generated App ID and private key available for external secret store
 - [ ] **VALIDATION**: Apps must be visible at `https://github.com/organizations/5dlabs/settings/apps`
 - [ ] **VALIDATION**: Each app must be installed on the organization with appropriate repository access
-- [ ] **CRITICAL**: GitHub Apps must be ACTUALLY CREATED during task execution, not left as "next steps"
+- [ ] **TASK SCOPE**: Focus on ExternalSecrets configuration and Helm integration, not app creation
 
 ### 3. Schema Validation ✓
 - [ ] `values.schema.json` exists and validates structure

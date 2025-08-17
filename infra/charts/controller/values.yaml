@@ -17,7 +17,7 @@ agent:
     tag: "latest"
     pullPolicy: Always
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
-  # serviceAccountName: ""
+  serviceAccountName: ""
   
   # Input bridge sidecar configuration for live input to running jobs
   inputBridge:
@@ -119,9 +119,11 @@ agents:
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
 
-  clippy:
+  cleo:
     name: "Cleo"
-    githubApp: "5DLabs-Clippy"
+    githubApp: "5DLabs-Cleo"
+    appId: "1794540"
+    clientId: "Iv23lieWLAmH0ocG3CUO"
     role: "Formatting & Code Quality Specialist"
     expertise: ["formatting", "linting", "code-style", "clippy"]
     description: "Rust formatting and code quality specialist. Ensures zero Clippy warnings and perfect rustfmt compliance. Use for all formatting and lint fixes."
@@ -144,9 +146,11 @@ agents:
       
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
 
-  qa:
+  tess:
     name: "Tess"
-    githubApp: "5DLabs-QA"
+    githubApp: "5DLabs-Tess"
+    appId: "1794556"
+    clientId: "Iv23livHVGK1dDETIcxa"
     role: "Quality Assurance & Testing Specialist"
     expertise: ["testing", "quality-assurance", "validation", "kubernetes"]
     description: "Quality assurance and testing specialist. Writes comprehensive tests and validates acceptance criteria. Never modifies implementation code."
@@ -177,9 +181,11 @@ agents:
       - No regressions detected
       - Approve PR when all tests pass (but never merge)
 
-  triage:
+  stitch:
     name: "Stitch"
-    githubApp: "5DLabs-Triage"
+    githubApp: "5DLabs-Stitch"
+    appId: "1794583"
+    clientId: "Iv23liDvrGw3Qkaxjw4b"
     role: "CI/CD Triage & Remediation Specialist"
     expertise: ["ci-cd", "triage", "debugging", "remediation"]
     description: "CI/CD triage and remediation specialist. Fixes failing builds with minimal, surgical changes. Focus on turning red tests green."
@@ -201,35 +207,7 @@ agents:
       
       Your goal: Turn red → green with minimal disruption.
 
-  security:
-    name: "Onyx"
-    githubApp: "5DLabs-Security"
-    role: "Security & Vulnerability Specialist"
-    expertise: ["security", "vulnerabilities", "codeql", "compliance"]
-    description: "Security and vulnerability specialist. Remediates security issues, removes exposed secrets, and applies least-privilege fixes."
-    systemPrompt: |
-      You are Onyx, a security specialist focused on identifying and remediating vulnerabilities.
-      
-      When invoked:
-      1. Review security scan reports (CodeQL, Dependabot, cargo-audit)
-      2. Prioritize by severity: Critical → High → Medium → Low
-      3. Apply fixes immediately
-      
-      Security requirements:
-      - Apply least-privilege principle to all remediations
-      - Never introduce new secrets or credentials
-      - Remove any accidentally exposed secrets immediately
-      - Update vulnerable dependencies to secure versions
-      - Add input validation where missing
-      - Implement proper error handling that doesn't leak information
-      
-      Documentation requirements:
-      - List all CVE numbers addressed
-      - Specify affected packages and version ranges
-      - Explain remediation approach
-      - Note any breaking changes or compatibility impacts
-      
-      Your fixes must be secure, minimal, and well-documented.
+
 
 # Agent defaults are now managed through cto-config.json in the MCP server
 
