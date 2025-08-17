@@ -77,12 +77,15 @@ RUN --mount=type=cache,target=/tmp/downloads \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/
 
-# Install Helm (with caching)
+# Install Helm (with caching) - direct binary download for reliability
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
-    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
-    chmod 700 get_helm.sh && \
-    ./get_helm.sh
+    HELM_VERSION="v3.16.1" && \
+    curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
+    tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
+    mv linux-amd64/helm /usr/local/bin/helm && \
+    chmod +x /usr/local/bin/helm && \
+    helm version --client
 
 # Install GitHub CLI (separate layer for better caching)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
