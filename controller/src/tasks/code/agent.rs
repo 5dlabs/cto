@@ -102,13 +102,17 @@ impl AgentClassifier {
                 let workspace_prefix = "workspace-";
                 let max_total_len: usize = 63;
                 let suffix_len = agent_name.len() + 1; // hyphen before agent
-                let service_max_len = max_total_len.saturating_sub(workspace_prefix.len() + suffix_len);
+                let service_max_len =
+                    max_total_len.saturating_sub(workspace_prefix.len() + suffix_len);
                 let truncated_service = if service.len() > service_max_len {
                     &service[..service_max_len]
                 } else {
                     service
                 };
-                Ok(format!("{}{}-{}", workspace_prefix, truncated_service, agent_name))
+                Ok(format!(
+                    "{}{}-{}",
+                    workspace_prefix, truncated_service, agent_name
+                ))
             } else {
                 Ok(pvc_name[..63].to_string())
             }
