@@ -20,11 +20,11 @@ spec:
           - path: body.action
             type: string
             value: ["opened"]
-          # Ensure PR has task label (check array length is greater than 0)
-          - path: body.pull_request.labels.#
-            type: number
-            comparator: ">"
-            value: "0"
+          # Ensure PR has task labels (non-empty array)
+          - path: body.pull_request.labels
+            type: array
+            comparator: "!="
+            value: []
   triggers:
     - template:
         name: resume-after-implementation
@@ -61,7 +61,6 @@ spec:
           labelSelector:
             matchLabels:
               workflow-type: play-orchestration
-              task-id: "{{.Input.parameters.taskId}}"
               current-stage: waiting-pr-created
       retryStrategy:
         steps: 3

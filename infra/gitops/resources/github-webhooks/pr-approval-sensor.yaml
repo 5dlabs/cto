@@ -74,7 +74,6 @@ spec:
           labelSelector:
             matchLabels:
               workflow-type: play-orchestration
-              task-id: "{{.Input.parameters.taskId}}"
               current-stage: waiting-pr-approved
       retryStrategy:
         steps: 3

@@ -73,12 +73,8 @@ spec:
                   {{ end }}
               dest: pushingAgent
           # Delete CodeRuns for quality/testing agents working on this task
-          # Only if taskId is not 0 (meaning branch matched pattern)
           labelSelector:
             matchExpressions:
-              - key: task-id
-                operator: In
-                values: ["{{.Input.parameters.taskId}}"]
               - key: github-app
                 operator: NotIn
                 values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]  # Exclude all implementation agents
