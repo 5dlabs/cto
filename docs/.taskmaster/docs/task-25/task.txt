@@ -1,0 +1,11 @@
+# Task ID: 25
+# Title: Production Deployment Pipeline
+# Status: pending
+# Dependencies: 24
+# Priority: medium
+# Description: Create GitOps deployment pipeline for rolling out multi-agent workflow system to production
+# Details:
+Setup ArgoCD applications for all components (controller, Argo Workflows, Argo Events). Implement progressive rollout strategy with canary deployments. Create rollback procedures with version pinning. Configure production-specific parameters (timeouts, retries, resources). Implement feature flags for gradual enablement. Setup production monitoring and alerting. Use Flux or ArgoCD for GitOps automation.
+
+# Test Strategy:
+Test deployment in staging environment. Verify rollback procedures work correctly. Test canary deployment with traffic splitting. Validate monitoring in production. Test feature flag toggles. Perform load testing before production rollout.

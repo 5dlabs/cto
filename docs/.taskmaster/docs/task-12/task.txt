@@ -1,0 +1,11 @@
+# Task ID: 12
+# Title: Create MCP Documentation Server Integration
+# Status: pending
+# Dependencies: 6
+# Priority: low
+# Description: Setup MCP documentation server and configure Rex/Blaze container scripts to query documentation before implementation
+# Details:
+Deploy rustdocs-mcp server (existing in infra/charts/rustdocs-mcp/). Configure container-rex.sh.hbs and container-blaze.sh.hbs templates to include rustdocs_query_rust_docs tool in their environments. Implement documentation-first workflow specifically in Rex/Blaze container scripts that queries MCP documentation server before any implementation. Add documentation-first instructions to container scripts. Setup service discovery for MCP server endpoints. Configure authentication if required. Implement retry logic for documentation queries. Note: Cleo and Tess agents don't require documentation queries as they focus on code quality and testing respectively.
+
+# Test Strategy:
+Verify MCP server accessible from Rex/Blaze agent containers. Test documentation queries return relevant results through container script execution. Validate Rex/Blaze use documentation in implementation workflow. Monitor query performance and success rates. Verify Cleo/Tess containers operate without documentation dependencies.

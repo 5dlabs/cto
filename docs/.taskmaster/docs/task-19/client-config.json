@@ -1,0 +1,72 @@
+{
+  "remoteTools": [
+    {
+      "name": "github-cli",
+      "description": "GitHub CLI for PR and review management",
+      "capabilities": ["pr", "review", "repo", "api", "auth"]
+    },
+    {
+      "name": "argo-cli", 
+      "description": "Argo Workflows CLI for workflow management",
+      "capabilities": ["submit", "get", "logs", "resume", "suspend"]
+    },
+    {
+      "name": "kubectl",
+      "description": "Kubernetes CLI for cluster operations",
+      "capabilities": ["apply", "get", "describe", "logs", "patch"]
+    },
+    {
+      "name": "curl",
+      "description": "HTTP client for GitHub API operations",
+      "capabilities": ["get", "post", "put", "delete", "headers"]
+    },
+    {
+      "name": "jq",
+      "description": "JSON processor for API response handling",
+      "capabilities": ["parse", "filter", "transform", "query"]
+    },
+    {
+      "name": "rust-analyzer",
+      "description": "Rust language server for approval engine development", 
+      "capabilities": ["syntax-check", "type-check", "completion"]
+    },
+    {
+      "name": "cargo",
+      "description": "Rust build tool for testing and development",
+      "capabilities": ["build", "test", "check", "run"]
+    }
+  ],
+  "localServers": {
+    "approval-engine-dev": {
+      "command": "cargo",
+      "args": ["watch", "-x", "check", "-x", "test"],
+      "cwd": "controller/",
+      "env": {
+        "RUST_LOG": "debug",
+        "GITHUB_TOKEN": "dev-token"
+      }
+    },
+    "github-webhook-simulator": {
+      "command": "python3",
+      "args": ["-m", "http.server", "8080"],
+      "cwd": "./test-fixtures/github-webhooks",
+      "env": {}
+    },
+    "argo-events-dev": {
+      "command": "kubectl",
+      "args": ["port-forward", "svc/eventbus-default-stan-svc", "4222:4222"],
+      "cwd": "./",
+      "env": {
+        "KUBECONFIG": "./dev-kubeconfig"
+      }
+    },
+    "workflow-monitor": {
+      "command": "watch",
+      "args": ["-n", "2", "kubectl", "get", "workflows", "-n", "taskmaster"],
+      "cwd": "./",
+      "env": {
+        "KUBECONFIG": "./dev-kubeconfig"
+      }
+    }
+  }
+}

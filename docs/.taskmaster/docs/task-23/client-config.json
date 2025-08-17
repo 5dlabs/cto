@@ -1,0 +1,41 @@
+{
+  "remoteTools": [
+    "kubernetes_listResources",
+    "kubernetes_describeResource",
+    "kubernetes_createResource",
+    "kubernetes_updateResource",
+    "kubernetes_deleteResource",
+    "kubernetes_listPods",
+    "kubernetes_getPodLogs",
+    "brave-search_brave_web_search",
+    "memory_create_entities",
+    "memory_query_entities"
+  ],
+  "localServers": {
+    "minio-client": {
+      "command": "python3",
+      "args": ["./tools/minio-manager.py"],
+      "env": {
+        "MINIO_ENDPOINT": "${MINIO_ENDPOINT}",
+        "MINIO_ACCESS_KEY": "${MINIO_ACCESS_KEY}",
+        "MINIO_SECRET_KEY": "${MINIO_SECRET_KEY}"
+      }
+    },
+    "archive-manager": {
+      "command": "python3",
+      "args": ["./tools/archive-manager.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "POSTGRES_URL": "${POSTGRES_URL}"
+      }
+    },
+    "retention-policy": {
+      "command": "python3",
+      "args": ["./tools/retention-policy-engine.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "POLICY_CONFIG_PATH": "./config/retention-policies.yaml"
+      }
+    }
+  }
+}

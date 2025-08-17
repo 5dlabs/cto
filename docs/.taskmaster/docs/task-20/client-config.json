@@ -1,0 +1,74 @@
+{
+  "remoteTools": [
+    {
+      "name": "rust-analyzer",
+      "description": "Rust language server for failure handling development",
+      "capabilities": ["syntax-check", "type-check", "completion", "refactor"]
+    },
+    {
+      "name": "cargo",
+      "description": "Rust build tool for testing and development", 
+      "capabilities": ["build", "test", "check", "bench", "clippy"]
+    },
+    {
+      "name": "kubectl",
+      "description": "Kubernetes CLI for workflow and cluster operations",
+      "capabilities": ["apply", "get", "describe", "logs", "port-forward"]
+    },
+    {
+      "name": "argo-cli",
+      "description": "Argo Workflows CLI for workflow management",
+      "capabilities": ["submit", "get", "logs", "retry", "suspend", "resume"]
+    },
+    {
+      "name": "prometheus-client",
+      "description": "Prometheus metrics client for monitoring",
+      "capabilities": ["query", "metrics", "alerts", "rules"]
+    },
+    {
+      "name": "chaos-engineering",
+      "description": "Chaos engineering tools for failure testing",
+      "capabilities": ["litmus", "chaos-monkey", "network-partition", "pod-kill"]
+    },
+    {
+      "name": "notification-testers",
+      "description": "Tools for testing notification systems",
+      "capabilities": ["slack-test", "email-test", "webhook-test", "pagerduty-test"]
+    }
+  ],
+  "localServers": {
+    "failure-handler-dev": {
+      "command": "cargo",
+      "args": ["watch", "-x", "check", "-x", "test failure::"],
+      "cwd": "controller/",
+      "env": {
+        "RUST_LOG": "debug,failure=trace",
+        "RETRY_CONFIG_PATH": "./dev-retry-config.toml"
+      }
+    },
+    "chaos-testing": {
+      "command": "python3",
+      "args": ["chaos_testing_server.py", "--port", "8080"],
+      "cwd": "./testing/chaos",
+      "env": {
+        "KUBECONFIG": "./dev-kubeconfig",
+        "CHAOS_DURATION": "300s"
+      }
+    },
+    "notification-mock": {
+      "command": "node",
+      "args": ["mock-notification-server.js"],
+      "cwd": "./testing/mocks",
+      "env": {
+        "PORT": "3000",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "metrics-collector": {
+      "command": "prometheus",
+      "args": ["--config.file=prometheus-dev.yml", "--web.listen-address=:9090"],
+      "cwd": "./monitoring",
+      "env": {}
+    }
+  }
+}

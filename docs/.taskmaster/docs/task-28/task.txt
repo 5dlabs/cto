@@ -1,0 +1,107 @@
+# Task ID: 28
+# Title: Implement comprehensive monitoring and alerting for long-running multi-agent workflows
+# Status: pending
+# Dependencies: 3, 15, 22, 23
+# Priority: medium
+# Description: Build a robust monitoring system for multi-agent workflows that run over extended periods (days/weeks), including health checks, stuck workflow detection, resource tracking, and automated cleanup strategies for completed workflows.
+# Details:
+Develop a comprehensive monitoring solution addressing operational concerns for long-running multi-agent workflows:
+
+1. **Health Check System**:
+   - Implement Kubernetes liveness/readiness probes for agent pods with custom health endpoints
+   - Create workflow heartbeat mechanism using Argo Workflows metrics (workflow.status.progress)
+   - Deploy synthetic health check workflows every 6 hours to verify system functionality
+   - Implement dead letter queue pattern for failed health checks
+   - Use Prometheus BlackBox exporter for external endpoint monitoring
+
+2. **Stuck Workflow Detection**:
+   - Configure Prometheus alerts for workflows stuck at same stage >6 hours (customizable per stage)
+   - Implement workflow age monitoring with graduated thresholds (warning at 7 days, critical at 10 days)
+   - Create AlertManager rules with PagerDuty/Slack integration for critical stuck workflows
+   - Build automatic workflow annotation with stuck reason analysis using controller logs
+   - Implement workflow recovery suggestions based on stuck patterns
+
+3. **Resource Consumption Tracking**:
+   - Deploy Kubernetes Metrics Server and collect pod-level metrics (CPU, memory, disk I/O)
+   - Implement PVC usage monitoring with alerts at 80% capacity
+   - Track GitHub API rate limits per agent using custom metrics
+   - Monitor network egress for cost optimization
+   - Create resource usage forecasting using historical data
+   - Implement cost allocation tags for multi-tenant scenarios
+
+4. **Automated Cleanup Strategies**:
+   - Configure graduated cleanup policies: active (no cleanup), completed (7 days), failed (3 days), stuck (14 days)
+   - Implement workflow archival to S3/MinIO before deletion with compression
+   - Create cleanup exemption mechanism via workflow annotations
+   - Build PVC cleanup for orphaned volumes using CronJob
+   - Implement log aggregation to centralized storage before pod deletion
+   - Create compliance-aware retention policies (30 days minimum for audit)
+
+5. **Monitoring Infrastructure**:
+   - Extend existing Grafana dashboards with long-running workflow panels
+   - Create SLO/SLI definitions: 99% workflow completion rate, <1% stuck rate
+   - Implement distributed tracing using OpenTelemetry for cross-agent correlation
+   - Build workflow timeline visualization showing all stage transitions
+   - Create agent performance comparison dashboard (Rex vs Cleo vs Tess)
+
+6. **Alerting Configuration**:
+   - Define alert severity levels: P1 (workflow stuck >24h), P2 (resource exhaustion), P3 (health check failures)
+   - Implement alert suppression during maintenance windows
+   - Create runbook automation for common issues (restart stuck workflow, cleanup PVC)
+   - Build alert correlation to reduce noise from cascading failures
+
+7. **Operational Tools**:
+   - Create kubectl plugin for workflow diagnostics: 'kubectl workflow-health'
+   - Implement workflow pause/resume CLI for maintenance
+   - Build bulk workflow operations API (pause all, cleanup completed)
+   - Create workflow migration tool for controller upgrades
+
+# Test Strategy:
+Comprehensive testing approach for monitoring and alerting system:
+
+1. **Health Check Validation**:
+   - Deploy test workflow and verify health checks report correctly
+   - Simulate agent pod crashes and confirm detection within 5 minutes
+   - Test synthetic workflow execution and metric collection
+   - Validate health check endpoints return proper HTTP status codes
+
+2. **Stuck Workflow Testing**:
+   - Create workflow with artificial suspension >6 hours
+   - Verify Prometheus alert fires with correct labels
+   - Test AlertManager routing to appropriate channels
+   - Validate stuck reason analysis captures root cause
+   - Test recovery suggestions for common stuck patterns
+
+3. **Resource Monitoring Verification**:
+   - Run resource-intensive workflow and verify metrics collection
+   - Test PVC usage alerts at 80% threshold
+   - Validate GitHub API rate limit tracking
+   - Verify resource forecasting with historical data
+   - Test cost allocation tag propagation
+
+4. **Cleanup Strategy Testing**:
+   - Create workflows in various states (completed, failed, stuck)
+   - Verify cleanup occurs at configured intervals
+   - Test archival to S3/MinIO with retrieval
+   - Validate cleanup exemption via annotations
+   - Test PVC orphan detection and cleanup
+   - Verify compliance retention policies enforced
+
+5. **Load Testing**:
+   - Run 100+ concurrent workflows for 72 hours
+   - Monitor system stability and resource consumption
+   - Verify no metric collection gaps
+   - Test alert storm suppression
+   - Validate dashboard performance with high cardinality
+
+6. **Failure Scenario Testing**:
+   - Simulate Prometheus outage and verify fallback monitoring
+   - Test AlertManager failure and backup notification paths
+   - Validate monitoring resilience during controller restarts
+   - Test recovery from S3/MinIO unavailability
+
+7. **Integration Testing**:
+   - Verify end-to-end alert flow from detection to notification
+   - Test runbook automation for common scenarios
+   - Validate distributed tracing across multiple agents
+   - Test bulk operations under various workflow states

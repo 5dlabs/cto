@@ -1,0 +1,11 @@
+# Task ID: 5
+# Title: Create GitHub Webhook Correlation Logic
+# Status: pending
+# Dependencies: 2, 3
+# Priority: high
+# Description: Implement Argo Events Sensor logic to extract task IDs from webhook payloads and correlate with suspended workflows using label selectors
+# Details:
+Create Sensor with webhook event processing using JQ expressions: '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'. Implement correlation logic using labelSelector: 'workflow-type=play-orchestration,task-id={{extracted-task-id}},current-stage={{target-stage}}'. Handle multiple event types: pull_request (opened/labeled), pull_request_review (submitted). Use Argo Events v1.9+ parameterization features for dynamic targeting. Implement fallback to branch name parsing if labels missing.
+
+# Test Strategy:
+Test JQ extraction with sample webhook payloads. Verify correlation finds correct suspended workflow. Test with multiple concurrent workflows. Validate edge cases: missing labels, malformed task IDs, duplicate labels.

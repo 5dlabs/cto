@@ -1,0 +1,102 @@
+# Task ID: 29
+# Title: Create agent-specific container scripts implementing distinct workflows for each agent type
+# Status: pending
+# Dependencies: 6, 4, 12
+# Priority: high
+# Description: Develop three specialized container scripts (container-rex.sh.hbs, container-cleo.sh.hbs, container-tess.sh.hbs) that implement distinct workflows tailored to each agent's responsibilities while maintaining compatibility with the existing CRD structure
+# Details:
+Implement three agent-specific container scripts in infra/charts/controller/claude-templates/:
+
+**1. container-rex.sh.hbs (Documentation-Driven Implementation)**
+- Query MCP documentation server before implementation using rustdocs_query_rust_docs
+- Pull relevant documentation into context (API docs, architecture guides, existing patterns)
+- Implement documentation-first approach with inline comments referencing source docs
+- Create implementation plan based on documented patterns
+- Generate comprehensive inline documentation for new code
+- Use git commands to stage changes with descriptive commit messages
+- Include documentation validation step to ensure code matches documented behavior
+
+**2. container-cleo.sh.hbs (Code Quality and Formatting Workflow)**
+- Run cargo fmt with --check first to identify formatting issues
+- Apply cargo fmt to auto-fix formatting problems
+- Execute cargo clippy with strict warning levels (deny warnings)
+- Generate clippy fix suggestions and apply them automatically
+- Run additional linters (if configured): rustfmt, prettier for configs
+- Perform import organization and dead code detection
+- Create quality report summarizing all fixes applied
+- Label PR with 'ready-for-qa' after successful quality checks
+- Use git commit with message detailing quality improvements
+
+**3. container-tess.sh.hbs (Testing and Deployment Validation)**
+- Execute comprehensive test suite: cargo test --all-features
+- Run integration tests with cargo test --test '*' 
+- Generate coverage reports using cargo llvm-cov or tarpaulin
+- Validate coverage meets thresholds (95% existing, 100% new code)
+- Perform deployment validation: cargo build --release
+- Run performance benchmarks if available: cargo bench
+- Execute property-based tests using proptest or quickcheck
+- Generate test report with coverage metrics and performance data
+- Approve PR if all tests pass and coverage requirements met
+- Create detailed test summary in PR comment
+
+**Common Script Structure:**
+- All scripts inherit base environment setup from shared template
+- Use consistent error handling with set -euo pipefail
+- Implement retry logic for transient failures (network, API calls)
+- Include telemetry hooks for workflow monitoring
+- Support dry-run mode for testing without commits
+- Use structured logging with timestamps and agent identification
+- Implement workspace isolation using agent-specific PVCs
+- Handle GitHub API interactions with proper authentication
+- Support both local and remote tool execution contexts
+
+**Template Variables:**
+- {{github_app}}: Agent identifier for conditional logic
+- {{task_id}}: Task reference for correlation
+- {{workspace_path}}: Agent-specific workspace location
+- {{github_token}}: Authentication for API calls
+- {{mcp_server_url}}: Documentation server endpoint (Rex only)
+- {{coverage_threshold}}: Test coverage requirements (Tess only)
+- {{quality_rules}}: Linting configuration (Cleo only)
+
+**Integration Points:**
+- Scripts must integrate with existing CodeRun CRD structure
+- Support status updates via Kubernetes API
+- Emit metrics for Grafana dashboard monitoring
+- Handle workflow stage transitions with label updates
+- Implement proper cleanup on failure or timeout
+
+# Test Strategy:
+**Unit Testing:**
+- Test each script in isolation with mock environments
+- Verify Rex correctly queries and uses documentation
+- Confirm Cleo applies all formatting and linting fixes
+- Validate Tess runs complete test suite and calculates coverage
+- Test error handling paths with simulated failures
+
+**Integration Testing:**
+- Submit test CodeRun CRDs for each agent type
+- Verify correct script selection based on github_app field
+- Test workflow execution from start to completion
+- Validate GitHub PR updates (labels, comments, approvals)
+- Confirm workspace isolation between concurrent agents
+
+**Workflow Testing:**
+- Test Rex → Cleo → Tess pipeline with real tasks
+- Verify stage transitions trigger correctly
+- Test feedback loops when Rex makes changes
+- Validate Cleo/Tess cancellation on Rex updates
+- Monitor resource usage and performance metrics
+
+**Edge Case Testing:**
+- Test with missing dependencies or tools
+- Verify behavior with invalid GitHub tokens
+- Test timeout handling and cleanup
+- Validate behavior with conflicting git states
+- Test concurrent execution of same task by different agents
+
+**Regression Testing:**
+- Ensure backward compatibility with existing workflows
+- Verify legacy PVC naming still works
+- Test with various CRD configurations
+- Validate all existing integrations remain functional

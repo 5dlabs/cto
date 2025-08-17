@@ -1,0 +1,41 @@
+{
+  "remoteTools": [
+    "kubernetes_listResources",
+    "kubernetes_describeResource",
+    "kubernetes_createResource",
+    "kubernetes_updateResource",
+    "kubernetes_deleteResource",
+    "kubernetes_listPods",
+    "kubernetes_getPodLogs",
+    "brave-search_brave_web_search",
+    "memory_create_entities",
+    "memory_query_entities"
+  ],
+  "localServers": {
+    "documentation-generator": {
+      "command": "python3",
+      "args": ["./tools/documentation-generator.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "PROMETHEUS_URL": "${PROMETHEUS_URL}",
+        "GRAFANA_URL": "${GRAFANA_URL}"
+      }
+    },
+    "system-analyzer": {
+      "command": "python3",
+      "args": ["./tools/system-analyzer.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "ARGO_SERVER": "${ARGO_SERVER}"
+      }
+    },
+    "runbook-validator": {
+      "command": "python3",
+      "args": ["./tools/runbook-validator.py"],
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "DRY_RUN": "true"
+      }
+    }
+  }
+}
