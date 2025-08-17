@@ -1,18 +1,22 @@
-# Custom PostgreSQL image with pgvector for Bitnami chart compatibility  
-# This image bridges the gap between pgvector/pgvector and Bitnami's directory structure
+# Custom PostgreSQL image with pgvector for Zalando postgres operator (Spilo) compatibility  
+# This image extends the official Spilo image with pgvector extension
 # Supports high-dimensional vectors (3072-dim) for text-embedding-3-large compatibility
 
-FROM pgvector/pgvector:pg16 AS pgvector-source
-FROM bitnami/postgresql:16.3.0-debian-12-r19
+FROM ghcr.io/zalando/spilo-16:3.3-p1
 
-# Copy pgvector extension files to Bitnami's expected locations
-COPY --from=pgvector-source /usr/lib/postgresql/16/lib/vector.so /opt/bitnami/postgresql/lib/
-COPY --from=pgvector-source /usr/share/postgresql/16/extension/vector* /opt/bitnami/postgresql/share/extension/
-
-# Ensure proper permissions for Bitnami's non-root setup
+# Switch to root to install pgvector
 USER root
-RUN chmod +r /opt/bitnami/postgresql/lib/vector.so && \
-    chmod +r /opt/bitnami/postgresql/share/extension/vector*
 
-# Switch back to Bitnami's default user
-USER 1001
+# Install pgvector extension from PostgreSQL APT repository
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    postgresql-16-pgvector \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Verify pgvector installation
+RUN ls -la /usr/lib/postgresql/16/lib/*vector* && \
+    ls -la /usr/share/postgresql/16/extension/vector*
+
+# Switch back to postgres user (Spilo default)
+USER postgres
