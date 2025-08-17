@@ -31,7 +31,7 @@ env:
 
 jobs:
   build-runtime:
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -101,7 +101,7 @@ jobs:
 
   build-agents:
     needs: build-runtime
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
