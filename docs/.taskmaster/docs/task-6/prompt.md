@@ -1,108 +1,81 @@
-# Agent-Specific Handlebars Templates Implementation
+# Autonomous Agent Prompt: QA Enforces Documentation Updates Before Approval
 
-You are implementing specialized container script templates for multi-agent orchestration. Create agent-specific Handlebars templates that enable Rex, Cleo, and Tess to execute their distinct workflows.
+## Mission
+Enhance the QA stage so that before PR approval, the QA (Cleo) agent verifies that any implementation changes are reflected in project documentation, or that a rationale is provided when docs are not needed.
 
-## Objective
+## Constraints
+- Do not create a new GitHub App. Use the existing QA agent context (Cleo).
+- Integrate into the QA stage right before Tess approval.
+- Avoid blocking legitimate refactors that require no docs; allow rationale template.
 
-Create agent-specific container scripts and template selection logic to replace the current single-template approach with specialized workflows for each agent type.
+## Objectives
+1. Detect code changes that likely require documentation updates.
+2. Determine whether appropriate docs have been updated in `docs/`.
+3. If missing, post a structured PR comment listing required doc updates and provide a rationale template.
+4. Fail the QA step until docs are updated or a rationale checkbox is checked in the PR comment.
 
-## Context
+## Technical Approach
 
-The Task Master system requires multi-agent orchestration where:
-- **Rex/Blaze**: Documentation-first implementation workflow
-- **Cleo**: Code quality and formatting workflow with CI validation
-- **Tess**: Comprehensive testing workflow with live deployment validation
+### Inputs
+- PR diff (changed files, added/removed paths)
+- Repo tree under `docs/` for cross-referencing
+- CODEOWNERS (optional) for required reviewers
 
-## Implementation Requirements
+### Steps
+1. Classify change areas by paths:
+   - `controller/**` → engineering and controller references
+   - `infra/**` (charts/CRDs/templates) → infra docs and references
+   - `docs/**` → may satisfy docs requirement
+   - `mcp/**` → CLI/tooling docs
+2. Build expected docs list per change area:
+   - engineering reports or design notes under `docs/engineering/`
+   - references under `docs/references/`
+   - examples under `docs/examples/`
+   - README/usage guides under `docs/`
+3. Check if PR adds/updates any expected docs paths.
+4. If none found:
+   - Post/update a PR comment with:
+     - Summary of change areas
+     - Required docs checklist with file suggestions
+     - Rationale template block
+     - Instruction: “Check ‘Docs not required’ with rationale to proceed, or push docs updates.”
+5. Expose a GitHub Check output summary mirroring the comment.
+6. Exit non-zero to block QA approval when docs missing and rationale not confirmed.
 
-### 1. Create Agent-Specific Container Templates
+### PR Comment Template
+```
+QA Docs Check
 
-**Rex/Blaze Template (container-rex.sh.hbs)**
-- Documentation-first approach via MCP server queries
-- Task file copying from `.taskmaster/docs/task-{id}/`
-- Implementation-focused environment setup
-- PR creation with proper task labeling
+Detected changes suggest docs updates are needed:
+- Areas: {{areas}}
+- Suggested docs:
+  - {{path 1}}
+  - {{path 2}}
 
-**Cleo Template (container-cleo.sh.hbs)**
-- Code quality tools setup (Clippy, rustfmt)
-- GitHub API authentication for label management
-- CI test validation workflow
-- Ready-for-QA label addition logic
+Actions:
+- [ ] I updated the docs listed above
+- [ ] Docs not required; rationale:
+  > {{provide brief reasoning}}
 
-**Tess Template (container-tess.sh.hbs)**
-- Kubernetes admin access configuration
-- Database admin credentials setup
-- Testing infrastructure access
-- 120% satisfaction requirement enforcement
-
-### 2. Implement Template Selection Logic
-
-Modify the controller's template loading mechanism:
-```rust
-fn get_container_template(github_app: &str) -> String {
-    match github_app {
-        "5DLabs-Rex" | "5DLabs-Blaze" => "container-rex.sh.hbs",
-        "5DLabs-Cleo" => "container-cleo.sh.hbs", 
-        "5DLabs-Tess" => "container-tess.sh.hbs",
-        _ => "container.sh.hbs", // Fallback
-    }
-}
+Notes:
+- Align with docs under docs/references/** and docs/engineering/** as applicable.
 ```
 
-### 3. Template Structure Organization
+### Non-Blocking Cases
+- Comment-only changes
+- Pure rename/move without semantic changes
+- Tests-only changes
 
-```
-infra/charts/controller/claude-templates/
-├── container.sh.hbs           # Default template
-├── container-rex.sh.hbs       # Rex implementation agent
-├── container-cleo.sh.hbs      # Cleo quality agent  
-├── container-tess.sh.hbs      # Tess testing agent
-└── agents/                    # Agent-specific prompts
-    ├── rex-system-prompt.md.hbs
-    ├── cleo-system-prompt.md.hbs
-    └── tess-system-prompt.md.hbs
-```
+## Integration Points
+- Triggered in QA stage (Argo Workflows node before `waiting-pr-approved` resume)
+- Use GitHub App auth of QA agent (Cleo) to read diff and post comments
 
-## Technical Specifications
-
-### Agent Environment Variables
-- `AGENT_ROLE`: Defines agent's primary function (implementation/quality/testing)
-- `WORKFLOW_STAGE`: Current stage in multi-agent workflow
-- `GITHUB_APP`: Used for template selection and authentication
-- `TASK_ID`: Enables task-specific resource access
-
-### Authentication Requirements
-- **Rex**: Standard GitHub App authentication
-- **Cleo**: GitHub API access for PR labeling
-- **Tess**: Admin credentials for infrastructure testing
-
-### Workflow Integration Points
-- Template selection based on `github_app` CRD field
-- Agent-specific environment setup
-- Handoff signals between agents (labels, events)
-- Session continuity within agent workspaces
+## Verification
+- Unit: path classification, doc suggestion mapping
+- Integration: end-to-end on test PRs with/without docs
+- Operational: avoids duplicate comments, updates existing comment
 
 ## Success Criteria
-
-1. **Template Selection Works**: Correct container script selected based on `github_app`
-2. **Agent Isolation**: Each agent runs with appropriate tools and permissions
-3. **Workflow Handoffs**: Clear signals between agent stages (PR labels, events)
-4. **Backward Compatibility**: Existing Rex/Blaze workflows continue functioning
-5. **Maintainable Architecture**: Easy to add new agents or modify workflows
-
-## Testing Requirements
-
-- Verify template selection logic with different `github_app` values
-- Test agent-specific environment setup and tool availability
-- Validate workflow progression through all agent stages
-- Confirm backward compatibility with existing implementations
-- Test failure scenarios and error handling
-
-## File Locations
-
-All templates should be created in:
-- `infra/charts/controller/claude-templates/container-{agent}.sh.hbs`
-- Controller modifications in `controller/src/tasks/code/templates.rs`
-- Template loading updates in `controller/src/tasks/code/resources.rs`
-
-Focus on creating a clean, maintainable template architecture that supports multi-agent workflows while preserving existing functionality.
+- Documents are updated or rationale provided for 95% of behavior-changing PRs
+- Minimal false positives
+- <10s analysis time for typical PR sizes
