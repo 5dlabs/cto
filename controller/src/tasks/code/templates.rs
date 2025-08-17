@@ -64,7 +64,22 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/container.sh.hbs")?;
+        // Select agent-specific template based on github_app field
+        let template_path = Self::get_agent_container_template(code_run);
+
+        // Try to load agent-specific template, fall back to default if not found
+        let template = match Self::load_template(&template_path) {
+            Ok(content) => content,
+            Err(_) if !template_path.ends_with("container.sh.hbs") => {
+                // If agent-specific template not found, try default
+                debug!(
+                    "Agent-specific template {} not found, falling back to default",
+                    template_path
+                );
+                Self::load_template("code/container.sh.hbs")?
+            }
+            Err(e) => return Err(e),
+        };
 
         handlebars
             .register_template_string("container_script", template)
@@ -325,6 +340,28 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
+    /// Select the appropriate container template based on the github_app field
+    fn get_agent_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Map GitHub App to agent-specific container template
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "container-rex.sh.hbs",
+            "5DLabs-Cleo" => "container-cleo.sh.hbs",
+            "5DLabs-Tess" => "container-tess.sh.hbs",
+            _ => {
+                // Default to the generic container template for unknown agents
+                debug!(
+                    "No agent-specific template for '{}', using default container.sh.hbs",
+                    github_app
+                );
+                "container.sh.hbs"
+            }
+        };
+
+        format!("code/{}", template_name)
+    }
+
     /// Load a template file from the mounted ConfigMap
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
@@ -341,5 +378,72 @@ impl CodeTemplateGenerator {
                 "Failed to load code template {relative_path} (key: {configmap_key}): {e}"
             ))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crds::{CodeRun, CodeRunSpec};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use std::collections::HashMap;
+
+    fn create_test_code_run(github_app: Option<String>) -> CodeRun {
+        CodeRun {
+            metadata: ObjectMeta {
+                name: Some("test-run".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            spec: CodeRunSpec {
+                task_id: 1,
+                service: "test-service".to_string(),
+                repository_url: "https://github.com/test/repo".to_string(),
+                docs_repository_url: "https://github.com/test/docs".to_string(),
+                docs_project_directory: None,
+                working_directory: None,
+                model: "sonnet".to_string(),
+                github_user: None,
+                github_app,
+                context_version: 1,
+                continue_session: false,
+                overwrite_memory: false,
+                docs_branch: "main".to_string(),
+                env: HashMap::new(),
+                env_from_secrets: Vec::new(),
+                enable_docker: None,
+                task_requirements: None,
+                service_account_name: None,
+            },
+            status: None,
+        }
+    }
+
+    #[test]
+    fn test_rex_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/container-rex.sh.hbs");
+    }
+
+    #[test]
+    fn test_cleo_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/container-cleo.sh.hbs");
+    }
+
+    #[test]
+    fn test_tess_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/container-tess.sh.hbs");
+    }
+
+    #[test]
+    fn test_default_template_selection() {
+        let code_run = create_test_code_run(None);
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/container.sh.hbs");
     }
 }

@@ -1,296 +1,212 @@
-# Toolman Guide: Implement Agent-Specific PVC Naming
+# Toolman Guide: Agent-Specific Handlebars Templates
 
 ## Overview
 
-This task requires Rust development capabilities combined with filesystem operations for code modification and testing. The selected tools focus on Rust code analysis, development, and validation for controller modification.
+This task focuses on implementing specialized container script templates for multi-agent orchestration. You'll create agent-specific Handlebars templates and modify the controller's template selection logic.
 
-## Core Tools
+## Tool Selection Strategy
 
-### Filesystem Operations
-The filesystem server provides essential tools for Rust development:
+### Primary Development Tools
 
-#### `read_file`
-- **Purpose**: Read existing controller source files and understand current implementation
-- **When to Use**: Examining `controller/src/tasks/code/resources.rs` and related files
-- **Example Usage**: Read PVC creation logic and controller reconciliation patterns
-- **Best Practice**: Start by understanding existing code structure before modifications
+**filesystem** - Essential for template creation and modification
+- Create new template files (container-rex.sh.hbs, container-cleo.sh.hbs, container-tess.sh.hbs)
+- Modify existing controller source code files
+- Organize template directory structure
+- Read existing templates for pattern consistency
 
-#### `write_file`
-- **Purpose**: Implement agent name extraction logic and modify PVC creation functions
-- **When to Use**: Adding new functions and updating existing controller code
-- **Example Usage**: Create `extract_agent_name()` function and update PVC naming logic
-- **Best Practice**: Make incremental changes and preserve existing functionality
+**git** - Required for version control and change tracking
+- Track template file additions and modifications
+- Review existing template patterns and structure
+- Commit incremental changes during development
+- Branch management for template implementation
 
-#### `search_files`
-- **Purpose**: Find relevant code patterns and PVC-related functions across codebase
-- **When to Use**: Locating PVC creation logic and controller integration points
-- **Example Usage**: Search for `PersistentVolumeClaim` usage and workspace patterns
-- **Best Practice**: Understand all code locations that need modification
+### Research and Documentation Tools
 
-#### `directory_tree`
-- **Purpose**: Map controller source structure and understand code organization
-- **When to Use**: Understanding controller architecture and file dependencies
-- **Example Usage**: Explore `controller/src/` structure and module relationships
-- **Best Practice**: Understand module structure before making changes
+**rustdocs_query_rust_docs** - Critical for controller integration
+- Research Handlebars template rendering in Rust
+- Understand controller template loading mechanisms
+- Query CRD field definitions and usage patterns
+- Find template context building patterns
 
-#### `list_directory`
-- **Purpose**: Inventory controller source files and identify modification targets
-- **When to Use**: Cataloging files that need updates for agent-specific naming
-- **Example Usage**: List files in `controller/src/tasks/code/` directory
-- **Best Practice**: Ensure all relevant files are identified for modification
+**memory_create_entities** - Store implementation knowledge
+- Document agent-specific template requirements
+- Track template selection logic implementation
+- Remember controller modification patterns
+- Store testing scenarios and validation approaches
 
-## Supporting Tools
+**brave_web_search** - Supplemental research tool
+- Research Handlebars conditional logic best practices
+- Find Kubernetes template pattern examples
+- Research multi-agent orchestration patterns
+- Lookup Argo Workflows integration approaches
 
-### Rust Documentation Access
+## Implementation Workflow
 
-#### `rustdocs_query_rust_docs`
-- **Purpose**: Access Rust documentation for kube-rs and related crates
-- **When to Use**: Understanding PersistentVolumeClaim API and Kubernetes resource management
-- **Example Usage**: Query documentation for `kube::Api<PersistentVolumeClaim>` usage
-- **Best Practice**: Understand API patterns before implementing new functionality
-
-### Knowledge Management
-
-#### `memory_create_entities`
-- **Purpose**: Create knowledge graph nodes for controller components and modifications
-- **When to Use**: Recording discovered code patterns and implementation decisions
-- **Example Usage**: Create entities for "PVC Creation", "Agent Name Extraction", "Controller Integration"
-- **Best Practice**: Document complex controller logic and modification relationships
-
-#### `memory_add_observations`
-- **Purpose**: Add detailed findings about controller implementation and changes
-- **When to Use**: Recording specific code patterns and modification approaches
-- **Example Usage**: Add observations about reconciliation patterns and error handling
-- **Best Practice**: Include code snippets and implementation details
-
-### Research Tools
-
-#### `brave_web_search`
-- **Purpose**: Research Rust patterns, kube-rs usage, and Kubernetes controller best practices
-- **When to Use**: Finding examples of PVC management and controller modification patterns
-- **Example Usage**: Search for "kube-rs PersistentVolumeClaim creation patterns"
-- **Best Practice**: Validate findings against official documentation and existing codebase
-
-## Implementation Flow
-
-### Phase 1: Code Discovery and Analysis
-1. Use `directory_tree` to map controller source structure
-2. Use `search_files` to locate PVC-related code and patterns
-3. Use `read_file` to examine current PVC creation logic
-4. Create knowledge entities for controller architecture components
-5. Document current implementation patterns and constraints
-
-### Phase 2: Agent Name Extraction Development
-1. Use `rustdocs_query_rust_docs` to understand regex and string manipulation patterns
-2. Use `write_file` to implement `extract_agent_name()` function
-3. Create comprehensive unit tests for extraction logic
-4. Add validation for Kubernetes naming constraints
-5. Test with various GitHub App naming patterns
-
-### Phase 3: PVC Logic Modification
-1. Use `read_file` to understand existing PVC creation functions
-2. Modify PVC naming logic to use agent-specific patterns
-3. Implement idempotent PVC creation with kube-rs
-4. Add proper error handling and recovery mechanisms
-5. Create integration tests for PVC management
-
-### Phase 4: Controller Integration
-1. Update reconciliation logic to use new PVC naming
-2. Modify pod creation to mount agent-specific workspaces
-3. Implement backward compatibility for existing workflows
-4. Add comprehensive logging and error handling
-5. Test controller integration end-to-end
-
-### Phase 5: Testing and Validation
-1. Create unit tests for all new functions
-2. Implement integration tests for controller behavior
-3. Test backward compatibility scenarios
-4. Validate performance impact measurements
-5. Document changes and update technical documentation
-
-## Rust Development Patterns
-
-### Agent Name Extraction Function
-```rust
-use regex::Regex;
-
-fn extract_agent_name(github_app: &str) -> Result<String, String> {
-    let re = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-    
-    if let Some(caps) = re.captures(github_app) {
-        let agent_name = caps.get(1).unwrap().as_str().to_lowercase();
-        
-        // Validate Kubernetes naming constraints
-        validate_k8s_name(&agent_name)?;
-        Ok(agent_name)
-    } else {
-        Err(format!("Cannot extract agent name from: {}", github_app))
-    }
-}
-
-fn validate_k8s_name(name: &str) -> Result<(), String> {
-    if name.len() > 63 {
-        return Err("Name exceeds Kubernetes limit".to_string());
-    }
-    
-    if !name.chars().all(|c| c.is_alphanumeric() || c == '-') {
-        return Err("Name contains invalid characters".to_string());
-    }
-    
-    Ok(())
-}
+### Phase 1: Analysis and Planning
+```
+Tools: filesystem, git, rustdocs_query_rust_docs, memory_create_entities
 ```
 
-### PVC Creation with kube-rs
-```rust
-use kube::api::{Api, PostParams};
-use k8s_openapi::api::core::v1::PersistentVolumeClaim;
+1. **Examine Existing Templates**
+   - Use `filesystem` to read current `container.sh.hbs`
+   - Study existing Handlebars context and variables
+   - Document current template patterns and structure
 
-async fn ensure_agent_pvc(
-    code_run: &CodeRun,
-    client: &kube::Client,
-) -> Result<String, kube::Error> {
-    let agent_name = extract_agent_name(&code_run.spec.github_app)
-        .map_err(|e| kube::Error::Api(ErrorResponse::default()))?;
-        
-    let pvc_name = format!(
-        "workspace-{}-{}",
-        code_run.spec.service,
-        agent_name
-    );
-    
-    let namespace = code_run.metadata.namespace.as_ref().unwrap();
-    let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
-    
-    match pvc_api.get(&pvc_name).await {
-        Ok(_) => Ok(pvc_name),
-        Err(kube::Error::Api(e)) if e.code == 404 => {
-            let pvc_spec = create_pvc_spec(&pvc_name, &code_run.spec.service, &agent_name);
-            pvc_api.create(&PostParams::default(), &pvc_spec).await?;
-            Ok(pvc_name)
-        }
-        Err(e) => Err(e),
-    }
-}
+2. **Research Controller Template System**
+   - Use `rustdocs_query_rust_docs` to understand template loading
+   - Find template rendering functions in controller code
+   - Identify where container scripts are generated
+
+3. **Plan Agent-Specific Requirements**
+   - Use `memory_create_entities` to document each agent's needs
+   - Define environment variables and setup requirements
+   - Plan template selection logic implementation
+
+### Phase 2: Template Creation
+```
+Tools: filesystem, memory_create_entities
 ```
 
-### Controller Integration Pattern
-```rust
-// In reconcile function
-async fn reconcile(
-    code_run: Arc<CodeRun>,
-    ctx: Arc<Context>,
-) -> Result<Action, Error> {
-    let client = &ctx.client;
-    
-    // Extract agent name early
-    let agent_name = match extract_agent_name(&code_run.spec.github_app) {
-        Ok(name) => name,
-        Err(e) => {
-            error!("Failed to extract agent name: {}", e);
-            update_status_with_error(&code_run, &e, client).await?;
-            return Ok(Action::requeue(Duration::from_secs(60)));
-        }
-    };
-    
-    // Ensure agent-specific PVC exists
-    let pvc_name = ensure_agent_pvc(&code_run, client).await?;
-    
-    // Create pod with agent workspace
-    create_agent_pod(&code_run, &pvc_name, &agent_name, client).await?;
-    
-    Ok(Action::requeue(Duration::from_secs(30)))
-}
+1. **Create Rex/Blaze Template**
+   ```bash
+   # Focus areas for container-rex.sh.hbs
+   - Documentation-first workflow setup
+   - MCP server integration preparation  
+   - Task file access patterns
+   - Implementation-focused environment
+   ```
+
+2. **Create Cleo Template**
+   ```bash
+   # Focus areas for container-cleo.sh.hbs
+   - Code quality tools setup
+   - GitHub API authentication
+   - CI validation workflow
+   - Ready-for-QA labeling logic
+   ```
+
+3. **Create Tess Template**
+   ```bash
+   # Focus areas for container-tess.sh.hbs
+   - Admin access configuration
+   - Testing infrastructure setup
+   - Deployment validation tools
+   - Comprehensive testing environment
+   ```
+
+### Phase 3: Controller Integration
 ```
+Tools: filesystem, rustdocs_query_rust_docs, git
+```
+
+1. **Implement Template Selection Logic**
+   - Modify `controller/src/tasks/code/templates.rs`
+   - Add `get_container_template()` function
+   - Implement agent-specific template mapping
+
+2. **Update Template Loading**
+   - Modify template rendering functions
+   - Ensure proper fallback to default template
+   - Add error handling for missing templates
+
+3. **Test Integration Points**
+   - Verify ConfigMap generation includes correct scripts
+   - Test template variable resolution
+   - Validate agent-specific context building
+
+### Phase 4: Testing and Validation
+```
+Tools: filesystem, git, memory_create_entities
+```
+
+1. **Create Test Scenarios**
+   - Test each agent template renders correctly
+   - Verify template selection logic works
+   - Test backward compatibility with existing workflows
+
+2. **Document Implementation**
+   - Use `memory_create_entities` to store validation results
+   - Document any issues and solutions found
+   - Create troubleshooting guidance
 
 ## Best Practices
 
-### Code Development Principles
-- Read and understand existing code before making modifications
-- Implement incremental changes with comprehensive testing
-- Maintain backward compatibility during transition periods
-- Add proper error handling and logging throughout
+### Template Development
+- **Consistency**: Follow existing template naming and structure patterns
+- **Modularity**: Create reusable template components where possible
+- **Documentation**: Include comments in templates explaining agent-specific logic
+- **Testing**: Test templates render without Handlebars errors
 
-### Rust-Specific Patterns
-- Use Result types for proper error handling
-- Implement idempotent operations for Kubernetes resources
-- Follow Rust naming conventions and ownership patterns
-- Add comprehensive unit tests for all new functions
+### Controller Integration  
+- **Type Safety**: Ensure proper error handling for template operations
+- **Performance**: Minimize template loading overhead
+- **Maintainability**: Keep template selection logic simple and clear
+- **Backward Compatibility**: Preserve existing workflow functionality
 
-### Controller Development Standards
-- Maintain reconciliation idempotency
-- Implement proper status updates and error reporting
-- Add structured logging for operational visibility
-- Consider performance impact of modifications
+### Code Organization
+- **File Structure**: Organize templates in logical directory structure
+- **Naming Conventions**: Use clear, consistent naming patterns
+- **Version Control**: Commit changes incrementally with clear messages
+- **Code Review**: Ensure code follows project standards
 
-### Testing Strategy
-- Create unit tests for agent name extraction logic
-- Implement integration tests for PVC management
-- Test backward compatibility scenarios thoroughly
-- Validate performance impact with benchmarks
+## Tool Usage Examples
 
-## Testing Strategy
+### Reading Existing Templates
+```bash
+# Use filesystem to examine current template structure
+filesystem.read_file("infra/charts/controller/claude-templates/container.sh.hbs")
+filesystem.list_directory("infra/charts/controller/claude-templates/")
+```
 
-### Unit Testing Approach
-1. **Agent Name Extraction**: Test all supported GitHub App patterns
-2. **Validation Logic**: Test Kubernetes naming constraint compliance
-3. **Error Handling**: Verify appropriate error messages and recovery
-4. **Edge Cases**: Test malformed inputs and boundary conditions
+### Researching Controller Code
+```bash
+# Use rustdocs to understand template system
+rustdocs_query_rust_docs("How does Handlebars template rendering work in Rust?")
+rustdocs_query_rust_docs("CodeRun CRD field definitions and usage")
+```
 
-### Integration Testing Pattern
-1. **PVC Creation**: Test with real Kubernetes cluster
-2. **Controller Flow**: Validate complete reconciliation process
-3. **Multi-Agent Scenarios**: Test concurrent agent operations
-4. **Migration Testing**: Validate backward compatibility
+### Creating New Templates
+```bash
+# Use filesystem to create agent-specific templates
+filesystem.write_file("infra/charts/controller/claude-templates/container-rex.sh.hbs", template_content)
+filesystem.write_file("infra/charts/controller/claude-templates/container-cleo.sh.hbs", template_content)
+```
 
-### Performance Testing Requirements
-1. **Extraction Speed**: Benchmark agent name extraction performance
-2. **Memory Usage**: Monitor controller memory consumption
-3. **Reconciliation Impact**: Measure reconciliation timing changes
-4. **Concurrent Operations**: Test with multiple simultaneous requests
+### Version Control Management
+```bash
+# Use git to track changes
+git.status()  # Check current changes
+git.diff()    # Review modifications
+git.log()     # Review change history
+```
 
-## Common Patterns
+## Common Pitfalls to Avoid
 
-### Controller Modification Pattern
-1. Analyze existing code structure and patterns
-2. Implement new functionality with proper error handling
-3. Integrate with existing reconciliation logic
-4. Add comprehensive testing and validation
-5. Document changes and update technical specifications
+1. **Template Syntax Errors**: Test all Handlebars syntax before deployment
+2. **Missing Variables**: Ensure all template variables are available in context
+3. **Permission Issues**: Verify agents get appropriate access levels
+4. **Breaking Changes**: Maintain backward compatibility with existing workflows
+5. **Resource Conflicts**: Ensure agent workspaces remain isolated
+6. **Error Handling**: Add proper fallbacks for template loading failures
 
-### Error Handling Pattern
-1. Use Result types for all potentially failing operations
-2. Provide specific error messages for troubleshooting
-3. Implement graceful fallback mechanisms where appropriate
-4. Add structured logging for operational visibility
+## Success Validation
 
-## Troubleshooting
+### Template Quality Checks
+- [ ] All templates render without Handlebars errors
+- [ ] Agent-specific environment variables are set correctly
+- [ ] Required tools and credentials are available to each agent
+- [ ] Template selection logic correctly maps GitHub Apps to templates
 
-### Development Issues
-- Use `rustdocs_query_rust_docs` for API documentation questions
-- Search existing codebase for similar patterns and implementations
-- Test changes incrementally to isolate issues
-- Use unit tests to validate individual function behavior
+### Integration Quality Checks  
+- [ ] Controller compiles and runs without errors
+- [ ] Template loading performance is acceptable
+- [ ] ConfigMaps contain correct container scripts
+- [ ] Agent pods start successfully with new templates
 
-### Integration Problems
-- Verify Kubernetes API permissions for PVC operations
-- Check namespace and resource naming constraints
-- Validate controller RBAC permissions
-- Test with actual Kubernetes cluster for integration validation
+### Workflow Quality Checks
+- [ ] Rex/Blaze workflows continue working as before
+- [ ] Cleo workflow has quality tools and GitHub API access
+- [ ] Tess workflow has admin access and testing infrastructure
+- [ ] Agent handoffs work correctly between workflow stages
 
-### Performance Concerns
-- Benchmark critical paths before and after modifications
-- Monitor memory usage during extended operations
-- Test concurrent operations to identify bottlenecks
-- Profile code execution for optimization opportunities
-
-## Notes
-
-This task focuses on Rust controller development with emphasis on:
-- Agent-specific workspace isolation through PVC naming
-- Robust parsing and validation of GitHub App identifiers
-- Idempotent Kubernetes resource management
-- Backward compatibility and migration support
-- Comprehensive testing and performance validation
-
-The tool selection enables comprehensive Rust development while maintaining access to documentation and research capabilities essential for controller modification.
+This implementation requires careful attention to both template development and controller integration. Focus on creating clean, maintainable templates while ensuring the controller can reliably select and load the appropriate template for each agent type.
