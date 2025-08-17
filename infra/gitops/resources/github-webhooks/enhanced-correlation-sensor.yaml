@@ -25,7 +25,7 @@ spec:
           - path: body.action
             type: string
             value: ["opened"]
-    
+
     # PR Labeled Event (ready-for-qa)
     - name: pr-labeled-qa
       eventSourceName: github
@@ -46,7 +46,7 @@ spec:
             type: string
             comparator: "~"
             value: "5DLabs-Cleo(\\[bot\\])?|5DLabs-Cleo"
-    
+
     # PR Review Approved Event
     - name: pr-approved
       eventSourceName: github
@@ -67,7 +67,7 @@ spec:
             type: string
             comparator: "~"
             value: "5DLabs-Tess(\\[bot\\])?|5DLabs-Tess"
-    
+
     # Push Event for Remediation
     - name: implementation-push
       eventSourceName: github
@@ -86,7 +86,7 @@ spec:
             type: string
             comparator: "~"
             value: "refs/heads/(task|feature/task)-.*"
-  
+
   triggers:
     # Trigger 1: Resume after PR Created
     - template:
@@ -151,7 +151,7 @@ spec:
         duration: "10s"
         factor: 2
         jitter: 0.1
-    
+
     # Trigger 2: Resume after Ready-for-QA Label
     - template:
         name: resume-after-ready-for-qa
@@ -200,7 +200,7 @@ spec:
         duration: "10s"
         factor: 2
         jitter: 0.1
-    
+
     # Trigger 3: Resume after PR Approval
     - template:
         name: resume-after-pr-approved
@@ -264,7 +264,7 @@ spec:
         duration: "10s"
         factor: 2
         jitter: 0.1
-    
+
     # Trigger 4: Cancel Quality Agents on Implementation Push
     - template:
         name: cancel-and-restart-qa
@@ -285,67 +285,67 @@ spec:
                 entrypoint: cleanup
                 serviceAccountName: argo-events-sa
                 templates:
-                - name: cleanup
-                  script:
-                    image: bitnami/kubectl:latest
-                    command: [bash]
-                    source: |
-                      #!/bin/bash
-                      set -e
-                      
-                      echo "=== Implementation Agent Remediation ==="
-                      echo "Push event from: {{ .Input.body.pusher.name }}"
-                      echo "Branch: {{ .Input.body.ref }}"
-                      
-                      # Extract task ID from branch
-                      BRANCH="{{ .Input.body.ref }}"
-                      TASK_ID=""
-                      
-                      # Try multiple extraction patterns
-                      if [[ "$BRANCH" =~ task-([0-9]+) ]]; then
-                        TASK_ID="${BASH_REMATCH[1]}"
-                      elif [[ "$BRANCH" =~ feature/task-([0-9]+) ]]; then
-                        TASK_ID="${BASH_REMATCH[1]}"
-                      fi
-                      
-                      if [ -z "$TASK_ID" ]; then
-                        echo "WARNING: Could not extract task ID from branch: $BRANCH"
-                        echo "Canceling all quality agents (broader cleanup)"
-                        kubectl delete coderun -l github-app=5DLabs-Cleo --ignore-not-found=true
-                        kubectl delete coderun -l github-app=5DLabs-Tess --ignore-not-found=true
-                      else
-                        echo "Task ID: $TASK_ID"
-                        echo "Canceling quality agents for task $TASK_ID"
-                        
-                        # Cancel Cleo and Tess CodeRuns for this specific task
-                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
-                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
-                        
-                        # Remove ready-for-qa label if present (using GitHub API would be better)
-                        # This is a placeholder - actual implementation would use GitHub API
-                        echo "TODO: Remove 'ready-for-qa' label from PR via GitHub API"
-                        
-                        # Resume workflow from Cleo stage
-                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
-                        echo "Updating workflow stage for $WORKFLOW_NAME"
-                        
-                        # Check if workflow exists
-                        if kubectl get workflow $WORKFLOW_NAME -n argo &>/dev/null; then
-                          echo "Workflow $WORKFLOW_NAME found, will be resumed from Cleo stage"
-                          # The workflow resume will happen via the PR created trigger
-                        else
-                          echo "Workflow $WORKFLOW_NAME not found, may not be created yet"
+                  - name: cleanup
+                    script:
+                      image: bitnami/kubectl:latest
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                        echo "=== Implementation Agent Remediation ==="
+                        echo "Push event from: {{ .Input.body.pusher.name }}"
+                        echo "Branch: {{ .Input.body.ref }}"
+
+                        # Extract task ID from branch
+                        BRANCH="{{ .Input.body.ref }}"
+                        TASK_ID=""
+
+                        # Try multiple extraction patterns
+                        if [[ "$BRANCH" =~ task-([0-9]+) ]]; then
+                          TASK_ID="${BASH_REMATCH[1]}"
+                        elif [[ "$BRANCH" =~ feature/task-([0-9]+) ]]; then
+                          TASK_ID="${BASH_REMATCH[1]}"
                         fi
-                      fi
-                      
-                      echo "=== Remediation Complete ==="
-          parameters:
-            # Log remediation event details
-            - src:
-                dependencyName: implementation-push
-                dataTemplate: |
-                  {{ .Input.body.pusher.name }} pushed to {{ .Input.body.ref }}
-              dest: spec.arguments.parameters.0.value
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "WARNING: Could not extract task ID from branch: $BRANCH"
+                          echo "Canceling all quality agents (broader cleanup)"
+                          kubectl delete coderun -l github-app=5DLabs-Cleo --ignore-not-found=true
+                          kubectl delete coderun -l github-app=5DLabs-Tess --ignore-not-found=true
+                        else
+                          echo "Task ID: $TASK_ID"
+                          echo "Canceling quality agents for task $TASK_ID"
+
+                          # Cancel Cleo and Tess CodeRuns for this specific task
+                          kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
+                          kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
+
+                          # Remove ready-for-qa label if present (using GitHub API would be better)
+                          # This is a placeholder - actual implementation would use GitHub API
+                          echo "TODO: Remove 'ready-for-qa' label from PR via GitHub API"
+
+                          # Resume workflow from Cleo stage
+                          WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
+                          echo "Updating workflow stage for $WORKFLOW_NAME"
+
+                          # Check if workflow exists
+                          if kubectl get workflow $WORKFLOW_NAME -n argo &>/dev/null; then
+                            echo "Workflow $WORKFLOW_NAME found, will be resumed from Cleo stage"
+                            # The workflow resume will happen via the PR created trigger
+                          else
+                            echo "Workflow $WORKFLOW_NAME not found, may not be created yet"
+                          fi
+                        fi
+
+                        echo "=== Remediation Complete ==="
+        parameters:
+          # Log remediation event details
+          - src:
+              dependencyName: implementation-push
+              dataTemplate: |
+                {{ .Input.body.pusher.name }} pushed to {{ .Input.body.ref }}
+            dest: spec.arguments.parameters.0.value
       retryStrategy:
         steps: 2
         duration: "5s"

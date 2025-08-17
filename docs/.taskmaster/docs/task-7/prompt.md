@@ -25,11 +25,11 @@
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 
 
-You are implementing atomic workflow stage management for multi-agent orchestration. Create label update mechanisms that coordinate agent handoffs through event-driven state transitions.
+You are ENHANCING existing workflow stage management for multi-agent orchestration. The basic stage labeling and event correlation are already implemented - you need to add explicit stage transition steps and atomic label update mechanisms.
 
 ## Objective
 
-Implement workflow template logic that updates current-stage labels atomically and handles transitions between Rex → Cleo → Tess agent phases through label-based event correlation.
+ENHANCE existing workflow template by adding explicit stage transition steps after each agent completes. Current implementation only sets labels at suspend points - add dedicated `update-workflow-stage` templates that atomically patch workflow labels via Kubernetes API after Rex, Cleo, and Tess complete. Integrate with existing suspend/resume pattern and task 5's correlation sensor.
 
 ## Context
 

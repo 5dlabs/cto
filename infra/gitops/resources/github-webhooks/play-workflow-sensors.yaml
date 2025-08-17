@@ -240,24 +240,24 @@ spec:
                     serviceAccountName: argo-events-sa
                     restartPolicy: Never
                     containers:
-                    - name: cancel-agents
-                      image: bitnami/kubectl:latest
-                      command:
-                      - /bin/sh
-                      - -c
-                      - |
-                        echo "Implementation agent pushed, canceling quality/testing agents..."
-                        
-                        # Get task ID from branch name
-                        BRANCH="{{ .Input.body.ref }}"
-                        TASK_ID=$(echo "$BRANCH" | grep -oE 'task-[0-9]+' | cut -d'-' -f2)
-                        echo "Task ID: $TASK_ID"
-                        
-                        # Cancel Cleo and Tess CodeRuns for this task
-                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
-                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
-                        
-                        echo "Quality agents canceled for task $TASK_ID"
+                      - name: cancel-agents
+                        image: bitnami/kubectl:latest
+                        command:
+                          - /bin/sh
+                          - -c
+                          - |
+                            echo "Implementation agent pushed, canceling quality/testing agents..."
+
+                            # Get task ID from branch name
+                            BRANCH="{{ .Input.body.ref }}"
+                            TASK_ID=$(echo "$BRANCH" | grep -oE 'task-[0-9]+' | cut -d'-' -f2)
+                            echo "Task ID: $TASK_ID"
+
+                            # Cancel Cleo and Tess CodeRuns for this task
+                            kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
+                            kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
+
+                            echo "Quality agents canceled for task $TASK_ID"
                 ttlSecondsAfterFinished: 60
       retryStrategy:
         steps: 2

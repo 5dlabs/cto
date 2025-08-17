@@ -4,6 +4,8 @@
 
 This task implements atomic workflow stage management for multi-agent orchestration. You'll create label update mechanisms that coordinate agent handoffs through event-driven state transitions.
 
+Scope: Enhance the existing workflow. Stage labels at suspend points and correlation sensors are already implemented. Add explicit post-agent stage transition steps and atomic label updates; do not modify correlation sensors beyond verification.
+
 ## Tool Selection Strategy
 
 ### Primary Development Tools
