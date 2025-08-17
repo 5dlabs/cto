@@ -1396,90 +1396,97 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .get("text")
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("text is required"))?;
-    let fifo_path = arguments
-        .get("fifo_path")
+    let job_type = arguments
+        .get("job_type")
         .and_then(|v| v.as_str())
-        .unwrap_or("/workspace/agent-input.jsonl");
+        .unwrap_or("code");
+    let user = arguments.get("user").and_then(|v| v.as_str());
+    let service = arguments.get("service").and_then(|v| v.as_str());
+    let task_id = arguments.get("task_id");
 
-    // Validate fifo_path to prevent command injection: must be an absolute path with safe characters
-    // Allowed: a-zA-Z0-9, '/', '-', '_', '.', (no spaces, quotes, semicolons, pipes, etc.)
-    if !(fifo_path.starts_with('/')
-        && fifo_path.len() <= 256
-        && fifo_path
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '-' || c == '_' || c == '.'))
-    {
-        return Err(anyhow!("Invalid fifo_path; must be absolute and contain only [a-zA-Z0-9/_-.]"));
+    // Build service selector based on available parameters
+    let mut label_selectors = vec![
+        format!("agents.platform/input=bridge"),
+        format!("agents.platform/jobType={}", job_type),
+    ];
+
+    // Add user filter if provided
+    if let Some(user_label) = user {
+        label_selectors.push(format!("agents.platform/user={}", user_label));
     }
 
-    // Routing: explicit name + job_type, or by user label (optionally filtered by job_type)
-    let job_type = arguments.get("job_type").and_then(|v| v.as_str());
-    let name = arguments.get("name").and_then(|v| v.as_str());
-    let user = arguments.get("user").and_then(|v| v.as_str());
+    // Add service/name filter if provided
+    if let Some(service_name) = service {
+        label_selectors.push(format!("agents.platform/name={}", service_name));
+    }
 
-    let (selector, pod_ns) = if let (Some(jt), Some(nm)) = (job_type, name) {
-        // route by explicit resource name
-        let label_selector = match jt {
-            "code" => format!("agents.platform/CodeRun={nm}"),
-            "docs" => format!("agents.platform/DocsRun={nm}"),
-            other => return Err(anyhow!(format!("Unsupported job_type: {other}"))),
-        };
-        (label_selector, namespace)
-    } else if let Some(user_label) = user {
-        // route by user label (with optional job_type filter)
-        let mut label_selector = format!("agents.platform/user={user_label}");
-        if let Some(jt) = job_type {
-            label_selector.push(',');
-            label_selector.push_str(&format!("agents.platform/jobType={jt}"));
-        }
-        (label_selector, namespace)
-    } else {
-        return Err(anyhow!("Provide either (job_type + name) or user label for routing"));
-    };
+    let selector = label_selectors.join(",");
 
-    // Find pod by labels
-    let pods_json = run_kubectl_json(&["get", "pods", "-n", pod_ns, "-l", &selector, "-o", "json"])?.to_string();
-    let pods: Value = serde_json::from_str(&pods_json)?;
-    let pod_name = pods
+    // Find services (not pods) by labels
+    let services_json = run_kubectl_json(&["get", "services", "-n", namespace, "-l", &selector, "-o", "json"])?.to_string();
+    let services: Value = serde_json::from_str(&services_json)?;
+    let service_items = services
         .get("items")
         .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|item| item.get("metadata"))
+        .ok_or(anyhow!("No services found"))?;
+
+    if service_items.is_empty() {
+        return Err(anyhow!(
+            "No input bridge services found with selector: {}. Available parameters: job_type={}, user={:?}, service={:?}",
+            selector, job_type, user, service
+        ));
+    }
+
+    // Take the first matching service (or could implement more sophisticated selection)
+    let service_item = &service_items[0];
+    let service_name = service_item
+        .get("metadata")
         .and_then(|m| m.get("name"))
         .and_then(|n| n.as_str())
-        .ok_or(anyhow!("No running pod found for routing selector"))?;
+        .ok_or(anyhow!("Service missing name"))?;
 
-    // Format a stream-json user message line (one JSON object per line)
-    let line = json!({
-        "type": "user",
-        "message": {
-            "role": "user",
-            "content": [ { "type": "text", "text": text } ]
-        }
-    })
-    .to_string();
+    let service_port = service_item
+        .get("spec")
+        .and_then(|s| s.get("ports"))
+        .and_then(|p| p.as_array())
+        .and_then(|ports| ports.first())
+        .and_then(|port| port.get("port"))
+        .and_then(|p| p.as_u64())
+        .ok_or(anyhow!("Service missing port"))?;
 
-    // Stream input safely using tee without invoking a shell; pass fifo_path as an argument
-    // This avoids shell interpolation entirely
-    let mut child = std::process::Command::new("kubectl")
-        .args(["-n", namespace, "exec", "-i", pod_name, "--", "tee", "-a", fifo_path])
-        .env("KUBECONFIG", std::env::var("KUBECONFIG").unwrap_or_default())
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .context("Failed to exec into pod")?;
-    if let Some(stdin) = child.stdin.as_mut() {
-        use std::io::Write as _;
-        stdin
-            .write_all(format!("{line}\n").as_bytes())
-            .context("Failed writing input to kubectl exec")?;
-    }
-    let out = child.wait_with_output()?;
-    if out.status.success() {
-        Ok(json!({"success": true, "pod": pod_name, "fifo": fifo_path}))
+    // Construct the service URL
+    let service_url = format!("http://{}.{}.svc.cluster.local:{}/input", service_name, namespace, service_port);
+
+    // Format the message as JSON
+    let message_data = json!({
+        "text": text
+    });
+
+    // Send HTTP POST request to the input bridge service
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(&service_url)
+        .header("Content-Type", "application/json")
+        .json(&message_data)
+        .timeout(Duration::from_secs(30))
+        .send()
+        .context("Failed to send HTTP request to input bridge")?;
+
+    if response.status().is_success() {
+        let response_text = response.text().unwrap_or_else(|_| "OK".to_string());
+        Ok(json!({
+            "success": true,
+            "service": service_name,
+            "url": service_url,
+            "response": response_text
+        }))
     } else {
-        Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
+        let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+        Err(anyhow!(
+            "HTTP request failed with status {}: {}",
+            response.status(),
+            error_text
+        ))
     }
 }
 
