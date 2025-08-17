@@ -34,8 +34,15 @@ spec:
         conditions: "github-pr-review"
         argoWorkflow:
           operation: resume
-          # Simple static targeting - workflows must handle task filtering internally
-          labelSelector: "workflow-type=play-orchestration,current-stage=waiting-pr-approved"
+          # Dynamic workflow targeting using parameterized args (Oracle's solution)
+          args: []  # Will be populated by parameters
+          parameters:
+            # Extract task ID from PR labels and construct workflow name for targeting
+            - src:
+                dependencyName: github-pr-review
+                dataTemplate: |
+                  play-task-{{ range $index, $label := .Input.body.pull_request.labels }}{{ if hasPrefix "task-" $label.name }}{{ $parts := splitList "-" $label.name }}{{ if gt (len $parts) 1 }}{{ index $parts 1 }}{{ end }}{{ end }}{{ end }}-workflow
+              dest: args.0
       retryStrategy:
         steps: 3
         duration: "10s"

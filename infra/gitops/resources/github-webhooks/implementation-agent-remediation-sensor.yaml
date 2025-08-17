@@ -75,7 +75,7 @@ spec:
                           || true
                         echo "QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}"
           parameters:
-            # Extract task ID from branch name
+            # Extract task ID from branch name for task-specific cleanup
             - src:
                 dependencyName: implementation-push-event
                 dataTemplate: |
