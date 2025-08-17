@@ -143,9 +143,12 @@ jobs:
           SCCACHE_IDLE_TIMEOUT: "0"
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
           CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-          CARGO_TARGET_DIR: "/cache/target"  # Build to cache directory for persistence
+          CARGO_TARGET_DIR: "$HOME/cache/target"  # Build to cache directory for persistence
         run: |
           echo "🏗️ Building controller binary with pre-warmed dependencies..."
+          
+          # Create cache directory
+          mkdir -p $HOME/cache/target
 
           # Show build environment
           echo "Build environment:"
@@ -172,14 +175,14 @@ jobs:
           echo "🔍 Checking target directory contents:"
           echo "CARGO_TARGET_DIR is: ${CARGO_TARGET_DIR:-not set}"
           ls -la target/release/ || echo "target/release/ not found"
-          ls -la /cache/target/release/ || echo "/cache/target/release/ not found"
+          ls -la $HOME/cache/target/release/ || echo "$HOME/cache/target/release/ not found"
           find target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in target/"
-          find /cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in target/"
-          find /cache/target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in /cache/target/"
-          find /cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in /cache/target/"
+          find $HOME/cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in target/"
+          find $HOME/cache/target -name "*controller*" -type f 2>/dev/null || echo "No controller files found in $HOME/cache/target/"
+          find $HOME/cache/target -name "*bridge*" -type f 2>/dev/null || echo "No bridge files found in $HOME/cache/target/"
 
           # Copy binary from cache target dir (where CARGO_TARGET_DIR points)
-          cp /cache/target/release/agent-controller agent-controller
+          cp $HOME/cache/target/release/agent-controller agent-controller
 
           # Show binary info
           echo "📦 Built binary info:"
@@ -248,11 +251,11 @@ jobs:
             echo "sccache not found; building without wrapper"
           fi
           # Use shared target directory for better cache hits
-          mkdir -p /cache/target
-          export CARGO_TARGET_DIR=/cache/target
+          mkdir -p $HOME/cache/target
+          export CARGO_TARGET_DIR=$HOME/cache/target
           cargo build --release
           command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
-          cp /cache/target/release/sidecar ./sidecar
+          cp $HOME/cache/target/release/sidecar ./sidecar
           ls -lh ./sidecar
 
       - name: Set up Docker Buildx
