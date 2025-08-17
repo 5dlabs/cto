@@ -1402,7 +1402,6 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .unwrap_or("code");
     let user = arguments.get("user").and_then(|v| v.as_str());
     let service = arguments.get("service").and_then(|v| v.as_str());
-    let task_id = arguments.get("task_id");
 
     // Build service selector based on available parameters
     let mut label_selectors = vec![
@@ -1472,7 +1471,9 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .send()
         .context("Failed to send HTTP request to input bridge")?;
 
-    if response.status().is_success() {
+    let status = response.status();
+    
+    if status.is_success() {
         let response_text = response.text().unwrap_or_else(|_| "OK".to_string());
         Ok(json!({
             "success": true,
@@ -1484,7 +1485,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
         Err(anyhow!(
             "HTTP request failed with status {}: {}",
-            response.status(),
+            status,
             error_text
         ))
     }
