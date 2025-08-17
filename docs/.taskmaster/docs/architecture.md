@@ -344,7 +344,7 @@ fi
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: play-workflow-
+  name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
     workflow-type: play-orchestration
 spec:
@@ -715,7 +715,7 @@ Benefits:
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow  
 metadata:
-  generateName: play-workflow-
+  name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
     workflow-type: play-orchestration
     task-id: "{{workflow.parameters.task-id}}"
@@ -738,19 +738,13 @@ spec:
       name: resume-after-pr-created
       argoWorkflow:
         operation: resume
-        source:
-          resource:
-            # Target specific workflow instance
-            labelSelector: |
-              workflow-type=play-orchestration,
-              task-id={{extracted-task-id}},
-              current-stage=waiting-pr-created
+        args: []
         parameters:
         - src:
-            # Extract task ID from PR labels using jq
+            # Extract task ID from PR labels and construct deterministic workflow name
             dataTemplate: |
-              {{jq '.pull_request.labels[?(@.name | startswith("task-"))].name | split("-")[1]'}}
-          dest: spec.arguments.parameters.extracted-task-id
+              play-task-{{ range $i, $l := .Input.body.pull_request.labels }}{{ if hasPrefix "task-" $l.name }}{{ $p := splitList "-" $l.name }}{{ if gt (len $p) 1 }}{{ index $p 1 }}{{ end }}{{ end }}{{ end }}-workflow
+          dest: args.0
 ```
 
 #### 3. Multi-Stage Progression Logic

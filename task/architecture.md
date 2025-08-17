@@ -315,7 +315,7 @@ fi
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: play-workflow-
+  name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
     workflow-type: play-orchestration
 spec:
@@ -686,7 +686,7 @@ Benefits:
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow  
 metadata:
-  generateName: play-workflow-
+  name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
     workflow-type: play-orchestration
     task-id: "{{workflow.parameters.task-id}}"

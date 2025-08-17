@@ -99,7 +99,7 @@ Each sensor must extract and validate:
 
 ## Sensor Configuration Templates
 
-### Multi-Agent Resume Sensor
+### Multi-Agent Resume Sensor (Supported Pattern)
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -122,12 +122,13 @@ spec:
       name: resume-after-implementation
       argoWorkflow:
         operation: resume
-        source:
-          resource:
-            labelSelector: |
-              workflow-type=play-orchestration,
-              task-id={{task-id}},
-              current-stage=waiting-pr-created
+        args: []
+        parameters:
+        - src:
+            dependencyName: github-pr-created
+            dataTemplate: |
+              play-task-{{ range $i, $l := .Input.body.pull_request.labels }}{{ if hasPrefix "task-" $l.name }}{{ $p := splitList "-" $l.name }}{{ if gt (len $p) 1 }}{{ index $p 1 }}{{ end }}{{ end }}{{ end }}-workflow
+          dest: args.0
 ```
 
 ### Ready-for-QA Label Sensor
@@ -152,39 +153,73 @@ spec:
         value: "ready-for-qa"
 ```
 
-### Rex Remediation Sensor
+### Implementation Agent Remediation Sensor (Cleanup Workflow)
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: rex-remediation-sensor
+  name: implementation-agent-remediation
   namespace: argo
 spec:
   dependencies:
-  - name: rex-push-event
+  - name: implementation-push-event
     eventSourceName: github
     eventName: push
     filters:
       data:
-      - path: sender.login
+      - path: headers.X-Github-Event
         type: string
-        value: "5DLabs-Rex[bot]"
+        value: ["push"]
+      - path: body.sender.login
+        type: string
+        comparator: "~"
+        value: "5DLabs-(Rex|Blaze|Morgan)\\[bot\\]|5DLabs-(Rex|Blaze|Morgan)"
       - path: ref
         type: string
-        comparator: "="
+        comparator: "~"
         value: "refs/heads/task-.*"
         
   triggers:
   - template:
-      name: cancel-running-agents
-      k8s:
-        operation: delete
+      name: create-cleanup-workflow
+      argoWorkflow:
+        operation: submit
         source:
           resource:
-            apiVersion: agents.platform/v1
-            kind: CodeRun
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
             metadata:
-              labelSelector: "task-id={{task-id}},github-app!=5DLabs-Rex"
+              generateName: cleanup-quality-agents-
+              namespace: argo
+            spec:
+              entrypoint: cleanup-quality-agents
+              arguments:
+                parameters:
+                  - name: task-id
+                    value: ""
+                  - name: pushing-agent
+                    value: ""
+              templates:
+                - name: cleanup-quality-agents
+                  inputs:
+                    parameters:
+                      - name: task-id
+                      - name: pushing-agent
+                  script:
+                    image: bitnami/kubectl:latest
+                    command: [sh]
+                    source: |
+                      #!/bin/sh
+                      echo "Implementation agent {{inputs.parameters.pushing-agent}} pushed to task-{{inputs.parameters.task-id}}"
+                      echo "Cancelling quality/testing agent CodeRuns for task-{{inputs.parameters.task-id}}"
+
+                      kubectl delete coderun -n argo \
+                        -l task-id={{inputs.parameters.task-id}} \
+                        -l github-app!=5DLabs-Rex \
+                        -l github-app!=5DLabs-Blaze \
+                        -l github-app!=5DLabs-Morgan \
+                        || true
+                      echo "QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}"
 ```
 
 ## Testing and Validation
