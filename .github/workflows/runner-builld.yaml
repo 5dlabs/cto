@@ -1,15 +1,16 @@
 ---
-name: Build Rust Builder Image
+# DEPRECATED: This workflow has been moved to infrastructure-build.yaml
+# The rust-builder image is now built as part of the infrastructure workflow
+# Use the infrastructure-build.yaml workflow with image=rust-builder parameter
+
+name: Build Rust Builder Image (DEPRECATED)
 
 on:
-  push:
-    tags: [ 'rust-builder-v*' ]
-    paths:
-      - '.github/workflows/build-rust-image.yml'
+  # Workflow disabled - moved to infrastructure-build.yaml
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to tag the image (e.g., 1.0.3)'
+      _deprecated:
+        description: 'This workflow is deprecated. Use infrastructure-build.yaml with image=rust-builder'
         required: false
         type: string
 
@@ -18,90 +19,24 @@ env:
   IMAGE_NAME: 5dlabs/rust-builder
 
 jobs:
-  build-and-push:
-    runs-on: [k8s-runner]
-    permissions:
-      contents: read
-      packages: write
+  deprecated-notice:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            # For version tags (rust-builder-v1.0.0), create versioned image
-            type=match,pattern=rust-builder-v(.*),group=1,enable=${{ startsWith(github.ref, 'refs/tags/rust-builder-v') }}
-            # For manual version from workflow_dispatch
-            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
-            # Always tag as 'latest' for any push (branch or tag)
-            type=raw,value=latest
-            # For main branch, also tag as 'main'
-            type=raw,value=main,enable={{is_default_branch}}
-            # For feature branches, use branch name
-            type=ref,event=branch
-            # For PRs
-            type=ref,event=pr
-            # Include SHA for traceability (only for branch builds, not tags)
-            type=sha,prefix={{branch}}-,format=short,enable=${{ github.ref_type != 'tag' }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./infra/images/builder/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Simplified caching strategy - GitHub Actions cache only
-          cache-from: |
-            type=gha,scope=rust-builder
-          cache-to: |
-            type=gha,scope=rust-builder,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-
-      - name: Image digest
-        run: echo ${{ steps.meta.outputs.digest }}
-
-      - name: Cache summary
+      - name: Deprecation Notice
         run: |
-          echo "## Docker Build Cache Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitHub Actions Cache**: Enabled with simplified scoping" >> $GITHUB_STEP_SUMMARY
-          echo "- **Cache Scope**: \`rust-builder\` (global)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Built Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The pre-warmed dependencies are now baked into the image and will be used by CI/CD workflows." >> $GITHUB_STEP_SUMMARY
-
-  # Cycle Arc runners to use new image
-  cycle-runners:
-    needs: build-and-push
-    runs-on: [k8s-runner]  # Temporarily use hosted runner to break chicken-and-egg cycle
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/example-project-and-cli'
-    steps:
-      - name: Cycle rust-builder runners
-        run: |
-          echo "🔄 New rust-builder image built successfully..."
-          echo "⚠️  Note: Currently running on hosted runner - cannot cycle Arc runners with kubectl"
-          echo "   The following commands would run on self-hosted runners:"
+          echo "🚨 This workflow has been DEPRECATED"
           echo ""
-          echo "   # kubectl delete pods -n arc-systems \\"
-          echo "   #   -l runner-deployment-name=agent-platform-runner-deployment \\"
-          echo "   #   --grace-period=30"
+          echo "The rust-builder image build has been moved to the infrastructure-build.yaml workflow"
+          echo "for better organization of infrastructure vs agent images."
           echo ""
-          echo "✅ Image is available at ghcr.io/5dlabs/rust-builder:latest"
-          echo "⚠️  Manually delete runner pods in arc-systems namespace to use new image"
+          echo "To build the rust-builder image, use:"
+          echo "  - Go to Actions → Infrastructure Images workflow"
+          echo "  - Click 'Run workflow'"
+          echo "  - Set image parameter to 'rust-builder'"
+          echo ""
+          echo "Or trigger via API:"
+          echo "gh workflow run infrastructure-build.yaml -f image=rust-builder"
+          echo ""
+          echo "⚠️  This workflow will be removed in a future update."
+          
+          exit 1  # Fail the job to make it clear this is deprecated
