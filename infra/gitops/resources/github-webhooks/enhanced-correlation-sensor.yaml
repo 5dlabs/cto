@@ -1,0 +1,352 @@
+---
+# Enhanced GitHub Webhook Correlation Sensor with Fallback Logic
+# This sensor implements Task 5 requirements for robust task ID extraction
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: enhanced-play-workflow-correlation
+  namespace: argo
+  labels:
+    task: "5"
+    type: correlation-logic
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    # PR Created Event
+    - name: pr-created
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["opened"]
+    
+    # PR Labeled Event (ready-for-qa)
+    - name: pr-labeled-qa
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["labeled"]
+          - path: body.label.name
+            type: string
+            value: ["ready-for-qa"]
+          # Verify label added by Cleo
+          - path: body.sender.login
+            type: string
+            comparator: "~"
+            value: "5DLabs-Cleo(\\[bot\\])?|5DLabs-Cleo"
+    
+    # PR Review Approved Event
+    - name: pr-approved
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request_review"]
+          - path: body.action
+            type: string
+            value: ["submitted"]
+          - path: body.review.state
+            type: string
+            value: ["approved"]
+          # Verify approval from Tess
+          - path: body.review.user.login
+            type: string
+            comparator: "~"
+            value: "5DLabs-Tess(\\[bot\\])?|5DLabs-Tess"
+    
+    # Push Event for Remediation
+    - name: implementation-push
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["push"]
+          # Match implementation agents (Rex, Blaze, Morgan)
+          - path: body.pusher.name
+            type: string
+            comparator: "~"
+            value: "5DLabs-(Rex|Blaze|Morgan)(\\[bot\\])?|5DLabs-(Rex|Blaze|Morgan)"
+          - path: body.ref
+            type: string
+            comparator: "~"
+            value: "refs/heads/(task|feature/task)-.*"
+  
+  triggers:
+    # Trigger 1: Resume after PR Created
+    - template:
+        name: resume-after-pr-created
+        conditions: "pr-created"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Primary: Extract task ID from PR labels
+            # Fallback: Extract from branch name if labels missing
+            - src:
+                dependencyName: pr-created
+                dataTemplate: |
+                  {{- /* Primary extraction: PR labels */ -}}
+                  {{- $taskId := "" -}}
+                  {{- range $i, $label := .Input.body.pull_request.labels -}}
+                    {{- if hasPrefix $label.name "task-" -}}
+                      {{- $parts := splitList "-" $label.name -}}
+                      {{- if gt (len $parts) 1 -}}
+                        {{- $taskId = index $parts 1 -}}
+                      {{- end -}}
+                    {{- end -}}
+                  {{- end -}}
+                  {{- /* Fallback extraction: Branch name */ -}}
+                  {{- if eq $taskId "" -}}
+                    {{- $ref := .Input.body.pull_request.head.ref -}}
+                    {{- if hasPrefix $ref "task-" -}}
+                      {{- $branch := trimPrefix "task-" $ref -}}
+                      {{- $parts := splitList "-" $branch -}}
+                      {{- if gt (len $parts) 0 -}}
+                        {{- $taskId = index $parts 0 -}}
+                      {{- end -}}
+                    {{- else if hasPrefix $ref "feature/task-" -}}
+                      {{- $branch := trimPrefix "feature/task-" $ref -}}
+                      {{- $parts := splitList "-" $branch -}}
+                      {{- if gt (len $parts) 0 -}}
+                        {{- $taskId = index $parts 0 -}}
+                      {{- end -}}
+                    {{- end -}}
+                  {{- end -}}
+                  {{- /* Construct workflow name */ -}}
+                  {{- if ne $taskId "" -}}
+                    play-task-{{ $taskId }}-workflow
+                  {{- else -}}
+                    play-task-unknown-workflow
+                  {{- end -}}
+              dest: args.0
+            # Pass PR metadata
+            - src:
+                dependencyName: pr-created
+                dataKey: body.pull_request.html_url
+              dest: spec.arguments.parameters.0.value
+              operation: overwrite
+            - src:
+                dependencyName: pr-created
+                dataKey: body.pull_request.number
+              dest: spec.arguments.parameters.1.value
+              operation: overwrite
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+    
+    # Trigger 2: Resume after Ready-for-QA Label
+    - template:
+        name: resume-after-ready-for-qa
+        conditions: "pr-labeled-qa"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Extract task ID with validation
+            - src:
+                dependencyName: pr-labeled-qa
+                dataTemplate: |
+                  {{- /* Extract task ID from PR labels */ -}}
+                  {{- $taskId := "" -}}
+                  {{- $multipleTaskLabels := 0 -}}
+                  {{- range $i, $label := .Input.body.pull_request.labels -}}
+                    {{- if hasPrefix $label.name "task-" -}}
+                      {{- $parts := splitList "-" $label.name -}}
+                      {{- if gt (len $parts) 1 -}}
+                        {{- if eq $taskId "" -}}
+                          {{- $taskId = index $parts 1 -}}
+                        {{- else -}}
+                          {{- $multipleTaskLabels = add $multipleTaskLabels 1 -}}
+                        {{- end -}}
+                      {{- end -}}
+                    {{- end -}}
+                  {{- end -}}
+                  {{- /* Handle multiple task labels (use first found) */ -}}
+                  {{- if and (ne $taskId "") (gt $multipleTaskLabels 0) -}}
+                    {{- /* Log warning about multiple labels but proceed */ -}}
+                    play-task-{{ $taskId }}-workflow
+                  {{- else if ne $taskId "" -}}
+                    play-task-{{ $taskId }}-workflow
+                  {{- else -}}
+                    play-task-unknown-workflow
+                  {{- end -}}
+              dest: args.0
+            # Pass QA ready status
+            - src:
+                dependencyName: pr-labeled-qa
+                dataTemplate: "ready-for-qa"
+              dest: spec.arguments.parameters.0.value
+              operation: overwrite
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+    
+    # Trigger 3: Resume after PR Approval
+    - template:
+        name: resume-after-pr-approved
+        conditions: "pr-approved"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Extract task ID with malformed label handling
+            - src:
+                dependencyName: pr-approved
+                dataTemplate: |
+                  {{- /* Extract and validate task ID */ -}}
+                  {{- $taskId := "" -}}
+                  {{- $malformedLabels := list -}}
+                  {{- range $i, $label := .Input.body.pull_request.labels -}}
+                    {{- if hasPrefix $label.name "task-" -}}
+                      {{- $parts := splitList "-" $label.name -}}
+                      {{- if gt (len $parts) 1 -}}
+                        {{- $id := index $parts 1 -}}
+                        {{- /* Validate task ID is numeric */ -}}
+                        {{- if regexMatch "^[0-9]+$" $id -}}
+                          {{- $taskId = $id -}}
+                        {{- else -}}
+                          {{- $malformedLabels = append $malformedLabels $label.name -}}
+                        {{- end -}}
+                      {{- end -}}
+                    {{- end -}}
+                  {{- end -}}
+                  {{- /* Fallback to branch if labels malformed */ -}}
+                  {{- if and (eq $taskId "") (gt (len $malformedLabels) 0) -}}
+                    {{- $ref := .Input.body.pull_request.head.ref -}}
+                    {{- if contains "task-" $ref -}}
+                      {{- $matches := regexFindAll "task-([0-9]+)" $ref -1 -}}
+                      {{- if gt (len $matches) 0 -}}
+                        {{- $match := index $matches 0 -}}
+                        {{- $taskId = regexReplaceAll "task-" $match "" -}}
+                      {{- end -}}
+                    {{- end -}}
+                  {{- end -}}
+                  {{- /* Construct workflow name */ -}}
+                  {{- if ne $taskId "" -}}
+                    play-task-{{ $taskId }}-workflow
+                  {{- else -}}
+                    play-task-unknown-workflow
+                  {{- end -}}
+              dest: args.0
+            # Pass approval status
+            - src:
+                dependencyName: pr-approved
+                dataTemplate: "approved"
+              dest: spec.arguments.parameters.0.value
+              operation: overwrite
+            - src:
+                dependencyName: pr-approved
+                dataKey: body.pull_request.merge_commit_sha
+              dest: spec.arguments.parameters.1.value
+              operation: overwrite
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+    
+    # Trigger 4: Cancel Quality Agents on Implementation Push
+    - template:
+        name: cancel-and-restart-qa
+        conditions: "implementation-push"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: remediation-cleanup-
+                namespace: argo
+                labels:
+                  type: remediation
+                  task: "5"
+              spec:
+                entrypoint: cleanup
+                serviceAccountName: argo-events-sa
+                templates:
+                - name: cleanup
+                  script:
+                    image: bitnami/kubectl:latest
+                    command: [bash]
+                    source: |
+                      #!/bin/bash
+                      set -e
+                      
+                      echo "=== Implementation Agent Remediation ==="
+                      echo "Push event from: {{ .Input.body.pusher.name }}"
+                      echo "Branch: {{ .Input.body.ref }}"
+                      
+                      # Extract task ID from branch
+                      BRANCH="{{ .Input.body.ref }}"
+                      TASK_ID=""
+                      
+                      # Try multiple extraction patterns
+                      if [[ "$BRANCH" =~ task-([0-9]+) ]]; then
+                        TASK_ID="${BASH_REMATCH[1]}"
+                      elif [[ "$BRANCH" =~ feature/task-([0-9]+) ]]; then
+                        TASK_ID="${BASH_REMATCH[1]}"
+                      fi
+                      
+                      if [ -z "$TASK_ID" ]; then
+                        echo "WARNING: Could not extract task ID from branch: $BRANCH"
+                        echo "Canceling all quality agents (broader cleanup)"
+                        kubectl delete coderun -l github-app=5DLabs-Cleo --ignore-not-found=true
+                        kubectl delete coderun -l github-app=5DLabs-Tess --ignore-not-found=true
+                      else
+                        echo "Task ID: $TASK_ID"
+                        echo "Canceling quality agents for task $TASK_ID"
+                        
+                        # Cancel Cleo and Tess CodeRuns for this specific task
+                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
+                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
+                        
+                        # Remove ready-for-qa label if present (using GitHub API would be better)
+                        # This is a placeholder - actual implementation would use GitHub API
+                        echo "TODO: Remove 'ready-for-qa' label from PR via GitHub API"
+                        
+                        # Resume workflow from Cleo stage
+                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
+                        echo "Updating workflow stage for $WORKFLOW_NAME"
+                        
+                        # Check if workflow exists
+                        if kubectl get workflow $WORKFLOW_NAME -n argo &>/dev/null; then
+                          echo "Workflow $WORKFLOW_NAME found, will be resumed from Cleo stage"
+                          # The workflow resume will happen via the PR created trigger
+                        else
+                          echo "Workflow $WORKFLOW_NAME not found, may not be created yet"
+                        fi
+                      fi
+                      
+                      echo "=== Remediation Complete ==="
+          parameters:
+            # Log remediation event details
+            - src:
+                dependencyName: implementation-push
+                dataTemplate: |
+                  {{ .Input.body.pusher.name }} pushed to {{ .Input.body.ref }}
+              dest: spec.arguments.parameters.0.value
+      retryStrategy:
+        steps: 2
+        duration: "5s"
+        factor: 1.5

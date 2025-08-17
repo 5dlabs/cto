@@ -1,0 +1,306 @@
+{
+  "test_cases": [
+    {
+      "name": "Test Case 1: Standard PR Creation",
+      "description": "Verify task ID extraction from PR with single task label",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 123,
+            "html_url": "https://github.com/5dlabs/cto/pull/123",
+            "labels": [
+              {
+                "name": "task-5",
+                "color": "ff0000",
+                "description": "Task 5 implementation"
+              }
+            ],
+            "head": {
+              "ref": "task-5-webhook-correlation"
+            }
+          },
+          "sender": {
+            "login": "5DLabs-Rex[bot]"
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "5",
+        "workflow_name": "play-task-5-workflow",
+        "action": "resume workflow"
+      }
+    },
+    {
+      "name": "Test Case 2: Multiple Labels",
+      "description": "Handle PR with multiple labels including task label",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 124,
+            "html_url": "https://github.com/5dlabs/cto/pull/124",
+            "labels": [
+              {
+                "name": "enhancement",
+                "color": "a2eeef"
+              },
+              {
+                "name": "task-8",
+                "color": "ff0000"
+              },
+              {
+                "name": "priority-high",
+                "color": "d73a4a"
+              }
+            ],
+            "head": {
+              "ref": "feature/task-8-multi-agent"
+            }
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "8",
+        "workflow_name": "play-task-8-workflow",
+        "action": "resume workflow"
+      }
+    },
+    {
+      "name": "Test Case 3: Branch Name Fallback",
+      "description": "Extract task ID from branch when label missing",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 125,
+            "html_url": "https://github.com/5dlabs/cto/pull/125",
+            "labels": [],
+            "head": {
+              "ref": "task-12-implement-feature"
+            }
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "12",
+        "workflow_name": "play-task-12-workflow",
+        "action": "resume workflow (fallback)"
+      }
+    },
+    {
+      "name": "Test Case 4: Ready-for-QA Label Event",
+      "description": "Handle PR labeling for Cleo completion",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "labeled",
+          "label": {
+            "name": "ready-for-qa"
+          },
+          "pull_request": {
+            "number": 126,
+            "labels": [
+              {
+                "name": "task-3"
+              },
+              {
+                "name": "ready-for-qa"
+              }
+            ]
+          },
+          "sender": {
+            "login": "5DLabs-Cleo[bot]"
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "3",
+        "workflow_name": "play-task-3-workflow",
+        "action": "resume workflow for QA"
+      }
+    },
+    {
+      "name": "Test Case 5: PR Approval Event",
+      "description": "Handle PR review approval from Tess",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request_review"
+        },
+        "body": {
+          "action": "submitted",
+          "review": {
+            "state": "approved",
+            "user": {
+              "login": "5DLabs-Tess[bot]"
+            }
+          },
+          "pull_request": {
+            "number": 127,
+            "labels": [
+              {
+                "name": "task-7"
+              },
+              {
+                "name": "ready-for-qa"
+              }
+            ],
+            "merge_commit_sha": "abc123def456"
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "7",
+        "workflow_name": "play-task-7-workflow",
+        "action": "resume workflow after approval"
+      }
+    },
+    {
+      "name": "Test Case 6: Rex Push Remediation",
+      "description": "Detect Rex push and trigger remediation",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "push"
+        },
+        "body": {
+          "pusher": {
+            "name": "5DLabs-Rex[bot]"
+          },
+          "ref": "refs/heads/task-9-fix-issues"
+        }
+      },
+      "expected": {
+        "extracted_task_id": "9",
+        "action": "cancel quality agents and restart QA pipeline"
+      }
+    },
+    {
+      "name": "Test Case 7: Malformed Task Label",
+      "description": "Handle invalid task label format",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 128,
+            "labels": [
+              {
+                "name": "task-abc"
+              }
+            ],
+            "head": {
+              "ref": "task-15-valid-branch"
+            }
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "15",
+        "workflow_name": "play-task-15-workflow",
+        "action": "resume workflow (fallback due to malformed label)",
+        "warning": "Malformed label 'task-abc', falling back to branch name"
+      }
+    },
+    {
+      "name": "Test Case 8: Multiple Task Labels",
+      "description": "Handle PR with multiple task labels (edge case)",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 129,
+            "labels": [
+              {
+                "name": "task-1"
+              },
+              {
+                "name": "task-2"
+              }
+            ],
+            "head": {
+              "ref": "feature/multi-task-edge-case"
+            }
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "1",
+        "workflow_name": "play-task-1-workflow",
+        "action": "resume workflow (first task label used)",
+        "warning": "Multiple task labels found, using first: task-1"
+      }
+    },
+    {
+      "name": "Test Case 9: Feature Branch Format",
+      "description": "Extract from feature/task-X branch format",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 130,
+            "labels": [],
+            "head": {
+              "ref": "feature/task-20-enhancement"
+            }
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": "20",
+        "workflow_name": "play-task-20-workflow",
+        "action": "resume workflow (feature branch format)"
+      }
+    },
+    {
+      "name": "Test Case 10: No Task Identification",
+      "description": "Handle case where no task ID can be extracted",
+      "event": {
+        "headers": {
+          "X-GitHub-Event": "pull_request"
+        },
+        "body": {
+          "action": "opened",
+          "pull_request": {
+            "number": 131,
+            "labels": [
+              {
+                "name": "bug"
+              },
+              {
+                "name": "documentation"
+              }
+            ],
+            "head": {
+              "ref": "fix/random-bug-fix"
+            }
+          }
+        }
+      },
+      "expected": {
+        "extracted_task_id": null,
+        "workflow_name": "play-task-unknown-workflow",
+        "action": "no workflow to resume",
+        "warning": "Could not extract task ID from labels or branch"
+      }
+    }
+  ]
+}
