@@ -1,0 +1,264 @@
+---
+# Sensor for PR Created Event - Resume after implementation work
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-pr-created
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-created
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request opened events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["opened"]
+  triggers:
+    - template:
+        name: resume-after-pr-created
+        conditions: "github-pr-created"
+        argoWorkflow:
+          operation: resume
+          # Resume specific workflow by name via args
+          args: []
+          parameters:
+            # Extract task ID from PR labels and construct deterministic workflow name
+            - src:
+                dependencyName: github-pr-created
+                dataTemplate: |
+                  {{ range $i, $l := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix $l.name "task-" }}
+                      {{ $p := splitList "-" $l.name }}
+                      {{ if gt (len $p) 1 }}
+                        play-task-{{ index $p 1 }}-workflow
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: args.0
+            # Pass PR URL to resumed workflow
+            - src:
+                dependencyName: github-pr-created
+                dataKey: body.pull_request.html_url
+              dest: spec.arguments.parameters.pr-url
+            # Pass PR number to resumed workflow
+            - src:
+                dependencyName: github-pr-created
+                dataKey: body.pull_request.number
+              dest: spec.arguments.parameters.pr-number
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+
+---
+# Sensor for Ready-for-QA Label Added - Resume after quality work
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-ready-for-qa
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-label-added
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request labeled events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["labeled"]
+          # Check if the label added is "ready-for-qa"
+          - path: body.label.name
+            type: string
+            value: ["ready-for-qa"]
+  triggers:
+    - template:
+        name: resume-after-ready-for-qa
+        conditions: "github-label-added"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Extract task ID from PR labels to find workflow
+            - src:
+                dependencyName: github-label-added
+                dataTemplate: |
+                  {{ range $i, $l := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix $l.name "task-" }}
+                      {{ $p := splitList "-" $l.name }}
+                      {{ if gt (len $p) 1 }}
+                        play-task-{{ index $p 1 }}-workflow
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: args.0
+            # Pass QA ready status
+            - src:
+                dependencyName: github-label-added
+                dataTemplate: "ready"
+              dest: spec.arguments.parameters.qa-status
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+
+---
+# Sensor for PR Approved - Resume after testing work
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-pr-approved
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-approved
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request_review events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request_review"]
+          - path: body.action
+            type: string
+            value: ["submitted"]
+          # Check if the review state is approved
+          - path: body.review.state
+            type: string
+            value: ["approved"]
+          # Check if reviewer is Tess
+          - path: body.review.user.login
+            type: string
+            comparator: "~"
+            value: "5DLabs-Tess.*"
+  triggers:
+    - template:
+        name: resume-after-pr-approved
+        conditions: "github-pr-approved"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Extract task ID from PR labels to find workflow
+            - src:
+                dependencyName: github-pr-approved
+                dataTemplate: |
+                  {{ range $i, $l := .Input.body.pull_request.labels }}
+                    {{ if hasPrefix $l.name "task-" }}
+                      {{ $p := splitList "-" $l.name }}
+                      {{ if gt (len $p) 1 }}
+                        play-task-{{ index $p 1 }}-workflow
+                      {{ end }}
+                    {{ end }}
+                  {{ end }}
+              dest: args.0
+            # Pass approval status
+            - src:
+                dependencyName: github-pr-approved
+                dataTemplate: "approved"
+              dest: spec.arguments.parameters.qa-status
+            # Pass merge commit SHA if available
+            - src:
+                dependencyName: github-pr-approved
+                dataKey: body.pull_request.merge_commit_sha
+              dest: spec.arguments.parameters.merge-sha
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+
+---
+# Sensor for Implementation Agent Remediation - Cancel running quality/testing agents
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: implementation-agent-remediation
+  namespace: argo
+  labels:
+    sensor-type: multi-agent-orchestration
+    agent-class: implementation
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: implementation-push-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for push events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["push"]
+          # Match any 5DLabs implementation agent (Rex, Blaze, Morgan)
+          - path: body.pusher.name
+            type: string
+            comparator: "~"
+            value: "5DLabs-(Rex|Blaze|Morgan)(\\[bot\\])?|5DLabs-(Rex|Blaze|Morgan)"
+          # Ensure push is to a task branch
+          - path: body.ref
+            type: string
+            comparator: "~"
+            value: "refs/heads/(task|feature/task)-.*"
+  triggers:
+    # Cancel running quality/testing agents
+    - template:
+        name: cancel-quality-agents
+        conditions: "implementation-push-event"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                generateName: cancel-quality-agents-
+                namespace: argo
+              spec:
+                template:
+                  spec:
+                    serviceAccountName: argo-events-sa
+                    restartPolicy: Never
+                    containers:
+                    - name: cancel-agents
+                      image: bitnami/kubectl:latest
+                      command:
+                      - /bin/sh
+                      - -c
+                      - |
+                        echo "Implementation agent pushed, canceling quality/testing agents..."
+                        
+                        # Get task ID from branch name
+                        BRANCH="{{ .Input.body.ref }}"
+                        TASK_ID=$(echo "$BRANCH" | grep -oE 'task-[0-9]+' | cut -d'-' -f2)
+                        echo "Task ID: $TASK_ID"
+                        
+                        # Cancel Cleo and Tess CodeRuns for this task
+                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
+                        kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
+                        
+                        echo "Quality agents canceled for task $TASK_ID"
+                ttlSecondsAfterFinished: 60
+      retryStrategy:
+        steps: 2
+        duration: "5s"

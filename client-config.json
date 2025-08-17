@@ -1,7 +1,7 @@
 {
   "remoteTools": [
     "memory_create_entities",
-    "memory_add_observations", 
+    "memory_add_observations",
     "brave_web_search"
   ],
   "localServers": {
@@ -12,7 +12,7 @@
       "workingDirectory": "project_root"
     },
     "kubernetes": {
-      "command": "npx",
+      "command": "npx", 
       "args": ["-y", "@kubernetes/mcp-server-kubernetes"],
       "tools": ["listResources", "describeResource", "createResource", "deleteResource", "applyResource"],
       "workingDirectory": "project_root"
