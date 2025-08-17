@@ -1,0 +1,11 @@
+# Task ID: 13
+# Title: Implement Task Progression Logic
+# Status: pending
+# Dependencies: 3, 7
+# Priority: low
+# Description: Build workflow logic to move completed tasks to .completed directory and discover next pending task
+# Details:
+Add workflow step after PR merge to move task directory: 'mv docs/.taskmaster/docs/task-X/ docs/.taskmaster/docs/.completed/'. Implement task discovery using: 'find docs/.taskmaster/docs/ -maxdepth 1 -name "task-*" -type d | grep -v ".completed" | sort -V | head -1'. Create workflow loop to continue with next task if found. Handle edge cases: no more tasks, invalid task structure. Use Argo Workflows loops or recursive templates.
+
+# Test Strategy:
+Test task movement after successful completion. Verify next task discovery with various directory structures. Test edge cases: last task, missing tasks, corrupted structure. Validate workflow continues seamlessly.

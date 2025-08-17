@@ -1,0 +1,11 @@
+# Task ID: 22
+# Title: Implement Resource Management
+# Status: pending
+# Dependencies: 15
+# Priority: low
+# Description: Configure resource limits, quotas, and autoscaling for agent pods and workflow components
+# Details:
+Set resource requests/limits for agent pods (CPU: 2-4 cores, Memory: 8-16Gi based on model). Configure PVC size limits per agent (start with 10Gi). Implement workflow-level resource quotas. Setup HPA for controller deployment. Configure pod priority classes for critical workflows. Implement resource monitoring and alerting. Consider using Kubernetes VPA for right-sizing.
+
+# Test Strategy:
+Test agents run within resource limits. Verify OOM handling and recovery. Test autoscaling under load. Validate quota enforcement. Monitor resource utilization patterns. Test priority scheduling under contention.

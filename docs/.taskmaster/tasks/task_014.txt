@@ -1,0 +1,11 @@
+# Task ID: 14
+# Title: Build Workflow Resume Operations
+# Status: pending
+# Dependencies: 5, 7, 10
+# Priority: medium
+# Description: Implement robust workflow resume operations for each suspension point with proper event correlation
+# Details:
+Implement resume operations using Argo Workflows API or kubectl. Each resume must validate: correct workflow (by labels), correct stage, valid event data. Add retry logic with exponential backoff for resume failures. Log all resume attempts for debugging. Consider using Argo Workflows SDK for programmatic control. Implement circuit breaker pattern for repeated failures.
+
+# Test Strategy:
+Test resume operations at each suspension point. Verify only correct workflows resume. Test concurrent resume attempts. Validate retry logic under API failures. Monitor resume latency and success rates.

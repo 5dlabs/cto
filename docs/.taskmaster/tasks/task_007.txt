@@ -1,0 +1,11 @@
+# Task ID: 7
+# Title: Implement Workflow Stage Transitions
+# Status: pending
+# Dependencies: 3, 5
+# Priority: medium
+# Description: Create workflow template logic to update current-stage labels and handle transitions between agent phases
+# Details:
+Implement label update mechanism after each DAG task completes. Use Argo Workflows resource template to patch workflow labels via Kubernetes API. Stage progression: waiting-pr-created → waiting-ready-for-qa → waiting-pr-approved. Ensure atomic label updates to prevent race conditions. Use workflow.labels for dynamic label management. Implement using inline script or resource operation with kubectl patch commands.
+
+# Test Strategy:
+Verify label updates occur at correct workflow stages. Test concurrent label updates don't cause conflicts. Confirm Sensor correctly targets workflows based on stage labels. Monitor for label update failures in workflow logs.
