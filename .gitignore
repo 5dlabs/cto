@@ -79,8 +79,9 @@ agent_*.md
 
 *.private-key.pem
 
+# Local temp working dir for ephemeral clones
+.tmp/
+
 # Task files
 # tasks.json
 # tasks/ 
-# Local temp working dir for ephemeral clones
-.tmp/

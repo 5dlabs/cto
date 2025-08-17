@@ -1,170 +1,642 @@
-# Multi-Agent, Event-Driven Orchestration — Product Requirements Document
+<context>
+# Overview  
+The Play Workflow is a sophisticated, event-driven, multi-agent orchestration system that processes software development tasks through automated quality gates. This system orchestrates three specialized AI agents (Rex, Cleo, Tess) working sequentially on GitHub pull requests, with each agent having distinct responsibilities and separate persistent workspaces. The workflow leverages real GitHub PR interactions, live Kubernetes deployment testing, and comprehensive quality assurance before human approval.
 
-## 1. Summary
-Build an Argo-centric, event-driven, multi-agent orchestration that can "press play" on a backlog and autonomously progress tasks to Done (merged). We continue using the existing CodeRun/DocsRun CRDs for job execution while orchestrating them via Argo Workflows (DAGs) triggered by Argo Events from GitHub.
+# Core Features  
+## Event-Driven Multi-Agent Pipeline
+- **Sequential Agent Processing**: Rex (implementation) → Cleo (code quality) → Tess (testing/validation) → Human approval
+- **Real GitHub Integration**: Actual PR creation, labeling, commenting, and approval workflows
+- **Live Infrastructure Testing**: Tess deploys and tests in real Kubernetes environments
+- **Feedback Loop Support**: Rex can restart at any point based on PR comments, automatically canceling downstream work
 
-Decision: Do not introduce NEW orchestration CRDs (like TaskSequence). Continue using existing CodeRun/DocsRun CRDs as the execution primitives. Orchestration logic lives entirely in Argo Workflows + Events. Agents are realized as profiles with dedicated system prompts and shared runtime.
+## Agent Specialization & Workspace Isolation
+- **Configurable Agent Selection**: No hardcoded agent names - implementation agent can be Rex, Blaze, or future agents
+- **Agent-Specific Workspaces**: Each agent maintains independent PVC workspaces (`workspace-{service}-{agent}`)
+- **Session Continuity**: Agents continue their own previous sessions, building expertise over time
+- **Live Input Capability**: Can send inputs to struggling agents via MCP input tool during execution
+- **Documentation-First Approach**: Implementation agents query MCP documentation server before coding
 
-## 2. Goals
-- Orchestrate tasks across specialized agents (authoring → clippy/lint → testing → deploy → acceptance) until merged.
-- React to GitHub events to resume or branch workflows (PR comments, issues, CI failures, merges, pushes).
-- Batch and parallelize independent tasks safely with rate limits.
-- Keep prompts configurable per agent profile without code changes; rely on agents ConfigMap and Workflow parameters.
-- Provide clear acceptance gating, observability, and auditability.
+## Robust Task Association & Correlation
+- **Multi-Method Validation**: PR labels (`task-3`), branch naming (`task-3-feature`), and workflow marker files
+- **Event Correlation**: GitHub webhook payloads correlate with suspended workflows via task labels
+- **Explicit Handoff Signals**: Cleo adds "ready-for-qa" label to signal completion to Tess
+- **Workflow State Management**: Workflows update their stage labels for precise event targeting
 
-## 3. Non-goals
-- No new custom resources for orchestration (e.g., no TaskSequence CRD).
-- No changes to existing CodeRun/DocsRun CRDs or their controllers.
-- No immediate auto-merge policies that bypass required reviews.
+# User Experience  
+## User Personas
+- **Platform Engineer**: Triggers "press play" to start multi-task processing
+- **CTO/Reviewer**: Provides PR feedback that triggers Rex remediation cycles
+- **Agent Operators**: Monitor agent progress through Argo Workflows UI, can provide live input during execution
 
-## 4. Users and scenarios
-- Platform engineer: triggers "press play" to process backlog across repos/services.
-- Reviewer: leaves PR comments → Rex (implementation agent) re-invoked with comments to apply fixes.
-- CI system: failing checks → Triage agent attempts fixes.
-- Product owner: files GitHub issues → Issue agent converts to implementation.
-- Security team: vulnerability reports generated → Security agent remediates issues.
-- QA: PR opened → Clippy formats/fixes warnings → QA agent adds tests, MUST verify in K8s with proof (logs/responses), can approve PRs.
+## Key User Flows
+1. **Happy Path**: Manual trigger → Rex implementation → Cleo quality → Tess validation → Human merge
+2. **Feedback Loop**: PR comment → Rex restart → Cancel running Cleo/Tess → Fresh QA pipeline
+3. **Live Monitoring**: Track multi-week workflows through Argo UI with clear stage indicators
+4. **Task Progression**: Completed tasks moved to `.completed/` directory, workflow continues to next task
 
-## 5. Functional requirements (FR)
-FR1. Press Play: A single manual trigger starts a project DAG that sequences/batches tasks.
-FR2. PR flow: Clippy (format + pedantic fixes) → QA (test-only, leaves comments if implementation needs changes).
-FR3. Task/Issue flow: Rex (implement) → Clippy → QA → deploy → acceptance.
-FR4. Event reactions: PR comments trigger Rex with downloaded comments; CI failures trigger Triage agent; security scans trigger Security agent.
-FR5. Parallelism: Independent tasks run concurrently using git worktrees as working directories (or separate PVCs).
-FR6. Prompting: Task prompt from `task/prompt.md`; agent persona from system prompt based on `github-app` parameter.
-FR7. Simplified API: Auto-detect parameters to reduce to 1-2 required arguments.
-FR8. Project-wide MCP tools: Tool configuration at project level in requirements (not per-task).
-FR9. Comment retrieval: Easy MCP tool/API for PR comment downloading.
-FR10. Compliance gates: Enforce fmt/clippy pedantic/zero warnings; QA must verify in K8s with proof before approval.
+## UI/UX Considerations
+- **Single Workflow Visibility**: Entire multi-agent process visible in Argo Workflows UI
+- **Clear Stage Indicators**: Workflow labels show current stage (waiting-pr-created, waiting-ready-for-qa, etc.)
+- **Agent Status Tracking**: Rich CRD status reporting for each agent with phase/condition details
+</context>
 
-## 6. Non-functional requirements (NFR)
-- Reliability: Recoverable from controller/runner restarts; no stuck state.
-- Security: GitHub App auth only; no PATs. Secrets via External Secrets.
-- Observability: OTEL traces and metrics; logs easy to correlate by repo/PR/task.
-- Cost control: Concurrency limits, batching windows.
+<PRD>
+# Technical Architecture  
 
-## 7. Architecture (high level)
-- Argo Events: GitHub EventSource + Sensors map events to Workflow parameters (repo, PR, branch, taskId, agent type).
-- Argo Workflows (primary orchestrator): DAG expresses agent steps. Each step creates CodeRun CRs which the existing controller executes.
-- CodeRun/DocsRun CRDs: Existing execution primitives remain unchanged; controller handles job lifecycle.
-- Agents ConfigMap: Declarative agent profiles in Helm values render to `controller-agents` ConfigMap with `*_system-prompt.md` files.
-- GitHub Actions + Argo CD: CI builds and deploys; Argo CD syncs from `main`. Preview environments optional per PR.
-- Telemetry: OTEL collector, Grafana/Victoria Dashboards already present in `infra/telemetry`.
+## System Components
 
-Example DAG flows:
+### Core Infrastructure
+- **Argo Workflows**: Primary orchestrator using DAG with suspend/resume patterns
+- **Argo Events**: GitHub webhook processing and workflow correlation
+- **CodeRun CRDs**: Existing execution primitives for agent jobs (no schema changes required)
+- **Kubernetes Controller**: Existing controller handles CRD lifecycle and agent pod creation
+- **GitHub Apps**: Agent-specific authentication (5DLabs-Rex, 5DLabs-Cleo, 5DLabs-Tess)
 
-**PR Validation Flow:**
+### Agent Architecture
 ```yaml
-- name: pr-validation
-  dag:
-    tasks:
-      - name: clippy-format
-        templateRef: { name: coderun-template, template: coderun-main }
-        arguments: { parameters: [{ name: github-app, value: clippy-agent }, ...] }
-        
-      - name: qa-testing
-        dependencies: [clippy-format]
-        templateRef: { name: coderun-template, template: coderun-main }
-        arguments: { parameters: [{ name: github-app, value: qa-agent }, ...] }
+Agent Specialization:
+- Rex/Blaze: Implementation agents with MCP documentation access
+- Cleo: Code quality specialist (Clippy pedantic, formatting, CI validation)  
+- Tess: QA specialist (code review, live K8s testing, test coverage enhancement)
+
+Workspace Isolation:
+- workspace-{service}-rex: Rex's persistent workspace
+- workspace-{service}-cleo: Cleo's persistent workspace
+- workspace-{service}-tess: Tess's persistent workspace
 ```
 
-**Task/Issue Implementation Flow:**
+### Event-Driven Workflow Structure
 ```yaml
-- name: implementation
-  dag:
-    tasks:
-      - name: implement
-        templateRef: { name: coderun-template, template: coderun-main }
-        arguments: { parameters: [{ name: github-app, value: rex }, ...] }
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: play-workflow-
+  labels:
+    workflow-type: play-orchestration
+    task-id: "{{workflow.parameters.task-id}}"
+    current-stage: waiting-pr-created
+spec:
+  entrypoint: main
+  activeDeadlineSeconds: 1209600  # 14 days for realistic development cycles
+  arguments:
+    parameters:
+    - name: implementation-agent
+      description: "Implementation agent to use (5DLabs-Rex, 5DLabs-Blaze, etc.)"
+      default: "5DLabs-Rex"
+    - name: quality-agent
+      description: "Code quality agent to use"
+      default: "5DLabs-Cleo"
+    - name: testing-agent
+      description: "Testing/QA agent to use"
+      default: "5DLabs-Tess"
+    
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: implementation-work
+        template: agent-coderun
+        arguments:
+          parameters:
+          - name: github-app
+            value: "{{workflow.parameters.implementation-agent}}"
+      
+      - name: wait-pr-created
+        dependencies: [implementation-work]
+        template: suspend-for-webhook
         
-      - name: clippy-format
-        dependencies: [implement]
-        templateRef: { name: coderun-template, template: coderun-main }
-        arguments: { parameters: [{ name: github-app, value: clippy-agent }, ...] }
+      - name: quality-work  
+        dependencies: [wait-pr-created]
+        template: agent-coderun
+        arguments:
+          parameters:
+          - name: github-app
+            value: "{{workflow.parameters.quality-agent}}"
+            
+      - name: wait-ready-for-qa
+        dependencies: [quality-work]
+        template: suspend-for-webhook
         
-      - name: qa-testing
-        dependencies: [clippy-format]
-        templateRef: { name: coderun-template, template: coderun-main }
-        arguments: { parameters: [{ name: github-app, value: qa-agent }, ...] }
+      - name: testing-work
+        dependencies: [wait-ready-for-qa]
+        template: agent-coderun
+        arguments:
+          parameters:
+          - name: github-app
+            value: "{{workflow.parameters.testing-agent}}"
+            
+      - name: wait-pr-approved
+        dependencies: [testing-work]
+        template: suspend-for-webhook
+        
+      - name: complete-task
+        dependencies: [wait-pr-approved]
+        template: mark-task-complete
+        
+  - name: suspend-for-webhook
+    suspend: {}  # Indefinite suspend until external resume
 ```
 
-Agent personas:
-- **Morgan**: PM orchestrator with awareness of all agents
-- **Rex**: Primary implementation
-- **Clippy**: Formatting + pedantic warnings
-- **QA**: Tests only, strict verification in K8s environment with proof, can approve PRs
-- **Triage**: CI failure remediation
-- **Security**: Vulnerability remediation
+## Data Models
 
-## 8. Prompting strategy
-- System prompts: Per-agent persona in Helm `values.yaml -> agents[*]` rendered into `controller-agents` ConfigMap.
-- Each GitHub App has distinct character/persona with specialized system prompt.
-- User prompt: `task/prompt.md` from docs service (same for all agents working on task).
-- Project-wide MCP tools: Defined in requirements.yaml at project level (not per-task).
-- Simplified arguments: Auto-detect most parameters to reduce to 1-2 required args.
+### Task Association Strategy
+```yaml
+Multi-Method Validation:
+- Primary: PR Labels (task-3) - webhook detection
+- Secondary: Branch naming (task-3-feature) - human readability
+- Fallback: Marker file (docs/.taskmaster/current-task.json) - workflow control
+- Validation: All methods must match or workflow fails
+```
 
-## 9. Event mapping
-- `pull_request` opened/updated → Clippy Agent → QA Agent flow.
-- `issue_comment` or `pull_request_review_comment` → Rex re-invoked with downloaded comments.
-- `workflow_run`/`check_run` failure → Triage Agent attempts fixes.
-- `issues` opened → Issue Agent → implementation flow.
-- Security scan complete → Security Agent reads reports and remediates.
-- `push`/merge → orchestrator resumes next task(s) or closes workflow.
+### GitHub Webhook Correlation
+```json
+{
+  "action": "opened",
+  "pull_request": {
+    "number": 123,
+    "labels": [
+      {
+        "id": 12345,
+        "name": "task-3",        # Correlation key
+        "color": "ff0000"
+      }
+    ],
+    "head": {
+      "ref": "task-3-implement-auth"  # Secondary correlation
+    }
+  }
+}
+```
 
-## 10. Security
-- Use GitHub App secrets (app-id, private-key) from External Secrets.
-- Least-privilege scopes; avoid long-lived tokens.
+### Event Correlation Logic
+```bash
+# Extract task ID from webhook payload
+TASK_FROM_LABEL=$(jq -r '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]' webhook.json)
 
-## 11. Observability
-- Emit span/metric per agent step with correlation labels: repo, prNumber, taskId, agent.
-- Surface links to PRs, Actions runs, and deployments as workflow outputs.
+# Target specific workflow instance
+labelSelector: "workflow-type=play-orchestration,task-id={{extracted-task-id}},current-stage=waiting-pr-created"
+```
 
-## 12. Implementation steps
-I1. **Simplify API**: Auto-detect parameters, reduce to 1-2 required arguments.
-I2. **Standardize structure**: Use docs in same project (no separate docs repo).
-I3. **Project-wide tools**: Move MCP configuration to project-level requirements.yaml.
-I4. **Define agent personas**: Create GitHub Apps for Morgan, Rex, Clippy, QA, Triage, Security, etc.
-I5. **Comment retrieval**: Implement MCP tool/API for efficient PR comment downloading.
-I6. **PR flow**: Implement Clippy → QA validation flow for pull requests.
-I7. **Orchestrator DAG**: Create WorkflowTemplate chaining CodeRun CRs with agent personas.
-I8. **Event sensors**: Configure for PR, issue, comment, CI failure, security events.
-I9. **Parallel execution**: Git worktrees as working directories (or separate PVCs).
-I10. **Telemetry**: Track orchestration metrics alongside CodeRun metrics.
+## APIs and Integrations
 
-## 13. Deliverables
-- Orchestrator DAG WorkflowTemplates for PR flow and implementation flow.
-- Agent personas/GitHub Apps: Morgan, Rex, Clippy, QA, Triage, Security, PR Comment, Issue.
-- Specialized system prompts for each agent persona in Helm values.
-- Event Sensors for PRs, issues, comments, CI failures, security scans.
-- MCP tool/API for PR comment retrieval.
-- Git worktree support (worktree root as working directory) or separate PVCs for isolation.
-- Simplified CodeRun API with auto-detection (1-2 required args).
-- Project-wide MCP tool configuration in requirements.yaml.
-- Documentation in `docs/.taskmaster/docs/architecture.md` and this PRD.
+### Argo Events Sensor Configuration
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-github-events
+spec:
+  dependencies:
+  - name: github-pr-created
+    eventSourceName: github-webhook
+    eventName: pull-request-opened
+  - name: github-pr-labeled
+    eventSourceName: github-webhook
+    eventName: pull-request-labeled
+  - name: github-pr-approved
+    eventSourceName: github-webhook
+    eventName: pull-request-review
+    
+  triggers:
+  - template:
+      name: resume-workflow-on-event
+      argoWorkflow:
+        operation: resume
+        source:
+          resource:
+            labelSelector: |
+              workflow-type=play-orchestration,
+              task-id={{extracted-task-id}},
+              current-stage={{target-stage}}
+```
 
-## 14. Acceptance criteria
-- PR flow: Clippy formats and fixes warnings, QA adds tests and MUST verify in Kubernetes with proof (logs/responses).
-- QA agent can approve PRs (but not merge) after strict verification.
-- Task flow: Rex implements, Clippy cleans, QA tests, deploys, validates acceptance.
-- PR comment triggers Rex with downloaded comments and results in fixes.
-- CI failure triggers Triage agent and results in fix commits.
-- Security scan triggers Security agent to remediate vulnerabilities.
-- Parallel tasks execute using git worktrees as working directories (or separate PVCs).
-- API simplified to 1-2 required arguments with high success rate.
-- All agents have distinct personas and specialized prompts.
+### Rex Remediation System
+```yaml
+# Separate sensor for Rex feedback loops
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: rex-remediation-restart
+spec:
+  dependencies:
+  - name: rex-push-event
+    eventSourceName: github-webhook
+    eventName: push
+    filters:
+      data:
+      - path: sender.login
+        type: string
+        value: "5DLabs-Rex[bot]"
+        
+  triggers:
+  - template:
+      name: restart-qa-pipeline
+      k8s:
+        operation: delete
+        source:
+          resource:
+            apiVersion: agents.platform/v1
+            kind: CodeRun
+            metadata:
+              labelSelector: "task-id={{extracted-task-id}},github-app!=5DLabs-Rex"
+```
 
-## 15. Risks and mitigations
-- Orchestrator complexity: Start with a single-task DAG; add parallelism later.
-- Event storms: Add debounce and per-repo concurrency limits.
-- Secret sprawl: Centralize via External Secrets; minimize env leak in logs.
+### Template System Modifications
+```handlebars
+Agent-Specific CLAUDE.md Memory:
+# Agent: {{github_app}}
+{{#if (eq github_app "5DLabs-Cleo")}}
+## Role: Code Quality & Formatting Specialist
+- Focus on Clippy pedantic compliance
+- Zero tolerance for formatting issues
+- CRITICAL: Add "ready-for-qa" label when work complete and tests pass
+{{else if (eq github_app "5DLabs-Tess")}}
+## Role: Quality Assurance & Testing Specialist
+- Comprehensive code review against acceptance criteria
+- Live Kubernetes deployment testing
+- Test coverage enhancement - add missing unit/integration tests
+- 120% satisfaction requirement before approval
+- Only start work when PR has "ready-for-qa" label
+{{/if}}
 
-## 16. Open questions
-- Git worktree: Use worktree root as working directory vs separate PVCs for complete isolation?
-- Comment retrieval: Extract from webhook payload vs GitHub MCP tool (document in prompt)?
-- Security reports: Use GitHub CLI with CodeQL (`gh api` commands)?
+Agent-Specific MCP Tools:
+{{#if (eq github_app "5DLabs-Cleo")}}
+  "remoteTools": [
+    "rustdocs_query_rust_docs",
+    "brave-search_brave_web_search",
+    "memory_create_entities"
+  ]
+{{else if (eq github_app "5DLabs-Tess")}}
+  "remoteTools": [
+    "kubernetes_listResources",
+    "kubernetes_describeResource",
+    "memory_create_entities",
+    "brave-search_brave_web_search"
+  ]
+{{/if}}
+```
 
-## 17. Decisions made
-- No auto-merge: QA agent can approve but not merge
-- Morgan PM: Out of scope for current sprint
-- Preview environments: Use existing namespaces (avoid secret duplication)
-- Event storm guardrails: Address if/when it becomes a problem
+## Infrastructure Requirements
+
+### CodeRun Controller Modifications
+```rust
+// Agent-specific PVC naming
+let pvc_name = format!("workspace-{}-{}", 
+    code_run.spec.service,
+    extract_agent_name(&code_run.spec.github_app)  // "rex", "cleo", "tess"
+);
+
+// Template resolution with agent-specific conditionals
+fn load_agent_template(github_app: &str, template_name: &str) -> Result<String> {
+    // Check for agent-specific template first
+    let agent_specific = format!("agents/{}-{}.hbs", 
+        extract_agent_name(github_app), 
+        template_name
+    );
+    
+    if template_exists(&agent_specific) {
+        load_template(&agent_specific)
+    } else {
+        load_template(&format!("code/{}.hbs", template_name))
+    }
+}
+```
+
+### RBAC Requirements for Tess
+```yaml
+# Tess needs extensive permissions for live testing
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tess-testing-permissions
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin  # Broad permissions for lab environment
+subjects:
+- kind: ServiceAccount
+  name: coderun-tess
+  namespace: agent-platform
+```
+
+### External Secrets Configuration
+```yaml
+# Agent-specific GitHub App secrets
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: github-app-5dlabs-cleo
+  namespace: agent-platform
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: secret-store
+    kind: ClusterSecretStore
+  target:
+    name: github-app-5dlabs-cleo
+    creationPolicy: Owner
+  data:
+  - secretKey: app-id
+    remoteRef:
+      key: github-app-cleo
+      property: app_id
+  - secretKey: private-key
+    remoteRef:
+      key: github-app-cleo
+      property: private_key
+  - secretKey: client-id
+    remoteRef:
+      key: github-app-cleo
+      property: client_id
+```
+
+# Development Roadmap  
+
+## Phase 1: Discovery & Analysis (Foundation)
+### Infrastructure Deep Dive
+- **CodeRun Controller Analysis**: Trace CRD processing from submission to pod creation
+- **Template System Mapping**: Document Handlebars context structure and template loading
+- **Event System Documentation**: Current Argo Events setup and GitHub webhook processing
+- **PVC Management Understanding**: How workspace persistence currently works
+- **Secret Flow Analysis**: GitHub App credentials → External Secrets → Agent containers
+
+### Deliverables
+- Complete architecture documentation of existing system
+- Gap analysis: what needs modification vs. new implementation
+- Compatibility assessment for existing Rex/Blaze workflows
+- Implementation roadmap with technical dependencies
+
+## Phase 2: Proof of Concept (Validation)
+### Argo Events Correlation Testing
+- Build minimal sensor/eventsource to validate GitHub webhook → workflow correlation
+- Test PR label extraction and task ID parsing
+- Validate suspend/resume patterns with real GitHub events
+- Prototype multi-stage workflow progression
+
+### Agent-Specific PVC Implementation
+- Modify controller to extract agent name from `github_app` field
+- Implement agent-specific PVC naming: `workspace-{service}-{agent}`
+- Test workspace isolation between agents
+- Validate session continuity for individual agents
+
+### Deliverables
+- Working Argo Events correlation with GitHub PRs
+- Agent workspace isolation proof of concept
+- Event-driven workflow state transitions
+
+## Phase 3: Template System Enhancement (Agent Specialization)
+### Agent-Specific Template Development
+```
+Template Structure:
+infra/charts/controller/claude-templates/
+├── agents/                          # NEW: Agent-specific prompts
+│   ├── cleo-system-prompt.md.hbs
+│   ├── tess-system-prompt.md.hbs
+│   └── rex-system-prompt.md.hbs
+├── code/
+│   ├── claude.md.hbs               # MODIFY: Agent conditionals
+│   ├── client-config.json.hbs      # MODIFY: Tool configurations
+│   ├── container.sh.hbs            # MODIFY: Agent setup
+│   └── settings.json.hbs           # MODIFY: Agent settings
+```
+
+### Agent Behavior Implementation
+- **Configurable Agent Selection**: Workflow parameters for implementation-agent, quality-agent, testing-agent
+- **No Hardcoded Agent Names**: All agent references parameterized for flexibility
+- **Cleo Specialization**: Code quality focus, "ready-for-qa" label addition
+- **Tess Specialization**: Live K8s testing, test coverage enhancement, comprehensive validation
+- **Implementation Agent Enhancement**: Task labeling compliance, documentation-first approach
+
+### Deliverables
+- Complete agent-specific template system with configurable agent selection
+- Agent behavior specialization implemented without hardcoded names
+- Template modification without breaking existing workflows
+- Support for multiple implementation agents (Rex, Blaze, future agents)
+
+## Phase 4: Multi-Agent Pipeline Integration (Orchestration)
+### Complete Workflow Implementation
+- **Play Template Recreation**: Build new configurable play-template.yaml (archived hardcoded version needs full rebuild)
+- **Parameterized Agent Pipeline**: Implementation → Quality → Testing with configurable agent selection
+- **Event-driven stage transitions** with webhook correlation
+- **Explicit handoff signals** (ready-for-qa labeling)
+- **Task completion and progression logic**
+
+### Rex Remediation System
+- PR comment detection and Rex restart logic
+- Automatic cancellation of running Cleo/Tess work
+- QA pipeline restart with fresh code
+- Event-based coordination for feedback loops
+
+### Deliverables
+- Full multi-agent workflow with event-driven transitions
+- Rex remediation and feedback loop handling
+- Complete task progression through quality gates
+
+## Phase 5: Testing & Validation (Quality Assurance)
+### End-to-End Workflow Testing
+- Multi-week workflow execution testing
+- Agent failure scenario validation
+- GitHub webhook reliability testing
+- Workspace isolation and session continuity verification
+
+### System Integration Testing
+- Multiple concurrent task processing
+- Rex remediation during active Cleo/Tess work
+- Task association validation across all scenarios
+- Performance testing with realistic development timelines
+
+### Deliverables
+- Validated multi-agent orchestration system
+- Comprehensive test coverage for edge cases
+- Performance benchmarks and resource utilization data
+
+# Logical Dependency Chain
+
+## Foundation Requirements (Must Complete First)
+1. **Discovery Phase**: Complete understanding of existing infrastructure
+2. **Event Correlation**: Basic GitHub webhook → workflow targeting
+3. **Agent Workspaces**: Isolated PVC implementation
+
+## Core Pipeline Development (Sequential Dependencies)
+4. **Template System**: Agent-specific behavior and prompts
+5. **Sequential Workflow**: Rex → Cleo → Tess pipeline
+6. **Event Integration**: Suspend/resume with GitHub events
+
+## Advanced Features (Build Upon Core)
+7. **Explicit Handoffs**: ready-for-qa labeling system  
+8. **Rex Remediation**: Feedback loop and cancellation logic
+9. **Task Progression**: Automatic next-task processing
+
+## Quality & Operations (Final Layer)
+10. **Comprehensive Testing**: Multi-week workflow validation
+11. **Edge Case Handling**: Agent failures, webhook issues
+12. **Performance Optimization**: Resource management and scaling
+
+# Risks and Mitigations  
+
+## Technical Challenges
+
+### Event Correlation Complexity
+**Risk**: GitHub webhook correlation with suspended workflows may fail
+**Mitigation**: Multi-method validation (labels + branch + marker file) with strict matching requirements
+
+### Long-Running Workflow Stability  
+**Risk**: Workflows spanning weeks may hit Kubernetes/etcd limits
+**Mitigation**: 14-day timeout strategy, resource monitoring, cleanup policies for completed workflows
+
+### Agent Coordination Failures
+**Risk**: Rex remediation may not properly cancel running Cleo/Tess work
+**Mitigation**: Event-driven cancellation with kubectl delete using label selectors, state reset mechanisms
+
+## Minimum Viable Product Definition
+
+### MVP Scope: Single-Task Sequential Pipeline
+- Rex implementation → Cleo quality → Tess validation → Human approval
+- Basic event correlation via PR labels
+- Agent workspace isolation
+- Manual task progression (no automatic next-task)
+
+### MVP Success Criteria
+- Complete one full task through all quality gates
+- Validate event-driven stage transitions
+- Demonstrate agent specialization and workspace isolation
+- Handle basic Rex remediation cycle
+
+### Build-Upon Strategy
+- Start with single task, add multi-task processing
+- Begin with happy path, add feedback loop complexity
+- Implement basic features, enhance with operational robustness
+
+## Resource Constraints
+
+### Development Complexity
+**Challenge**: Modifying production controller and template system
+**Approach**: Incremental changes with backward compatibility, extensive testing in lab environment
+
+### GitHub API Limitations
+**Challenge**: Webhook reliability and rate limiting
+**Approach**: Assume webhooks work for lab, implement retry/fallback in production phase
+
+### Kubernetes Resource Management
+**Challenge**: Multiple long-running workflows consuming resources
+**Approach**: Start with small scale, implement monitoring and limits based on actual usage patterns
+
+# Appendix  
+
+## Research Findings
+
+### Argo Workflows Event Integration
+- **Confirmed Feasible**: Suspend/resume patterns work with external events
+- **Correlation Method**: Label selectors provide precise workflow targeting  
+- **Timeout Strategy**: activeDeadlineSeconds supports multi-week workflows
+- **Resource Efficiency**: Suspended workflows consume no pod resources
+
+### GitHub Webhook Payload Structure
+```json
+Confirmed webhook payloads include:
+- pull_request.labels[] array with name/id/color
+- pull_request.head.ref for branch names
+- sender.login for author identification
+- Reliable jq extraction: .pull_request.labels[?(@.name | startswith("task-"))].name
+```
+
+### CodeRun CRD Capabilities
+- **Existing Fields Support**: github_app, continue_session, service parameters
+- **No Schema Changes**: Current CRD structure sufficient for multi-agent support
+- **Template System**: Handlebars conditionals can handle agent specialization
+- **PVC Management**: Controller already handles workspace persistence
+
+## Technical Specifications
+
+### Event Detection Patterns
+```yaml
+Stage Targeting:
+- waiting-pr-created: After Rex creates PR
+- waiting-ready-for-qa: After Cleo adds ready-for-qa label  
+- waiting-pr-approved: After Tess approves PR
+
+Event Discrimination:
+- pull-request-opened: Resume from waiting-pr-created
+- pull-request-labeled: Resume from waiting-ready-for-qa (label.name = "ready-for-qa")
+- pull-request-review: Resume from waiting-pr-approved (state = approved, user = 5DLabs-Tess)
+```
+
+### Agent Workspace Specifications
+```yaml
+PVC Naming Convention:
+- Current: workspace-{service}
+- New: workspace-{service}-{agent}
+
+Examples (Dynamic based on workflow parameters):
+- workspace-cto-rex: Rex implementation workspace (when implementation-agent=5DLabs-Rex)
+- workspace-cto-blaze: Blaze implementation workspace (when implementation-agent=5DLabs-Blaze)
+- workspace-cto-cleo: Cleo code quality workspace
+- workspace-cto-tess: Tess testing workspace
+
+Benefits:
+- Clean cancellation when implementation agent pushes fixes
+- Independent agent context accumulation
+- File system operation isolation
+- Efficient restart without affecting other agents
+- Support for multiple implementation agents without conflicts
+```
+
+### Configurable Agent Selection Requirements
+```yaml
+Workflow Template Parameters (Required):
+- implementation-agent: "5DLabs-Rex" | "5DLabs-Blaze" | future agents
+- quality-agent: "5DLabs-Cleo" (default)
+- testing-agent: "5DLabs-Tess" (default)
+
+Design Principles:
+- No hardcoded agent names in workflow templates
+- All agent references via workflow parameters
+- Support for multiple implementation agents
+- Easy addition of new agents without template changes
+- Backward compatibility with existing agents
+```
+
+### Task Completion Flow
+```yaml
+Process:
+1. Human (CTO) reviews and merges PR
+2. Task marked as completed
+3. Task directory moved from docs/.taskmaster/docs/task-X/ to docs/.taskmaster/docs/.completed/task-X/
+4. Workflow discovers next pending task (task-X+1)
+5. Automatic progression to next task implementation
+
+Discovery Logic:
+find docs/.taskmaster/docs/ -maxdepth 1 -name "task-*" -type d | grep -v ".completed" | sort -V
+```
+
+### Implementation Timeline Expectations
+- **Discovery Phase**: 1-2 weeks (critical for understanding existing system)
+- **Proof of Concept**: 2-3 weeks (event correlation and workspace isolation)
+- **Template Development**: 2-3 weeks (agent specialization implementation)
+- **Pipeline Integration**: 3-4 weeks (full workflow with event handling)
+- **Testing & Validation**: 2-3 weeks (end-to-end workflow testing)
+
+**Total Estimated Timeline**: 10-15 weeks for complete multi-agent orchestration system
+
+### Quality Assurance Requirements
+
+#### Tess Validation Phases
+1. **Code Review Phase**: Comprehensive review against acceptance criteria before execution
+2. **Live Deployment Phase**: Real Kubernetes deployment with full integration testing
+3. **Test Coverage Enhancement**: Add missing unit/integration tests for near 100% coverage
+4. **Approval Gate**: 120% satisfaction requirement before PR approval
+
+#### Rex Documentation-First Approach
+1. Query MCP documentation server for relevant crate documentation
+2. Research best practices for specific implementation patterns  
+3. Verify API documentation for integrations
+4. Follow documented patterns to reduce rework cycles
+
+#### Cleo Quality Standards
+1. All Clippy pedantic warnings must be 100% resolved
+2. Full formatting compliance with zero tolerance
+3. Wait for GitHub Actions CI success before completion
+4. Add "ready-for-qa" label only when fully satisfied with quality AND tests passing
+
+This comprehensive system ensures robust, quality-focused development with proper agent specialization, workspace isolation, and event-driven orchestration suitable for real-world software development cycles.
+</PRD>

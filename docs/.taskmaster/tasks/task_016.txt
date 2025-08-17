@@ -1,0 +1,11 @@
+# Task ID: 16
+# Title: Implement Controller Template Loading
+# Status: pending
+# Dependencies: 4, 6
+# Priority: medium
+# Description: Update Rust controller to select agent-specific container scripts based on github_app field for different workflow types
+# Details:
+Modify controller/src/tasks/code/templates.rs to implement simple script selection based on agent name extracted from github_app field. Map agents to their specific container scripts: '5DLabs-Rex' or '5DLabs-Blaze' → container-rex.sh.hbs (current implementation workflow), '5DLabs-Cleo' → container-cleo.sh.hbs (code quality workflow), '5DLabs-Tess' → container-tess.sh.hbs (testing workflow). This approach avoids complex Handlebars conditionals and keeps agent workflows cleanly separated. Each container script template will contain the complete workflow logic for that specific agent.
+
+# Test Strategy:
+Unit test script selection logic for each agent type (Rex, Blaze, Cleo, Tess). Verify correct template file is loaded based on github_app value. Test fallback behavior for unknown agents. Validate that each container script template loads and compiles correctly. Test edge cases like missing templates or malformed github_app values.

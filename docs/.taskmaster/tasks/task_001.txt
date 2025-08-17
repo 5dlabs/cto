@@ -1,0 +1,61 @@
+# Task ID: 1
+# Title: Analyze Existing CodeRun Controller Architecture
+# Status: completed
+# Dependencies: None
+# Priority: high
+# Description: Perform comprehensive discovery and documentation of the existing CodeRun controller implementation, CRD structure, template system, and agent pod creation flow - COMPLETED with 47-page technical analysis
+# Details:
+DISCOVERY PHASE COMPLETE: Comprehensive analysis documented in task-1-discovery-report.md (47 pages). Key findings: 1) CRD fully supports multi-agent scenarios with github_app field and agent-specific env/secrets 2) Controller has solid reconciliation patterns with status-first idempotency and TTL safety 3) Handlebars template system ready for agent-specific customization with conditional logic support 4) Argo Events infrastructure working (rate-limited but functional) 5) GitHub App authentication flow production-ready in container.sh.hbs (1120+ lines). Infrastructure confirmed ready for multi-agent implementation with clear modification priorities identified.
+
+# Test Strategy:
+Documentation validated through actual CodeRun submissions and controller log analysis. Test CRDs confirmed the documented flow matches observed behavior. kubectl describe and controller logs verified understanding of reconciliation patterns, finalizer logic, and status updates. All compatibility requirements for existing Rex/Blaze workflows documented.
+
+# Subtasks:
+## 1. Document CRD Structure Analysis [completed]
+### Dependencies: None
+### Description: Complete analysis of CodeRun CRD with focus on multi-agent support capabilities
+### Details:
+
+
+## 2. Analyze Controller Reconciliation Logic [completed]
+### Dependencies: None
+### Description: Document reconciliation patterns, status-first idempotency, and TTL safety mechanisms
+### Details:
+
+
+## 3. Map Template System Architecture [completed]
+### Dependencies: None
+### Description: Document Handlebars template system with conditional logic capabilities for agent customization
+### Details:
+
+
+## 4. Verify Argo Events Infrastructure [completed]
+### Dependencies: None
+### Description: Confirm Argo Events working status and document rate-limiting considerations
+### Details:
+
+
+## 5. Document GitHub App Authentication [completed]
+### Dependencies: None
+### Description: Map production-ready authentication flow in container.sh.hbs template
+### Details:
+
+
+## 6. Identify Required Modifications [completed]
+### Dependencies: None
+### Description: Prioritize modifications: PVC naming, agent templates, conditionals, workflows, sensors
+### Details:
+
+
+## 7. Confirm Technical Feasibility [completed]
+### Dependencies: None
+### Description: Validate suspend/resume, event correlation, agent isolation, and template customization
+### Details:
+
+
+## 8. Generate Discovery Report [completed]
+### Dependencies: None
+### Description: Create comprehensive 47-page technical analysis document (task-1-discovery-report.md)
+### Details:
+
+
