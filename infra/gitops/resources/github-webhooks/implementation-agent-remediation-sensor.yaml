@@ -31,18 +31,44 @@ spec:
             comparator: "~"
             value: "refs/heads/task-.*"
   triggers:
-    # Trigger 1: Cancel running Cleo/Tess CodeRun CRDs
+    # Trigger 1: Create cleanup workflow to cancel running quality agents
     - template:
-        name: cancel-running-quality-agents
+        name: create-cleanup-workflow
         conditions: "implementation-push-event"
-        k8s:
-          operation: delete
+        argoWorkflow:
+          operation: submit
           source:
             resource:
-              apiVersion: agents.platform/v1
-              kind: CodeRun
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
               metadata:
+                generateName: cleanup-quality-agents-
                 namespace: argo
+              spec:
+                entrypoint: cleanup-quality-agents
+                arguments:
+                  parameters:
+                    - name: task-id
+                    - name: pushing-agent
+                templates:
+                  - name: cleanup-quality-agents
+                    inputs:
+                      parameters:
+                        - name: task-id
+                        - name: pushing-agent
+                    script:
+                      image: bitnami/kubectl:latest
+                      command: [sh]
+                      source: |
+                        #!/bin/sh
+                        echo "Implementation agent {{inputs.parameters.pushing-agent}} pushed to task-{{inputs.parameters.task-id}}"
+                        echo "Cancelling quality/testing agent CodeRuns for task-{{inputs.parameters.task-id}}"
+
+                        # Delete quality agent CodeRuns for this specific task
+                        kubectl delete coderun \
+                          -l task-id={{inputs.parameters.task-id}},github-app!=5DLabs-Rex,github-app!=5DLabs-Blaze,github-app!=5DLabs-Morgan \
+                          || true
+                        echo "QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}"
           parameters:
             # Extract task ID from branch name
             - src:
@@ -58,7 +84,7 @@ spec:
                   {{ else }}
                     0
                   {{ end }}
-              dest: taskId
+              dest: spec.arguments.parameters.0.value
             # Extract the pushing agent name for logging
             - src:
                 dependencyName: implementation-push-event
@@ -71,16 +97,7 @@ spec:
                   {{ else }}
                     unknown
                   {{ end }}
-              dest: pushingAgent
-          # Delete CodeRuns for quality/testing agents
-          # Note: This deletes ALL quality agent CodeRuns, not just for the specific task
-          # This ensures a clean restart of the QA pipeline when implementation code changes
-          # Task-specific filtering is not possible due to Argo Events labelSelector limitations
-          labelSelector:
-            matchExpressions:
-              - key: github-app
-                operator: NotIn
-                values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]  # Exclude all implementation agents
+              dest: spec.arguments.parameters.1.value
       retryStrategy:
         steps: 3
         duration: "5s"
@@ -106,32 +123,10 @@ spec:
                 namespace: argo
               type: Normal
               reason: "AgentPushDetected"
-              message: "Implementation agent pushed to task branch, restarting QA pipeline"
           parameters:
+            # Dynamic message with agent and task info
             - src:
                 dependencyName: implementation-push-event
-                dataTemplate: |
-                  {{ $login := .Input.body.sender.login }}
-                  {{ if hasPrefix $login "5DLabs-" }}
-                    {{ $agent := trimPrefix "5DLabs-" $login }}
-                    {{ $agent := trimSuffix "[bot]" $agent }}
-                    {{ lower $agent }}
-                  {{ else }}
-                    unknown
-                  {{ end }}
-              dest: pushingAgent
-            - src:
-                dependencyName: implementation-push-event
-                dataTemplate: |
-                  {{ $ref := .Input.body.ref }}
-                  {{ if hasPrefix $ref "refs/heads/task-" }}
-                    {{ $branch := trimPrefix "refs/heads/task-" $ref }}
-                    {{ $parts := splitList "-" $branch }}
-                    {{ if gt (len $parts) 0 }}
-                      {{ index $parts 0 }}
-                    {{ end }}
-                  {{ else }}
-                    0
-                  {{ end }}
-              dest: taskId
+                dataTemplate: "Implementation agent pushed to task branch, restarting QA pipeline"
+              dest: message
 

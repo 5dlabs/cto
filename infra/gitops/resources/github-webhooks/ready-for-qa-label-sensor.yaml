@@ -42,7 +42,7 @@ spec:
                 namespace: argo
               spec: {}
           parameters:
-            # Extract task ID from PR labels
+            # Extract task ID from PR labels for workflow targeting
             - src:
                 dependencyName: github-pr-labeled
                 dataTemplate: |
@@ -50,28 +50,21 @@ spec:
                     {{ if hasPrefix "task-" $label.name }}
                       {{ $parts := splitList "-" $label.name }}
                       {{ if gt (len $parts) 1 }}
-                        {{ index $parts 1 }}
+                        play-task-{{ index $parts 1 }}
                       {{ end }}
                     {{ end }}
                   {{ end }}
-              dest: taskId
-            # Extract PR number for correlation
+              dest: metadata.name
+            # Extract PR number for workflow context
             - src:
                 dependencyName: github-pr-labeled
                 dataKey: body.pull_request.number
-              dest: prNumber
-            # Get repository name
+              dest: spec.arguments.parameters.pr-number
+            # Get repository name for workflow context
             - src:
                 dependencyName: github-pr-labeled
                 dataKey: body.repository.name
-              dest: repoName
-          # Use label selector to find and resume workflows
-          # Note: taskId is extracted and passed as parameter to the workflow
-          # The workflow itself handles task-specific logic using the taskId parameter
-          labelSelector:
-            matchLabels:
-              workflow-type: play-orchestration
-              current-stage: waiting-ready-for-qa
+              dest: spec.arguments.parameters.repository
       retryStrategy:
         steps: 3
         duration: "10s"
