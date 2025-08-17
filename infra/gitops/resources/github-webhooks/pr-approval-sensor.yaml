@@ -34,15 +34,26 @@ spec:
         conditions: "github-pr-review"
         argoWorkflow:
           operation: resume
-          # Dynamic workflow targeting using parameterized args (Oracle's solution)
-          args: []  # Will be populated by parameters
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                name: ""
           parameters:
             # Extract task ID from PR labels and construct workflow name for targeting
             - src:
                 dependencyName: github-pr-review
                 dataTemplate: |
-                  play-task-{{ range $index, $label := .Input.body.pull_request.labels }}{{ if hasPrefix "task-" $label.name }}{{ $parts := splitList "-" $label.name }}{{ if gt (len $parts) 1 }}{{ index $parts 1 }}{{ end }}{{ end }}{{ end }}-workflow
-              dest: args.0
+                  {{ $ref := .Input.body.pull_request.head.ref }}
+                  {{ if hasPrefix $ref "task-" }}
+                    {{ $branch := trimPrefix "task-" $ref }}
+                    {{ $parts := splitList "-" $branch }}
+                    play-task-{{ index $parts 0 }}-workflow
+                  {{ else }}
+                    play-task-unknown-workflow
+                  {{ end }}
+              dest: source.resource.metadata.name
       retryStrategy:
         steps: 3
         duration: "10s"
