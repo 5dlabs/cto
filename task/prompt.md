@@ -214,10 +214,7 @@ spec:
                       echo "Cancelling quality/testing agent CodeRuns for task-{{inputs.parameters.task-id}}"
 
                       kubectl delete coderun -n argo \
-                        -l task-id={{inputs.parameters.task-id}} \
-                        -l github-app!=5DLabs-Rex \
-                        -l github-app!=5DLabs-Blaze \
-                        -l github-app!=5DLabs-Morgan \
+                        -l "task-id={{inputs.parameters.task-id}},github-app notin (5DLabs-Rex,5DLabs-Blaze,5DLabs-Morgan)" \
                         || true
                       echo "QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}"
 ```
