@@ -116,7 +116,7 @@ spec:
           memory: "4Gi"
 
       # Use the working rust-builder image
-      image: ghcr.io/5dlabs/cto/rust-builder:1.2.0
+      image: ghcr.io/5dlabs/rust-builder:1.2.0
       imagePullPolicy: Always
       dockerEnabled: true
       dockerdWithinRunnerContainer: true
@@ -151,7 +151,7 @@ spec:
       # Init containers for cache setup and tool installation
       initContainers:
         - name: setup-cache
-          image: ghcr.io/5dlabs/cto/rust-builder:1.2.0
+          image: ghcr.io/5dlabs/rust-builder:1.2.0
           command: ["/bin/sh", "-c"]
           args:
             - |

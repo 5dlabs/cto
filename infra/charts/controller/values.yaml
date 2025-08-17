@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/5dlabs/cto/controller
+  repository: ghcr.io/5dlabs/controller
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
@@ -13,7 +13,7 @@ image:
 # Agent/Task Runner image configuration (used by controller to create Jobs)
 agent:
   image:
-    repository: ghcr.io/5dlabs/cto/claude
+    repository: ghcr.io/5dlabs/claude
     tag: "latest"
     pullPolicy: Always
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
@@ -23,7 +23,7 @@ agent:
   inputBridge:
     enabled: true
     image:
-      repository: ghcr.io/5dlabs/cto/sidecar
+      repository: ghcr.io/5dlabs/sidecar
       tag: "latest"
       pullPolicy: Always
     port: 8080

@@ -33,7 +33,7 @@ spec:
       # Override values for GitOps deployment
       parameters:
         - name: image.repository
-          value: ghcr.io/5dlabs/cto/controller
+          value: ghcr.io/5dlabs/controller
         - name: image.tag
           value: latest
         - name: image.pullPolicy
