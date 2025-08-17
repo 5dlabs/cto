@@ -4,6 +4,8 @@
 
 Create workflow template logic to update current-stage labels and handle transitions between agent phases. This enables event-driven coordination by maintaining workflow state through label updates that trigger subsequent agent stages.
 
+Scope update: The project already sets stage labels at suspend points and has working correlation sensors (from task 5). Enhance the existing workflow by adding explicit post-agent stage transition steps and atomic label update mechanisms (JSON merge patch + verification) after Rex, Cleo, and Tess complete. Do not rework the existing correlation sensors; integrate with them.
+
 ## Technical Context
 
 Multi-agent orchestration requires atomic state management to coordinate agent handoffs. The workflow must track its current stage and update labels atomically to prevent race conditions while enabling event-driven progression through agent phases.

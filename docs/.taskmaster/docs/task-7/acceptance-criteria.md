@@ -1,5 +1,7 @@
 # Acceptance Criteria: Workflow Stage Transitions
 
+Note: Scope limited to enhancing the existing implementation. Baseline stage labeling at suspend points and event correlation sensors already exist. Focus on adding explicit post-agent stage transitions and atomic label update mechanisms without reworking correlation sensors.
+
 ## Core Stage Management Requirements
 
 ### ✅ Stage Transition System
