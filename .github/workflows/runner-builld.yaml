@@ -90,7 +90,7 @@ jobs:
   # Cycle Arc runners to use new image
   cycle-runners:
     needs: build-and-push
-    runs-on: [self-hosted, k8s-runner]  # Run on existing k8s-runner that has kubectl/twingate
+    runs-on: ubuntu-latest  # Temporarily use hosted runner to break chicken-and-egg cycle
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/example-project-and-cli'
     steps:
       - name: Cycle rust-builder runners

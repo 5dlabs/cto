@@ -50,7 +50,7 @@ jobs:
   # Build only controller (skip Claude Code for now)
   build-controller:
     needs: [version]
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     # No container needed - the Arc runners now have the rust-builder image!
     permissions:
       contents: read
@@ -226,7 +226,7 @@ jobs:
 
   build-sidecar:
     needs: [version]
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -291,7 +291,7 @@ jobs:
   # Deploy immediately
   deploy:
     needs: [version, build-controller]
-    runs-on: [k8s-runner]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
