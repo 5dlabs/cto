@@ -148,6 +148,12 @@ jobs:
             version_type: npm
             version_pkg: "@qwen-code/qwen-code"
             version_arg: QWEN_CODE_VERSION
+          - id: opencode
+            image: opencode
+            context: ./infra/images/opencode
+            file: ./infra/images/opencode/Dockerfile
+            version_type: script_hash
+            script_url: https://opencode.ai/install
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js (ensure npm available in runner)
