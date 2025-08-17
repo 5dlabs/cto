@@ -1,12 +1,12 @@
-# Task 4: Implement Agent-Specific PVC Naming
+# Task 4: Implement Agent-Specific PVC Naming (Updated)
 
 ## Overview
 
-Modify the Rust controller to extract agent names from the `github_app` field and implement a `workspace-{service}-{agent}` PVC naming pattern for proper agent workspace isolation in the multi-agent orchestration system.
+Modify the Rust controller to extract agent names from the `github_app` field and implement conditional agent-specific PVC naming. **Implementation agents (Rex, Blaze) should continue using the shared `workspace-{service}` pattern**, while other agent types may require separate workspaces for proper isolation.
 
 ## Technical Context
 
-The current controller uses a generic `workspace-{service}` naming pattern for PVCs. Multi-agent workflows require isolated workspaces where Rex, Cleo, and Tess agents maintain separate persistent contexts and can be cancelled/restarted independently without affecting other agents' accumulated knowledge.
+The current controller uses a generic `workspace-{service}` naming pattern for PVCs. This pattern is **correct for implementation agents** who work on the same workspace surface. However, the system needs to support future agent types that may require isolated workspaces for independent operation, session continuity, and knowledge accumulation.
 
 ## Implementation Guide
 
@@ -33,196 +33,162 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
    }
    ```
 
-2. **Implement Robust Pattern Matching**
+2. **Implement Agent Type Classification**
    ```rust
-   use regex::Regex;
+   fn is_implementation_agent(agent_name: &str) -> bool {
+       // Implementation agents work on the same workspace
+       matches!(agent_name, "rex" | "blaze")
+   }
    
-   fn extract_agent_name(github_app: &str) -> Result<String, String> {
-       let re = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-       
-       if let Some(caps) = re.captures(github_app) {
-           Ok(caps.get(1).unwrap().as_str().to_lowercase())
-       } else {
-           Err(format!("Cannot extract agent name from: {}", github_app))
-       }
+   fn requires_isolated_workspace(agent_name: &str) -> bool {
+       // Non-implementation agents may need isolated workspaces
+       !is_implementation_agent(agent_name)
    }
    ```
 
-### Phase 2: PVC Creation Logic Modification
+### Phase 2: Conditional PVC Naming Logic
 
 1. **Update PVC Name Generation**
    ```rust
-   // In create_pvc function
-   async fn create_pvc(
-       code_run: &CodeRun,
-       client: &kube::Client,
-   ) -> Result<PersistentVolumeClaim, kube::Error> {
-       let agent_name = extract_agent_name(&code_run.spec.github_app)
-           .map_err(|e| kube::Error::Api(kube::error::ErrorResponse {
-               // Handle extraction error
-           }))?;
-           
-       let pvc_name = format!(
-           "workspace-{}-{}",
-           code_run.spec.service,
-           agent_name
-       );
+   // In ensure_pvc_exists function
+   async fn ensure_pvc_exists(&self, code_run: &CodeRun) -> Result<()> {
+       let service_name = &code_run.spec.service;
+       let github_app = code_run.spec.github_app.as_ref()
+           .ok_or_else(|| Error::ConfigError("GitHub App is required".to_string()))?;
        
-       // Create PVC with new naming pattern
-       create_pvc_resource(&pvc_name, &code_run.metadata.namespace)
+       let agent_name = extract_agent_name(github_app);
+       
+       // Implementation agents use shared workspace
+       let pvc_name = if is_implementation_agent(&agent_name) {
+           format!("workspace-{service_name}")
+       } else {
+           // Non-implementation agents get isolated workspaces
+           format!("workspace-{service_name}-{agent_name}")
+       };
+       
+       info!("📦 Ensuring PVC exists: {} (agent: {})", pvc_name, agent_name);
+       self.ensure_pvc_exists(&pvc_name, service_name).await?;
+       Ok(())
    }
    ```
 
-2. **Implement Legacy PVC Compatibility**
+2. **Maintain Backward Compatibility**
    ```rust
-   async fn ensure_pvc_exists(
-       code_run: &CodeRun,
-       client: &kube::Client,
-   ) -> Result<String, kube::Error> {
-       let agent_name = extract_agent_name(&code_run.spec.github_app)?;
-       let new_pvc_name = format!(
-           "workspace-{}-{}", 
-           code_run.spec.service, 
-           agent_name
-       );
-       let legacy_pvc_name = format!(
-           "workspace-{}", 
-           code_run.spec.service
-       );
-       
-       // Try new naming first, fall back to legacy if needed
-       match get_pvc(&new_pvc_name, client).await {
-           Ok(pvc) => Ok(new_pvc_name),
-           Err(_) => {
-               // Check for legacy PVC
-               match get_pvc(&legacy_pvc_name, client).await {
-                   Ok(_) => {
-                       // Migrate legacy PVC or create new one
-                       create_pvc_with_name(&new_pvc_name, client).await?;
-                       Ok(new_pvc_name)
-                   }
-                   Err(_) => {
-                       // Create new PVC
-                       create_pvc_with_name(&new_pvc_name, client).await?;
-                       Ok(new_pvc_name)
-                   }
-               }
-           }
-       }
-   }
+   // The existing workspace-{service} pattern remains the default
+   // for implementation agents, ensuring no breaking changes
    ```
 
 ### Phase 3: Controller Integration
 
 1. **Update Reconciliation Logic**
    ```rust
-   // In controller reconcile function
-   async fn reconcile(
-       code_run: Arc<CodeRun>,
-       ctx: Arc<Context>,
-   ) -> Result<Action, Error> {
-       let client = &ctx.client;
-       
-       // Extract agent name early for consistent usage
-       let agent_name = match extract_agent_name(&code_run.spec.github_app) {
-           Ok(name) => name,
-           Err(e) => {
-               update_status_with_error(&code_run, &e, client).await?;
-               return Ok(Action::requeue(Duration::from_secs(60)));
-           }
-       };
-       
-       // Create PVC with agent-specific naming
-       let pvc_name = ensure_pvc_exists(&code_run, client).await?;
-       
-       // Continue with pod creation using new PVC name
-       create_agent_pod(&code_run, &pvc_name, &agent_name, client).await?;
-       
-       Ok(Action::requeue(Duration::from_secs(30)))
+   // In reconcile_create_or_update function
+   pub async fn reconcile_create_or_update(&self, code_run: &Arc<CodeRun>) -> Result<Action> {
+       let name = code_run.name_any();
+       info!("🚀 Creating/updating code resources for: {}", name);
+
+       // Ensure PVC exists with conditional naming
+       self.ensure_pvc_exists(code_run).await?;
+       info!("✅ PVC check completed");
+
+       // Continue with existing logic...
    }
    ```
 
-2. **Pod Volume Mount Configuration**
+2. **Update Volume Mounting**
    ```rust
-   fn create_pod_spec(
-       code_run: &CodeRun,
-       pvc_name: &str,
-       agent_name: &str,
-   ) -> Result<PodSpec, Error> {
-       let volume_mount = VolumeMount {
-           name: "workspace".to_string(),
-           mount_path: "/workspace".to_string(),
-           ..Default::default()
+   // In build_job_spec function
+   fn build_job_spec(&self, code_run: &CodeRun, job_name: &str, cm_name: &str) -> Result<Job> {
+       // ... existing volume setup ...
+       
+       // PVC workspace volume with conditional naming
+       let service_name = &code_run.spec.service;
+       let github_app = code_run.spec.github_app.as_ref()
+           .ok_or_else(|| Error::ConfigError("GitHub App is required".to_string()))?;
+       
+       let agent_name = extract_agent_name(github_app);
+       let pvc_name = if is_implementation_agent(&agent_name) {
+           format!("workspace-{service_name}")
+       } else {
+           format!("workspace-{service_name}-{agent_name}")
        };
        
-       let volume = Volume {
-           name: "workspace".to_string(),
-           persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
-               claim_name: pvc_name.to_string(),
-               ..Default::default()
-           }),
-           ..Default::default()
-       };
+       volumes.push(json!({
+           "name": "workspace",
+           "persistentVolumeClaim": {
+               "claimName": pvc_name
+           }
+       }));
        
-       // Build pod spec with proper workspace mounting
-       build_agent_pod_spec(code_run, agent_name, volume_mount, volume)
+       // ... rest of job spec ...
    }
    ```
 
 ## Code Examples
 
-### Complete Agent Name Extraction
+### Complete Agent Classification System
 ```rust
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::HashSet;
 
-pub struct AgentNameExtractor {
-    patterns: HashMap<String, String>,
+pub struct AgentClassifier {
+    implementation_agents: HashSet<String>,
     fallback_regex: Regex,
 }
 
-impl AgentNameExtractor {
+impl AgentClassifier {
     pub fn new() -> Self {
-        let mut patterns = HashMap::new();
-        patterns.insert("5DLabs-Rex".to_string(), "rex".to_string());
-        patterns.insert("5DLabs-Blaze".to_string(), "blaze".to_string());
-        patterns.insert("5DLabs-Cleo".to_string(), "cleo".to_string());
-        patterns.insert("5DLabs-Tess".to_string(), "tess".to_string());
+        let mut implementation_agents = HashSet::new();
+        implementation_agents.insert("rex".to_string());
+        implementation_agents.insert("blaze".to_string());
         
         let fallback_regex = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
         
         Self {
-            patterns,
+            implementation_agents,
             fallback_regex,
         }
     }
     
-    pub fn extract(&self, github_app: &str) -> Result<String, String> {
-        // Try exact match first
-        if let Some(agent) = self.patterns.get(github_app) {
-            return Ok(agent.clone());
-        }
-        
-        // Try regex extraction
+    pub fn extract_agent_name(&self, github_app: &str) -> Result<String, String> {
         if let Some(caps) = self.fallback_regex.captures(github_app) {
-            return Ok(caps.get(1).unwrap().as_str().to_lowercase());
+            Ok(caps.get(1).unwrap().as_str().to_lowercase())
+        } else {
+            Err(format!("Cannot extract agent name from: {}", github_app))
         }
+    }
+    
+    pub fn is_implementation_agent(&self, agent_name: &str) -> bool {
+        self.implementation_agents.contains(agent_name)
+    }
+    
+    pub fn requires_isolated_workspace(&self, agent_name: &str) -> bool {
+        !self.is_implementation_agent(agent_name)
+    }
+    
+    pub fn get_pvc_name(&self, service: &str, github_app: &str) -> Result<String, String> {
+        let agent_name = self.extract_agent_name(github_app)?;
         
-        Err(format!("Cannot extract agent name from: {}", github_app))
+        if self.is_implementation_agent(&agent_name) {
+            Ok(format!("workspace-{}", service))
+        } else {
+            Ok(format!("workspace-{}-{}", service, agent_name))
+        }
     }
 }
 ```
 
-### PVC Management with Migration
+### PVC Management with Conditional Logic
 ```rust
-use kube::api::{Api, ListParams, PostParams};
+use kube::api::{Api, PostParams};
 use k8s_openapi::api::core::v1::PersistentVolumeClaim;
 
-pub async fn manage_agent_pvc(
+pub async fn ensure_conditional_pvc(
     code_run: &CodeRun,
     client: &kube::Client,
 ) -> Result<String, kube::Error> {
-    let agent_name = extract_agent_name(&code_run.spec.github_app)
+    let classifier = AgentClassifier::new();
+    let pvc_name = classifier.get_pvc_name(&code_run.spec.service, &code_run.spec.github_app)
         .map_err(|e| kube::Error::Api(ErrorResponse::default()))?;
         
     let namespace = code_run.metadata.namespace.as_ref()
@@ -230,21 +196,18 @@ pub async fn manage_agent_pvc(
         
     let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
     
-    let new_pvc_name = format!("workspace-{}-{}", code_run.spec.service, agent_name);
-    let legacy_pvc_name = format!("workspace-{}", code_run.spec.service);
-    
-    // Check if new PVC exists
-    match pvc_api.get(&new_pvc_name).await {
+    // Check if PVC exists, create if missing
+    match pvc_api.get(&pvc_name).await {
         Ok(_) => {
-            info!("Agent PVC exists: {}", new_pvc_name);
-            Ok(new_pvc_name)
+            info!("Agent PVC exists: {}", pvc_name);
+            Ok(pvc_name)
         }
         Err(kube::Error::Api(e)) if e.code == 404 => {
             // Create new PVC
-            let pvc_spec = create_pvc_spec(&new_pvc_name, &code_run.spec.service);
+            let pvc_spec = create_pvc_spec(&pvc_name, &code_run.spec.service);
             pvc_api.create(&PostParams::default(), &pvc_spec).await?;
-            info!("Created agent PVC: {}", new_pvc_name);
-            Ok(new_pvc_name)
+            info!("Created agent PVC: {}", pvc_name);
+            Ok(pvc_name)
         }
         Err(e) => Err(e),
     }
@@ -253,24 +216,24 @@ pub async fn manage_agent_pvc(
 
 ## Architecture Patterns
 
-### Agent Workspace Isolation
-The new PVC naming pattern ensures:
-1. **Independent Workspaces**: Each agent maintains separate persistent storage
-2. **Clean Cancellation**: Running agents can be cancelled without affecting others
-3. **Session Continuity**: Agents continue their own previous sessions
-4. **Knowledge Accumulation**: Agents build expertise in their dedicated workspaces
+### Conditional Workspace Strategy
+The new PVC naming strategy ensures:
+1. **Implementation Agents**: Continue using shared `workspace-{service}` (Rex, Blaze)
+2. **Future Agents**: Get isolated `workspace-{service}-{agent}` workspaces
+3. **Backward Compatibility**: No changes to existing implementation agent behavior
+4. **Extensibility**: Easy to add new agent types with different workspace requirements
 
 ### Migration Strategy
 ```rust
-// Transition period logic
+// No migration needed - implementation agents continue using existing pattern
+// New agent types automatically get isolated workspaces
 Workspace Naming Evolution:
-Phase 1: Legacy "workspace-{service}" (existing)
-Phase 2: Dual support - check new naming, fall back to legacy
-Phase 3: Pure "workspace-{service}-{agent}" (target)
+Phase 1: Legacy "workspace-{service}" (existing - continues for implementation agents)
+Phase 2: Conditional "workspace-{service}" or "workspace-{service}-{agent}" (new)
 ```
 
 ### Error Handling Patterns
-- **Graceful Degradation**: Fall back to legacy naming if extraction fails
+- **Graceful Degradation**: Fall back to shared workspace if agent classification fails
 - **Clear Error Messages**: Specific errors for debugging agent name issues
 - **Validation**: Ensure agent names meet Kubernetes naming constraints
 - **Logging**: Comprehensive logging for troubleshooting PVC issues
@@ -299,11 +262,17 @@ fn validate_agent_name(agent_name: &str) -> Result<(), String> {
 
 ### PVC Creation with Proper Labels
 ```rust
-fn create_pvc_spec(pvc_name: &str, service: &str, agent: &str) -> PersistentVolumeClaim {
+fn create_pvc_spec(pvc_name: &str, service: &str, agent: Option<&str>) -> PersistentVolumeClaim {
     let mut labels = std::collections::BTreeMap::new();
     labels.insert("service".to_string(), service.to_string());
-    labels.insert("agent".to_string(), agent.to_string());
     labels.insert("component".to_string(), "agent-workspace".to_string());
+    
+    if let Some(agent_name) = agent {
+        labels.insert("agent".to_string(), agent_name.to_string());
+        labels.insert("workspace-type".to_string(), "isolated".to_string());
+    } else {
+        labels.insert("workspace-type".to_string(), "shared".to_string());
+    }
     
     PersistentVolumeClaim {
         metadata: ObjectMeta {
@@ -331,19 +300,19 @@ fn create_pvc_spec(pvc_name: &str, service: &str, agent: &str) -> PersistentVolu
 ## Testing Strategy
 
 ### Unit Testing
-1. **Agent Name Extraction**: Test with various GitHub App naming patterns
-2. **PVC Name Generation**: Verify correct formatting and validation
+1. **Agent Classification**: Test implementation vs non-implementation agent detection
+2. **PVC Name Generation**: Verify correct naming for different agent types
 3. **Error Handling**: Test with invalid inputs and edge cases
-4. **Migration Logic**: Test legacy PVC handling and transitions
+4. **Backward Compatibility**: Ensure implementation agents continue using shared workspace
 
 ### Integration Testing
 1. **Controller Reconciliation**: Test with different agent types
 2. **PVC Creation**: Verify PVCs created with correct naming
-3. **Workspace Isolation**: Confirm agents get separate workspaces
-4. **Backward Compatibility**: Ensure existing workflows continue working
+3. **Workspace Sharing**: Confirm implementation agents share workspace
+4. **Workspace Isolation**: Confirm non-implementation agents get isolated workspaces
 
 ### Performance Testing
-1. **Extraction Speed**: Benchmark agent name extraction performance
+1. **Classification Speed**: Benchmark agent classification performance
 2. **PVC Operations**: Test PVC creation and lookup efficiency
 3. **Memory Usage**: Monitor controller memory with new logic
 4. **Concurrent Operations**: Test with multiple simultaneous requests
