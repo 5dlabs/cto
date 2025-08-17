@@ -280,7 +280,7 @@ impl Default for ControllerConfig {
                 input_bridge: InputBridgeConfig {
                     enabled: true,
                     image: ImageConfig {
-                        repository: "ghcr.io/5dlabs/cto/input-bridge".to_string(),
+                        repository: "ghcr.io/5dlabs/input-bridge".to_string(),
                         tag: "latest".to_string(),
                     },
                     port: 8080,

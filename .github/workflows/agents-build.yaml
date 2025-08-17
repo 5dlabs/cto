@@ -27,7 +27,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ${{ github.repository }}
+  IMAGE_BASE: 5dlabs
 
 jobs:
   build-runtime:

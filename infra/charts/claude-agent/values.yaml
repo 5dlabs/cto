@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/5dlabs/cto/claude
+  repository: ghcr.io/5dlabs/claude
   tag: latest
   pullPolicy: Always
 
@@ -23,7 +23,7 @@ api:
   port: 8080
   name: http
   image:
-    repository: ghcr.io/5dlabs/cto/sidecar
+    repository: ghcr.io/5dlabs/sidecar
     tag: latest
     pullPolicy: IfNotPresent
 

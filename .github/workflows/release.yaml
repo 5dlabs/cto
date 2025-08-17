@@ -223,7 +223,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       REGISTRY: ghcr.io
-      IMAGE_BASE: ${{ github.repository }}
+      IMAGE_BASE: 5dlabs
     steps:
       - uses: actions/checkout@v4
         with:
@@ -379,11 +379,11 @@ jobs:
           echo '```bash' >> $RUNNER_TEMP/notes.txt
           echo "# Pull the latest controller image" >> $RUNNER_TEMP/notes.txt
           VERSION_CLEAN=${VERSION#v}
-          echo "docker pull ghcr.io/${{ github.repository }}/controller:${VERSION_CLEAN}" >> $RUNNER_TEMP/notes.txt
+          echo "docker pull ghcr.io/5dlabs/controller:${VERSION_CLEAN}" >> $RUNNER_TEMP/notes.txt
           echo "" >> $RUNNER_TEMP/notes.txt
           echo "# Use in Helm deployments" >> $RUNNER_TEMP/notes.txt
           echo "helm upgrade controller 5dlabs/controller \\" >> $RUNNER_TEMP/notes.txt
-          echo "  --set image.repository=ghcr.io/${{ github.repository }}/controller \\" >> $RUNNER_TEMP/notes.txt
+          echo "  --set image.repository=ghcr.io/5dlabs/controller \\" >> $RUNNER_TEMP/notes.txt
           echo "  --set image.tag=${VERSION_CLEAN}" >> $RUNNER_TEMP/notes.txt
           echo '```' >> $RUNNER_TEMP/notes.txt
 

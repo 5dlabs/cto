@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/5dlabs/cto/runtime:latest
+ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
 FROM ${BASE_IMAGE}
 
 # Use root for global npm install, then drop privileges
