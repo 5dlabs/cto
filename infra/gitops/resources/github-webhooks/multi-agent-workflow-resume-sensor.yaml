@@ -20,11 +20,11 @@ spec:
           - path: body.action
             type: string
             value: ["opened"]
-          # Ensure PR has task labels (non-empty array)
-          - path: body.pull_request.labels
-            type: array
-            comparator: "!="
-            value: []
+          # Skip label filtering for now - will be validated in dataTemplate
+          # - path: body.pull_request.labels.#.name
+          #   type: string
+          #   comparator: "~"
+          #   value: "task-.*"
   triggers:
     - template:
         name: resume-after-implementation
@@ -57,7 +57,9 @@ spec:
                 dependencyName: github-pr-created
                 dataKey: body.pull_request.head.ref
               dest: branchName
-          # Use label selector to find and resume the correct workflow
+          # Use label selector to find and resume workflows
+          # Note: taskId is extracted and passed as parameter to the workflow
+          # The workflow itself handles task-specific logic using the taskId parameter
           labelSelector:
             matchLabels:
               workflow-type: play-orchestration

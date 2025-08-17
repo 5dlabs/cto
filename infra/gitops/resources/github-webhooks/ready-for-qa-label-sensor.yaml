@@ -65,7 +65,9 @@ spec:
                 dependencyName: github-pr-labeled
                 dataKey: body.repository.name
               dest: repoName
-          # Use label selector to find and resume the correct workflow
+          # Use label selector to find and resume workflows
+          # Note: taskId is extracted and passed as parameter to the workflow
+          # The workflow itself handles task-specific logic using the taskId parameter
           labelSelector:
             matchLabels:
               workflow-type: play-orchestration
