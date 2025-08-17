@@ -34,37 +34,8 @@ spec:
         conditions: "github-pr-review"
         argoWorkflow:
           operation: resume
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                namespace: argo
-              spec: {}
-          parameters:
-            # Extract task ID from PR labels for workflow targeting
-            - src:
-                dependencyName: github-pr-review
-                dataTemplate: |
-                  {{ range $index, $label := .Input.body.pull_request.labels }}
-                    {{ if hasPrefix "task-" $label.name }}
-                      {{ $parts := splitList "-" $label.name }}
-                      {{ if gt (len $parts) 1 }}
-                        play-task-{{ index $parts 1 }}
-                      {{ end }}
-                    {{ end }}
-                  {{ end }}
-              dest: metadata.name
-            # Extract PR number for workflow context
-            - src:
-                dependencyName: github-pr-review
-                dataKey: body.pull_request.number
-              dest: spec.arguments.parameters.pr-number
-            # Extract review ID for tracking
-            - src:
-                dependencyName: github-pr-review
-                dataKey: body.review.id
-              dest: spec.arguments.parameters.review-id
+          # Simple static targeting - workflows must handle task filtering internally
+          labelSelector: "workflow-type=play-orchestration,current-stage=waiting-pr-approved"
       retryStrategy:
         steps: 3
         duration: "10s"

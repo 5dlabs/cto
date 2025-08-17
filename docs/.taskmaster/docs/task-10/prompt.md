@@ -1,5 +1,30 @@
 # Ready-for-QA Label Logic Implementation
 
+## 🚨 CRITICAL: Argo Events Reference Documentation
+
+**BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
+- **Location:** [docs/references/argo-events/](../../../references/argo-events/)
+- **Key Files:**
+  - `github.yaml` - GitHub webhook sensor patterns
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+  - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
+
+**❌ UNSUPPORTED Operations (will cause deployment failures):**
+- `operation: delete` ❌
+- `operation: patch` ❌  
+- `operation: update` ❌
+- Template variables in `labelSelector` ❌
+
+**✅ SUPPORTED Operations:**
+- `operation: create` (k8s resources)
+- `operation: submit` (Argo Workflows)
+- `operation: resume` (Argo Workflows)
+- `dest: metadata.name` (dynamic targeting)
+
+**💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 You are implementing the critical handoff mechanism between Cleo's code quality work and Tess's comprehensive testing phase. Create logic for Cleo to add 'ready-for-qa' label to PRs as an explicit signal that triggers Tess workflow resumption.
 
 ## Objective

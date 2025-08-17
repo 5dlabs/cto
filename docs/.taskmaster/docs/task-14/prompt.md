@@ -1,5 +1,30 @@
 # Autonomous Agent Prompt: Build Workflow Resume Operations
 
+## 🚨 CRITICAL: Argo Events Reference Documentation
+
+**BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
+- **Location:** [docs/references/argo-events/](../../../references/argo-events/)
+- **Key Files:**
+  - `github.yaml` - GitHub webhook sensor patterns
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+  - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
+
+**❌ UNSUPPORTED Operations (will cause deployment failures):**
+- `operation: delete` ❌
+- `operation: patch` ❌  
+- `operation: update` ❌
+- Template variables in `labelSelector` ❌
+
+**✅ SUPPORTED Operations:**
+- `operation: create` (k8s resources)
+- `operation: submit` (Argo Workflows)
+- `operation: resume` (Argo Workflows)
+- `dest: metadata.name` (dynamic targeting)
+
+**💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 ## Mission
 
 You are tasked with implementing robust workflow resume operations for the multi-agent orchestration system. This system must reliably resume suspended workflows at the correct points based on GitHub events, with comprehensive error handling, retry logic, and failure protection.

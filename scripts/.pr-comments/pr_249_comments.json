@@ -6,7 +6,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9Iql",
     "diff_hunk": "@@ -0,0 +1,107 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                name: \"\"  # Will be determined by label selector\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get repository name\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.repository.name\n+              dest: repoName\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+        k8s:\n+          operation: patch\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Task ID for label selector\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              task-id: \"{{taskId}}\"\n+              current-stage: waiting-pr-approved\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"\n+        factor: 2\n+        jitter: 0.1",
     "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "4cea449ae2c8b10f472663ecfe878ba4e2b0218f",
     "user": {
       "login": "cursor[bot]",
@@ -61,11 +61,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 79,
+    "line": 72,
     "original_line": 107,
     "side": "RIGHT",
     "original_position": 107,
-    "position": 79,
+    "position": 72,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -79,7 +79,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9Iqm",
     "diff_hunk": "@@ -0,0 +1,108 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: implementation-agent-remediation\n+  namespace: argo\n+  labels:\n+    sensor-type: multi-agent-orchestration\n+    agent-class: implementation\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: implementation-push-event\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+        # Filter for push events\n+        - path: headers.X-Github-Event\n+          type: string\n+          value: [\"push\"]\n+        # Match any 5DLabs implementation agent (Rex, Blaze, Morgan, etc.)\n+        - path: body.sender.login\n+          type: string\n+          comparator: \"~\"\n+          value: \"5DLabs-(Rex|Blaze|Morgan)\\\\[bot\\\\]|5DLabs-(Rex|Blaze|Morgan)\"\n+        # Ensure push is to a task branch\n+        - path: body.ref\n+          type: string\n+          comparator: \"~\"\n+          value: \"refs/heads/task-.*\"\n+  triggers:\n+    # Trigger 1: Cancel running Cleo/Tess CodeRun CRDs\n+    - template:\n+        name: cancel-running-quality-agents\n+        conditions: \"implementation-push-event\"\n+        k8s:\n+          operation: delete\n+          source:\n+            resource:\n+              apiVersion: agents.platform/v1\n+              kind: CodeRun\n+              metadata:\n+                namespace: argo\n+          parameters:\n+            # Extract task ID from branch name\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $ref := .Input.body.ref }}\n+                  {{ if hasPrefix $ref \"refs/heads/task-\" }}\n+                    {{ $branch := trimPrefix \"refs/heads/task-\" $ref }}\n+                    {{ $parts := splitList \"-\" $branch }}\n+                    {{ if gt (len $parts) 0 }}\n+                      {{ index $parts 0 }}\n+                    {{ end }}\n+                  {{ else }}\n+                    0\n+                  {{ end }}\n+              dest: taskId\n+            # Extract the pushing agent name for logging\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $login := .Input.body.sender.login }}\n+                  {{ if hasPrefix $login \"5DLabs-\" }}\n+                    {{ $agent := trimPrefix \"5DLabs-\" $login }}\n+                    {{ $agent := trimSuffix \"[bot]\" $agent }}\n+                    {{ lower $agent }}\n+                  {{ else }}\n+                    unknown\n+                  {{ end }}\n+              dest: pushingAgent\n+          # Delete CodeRuns for quality/testing agents working on this task\n+          # Only if taskId is not 0 (meaning branch matched pattern)  \n+          labelSelector:\n+            matchExpressions:\n+            - key: task-id\n+              operator: In\n+              values: [\"{{taskId}}\"]\n+            - key: github-app\n+              operator: NotIn\n+              values: [\"5DLabs-Rex\", \"5DLabs-Blaze\", \"5DLabs-Morgan\"]  # Exclude all implementation agents\n+      retryStrategy:\n+        steps: 3\n+        duration: \"5s\"\n+        factor: 2\n+        jitter: 0.1\n+    \n+    # Trigger 2: Log the remediation event for monitoring\n+    - template:\n+        name: log-remediation-event\n+        conditions: \"implementation-push-event\"\n+        log:\n+          intervalSeconds: 1\n+        k8s:\n+          operation: create\n+          source:\n+            resource:\n+              apiVersion: v1\n+              kind: Event\n+              metadata:\n+                generateName: implementation-remediation-\n+                namespace: argo\n+              eventName: \"ImplementationRemediation\"\n+              reason: \"AgentPushDetected\"  \n+              message: \"Implementation agent {{pushingAgent}} pushed to task-{{taskId}}, restarting QA pipeline\"",
     "path": "implementation-agent-remediation-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "4cea449ae2c8b10f472663ecfe878ba4e2b0218f",
     "user": {
       "login": "cursor[bot]",
@@ -152,7 +152,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9Iqn",
     "diff_hunk": "@@ -0,0 +1,95 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: multi-agent-workflow-resume\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-created\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request opened events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"opened\"]\n+          # Ensure PR has task label\n+          - path: body.pull_request.labels\n+            type: array\n+            comparator: \">\"\n+            value:\n+              - \"0\"\n+  triggers:\n+    - template:\n+        name: resume-after-implementation\n+        conditions: \"github-pr-created\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                name: \"\"  # Will be determined by label selector\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-created\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract and validate branch name matches task pattern\n+            - src:\n+                dependencyName: github-pr-created\n+                dataKey: body.pull_request.head.ref\n+              dest: branchName\n+        k8s:\n+          operation: patch\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Task ID for label selector\n+            - src:\n+                dependencyName: github-pr-created\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              task-id: \"{{taskId}}\"\n+              current-stage: waiting-pr-created\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"\n+        factor: 2\n+        jitter: 0.1",
     "path": "infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "4cea449ae2c8b10f472663ecfe878ba4e2b0218f",
     "user": {
       "login": "cursor[bot]",
@@ -207,11 +207,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 71,
+    "line": 69,
     "original_line": 95,
     "side": "RIGHT",
     "original_position": 95,
-    "position": 71,
+    "position": 69,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -225,7 +225,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9Iqo",
     "diff_hunk": "@@ -0,0 +1,107 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                name: \"\"  # Will be determined by label selector\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get repository name\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.repository.name\n+              dest: repoName\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+        k8s:\n+          operation: patch\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Task ID for label selector\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              task-id: \"{{taskId}}\"\n+              current-stage: waiting-pr-approved\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"\n+        factor: 2\n+        jitter: 0.1",
     "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "4cea449ae2c8b10f472663ecfe878ba4e2b0218f",
     "user": {
       "login": "cursor[bot]",
@@ -280,11 +280,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 79,
+    "line": 72,
     "original_line": 107,
     "side": "RIGHT",
     "original_position": 107,
-    "position": 79,
+    "position": 72,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -298,7 +298,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9KUn",
     "diff_hunk": "@@ -0,0 +1,71 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: multi-agent-workflow-resume\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-created\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request opened events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"opened\"]\n+          # Ensure PR has task label (check array length is greater than 0)\n+          - path: body.pull_request.labels.#\n+            type: number\n+            comparator: \">\"\n+            value: \"0\"\n+  triggers:\n+    - template:\n+        name: resume-after-implementation\n+        conditions: \"github-pr-created\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-created\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract and validate branch name matches task pattern\n+            - src:\n+                dependencyName: github-pr-created\n+                dataKey: body.pull_request.head.ref\n+              dest: branchName\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              task-id: \"{{.Input.parameters.taskId}}\"\n+              current-stage: waiting-pr-created\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"\n+        factor: 2\n+        jitter: 0.1\n+",
     "path": "infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "2acf7950db8ae2a3ac15bc647bab5526bfaca8a6",
     "user": {
       "login": "cursor[bot]",
@@ -353,11 +353,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 72,
+    "line": 70,
     "original_line": 71,
     "side": "RIGHT",
     "original_position": 71,
-    "position": 72,
+    "position": 70,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -371,7 +371,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9KUo",
     "diff_hunk": "@@ -0,0 +1,84 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get repository name\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.repository.name\n+              dest: repoName\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              task-id: \"{{.Input.parameters.taskId}}\"\n+              current-stage: waiting-pr-approved\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"\n+        factor: 2\n+        jitter: 0.1\n+",
     "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "2acf7950db8ae2a3ac15bc647bab5526bfaca8a6",
     "user": {
       "login": "cursor[bot]",
@@ -426,11 +426,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 80,
+    "line": 73,
     "original_line": 84,
     "side": "RIGHT",
     "original_position": 84,
-    "position": 80,
+    "position": 73,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -444,7 +444,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9K11",
     "diff_hunk": "@@ -0,0 +1,83 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get repository name\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.repository.name\n+              dest: repoName\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-pr-approved",
     "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "b317e3b75b4251b7ca489a43eafd39d39f9baba6",
     "user": {
       "login": "cursor[bot]",
@@ -499,11 +499,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 74,
+    "line": null,
     "original_line": 77,
     "side": "RIGHT",
     "original_position": 77,
-    "position": 74,
+    "position": null,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -517,7 +517,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9K14",
     "diff_hunk": "@@ -0,0 +1,70 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: multi-agent-workflow-resume\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-created\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request opened events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"opened\"]\n+          # Ensure PR has task labels (non-empty array)\n+          - path: body.pull_request.labels\n+            type: array\n+            comparator: \"!=\"\n+            value: []",
     "path": "infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "b317e3b75b4251b7ca489a43eafd39d39f9baba6",
     "user": {
       "login": "cursor[bot]",
@@ -590,7 +590,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9K17",
     "diff_hunk": "@@ -0,0 +1,70 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: multi-agent-workflow-resume\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-created\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request opened events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"opened\"]\n+          # Ensure PR has task labels (non-empty array)\n+          - path: body.pull_request.labels\n+            type: array\n+            comparator: \"!=\"\n+            value: []\n+  triggers:\n+    - template:\n+        name: resume-after-implementation\n+        conditions: \"github-pr-created\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-created\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract and validate branch name matches task pattern\n+            - src:\n+                dependencyName: github-pr-created\n+                dataKey: body.pull_request.head.ref\n+              dest: branchName\n+          # Use label selector to find and resume the correct workflow\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-pr-created",
     "path": "infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "b317e3b75b4251b7ca489a43eafd39d39f9baba6",
     "user": {
       "login": "cursor[bot]",
@@ -645,11 +645,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 66,
+    "line": null,
     "original_line": 64,
     "side": "RIGHT",
     "original_position": 64,
-    "position": 66,
+    "position": null,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -663,7 +663,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9K1_",
     "diff_hunk": "@@ -0,0 +1,134 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: implementation-agent-remediation\n+  namespace: argo\n+  labels:\n+    sensor-type: multi-agent-orchestration\n+    agent-class: implementation\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: implementation-push-event\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for push events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"push\"]\n+          # Match any 5DLabs implementation agent (Rex, Blaze, Morgan, etc.)\n+          - path: body.sender.login\n+            type: string\n+            comparator: \"~\"\n+            value: \"5DLabs-(Rex|Blaze|Morgan)\\\\[bot\\\\]|5DLabs-(Rex|Blaze|Morgan)\"\n+          # Ensure push is to a task branch\n+          - path: body.ref\n+            type: string\n+            comparator: \"~\"\n+            value: \"refs/heads/task-.*\"\n+  triggers:\n+    # Trigger 1: Cancel running Cleo/Tess CodeRun CRDs\n+    - template:\n+        name: cancel-running-quality-agents\n+        conditions: \"implementation-push-event\"\n+        k8s:\n+          operation: delete\n+          source:\n+            resource:\n+              apiVersion: agents.platform/v1\n+              kind: CodeRun\n+              metadata:\n+                namespace: argo\n+          parameters:\n+            # Extract task ID from branch name\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $ref := .Input.body.ref }}\n+                  {{ if hasPrefix $ref \"refs/heads/task-\" }}\n+                    {{ $branch := trimPrefix \"refs/heads/task-\" $ref }}\n+                    {{ $parts := splitList \"-\" $branch }}\n+                    {{ if gt (len $parts) 0 }}\n+                      {{ index $parts 0 }}\n+                    {{ end }}\n+                  {{ else }}\n+                    0\n+                  {{ end }}\n+              dest: taskId\n+            # Extract the pushing agent name for logging\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $login := .Input.body.sender.login }}\n+                  {{ if hasPrefix $login \"5DLabs-\" }}\n+                    {{ $agent := trimPrefix \"5DLabs-\" $login }}\n+                    {{ $agent := trimSuffix \"[bot]\" $agent }}\n+                    {{ lower $agent }}\n+                  {{ else }}\n+                    unknown\n+                  {{ end }}\n+              dest: pushingAgent\n+          # Delete CodeRuns for quality/testing agents working on this task\n+          labelSelector:\n+            matchExpressions:\n+              - key: github-app\n+                operator: NotIn\n+                values: [\"5DLabs-Rex\", \"5DLabs-Blaze\", \"5DLabs-Morgan\"]  # Exclude all implementation agents\n+      retryStrategy:",
     "path": "infra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "b317e3b75b4251b7ca489a43eafd39d39f9baba6",
     "user": {
       "login": "cursor[bot]",
@@ -718,11 +718,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 84,
+    "line": 101,
     "original_line": 81,
     "side": "RIGHT",
     "original_position": 81,
-    "position": 84,
+    "position": 101,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -736,7 +736,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9LU8",
     "diff_hunk": "@@ -0,0 +1,80 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+          # Use label selector to find and resume workflows\n+          # Note: taskId is extracted and passed as parameter to the workflow\n+          # The workflow itself handles task-specific logic using the taskId parameter\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-pr-approved\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"",
     "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "d8c7db0dbcac5c5ba4ebf68402847e275884bb88",
     "user": {
       "login": "cursor[bot]",
@@ -791,11 +791,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 77,
+    "line": 70,
     "original_line": 77,
     "side": "RIGHT",
     "original_position": 77,
-    "position": 77,
+    "position": 70,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -809,7 +809,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9LVA",
     "diff_hunk": "@@ -0,0 +1,137 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: implementation-agent-remediation\n+  namespace: argo\n+  labels:\n+    sensor-type: multi-agent-orchestration\n+    agent-class: implementation\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: implementation-push-event\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for push events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"push\"]\n+          # Match any 5DLabs implementation agent (Rex, Blaze, Morgan, etc.)\n+          - path: body.sender.login\n+            type: string\n+            comparator: \"~\"\n+            value: \"5DLabs-(Rex|Blaze|Morgan)\\\\[bot\\\\]|5DLabs-(Rex|Blaze|Morgan)\"\n+          # Ensure push is to a task branch\n+          - path: body.ref\n+            type: string\n+            comparator: \"~\"\n+            value: \"refs/heads/task-.*\"\n+  triggers:\n+    # Trigger 1: Cancel running Cleo/Tess CodeRun CRDs\n+    - template:\n+        name: cancel-running-quality-agents\n+        conditions: \"implementation-push-event\"\n+        k8s:\n+          operation: delete\n+          source:\n+            resource:\n+              apiVersion: agents.platform/v1\n+              kind: CodeRun\n+              metadata:\n+                namespace: argo\n+          parameters:\n+            # Extract task ID from branch name\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $ref := .Input.body.ref }}\n+                  {{ if hasPrefix $ref \"refs/heads/task-\" }}\n+                    {{ $branch := trimPrefix \"refs/heads/task-\" $ref }}\n+                    {{ $parts := splitList \"-\" $branch }}\n+                    {{ if gt (len $parts) 0 }}\n+                      {{ index $parts 0 }}\n+                    {{ end }}\n+                  {{ else }}\n+                    0\n+                  {{ end }}\n+              dest: taskId\n+            # Extract the pushing agent name for logging\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $login := .Input.body.sender.login }}\n+                  {{ if hasPrefix $login \"5DLabs-\" }}\n+                    {{ $agent := trimPrefix \"5DLabs-\" $login }}\n+                    {{ $agent := trimSuffix \"[bot]\" $agent }}\n+                    {{ lower $agent }}\n+                  {{ else }}\n+                    unknown\n+                  {{ end }}\n+              dest: pushingAgent\n+          # Delete CodeRuns for quality/testing agents\n+          # Note: This deletes ALL quality agent CodeRuns, not just for the specific task\n+          # This ensures a clean restart of the QA pipeline when implementation code changes\n+          # Task-specific filtering is not possible due to Argo Events labelSelector limitations\n+          labelSelector:\n+            matchExpressions:\n+              - key: github-app\n+                operator: NotIn\n+                values: [\"5DLabs-Rex\", \"5DLabs-Blaze\", \"5DLabs-Morgan\"]  # Exclude all implementation agents",
     "path": "infra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "d8c7db0dbcac5c5ba4ebf68402847e275884bb88",
     "user": {
       "login": "cursor[bot]",
@@ -864,11 +864,11 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 83,
+    "line": null,
     "original_line": 83,
     "side": "RIGHT",
     "original_position": 83,
-    "position": 83,
+    "position": null,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
@@ -882,7 +882,7 @@
     "node_id": "PRRC_kwDOPFxW6M6H9LVB",
     "diff_hunk": "@@ -0,0 +1,80 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: ready-for-qa-label\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-labeled\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request labeled events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"labeled\"]\n+          # Check for ready-for-qa label\n+          - path: body.label.name\n+            type: string\n+            value: [\"ready-for-qa\"]\n+          # Verify label was added by Cleo\n+          - path: body.sender.login\n+            type: string\n+            value: [\"5DLabs-Cleo[bot]\", \"5DLabs-Cleo\"]\n+  triggers:\n+    - template:\n+        name: resume-after-cleo\n+        conditions: \"github-pr-labeled\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number for correlation\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get repository name\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataKey: body.repository.name\n+              dest: repoName\n+          # Use label selector to find and resume workflows\n+          # Note: taskId is extracted and passed as parameter to the workflow\n+          # The workflow itself handles task-specific logic using the taskId parameter\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-ready-for-qa",
     "path": "infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml",
-    "commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
     "original_commit_id": "d8c7db0dbcac5c5ba4ebf68402847e275884bb88",
     "user": {
       "login": "cursor[bot]",
@@ -937,15 +937,599 @@
     "start_line": null,
     "original_start_line": null,
     "start_side": null,
-    "line": 74,
+    "line": null,
     "original_line": 74,
     "side": "RIGHT",
     "original_position": 74,
-    "position": 74,
+    "position": null,
     "subject_type": "line",
     "author": {
       "login": "cursor[bot]"
     },
     "createdAt": "2025-08-17T17:35:55Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963338",
+    "pull_request_review_id": 3126417536,
+    "id": 2280963338,
+    "node_id": "PRRC_kwDOPFxW6M6H9L0K",
+    "diff_hunk": "@@ -0,0 +1,80 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+          # Use label selector to find and resume workflows\n+          # Note: taskId is extracted and passed as parameter to the workflow\n+          # The workflow itself handles task-specific logic using the taskId parameter\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-pr-approved\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"",
+    "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "d8c7db0dbcac5c5ba4ebf68402847e275884bb88",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Task Filtering Missing in Sensor Configurations\n\n<!-- DESCRIPTION START -->\nThe `labelSelector`s in several sensors lack task-specific filtering. Although a `taskId` is extracted from the event payload, it's not applied to the `labelSelector`. This causes operations, such as deleting CodeRun resources or resuming workflows, to affect all matching resources instead of only the specific task that triggered the event, potentially impacting unrelated work.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml#L74-L83\ninfra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L67-L77\ninfra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L62-L67\ninfra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L74\nLOCATIONS END -->\n<details>\n<summary>Additional Locations (3)</summary>\n\n- [`infra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml#L74-L83`](https://github.com/5dlabs/cto/blob/d8c7db0dbcac5c5ba4ebf68402847e275884bb88/infra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml#L74-L83)\n- [`infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L62-L67`](https://github.com/5dlabs/cto/blob/d8c7db0dbcac5c5ba4ebf68402847e275884bb88/infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L62-L67)\n- [`infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L74`](https://github.com/5dlabs/cto/blob/d8c7db0dbcac5c5ba4ebf68402847e275884bb88/infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L74)\n\n</details>\n\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjQ0NTUyZmRhLWE0M2EtNGMwMi05ZTZmLTMzMWJlMTY2ZWRlYSIsImVuY3J5cHRpb25LZXkiOiJqa0REZXA1MTZWY052SXBNaG0xLUFOLWxlb2xaNTNacHBaMWFDNzJja0RZIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUyNTUzLCJleHAiOjE3NTYwNTczNTN9.aizn0rsJfRt5EZffnTHd95Z5pMTLVsPZeTh47jDM1j9xiXlOZDWV79cztxjTaAsqz_mW8QbNmH2NA29UN0xDRQFcnsCzy9-fjQa0YAYKXOPjrESl5AOvNtmgKFNZigvHVzytCS-7C-4I8P0GhYpzw6vx-GwXQdAOk1amcl62f5wS7BhY_Fv-TayWKq-tduoqV4IIruCOjqMaPd3S_uhEXqaC-z8hebXwdrJDyCV1pcyKXUKQ6qUrrOJ_p3tuBYPvu6vS5BzMz2m3agEp6fOkL0-XIJU7tprGYG4DycGpLWmziu-NguMPFcR_RVWnX_CnDDUQ1qOis6zt4HXL4dOwpA\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjQ0NTUyZmRhLWE0M2EtNGMwMi05ZTZmLTMzMWJlMTY2ZWRlYSIsImVuY3J5cHRpb25LZXkiOiJqa0REZXA1MTZWY052SXBNaG0xLUFOLWxlb2xaNTNacHBaMWFDNzJja0RZIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6ImQ4YzdkYjBkYmNhYzVjNWJhNGViZjY4NDAyODQ3ZTI3NTg4NGJiODgifSwiaWF0IjoxNzU1NDUyNTUzLCJleHAiOjE3NTYwNTczNTN9.HzjhIooYOQUa4fNEax23ravlaDAvopVUlUXBj_g7SczWECg8QLL_DT8SqemM7GKuaVaIIMzchV-dQXxra_ydDAJqQ5eEtRwEJAoE3KlqCDpI8QYuhoszPL3QSGB2nfQi0mBiJYmvlJ6i-I2MAzAdLfy3d8Qn_8swVv8C8eSmy5Znn_fcpnHEREXulq4F22hCIzO1a-6O7SmCbqWFqRr9c9m7FngMl7L4Ysel4xAQA9B2-eg48gT6LeC_7f5HdCSR6Zt1DX_kXKLRD-GlUsi1ur2KhkhQ--YOFoRGw3I7AV2cWBMqcac5lran9YXZWAyAmsO-x2ihnEAx_kQyFWHXTA\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:42:34Z",
+    "updated_at": "2025-08-17T17:42:34Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963338",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963338"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963338"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963338/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 70,
+    "original_line": 77,
+    "side": "RIGHT",
+    "original_position": 77,
+    "position": 70,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:42:34Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963341",
+    "pull_request_review_id": 3126417536,
+    "id": 2280963341,
+    "node_id": "PRRC_kwDOPFxW6M6H9L0N",
+    "diff_hunk": "@@ -0,0 +1,80 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: ready-for-qa-label\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-labeled\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request labeled events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"labeled\"]\n+          # Check for ready-for-qa label\n+          - path: body.label.name\n+            type: string\n+            value: [\"ready-for-qa\"]\n+          # Verify label was added by Cleo\n+          - path: body.sender.login\n+            type: string\n+            value: [\"5DLabs-Cleo[bot]\", \"5DLabs-Cleo\"]\n+  triggers:\n+    - template:\n+        name: resume-after-cleo\n+        conditions: \"github-pr-labeled\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number for correlation\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get repository name\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataKey: body.repository.name\n+              dest: repoName\n+          # Use label selector to find and resume workflows\n+          # Note: taskId is extracted and passed as parameter to the workflow\n+          # The workflow itself handles task-specific logic using the taskId parameter\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-ready-for-qa\n+      retryStrategy:",
+    "path": "infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "d8c7db0dbcac5c5ba4ebf68402847e275884bb88",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Argo Sensors Resume Incorrect Workflows\n\n<!-- DESCRIPTION START -->\nThe new Argo Sensors extract a `taskId` from PR labels but omit it from the `labelSelector` for workflow resumption. This means all workflows matching the `workflow-type` and `current-stage` labels are resumed, instead of only the specific task's workflow. This breaks task-specific correlation.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L75\ninfra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L70-L77\ninfra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L59-L66\nLOCATIONS END -->\n<details>\n<summary>Additional Locations (2)</summary>\n\n- [`infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L70-L77`](https://github.com/5dlabs/cto/blob/d8c7db0dbcac5c5ba4ebf68402847e275884bb88/infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L70-L77)\n- [`infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L59-L66`](https://github.com/5dlabs/cto/blob/d8c7db0dbcac5c5ba4ebf68402847e275884bb88/infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L59-L66)\n\n</details>\n\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjI5NjkzN2I1LTYwMWQtNDYxMC1hYzA5LTBkYjRjNmZiN2Q3YSIsImVuY3J5cHRpb25LZXkiOiI4OWR1WXc5QWpjMkNyZ2t1eFhnVkRZWUlOS3dQWXlWZXZrNl9ZcHpnX0RNIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUyNTUzLCJleHAiOjE3NTYwNTczNTN9.hPMo0HVZCj8AIY0S_vkaL4oZwjb_zH9eSmNQS4X0NxnBCNFLFfLbOTEy9DilEOWCh140POQumadRLDWdVj3t5uFccLyORqggba3ePHVBB3dBtWEAaFbY9BeGibDEz0DK_HhTcLsInwJYIfKpgJuYHPkRbYbg0M7GsyNxA4CSFFvDGBVsIgHpVo0lOLJKri6MQ5MNCCW4hsS_c-BV5ss6NH1iYYUhQTAK2xuIAAQUDxQO3AuCIF_ZkB9a6cN6wf_Yn3IQrqssU6Ml03m2XsJEG1_LOFdNkX23kPuuK6AYuNQG-nq8bVob6Xu05BX-tqIw4dK5tp522ZSrjdhTwWpcKg\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjI5NjkzN2I1LTYwMWQtNDYxMC1hYzA5LTBkYjRjNmZiN2Q3YSIsImVuY3J5cHRpb25LZXkiOiI4OWR1WXc5QWpjMkNyZ2t1eFhnVkRZWUlOS3dQWXlWZXZrNl9ZcHpnX0RNIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6ImQ4YzdkYjBkYmNhYzVjNWJhNGViZjY4NDAyODQ3ZTI3NTg4NGJiODgifSwiaWF0IjoxNzU1NDUyNTUzLCJleHAiOjE3NTYwNTczNTN9.Lx2MJZi2hRUIC-P950dTGgB7ZfE7YZp6m3T-5TC8i_ab_9ys_xdU_qcsPvavS6pN5nC-iq8-S79q1pBhqAVWLHvTEVuZF7hYOpH9pz267XuasWjaWbxvalm7IruYPu6urYYmaDbK0ZTbQrEX-e8Y5FbelPng30kWs7T-B2zkiFGSYTz_7wqq92VjcHNVt58_g-bY1GnwYU7f-l7SQa_dgPziR9X5yxyaPBB_rRNJy-5W1fKEhoCvs02Ickpn6atAsz9SkkE35Im-4jaKzZ9i1uMPrTFU42Bkq0JO3U5KU3f-9vftsBd6sY7kOBPIrHz60KdexCDKFZXdWfauzr5XWA\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:42:34Z",
+    "updated_at": "2025-08-17T17:42:34Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963341",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963341"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963341"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963341/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 68,
+    "original_line": 75,
+    "side": "RIGHT",
+    "original_position": 75,
+    "position": 68,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:42:34Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963717",
+    "pull_request_review_id": 3126417793,
+    "id": 2280963717,
+    "node_id": "PRRC_kwDOPFxW6M6H9L6F",
+    "diff_hunk": "@@ -0,0 +1,80 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+          # Use label selector to find and resume workflows\n+          # Note: taskId is extracted and passed as parameter to the workflow\n+          # The workflow itself handles task-specific logic using the taskId parameter\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-pr-approved\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"",
+    "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Sensors Fail to Resume Specific Workflows\n\n<!-- DESCRIPTION START -->\nThe sensors extract a `taskId` from PR labels but don't include it in the `labelSelector`. This causes them to attempt to resume all workflows matching static `workflow-type` and `current-stage` labels, instead of the specific workflow for the extracted task, leading to unintended resumptions.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L59-L66\ninfra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L75\ninfra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L67-L77\nLOCATIONS END -->\n<details>\n<summary>Additional Locations (2)</summary>\n\n- [`infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L59-L66`](https://github.com/5dlabs/cto/blob/eb402cb7a8c6dd225840a20794ad0747ca185e24/infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L59-L66)\n- [`infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L75`](https://github.com/5dlabs/cto/blob/eb402cb7a8c6dd225840a20794ad0747ca185e24/infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L67-L75)\n\n</details>\n\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjBkNDk0ZmQxLWFiNDktNDkyOC1hOTcyLTQ2MTMwYTU3NTg1NSIsImVuY3J5cHRpb25LZXkiOiIzT3JneDhMSkgzazR2NjhxaUY0cGJVSVdrRl9SOTJIbEVKaDg4NzVGdFZVIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.L_Boxaz53bT7Wgsm90onFlibh3ojQl2_8fJAvIeOZO_7KIJ1FfGgzqbkMXiByGgQfYVorj2wT5seiuGYPt834SvgthY_gfVdWz4U5mx_aIYAQqZivpLXuZK_TjbAPebmVdaBaWXiiaTNra8aJT5vugyS_k2XV5Xaze5xk1PZOXkf3eDtDqXB3sgaJbRORnMBvjqWBXzfPS9sZ7H7uV5nyLjhNDqy6dC7Hw6aPEyaRVv1rTmW_W-8tFDt1tuqvgnZtuXdKe3TP42C3hr3RfoiuF8pxwiD4zZP2r2xU0uXbsgfE0mPlUSKp0_48198wWzLorFvN7yZ-pQzSE1Fi6LFvQ\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjBkNDk0ZmQxLWFiNDktNDkyOC1hOTcyLTQ2MTMwYTU3NTg1NSIsImVuY3J5cHRpb25LZXkiOiIzT3JneDhMSkgzazR2NjhxaUY0cGJVSVdrRl9SOTJIbEVKaDg4NzVGdFZVIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6ImViNDAyY2I3YThjNmRkMjI1ODQwYTIwNzk0YWQwNzQ3Y2ExODVlMjQifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.mVrweOYgof4ru3cTv53kL-bTM6pGUqMYAaFZLhKFjPMKfYC5P1DCKPHDZ49r-o7OvueKf4koeze2ENqHdxoKU1BHKNWSDvMmg28dEmFGNRlvTN75hwB8sKeNUckW8YFj6eomyLxZO432G9jJ4MGcU5d1EAT4l1LuDm-BfGN5ppv17uTMjdIa7Koil15_ptMQri9EOWsA7eKNa0u5IwyNn0wOT9piwKzdKAF6i7LEgV9qfr_XeAd_rB8KiEyBQLk4yWmCzo2S6dFCRP9yQ8g8npjaDhHs4bSeYN23TtU8HA5c4_Xv6-M4yHEiNpNGPEoDXuiK2KBLhE4YlroIOyt4dw\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:43:31Z",
+    "updated_at": "2025-08-17T17:43:32Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963717",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963717"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963717"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963717/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 70,
+    "original_line": 77,
+    "side": "RIGHT",
+    "original_position": 77,
+    "position": 70,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:43:31Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963720",
+    "pull_request_review_id": 3126417793,
+    "id": 2280963720,
+    "node_id": "PRRC_kwDOPFxW6M6H9L6I",
+    "diff_hunk": "@@ -0,0 +1,137 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: implementation-agent-remediation\n+  namespace: argo\n+  labels:\n+    sensor-type: multi-agent-orchestration\n+    agent-class: implementation\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: implementation-push-event\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for push events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"push\"]\n+          # Match any 5DLabs implementation agent (Rex, Blaze, Morgan, etc.)\n+          - path: body.sender.login\n+            type: string\n+            comparator: \"~\"\n+            value: \"5DLabs-(Rex|Blaze|Morgan)\\\\[bot\\\\]|5DLabs-(Rex|Blaze|Morgan)\"\n+          # Ensure push is to a task branch\n+          - path: body.ref\n+            type: string\n+            comparator: \"~\"\n+            value: \"refs/heads/task-.*\"\n+  triggers:\n+    # Trigger 1: Cancel running Cleo/Tess CodeRun CRDs\n+    - template:\n+        name: cancel-running-quality-agents\n+        conditions: \"implementation-push-event\"\n+        k8s:\n+          operation: delete\n+          source:\n+            resource:\n+              apiVersion: agents.platform/v1\n+              kind: CodeRun\n+              metadata:\n+                namespace: argo\n+          parameters:\n+            # Extract task ID from branch name\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $ref := .Input.body.ref }}\n+                  {{ if hasPrefix $ref \"refs/heads/task-\" }}\n+                    {{ $branch := trimPrefix \"refs/heads/task-\" $ref }}\n+                    {{ $parts := splitList \"-\" $branch }}\n+                    {{ if gt (len $parts) 0 }}\n+                      {{ index $parts 0 }}\n+                    {{ end }}\n+                  {{ else }}\n+                    0\n+                  {{ end }}\n+              dest: taskId\n+            # Extract the pushing agent name for logging\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $login := .Input.body.sender.login }}\n+                  {{ if hasPrefix $login \"5DLabs-\" }}\n+                    {{ $agent := trimPrefix \"5DLabs-\" $login }}\n+                    {{ $agent := trimSuffix \"[bot]\" $agent }}\n+                    {{ lower $agent }}\n+                  {{ else }}\n+                    unknown\n+                  {{ end }}\n+              dest: pushingAgent\n+          # Delete CodeRuns for quality/testing agents\n+          # Note: This deletes ALL quality agent CodeRuns, not just for the specific task\n+          # This ensures a clean restart of the QA pipeline when implementation code changes\n+          # Task-specific filtering is not possible due to Argo Events labelSelector limitations\n+          labelSelector:\n+            matchExpressions:\n+              - key: github-app\n+                operator: NotIn\n+                values: [\"5DLabs-Rex\", \"5DLabs-Blaze\", \"5DLabs-Morgan\"]  # Exclude all implementation agents",
+    "path": "infra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Sensor Deletes Unrelated CodeRuns\n\n<!-- DESCRIPTION START -->\nThe `implementation-agent-remediation` sensor extracts a task ID from the branch name but doesn't use it in the CodeRun deletion `labelSelector`. This causes the sensor to delete all quality/testing agent CodeRuns across all tasks when an implementation agent pushes, potentially canceling unrelated work.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml#L74-L83\nLOCATIONS END -->\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90Ojc4NzNmYmZlLTkyMzQtNGE3Yi04ZTBhLTM2ODVkZTg2MjkxZCIsImVuY3J5cHRpb25LZXkiOiItSzBYQTdsVjV1WVBhTGxzSldXM3gyb0pHaHp3WlVva1FzLWlHa2FScUVzIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.Nh-_LyuC9fluVDpSX7a8NsB8nhgiAT3yAB3wcAe8-bDfPpIVuHm7TUqZITiInSBmVbzbc2_Lol56CCoafZuOh_ccwGz124U67q8mgSS-MTTyPmsJ2y-A_lzqzgFs91xpBidx1J49ymZESTfcZg3C7HhNEYilaKgxE6VK2dboM7QzdBRzZyyw_5-aPsJPKEgekhVt9Xm-wBNTf9U1nlZFp7g0HDVPMHVYoXI9eXRVk5DiA18kkJTE0oMy0gVOHnHVn6yDM2gjLPF1918I71XmgTp85OEP0INrlyzpwGwGtEuW35Dg45y2PNtEVwvnLVf3KJ8pO9RekuGijZvkhLgGrw\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90Ojc4NzNmYmZlLTkyMzQtNGE3Yi04ZTBhLTM2ODVkZTg2MjkxZCIsImVuY3J5cHRpb25LZXkiOiItSzBYQTdsVjV1WVBhTGxzSldXM3gyb0pHaHp3WlVva1FzLWlHa2FScUVzIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6ImViNDAyY2I3YThjNmRkMjI1ODQwYTIwNzk0YWQwNzQ3Y2ExODVlMjQifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.BQVqoKcaPNf-RXiwlQJn_FVKgeZQP-ktwgZSbeNhiHCjA0Iw0iv36Xhq27zf6r3PMV6qclqbRAYGz0fLhuOo8K85eP6tTqMmZDnHXmR4O273Gqx96cla8vqR7SF6JLft8ZO_TNxB3vcLO2niH3nNcQwiQJTUOrihdI5Fwbt6Ac-5XpIHKmW44dfF3LgOYLpWw5kxhrI4qq2FtOCr2YOMR8t9CqXPWNYcErcxSZI-8syXjPpyAk5umzUyI2DsYtMKKrgZsjT4w7Fz4PnS-VA0wXO6-kTvzeKGAUFy_Ohg35YBAMBDUQ2-QOVkpVw5f-hImfNloSYxqisjBManxrGsZg\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:43:31Z",
+    "updated_at": "2025-08-17T17:43:32Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963720",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963720"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963720"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963720/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": null,
+    "original_line": 83,
+    "side": "RIGHT",
+    "original_position": 83,
+    "position": null,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:43:31Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963721",
+    "pull_request_review_id": 3126417793,
+    "id": 2280963721,
+    "node_id": "PRRC_kwDOPFxW6M6H9L6J",
+    "diff_hunk": "@@ -0,0 +1,72 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: multi-agent-workflow-resume\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-created\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request opened events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"opened\"]\n+          # Skip label filtering for now - will be validated in dataTemplate\n+          # - path: body.pull_request.labels.#.name\n+          #   type: string\n+          #   comparator: \"~\"\n+          #   value: \"task-.*\"",
+    "path": "infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Argo Events Sensor Fails to Filter PR Labels\n\n<!-- DESCRIPTION START -->\nThe Argo Events sensor's filter for PR labels uses unsupported syntax. The `comparator: \"!=\"` with `value: []` is not valid for checking if an array is non-empty, which impacts the sensor's ability to correctly filter PRs by label presence.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L22-L27\nLOCATIONS END -->\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OmFlYWY1ZmU1LWFiMDMtNGM3Zi1hNmNlLTNiMzVkOWZhNTAyNiIsImVuY3J5cHRpb25LZXkiOiJyUDhsU0p0TEY2YzdHTHFkSktIQ2JVdGpwbWllbWVCekplSnFtX1BkLVd3IiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.QcWv30SF38zKQ1_666Q0WZQ8ukDLeMYYDMWp4ayCBrxuQPDhPDqeNzxXXTa8_cM2FtX_F13f6H8COIufMNeK4ECDPYbi5pxNyx5bVHhsPSrZ3eLxSn_ycInPNM-dxP0pZbqzoomkZpK_z6GNd8KOVPKsGj0gXNStQoaa00yopcy7dEhyXRFVv_pURsbHIkQueLK20a2wdIwdYu0VO3wwqTjzRcILAQBB4SL9TgHtQKFhg4hL4_BmTJ3Ejp3JXKsld5cAF-Ox7aItSOSXupcQ11FPH7Bs66DO7gVpCpkODh-ef9e3N1W3vcnGcL4H59oVZhNPRALovvDqebfdJ8adlQ\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OmFlYWY1ZmU1LWFiMDMtNGM3Zi1hNmNlLTNiMzVkOWZhNTAyNiIsImVuY3J5cHRpb25LZXkiOiJyUDhsU0p0TEY2YzdHTHFkSktIQ2JVdGpwbWllbWVCekplSnFtX1BkLVd3IiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6ImViNDAyY2I3YThjNmRkMjI1ODQwYTIwNzk0YWQwNzQ3Y2ExODVlMjQifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.DOkjNPIbMa3Ss_C8rRVXEZs5-So-skub5rs1KhgDdTl2E39AET5VuqC2goVvYbCOShR-UFqjusa5DGVReC7WMH-y-Ua999zlFNgiYzh-VWJseBJYEfxeaMqfn_R9gkD2kEihCkTczrC19vWhfxRgbEObOs1Whl48PlUyDfRYBJ-dL9qGQSuTcYJ4ERu4YFb5U7sGDff83dS-nYm_4vAEIhAPwcmhWgmhWb-A_-X1m_A7XYC5tN6JPcapKnbt6rv8O3dDsRlBjfhOZ7i7QMmlrZ70l7VzSvhWwLOtOFDDeG1glsH-lth3__WbpzXc9hcfrT4dg0LPYub3Ep9_rMRzpA\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:43:31Z",
+    "updated_at": "2025-08-17T17:43:32Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963721",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963721"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963721"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963721/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 27,
+    "original_line": 27,
+    "side": "RIGHT",
+    "original_position": 27,
+    "position": 27,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:43:31Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963722",
+    "pull_request_review_id": 3126417793,
+    "id": 2280963722,
+    "node_id": "PRRC_kwDOPFxW6M6H9L6K",
+    "diff_hunk": "@@ -0,0 +1,80 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: pr-approval\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-review\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request_review events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request_review\"]\n+          - path: body.action\n+            type: string\n+            value: [\"submitted\"]\n+          # Check for approval state\n+          - path: body.review.state\n+            type: string\n+            value: [\"approved\"]\n+          # Verify approval comes from Tess\n+          - path: body.review.user.login\n+            type: string\n+            value: [\"5DLabs-Tess[bot]\", \"5DLabs-Tess\"]\n+  triggers:\n+    - template:\n+        name: resume-after-tess\n+        conditions: \"github-pr-review\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels\n+            - src:\n+                dependencyName: github-pr-review\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        {{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: taskId\n+            # Extract PR number\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.pull_request.number\n+              dest: prNumber\n+            # Get review ID for tracking\n+            - src:\n+                dependencyName: github-pr-review\n+                dataKey: body.review.id\n+              dest: reviewId\n+          # Use label selector to find and resume workflows\n+          # Note: taskId is extracted and passed as parameter to the workflow\n+          # The workflow itself handles task-specific logic using the taskId parameter\n+          labelSelector:\n+            matchLabels:\n+              workflow-type: play-orchestration\n+              current-stage: waiting-pr-approved",
+    "path": "infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "eb402cb7a8c6dd225840a20794ad0747ca185e24",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Sensor Fails to Filter Workflows by Task ID\n\n<!-- DESCRIPTION START -->\nThe sensor extracts a `taskId` from PR labels but omits it from the `labelSelector`. This means it attempts to resume all workflows matching `workflow-type: play-orchestration` and `current-stage: waiting-pr-approved`, rather than the specific workflow for the approved PR's task. This can lead to unintended workflow resumptions.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L70-L74\nLOCATIONS END -->\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjYwMDAyMGMzLWMwZTYtNDhlOC04ZTM0LTI3NWU5MTJhNzg1NCIsImVuY3J5cHRpb25LZXkiOiJucFJtenNmdUgweXR3bTQ1S24yRzBvc1p3eVVuNHNEYUJPem5oYUtFSlNvIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.foZnYBul3u8RZkM0xpQNyS7EzvzVZgfhl23PGaP4njvZM1a-LQNh4CX0km5c74O8Zh35bxFRbsGF5NgTsenbrUvFLvb7b2LZMzxhjBOPltbI20b7md-fAGOiApI9SQjrRn_N2TJBAFa3KrxthqEHo7n4kpSRtJZiMggIuXZSed-wMdG9-AIXtYYIuTZ3zFLSp6FMHNldslehXVzhieSJoiwHkeB2Fy_ThQqKQH3mcAt_Yy8eHAuWQ4JANC5dhnqx6LNtKKY8TPpVW9IxQ49irO64CjHuWsiDiDkiLCTu74KTEXnR-reJScx-HxNxSDKiEUnfzIXSJNCCyINiL4ZNCg\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjYwMDAyMGMzLWMwZTYtNDhlOC04ZTM0LTI3NWU5MTJhNzg1NCIsImVuY3J5cHRpb25LZXkiOiJucFJtenNmdUgweXR3bTQ1S24yRzBvc1p3eVVuNHNEYUJPem5oYUtFSlNvIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6ImViNDAyY2I3YThjNmRkMjI1ODQwYTIwNzk0YWQwNzQ3Y2ExODVlMjQifSwiaWF0IjoxNzU1NDUyNjExLCJleHAiOjE3NTYwNTc0MTF9.WApf1GyzDA_skpbvMVqGIASYVe3WXiD21ojesNLAaMSjiUvpGEoVcMZP8bBw8vewqFUc6-cv9bm57Yzqu5vLEhtufzN0zhqEk3Mr-35L55ChBXXzlwDCWNJvHLkXkS9GHPBGIfjWuPbkVL5cGqwNJNLEazLT3ff57_-8IrWsJ051zNAIxp5qlIo0BbxXi5KA-yqkbKLuELTkGlxNgDbdF08w0L0poQcaubZwo92Mwo8HZFBrjjFEgwUhe-wOcyvq3JrRpzc2yJ9OyBTARet2t6qP4eF85rpsuITRnT3FHvVPecgOlN6d81gg6Vt9HGe7DC2s4yFGzVOaf1MyGoY4ow\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:43:32Z",
+    "updated_at": "2025-08-17T17:43:32Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963722",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963722"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280963722"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280963722/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": null,
+    "original_line": 74,
+    "side": "RIGHT",
+    "original_position": 74,
+    "position": null,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:43:32Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280965842",
+    "pull_request_review_id": 3126419544,
+    "id": 2280965842,
+    "node_id": "PRRC_kwDOPFxW6M6H9MbS",
+    "diff_hunk": "@@ -0,0 +1,73 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: ready-for-qa-label\n+  namespace: argo\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: github-pr-labeled\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for pull_request labeled events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"pull_request\"]\n+          - path: body.action\n+            type: string\n+            value: [\"labeled\"]\n+          # Check for ready-for-qa label\n+          - path: body.label.name\n+            type: string\n+            value: [\"ready-for-qa\"]\n+          # Verify label was added by Cleo\n+          - path: body.sender.login\n+            type: string\n+            value: [\"5DLabs-Cleo[bot]\", \"5DLabs-Cleo\"]\n+  triggers:\n+    - template:\n+        name: resume-after-cleo\n+        conditions: \"github-pr-labeled\"\n+        argoWorkflow:\n+          operation: resume\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                namespace: argo\n+              spec: {}\n+          parameters:\n+            # Extract task ID from PR labels for workflow targeting\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataTemplate: |\n+                  {{ range $index, $label := .Input.body.pull_request.labels }}\n+                    {{ if hasPrefix \"task-\" $label.name }}\n+                      {{ $parts := splitList \"-\" $label.name }}\n+                      {{ if gt (len $parts) 1 }}\n+                        play-task-{{ index $parts 1 }}\n+                      {{ end }}\n+                    {{ end }}\n+                  {{ end }}\n+              dest: metadata.name\n+            # Extract PR number for workflow context\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataKey: body.pull_request.number\n+              dest: spec.arguments.parameters.pr-number\n+            # Get repository name for workflow context\n+            - src:\n+                dependencyName: github-pr-labeled\n+                dataKey: body.repository.name\n+              dest: spec.arguments.parameters.repository\n+      retryStrategy:\n+        steps: 3\n+        duration: \"10s\"\n+        factor: 2\n+        jitter: 0.1\n+",
+    "path": "infra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Sensor Fails to Resume Workflows Due to Incorrect Naming\n\n<!-- DESCRIPTION START -->\nThe sensors incorrectly attempt to resume Argo Workflows by dynamically setting `metadata.name` via a `dataTemplate` to a constructed name like \"play-task-X\". Argo Workflow resume operations target existing workflows, which have auto-generated names and require `labelSelector` for proper targeting. The current configuration also lacks a `labelSelector` that incorporates the dynamic task ID, preventing the sensor from resuming the correct workflow.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/ready-for-qa-label-sensor.yaml#L41-L74\ninfra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L41-L67\ninfra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L41-L64\nLOCATIONS END -->\n<details>\n<summary>Additional Locations (2)</summary>\n\n- [`infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L41-L67`](https://github.com/5dlabs/cto/blob/4fe4afa28f4e20a500a4e17482f970f8e2524efb/infra/gitops/resources/github-webhooks/pr-approval-sensor.yaml#L41-L67)\n- [`infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L41-L64`](https://github.com/5dlabs/cto/blob/4fe4afa28f4e20a500a4e17482f970f8e2524efb/infra/gitops/resources/github-webhooks/multi-agent-workflow-resume-sensor.yaml#L41-L64)\n\n</details>\n\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjYwMTgyZjBjLTVhODktNDk4Yi04ZTI4LWY4M2I2MDZkNDA5MSIsImVuY3J5cHRpb25LZXkiOiJOWjZaSHVfOVQ1MndqWFdCRGJUUVdoV0d4RjFPdzdqQm8yekU1eE0tWjlzIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUzMDYxLCJleHAiOjE3NTYwNTc4NjF9.dhJa60xQHmxbJ01yO0uhZquNcq0caWRihsFp_9GbdOWC1M3m7ldwqvu_UzIlNZNC2YDqlmOGIbFjvk0xvG3rmVRZuwxDOx3l0Qf4VoPfyFdq8AgMq8eFLK-zt2x_iOgW7can8aPFARXYDm5CYSRvRhuF1r8VFgogNVJROcSgpstrssSGhjxo7JrVbWKXEbd12x9qmwG3S-Dxp_cv6zd8NDdmtQM92RHOaxNI38zApgdZ91_LrDGlLicHv33e7js7rYTz3RWBujwNbaLDxFNT7ISIan8VHS_apqkc-6fWmc3hTqjo4Fbaa6dVCl3ax_0NW6zG_2fl2ZhDYKm2F6Ouxg\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjYwMTgyZjBjLTVhODktNDk4Yi04ZTI4LWY4M2I2MDZkNDA5MSIsImVuY3J5cHRpb25LZXkiOiJOWjZaSHVfOVQ1MndqWFdCRGJUUVdoV0d4RjFPdzdqQm8yekU1eE0tWjlzIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6IjRmZTRhZmEyOGY0ZTIwYTUwMGE0ZTE3NDgyZjk3MGY4ZTI1MjRlZmIifSwiaWF0IjoxNzU1NDUzMDYxLCJleHAiOjE3NTYwNTc4NjF9.T1lH0CB3bXuxikV8M6b7wCotZAOoA4veyCWA4NbaVCdB86Fz1ck8deqtcTTlze00oWQ9LGMO2_sN1DWdOVWQqIm522rnvC1WLtpG1HuNlwkkKgsG8gD4aa8q6QtgKxvWrt6rHrIwkVYqI90zxgKsCPnyGV24-ZQ_XEKnHJKqFiqhhIB7iM9I67p6d9dlag_fGmB2puZRfEfLMqXKocE60ipY082MeBS3E5CzZMd44i-1EnzGI53Bv15N_ppq8rwhiluA84IzK8YO_Ejr6CXKPn9G7hzu2HxgOhaIXwnJFN5Tm4vIi-CWnmLCvdgC4etgz8TJS4XWKVv89bQ1R7rshA\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:51:02Z",
+    "updated_at": "2025-08-17T17:51:02Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280965842",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280965842"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280965842"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280965842/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 73,
+    "original_line": 73,
+    "side": "RIGHT",
+    "original_position": 73,
+    "position": 73,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:51:02Z"
+  },
+  {
+    "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280965844",
+    "pull_request_review_id": 3126419544,
+    "id": 2280965844,
+    "node_id": "PRRC_kwDOPFxW6M6H9MbU",
+    "diff_hunk": "@@ -0,0 +1,132 @@\n+---\n+apiVersion: argoproj.io/v1alpha1\n+kind: Sensor\n+metadata:\n+  name: implementation-agent-remediation\n+  namespace: argo\n+  labels:\n+    sensor-type: multi-agent-orchestration\n+    agent-class: implementation\n+spec:\n+  template:\n+    serviceAccountName: argo-events-sa\n+  dependencies:\n+    - name: implementation-push-event\n+      eventSourceName: github\n+      eventName: org\n+      filters:\n+        data:\n+          # Filter for push events\n+          - path: headers.X-Github-Event\n+            type: string\n+            value: [\"push\"]\n+          # Match any 5DLabs implementation agent (Rex, Blaze, Morgan, etc.)\n+          - path: body.sender.login\n+            type: string\n+            comparator: \"~\"\n+            value: \"5DLabs-(Rex|Blaze|Morgan)\\\\[bot\\\\]|5DLabs-(Rex|Blaze|Morgan)\"\n+          # Ensure push is to a task branch\n+          - path: body.ref\n+            type: string\n+            comparator: \"~\"\n+            value: \"refs/heads/task-.*\"\n+  triggers:\n+    # Trigger 1: Create cleanup workflow to cancel running quality agents\n+    - template:\n+        name: create-cleanup-workflow\n+        conditions: \"implementation-push-event\"\n+        argoWorkflow:\n+          operation: submit\n+          source:\n+            resource:\n+              apiVersion: argoproj.io/v1alpha1\n+              kind: Workflow\n+              metadata:\n+                generateName: cleanup-quality-agents-\n+                namespace: argo\n+              spec:\n+                entrypoint: cleanup-quality-agents\n+                arguments:\n+                  parameters:\n+                    - name: task-id\n+                    - name: pushing-agent\n+                templates:\n+                  - name: cleanup-quality-agents\n+                    inputs:\n+                      parameters:\n+                        - name: task-id\n+                        - name: pushing-agent\n+                    script:\n+                      image: bitnami/kubectl:latest\n+                      command: [sh]\n+                      source: |\n+                        #!/bin/sh\n+                        echo \"Implementation agent {{inputs.parameters.pushing-agent}} pushed to task-{{inputs.parameters.task-id}}\"\n+                        echo \"Cancelling quality/testing agent CodeRuns for task-{{inputs.parameters.task-id}}\"\n+\n+                        # Delete quality agent CodeRuns for this specific task\n+                        kubectl delete coderun \\\n+                          -l task-id={{inputs.parameters.task-id}},github-app!=5DLabs-Rex,github-app!=5DLabs-Blaze,github-app!=5DLabs-Morgan \\\n+                          || true\n+                        echo \"QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}\"\n+          parameters:\n+            # Extract task ID from branch name\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $ref := .Input.body.ref }}\n+                  {{ if hasPrefix $ref \"refs/heads/task-\" }}\n+                    {{ $branch := trimPrefix \"refs/heads/task-\" $ref }}\n+                    {{ $parts := splitList \"-\" $branch }}\n+                    {{ if gt (len $parts) 0 }}\n+                      {{ index $parts 0 }}\n+                    {{ end }}\n+                  {{ else }}\n+                    0\n+                  {{ end }}\n+              dest: spec.arguments.parameters.0.value\n+            # Extract the pushing agent name for logging\n+            - src:\n+                dependencyName: implementation-push-event\n+                dataTemplate: |\n+                  {{ $login := .Input.body.sender.login }}\n+                  {{ if hasPrefix $login \"5DLabs-\" }}\n+                    {{ $agent := trimPrefix \"5DLabs-\" $login }}\n+                    {{ $agent := trimSuffix \"[bot]\" $agent }}\n+                    {{ lower $agent }}\n+                  {{ else }}\n+                    unknown\n+                  {{ end }}\n+              dest: spec.arguments.parameters.1.value",
+    "path": "infra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml",
+    "commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "original_commit_id": "4fe4afa28f4e20a500a4e17482f970f8e2524efb",
+    "user": {
+      "login": "cursor[bot]",
+      "id": 206951365,
+      "node_id": "BOT_kgDODFXTxQ",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1210556?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/cursor%5Bbot%5D",
+      "html_url": "https://github.com/apps/cursor",
+      "followers_url": "https://api.github.com/users/cursor%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/cursor%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/cursor%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/cursor%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/cursor%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/cursor%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/cursor%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/cursor%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/cursor%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "### Bug: Sensor Cleanup Deletes All CodeRuns\n\n<!-- DESCRIPTION START -->\nThe sensor's cleanup workflow incorrectly deletes *all* quality agent CodeRuns due to a missing `task-id` filter. Additionally, the `create-cleanup-workflow` trigger passes `task-id` and `pushing-agent` using incorrect array indices, and these parameters are not available for the `log-remediation-event` trigger, preventing dynamic logging.\n<!-- DESCRIPTION END -->\n\n<!-- LOCATIONS START\ninfra/gitops/resources/github-webhooks/implementation-agent-remediation-sensor.yaml#L74-L100\nLOCATIONS END -->\n<a href=\"https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9DVVJTT1IiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjAzYmQ0NGI2LTZjYjQtNDg3ZC05ZTdiLTUxYmUyODFiOTUzMSIsImVuY3J5cHRpb25LZXkiOiJFalJtMzlNdkU0cEZiMHlHMndHNEJJN1VCQzdPcGJsS1BFc2tZa1dReVVvIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24ifSwiaWF0IjoxNzU1NDUzMDYxLCJleHAiOjE3NTYwNTc4NjF9.DolhvEu34MKTfnJXEcZO3Fyla9F46JCA8emXRePviqYID6bFkFJEYsfBeXOa3M12IRWf1inU1vof6nJOgi-psddZ0FFv8qgF1MJvQpAV8P9IbCQhDkf-h1z4C2L5_9wRWrve-3wLWdsdbUekS9p92zFV8y-kZkLImpa1XulQZYMtCwQ53dskUGqbgCmY3FAtLWMYJHn2pZTQ4Fkchw5G6GWyQDbffvHuDcDBsDmAOgVvt3SWmXf0h50CQ0UbDGHXvTbthkKGcT6Vh5arjslBoHjGrMxgJZ76kqJyWb3LVszs6MBG0vYDYWa-bCvScHLMFFcmuJjKPwOmPd8Kv8YP-A\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-cursor-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-cursor-light.svg\">\n    <img alt=\"Fix in Cursor\" src=\"https://cursor.com/fix-in-cursor.svg\">\n  </picture>\n</a> <a href=\"https://cursor.com/agents?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJ1Z2JvdC12MSJ9.eyJ2ZXJzaW9uIjoxLCJ0eXBlIjoiQlVHQk9UX0ZJWF9JTl9XRUIiLCJkYXRhIjp7InJlZGlzS2V5IjoiYnVnYm90OjAzYmQ0NGI2LTZjYjQtNDg3ZC05ZTdiLTUxYmUyODFiOTUzMSIsImVuY3J5cHRpb25LZXkiOiJFalJtMzlNdkU0cEZiMHlHMndHNEJJN1VCQzdPcGJsS1BFc2tZa1dReVVvIiwiYnJhbmNoIjoiZmVhdHVyZS90YXNrLTItaW1wbGVtZW50YXRpb24iLCJyZXBvT3duZXIiOiI1ZGxhYnMiLCJyZXBvTmFtZSI6ImN0byIsInByTnVtYmVyIjoyNDksImNvbW1pdFNoYSI6IjRmZTRhZmEyOGY0ZTIwYTUwMGE0ZTE3NDgyZjk3MGY4ZTI1MjRlZmIifSwiaWF0IjoxNzU1NDUzMDYxLCJleHAiOjE3NTYwNTc4NjF9.TL-dK_ELFzNpwggLo4rqOf-mGBr5n8A5qAtBWFC6iOQ97nf1hx3WGkkrTgNLRi0ZyCLfyF32sEze5j8tuEq0gTdJh5Ole2fSQ91iICY93cQSpD1EFRtG-G68uU6MUNp8TNgWm4dGEXbVXu07t8vyF8kI0A4mdZAsyN0bRy0LvRpN4j3mPIJmbKX5McOVSn-MdEXYbv0gaMyBuIA5m397Ra-E6DxjwLPgqRfLDxJM6jfUXV_VPpEYwLo-HqjBIP3OzBcAMkPAkuImMRtC0-TCX3eW1gImPLP8uwWu399OYuqSFTHROtE48kdKUjyjVq9shJZpUt3w8J7dMvAtJ2GpdA\">\n  <picture>\n    <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://cursor.com/fix-in-web-dark.svg\">\n    <source media=\"(prefers-color-scheme: light)\" srcset=\"https://cursor.com/fix-in-web-light.svg\">\n    <img alt=\"Fix in Web\" src=\"https://cursor.com/fix-in-web.svg\">\n  </picture>\n</a>\n\n",
+    "created_at": "2025-08-17T17:51:02Z",
+    "updated_at": "2025-08-17T17:51:02Z",
+    "html_url": "https://github.com/5dlabs/cto/pull/249#discussion_r2280965844",
+    "pull_request_url": "https://api.github.com/repos/5dlabs/cto/pulls/249",
+    "author_association": "NONE",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280965844"
+      },
+      "html": {
+        "href": "https://github.com/5dlabs/cto/pull/249#discussion_r2280965844"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/5dlabs/cto/pulls/249"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/5dlabs/cto/pulls/comments/2280965844/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 100,
+    "original_line": 100,
+    "side": "RIGHT",
+    "original_position": 100,
+    "position": 100,
+    "subject_type": "line",
+    "author": {
+      "login": "cursor[bot]"
+    },
+    "createdAt": "2025-08-17T17:51:02Z"
   }
 ]

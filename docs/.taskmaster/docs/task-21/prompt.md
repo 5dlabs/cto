@@ -1,5 +1,30 @@
 # Autonomous Agent Prompt: End-to-End Testing Suite Development
 
+## 🚨 CRITICAL: Argo Events Reference Documentation
+
+**BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
+- **Location:** [docs/references/argo-events/](../../../references/argo-events/)
+- **Key Files:**
+  - `github.yaml` - GitHub webhook sensor patterns
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+  - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
+
+**❌ UNSUPPORTED Operations (will cause deployment failures):**
+- `operation: delete` ❌
+- `operation: patch` ❌  
+- `operation: update` ❌
+- Template variables in `labelSelector` ❌
+
+**✅ SUPPORTED Operations:**
+- `operation: create` (k8s resources)
+- `operation: submit` (Argo Workflows)
+- `operation: resume` (Argo Workflows)
+- `dest: metadata.name` (dynamic targeting)
+
+**💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 ## Mission Statement
 You are an expert testing engineer tasked with creating a comprehensive end-to-end testing suite for a multi-agent workflow orchestration system. Your goal is to build robust testing infrastructure that validates the entire pipeline from GitHub webhooks through Rex implementation, Cleo code quality, and Tess validation phases.
 

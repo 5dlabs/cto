@@ -377,3 +377,4 @@ Stage 7: complete-task (cleanup and next task trigger)
 - [Workflow Templates](https://argoproj.github.io/argo-workflows/workflow-templates/)
 - [Multi-Agent Architecture](.taskmaster/docs/architecture.md)
 - [CodeRun CRD Specification](controller/src/crds/coderun.rs)
+- **[Argo Events Reference Examples](../../references/argo-events/)** - CRITICAL: Review before implementing any Argo Events sensors/triggers

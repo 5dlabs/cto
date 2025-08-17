@@ -49,7 +49,9 @@ spec:
                 arguments:
                   parameters:
                     - name: task-id
+                      value: ""
                     - name: pushing-agent
+                      value: ""
                 templates:
                   - name: cleanup-quality-agents
                     inputs:
@@ -64,9 +66,12 @@ spec:
                         echo "Implementation agent {{inputs.parameters.pushing-agent}} pushed to task-{{inputs.parameters.task-id}}"
                         echo "Cancelling quality/testing agent CodeRuns for task-{{inputs.parameters.task-id}}"
 
-                        # Delete quality agent CodeRuns for this specific task
-                        kubectl delete coderun \
-                          -l task-id={{inputs.parameters.task-id}},github-app!=5DLabs-Rex,github-app!=5DLabs-Blaze,github-app!=5DLabs-Morgan \
+                        # Delete quality agent CodeRuns for this specific task only
+                        kubectl delete coderun -n argo \
+                          -l task-id={{inputs.parameters.task-id}} \
+                          -l github-app!=5DLabs-Rex \
+                          -l github-app!=5DLabs-Blaze \
+                          -l github-app!=5DLabs-Morgan \
                           || true
                         echo "QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}"
           parameters:
