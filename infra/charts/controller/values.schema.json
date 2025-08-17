@@ -92,6 +92,10 @@
           },
           "required": ["repository"]
         },
+        "serviceAccountName": {
+          "type": "string",
+          "description": "Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)"
+        },
         "inputBridge": {
           "type": "object",
           "properties": {

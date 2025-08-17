@@ -84,3 +84,4 @@ agent_*.md
 # tasks/ 
 # Local temp working dir for ephemeral clones
 .tmp/
+.keys/
