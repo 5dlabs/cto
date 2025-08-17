@@ -130,29 +130,30 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 ---
 
-## Rex Remediation & QA Pipeline Restart
+## Implementation Agent Remediation & QA Pipeline Restart
 
-### Rex Comment Response (Separate Process)
+### Implementation Agent Comment Response (Separate Process)
 **Trigger:** Any new comment added to PR (by Tess, CTO, or other agents)
 
 **Process:**
-1. Rex detects new PR comments
-2. Rex starts with session resume  
-3. Rex pulls down **only unresolved/relevant comments**
-4. Rex addresses issues and pushes fixes
-5. **Rex push triggers QA pipeline restart** (see below)
+1. Implementation agent (Rex, Blaze, or Morgan) detects new PR comments
+2. Agent starts with session resume  
+3. Agent pulls down **only unresolved/relevant comments**
+4. Agent addresses issues and pushes fixes
+5. **Implementation agent push triggers QA pipeline restart** (see below)
 
 ### QA Pipeline Restart Logic
-**Trigger:** Rex pushes to feature branch (any commit by 5DLabs-Rex)
+**Trigger:** Any implementation agent pushes to feature branch (commit by 5DLabs-Rex, 5DLabs-Blaze, or 5DLabs-Morgan)
 
-**The Problem:** When Rex fixes issues, any running Cleo/Tess work becomes obsolete
+**The Problem:** When implementation agents fix issues, any running Cleo/Tess work becomes obsolete
 
 **Cancellation Process:**
-1. **GitHub webhook detects push by Rex** to feature branch
+1. **GitHub webhook detects push by implementation agent** to feature branch
 2. **Cancel running Cleo/Tess CRDs** for this task immediately:
    ```bash
-   kubectl delete coderun -l task-id=3,github-app=5DLabs-Cleo
-   kubectl delete coderun -l task-id=3,github-app=5DLabs-Tess
+   # Cancels ALL quality/testing agent CodeRuns (not task-specific due to sensor limitations)
+   kubectl delete coderun -l github-app=5DLabs-Cleo
+   kubectl delete coderun -l github-app=5DLabs-Tess
    ```
 3. **Remove "ready-for-qa" label** (if present) to reset state
 4. **Update workflow stage** back to waiting-pr-created  
@@ -160,41 +161,69 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 ### Event-Based Coordination
 ```yaml
-# New Argo Events sensor for Rex remediation
+# Multi-agent sensor for implementation agent remediation
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: rex-remediation-restart
+  name: implementation-agent-remediation
+  labels:
+    sensor-type: multi-agent-orchestration
+    agent-class: implementation
 spec:
   dependencies:
-  - name: rex-push-event
-    eventSourceName: github-webhook
-    eventName: push
+  - name: implementation-push-event
+    eventSourceName: github
+    eventName: org
     filters:
       data:
-      - path: sender.login
-        type: string
-        value: "5DLabs-Rex[bot]"
-      - path: ref
-        type: string
-        comparator: "="
-        value: "refs/heads/task-.*"
+        # Match any 5DLabs implementation agent (Rex, Blaze, Morgan)
+        - path: body.sender.login
+          type: string
+          comparator: "~"
+          value: "5DLabs-(Rex|Blaze|Morgan)\\[bot\\]|5DLabs-(Rex|Blaze|Morgan)"
+        # Ensure push is to a task branch
+        - path: body.ref
+          type: string
+          comparator: "~"
+          value: "refs/heads/task-.*"
         
   triggers:
   - template:
-      name: restart-qa-pipeline
+      name: cancel-running-quality-agents
       k8s:
-        # Cancel running agents
+        # Cancel running quality/testing agents
         operation: delete
         source:
           resource:
             apiVersion: agents.platform/v1
             kind: CodeRun
-            metadata:
-              labelSelector: "task-id={{extracted-task-id}},github-app!=5DLabs-Rex"
-        # Remove ready-for-qa label and restart workflow
-        # (Additional trigger steps for label removal and workflow resume)
+        labelSelector:
+          matchExpressions:
+            - key: github-app
+              operator: NotIn
+              values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]
+        # Additional logging and workflow resume triggers follow
 ```
+
+### Adding New Implementation Agents
+
+The implementation agent remediation sensor supports multiple agents via regex matching. To add a new implementation agent (e.g., "Nova"):
+
+1. **Update Sensor Regex**: Add "Nova" to the regex pattern in `implementation-agent-remediation-sensor.yaml`
+   ```yaml
+   value: "5DLabs-(Rex|Blaze|Morgan|Nova)\\[bot\\]|5DLabs-(Rex|Blaze|Morgan|Nova)"
+   ```
+
+2. **Update Agent Exclusion**: Add "5DLabs-Nova" to the exclusion list
+   ```yaml
+   values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan", "5DLabs-Nova"]
+   ```
+
+3. **Create GitHub App**: Set up 5DLabs-Nova GitHub App with appropriate permissions
+
+4. **Update Agent Configuration**: Add Nova to `values.yaml` and secret management
+
+The sensor will automatically detect pushes from the new agent and trigger QA pipeline restarts.
 
 ---
 
@@ -315,7 +344,7 @@ fi
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
-  generateName: play-workflow-
+  name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
     workflow-type: play-orchestration
 spec:
@@ -686,7 +715,7 @@ Benefits:
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow  
 metadata:
-  generateName: play-workflow-
+  name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
     workflow-type: play-orchestration
     task-id: "{{workflow.parameters.task-id}}"
@@ -709,19 +738,13 @@ spec:
       name: resume-after-pr-created
       argoWorkflow:
         operation: resume
-        source:
-          resource:
-            # Target specific workflow instance
-            labelSelector: |
-              workflow-type=play-orchestration,
-              task-id={{extracted-task-id}},
-              current-stage=waiting-pr-created
+        args: []
         parameters:
         - src:
-            # Extract task ID from PR labels using jq
+            # Extract task ID from PR labels and construct deterministic workflow name
             dataTemplate: |
-              {{jq '.pull_request.labels[?(@.name | startswith("task-"))].name | split("-")[1]'}}
-          dest: spec.arguments.parameters.extracted-task-id
+              play-task-{{ range $i, $l := .Input.body.pull_request.labels }}{{ if hasPrefix "task-" $l.name }}{{ $p := splitList "-" $l.name }}{{ if gt (len $p) 1 }}{{ index $p 1 }}{{ end }}{{ end }}{{ end }}-workflow
+          dest: args.0
 ```
 
 #### 3. Multi-Stage Progression Logic

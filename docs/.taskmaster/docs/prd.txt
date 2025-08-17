@@ -210,35 +210,48 @@ spec:
               current-stage={{target-stage}}
 ```
 
-### Rex Remediation System
+### Implementation Agent Remediation System
 ```yaml
-# Separate sensor for Rex feedback loops
+# Multi-agent sensor for any implementation agent (Rex, Blaze, Morgan) feedback loops
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: rex-remediation-restart
+  name: implementation-agent-remediation
+  labels:
+    sensor-type: multi-agent-orchestration
+    agent-class: implementation
 spec:
   dependencies:
-  - name: rex-push-event
-    eventSourceName: github-webhook
-    eventName: push
+  - name: implementation-push-event
+    eventSourceName: github
+    eventName: org
     filters:
       data:
-      - path: sender.login
-        type: string
-        value: "5DLabs-Rex[bot]"
+        # Match any 5DLabs implementation agent (Rex, Blaze, Morgan)
+        - path: body.sender.login
+          type: string
+          comparator: "~"
+          value: "5DLabs-(Rex|Blaze|Morgan)\\[bot\\]|5DLabs-(Rex|Blaze|Morgan)"
+        # Ensure push is to a task branch
+        - path: body.ref
+          type: string
+          comparator: "~"
+          value: "refs/heads/task-.*"
         
   triggers:
   - template:
-      name: restart-qa-pipeline
+      name: cancel-running-quality-agents
       k8s:
         operation: delete
         source:
           resource:
             apiVersion: agents.platform/v1
             kind: CodeRun
-            metadata:
-              labelSelector: "task-id={{extracted-task-id}},github-app!=5DLabs-Rex"
+        labelSelector:
+          matchExpressions:
+            - key: github-app
+              operator: NotIn
+              values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]
 ```
 
 ### Template System Modifications
@@ -421,15 +434,15 @@ infra/charts/controller/claude-templates/
 - **Explicit handoff signals** (ready-for-qa labeling)
 - **Task completion and progression logic**
 
-### Rex Remediation System
-- PR comment detection and Rex restart logic
-- Automatic cancellation of running Cleo/Tess work
-- QA pipeline restart with fresh code
-- Event-based coordination for feedback loops
+### Implementation Agent Remediation System
+- PR comment detection and implementation agent restart logic (Rex, Blaze, Morgan)
+- Automatic cancellation of running Cleo/Tess work when any implementation agent pushes fixes
+- QA pipeline restart with fresh code from any implementation agent
+- Event-based coordination for feedback loops with multi-agent support
 
 ### Deliverables
 - Full multi-agent workflow with event-driven transitions
-- Rex remediation and feedback loop handling
+- Implementation agent remediation and feedback loop handling
 - Complete task progression through quality gates
 
 ## Phase 5: Testing & Validation (Quality Assurance)

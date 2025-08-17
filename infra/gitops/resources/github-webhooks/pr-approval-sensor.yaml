@@ -1,0 +1,57 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pr-approval
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-review
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request_review events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request_review"]
+          - path: body.action
+            type: string
+            value: ["submitted"]
+          # Check for approval state
+          - path: body.review.state
+            type: string
+            value: ["approved"]
+          # Verify approval comes from Tess
+          - path: body.review.user.login
+            type: string
+            value: ["5DLabs-Tess[bot]", "5DLabs-Tess"]
+  triggers:
+    - template:
+        name: resume-after-tess
+        conditions: "github-pr-review"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Extract task ID from PR labels and construct workflow name for targeting
+            - src:
+                dependencyName: github-pr-review
+                dataTemplate: |
+                  {{ $ref := .Input.body.pull_request.head.ref }}
+                  {{ if hasPrefix $ref "task-" }}
+                    {{ $branch := trimPrefix "task-" $ref }}
+                    {{ $parts := splitList "-" $branch }}
+                    play-task-{{ index $parts 0 }}-workflow
+                  {{ else }}
+                    play-task-unknown-workflow
+                  {{ end }}
+              dest: args.0
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+

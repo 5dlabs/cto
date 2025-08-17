@@ -1,0 +1,55 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: multi-agent-workflow-resume
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-created
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request opened events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["opened"]
+          # Skip label filtering for now - will be validated in dataTemplate
+          # - path: body.pull_request.labels.#.name
+          #   type: string
+          #   comparator: "~"
+          #   value: "task-.*"
+  triggers:
+    - template:
+        name: resume-after-implementation
+        conditions: "github-pr-created"
+        argoWorkflow:
+          operation: resume
+          # Resume specific workflow by name via args
+          args: []
+          parameters:
+            # Extract task ID from PR labels and construct workflow name for targeting
+            - src:
+                dependencyName: github-pr-created
+                dataTemplate: |
+                  {{ $ref := .Input.body.pull_request.head.ref }}
+                  {{ if hasPrefix $ref "task-" }}
+                    {{ $branch := trimPrefix "task-" $ref }}
+                    {{ $parts := splitList "-" $branch }}
+                    play-task-{{ index $parts 0 }}-workflow
+                  {{ else }}
+                    play-task-unknown-workflow
+                  {{ end }}
+              dest: args.0
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+

@@ -1,0 +1,57 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ready-for-qa-label
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-labeled
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request labeled events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["labeled"]
+          # Check for ready-for-qa label
+          - path: body.label.name
+            type: string
+            value: ["ready-for-qa"]
+          # Verify label was added by Cleo
+          - path: body.sender.login
+            type: string
+            value: ["5DLabs-Cleo[bot]", "5DLabs-Cleo"]
+  triggers:
+    - template:
+        name: resume-after-cleo
+        conditions: "github-pr-labeled"
+        argoWorkflow:
+          operation: resume
+          args: []
+          parameters:
+            # Extract task ID from PR labels and construct workflow name for targeting
+            - src:
+                dependencyName: github-pr-labeled
+                dataTemplate: |
+                  {{ $ref := .Input.body.pull_request.head.ref }}
+                  {{ if hasPrefix $ref "task-" }}
+                    {{ $branch := trimPrefix "task-" $ref }}
+                    {{ $parts := splitList "-" $branch }}
+                    play-task-{{ index $parts 0 }}-workflow
+                  {{ else }}
+                    play-task-unknown-workflow
+                  {{ end }}
+              dest: args.0
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
+

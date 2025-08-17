@@ -1,5 +1,30 @@
 # Autonomous Agent Prompt: Design Multi-Agent Workflow DAG Structure
 
+## 🚨 CRITICAL: Argo Events Reference Documentation
+
+**BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
+- **Location:** [docs/references/argo-events/](../../../references/argo-events/)
+- **Key Files:**
+  - `github.yaml` - GitHub webhook sensor patterns
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+  - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
+
+**❌ UNSUPPORTED Operations (will cause deployment failures):**
+- `operation: delete` ❌
+- `operation: patch` ❌  
+- `operation: update` ❌
+- Template variables in `labelSelector` ❌
+
+**✅ SUPPORTED Operations:**
+- `operation: create` (k8s resources)
+- `operation: submit` (Argo Workflows)
+- `operation: resume` (Argo Workflows)
+- `dest: metadata.name` (dynamic targeting)
+
+**💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 ## Mission
 
 You are tasked with designing and implementing the core Argo Workflow template that orchestrates multi-agent collaboration through event-driven coordination. Your mission is to create a robust, parameterized DAG structure that enables flexible agent selection while maintaining reliable workflow state management across development cycles spanning days or weeks.

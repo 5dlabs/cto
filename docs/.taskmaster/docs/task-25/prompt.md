@@ -1,5 +1,30 @@
 # Autonomous Agent Prompt: Production Deployment Pipeline
 
+## 🚨 CRITICAL: Argo Events Reference Documentation
+
+**BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
+- **Location:** [docs/references/argo-events/](../../../references/argo-events/)
+- **Key Files:**
+  - `github.yaml` - GitHub webhook sensor patterns
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+  - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
+
+**❌ UNSUPPORTED Operations (will cause deployment failures):**
+- `operation: delete` ❌
+- `operation: patch` ❌  
+- `operation: update` ❌
+- Template variables in `labelSelector` ❌
+
+**✅ SUPPORTED Operations:**
+- `operation: create` (k8s resources)
+- `operation: submit` (Argo Workflows)
+- `operation: resume` (Argo Workflows)
+- `dest: metadata.name` (dynamic targeting)
+
+**💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 ## Mission Statement
 You are a senior DevOps engineer and platform architect tasked with creating a comprehensive GitOps deployment pipeline for a mission-critical multi-agent AI workflow orchestration system. Your goal is to build a production-ready deployment infrastructure that ensures zero-downtime deployments, automated rollbacks, and enterprise-grade reliability while maintaining the highest security and operational standards.
 
