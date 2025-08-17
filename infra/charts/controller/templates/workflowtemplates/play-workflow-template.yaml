@@ -1,0 +1,368 @@
+{{- if .Values.argo.enabled }}
+---
+# Multi-Agent Play Workflow Template
+# Orchestrates Rex/Blaze → Cleo → Tess through event-driven coordination
+# Supports parameterized agent selection and suspend/resume patterns
+
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: play-workflow-template
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: play-workflow-template
+    app.kubernetes.io/part-of: platform
+    agents.platform/orchestration: multi-agent
+    workflow-type: play-orchestration
+spec:
+  # Extended deadline for realistic multi-day development cycles
+  activeDeadlineSeconds: 1209600  # 14 days
+  
+  # Service account with proper permissions for CRD operations
+  serviceAccountName: argo-workflow
+  
+  # Main entry point
+  entrypoint: main
+  
+  # Global arguments for workflow configuration
+  arguments:
+    parameters:
+      # Agent selection parameters (no hardcoded names)
+      - name: implementation-agent
+        description: "Agent to use for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)"
+        value: "5DLabs-Rex"
+      - name: quality-agent
+        description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
+        value: "5DLabs-Cleo"
+      - name: testing-agent
+        description: "Agent to use for testing and validation (e.g., 5DLabs-Tess)"
+        value: "5DLabs-Tess"
+      
+      # Task and repository configuration
+      - name: task-id
+        description: "Unique task identifier for correlation (required)"
+        value: ""
+      - name: repository
+        description: "GitHub repository for the work"
+        value: "5dlabs/cto"
+      - name: service
+        description: "Service identifier for persistent workspace"
+        value: "cto"
+      
+      # Model configuration
+      - name: model
+        description: "Claude model to use for all agents"
+        value: "claude-3-5-sonnet-20241022"
+      
+      # PR context (populated by suspend/resume)
+      - name: pr-url
+        description: "Pull request URL (populated after PR creation)"
+        value: ""
+      - name: pr-number
+        description: "Pull request number (populated after PR creation)"
+        value: ""
+      
+      # QA feedback (populated by suspend/resume)
+      - name: qa-status
+        description: "QA approval status (populated after QA)"
+        value: ""
+      - name: qa-comments
+        description: "QA feedback comments (populated after QA)"
+        value: ""
+
+  # Workflow instance naming pattern
+  onExit: cleanup-handler
+  
+  # Volume claim templates for shared workspace
+  volumeClaimTemplates:
+    - metadata:
+        name: workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+
+  templates:
+    # Main DAG with sequential task execution and suspend points
+    - name: main
+      dag:
+        tasks:
+          # Stage 1: Implementation work
+          - name: implementation-work
+            template: agent-coderun
+            arguments:
+              parameters:
+              - name: github-app
+                value: "{{`{{workflow.parameters.implementation-agent}}`}}"
+              - name: task-id
+                value: "{{`{{workflow.parameters.task-id}}`}}"
+              - name: stage
+                value: "implementation"
+          
+          # Suspend point 1: Wait for PR creation
+          - name: wait-pr-created
+            dependencies: [implementation-work]
+            template: suspend-for-event
+            arguments:
+              parameters:
+              - name: event-type
+                value: "pr-created"
+              - name: stage-name
+                value: "waiting-pr-created"
+          
+          # Stage 2: Quality work
+          - name: quality-work
+            dependencies: [wait-pr-created]
+            template: agent-coderun
+            arguments:
+              parameters:
+              - name: github-app
+                value: "{{`{{workflow.parameters.quality-agent}}`}}"
+              - name: task-id
+                value: "{{`{{workflow.parameters.task-id}}`}}"
+              - name: stage
+                value: "quality"
+              - name: pr-url
+                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-url}}`}}"
+              - name: pr-number
+                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
+          
+          # Suspend point 2: Wait for ready-for-qa label
+          - name: wait-ready-for-qa
+            dependencies: [quality-work]
+            template: suspend-for-event
+            arguments:
+              parameters:
+              - name: event-type
+                value: "ready-for-qa"
+              - name: stage-name
+                value: "waiting-ready-for-qa"
+          
+          # Stage 3: Testing work
+          - name: testing-work
+            dependencies: [wait-ready-for-qa]
+            template: agent-coderun
+            arguments:
+              parameters:
+              - name: github-app
+                value: "{{`{{workflow.parameters.testing-agent}}`}}"
+              - name: task-id
+                value: "{{`{{workflow.parameters.task-id}}`}}"
+              - name: stage
+                value: "testing"
+              - name: pr-url
+                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-url}}`}}"
+              - name: pr-number
+                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
+              - name: qa-ready
+                value: "true"
+          
+          # Suspend point 3: Wait for PR approval
+          - name: wait-pr-approved
+            dependencies: [testing-work]
+            template: suspend-for-event
+            arguments:
+              parameters:
+              - name: event-type
+                value: "pr-approved"
+              - name: stage-name
+                value: "waiting-pr-approved"
+          
+          # Stage 4: Complete task
+          - name: complete-task
+            dependencies: [wait-pr-approved]
+            template: task-completion
+            arguments:
+              parameters:
+              - name: task-id
+                value: "{{`{{workflow.parameters.task-id}}`}}"
+              - name: approval-status
+                value: "{{`{{tasks.wait-pr-approved.outputs.parameters.approval-status}}`}}"
+              - name: merge-sha
+                value: "{{`{{tasks.wait-pr-approved.outputs.parameters.merge-sha}}`}}"
+
+    # Template for creating CodeRun CRDs for agent execution
+    - name: agent-coderun
+      inputs:
+        parameters:
+        - name: github-app
+        - name: task-id
+        - name: stage
+        - name: pr-url
+          default: ""
+        - name: pr-number
+          default: ""
+        - name: qa-ready
+          default: "false"
+      outputs:
+        parameters:
+        - name: coderun-name
+          valueFrom:
+            jsonPath: '{.metadata.name}'
+        - name: coderun-status
+          valueFrom:
+            jsonPath: '{.status.phase}'
+      resource:
+        action: create
+        setOwnerReference: true
+        manifest: |
+          apiVersion: agents.platform/v1
+          kind: CodeRun
+          metadata:
+            generateName: "coderun-{{`{{inputs.parameters.stage}}`}}-task{{`{{inputs.parameters.task-id}}`}}-"
+            namespace: {{ .Release.Namespace }}
+            labels:
+              task-id: "{{`{{inputs.parameters.task-id}}`}}"
+              github-app: "{{`{{inputs.parameters.github-app}}`}}"
+              workflow-name: "{{`{{workflow.name}}`}}"
+              workflow-stage: "{{`{{inputs.parameters.stage}}`}}"
+              workflow-type: "play-orchestration"
+          spec:
+            taskId: {{`{{inputs.parameters.task-id}}`}}
+            service: "{{`{{workflow.parameters.service}}`}}"
+            repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
+            docsRepositoryUrl: "5dlabs/cto"
+            docsProjectDirectory: "."
+            workingDirectory: "."
+            githubApp: "{{`{{inputs.parameters.github-app}}`}}"
+            model: "{{`{{workflow.parameters.model}}`}}"
+            continueSession: true
+            overwriteMemory: false
+            docsBranch: "main"
+            contextVersion: 1
+            # Pass PR context as environment if available
+            environment:
+              PR_URL: "{{`{{inputs.parameters.pr-url}}`}}"
+              PR_NUMBER: "{{`{{inputs.parameters.pr-number}}`}}"
+              QA_READY: "{{`{{inputs.parameters.qa-ready}}`}}"
+              WORKFLOW_STAGE: "{{`{{inputs.parameters.stage}}`}}"
+      retryStrategy:
+        limit: 2
+        retryPolicy: "Always"
+        backoff:
+          duration: "30s"
+          factor: 2
+          maxDuration: "5m"
+
+    # Template for suspend points waiting for external events
+    - name: suspend-for-event
+      inputs:
+        parameters:
+        - name: event-type
+        - name: stage-name
+      outputs:
+        parameters:
+        - name: pr-url
+          value: "{{`{{workflow.parameters.pr-url}}`}}"
+        - name: pr-number
+          value: "{{`{{workflow.parameters.pr-number}}`}}"
+        - name: approval-status
+          value: "{{`{{workflow.parameters.qa-status}}`}}"
+        - name: merge-sha
+          value: ""
+      metadata:
+        labels:
+          current-stage: "{{`{{inputs.parameters.stage-name}}`}}"
+          task-id: "{{`{{workflow.parameters.task-id}}`}}"
+          workflow-type: "play-orchestration"
+          repository: "{{`{{workflow.parameters.repository}}`}}"
+      suspend: {}  # Indefinite suspend until external resume
+
+    # Template for task completion and cleanup
+    - name: task-completion
+      inputs:
+        parameters:
+        - name: task-id
+        - name: approval-status
+        - name: merge-sha
+      script:
+        image: alpine:3.20
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          echo "========================================="
+          echo "Completing Task {{`{{inputs.parameters.task-id}}`}}"
+          echo "========================================="
+          echo "Approval Status: {{`{{inputs.parameters.approval-status}}`}}"
+          echo "Merge SHA: {{`{{inputs.parameters.merge-sha}}`}}"
+          echo ""
+          
+          # Create completion marker
+          echo "Task {{`{{inputs.parameters.task-id}}`}} completed at $(date)" > /tmp/task-complete.txt
+          echo "Workflow: {{`{{workflow.name}}`}}" >> /tmp/task-complete.txt
+          echo "Duration: {{`{{workflow.duration}}`}}" >> /tmp/task-complete.txt
+          echo "PR Approved: {{`{{inputs.parameters.approval-status}}`}}" >> /tmp/task-complete.txt
+          
+          # Generate workflow summary
+          cat <<EOF > /tmp/workflow-summary.md
+          # Task {{`{{inputs.parameters.task-id}}`}} Completion Summary
+          
+          ## Workflow Details
+          - **Workflow Name**: {{`{{workflow.name}}`}}
+          - **Task ID**: {{`{{inputs.parameters.task-id}}`}}
+          - **Repository**: {{`{{workflow.parameters.repository}}`}}
+          - **Duration**: {{`{{workflow.duration}}`}}
+          
+          ## Agent Execution
+          - **Implementation Agent**: {{`{{workflow.parameters.implementation-agent}}`}}
+          - **Quality Agent**: {{`{{workflow.parameters.quality-agent}}`}}
+          - **Testing Agent**: {{`{{workflow.parameters.testing-agent}}`}}
+          
+          ## Results
+          - **PR Number**: {{`{{workflow.parameters.pr-number}}`}}
+          - **Approval Status**: {{`{{inputs.parameters.approval-status}}`}}
+          - **Merge SHA**: {{`{{inputs.parameters.merge-sha}}`}}
+          
+          ## Stages Completed
+          1. ✅ Implementation Work
+          2. ✅ Quality Assurance
+          3. ✅ Testing & Validation
+          4. ✅ PR Approval
+          
+          Task successfully completed and merged to main branch.
+          EOF
+          
+          echo ""
+          echo "Workflow summary generated successfully"
+          echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
+        volumeMounts:
+        - name: workspace
+          mountPath: /work
+
+    # Cleanup handler for workflow completion/failure
+    - name: cleanup-handler
+      script:
+        image: alpine:3.20
+        command: [sh]
+        source: |
+          #!/bin/sh
+          echo "========================================="
+          echo "Workflow Cleanup Handler"
+          echo "========================================="
+          echo "Workflow Name: {{`{{workflow.name}}`}}"
+          echo "Status: {{`{{workflow.status}}`}}"
+          echo "Task ID: {{`{{workflow.parameters.task-id}}`}}"
+          
+          # Log final workflow state
+          if [ "{{`{{workflow.status}}`}}" = "Succeeded" ]; then
+            echo "✅ Workflow completed successfully"
+          else
+            echo "❌ Workflow failed or was terminated"
+          fi
+          
+          echo "Cleanup completed"
+
+  # TTL strategy for workflow cleanup
+  ttlStrategy:
+    secondsAfterCompletion: 86400    # Keep completed workflows for 24 hours
+    secondsAfterFailure: 259200      # Keep failed workflows for 3 days
+    secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
+
+  # Pod garbage collection
+  podGC:
+    strategy: OnPodCompletion
+    deleteDelayDuration: 60s
+{{- end }}
