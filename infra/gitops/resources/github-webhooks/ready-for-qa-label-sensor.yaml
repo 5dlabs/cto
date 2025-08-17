@@ -34,12 +34,7 @@ spec:
         conditions: "github-pr-labeled"
         argoWorkflow:
           operation: resume
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                name: ""
+          args: []
           parameters:
             # Extract task ID from PR labels and construct workflow name for targeting
             - src:
@@ -53,7 +48,7 @@ spec:
                   {{ else }}
                     play-task-unknown-workflow
                   {{ end }}
-              dest: source.resource.metadata.name
+              dest: args.0
       retryStrategy:
         steps: 3
         duration: "10s"
