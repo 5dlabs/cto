@@ -307,14 +307,15 @@ The DAG implements a sophisticated state machine:
 
 ### Parameterized Agent Architecture
 - **No Hardcoded Agents**: All agent references use workflow parameters
-- **Flexible Selection**: Support for Rex, Blaze, Cleo, Tess, and future agents
+- **Flexible Selection**: Support for Rex, Blaze, Morgan, Cleo, Tess, and future agents
 - **Consistent Interface**: Same CodeRun template works for all agents
 - **Agent-Specific Configuration**: Templates handle agent differences transparently
+- **Multi-Agent Remediation**: Event-driven system supports any implementation agent (Rex, Blaze, Morgan) triggering QA pipeline restarts
 
 ### Workflow Lifecycle Management
 ```yaml
 # Workflow progresses through defined stages:
-Stage 1: implementation-work (Rex/Blaze execution)
+Stage 1: implementation-work (Rex/Blaze/Morgan execution)
   ↓
 Stage 2: wait-pr-created (suspend for PR creation event)
   ↓
