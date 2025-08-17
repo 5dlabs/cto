@@ -82,14 +82,19 @@ RUN --mount=type=cache,target=/tmp/downloads \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/
 
-# Install Helm (with caching) - robust download with retries for network issues
+# Install Helm (with caching) - use GitHub releases to avoid get.helm.sh SSL issues
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
     HELM_VERSION="v3.16.1" && \
-    # Use robust curl options with retries for SSL connection issues \
-    curl --retry 5 --retry-delay 2 --retry-connrefused \
-         --tlsv1.2 --proto '=https' --location --fail --silent --show-error \
-         -O "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
+    # Try GitHub releases first (more reliable than get.helm.sh) \
+    (curl --retry 3 --retry-delay 2 --retry-connrefused \
+          --tlsv1.2 --proto '=https' --location --fail --silent --show-error \
+          -O "https://github.com/helm/helm/releases/download/${HELM_VERSION}/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+     || \
+     # Fallback to get.helm.sh with more permissive SSL \
+     curl --retry 3 --retry-delay 2 --retry-connrefused \
+          --insecure --location --fail --silent --show-error \
+          -O "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz") && \
     tar -zxf "helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
     mv linux-amd64/helm /usr/local/bin/helm && \
     chmod +x /usr/local/bin/helm && \
