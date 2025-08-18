@@ -37,11 +37,11 @@ spec:
 
       # Repository configuration
       - name: repository
-        value: "5dlabs/cto"
+        value: "5dlabs/cto-play-test"
       - name: service
-        value: "cto"
+        value: "play-test"
       - name: docs-repository
-        value: "https://github.com/5dlabs/cto"
+        value: "https://github.com/5dlabs/cto-play-test"
       - name: docs-project-directory
         value: "docs"
       - name: docs-branch
