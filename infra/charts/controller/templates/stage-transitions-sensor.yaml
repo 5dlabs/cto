@@ -85,14 +85,14 @@ spec:
             - src:
                 dependencyName: github-pr-created
                 dataTemplate: |
-                  {{- range .Input.body.pull_request.labels -}}
-                  {{- if hasPrefix "task-" .name -}}
-                  {{- $parts := splitList "-" .name -}}
-                  {{- if gt (len $parts) 1 -}}
-                  {{- index $parts 1 -}}
-                  {{- end -}}
-                  {{- end -}}
-                  {{- end -}}
+                  {{"{{- range .Input.body.pull_request.labels -}}"}}
+                  {{"{{- if hasPrefix \"task-\" .name -}}"}}
+                  {{"{{- $parts := splitList \"-\" .name -}}"}}
+                  {{"{{- if gt (len $parts) 1 -}}"}}
+                  {{"{{- index $parts 1 -}}"}}
+                  {{"{{- end -}}"}}
+                  {{"{{- end -}}"}}
+                  {{"{{- end -}}"}}
               dest: args.0
           source:
             resource:
@@ -111,14 +111,14 @@ spec:
             - src:
                 dependencyName: github-ready-for-qa
                 dataTemplate: |
-                  {{- range .Input.body.pull_request.labels -}}
-                  {{- if hasPrefix "task-" .name -}}
-                  {{- $parts := splitList "-" .name -}}
-                  {{- if gt (len $parts) 1 -}}
-                  {{- index $parts 1 -}}
-                  {{- end -}}
-                  {{- end -}}
-                  {{- end -}}
+                  {{"{{- range .Input.body.pull_request.labels -}}"}}
+                  {{"{{- if hasPrefix \"task-\" .name -}}"}}
+                  {{"{{- $parts := splitList \"-\" .name -}}"}}
+                  {{"{{- if gt (len $parts) 1 -}}"}}
+                  {{"{{- index $parts 1 -}}"}}
+                  {{"{{- end -}}"}}
+                  {{"{{- end -}}"}}
+                  {{"{{- end -}}"}}
               dest: args.0
           source:
             resource:
@@ -137,14 +137,14 @@ spec:
             - src:
                 dependencyName: github-pr-approved
                 dataTemplate: |
-                  {{- range .Input.body.pull_request.labels -}}
-                  {{- if hasPrefix "task-" .name -}}
-                  {{- $parts := splitList "-" .name -}}
-                  {{- if gt (len $parts) 1 -}}
-                  {{- index $parts 1 -}}
-                  {{- end -}}
-                  {{- end -}}
-                  {{- end -}}
+                  {{"{{- range .Input.body.pull_request.labels -}}"}}
+                  {{"{{- if hasPrefix \"task-\" .name -}}"}}
+                  {{"{{- $parts := splitList \"-\" .name -}}"}}
+                  {{"{{- if gt (len $parts) 1 -}}"}}
+                  {{"{{- index $parts 1 -}}"}}
+                  {{"{{- end -}}"}}
+                  {{"{{- end -}}"}}
+                  {{"{{- end -}}"}}
               dest: args.0
           source:
             resource:
