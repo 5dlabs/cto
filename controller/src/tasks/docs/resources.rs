@@ -1,4 +1,5 @@
 use crate::crds::DocsRun;
+use crate::tasks::code::naming::ResourceNaming;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
 use k8s_openapi::api::{
@@ -172,7 +173,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or(&self.ctx.namespace);
         let services: Api<Service> = Api::namespaced(self.ctx.client.clone(), namespace);
 
-        let svc_name = format!("{job_name}-bridge");
+        let svc_name = ResourceNaming::headless_service_name(job_name);
 
         let mut meta_labels = BTreeMap::new();
         meta_labels.insert("agents.platform/jobType".to_string(), "docs".to_string());
@@ -681,7 +682,6 @@ impl<'a> DocsResourceManager<'a> {
             },
             "spec": {
                 "backoffLimit": 0,
-                "ttlSecondsAfterFinished": 30,
                 "template": {
                     "metadata": {
                         "labels": labels

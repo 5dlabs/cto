@@ -6,7 +6,7 @@ use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ConfigMap, PersistentVolumeClaim},
 };
-use kube::api::{Patch, PatchParams};
+use kube::api::{DeleteParams, Patch, PatchParams};
 use kube::runtime::controller::Action;
 use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
 use kube::{Api, ResourceExt};
@@ -179,6 +179,22 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             )
             .await?;
 
+            // Cleanup per controller configuration
+            if ctx.config.cleanup.enabled {
+                let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
+                if cleanup_delay_minutes == 0 {
+                    let _ = jobs
+                        .delete(&job_name, &DeleteParams::default())
+                        .await;
+                    info!("Deleted completed code job: {}", job_name);
+                } else {
+                    info!(
+                        "Delaying cleanup for {} minutes for CodeRun job {}",
+                        cleanup_delay_minutes, job_name
+                    );
+                }
+            }
+
             // Use await_change() to stop reconciliation
             Ok(Action::await_change())
         }
@@ -195,6 +211,22 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 false,
             )
             .await?;
+
+            // Cleanup per controller configuration (failed jobs)
+            if ctx.config.cleanup.enabled {
+                let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
+                if cleanup_delay_minutes == 0 {
+                    let _ = jobs
+                        .delete(&job_name, &DeleteParams::default())
+                        .await;
+                    info!("Deleted failed code job: {}", job_name);
+                } else {
+                    info!(
+                        "Delaying failed-job cleanup for {} minutes for CodeRun job {}",
+                        cleanup_delay_minutes, job_name
+                    );
+                }
+            }
 
             // Use await_change() to stop reconciliation
             Ok(Action::await_change())

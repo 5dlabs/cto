@@ -1016,7 +1016,7 @@ impl<'a> CodeResourceManager<'a> {
             .or(code_run.spec.github_user.as_deref())
             .unwrap_or("unknown");
         let list_params = ListParams::default().labels(&format!(
-            "app=orchestrator,component=code-runner,github-user={},service={}",
+            "app=controller,component=code-runner,github-user={},service={}",
             self.sanitize_label_value(github_identifier),
             self.sanitize_label_value(&code_run.spec.service)
         ));
@@ -1044,7 +1044,7 @@ impl<'a> CodeResourceManager<'a> {
             .or(code_run.spec.github_user.as_deref())
             .unwrap_or("unknown");
         let list_params = ListParams::default().labels(&format!(
-            "app=orchestrator,component=code-runner,github-user={},service={}",
+            "app=controller,component=code-runner,github-user={},service={}",
             self.sanitize_label_value(github_identifier),
             self.sanitize_label_value(&code_run.spec.service)
         ));
