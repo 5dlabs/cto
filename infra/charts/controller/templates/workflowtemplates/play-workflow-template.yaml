@@ -682,16 +682,6 @@ spec:
         parameters:
         - name: event-type
         - name: stage-name
-      outputs:
-        parameters:
-        - name: pr-url
-          value: "{{`{{workflow.parameters.pr-url}}`}}"
-        - name: pr-number
-          value: "{{`{{workflow.parameters.pr-number}}`}}"
-        - name: approval-status
-          value: "{{`{{workflow.parameters.qa-status}}`}}"
-        - name: merge-sha
-          value: ""
       metadata:
         labels:
           current-stage: "{{`{{inputs.parameters.stage-name}}`}}"
