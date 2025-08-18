@@ -1,0 +1,6 @@
+enabled: false
+
+engineeringDashboard:
+  enabled: false
+  namespace: telemetry
+
