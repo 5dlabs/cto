@@ -315,13 +315,12 @@ spec:
                 "current-stage": "{{`{{inputs.parameters.new-stage}}`}}",
                 "task-id": "{{`{{workflow.parameters.task-id}}`}}",
                 "repository": "{{`{{workflow.parameters.repository}}`}}",
-                "updated-at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+                "updated-at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
               }
             }
           }'
 
-          echo "Applying patch:"
-          echo "$PATCH_JSON" | jq .
+          echo "Applying patch payload"
 
           # Apply the patch with retry logic
           MAX_RETRIES=3
@@ -378,7 +377,7 @@ spec:
           echo "Stage transition completed:"
           kubectl get workflow "{{`{{workflow.name}}`}}" \
             -n {{ .Release.Namespace }} \
-            -o jsonpath='{.metadata.labels}' | jq .
+            -o json
       retryStrategy:
         limit: 2
         retryPolicy: "OnFailure"
