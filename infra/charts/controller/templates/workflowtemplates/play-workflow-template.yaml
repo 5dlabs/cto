@@ -353,7 +353,7 @@ spec:
 
             CURRENT_STAGE=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
               -n {{ .Release.Namespace }} \
-              -o jsonpath='{.metadata.labels.current-stage}')
+              -o jsonpath='{.metadata.labels["current-stage"]}')
 
             if [ "$CURRENT_STAGE" = "{{`{{inputs.parameters.new-stage}}`}}" ]; then
               echo "✅ Verification successful: Stage is now '$CURRENT_STAGE'"
