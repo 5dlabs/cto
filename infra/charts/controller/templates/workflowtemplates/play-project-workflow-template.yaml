@@ -121,8 +121,21 @@ spec:
 
           # Clone repository to get task structure
           apk add --no-cache git
+
+          # Normalize docs-repository: accept either org/repo or full URL
+          DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
+          case "$DOCS_REPO_INPUT" in
+            http://*|https://*)
+              DOCS_REPO_URL="$DOCS_REPO_INPUT"
+              ;;
+            *)
+              DOCS_REPO_URL="https://github.com/$DOCS_REPO_INPUT"
+              ;;
+          esac
+
+          echo "🔗 Using docs repository URL: $DOCS_REPO_URL"
           git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
-            "{{`{{workflow.parameters.docs-repository}}`}}" /workspace
+            "$DOCS_REPO_URL" /workspace
 
           cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
 
