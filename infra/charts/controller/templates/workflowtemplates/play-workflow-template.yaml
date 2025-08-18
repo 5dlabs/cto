@@ -256,7 +256,7 @@ spec:
             service: "{{`{{workflow.parameters.service}}`}}"
             repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
             docsRepositoryUrl: "5dlabs/cto"
-            docsProjectDirectory: "."
+            docsProjectDirectory: "docs"
             workingDirectory: "."
             githubApp: "{{`{{inputs.parameters.github-app}}`}}"
             model: "{{`{{workflow.parameters.model}}`}}"
@@ -265,7 +265,7 @@ spec:
             docsBranch: "main"
             contextVersion: 1
             # Pass PR context as environment if available
-            environment:
+            env:
               PR_URL: "{{`{{inputs.parameters.pr-url}}`}}"
               PR_NUMBER: "{{`{{inputs.parameters.pr-number}}`}}"
               QA_READY: "{{`{{inputs.parameters.qa-ready}}`}}"
