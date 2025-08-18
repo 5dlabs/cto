@@ -563,7 +563,6 @@ spec:
           current-stage: "{{`{{inputs.parameters.stage-name}}`}}"
           task-id: "{{`{{workflow.parameters.task-id}}`}}"
           workflow-type: "play-orchestration"
-          repository: "{{`{{workflow.parameters.repository}}`}}"
       suspend: {}  # Indefinite suspend until external resume
 
     # Template for task completion and cleanup
