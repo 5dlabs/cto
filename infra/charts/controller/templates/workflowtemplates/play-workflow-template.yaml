@@ -21,6 +21,12 @@ spec:
   # Service account with proper permissions for CRD operations
   serviceAccountName: argo-workflow
 
+  # Ensure labels are applied to instantiated Workflows created from this template
+  workflowMetadata:
+    labels:
+      workflow-type: play-orchestration
+      workflows.argoproj.io/controller-instanceid: default
+
   # Main entry point
   entrypoint: main
 
@@ -68,6 +74,9 @@ spec:
         value: ""
       - name: qa-comments
         description: "QA feedback comments (populated after QA)"
+        value: ""
+      - name: merge-sha
+        description: "Merge commit SHA (populated after PR merge)"
         value: ""
 
   # Workflow instance naming pattern
@@ -202,9 +211,9 @@ spec:
               - name: task-id
                 value: "{{`{{workflow.parameters.task-id}}`}}"
               - name: approval-status
-                value: "{{`{{tasks.wait-pr-approved.outputs.parameters.approval-status}}`}}"
+                value: "{{`{{workflow.parameters.qa-status}}`}}"
               - name: merge-sha
-                value: "{{`{{tasks.wait-pr-approved.outputs.parameters.merge-sha}}`}}"
+                value: "{{`{{workflow.parameters.merge-sha}}`}}"
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
     # Implementation cycle: run Rex, then check/poll for PR; if not found, repeat by failing upstream
@@ -470,6 +479,13 @@ spec:
             namespace: {{ .Release.Namespace }}
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
+      retryStrategy:
+        limit: 30
+        retryPolicy: "OnError"
+        backoff:
+          duration: "10s"
+          factor: 2
+          maxDuration: "5m"
 
     # Template for atomic workflow stage updates with optimistic locking
     - name: update-workflow-stage
