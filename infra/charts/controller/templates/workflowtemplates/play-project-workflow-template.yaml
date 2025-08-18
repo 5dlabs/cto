@@ -113,11 +113,16 @@ spec:
       script:
         image: alpine/k8s:1.31.0
         env:
-        - name: GITHUB_TOKEN
+        - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:
               name: github-app-5dlabs-morgan
-              key: token
+              key: app-id
+        - name: GITHUB_APP_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: github-app-5dlabs-morgan
+              key: private-key
         command: [sh]
         source: |
           #!/bin/sh
@@ -126,7 +131,7 @@ spec:
           echo "🔍 Discovering tasks in workspace..."
 
           # Clone repository to get task structure
-          apk add --no-cache git
+          apk add --no-cache git curl openssl jq
 
           # Normalize docs-repository: accept either org/repo or full URL
           DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
@@ -139,19 +144,74 @@ spec:
               ;;
           esac
 
-          # If a GitHub token is present (Morgan App), use it for authenticated clone
-          if [ -n "${GITHUB_TOKEN:-}" ]; then
-            echo "🔐 Using Morgan token for authenticated clone"
-            # Inject token into URL safely
-            AUTH_URL=$(echo "$DOCS_REPO_URL" | sed 's#^https://#https://x-access-token:'"$GITHUB_TOKEN"'@#')
-            echo "🔗 Cloning: $DOCS_REPO_URL (authenticated)"
-            git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
-              "$AUTH_URL" /workspace
-          else
-            echo "🔗 Cloning without credentials: $DOCS_REPO_URL"
-            git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
-              "$DOCS_REPO_URL" /workspace
+          AUTH_URL="$DOCS_REPO_URL"
+          # If Morgan App credentials are present, generate an installation token
+          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+            echo "🔐 Using Morgan GitHub App to authenticate clone"
+            # Write the private key to a temp file (support escaped newlines)
+            TEMP_KEY="/tmp/github-app-key.pem"
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+            chmod 600 "$TEMP_KEY"
+
+            # Build JWT manually
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || base64)
+            JWT_HEADER=$(echo -n "$JWT_HEADER" | tr '+/' '-_' | tr -d '=')
+            JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64)
+            JWT_PAYLOAD=$(echo -n "$JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
+            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || base64)
+            JWT_SIGNATURE=$(echo -n "$JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
+            JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+            # Derive owner/repo from input if possible for repo-scoped installation lookup
+            OWNER=""
+            REPO=""
+            case "$DOCS_REPO_INPUT" in
+              http://*|https://*)
+                OWNER=$(echo "$DOCS_REPO_INPUT" | sed -E 's#https?://github.com/([^/]+)/.*#\1#')
+                REPO=$(echo "$DOCS_REPO_INPUT" | sed -E 's#https?://github.com/[^/]+/([^/]+)(\.git)?$#\1#')
+                ;;
+              *)
+                OWNER=$(echo "$DOCS_REPO_INPUT" | cut -d'/' -f1)
+                REPO=$(echo "$DOCS_REPO_INPUT" | cut -d'/' -f2)
+                ;;
+            esac
+
+            echo "🔎 Resolving installation for $OWNER/$REPO"
+            INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $JWT_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$OWNER/$REPO/installation" | jq -r '.id')
+
+            if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
+              echo "ℹ️ Repo installation not found, trying org installation"
+              INSTALLATION_ID=$(curl -s -L \
+                -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
+            fi
+
+            if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+              TOKEN=$(curl -s -X POST \
+                -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+              if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
+                AUTH_URL=$(echo "$DOCS_REPO_URL" | sed "s#^https://#https://x-access-token:$TOKEN@#")
+              else
+                echo "⚠️ Failed to obtain installation token; proceeding anonymously"
+              fi
+            else
+              echo "⚠️ No installation found for $OWNER; proceeding anonymously"
+            fi
+
+            rm -f "$TEMP_KEY"
           fi
+
+          echo "🔗 Cloning: $DOCS_REPO_URL"
+          git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
+            "$AUTH_URL" /workspace
 
           cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
 
