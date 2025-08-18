@@ -363,9 +363,8 @@ spec:
               "labels": {
                 "current-stage": "{{`{{inputs.parameters.new-stage}}`}}",
                 "task-id": "{{`{{workflow.parameters.task-id}}`}}",
-                "repository": "{{`{{workflow.parameters.repository}}`}}",
-                "previous-stage": "'$CURRENT_STAGE'",
-                "updated-at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+                "repository": "$(echo '{{`{{workflow.parameters.repository}}`}}' | tr '/' '-')",
+                "previous-stage": "'$CURRENT_STAGE'"
               }
             }
           }'
