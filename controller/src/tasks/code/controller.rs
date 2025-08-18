@@ -1,3 +1,4 @@
+use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
 use crate::crds::CodeRun;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
@@ -5,7 +6,7 @@ use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ConfigMap, PersistentVolumeClaim},
 };
-use kube::api::{Patch, PatchParams};
+use kube::api::{DeleteParams, Patch, PatchParams};
 use kube::runtime::controller::Action;
 use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
 use kube::{Api, ResourceExt};
@@ -114,7 +115,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let configmaps: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
     let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
-    let job_name = generate_code_job_name(&code_run);
+    let job_name = get_job_name(&code_run);
     info!("Generated job name: {}", job_name);
 
     let job_state = check_code_job_state(&jobs, &job_name).await?;
@@ -178,6 +179,22 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             )
             .await?;
 
+            // Cleanup per controller configuration
+            if ctx.config.cleanup.enabled {
+                let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
+                if cleanup_delay_minutes == 0 {
+                    let _ = jobs
+                        .delete(&job_name, &DeleteParams::default())
+                        .await;
+                    info!("Deleted completed code job: {}", job_name);
+                } else {
+                    info!(
+                        "Delaying cleanup for {} minutes for CodeRun job {}",
+                        cleanup_delay_minutes, job_name
+                    );
+                }
+            }
+
             // Use await_change() to stop reconciliation
             Ok(Action::await_change())
         }
@@ -194,6 +211,22 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 false,
             )
             .await?;
+
+            // Cleanup per controller configuration (failed jobs)
+            if ctx.config.cleanup.enabled {
+                let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
+                if cleanup_delay_minutes == 0 {
+                    let _ = jobs
+                        .delete(&job_name, &DeleteParams::default())
+                        .await;
+                    info!("Deleted failed code job: {}", job_name);
+                } else {
+                    info!(
+                        "Delaying failed-job cleanup for {} minutes for CodeRun job {}",
+                        cleanup_delay_minutes, job_name
+                    );
+                }
+            }
 
             // Use await_change() to stop reconciliation
             Ok(Action::await_change())
@@ -227,21 +260,21 @@ pub enum CodeJobState {
     Failed,
 }
 
-fn generate_code_job_name(code_run: &CodeRun) -> String {
-    let namespace = code_run.metadata.namespace.as_deref().unwrap_or("default");
-    let name = code_run.metadata.name.as_deref().unwrap_or("unknown");
-    let uid_suffix = code_run
-        .metadata
-        .uid
-        .as_deref()
-        .map(|uid| &uid[..8])
-        .unwrap_or("nouid");
-    let task_id = code_run.spec.task_id;
-    let context_version = code_run.spec.context_version;
+/// Get job name for CodeRun - prefer stored name, fallback to generation
+/// This fixes the job name mismatch that was causing status update failures
+fn get_job_name(code_run: &CodeRun) -> String {
+    // First try to get the job name from CodeRun status (set during creation)
+    if let Some(status) = &code_run.status {
+        if let Some(job_name) = &status.job_name {
+            info!("Using stored job name from status: {}", job_name);
+            return job_name.clone();
+        }
+    }
 
-    format!("code-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}")
-        .replace(['_', '.'], "-")
-        .to_lowercase()
+    // Fallback to unified generation
+    let generated_name = ResourceNaming::job_name(code_run);
+    info!("Generated job name: {}", generated_name);
+    generated_name
 }
 
 async fn check_code_job_state(jobs: &Api<Job>, job_name: &str) -> Result<CodeJobState> {

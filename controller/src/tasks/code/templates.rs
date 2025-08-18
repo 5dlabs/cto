@@ -359,7 +359,7 @@ impl CodeTemplateGenerator {
             }
         };
 
-        format!("code/{}", template_name)
+        format!("code/{template_name}")
     }
 
     /// Load a template file from the mounted ConfigMap

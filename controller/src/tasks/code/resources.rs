@@ -1,4 +1,5 @@
 use super::agent::AgentClassifier;
+use super::naming::ResourceNaming;
 use crate::crds::CodeRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, Context, Result};
@@ -183,7 +184,7 @@ impl<'a> CodeResourceManager<'a> {
             .unwrap_or(&self.ctx.namespace);
         let services: Api<Service> = Api::namespaced(self.ctx.client.clone(), namespace);
 
-        let svc_name = format!("{job_name}-bridge");
+        let svc_name = ResourceNaming::headless_service_name(job_name);
 
         // Build labels for metadata and selector
         let mut meta_labels = BTreeMap::new();
@@ -504,44 +505,8 @@ impl<'a> CodeResourceManager<'a> {
     }
 
     fn generate_job_name(&self, code_run: &CodeRun) -> String {
-        // Use deterministic naming based on the CodeRun's actual name and UID
-        // This ensures the same CodeRun always generates the same Job name
-        let namespace = code_run.metadata.namespace.as_deref().unwrap_or("default");
-        let name = code_run.metadata.name.as_deref().unwrap_or("unknown");
-        let uid_suffix = code_run
-            .metadata
-            .uid
-            .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
-        let task_id = code_run.spec.task_id;
-        let context_version = code_run.spec.context_version;
-
-        let job_name =
-            format!("code-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}")
-                .replace(['_', '.'], "-")
-                .to_lowercase();
-
-        // Kubernetes has a 63-character limit for resource names and labels
-        // Truncate if necessary while preserving uniqueness
-        if job_name.len() > 63 {
-            let uid_and_suffix = format!("-{uid_suffix}-t{task_id}-v{context_version}");
-            let available_len = 63 - uid_and_suffix.len();
-            let prefix = format!("code-{namespace}-{name}")
-                .replace(['_', '.'], "-")
-                .to_lowercase();
-
-            if prefix.len() > available_len {
-                format!(
-                    "{}-{uid_suffix}-t{task_id}-v{context_version}",
-                    &prefix[..available_len]
-                )
-            } else {
-                job_name
-            }
-        } else {
-            job_name
-        }
+        // Use unified naming system to ensure consistency with controller lookups
+        ResourceNaming::job_name(code_run)
     }
 
     fn build_job_spec(&self, code_run: &CodeRun, job_name: &str, cm_name: &str) -> Result<Job> {
@@ -859,7 +824,6 @@ impl<'a> CodeResourceManager<'a> {
             },
             "spec": {
                 "backoffLimit": 0,
-                "ttlSecondsAfterFinished": 30,
                 "template": {
                     "metadata": { "labels": labels },
                     "spec": pod_spec
@@ -1052,7 +1016,7 @@ impl<'a> CodeResourceManager<'a> {
             .or(code_run.spec.github_user.as_deref())
             .unwrap_or("unknown");
         let list_params = ListParams::default().labels(&format!(
-            "app=orchestrator,component=code-runner,github-user={},service={}",
+            "app=controller,component=code-runner,github-user={},service={}",
             self.sanitize_label_value(github_identifier),
             self.sanitize_label_value(&code_run.spec.service)
         ));
@@ -1080,7 +1044,7 @@ impl<'a> CodeResourceManager<'a> {
             .or(code_run.spec.github_user.as_deref())
             .unwrap_or("unknown");
         let list_params = ListParams::default().labels(&format!(
-            "app=orchestrator,component=code-runner,github-user={},service={}",
+            "app=controller,component=code-runner,github-user={},service={}",
             self.sanitize_label_value(github_identifier),
             self.sanitize_label_value(&code_run.spec.service)
         ));

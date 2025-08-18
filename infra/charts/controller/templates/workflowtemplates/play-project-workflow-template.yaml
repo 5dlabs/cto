@@ -269,6 +269,17 @@ spec:
         - name: task-count
       script:
         image: alpine/k8s:1.31.0
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: github-app-5dlabs-morgan
+              key: app-id
+        - name: GITHUB_APP_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: github-app-5dlabs-morgan
+              key: private-key
         command: [sh]
         source: |
           #!/bin/sh
