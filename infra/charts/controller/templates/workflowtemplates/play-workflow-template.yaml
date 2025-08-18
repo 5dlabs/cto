@@ -215,7 +215,7 @@ spec:
               - name: merge-sha
                 value: "{{`{{tasks.wait-pr-approved.outputs.parameters.merge-sha}}`}}"
 
-    # Template for creating CodeRun CRDs for agent execution
+    # Template for creating CodeRun CRDs for agent execution and waiting for completion
     - name: agent-coderun
       inputs:
         parameters:
@@ -231,11 +231,51 @@ spec:
       outputs:
         parameters:
         - name: coderun-name
+          value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
+        - name: coderun-status
+          value: "Succeeded"
+      steps:
+      - - name: create-coderun-resource
+          template: create-coderun-resource
+          arguments:
+            parameters:
+            - name: github-app
+              value: "{{`{{inputs.parameters.github-app}}`}}"
+            - name: task-id
+              value: "{{`{{inputs.parameters.task-id}}`}}"
+            - name: stage
+              value: "{{`{{inputs.parameters.stage}}`}}"
+            - name: pr-url
+              value: "{{`{{inputs.parameters.pr-url}}`}}"
+            - name: pr-number
+              value: "{{`{{inputs.parameters.pr-number}}`}}"
+            - name: qa-ready
+              value: "{{`{{inputs.parameters.qa-ready}}`}}"
+      - - name: wait-for-completion
+          template: wait-coderun-completion
+          arguments:
+            parameters:
+            - name: coderun-name
+              value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
+
+    # Template for creating CodeRun resources
+    - name: create-coderun-resource
+      inputs:
+        parameters:
+        - name: github-app
+        - name: task-id
+        - name: stage
+        - name: pr-url
+          default: ""
+        - name: pr-number
+          default: ""
+        - name: qa-ready
+          default: "false"
+      outputs:
+        parameters:
+        - name: name
           valueFrom:
             jsonPath: '{.metadata.name}'
-        - name: coderun-status
-          valueFrom:
-            jsonPath: '{.status.phase}'
       resource:
         action: create
         setOwnerReference: true
@@ -277,6 +317,22 @@ spec:
           duration: "30s"
           factor: 2
           maxDuration: "5m"
+
+    # Template for waiting for CodeRun completion
+    - name: wait-coderun-completion
+      inputs:
+        parameters:
+        - name: coderun-name
+      resource:
+        action: get
+        manifest: |
+          apiVersion: agents.platform/v1
+          kind: CodeRun
+          metadata:
+            name: "{{`{{inputs.parameters.coderun-name}}`}}"
+            namespace: {{ .Release.Namespace }}
+        successCondition: status.phase == Succeeded
+        failureCondition: status.phase == Failed
 
     # Template for atomic workflow stage updates with optimistic locking
     - name: update-workflow-stage
