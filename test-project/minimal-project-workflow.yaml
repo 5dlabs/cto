@@ -20,7 +20,7 @@ spec:
       
       # Repository configuration for test project
       - name: repository
-        value: "5dlabs/cto"
+        value: "5dlabs-cto"
       - name: service
         value: "test-minimal"
       - name: docs-repository
