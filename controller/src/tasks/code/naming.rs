@@ -64,19 +64,26 @@ impl ResourceNaming {
             name.to_string()
         } else {
             // Intelligent truncation: preserve the meaningful suffix
-            // Keep the pattern: -{uid}-t{task}-v{version}
+            // Keep the pattern: {uid}-t{task}-v{version} (last 3 parts)
             let parts: Vec<&str> = name.split('-').collect();
             if parts.len() >= 4 {
-                // Try to preserve the last 4 parts: {uid}-t{task}-v{version}
+                // Preserve the last 3 parts: {uid}-t{task}-v{version}
                 let preserved_suffix = parts[parts.len() - 3..].join("-");
                 let available_space =
                     MAX_K8S_NAME_LENGTH.saturating_sub(preserved_suffix.len() + 1);
 
-                let prefix = &name[..available_space.min(name.len())];
-                format!("{prefix}-{preserved_suffix}")
-                    .chars()
-                    .take(MAX_K8S_NAME_LENGTH)
-                    .collect()
+                let prefix_len = available_space.min(name.len());
+                if prefix_len > 0 {
+                    format!("{}-{}", &name[..prefix_len], preserved_suffix)
+                        .chars()
+                        .take(MAX_K8S_NAME_LENGTH)
+                        .collect()
+                } else {
+                    preserved_suffix
+                        .chars()
+                        .take(MAX_K8S_NAME_LENGTH)
+                        .collect()
+                }
             } else {
                 // Fallback: simple truncation
                 name.chars().take(MAX_K8S_NAME_LENGTH).collect()
