@@ -1,14 +1,14 @@
 use crate::crds::{CodeRun, DocsRun};
+use chrono::Utc;
 use futures::StreamExt;
 use k8s_openapi::api::batch::v1::Job;
+use kube::api::{ListParams, Patch, PatchParams};
 use kube::runtime::controller::{Action, Controller};
 use kube::runtime::watcher::Config;
 use kube::{Api, Client, ResourceExt};
-use kube::api::{ListParams, Patch, PatchParams};
 use serde_json::json;
-use std::time::Duration;
-use chrono::Utc;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{debug, error, info, instrument, Instrument};
 
 pub mod code;
@@ -97,7 +97,10 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
                         .as_ref()
                         .map(|s| s.phase.clone())
                         .unwrap_or_else(|| "".to_string());
-                    info!("Existing CodeRun: name={}, githubApp={}, phase='{}'", name, app, phase);
+                    info!(
+                        "Existing CodeRun: name={}, githubApp={}, phase='{}'",
+                        name, app, phase
+                    );
                 }
             }
             Err(e) => {
