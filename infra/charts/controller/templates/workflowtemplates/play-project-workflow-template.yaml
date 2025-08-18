@@ -1,0 +1,339 @@
+{{- if .Values.argo.enabled }}
+---
+# Full Project Play Workflow Template
+# Executes all tasks in a project sequentially from task-1 to task-N
+# Implements task discovery, current-task markers, and archiving
+
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: play-project-workflow-template
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: play-project-workflow-template
+    app.kubernetes.io/part-of: platform
+    agents.platform/orchestration: full-project
+    workflow-type: project-orchestration
+spec:
+  # Extended deadline for full project execution
+  activeDeadlineSeconds: 2592000  # 30 days
+
+  # Service account with proper permissions
+  serviceAccountName: argo-workflow
+
+  # Main entry point
+  entrypoint: orchestrate-project
+
+  # Global arguments
+  arguments:
+    parameters:
+      # Agent selection (using same pattern as play-workflow-template)
+      - name: implementation-agent
+        value: "5DLabs-Rex"
+      - name: quality-agent
+        value: "5DLabs-Cleo"
+      - name: testing-agent
+        value: "5DLabs-Tess"
+      
+      # Repository configuration
+      - name: repository
+        value: "5dlabs/cto"
+      - name: service
+        value: "cto"
+      - name: docs-repository
+        value: "https://github.com/5dlabs/cto"
+      - name: docs-project-directory
+        value: "docs"
+      - name: docs-branch
+        value: "main"
+      
+      # Execution control
+      - name: start-from-task
+        value: "1"
+        description: "Task ID to start/resume from"
+      - name: max-tasks
+        value: "100"
+        description: "Maximum number of tasks to execute"
+      
+      # Model configuration
+      - name: model
+        value: "claude-3-5-sonnet-20241022"
+
+  # Volume for shared workspace
+  volumeClaimTemplates:
+    - metadata:
+        name: project-workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+
+  templates:
+    # Main orchestration template
+    - name: orchestrate-project
+      steps:
+        # Step 1: Discover all tasks
+        - - name: discover-tasks
+            template: task-discovery
+            arguments:
+              parameters:
+              - name: docs-directory
+                value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
+              - name: start-from
+                value: "{{`{{workflow.parameters.start-from-task}}`}}"
+              - name: max-tasks
+                value: "{{`{{workflow.parameters.max-tasks}}`}}"
+        
+        # Step 2: Process tasks sequentially
+        - - name: process-tasks
+            template: sequential-task-processor
+            arguments:
+              parameters:
+              - name: task-list
+                value: "{{`{{steps.discover-tasks.outputs.parameters.task-list}}`}}"
+              - name: task-count
+                value: "{{`{{steps.discover-tasks.outputs.parameters.task-count}}`}}"
+
+    # Task discovery template
+    - name: task-discovery
+      inputs:
+        parameters:
+        - name: docs-directory
+        - name: start-from
+        - name: max-tasks
+      outputs:
+        parameters:
+        - name: task-list
+          valueFrom:
+            path: /tmp/task-list.txt
+        - name: task-count
+          valueFrom:
+            path: /tmp/task-count.txt
+      script:
+        image: alpine/k8s:1.31.0
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          echo "🔍 Discovering tasks in workspace..."
+          
+          # Clone repository to get task structure
+          apk add --no-cache git
+          git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
+            "{{`{{workflow.parameters.docs-repository}}`}}" /workspace
+          
+          cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
+          
+          # Check for .taskmaster/docs directory
+          TASK_DIR=".taskmaster/docs"
+          if [ ! -d "$TASK_DIR" ]; then
+            echo "❌ TaskMaster directory not found: $TASK_DIR"
+            exit 1
+          fi
+          
+          # Discover task directories
+          echo "📋 Scanning for task-* directories..."
+          tasks=""
+          count=0
+          
+          for dir in $(ls -1d $TASK_DIR/task-* 2>/dev/null | sort -V); do
+            task_num=$(basename "$dir" | sed 's/task-//')
+            
+            # Check if task number is >= start-from
+            if [ "$task_num" -ge "{{`{{inputs.parameters.start-from}}`}}" ]; then
+              if [ -z "$tasks" ]; then
+                tasks="$task_num"
+              else
+                tasks="$tasks,$task_num"
+              fi
+              count=$((count + 1))
+              
+              # Check max tasks limit
+              if [ "$count" -ge "{{`{{inputs.parameters.max-tasks}}`}}" ]; then
+                echo "⚠️ Reached max tasks limit: {{`{{inputs.parameters.max-tasks}}`}}"
+                break
+              fi
+            fi
+          done
+          
+          if [ -z "$tasks" ]; then
+            echo "❌ No tasks found starting from task-{{`{{inputs.parameters.start-from}}`}}"
+            exit 1
+          fi
+          
+          echo "✅ Found $count tasks: $tasks"
+          echo "$tasks" > /tmp/task-list.txt
+          echo "$count" > /tmp/task-count.txt
+
+    # Sequential task processor - processes tasks one by one
+    - name: sequential-task-processor
+      inputs:
+        parameters:
+        - name: task-list
+        - name: task-count
+      script:
+        image: alpine/k8s:1.31.0
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          echo "📋 Processing {{`{{inputs.parameters.task-count}}`}} tasks sequentially..."
+          
+          # Convert comma-separated list to space-separated for iteration
+          task_list="{{`{{inputs.parameters.task-list}}`}}"
+          task_list="${task_list//,/ }"
+          
+          # Process each task sequentially
+          task_index=1
+          for task_id in $task_list; do
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "🎯 Starting Task $task_id ($task_index/{{`{{inputs.parameters.task-count}}`}})"
+            echo "════════════════════════════════════════"
+            
+            # Create current-task marker
+            cat > /tmp/current-task.json <<EOF
+          {
+            "task_id": "$task_id",
+            "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "workflow_id": "{{`{{workflow.name}}`}}",
+            "task_index": $task_index,
+            "total_tasks": {{`{{inputs.parameters.task-count}}`}}
+          }
+          EOF
+            kubectl create configmap current-task-{{`{{workflow.name}}`}} \
+              --from-file=current-task.json=/tmp/current-task.json \
+              -n {{ .Release.Namespace }} \
+              --dry-run=client -o yaml | kubectl apply -n {{ .Release.Namespace }} -f -
+            
+            # Submit workflow for this task
+            echo "🚀 Submitting workflow for task-$task_id..."
+            
+            cat > /tmp/workflow.yaml <<EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            generateName: play-task-${task_id}-
+            namespace: {{ .Release.Namespace }}
+            labels:
+              task-id: "$task_id"
+              repository: "$(echo "{{`{{workflow.parameters.repository}}`}}" | tr '/' '-')"
+              current-stage: "pending"
+              parent-workflow: "{{`{{workflow.name}}`}}"
+              project-play: "true"
+          spec:
+            workflowTemplateRef:
+              name: play-workflow-template
+            arguments:
+              parameters:
+                - name: task-id
+                  value: "$task_id"
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: service
+                  value: "{{`{{workflow.parameters.service}}`}}"
+                - name: docs-repository
+                  value: "{{`{{workflow.parameters.docs-repository}}`}}"
+                - name: docs-project-directory
+                  value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
+                - name: docs-branch
+                  value: "{{`{{workflow.parameters.docs-branch}}`}}"
+                - name: implementation-agent
+                  value: "{{`{{workflow.parameters.implementation-agent}}`}}"
+                - name: quality-agent
+                  value: "{{`{{workflow.parameters.quality-agent}}`}}"
+                - name: testing-agent
+                  value: "{{`{{workflow.parameters.testing-agent}}`}}"
+                - name: model
+                  value: "{{`{{workflow.parameters.model}}`}}"
+          EOF
+            
+            workflow_name=$(kubectl create -f /tmp/workflow.yaml -o jsonpath='{.metadata.name}')
+            
+            if [ -z "$workflow_name" ]; then
+              echo "❌ Failed to create workflow for task-$task_id"
+              exit 1
+            fi
+            
+            echo "✅ Created workflow: $workflow_name"
+            
+            # Wait for workflow completion
+            echo "⏳ Waiting for task-$task_id to complete..."
+            max_wait=7200  # 2 hours max wait per task
+            elapsed=0
+            interval=30
+            
+            while [ $elapsed -lt $max_wait ]; do
+              status=$(kubectl get workflow "$workflow_name" \
+                -n {{ .Release.Namespace }} \
+                -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+              
+              case "$status" in
+                "Succeeded")
+                  echo "✅ Task $task_id completed successfully"
+                  break
+                  ;;
+                "Failed"|"Error")
+                  echo "❌ Task $task_id failed"
+                  kubectl get workflow "$workflow_name" -n {{ .Release.Namespace }} -o yaml | tail -20
+                  exit 1
+                  ;;
+                "Running"|"Pending")
+                  if [ $((elapsed % 300)) -eq 0 ]; then
+                    echo "🔄 Task $task_id still running... ($elapsed seconds elapsed)"
+                  fi
+                  ;;
+                *)
+                  echo "📊 Task $task_id status: $status"
+                  ;;
+              esac
+              
+              sleep $interval
+              elapsed=$((elapsed + interval))
+            done
+            
+            if [ $elapsed -ge $max_wait ]; then
+              echo "⏱️ Timeout waiting for task $task_id"
+              exit 1
+            fi
+            
+            # Archive task (placeholder for now)
+            echo "📦 Archiving task-$task_id..."
+            kubectl create configmap task-archive-${task_id}-{{`{{workflow.name}}`}} \
+              --from-literal=task_id="$task_id" \
+              --from-literal=completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+              -n {{ .Release.Namespace }} \
+              --dry-run=client -o yaml | kubectl apply -n {{ .Release.Namespace }} -f -
+            
+            # Progress report
+            percent=$((task_index * 100 / {{`{{inputs.parameters.task-count}}`}}))
+            echo ""
+            echo "📊 PROGRESS: $task_index/{{`{{inputs.parameters.task-count}}`}} tasks complete ($percent%)"
+            printf "["
+            for i in $(seq 1 20); do
+              if [ $((i * 5)) -le $percent ]; then
+                printf "█"
+              else
+                printf "░"
+              fi
+            done
+            printf "] $percent%%\n"
+            echo ""
+            
+            task_index=$((task_index + 1))
+          done
+          
+          # Clean up current-task marker
+          kubectl delete configmap current-task-{{`{{workflow.name}}`}} \
+            -n {{ .Release.Namespace }} --ignore-not-found=true
+          
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "🎉 ALL TASKS COMPLETED SUCCESSFULLY!"
+          echo "════════════════════════════════════════"
+
+{{- end }}
+
