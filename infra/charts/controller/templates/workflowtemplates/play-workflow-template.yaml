@@ -44,10 +44,10 @@ spec:
         value: ""
       - name: repository
         description: "GitHub repository for the work"
-        value: "5dlabs/cto"
+        value: "5dlabs/cto-play-test"
       - name: service
         description: "Service identifier for persistent workspace"
-        value: "cto"
+        value: "play-test"
 
       # Model configuration
       - name: model
@@ -255,7 +255,7 @@ spec:
             taskId: {{`{{inputs.parameters.task-id}}`}}
             service: "{{`{{workflow.parameters.service}}`}}"
             repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
-            docsRepositoryUrl: "5dlabs/cto"
+            docsRepositoryUrl: "https://github.com/5dlabs/cto-play-test"
             docsProjectDirectory: "docs"
             workingDirectory: "."
             githubApp: "{{`{{inputs.parameters.github-app}}`}}"
