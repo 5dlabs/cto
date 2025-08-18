@@ -246,7 +246,7 @@ main() {
     
     # Show final workflow state
     log_info "Final workflow labels:"
-    kubectl get workflow "$WORKFLOW_NAME" -n $NAMESPACE -o jsonpath='{.metadata.labels}' | jq .
+    kubectl get workflow "$WORKFLOW_NAME" -n $NAMESPACE -o jsonpath='{.metadata.labels}'
 }
 
 # Check prerequisites
