@@ -256,7 +256,7 @@ spec:
             service: "{{`{{workflow.parameters.service}}`}}"
             repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
             docsRepositoryUrl: "5dlabs/cto"
-            docsProjectDirectory: "."
+            docsProjectDirectory: "docs"
             workingDirectory: "."
             githubApp: "{{`{{inputs.parameters.github-app}}`}}"
             model: "{{`{{workflow.parameters.model}}`}}"
