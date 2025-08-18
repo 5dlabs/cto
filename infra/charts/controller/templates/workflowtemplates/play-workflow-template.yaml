@@ -357,13 +357,14 @@ spec:
           fi
 
           # Prepare the JSON patch with optimistic locking
+          REPOSITORY_LABEL=$(echo '{{`{{workflow.parameters.repository}}`}}' | tr '/' '-')
           PATCH_JSON='{
             "metadata": {
               "resourceVersion": "'$RESOURCE_VERSION'",
               "labels": {
                 "current-stage": "{{`{{inputs.parameters.new-stage}}`}}",
                 "task-id": "{{`{{workflow.parameters.task-id}}`}}",
-                "repository": "$(echo '{{`{{workflow.parameters.repository}}`}}' | tr '/' '-')",
+                "repository": "'$REPOSITORY_LABEL'",
                 "previous-stage": "'$CURRENT_STAGE'"
               }
             }
