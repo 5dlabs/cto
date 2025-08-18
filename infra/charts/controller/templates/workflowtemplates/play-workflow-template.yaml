@@ -17,13 +17,13 @@ metadata:
 spec:
   # Extended deadline for realistic multi-day development cycles
   activeDeadlineSeconds: 1209600  # 14 days
-  
+
   # Service account with proper permissions for CRD operations
   serviceAccountName: argo-workflow
-  
+
   # Main entry point
   entrypoint: main
-  
+
   # Global arguments for workflow configuration
   arguments:
     parameters:
@@ -37,7 +37,7 @@ spec:
       - name: testing-agent
         description: "Agent to use for testing and validation (e.g., 5DLabs-Tess)"
         value: "5DLabs-Tess"
-      
+
       # Task and repository configuration
       - name: task-id
         description: "Unique task identifier for correlation (required)"
@@ -48,12 +48,12 @@ spec:
       - name: service
         description: "Service identifier for persistent workspace"
         value: "cto"
-      
+
       # Model configuration
       - name: model
         description: "Claude model to use for all agents"
         value: "claude-3-5-sonnet-20241022"
-      
+
       # PR context (populated by suspend/resume)
       - name: pr-url
         description: "Pull request URL (populated after PR creation)"
@@ -61,7 +61,7 @@ spec:
       - name: pr-number
         description: "Pull request number (populated after PR creation)"
         value: ""
-      
+
       # QA feedback (populated by suspend/resume)
       - name: qa-status
         description: "QA approval status (populated after QA)"
@@ -72,7 +72,7 @@ spec:
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
-  
+
   # Volume claim templates for shared workspace
   volumeClaimTemplates:
     - metadata:
@@ -99,10 +99,21 @@ spec:
                 value: "{{`{{workflow.parameters.task-id}}`}}"
               - name: stage
                 value: "implementation"
-          
+
+          # Update stage after implementation completes
+          - name: update-to-waiting-pr
+            dependencies: [implementation-work]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-pr-created"
+              - name: verify-update
+                value: "true"
+
           # Suspend point 1: Wait for PR creation
           - name: wait-pr-created
-            dependencies: [implementation-work]
+            dependencies: [update-to-waiting-pr]
             template: suspend-for-event
             arguments:
               parameters:
@@ -110,7 +121,7 @@ spec:
                 value: "pr-created"
               - name: stage-name
                 value: "waiting-pr-created"
-          
+
           # Stage 2: Quality work
           - name: quality-work
             dependencies: [wait-pr-created]
@@ -127,10 +138,21 @@ spec:
                 value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-url}}`}}"
               - name: pr-number
                 value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
-          
+
+          # Update stage after quality work completes
+          - name: update-to-waiting-qa
+            dependencies: [quality-work]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-ready-for-qa"
+              - name: verify-update
+                value: "true"
+
           # Suspend point 2: Wait for ready-for-qa label
           - name: wait-ready-for-qa
-            dependencies: [quality-work]
+            dependencies: [update-to-waiting-qa]
             template: suspend-for-event
             arguments:
               parameters:
@@ -138,7 +160,7 @@ spec:
                 value: "ready-for-qa"
               - name: stage-name
                 value: "waiting-ready-for-qa"
-          
+
           # Stage 3: Testing work
           - name: testing-work
             dependencies: [wait-ready-for-qa]
@@ -157,10 +179,21 @@ spec:
                 value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
               - name: qa-ready
                 value: "true"
-          
+
+          # Update stage after testing work completes
+          - name: update-to-waiting-approval
+            dependencies: [testing-work]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-pr-approved"
+              - name: verify-update
+                value: "true"
+
           # Suspend point 3: Wait for PR approval
           - name: wait-pr-approved
-            dependencies: [testing-work]
+            dependencies: [update-to-waiting-approval]
             template: suspend-for-event
             arguments:
               parameters:
@@ -168,7 +201,7 @@ spec:
                 value: "pr-approved"
               - name: stage-name
                 value: "waiting-pr-approved"
-          
+
           # Stage 4: Complete task
           - name: complete-task
             dependencies: [wait-pr-approved]
@@ -245,6 +278,114 @@ spec:
           factor: 2
           maxDuration: "5m"
 
+    # Template for atomic workflow stage updates
+    - name: update-workflow-stage
+      inputs:
+        parameters:
+        - name: new-stage
+          description: "The new stage to transition to"
+        - name: verify-update
+          description: "Whether to verify the update succeeded"
+          default: "true"
+      outputs:
+        parameters:
+        - name: update-status
+          valueFrom:
+            path: /tmp/update-status.txt
+          default: "unknown"
+      script:
+        image: alpine/k8s:1.31.0
+        command: [bash]
+        source: |
+          #!/bin/bash
+          set -e
+
+          echo "========================================="
+          echo "Updating Workflow Stage"
+          echo "========================================="
+          echo "Workflow: {{`{{workflow.name}}`}}"
+          echo "Current Task: {{`{{workflow.parameters.task-id}}`}}"
+          echo "New Stage: {{`{{inputs.parameters.new-stage}}`}}"
+          echo ""
+
+          # Prepare the JSON patch for atomic label update
+          PATCH_JSON='{
+            "metadata": {
+              "labels": {
+                "current-stage": "{{`{{inputs.parameters.new-stage}}`}}",
+                "task-id": "{{`{{workflow.parameters.task-id}}`}}",
+                "repository": "{{`{{workflow.parameters.repository}}`}}",
+                "updated-at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+              }
+            }
+          }'
+
+          echo "Applying patch payload"
+
+          # Apply the patch with retry logic
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          UPDATE_SUCCESS=false
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo ""
+            echo "Attempt $((RETRY_COUNT+1)) of $MAX_RETRIES..."
+
+            if kubectl patch workflow "{{`{{workflow.name}}`}}" \
+              --type='merge' \
+              --patch="$PATCH_JSON" \
+              -n {{ .Release.Namespace }}; then
+
+              UPDATE_SUCCESS=true
+              echo "✅ Stage update successful"
+              break
+            else
+              echo "⚠️ Stage update failed, retrying..."
+              RETRY_COUNT=$((RETRY_COUNT+1))
+              sleep 2
+            fi
+          done
+
+          # Verify the update if requested
+          if [ "{{`{{inputs.parameters.verify-update}}`}}" = "true" ]; then
+            echo ""
+            echo "Verifying stage update..."
+
+            CURRENT_STAGE=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
+              -n {{ .Release.Namespace }} \
+              -o jsonpath='{.metadata.labels.current-stage}')
+
+            if [ "$CURRENT_STAGE" = "{{`{{inputs.parameters.new-stage}}`}}" ]; then
+              echo "✅ Verification successful: Stage is now '$CURRENT_STAGE'"
+              echo "success" > /tmp/update-status.txt
+            else
+              echo "❌ Verification failed: Expected '{{`{{inputs.parameters.new-stage}}`}}', got '$CURRENT_STAGE'"
+              echo "failed" > /tmp/update-status.txt
+              exit 1
+            fi
+          else
+            if [ "$UPDATE_SUCCESS" = true ]; then
+              echo "success" > /tmp/update-status.txt
+            else
+              echo "failed" > /tmp/update-status.txt
+              exit 1
+            fi
+          fi
+
+          # Log final state
+          echo ""
+          echo "Stage transition completed:"
+          kubectl get workflow "{{`{{workflow.name}}`}}" \
+            -n {{ .Release.Namespace }} \
+            -o json
+      retryStrategy:
+        limit: 2
+        retryPolicy: "OnFailure"
+        backoff:
+          duration: "5s"
+          factor: 2
+          maxDuration: "30s"
+
     # Template for suspend points waiting for external events
     - name: suspend-for-event
       inputs:
@@ -282,49 +423,49 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           echo "========================================="
           echo "Completing Task {{`{{inputs.parameters.task-id}}`}}"
           echo "========================================="
           echo "Approval Status: {{`{{inputs.parameters.approval-status}}`}}"
           echo "Merge SHA: {{`{{inputs.parameters.merge-sha}}`}}"
           echo ""
-          
+
           # Create completion marker
           echo "Task {{`{{inputs.parameters.task-id}}`}} completed at $(date)" > /tmp/task-complete.txt
           echo "Workflow: {{`{{workflow.name}}`}}" >> /tmp/task-complete.txt
           echo "Duration: {{`{{workflow.duration}}`}}" >> /tmp/task-complete.txt
           echo "PR Approved: {{`{{inputs.parameters.approval-status}}`}}" >> /tmp/task-complete.txt
-          
+
           # Generate workflow summary
           cat <<EOF > /tmp/workflow-summary.md
           # Task {{`{{inputs.parameters.task-id}}`}} Completion Summary
-          
+
           ## Workflow Details
           - **Workflow Name**: {{`{{workflow.name}}`}}
           - **Task ID**: {{`{{inputs.parameters.task-id}}`}}
           - **Repository**: {{`{{workflow.parameters.repository}}`}}
           - **Duration**: {{`{{workflow.duration}}`}}
-          
+
           ## Agent Execution
           - **Implementation Agent**: {{`{{workflow.parameters.implementation-agent}}`}}
           - **Quality Agent**: {{`{{workflow.parameters.quality-agent}}`}}
           - **Testing Agent**: {{`{{workflow.parameters.testing-agent}}`}}
-          
+
           ## Results
           - **PR Number**: {{`{{workflow.parameters.pr-number}}`}}
           - **Approval Status**: {{`{{inputs.parameters.approval-status}}`}}
           - **Merge SHA**: {{`{{inputs.parameters.merge-sha}}`}}
-          
+
           ## Stages Completed
           1. ✅ Implementation Work
           2. ✅ Quality Assurance
           3. ✅ Testing & Validation
           4. ✅ PR Approval
-          
+
           Task successfully completed and merged to main branch.
           EOF
-          
+
           echo ""
           echo "Workflow summary generated successfully"
           echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
@@ -345,14 +486,14 @@ spec:
           echo "Workflow Name: {{`{{workflow.name}}`}}"
           echo "Status: {{`{{workflow.status}}`}}"
           echo "Task ID: {{`{{workflow.parameters.task-id}}`}}"
-          
+
           # Log final workflow state
           if [ "{{`{{workflow.status}}`}}" = "Succeeded" ]; then
             echo "✅ Workflow completed successfully"
           else
             echo "❌ Workflow failed or was terminated"
           fi
-          
+
           echo "Cleanup completed"
 
   # TTL strategy for workflow cleanup
