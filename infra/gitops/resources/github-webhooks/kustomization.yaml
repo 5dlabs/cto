@@ -7,4 +7,5 @@ resources:
   - eventbus.yaml
   - externalsecret.yaml
   - sa-rbac.yaml
+  - stage-aware-resume-sensor.yaml
 
