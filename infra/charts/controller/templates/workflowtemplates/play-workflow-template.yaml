@@ -203,8 +203,19 @@ spec:
                 value: "waiting-pr-approved"
 
           # Stage 4: Complete task
-          - name: complete-task
+          # Suspend point 4: Wait for PR merged before completing
+          - name: wait-pr-merged
             dependencies: [wait-pr-approved]
+            template: suspend-for-event
+            arguments:
+              parameters:
+              - name: event-type
+                value: "pr-merged"
+              - name: stage-name
+                value: "waiting-pr-merged"
+
+          - name: complete-task
+            dependencies: [wait-pr-merged]
             template: task-completion
             arguments:
               parameters:

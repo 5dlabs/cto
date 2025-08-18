@@ -59,6 +59,22 @@ spec:
             type: string
             value: ["approved"]
 
+    # PR Merged - Resume workflows waiting for this
+    - name: pr-merged-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["closed"]
+          - path: body.pull_request.merged
+            type: string
+            value: ["true"]
+
   triggers:
     # Resume workflows at waiting-pr-created stage
     - template:
@@ -142,6 +158,71 @@ spec:
                                 }
                               }
                             }'
+
+                          # Resume the workflow
+                          argo resume $WORKFLOW_NAME -n argo
+
+                          echo "✅ Workflow resumed successfully"
+                        else
+                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
+                          echo "Skipping resume to prevent incorrect stage progression"
+                        fi
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+
+    # Resume workflows at waiting-pr-merged stage (PR closed & merged)
+    - template:
+        name: resume-waiting-pr-merged
+        conditions: "pr-merged-event"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: stage-resume-pr-merged-
+                namespace: argo
+                labels:
+                  type: stage-resume
+                  target-stage: waiting-pr-merged
+              spec:
+                entrypoint: resume-workflow
+                serviceAccountName: argo-events-sa
+                templates:
+                  - name: resume-workflow
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                        echo "=== Stage-Aware Workflow Resume ==="
+                        echo "Target Stage: waiting-pr-merged"
+                        echo "PR Number: {{ .Input.body.pull_request.number }}"
+
+                        # Extract task ID from PR labels using jq
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ERROR: No task-* label found on PR"
+                          exit 1
+                        fi
+
+                        echo "Task ID: $TASK_ID"
+                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
+
+                        # Check if workflow exists and is at correct stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
+                          -n argo \
+                          -o jsonpath='{.metadata.labels.current-stage}' \
+                          2>/dev/null || echo "")
+
+                        if [ "$CURRENT_STAGE" = "waiting-pr-merged" ]; then
+                          echo "Found workflow at correct stage, resuming..."
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n argo
