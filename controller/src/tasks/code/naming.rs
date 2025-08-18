@@ -79,10 +79,7 @@ impl ResourceNaming {
                         .take(MAX_K8S_NAME_LENGTH)
                         .collect()
                 } else {
-                    preserved_suffix
-                        .chars()
-                        .take(MAX_K8S_NAME_LENGTH)
-                        .collect()
+                    preserved_suffix.chars().take(MAX_K8S_NAME_LENGTH).collect()
                 }
             } else {
                 // Fallback: simple truncation

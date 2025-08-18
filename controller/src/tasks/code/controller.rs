@@ -183,9 +183,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
-                    let _ = jobs
-                        .delete(&job_name, &DeleteParams::default())
-                        .await;
+                    let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
                     info!("Deleted completed code job: {}", job_name);
                 } else {
                     info!(
@@ -216,9 +214,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
-                    let _ = jobs
-                        .delete(&job_name, &DeleteParams::default())
-                        .await;
+                    let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
                     info!("Deleted failed code job: {}", job_name);
                 } else {
                     info!(
