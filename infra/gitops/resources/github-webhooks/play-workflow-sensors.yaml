@@ -27,7 +27,13 @@ spec:
         conditions: "github-pr-created"
         argoWorkflow:
           operation: resume
-          # Resume specific workflow by name via args
+          source:
+            resource:
+              # Only resume workflows waiting for PR creation
+              selector:
+                matchLabels:
+                  workflow-type: play-orchestration
+                  current-stage: waiting-pr-created
           args: []
           parameters:
             # Extract task ID from PR labels and construct deterministic workflow name
@@ -75,23 +81,34 @@ spec:
       eventName: org
       filters:
         data:
-          # Filter for pull_request labeled events
+          # Filter for pull_request labeled events and ensure it's a stage transition
           - path: headers.X-Github-Event
             type: string
             value: ["pull_request"]
           - path: body.action
             type: string
             value: ["labeled"]
-          # Check if the label added is "ready-for-qa"
+          # Check if the label added is "ready-for-qa" AND sender is Cleo
           - path: body.label.name
             type: string
             value: ["ready-for-qa"]
+          - path: body.sender.login
+            type: string
+            comparator: "~"
+            value: "5DLabs-Cleo.*"
   triggers:
     - template:
         name: resume-after-ready-for-qa
         conditions: "github-label-added"
         argoWorkflow:
           operation: resume
+          source:
+            resource:
+              # Only resume workflows waiting for QA ready state
+              selector:
+                matchLabels:
+                  workflow-type: play-orchestration
+                  current-stage: waiting-ready-for-qa
           args: []
           parameters:
             # Extract task ID from PR labels to find workflow
@@ -156,6 +173,13 @@ spec:
         conditions: "github-pr-approved"
         argoWorkflow:
           operation: resume
+          source:
+            resource:
+              # Only resume workflows waiting for PR approval
+              selector:
+                matchLabels:
+                  workflow-type: play-orchestration
+                  current-stage: waiting-pr-approved
           args: []
           parameters:
             # Extract task ID from PR labels to find workflow
