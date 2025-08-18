@@ -527,34 +527,35 @@ cd "/workspace/$REPO_NAME"
 echo "🔄 Syncing with latest main to prevent conflicts..."
 git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || echo "⚠️ Could not fetch main/master branch"
 
-# Create or checkout feature branch
+# Create or checkout feature branch (with conflict-safe fallback)
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
 BRANCH_EXISTS="false"
 
-    if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
-        BRANCH_EXISTS="true"
-        echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
-        git checkout $FEATURE_BRANCH
+if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
+    BRANCH_EXISTS="true"
+    echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+    git checkout $FEATURE_BRANCH
 
-        echo "📥 Merging latest main into $FEATURE_BRANCH..."
-        if git merge origin/main --no-edit; then
-            echo "✓ Successfully merged latest main into feature branch"
-        else
-            echo "⚠️ MERGE CONFLICT: Cannot auto-merge main into $FEATURE_BRANCH"
-            echo "❗ Manual conflict resolution required by Claude agent"
-            echo ""
-            echo "📋 Conflict files:"
-            git status --porcelain | grep "^UU\|^AA\|^DD" || echo "   (Use 'git status' to see details)"
-            echo ""
-            echo "🔧 Claude will need to resolve conflicts manually before proceeding"
-            # Don't exit - let Claude handle the conflicts
-        fi
+    echo "📥 Merging latest main into $FEATURE_BRANCH..."
+    if git merge origin/main --no-edit; then
+        echo "✓ Successfully merged latest main into feature branch"
     else
-        # Create new feature branch from latest main
-        echo "Creating new feature branch '$FEATURE_BRANCH' from latest main..."
-        git checkout -b $FEATURE_BRANCH origin/main
-        echo "✓ Created feature branch: $FEATURE_BRANCH"
+        echo "⚠️ MERGE CONFLICT: Cannot auto-merge main into $FEATURE_BRANCH"
+        echo "🔄 Auto-aborting merge and creating a fresh branch from origin/main"
+        # Abort merge if in progress
+        git merge --abort 2>/dev/null || true
+        # Create a unique fresh branch to avoid reuse conflicts
+        NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+        git checkout -B "$NEW_BRANCH" origin/main
+        FEATURE_BRANCH="$NEW_BRANCH"
+        echo "✓ Switched to fresh branch: $FEATURE_BRANCH"
     fi
+else
+    # Create new feature branch from latest main
+    echo "Creating new feature branch '$FEATURE_BRANCH' from latest main..."
+    git checkout -b $FEATURE_BRANCH origin/main
+    echo "✓ Created feature branch: $FEATURE_BRANCH"
+fi
 
 # 5. Set Working Directory (Critical for Claude Execution)
 WORK_DIR="{{working_directory}}"
