@@ -88,9 +88,9 @@ spec:
     - name: main
       dag:
         tasks:
-          # Stage 1: Implementation work
-          - name: implementation-work
-            template: agent-coderun
+          # Stage 1: Implementation cycle (Rex runs; if no PR, retry cycle)
+          - name: implementation-cycle
+            template: implementation-cycle
             arguments:
               parameters:
               - name: github-app
@@ -100,31 +100,11 @@ spec:
               - name: stage
                 value: "implementation"
 
-          # Update stage after implementation completes
-          - name: update-to-waiting-pr
-            dependencies: [implementation-work]
-            template: update-workflow-stage
-            arguments:
-              parameters:
-              - name: new-stage
-                value: "waiting-pr-created"
-              - name: verify-update
-                value: "true"
-
-          # Suspend point 1: Wait for PR creation
-          - name: wait-pr-created
-            dependencies: [update-to-waiting-pr]
-            template: suspend-for-event
-            arguments:
-              parameters:
-              - name: event-type
-                value: "pr-created"
-              - name: stage-name
-                value: "waiting-pr-created"
+          # (Removed suspend on PR-created; handled by implementation-cycle polling)
 
           # Stage 2: Quality work
           - name: quality-work
-            dependencies: [wait-pr-created]
+            dependencies: [implementation-cycle]
             template: agent-coderun
             arguments:
               parameters:
@@ -135,9 +115,9 @@ spec:
               - name: stage
                 value: "quality"
               - name: pr-url
-                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-url}}`}}"
+                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
               - name: pr-number
-                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
+                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
 
           # Update stage after quality work completes
           - name: update-to-waiting-qa
@@ -174,9 +154,9 @@ spec:
               - name: stage
                 value: "testing"
               - name: pr-url
-                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-url}}`}}"
+                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
               - name: pr-number
-                value: "{{`{{tasks.wait-pr-created.outputs.parameters.pr-number}}`}}"
+                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
               - name: qa-ready
                 value: "true"
 
@@ -227,6 +207,160 @@ spec:
                 value: "{{`{{tasks.wait-pr-approved.outputs.parameters.merge-sha}}`}}"
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
+    # Implementation cycle: run Rex, then check/poll for PR; if not found, repeat by failing upstream
+    - name: implementation-cycle
+      inputs:
+        parameters:
+        - name: github-app
+        - name: task-id
+        - name: stage
+      outputs:
+        parameters:
+        - name: pr-url
+          valueFrom:
+            parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-url}}`}}"
+        - name: pr-number
+          valueFrom:
+            parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-number}}`}}"
+      steps:
+      - - name: implementation-work
+          template: agent-coderun
+          arguments:
+            parameters:
+            - name: github-app
+              value: "{{`{{inputs.parameters.github-app}}`}}"
+            - name: task-id
+              value: "{{`{{inputs.parameters.task-id}}`}}"
+            - name: stage
+              value: "{{`{{inputs.parameters.stage}}`}}"
+      - - name: wait-for-pr
+          template: check-or-wait-for-pr
+          arguments:
+            parameters:
+            - name: repository
+              value: "{{`{{workflow.parameters.repository}}`}}"
+            - name: task-id
+              value: "{{`{{inputs.parameters.task-id}}`}}"
+
+    # Template to check/poll GitHub for PR existence for task label
+    - name: check-or-wait-for-pr
+      inputs:
+        parameters:
+        - name: repository
+        - name: task-id
+      outputs:
+        parameters:
+        - name: pr-url
+          valueFrom:
+            path: /tmp/pr-url.txt
+          default: ""
+        - name: pr-number
+          valueFrom:
+            path: /tmp/pr-number.txt
+          default: ""
+      script:
+        image: alpine:3.20
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: github-app-5dlabs-morgan
+              key: app-id
+        - name: GITHUB_APP_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: github-app-5dlabs-morgan
+              key: private-key
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          REPO="{{`{{inputs.parameters.repository}}`}}"
+          TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
+          LABEL="task-${TASK_ID}"
+          echo "🔎 Looking for PR with label ${LABEL} in ${REPO}"
+
+          # Ensure tools
+          apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
+
+          AUTH_HEADER=""
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+
+          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+            echo "🔐 Using Morgan GitHub App for authenticated API calls"
+            TEMP_KEY="/tmp/github-app-key.pem"
+            # Support escaped newlines in secret
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+            chmod 600 "$TEMP_KEY"
+
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
+            HDR=$(echo -n "$HDR" | tr '+/' '-_' | tr -d '=')
+            PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64)
+            PAY=$(echo -n "$PAY" | tr '+/' '-_' | tr -d '=')
+            SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
+            SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
+            JWT="$HDR.$PAY.$SIG"
+
+            # Resolve installation ID (repo first, fallback org)
+            INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $JWT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+            if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
+              INSTALLATION_ID=$(curl -s -L \
+                -H "Authorization: Bearer $JWT" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
+            fi
+
+            if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+              TOKEN=$(curl -s -X POST \
+                -H "Authorization: Bearer $JWT" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+              if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
+                AUTH_HEADER="Authorization: Bearer $TOKEN"
+              fi
+            fi
+
+            rm -f "$TEMP_KEY"
+          else
+            echo "ℹ️ Morgan credentials not available; using unauthenticated GitHub API"
+          fi
+
+          # Poll up to 60s (12 x 5s)
+          attempts=12
+          while [ $attempts -gt 0 ]; do
+            # GitHub API - list open PRs
+            if [ -n "$AUTH_HEADER" ]; then
+              resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
+            else
+              resp=$(curl -sL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
+            fi
+            pr_url=$(echo "$resp" | jq -r '.[] | select(.labels // [] | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
+            pr_number=$(echo "$resp" | jq -r '.[] | select(.labels // [] | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+
+            if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
+              echo "$pr_url" > /tmp/pr-url.txt
+              echo "$pr_number" > /tmp/pr-number.txt
+              echo "✅ Found PR #$pr_number"
+              exit 0
+            fi
+
+            attempts=$((attempts-1))
+            echo "⏳ PR not found yet, retrying... ($attempts left)"
+            sleep 5
+          done
+
+          echo "❌ No PR found for ${LABEL} after waiting."
+          # Leave outputs empty; upstream can decide to re-run implementation
+          > /tmp/pr-url.txt
+          > /tmp/pr-number.txt
+          exit 0
     - name: agent-coderun
       inputs:
         parameters:
