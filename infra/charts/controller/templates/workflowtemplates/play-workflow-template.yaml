@@ -242,9 +242,8 @@ spec:
       outputs:
         parameters:
         - name: coderun-name
-          value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
-        - name: coderun-status
-          value: "Succeeded"
+          valueFrom:
+            parameter: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
       steps:
       - - name: create-coderun-resource
           template: create-coderun-resource
