@@ -385,7 +385,7 @@ spec:
             echo "Attempt $((RETRY_COUNT+1)) of $MAX_RETRIES..."
 
             if kubectl patch workflow "{{`{{workflow.name}}`}}" \
-              --type='strategic-merge' \
+              --type='strategic' \
               --patch="$PATCH_JSON" \
               -n {{ .Release.Namespace }}; then
 
