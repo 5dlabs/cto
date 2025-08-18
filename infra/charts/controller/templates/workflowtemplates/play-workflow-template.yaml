@@ -278,7 +278,7 @@ spec:
           factor: 2
           maxDuration: "5m"
 
-    # Template for atomic workflow stage updates
+    # Template for atomic workflow stage updates with optimistic locking
     - name: update-workflow-stage
       inputs:
         parameters:
@@ -293,6 +293,10 @@ spec:
           valueFrom:
             path: /tmp/update-status.txt
           default: "unknown"
+        - name: resource-version
+          valueFrom:
+            path: /tmp/resource-version.txt
+          default: ""
       script:
         image: alpine/k8s:1.31.0
         command: [bash]
@@ -308,31 +312,80 @@ spec:
           echo "New Stage: {{`{{inputs.parameters.new-stage}}`}}"
           echo ""
 
-          # Prepare the JSON patch for atomic label update
+          # Function to validate stage transition
+          validate_stage_transition() {
+            local current_stage=$1
+            local new_stage=$2
+
+            # Define valid transitions
+            case $current_stage in
+              "pending")
+                [[ $new_stage == "waiting-pr-created" ]] && return 0
+                ;;
+              "waiting-pr-created")
+                [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
+                ;;
+              "waiting-ready-for-qa")
+                [[ $new_stage == "waiting-pr-approved" ]] && return 0
+                ;;
+              "waiting-pr-approved")
+                [[ $new_stage == "completed" ]] && return 0
+                ;;
+            esac
+
+            echo "❌ Invalid stage transition: $current_stage → $new_stage"
+            return 1
+          }
+
+          # Get current state and resource version for optimistic locking
+          echo "Fetching current workflow state..."
+          WORKFLOW_JSON=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
+            -n {{ .Release.Namespace }} \
+            -o json)
+
+          CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"] // "pending"')
+          RESOURCE_VERSION=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.resourceVersion')
+
+          echo "Current stage: $CURRENT_STAGE"
+          echo "Resource version: $RESOURCE_VERSION"
+
+          # Validate stage transition
+          if ! validate_stage_transition "$CURRENT_STAGE" "{{`{{inputs.parameters.new-stage}}`}}"; then
+            echo "❌ Stage transition validation failed"
+            echo "failed" > /tmp/update-status.txt
+            exit 1
+          fi
+
+          # Prepare the JSON patch with optimistic locking
           PATCH_JSON='{
             "metadata": {
+              "resourceVersion": "'$RESOURCE_VERSION'",
               "labels": {
                 "current-stage": "{{`{{inputs.parameters.new-stage}}`}}",
                 "task-id": "{{`{{workflow.parameters.task-id}}`}}",
                 "repository": "{{`{{workflow.parameters.repository}}`}}",
+                "previous-stage": "'$CURRENT_STAGE'",
                 "updated-at": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
               }
             }
           }'
 
-          echo "Applying patch payload"
+          echo ""
+          echo "Prepared patch payload:"
+          echo "$PATCH_JSON" | jq .
 
-          # Apply the patch with retry logic
-          MAX_RETRIES=3
+          # Apply the patch with exponential backoff retry
+          MAX_RETRIES=5
           RETRY_COUNT=0
           UPDATE_SUCCESS=false
+          BACKOFF_TIME=1
 
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo ""
             echo "Attempt $((RETRY_COUNT+1)) of $MAX_RETRIES..."
 
             if kubectl patch workflow "{{`{{workflow.name}}`}}" \
-              --type='merge' \
+              --type='strategic-merge' \
               --patch="$PATCH_JSON" \
               -n {{ .Release.Namespace }}; then
 
@@ -340,51 +393,95 @@ spec:
               echo "✅ Stage update successful"
               break
             else
-              echo "⚠️ Stage update failed, retrying..."
+              echo "⚠️ Stage update failed with status: $?"
+              echo "Retrying in $BACKOFF_TIME seconds..."
+              sleep $BACKOFF_TIME
+              
+              # Update resource version before retry
+              RESOURCE_VERSION=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
+                -n {{ .Release.Namespace }} \
+                -o jsonpath='{.metadata.resourceVersion}')
+              
+              # Update patch with new resource version
+              PATCH_JSON=$(echo "$PATCH_JSON" | jq --arg rv "$RESOURCE_VERSION" \
+                '.metadata.resourceVersion = $rv')
+
               RETRY_COUNT=$((RETRY_COUNT+1))
+              BACKOFF_TIME=$((BACKOFF_TIME*2))
+            fi
+          done
+
+          # Save resource version for other templates
+          echo "$RESOURCE_VERSION" > /tmp/resource-version.txt
+
+          # Always verify the update
+          echo ""
+          echo "Verifying stage update..."
+
+          VERIFY_MAX_RETRIES=3
+          VERIFY_COUNT=0
+          VERIFY_SUCCESS=false
+
+          while [ $VERIFY_COUNT -lt $VERIFY_MAX_RETRIES ]; do
+            WORKFLOW_JSON=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
+              -n {{ .Release.Namespace }} \
+              -o json)
+
+            CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"]')
+            PREVIOUS_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["previous-stage"]')
+            NEW_RESOURCE_VERSION=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.resourceVersion')
+
+            echo "Current Stage: $CURRENT_STAGE"
+            echo "Previous Stage: $PREVIOUS_STAGE"
+            echo "Resource Version: $NEW_RESOURCE_VERSION"
+
+            if [ "$CURRENT_STAGE" = "{{`{{inputs.parameters.new-stage}}`}}" ]; then
+              VERIFY_SUCCESS=true
+              echo "✅ Verification successful: Stage transition complete"
+              echo "success" > /tmp/update-status.txt
+              break
+            else
+              echo "⚠️ Verification attempt $((VERIFY_COUNT+1)) failed, retrying..."
+              VERIFY_COUNT=$((VERIFY_COUNT+1))
               sleep 2
             fi
           done
 
-          # Verify the update if requested
-          if [ "{{`{{inputs.parameters.verify-update}}`}}" = "true" ]; then
-            echo ""
-            echo "Verifying stage update..."
-
-            CURRENT_STAGE=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
-              -n {{ .Release.Namespace }} \
-              -o jsonpath='{.metadata.labels["current-stage"]}')
-
-            if [ "$CURRENT_STAGE" = "{{`{{inputs.parameters.new-stage}}`}}" ]; then
-              echo "✅ Verification successful: Stage is now '$CURRENT_STAGE'"
-              echo "success" > /tmp/update-status.txt
-            else
-              echo "❌ Verification failed: Expected '{{`{{inputs.parameters.new-stage}}`}}', got '$CURRENT_STAGE'"
-              echo "failed" > /tmp/update-status.txt
-              exit 1
-            fi
-          else
-            if [ "$UPDATE_SUCCESS" = true ]; then
-              echo "success" > /tmp/update-status.txt
-            else
-              echo "failed" > /tmp/update-status.txt
-              exit 1
-            fi
+          if [ "$VERIFY_SUCCESS" != true ]; then
+            echo "❌ Stage update verification failed after $VERIFY_MAX_RETRIES attempts"
+            echo "failed" > /tmp/update-status.txt
+            exit 1
           fi
 
-          # Log final state
+          # Output monitoring metrics
+          cat <<EOF > /tmp/stage-transition-metrics.json
+          {
+            "workflow": "{{`{{workflow.name}}`}}",
+            "task_id": "{{`{{workflow.parameters.task-id}}`}}",
+            "transition": {
+              "from": "$PREVIOUS_STAGE",
+              "to": "$CURRENT_STAGE",
+              "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+              "duration_seconds": "$SECONDS",
+              "retry_count": "$RETRY_COUNT",
+              "verify_count": "$VERIFY_COUNT",
+              "resource_version": "$NEW_RESOURCE_VERSION"
+            }
+          }
+          EOF
+
           echo ""
-          echo "Stage transition completed:"
-          kubectl get workflow "{{`{{workflow.name}}`}}" \
-            -n {{ .Release.Namespace }} \
-            -o json
+          echo "Stage transition completed successfully"
+          echo "Duration: $SECONDS seconds"
+          echo "Retries required: $RETRY_COUNT"
+          echo "Verification attempts: $VERIFY_COUNT"
       retryStrategy:
-        limit: 2
+        limit: 3
         retryPolicy: "OnFailure"
         backoff:
-          duration: "5s"
+          duration: "10s"
           factor: 2
-          maxDuration: "30s"
+          maxDuration: "1m"
 
     # Template for suspend points waiting for external events
     - name: suspend-for-event
