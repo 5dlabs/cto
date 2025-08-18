@@ -40,13 +40,13 @@ spec:
           
           # Function to update labels atomically
           update_labels() {
-            echo "Updating workflow stage to {{inputs.parameters.new-stage}}"
-            kubectl patch workflow "{{workflow.name}}" \
+            echo "Updating workflow stage to {{"{{inputs.parameters.new-stage}}"}}"
+            kubectl patch workflow "{{"{{workflow.name}}"}}" \
               --type=merge \
               -p='{"metadata":{"labels":{
-                "current-stage":"{{inputs.parameters.new-stage}}",
-                "task-id":"{{workflow.parameters.task-id}}",
-                "repository":"{{workflow.parameters.repository}}",
+                "current-stage":"{{"{{inputs.parameters.new-stage}}"}}",
+                "task-id":"{{"{{workflow.parameters.task-id}}"}}",
+                "repository":"{{"{{workflow.parameters.repository}}"}}",
                 "updated-at":"'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
               }}}'
           }
@@ -54,15 +54,15 @@ spec:
           # Function to verify label update
           verify_labels() {
             echo "Verifying label update"
-            current_stage=$(kubectl get workflow "{{workflow.name}}" -o jsonpath='{.metadata.labels.current-stage}')
-            if [ "$current_stage" != "{{inputs.parameters.new-stage}}" ]; then
+            current_stage=$(kubectl get workflow "{{"{{workflow.name}}"}}" -o jsonpath='{.metadata.labels.current-stage}')
+            if [ "$current_stage" != "{{"{{inputs.parameters.new-stage}}"}}" ]; then
               return 1
             fi
             return 0
           }
           
           # Retry loop with exponential backoff
-          max_attempts={{inputs.parameters.retry-attempts}}
+          max_attempts={{"{{inputs.parameters.retry-attempts}}"}}
           attempt=1
           delay=5
           
@@ -80,8 +80,6 @@ spec:
           
           echo "Failed to update workflow stage after $max_attempts attempts"
           exit 1
-  
-  templates:
     # Main workflow orchestrating multiple agents with stage transitions
     - name: multi-agent-workflow
       dag:
@@ -174,10 +172,10 @@ spec:
       suspend: {}
       metadata:
         labels:
-          current-stage: "{{inputs.parameters.stage}}"
-          task-id: "{{workflow.parameters.task-id}}"
-          repository: "{{workflow.parameters.repository}}"
-          updated-at: "{{workflow.creationTimestamp}}"
+          current-stage: "{{"{{inputs.parameters.stage}}"}}"
+          task-id: "{{"{{workflow.parameters.task-id}}"}}"
+          repository: "{{"{{workflow.parameters.repository}}"}}"
+          updated-at: "{{"{{workflow.creationTimestamp}}"}}"
 
   # Cleanup policy - keep completed workflows for debugging
   ttlStrategy:
