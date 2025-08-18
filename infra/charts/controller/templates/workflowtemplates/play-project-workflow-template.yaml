@@ -207,7 +207,7 @@ spec:
             kubectl create configmap current-task-{{`{{workflow.name}}`}} \
               --from-file=current-task.json=/tmp/current-task.json \
               -n agent-platform \
-              --dry-run=client -o yaml | kubectl apply -f -
+              --dry-run=client -o yaml | kubectl apply -n agent-platform -f -
             
             # Submit workflow for this task
             echo "🚀 Submitting workflow for task-$task_id..."
@@ -306,7 +306,7 @@ spec:
               --from-literal=task_id="$task_id" \
               --from-literal=completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
               -n agent-platform \
-              --dry-run=client -o yaml | kubectl apply -f -
+              --dry-run=client -o yaml | kubectl apply -n agent-platform -f -
             
             # Progress report
             percent=$((task_index * 100 / {{`{{inputs.parameters.task-count}}`}}))
