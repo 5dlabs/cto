@@ -16,17 +16,17 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["create", "get", "list", "update", "delete", "patch"]
-  
+
   # Allow creating WorkflowTaskResults for Argo Workflows
   - apiGroups: ["argoproj.io"]
     resources: ["workflowtaskresults"]
     verbs: ["create", "get", "list", "patch", "update"]
-  
+
   # Allow managing workflows for play-project-workflow-template
   - apiGroups: ["argoproj.io"]
     resources: ["workflows"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
-  
+
   # Allow accessing workflow templates
   - apiGroups: ["argoproj.io"]
     resources: ["workflowtemplates"]

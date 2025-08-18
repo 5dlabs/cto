@@ -43,13 +43,13 @@ spec:
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
-  
+
   # Workflow timeout (2 hours for intake processing)
   activeDeadlineSeconds: 7200
-  
+
   # Main workflow entrypoint
   entrypoint: intake-main
-  
+
   templates:
     # Main intake execution flow
     - name: intake-main
@@ -112,10 +112,10 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           # ConfigMap already created by MCP server, just pass it through
           echo "Using ConfigMap: {{`{{inputs.parameters.configmap-name}}`}}"
-          
+
           # Output the ConfigMap name for the next step
           echo "{{`{{inputs.parameters.configmap-name}}`}}" > /tmp/configmap-name
           echo "ConfigMap created successfully"

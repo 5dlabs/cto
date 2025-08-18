@@ -1,6 +1,6 @@
 {{- if .Values.argo.enabled }}
 ---
-# Argo Workflow Template for DocsRun Tasks  
+# Argo Workflow Template for DocsRun Tasks
 # This template creates DocsRun CRDs and lets the existing controller handle execution
 
 apiVersion: argoproj.io/v1alpha1
@@ -33,13 +33,13 @@ spec:
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
-  
-  # Workflow timeout (3 hours)  
+
+  # Workflow timeout (3 hours)
   activeDeadlineSeconds: 10800
-  
+
   # Main workflow entry point
   entrypoint: docsrun-main
-  
+
   templates:
     # Main DocsRun execution - create CRD and wait for completion
     - name: docsrun-main
@@ -52,7 +52,7 @@ spec:
             parameters:
             - name: docsrun-name
               value: "{{`{{steps.create-docsrun-resource.outputs.parameters.name}}`}}"
-          
+
     - name: create-docsrun-resource
       outputs:
         parameters:
@@ -78,7 +78,7 @@ spec:
             repositoryUrl: "{{`{{workflow.parameters.repository-url}}`}}"
             model: "{{`{{workflow.parameters.model}}`}}"
             includeCodebase: {{`{{workflow.parameters.include-codebase}}`}}
-            
+
     - name: wait-docsrun-completion
       inputs:
         parameters:
@@ -93,15 +93,12 @@ spec:
             namespace: {{ .Release.Namespace }}
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
-            
-  # Workflow timeout - allow up to 5 hours for long documentation tasks
-  activeDeadlineSeconds: 18000     # 5 hours = 5 * 60 * 60 = 18000 seconds
-  
+
   # Cleanup policy - reasonable cleanup for long-running AI tasks
   ttlStrategy:
     secondsAfterCompletion: 300    # Keep completed workflows for 5 minutes
     secondsAfterFailure: 10800     # Keep failed workflows for 3 hours
-  
+
   # Pod garbage collection
   podGC:
     strategy: OnPodCompletion      # Delete pods immediately when they complete{{- end }}

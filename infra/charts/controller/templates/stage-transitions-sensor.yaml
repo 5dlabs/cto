@@ -14,7 +14,7 @@ metadata:
 spec:
   template:
     serviceAccountName: operate-workflow-sa
-    
+
   # GitHub webhook event dependencies
   dependencies:
     # PR Creation Event
@@ -33,10 +33,10 @@ spec:
               - opened
           - path: body.pull_request.state
             type: string
-            value: 
+            value:
               - open
-              
-    # Ready for QA Label Event        
+
+    # Ready for QA Label Event
     - name: github-ready-for-qa
       eventSourceName: github
       eventName: pull_request
@@ -54,7 +54,7 @@ spec:
             type: string
             value:
               - ready-for-qa
-              
+
     # PR Approval Event
     - name: github-pr-approved
       eventSourceName: github
@@ -73,8 +73,8 @@ spec:
             type: string
             value:
               - 5DLabs-Tess[bot]
-              
-  # Stage-specific workflow resumption triggers              
+
+  # Stage-specific workflow resumption triggers
   triggers:
     # Resume workflows waiting for PR creation
     - template:
@@ -101,8 +101,8 @@ spec:
               metadata:
                 labels:
                   current-stage: waiting-pr-created
-                  
-    # Resume workflows waiting for ready-for-qa           
+
+    # Resume workflows waiting for ready-for-qa
     - template:
         name: resume-ready-for-qa
         argoWorkflow:
@@ -127,7 +127,7 @@ spec:
               metadata:
                 labels:
                   current-stage: waiting-ready-for-qa
-                  
+
     # Resume workflows waiting for PR approval
     - template:
         name: resume-pr-approved
