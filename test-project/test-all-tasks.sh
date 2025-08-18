@@ -28,11 +28,11 @@ fi
 # Submit the workflow
 echo "🚀 Submitting test project workflow..."
 
-WORKFLOW_NAME=$(kubectl create -f test-project/minimal-project-workflow.yaml -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
+WORKFLOW_NAME=$(kubectl create -f minimal-project-workflow.yaml -o jsonpath='{.metadata.name}' 2>/dev/null || echo "")
 
 if [ -z "$WORKFLOW_NAME" ]; then
     echo "❌ Failed to create workflow"
-    echo "   Make sure test-project/minimal-project-workflow.yaml exists"
+    echo "   Make sure minimal-project-workflow.yaml exists"
     exit 1
 fi
 
