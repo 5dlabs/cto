@@ -310,13 +310,6 @@ spec:
               PR_NUMBER: "{{`{{inputs.parameters.pr-number}}`}}"
               QA_READY: "{{`{{inputs.parameters.qa-ready}}`}}"
               WORKFLOW_STAGE: "{{`{{inputs.parameters.stage}}`}}"
-      retryStrategy:
-        limit: 2
-        retryPolicy: "Always"
-        backoff:
-          duration: "30s"
-          factor: 2
-          maxDuration: "5m"
 
     # Template for waiting for CodeRun completion
     - name: wait-coderun-completion
