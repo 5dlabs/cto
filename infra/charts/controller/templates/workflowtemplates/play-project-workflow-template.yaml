@@ -112,6 +112,12 @@ spec:
             path: /tmp/task-count.txt
       script:
         image: alpine/k8s:1.31.0
+        env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-app-5dlabs-morgan
+              key: token
         command: [sh]
         source: |
           #!/bin/sh
@@ -133,9 +139,19 @@ spec:
               ;;
           esac
 
-          echo "🔗 Using docs repository URL: $DOCS_REPO_URL"
-          git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
-            "$DOCS_REPO_URL" /workspace
+          # If a GitHub token is present (Morgan App), use it for authenticated clone
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            echo "🔐 Using Morgan token for authenticated clone"
+            # Inject token into URL safely
+            AUTH_URL=$(echo "$DOCS_REPO_URL" | sed 's#^https://#https://x-access-token:'"$GITHUB_TOKEN"'@#')
+            echo "🔗 Cloning: $DOCS_REPO_URL (authenticated)"
+            git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
+              "$AUTH_URL" /workspace
+          else
+            echo "🔗 Cloning without credentials: $DOCS_REPO_URL"
+            git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
+              "$DOCS_REPO_URL" /workspace
+          fi
 
           cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
 
