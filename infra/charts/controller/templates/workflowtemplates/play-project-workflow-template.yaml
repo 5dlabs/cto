@@ -34,7 +34,7 @@ spec:
         value: "5DLabs-Cleo"
       - name: testing-agent
         value: "5DLabs-Tess"
-      
+
       # Repository configuration
       - name: repository
         value: "5dlabs/cto"
@@ -46,7 +46,7 @@ spec:
         value: "docs"
       - name: docs-branch
         value: "main"
-      
+
       # Execution control
       - name: start-from-task
         value: "1"
@@ -54,7 +54,7 @@ spec:
       - name: max-tasks
         value: "100"
         description: "Maximum number of tasks to execute"
-      
+
       # Model configuration
       - name: model
         value: "claude-3-5-sonnet-20241022"
@@ -84,7 +84,7 @@ spec:
                 value: "{{`{{workflow.parameters.start-from-task}}`}}"
               - name: max-tasks
                 value: "{{`{{workflow.parameters.max-tasks}}`}}"
-        
+
         # Step 2: Process tasks sequentially
         - - name: process-tasks
             template: sequential-task-processor
@@ -116,31 +116,31 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           echo "🔍 Discovering tasks in workspace..."
-          
+
           # Clone repository to get task structure
           apk add --no-cache git
           git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" \
             "{{`{{workflow.parameters.docs-repository}}`}}" /workspace
-          
+
           cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
-          
+
           # Check for .taskmaster/docs directory
           TASK_DIR=".taskmaster/docs"
           if [ ! -d "$TASK_DIR" ]; then
             echo "❌ TaskMaster directory not found: $TASK_DIR"
             exit 1
           fi
-          
+
           # Discover task directories
           echo "📋 Scanning for task-* directories..."
           tasks=""
           count=0
-          
+
           for dir in $(ls -1d $TASK_DIR/task-* 2>/dev/null | sort -V); do
             task_num=$(basename "$dir" | sed 's/task-//')
-            
+
             # Check if task number is >= start-from
             if [ "$task_num" -ge "{{`{{inputs.parameters.start-from}}`}}" ]; then
               if [ -z "$tasks" ]; then
@@ -149,7 +149,7 @@ spec:
                 tasks="$tasks,$task_num"
               fi
               count=$((count + 1))
-              
+
               # Check max tasks limit
               if [ "$count" -ge "{{`{{inputs.parameters.max-tasks}}`}}" ]; then
                 echo "⚠️ Reached max tasks limit: {{`{{inputs.parameters.max-tasks}}`}}"
@@ -157,12 +157,12 @@ spec:
               fi
             fi
           done
-          
+
           if [ -z "$tasks" ]; then
             echo "❌ No tasks found starting from task-{{`{{inputs.parameters.start-from}}`}}"
             exit 1
           fi
-          
+
           echo "✅ Found $count tasks: $tasks"
           echo "$tasks" > /tmp/task-list.txt
           echo "$count" > /tmp/task-count.txt
@@ -179,13 +179,13 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           echo "📋 Processing {{`{{inputs.parameters.task-count}}`}} tasks sequentially..."
-          
+
           # Convert comma-separated list to space-separated for iteration
           task_list="{{`{{inputs.parameters.task-list}}`}}"
           task_list="${task_list//,/ }"
-          
+
           # Process each task sequentially
           task_index=1
           for task_id in $task_list; do
@@ -193,7 +193,7 @@ spec:
             echo "════════════════════════════════════════"
             echo "🎯 Starting Task $task_id ($task_index/{{`{{inputs.parameters.task-count}}`}})"
             echo "════════════════════════════════════════"
-            
+
             # Create current-task marker
             cat > /tmp/current-task.json <<EOF
           {
@@ -208,10 +208,10 @@ spec:
               --from-file=current-task.json=/tmp/current-task.json \
               -n {{ .Release.Namespace }} \
               --dry-run=client -o yaml | kubectl apply -n {{ .Release.Namespace }} -f -
-            
+
             # Submit workflow for this task
             echo "🚀 Submitting workflow for task-$task_id..."
-            
+
             cat > /tmp/workflow.yaml <<EOF
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
@@ -250,27 +250,27 @@ spec:
                 - name: model
                   value: "{{`{{workflow.parameters.model}}`}}"
           EOF
-            
+
             workflow_name=$(kubectl create -f /tmp/workflow.yaml -o jsonpath='{.metadata.name}')
-            
+
             if [ -z "$workflow_name" ]; then
               echo "❌ Failed to create workflow for task-$task_id"
               exit 1
             fi
-            
+
             echo "✅ Created workflow: $workflow_name"
-            
+
             # Wait for workflow completion
             echo "⏳ Waiting for task-$task_id to complete..."
             max_wait=7200  # 2 hours max wait per task
             elapsed=0
             interval=30
-            
+
             while [ $elapsed -lt $max_wait ]; do
               status=$(kubectl get workflow "$workflow_name" \
                 -n {{ .Release.Namespace }} \
                 -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-              
+
               case "$status" in
                 "Succeeded")
                   echo "✅ Task $task_id completed successfully"
@@ -290,16 +290,16 @@ spec:
                   echo "📊 Task $task_id status: $status"
                   ;;
               esac
-              
+
               sleep $interval
               elapsed=$((elapsed + interval))
             done
-            
+
             if [ $elapsed -ge $max_wait ]; then
               echo "⏱️ Timeout waiting for task $task_id"
               exit 1
             fi
-            
+
             # Archive task (placeholder for now)
             echo "📦 Archiving task-$task_id..."
             kubectl create configmap task-archive-${task_id}-{{`{{workflow.name}}`}} \
@@ -307,7 +307,7 @@ spec:
               --from-literal=completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
               -n {{ .Release.Namespace }} \
               --dry-run=client -o yaml | kubectl apply -n {{ .Release.Namespace }} -f -
-            
+
             # Progress report
             percent=$((task_index * 100 / {{`{{inputs.parameters.task-count}}`}}))
             echo ""
@@ -322,14 +322,14 @@ spec:
             done
             printf "] $percent%%\n"
             echo ""
-            
+
             task_index=$((task_index + 1))
           done
-          
+
           # Clean up current-task marker
           kubectl delete configmap current-task-{{`{{workflow.name}}`}} \
             -n {{ .Release.Namespace }} --ignore-not-found=true
-          
+
           echo ""
           echo "════════════════════════════════════════"
           echo "🎉 ALL TASKS COMPLETED SUCCESSFULLY!"

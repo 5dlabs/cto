@@ -396,12 +396,12 @@ spec:
               echo "⚠️ Stage update failed with status: $?"
               echo "Retrying in $BACKOFF_TIME seconds..."
               sleep $BACKOFF_TIME
-              
+
               # Update resource version before retry
               RESOURCE_VERSION=$(kubectl get workflow "{{`{{workflow.name}}`}}" \
                 -n {{ .Release.Namespace }} \
                 -o jsonpath='{.metadata.resourceVersion}')
-              
+
               # Update patch with new resource version
               PATCH_JSON=$(echo "$PATCH_JSON" | jq --arg rv "$RESOURCE_VERSION" \
                 '.metadata.resourceVersion = $rv')
