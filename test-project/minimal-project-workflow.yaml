@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: test-minimal-project-
+  namespace: agent-platform
+  labels:
+    workflow-type: minimal-test
+    test-project: "true"
+    cost: "zero"
+spec:
+  workflowTemplateRef:
+    name: play-project-workflow-template
+  arguments:
+    parameters:
+      # Task configuration
+      - name: start-from-task
+        value: "1"
+      - name: max-tasks
+        value: "4"
+      
+      # Repository configuration for test project
+      - name: repository
+        value: "5dlabs/cto"
+      - name: service
+        value: "test-minimal"
+      - name: docs-repository
+        value: "https://github.com/5dlabs/cto"
+      - name: docs-project-directory
+        value: "test-project"
+      - name: docs-branch
+        value: "feat/minimal-test-project"
+      
+      # Agent configuration (using minimal/mock agents if available)
+      - name: implementation-agent
+        value: "5DLabs-Rex"
+      - name: quality-agent
+        value: "5DLabs-Cleo"
+      - name: testing-agent
+        value: "5DLabs-Tess"
+      
+      # Model configuration (use fastest/cheapest model)
+      - name: model
+        value: "claude-3-5-haiku-20241022"

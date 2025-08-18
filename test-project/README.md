@@ -23,7 +23,7 @@ This project provides a minimal set of 4 tasks that:
 ### Option 1: Test with Play Project Workflow
 ```bash
 # Submit the full project workflow
-kubectl apply -f test-project-workflow.yaml
+kubectl apply -f minimal-project-workflow.yaml
 ```
 
 ### Option 2: Test Individual Tasks
