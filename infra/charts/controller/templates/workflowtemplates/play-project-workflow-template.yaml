@@ -206,7 +206,7 @@ spec:
           EOF
             kubectl create configmap current-task-{{`{{workflow.name}}`}} \
               --from-file=current-task.json=/tmp/current-task.json \
-              -n {{ .Release.Namespace }} \
+              -n agent-platform \
               --dry-run=client -o yaml | kubectl apply -f -
             
             # Submit workflow for this task
@@ -217,7 +217,7 @@ spec:
           kind: Workflow
           metadata:
             generateName: play-task-${task_id}-
-            namespace: {{ .Release.Namespace }}
+            namespace: agent-platform
             labels:
               task-id: "$task_id"
               repository: "$(echo "{{`{{workflow.parameters.repository}}`}}" | tr '/' '-')"
@@ -268,7 +268,7 @@ spec:
             
             while [ $elapsed -lt $max_wait ]; do
               status=$(kubectl get workflow "$workflow_name" \
-                -n {{ .Release.Namespace }} \
+                -n agent-platform \
                 -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
               
               case "$status" in
@@ -278,7 +278,7 @@ spec:
                   ;;
                 "Failed"|"Error")
                   echo "❌ Task $task_id failed"
-                  kubectl get workflow "$workflow_name" -n {{ .Release.Namespace }} -o yaml | tail -20
+                  kubectl get workflow "$workflow_name" -n agent-platform -o yaml | tail -20
                   exit 1
                   ;;
                 "Running"|"Pending")
@@ -305,7 +305,7 @@ spec:
             kubectl create configmap task-archive-${task_id}-{{`{{workflow.name}}`}} \
               --from-literal=task_id="$task_id" \
               --from-literal=completed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
-              -n {{ .Release.Namespace }} \
+              -n agent-platform \
               --dry-run=client -o yaml | kubectl apply -f -
             
             # Progress report
@@ -328,7 +328,7 @@ spec:
           
           # Clean up current-task marker
           kubectl delete configmap current-task-{{`{{workflow.name}}`}} \
-            -n {{ .Release.Namespace }} --ignore-not-found=true
+            -n agent-platform --ignore-not-found=true
           
           echo ""
           echo "════════════════════════════════════════"
