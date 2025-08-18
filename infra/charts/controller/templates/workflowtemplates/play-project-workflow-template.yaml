@@ -21,6 +21,11 @@ spec:
   # Service account with proper permissions
   serviceAccountName: argo-workflow
 
+  # Ensure labels are applied to instantiated Workflows created from this template
+  workflowMetadata:
+    labels:
+      workflow-type: project-orchestration
+
   # Main entry point
   entrypoint: orchestrate-project
 
