@@ -265,7 +265,7 @@ spec:
             docsBranch: "main"
             contextVersion: 1
             # Pass PR context as environment if available
-            environment:
+            env:
               PR_URL: "{{`{{inputs.parameters.pr-url}}`}}"
               PR_NUMBER: "{{`{{inputs.parameters.pr-number}}`}}"
               QA_READY: "{{`{{inputs.parameters.qa-ready}}`}}"
