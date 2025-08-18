@@ -38,7 +38,7 @@ create_test_workflow() {
     log_info "Creating test workflow for stage transitions..."
     
     # Submit the test workflow
-    WORKFLOW_NAME=$(argo submit /workspace/5dlabs-cto/infra/examples/test-stage-transitions.yaml \
+    WORKFLOW_NAME=$(argo submit infra/examples/test-stage-transitions.yaml \
         -n $NAMESPACE \
         --wait=false \
         -o name | cut -d'/' -f2)

@@ -82,7 +82,7 @@ spec:
                 templates:
                   - name: resume-workflow
                     script:
-                      image: bitnami/kubectl:1.31
+                      image: alpine/k8s:1.31.0
                       command: [bash]
                       source: |
                         #!/bin/bash
@@ -92,17 +92,8 @@ spec:
                         echo "Target Stage: waiting-pr-created"
                         echo "PR Number: {{ .Input.body.pull_request.number }}"
 
-                        # Extract task ID from PR labels
-                        TASK_ID=""
-                        {{- range $i, $label := .Input.body.pull_request.labels }}
-                          {{- if hasPrefix $label.name "task-" }}
-                            LABEL_NAME="{{ $label.name }}"
-                            if [[ "$LABEL_NAME" =~ task-([0-9]+) ]]; then
-                              TASK_ID="${BASH_REMATCH[1]}"
-                              break
-                            fi
-                          {{- end }}
-                        {{- end }}
+                        # Extract task ID from PR labels using jq
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
@@ -174,7 +165,7 @@ spec:
                 templates:
                   - name: resume-workflow
                     script:
-                      image: bitnami/kubectl:1.31
+                      image: alpine/k8s:1.31.0
                       command: [bash]
                       source: |
                         #!/bin/bash
@@ -192,17 +183,8 @@ spec:
                           exit 0
                         fi
 
-                        # Extract task ID from PR labels
-                        TASK_ID=""
-                        {{- range $i, $label := .Input.body.pull_request.labels }}
-                          {{- if hasPrefix $label.name "task-" }}
-                            LABEL_NAME="{{ $label.name }}"
-                            if [[ "$LABEL_NAME" =~ task-([0-9]+) ]]; then
-                              TASK_ID="${BASH_REMATCH[1]}"
-                              break
-                            fi
-                          {{- end }}
-                        {{- end }}
+                        # Extract task ID from PR labels using jq
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
@@ -270,7 +252,7 @@ spec:
                 templates:
                   - name: resume-workflow
                     script:
-                      image: bitnami/kubectl:1.31
+                      image: alpine/k8s:1.31.0
                       command: [bash]
                       source: |
                         #!/bin/bash
@@ -288,17 +270,8 @@ spec:
                           exit 0
                         fi
 
-                        # Extract task ID from PR labels
-                        TASK_ID=""
-                        {{- range $i, $label := .Input.body.pull_request.labels }}
-                          {{- if hasPrefix $label.name "task-" }}
-                            LABEL_NAME="{{ $label.name }}"
-                            if [[ "$LABEL_NAME" =~ task-([0-9]+) ]]; then
-                              TASK_ID="${BASH_REMATCH[1]}"
-                              break
-                            fi
-                          {{- end }}
-                        {{- end }}
+                        # Extract task ID from PR labels using jq
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
