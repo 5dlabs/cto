@@ -59,10 +59,10 @@ impl AgentClassifier {
 
                 Ok(agent_name)
             } else {
-                Err(format!("Cannot extract agent name from: {}", github_app))
+                Err(format!("Cannot extract agent name from: {github_app}"))
             }
         } else {
-            Err(format!("Invalid GitHub App format: {}", github_app))
+            Err(format!("Invalid GitHub App format: {github_app}"))
         }
     }
 
@@ -89,10 +89,10 @@ impl AgentClassifier {
 
         let pvc_name = if self.is_implementation_agent(&agent_name) {
             // Implementation agents share workspace
-            format!("workspace-{}", service)
+            format!("workspace-{service}")
         } else {
             // Non-implementation agents get isolated workspaces
-            format!("workspace-{}-{}", service, agent_name)
+            format!("workspace-{service}-{agent_name}")
         };
 
         // Ensure PVC name doesn't exceed Kubernetes limits
@@ -109,10 +109,7 @@ impl AgentClassifier {
                 } else {
                     service
                 };
-                Ok(format!(
-                    "{}{}-{}",
-                    workspace_prefix, truncated_service, agent_name
-                ))
+                Ok(format!("{workspace_prefix}{truncated_service}-{agent_name}"))
             } else {
                 Ok(pvc_name[..63].to_string())
             }
@@ -128,10 +125,7 @@ impl AgentClassifier {
         }
 
         if name.len() > 63 {
-            return Err(format!(
-                "Name '{}' exceeds Kubernetes limit of 63 characters",
-                name
-            ));
+            return Err(format!("Name '{name}' exceeds Kubernetes limit of 63 characters"));
         }
 
         // Check for valid characters (alphanumeric and hyphens)
@@ -139,12 +133,12 @@ impl AgentClassifier {
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         {
-            return Err(format!("Name '{}' contains invalid characters. Only lowercase alphanumeric and hyphens are allowed", name));
+            return Err(format!("Name '{name}' contains invalid characters. Only lowercase alphanumeric and hyphens are allowed"));
         }
 
         // Must start and end with alphanumeric
         if name.starts_with('-') || name.ends_with('-') {
-            return Err(format!("Name '{}' cannot start or end with a hyphen", name));
+            return Err(format!("Name '{name}' cannot start or end with a hyphen"));
         }
 
         Ok(())

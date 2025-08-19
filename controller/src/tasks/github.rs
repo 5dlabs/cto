@@ -12,7 +12,7 @@ pub async fn check_github_for_pr_by_branch(
     github_token: Option<&str>,
 ) -> Result<Option<String>> {
     let task_id = code_run.spec.task_id;
-    let expected_branch = format!("task-{}", task_id);
+    let expected_branch = format!("task-{task_id}");
 
     info!(
         "Checking GitHub API for PR with branch: {}",
@@ -39,10 +39,10 @@ pub async fn check_github_for_pr_by_branch(
         .pulls(&owner, &repo)
         .list()
         .state(octocrab::params::State::Open)
-        .head(&format!("{}:{}", owner, expected_branch))
+        .head(&format!("{owner}:{expected_branch}"))
         .send()
         .await
-        .with_context(|| format!("Failed to search for PRs in {}/{}", owner, repo))?;
+        .with_context(|| format!("Failed to search for PRs in {owner}/{repo}"))?;
 
     if let Some(pr) = pulls.items.first() {
         let pr_url = pr.html_url.as_ref().map(|url| url.to_string());
@@ -108,7 +108,7 @@ pub async fn update_code_run_pr_url(
             &Patch::Merge(&status_patch),
         )
         .await
-        .with_context(|| format!("Failed to update CodeRun {} with PR URL", code_run_name))?;
+        .with_context(|| format!("Failed to update CodeRun {code_run_name} with PR URL"))?;
 
     info!(
         "✅ Successfully updated CodeRun {} with PR URL",
