@@ -13,7 +13,7 @@ spec:
   project: platform
   source:
     repoURL: https://github.com/5dlabs/charts
-    chart: jupiter
+    path: jupiter
     targetRevision: main
     helm:
       values: |
