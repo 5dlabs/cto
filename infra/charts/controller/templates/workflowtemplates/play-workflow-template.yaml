@@ -25,7 +25,6 @@ spec:
   workflowMetadata:
     labels:
       workflow-type: play-orchestration
-      workflows.argoproj.io/controller-instanceid: default
 
   # Main entry point
   entrypoint: main

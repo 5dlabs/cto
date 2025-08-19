@@ -30,12 +30,32 @@ spec:
         controller:
           image:
             tag: v3.7.0-rc4
+          # Increase parallelism limits to prevent workflow blocking
+          parallelism: 50
+          namespaceParallelism: 10
+          # Configure controller to watch multiple namespaces
+          # Note: This requires the controller to NOT use instanceID filtering
+          instanceID: ""
+          # Watch both argo and agent-platform namespaces
+          workflowNamespaces:
+            - argo
+            - agent-platform
         server:
           image:
             tag: v3.7.0-rc4
         executor:
           image:
             tag: v3.7.0-rc4
+
+        # Controller configuration via ConfigMap
+        config:
+          parallelism: 50
+          namespaceParallelism: 10
+          namespace: "agent-platform,argo"
+          nodeEvents:
+            enabled: true
+          workflowEvents:
+            enabled: true
 
         # Use values from our local configuration file
         artifactRepository:
