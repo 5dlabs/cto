@@ -1127,13 +1127,13 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   
   # First, try to find PR by task label (Claude should have added task-N label)
   TASK_LABEL="task-${TASK_ID}"
-  PR_NUMBER=$(gh pr list -R "{{repository_url}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+  PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
   
   # If not found by label, try by branch name (current branch)
   if [ -z "$PR_NUMBER" ]; then
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
     if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-      PR_NUMBER=$(gh pr list -R "{{repository_url}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+      PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
     fi
   fi
   
@@ -1141,7 +1141,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
     echo "✅ Found PR #${PR_NUMBER}"
     
     # Get the PR URL
-    PR_URL="https://github.com/{{repository_url}}/pull/${PR_NUMBER}"
+    PR_URL="https://github.com/{{docs_repository_url}}/pull/${PR_NUMBER}"
     echo "📝 PR URL: $PR_URL"
     
     # Update CodeRun status with PR URL via Kubernetes API
@@ -1174,18 +1174,18 @@ EOF
     SERVICE_LABEL="service-${SERVICE_NAME:-unknown}"
     
     # Use gh CLI to add labels (simpler than curl)
-    if gh pr edit "$PR_NUMBER" -R "{{repository_url}}" --add-label "${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
+    if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
       echo "✅ Added correlation labels: $RUN_LABEL, $SERVICE_LABEL"
     else
       echo "⚠️ Failed to add correlation labels (they may not exist)"
       
       # Try to create the labels if they don't exist
       echo "🏷️ Creating missing labels..."
-      gh label create "$RUN_LABEL" -R "{{repository_url}}" --color "0366d6" --description "Workflow run correlation" 2>/dev/null || true
-      gh label create "$SERVICE_LABEL" -R "{{repository_url}}" --color "0e8a16" --description "Service correlation" 2>/dev/null || true
+      gh label create "$RUN_LABEL" -R "{{docs_repository_url}}" --color "0366d6" --description "Workflow run correlation" 2>/dev/null || true
+      gh label create "$SERVICE_LABEL" -R "{{docs_repository_url}}" --color "0e8a16" --description "Service correlation" 2>/dev/null || true
       
       # Try again to add the labels
-      if gh pr edit "$PR_NUMBER" -R "{{repository_url}}" --add-label "${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
+      if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
         echo "✅ Labels created and added successfully"
       else
         echo "⚠️ Could not add labels even after creating them"
