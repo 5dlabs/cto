@@ -21,7 +21,7 @@ pub fn extract_workflow_name(code_run: &CodeRun) -> Result<String> {
 
     // Fallback: construct from task ID
     let task_id = code_run.spec.task_id;
-    Ok(format!("play-task-{}-workflow", task_id))
+    Ok(format!("play-task-{task_id}-workflow"))
 }
 
 /// Extract PR number from GitHub PR URL
@@ -31,7 +31,7 @@ pub fn extract_pr_number(pr_url: &str) -> Result<u32> {
     if let Some(number_str) = parts.last() {
         number_str
             .parse::<u32>()
-            .with_context(|| format!("Failed to parse PR number from URL: {}", pr_url))
+            .with_context(|| format!("Failed to parse PR number from URL: {pr_url}"))
     } else {
         Err(anyhow::anyhow!("Invalid PR URL format: {}", pr_url))
     }
