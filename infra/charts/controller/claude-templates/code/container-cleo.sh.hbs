@@ -384,4 +384,51 @@ echo "════════════════════════�
 
 # Start Claude with Cleo-specific configuration
 cd "$CLAUDE_WORK_DIR"
-exec /usr/local/bin/claude-cli "$@"
+
+# Build Claude command
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+
+# Check if prompt.md exists and use it as main prompt
+if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
+    echo "✓ Using task-specific prompt from docs service: task/prompt.md"
+    
+    # Seed initial user turn via a FIFO
+    FIFO_PATH="/workspace/agent-input.jsonl"
+    rm -f "$FIFO_PATH" 2>/dev/null || true
+    mkfifo "$FIFO_PATH"
+    chmod 666 "$FIFO_PATH" || true
+    
+    # Start Claude (reader) first in background
+    $CLAUDE_CMD < "$FIFO_PATH" &
+    CLAUDE_PID=$!
+    
+    # Compose initial user turn
+    USER_COMBINED=$(printf "%s" "$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
+    
+    # Send via sidecar HTTP endpoint
+    if printf '{"text":%s}\n' "$USER_COMBINED" | \
+         curl -fsS -X POST http://127.0.0.1:8080/input \
+           -H 'Content-Type: application/json' \
+           --data-binary @- >/dev/null 2>&1; then
+      echo "✓ Initial prompt sent via sidecar /input"
+    else
+      echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+      exec 9>"$FIFO_PATH"
+      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+    fi
+    
+    # Wait for Claude process to complete
+    wait "$CLAUDE_PID"
+    # Close FIFO writer if it was opened
+    exec 9>&- 2>/dev/null || true
+    
+    # Gracefully stop sidecar
+    if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+      echo "✓ Requested sidecar shutdown"
+    else
+      echo "⚠️ Failed to request sidecar shutdown"
+    fi
+else
+    echo "❌ ERROR: No prompt.md found from docs service"
+    exit 1
+fi
