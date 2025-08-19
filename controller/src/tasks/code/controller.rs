@@ -12,7 +12,7 @@ use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
 use kube::{Api, ResourceExt};
 use serde_json::json;
 use std::sync::Arc;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
 pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Result<Action> {
@@ -179,6 +179,9 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             )
             .await?;
 
+            // Handle workflow resumption after successful completion
+            handle_workflow_resumption_on_completion(&code_run, ctx).await?;
+
             // Cleanup per controller configuration
             if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
@@ -209,6 +212,9 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 false,
             )
             .await?;
+
+            // Handle workflow resumption for failed jobs
+            handle_workflow_resumption_on_failure(&code_run, ctx).await?;
 
             // Cleanup per controller configuration (failed jobs)
             if ctx.config.cleanup.enabled {
@@ -372,5 +378,175 @@ async fn update_code_status_with_completion(
         "Status updated successfully to '{}' with work_completed={}",
         new_phase, work_completed
     );
+    Ok(())
+}
+
+/// Handle workflow resumption when CodeRun completes successfully
+async fn handle_workflow_resumption_on_completion(
+    code_run: &CodeRun,
+    ctx: &Context,
+) -> Result<()> {
+    use crate::tasks::workflow::{extract_workflow_name, extract_pr_number, resume_workflow_for_pr};
+
+    let workflow_name = match extract_workflow_name(code_run) {
+        Ok(name) => name,
+        Err(e) => {
+            warn!("Could not extract workflow name: {}", e);
+            return Ok(()); // Not an error - CodeRun might not be part of a workflow
+        }
+    };
+
+    // Check if PR URL is already available
+    if let Some(status) = &code_run.status {
+        if let Some(pr_url) = &status.pull_request_url {
+            if !pr_url.is_empty() && pr_url != "no-pr" {
+                info!("PR URL found in CodeRun status: {}", pr_url);
+                let pr_number = match extract_pr_number(pr_url) {
+                    Ok(num) => num,
+                    Err(e) => {
+                        warn!("Failed to extract PR number from {}: {}", pr_url, e);
+                        return Ok(()); // Not a critical error
+                    }
+                };
+                if let Err(e) = resume_workflow_for_pr(
+                    &ctx.client,
+                    &ctx.namespace,
+                    &workflow_name,
+                    pr_url,
+                    pr_number,
+                ).await {
+                    warn!("Failed to resume workflow: {}", e);
+                }
+                return Ok(());
+            }
+        }
+    }
+
+    // No PR URL found - start timeout handler
+    info!("No PR URL found in CodeRun status, starting timeout handler");
+    handle_no_pr_timeout(&workflow_name, code_run, ctx).await
+}
+
+/// Handle workflow resumption when CodeRun fails
+async fn handle_workflow_resumption_on_failure(
+    code_run: &CodeRun,
+    ctx: &Context,
+) -> Result<()> {
+    use crate::tasks::workflow::{extract_workflow_name, resume_workflow_for_failure};
+
+    let workflow_name = match extract_workflow_name(code_run) {
+        Ok(name) => name,
+        Err(e) => {
+            warn!("Could not extract workflow name: {}", e);
+            return Ok(()); // Not an error - CodeRun might not be part of a workflow
+        }
+    };
+
+    let error_message = code_run
+        .status
+        .as_ref()
+        .and_then(|s| s.message.as_deref())
+        .unwrap_or("Code implementation failed");
+
+    if let Err(e) = resume_workflow_for_failure(&ctx.client, &ctx.namespace, &workflow_name, error_message).await {
+        warn!("Failed to resume workflow for failure: {}", e);
+    }
+    Ok(())
+}
+
+/// Handle timeout when no PR is created
+async fn handle_no_pr_timeout(
+    workflow_name: &str,
+    code_run: &CodeRun,
+    ctx: &Context,
+) -> Result<()> {
+    use crate::tasks::workflow::resume_workflow_for_no_pr;
+    use crate::tasks::github::{check_github_for_pr_by_branch, update_code_run_pr_url};
+    use tokio::time::{sleep, Duration};
+
+    // TODO: Make timeout configurable
+    let timeout_seconds = 60;
+    
+    info!("Starting no-PR timeout handler ({}s) for workflow: {}", timeout_seconds, workflow_name);
+
+    // Strategy 1: Wait and check CodeRun again (maybe PR creation was delayed)
+    sleep(Duration::from_secs(30)).await;
+
+    // Re-fetch CodeRun to check for updates
+    let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let updated_code_run = match coderuns.get(&code_run.name_any()).await {
+        Ok(cr) => cr,
+        Err(e) => {
+            warn!("Failed to re-fetch CodeRun: {}", e);
+            code_run.clone() // Use original if refetch fails
+        }
+    };
+
+    // Check if PR URL appeared
+    if let Some(status) = &updated_code_run.status {
+        if let Some(pr_url) = &status.pull_request_url {
+            if !pr_url.is_empty() && pr_url != "no-pr" {
+                info!("PR URL found after delay: {}", pr_url);
+                let pr_number = match crate::tasks::workflow::extract_pr_number(pr_url) {
+                    Ok(num) => num,
+                    Err(e) => {
+                        warn!("Failed to extract PR number: {}", e);
+                        return Ok(());
+                    }
+                };
+                if let Err(e) = crate::tasks::workflow::resume_workflow_for_pr(
+                    &ctx.client,
+                    &ctx.namespace,
+                    workflow_name,
+                    pr_url,
+                    pr_number,
+                ).await {
+                    warn!("Failed to resume workflow: {}", e);
+                }
+                return Ok(());
+            }
+        }
+    }
+
+    // Strategy 2: Check GitHub directly for PR by branch name
+    // TODO: Get GitHub token from configuration
+    if let Ok(Some(pr_url)) = check_github_for_pr_by_branch(&updated_code_run, None).await {
+        info!("Found PR via GitHub API: {}", pr_url);
+        
+        // Update CodeRun with found PR URL
+        if let Err(e) = update_code_run_pr_url(&ctx.client, &ctx.namespace, &code_run.name_any(), &pr_url).await {
+            warn!("Failed to update CodeRun with PR URL: {}", e);
+        }
+
+        let pr_number = match crate::tasks::workflow::extract_pr_number(&pr_url) {
+            Ok(num) => num,
+            Err(e) => {
+                warn!("Failed to extract PR number from GitHub API result: {}", e);
+                return Ok(());
+            }
+        };
+        if let Err(e) = crate::tasks::workflow::resume_workflow_for_pr(
+            &ctx.client,
+            &ctx.namespace,
+            workflow_name,
+            &pr_url,
+            pr_number,
+        ).await {
+            warn!("Failed to resume workflow from GitHub API result: {}", e);
+        }
+        return Ok(());
+    }
+
+    // Strategy 3: Resume workflow with "no PR" status
+    info!("No PR found after timeout, resuming workflow with no-pr status");
+    let coderun_status = updated_code_run
+        .status
+        .as_ref()
+        .map(|s| s.phase.as_str())
+        .unwrap_or("Succeeded");
+
+    if let Err(e) = resume_workflow_for_no_pr(&ctx.client, &ctx.namespace, workflow_name, coderun_status).await {
+        warn!("Failed to resume workflow with no-PR status: {}", e);
+    }
     Ok(())
 }

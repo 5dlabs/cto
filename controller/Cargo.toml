@@ -51,6 +51,9 @@ tracing-opentelemetry = { workspace = true }
 # HTTP Client
 reqwest = { workspace = true }
 
+# GitHub API
+octocrab = "0.38"
+
 # Async utilities
 futures = { workspace = true }
 async-trait = { workspace = true }

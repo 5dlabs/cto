@@ -14,7 +14,9 @@ use tracing::{debug, error, info, instrument, Instrument};
 pub mod code;
 pub mod config;
 pub mod docs;
+pub mod github;
 pub mod types;
+pub mod workflow;
 
 // Re-export commonly used items
 pub use code::reconcile_code_run;
