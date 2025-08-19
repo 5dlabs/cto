@@ -321,10 +321,12 @@ EOF
 
     # Copy base CLAUDE.md from ConfigMap if it exists (match Rex pattern)
     if [ -f "/task-files/CLAUDE.md" ]; then
-        cat /task-files/CLAUDE.md >> "$CLAUDE_WORK_DIR/CLAUDE.md"
+        cat /task-files/CLAUDE.md >> "/workspace/CLAUDE.md"
         echo "✓ Appended base CLAUDE.md content from ConfigMap"
     fi
     
+    # Copy to working directory for consistency with Rex pattern
+    cp "/workspace/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
     echo "✓ Created Cleo-specific CLAUDE.md memory"
 fi
 
