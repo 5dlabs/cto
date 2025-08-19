@@ -82,6 +82,12 @@ agent_*.md
 # Local temp working dir for ephemeral clones
 .tmp/
 
+# Test repositories
+.test-repo/
+
+# Solana credentials
+sol.env
+
 # Task files
 # tasks.json
 # tasks/ 
