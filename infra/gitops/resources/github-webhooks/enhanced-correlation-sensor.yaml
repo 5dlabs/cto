@@ -283,7 +283,7 @@ spec:
                   task: "5"
               spec:
                 entrypoint: cleanup
-                serviceAccountName: argo-events-sa
+                serviceAccountName: argo-workflow
                 templates:
                   - name: cleanup
                     script:

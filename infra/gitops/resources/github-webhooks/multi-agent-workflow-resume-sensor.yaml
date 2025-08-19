@@ -38,7 +38,8 @@ spec:
               metadata:
                 name: ""
                 namespace: agent-platform
-              spec: {}
+              spec:
+                serviceAccountName: argo-workflow
           parameters:
             - src:
                 dependencyName: github-pr-created
