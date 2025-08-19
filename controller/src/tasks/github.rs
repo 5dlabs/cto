@@ -13,15 +13,20 @@ pub async fn check_github_for_pr_by_branch(
 ) -> Result<Option<String>> {
     let task_id = code_run.spec.task_id;
     let expected_branch = format!("task-{}", task_id);
-    
-    info!("Checking GitHub API for PR with branch: {}", expected_branch);
+
+    info!(
+        "Checking GitHub API for PR with branch: {}",
+        expected_branch
+    );
 
     // Parse repository URL to extract owner/repo
     let (owner, repo) = parse_repository_url(&code_run.spec.repository_url)?;
-    
+
     // Create GitHub client
     let octocrab = if let Some(token) = github_token {
-        Octocrab::builder().personal_token(token.to_string()).build()?
+        Octocrab::builder()
+            .personal_token(token.to_string())
+            .build()?
     } else {
         // Try to use GitHub App authentication if available
         // For now, we'll use unauthenticated requests (rate limited)
@@ -65,7 +70,10 @@ fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
     if parts.len() >= 2 {
         Ok((parts[0].to_string(), parts[1].to_string()))
     } else {
-        Err(anyhow::anyhow!("Invalid repository URL format: {}", repo_url))
+        Err(anyhow::anyhow!(
+            "Invalid repository URL format: {}",
+            repo_url
+        ))
     }
 }
 
@@ -76,7 +84,10 @@ pub async fn update_code_run_pr_url(
     code_run_name: &str,
     pr_url: &str,
 ) -> Result<()> {
-    use kube::{Api, api::{PatchParams, Patch}};
+    use kube::{
+        api::{Patch, PatchParams},
+        Api,
+    };
     use serde_json::json;
 
     info!("Updating CodeRun {} with PR URL: {}", code_run_name, pr_url);
@@ -99,7 +110,10 @@ pub async fn update_code_run_pr_url(
         .await
         .with_context(|| format!("Failed to update CodeRun {} with PR URL", code_run_name))?;
 
-    info!("✅ Successfully updated CodeRun {} with PR URL", code_run_name);
+    info!(
+        "✅ Successfully updated CodeRun {} with PR URL",
+        code_run_name
+    );
     Ok(())
 }
 

@@ -51,7 +51,15 @@ pub async fn resume_workflow_for_pr(
     );
 
     // Use direct HTTP calls to Argo Workflows API
-    resume_workflow_via_http(client, namespace, workflow_name, Some(pr_url), Some(pr_number), None).await
+    resume_workflow_via_http(
+        client,
+        namespace,
+        workflow_name,
+        Some(pr_url),
+        Some(pr_number),
+        None,
+    )
+    .await
 }
 
 /// Resume workflow when CodeRun failed
@@ -67,7 +75,15 @@ pub async fn resume_workflow_for_failure(
     );
 
     // Use direct HTTP calls to Argo Workflows API
-    resume_workflow_via_http(client, namespace, workflow_name, None, None, Some(error_message)).await
+    resume_workflow_via_http(
+        client,
+        namespace,
+        workflow_name,
+        None,
+        None,
+        Some(error_message),
+    )
+    .await
 }
 
 /// Resume workflow when no PR was created
@@ -84,7 +100,10 @@ pub async fn resume_workflow_for_no_pr(
 
     // For now, log the action but don't actually resume
     // TODO: Implement proper workflow resumption
-    warn!("Would resume workflow {} with no-PR status: {} (namespace: {})", workflow_name, coderun_status, namespace);
+    warn!(
+        "Would resume workflow {} with no-PR status: {} (namespace: {})",
+        workflow_name, coderun_status, namespace
+    );
     Ok(())
 }
 
@@ -100,16 +119,19 @@ async fn resume_workflow_via_http(
     // For now, just log the action
     // TODO: Implement actual Argo Workflows API calls
     if let Some(pr_url) = pr_url {
-        info!("Would resume workflow {} with PR: {} (#{:?})", 
-              workflow_name, pr_url, pr_number);
+        info!(
+            "Would resume workflow {} with PR: {} (#{:?})",
+            workflow_name, pr_url, pr_number
+        );
     } else if let Some(error) = error_message {
-        info!("Would resume workflow {} with error: {}", 
-              workflow_name, error);
+        info!(
+            "Would resume workflow {} with error: {}",
+            workflow_name, error
+        );
     } else {
-        info!("Would resume workflow {} with no-PR status", 
-              workflow_name);
+        info!("Would resume workflow {} with no-PR status", workflow_name);
     }
-    
+
     Ok(())
 }
 
@@ -119,16 +141,22 @@ mod tests {
 
     #[test]
     fn test_extract_pr_number() {
-        assert_eq!(extract_pr_number("https://github.com/owner/repo/pull/123").unwrap(), 123);
-        assert_eq!(extract_pr_number("https://github.com/5dlabs/cto/pull/42").unwrap(), 42);
+        assert_eq!(
+            extract_pr_number("https://github.com/owner/repo/pull/123").unwrap(),
+            123
+        );
+        assert_eq!(
+            extract_pr_number("https://github.com/5dlabs/cto/pull/42").unwrap(),
+            42
+        );
         assert!(extract_pr_number("invalid-url").is_err());
         assert!(extract_pr_number("https://github.com/owner/repo/pull/abc").is_err());
     }
 
     #[test]
     fn test_extract_workflow_name_from_labels() {
-        use std::collections::BTreeMap;
         use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+        use std::collections::BTreeMap;
 
         let mut labels = BTreeMap::new();
         labels.insert("workflow-name".to_string(), "test-workflow".to_string());
@@ -196,6 +224,9 @@ mod tests {
             status: None,
         };
 
-        assert_eq!(extract_workflow_name(&code_run).unwrap(), "play-task-5-workflow");
+        assert_eq!(
+            extract_workflow_name(&code_run).unwrap(),
+            "play-task-5-workflow"
+        );
     }
 }

@@ -382,11 +382,10 @@ async fn update_code_status_with_completion(
 }
 
 /// Handle workflow resumption when CodeRun completes successfully
-async fn handle_workflow_resumption_on_completion(
-    code_run: &CodeRun,
-    ctx: &Context,
-) -> Result<()> {
-    use crate::tasks::workflow::{extract_workflow_name, extract_pr_number, resume_workflow_for_pr};
+async fn handle_workflow_resumption_on_completion(code_run: &CodeRun, ctx: &Context) -> Result<()> {
+    use crate::tasks::workflow::{
+        extract_pr_number, extract_workflow_name, resume_workflow_for_pr,
+    };
 
     let workflow_name = match extract_workflow_name(code_run) {
         Ok(name) => name,
@@ -414,7 +413,9 @@ async fn handle_workflow_resumption_on_completion(
                     &workflow_name,
                     pr_url,
                     pr_number,
-                ).await {
+                )
+                .await
+                {
                     warn!("Failed to resume workflow: {}", e);
                 }
                 return Ok(());
@@ -428,10 +429,7 @@ async fn handle_workflow_resumption_on_completion(
 }
 
 /// Handle workflow resumption when CodeRun fails
-async fn handle_workflow_resumption_on_failure(
-    code_run: &CodeRun,
-    ctx: &Context,
-) -> Result<()> {
+async fn handle_workflow_resumption_on_failure(code_run: &CodeRun, ctx: &Context) -> Result<()> {
     use crate::tasks::workflow::{extract_workflow_name, resume_workflow_for_failure};
 
     let workflow_name = match extract_workflow_name(code_run) {
@@ -448,7 +446,10 @@ async fn handle_workflow_resumption_on_failure(
         .and_then(|s| s.message.as_deref())
         .unwrap_or("Code implementation failed");
 
-    if let Err(e) = resume_workflow_for_failure(&ctx.client, &ctx.namespace, &workflow_name, error_message).await {
+    if let Err(e) =
+        resume_workflow_for_failure(&ctx.client, &ctx.namespace, &workflow_name, error_message)
+            .await
+    {
         warn!("Failed to resume workflow for failure: {}", e);
     }
     Ok(())
@@ -460,14 +461,17 @@ async fn handle_no_pr_timeout(
     code_run: &CodeRun,
     ctx: &Context,
 ) -> Result<()> {
-    use crate::tasks::workflow::resume_workflow_for_no_pr;
     use crate::tasks::github::{check_github_for_pr_by_branch, update_code_run_pr_url};
+    use crate::tasks::workflow::resume_workflow_for_no_pr;
     use tokio::time::{sleep, Duration};
 
     // TODO: Make timeout configurable
     let timeout_seconds = 60;
-    
-    info!("Starting no-PR timeout handler ({}s) for workflow: {}", timeout_seconds, workflow_name);
+
+    info!(
+        "Starting no-PR timeout handler ({}s) for workflow: {}",
+        timeout_seconds, workflow_name
+    );
 
     // Strategy 1: Wait and check CodeRun again (maybe PR creation was delayed)
     sleep(Duration::from_secs(30)).await;
@@ -500,7 +504,9 @@ async fn handle_no_pr_timeout(
                     workflow_name,
                     pr_url,
                     pr_number,
-                ).await {
+                )
+                .await
+                {
                     warn!("Failed to resume workflow: {}", e);
                 }
                 return Ok(());
@@ -512,9 +518,11 @@ async fn handle_no_pr_timeout(
     // TODO: Get GitHub token from configuration
     if let Ok(Some(pr_url)) = check_github_for_pr_by_branch(&updated_code_run, None).await {
         info!("Found PR via GitHub API: {}", pr_url);
-        
+
         // Update CodeRun with found PR URL
-        if let Err(e) = update_code_run_pr_url(&ctx.client, &ctx.namespace, &code_run.name_any(), &pr_url).await {
+        if let Err(e) =
+            update_code_run_pr_url(&ctx.client, &ctx.namespace, &code_run.name_any(), &pr_url).await
+        {
             warn!("Failed to update CodeRun with PR URL: {}", e);
         }
 
@@ -531,7 +539,9 @@ async fn handle_no_pr_timeout(
             workflow_name,
             &pr_url,
             pr_number,
-        ).await {
+        )
+        .await
+        {
             warn!("Failed to resume workflow from GitHub API result: {}", e);
         }
         return Ok(());
@@ -545,7 +555,9 @@ async fn handle_no_pr_timeout(
         .map(|s| s.phase.as_str())
         .unwrap_or("Succeeded");
 
-    if let Err(e) = resume_workflow_for_no_pr(&ctx.client, &ctx.namespace, workflow_name, coderun_status).await {
+    if let Err(e) =
+        resume_workflow_for_no_pr(&ctx.client, &ctx.namespace, workflow_name, coderun_status).await
+    {
         warn!("Failed to resume workflow with no-PR status: {}", e);
     }
     Ok(())
