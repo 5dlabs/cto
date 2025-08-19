@@ -95,7 +95,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
                 // Handle workflow resumption for already succeeded CodeRuns
                 handle_workflow_resumption_on_completion(&code_run, ctx).await?;
-                
+
                 return Ok(Action::await_change());
             }
             "Failed" => {
