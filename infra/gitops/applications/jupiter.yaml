@@ -12,9 +12,9 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://5dlabs.github.io/charts
+    repoURL: https://github.com/5dlabs/charts
     chart: jupiter
-    targetRevision: 0.1.0
+    targetRevision: main
     helm:
       values: |
         image:
