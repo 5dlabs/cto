@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use kube::Client;
 use serde_json::json;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
 
@@ -110,7 +110,7 @@ pub async fn resume_workflow_for_no_pr(
 
 /// Resume workflow by forcing re-evaluation of stuck resource nodes
 async fn resume_workflow_via_http(
-    client: &Client,
+    _client: &Client,
     namespace: &str,
     workflow_name: &str,
     pr_url: Option<&str>,
@@ -122,28 +122,49 @@ async fn resume_workflow_via_http(
         workflow_name, namespace
     );
 
-    // Use the Kubernetes client to get the workflow
-    use kube::Api;
-    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    // Use raw HTTP calls since we need to work with Argo Workflows CRDs
+    // and the kube dynamic API is complex for this use case
+    let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
+        .context("Failed to read service account token")?;
     
-    // Create a dynamic API for workflows
-    let workflows: Api<serde_json::Value> = Api::namespaced_with(
-        client.clone(),
-        namespace,
-        &kube::api::ApiResource {
-            group: "argoproj.io".to_string(),
-            version: "v1alpha1".to_string(),
-            api_version: "argoproj.io/v1alpha1".to_string(),
-            kind: "Workflow".to_string(),
-            plural: "workflows".to_string(),
-        },
+    let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        .context("Failed to read CA certificate")?;
+    
+    let cert = reqwest::Certificate::from_pem(&ca_cert)
+        .context("Failed to parse CA certificate")?;
+    
+    let http_client = reqwest::Client::builder()
+        .add_root_certificate(cert)
+        .build()
+        .context("Failed to create HTTP client")?;
+
+    // Get the current workflow via HTTP API
+    let api_server = "https://kubernetes.default.svc";
+    let get_url = format!(
+        "{}/apis/argoproj.io/v1alpha1/namespaces/{}/workflows/{}",
+        api_server, namespace, workflow_name
     );
 
-    // Get the current workflow
-    let workflow = workflows
-        .get(workflow_name)
+    let workflow_response = http_client
+        .get(&get_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
         .await
         .context("Failed to get workflow")?;
+
+    if !workflow_response.status().is_success() {
+        let status = workflow_response.status();
+        let error_text = workflow_response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(anyhow::anyhow!(
+            "Failed to get workflow {}: HTTP {} - {}",
+            workflow_name, status, error_text
+        ));
+    }
+
+    let workflow: serde_json::Value = workflow_response
+        .json()
+        .await
+        .context("Failed to parse workflow JSON")?;
 
     // Find nodes that are waiting for CodeRun completion
     let nodes = workflow
@@ -185,11 +206,29 @@ async fn resume_workflow_via_http(
 
     info!("🔄 Forcing workflow controller to re-evaluate workflow: {}", workflow_name);
     
-    let patch_params = kube::api::PatchParams::default();
-    workflows
-        .patch(workflow_name, &patch_params, &kube::api::Patch::Merge(retry_patch))
+    // Patch the workflow via HTTP API
+    let patch_url = format!(
+        "{}/apis/argoproj.io/v1alpha1/namespaces/{}/workflows/{}",
+        api_server, namespace, workflow_name
+    );
+
+    let patch_response = http_client
+        .patch(&patch_url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/merge-patch+json")
+        .json(&retry_patch)
+        .send()
         .await
         .context("Failed to patch workflow with retry annotation")?;
+
+    if !patch_response.status().is_success() {
+        let status = patch_response.status();
+        let error_text = patch_response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(anyhow::anyhow!(
+            "Failed to patch workflow {}: HTTP {} - {}",
+            workflow_name, status, error_text
+        ));
+    }
 
     info!("✅ Successfully triggered workflow re-evaluation: {}", workflow_name);
 
