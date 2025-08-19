@@ -37,6 +37,14 @@ log_error() {
 create_test_workflow() {
     log_info "Creating test workflow for stage transitions..."
     
+    echo "📋 Checking for stage-transitions-template..."
+    if kubectl get workflowtemplate stage-transitions-template -n "$NAMESPACE" &>/dev/null; then
+        echo "✅ Template exists in cluster"
+    else
+        echo "❌ Template not found. Applying from local file..."
+        kubectl apply -f infra/charts/controller/templates/stage-transitions-template.yaml -n "$NAMESPACE"
+    fi
+    
     # Submit the test workflow
     WORKFLOW_NAME=$(argo submit infra/examples/test-stage-transitions.yaml \
         -n $NAMESPACE \
