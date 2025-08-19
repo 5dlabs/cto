@@ -458,6 +458,8 @@ spec:
       resource:
         action: create
         setOwnerReference: true
+        successCondition: status.phase == Succeeded
+        failureCondition: status.phase == Failed
         manifest: |
           apiVersion: agents.platform/v1
           kind: CodeRun
