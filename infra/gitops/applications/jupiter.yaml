@@ -1,0 +1,82 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jupiter
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: jupiter
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://5dlabs.github.io/charts
+    chart: jupiter
+    targetRevision: 0.1.0
+    helm:
+      values: |
+        image:
+          repository: "ghcr.io/5dlabs/jupiter-swap-api"
+          tag: "v6.0.62"
+          pullPolicy: Always
+        
+        ingress:
+          enabled: true
+          className: alb
+          annotations:
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/group.name: alb-public
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+            alb.ingress.kubernetes.io/healthcheck-path: /v6/health
+            alb.ingress.kubernetes.io/healthcheck-interval-seconds: '10'
+            alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=20
+          hosts:
+            - host: jupiter-api.5dlabs.com
+              paths:
+                - path: /
+                  pathType: ImplementationSpecific
+          tls:
+            - secretName: jupiter-api-tls
+              hosts:
+                - jupiter-api.5dlabs.com
+        
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+        
+        autoscaling:
+          enabled: true
+          minReplicas: 2
+          maxReplicas: 10
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 70
+        
+        env:
+          RUST_LOG: "info"
+        
+        jupiter:
+          solanaCredentials:
+            enabled: true
+            secretName: "jupiter-solana-credentials"
+          
+          rpcEndpoint: "https://api.mainnet-beta.solana.com"
+          debug: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: jupiter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+  revisionHistoryLimit: 10
