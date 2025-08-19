@@ -2,7 +2,8 @@
 
 use anyhow::{Context, Result};
 use kube::Client;
-use tracing::{info, warn};
+use serde_json::json;
+use tracing::{info, warn, error};
 
 use crate::crds::coderun::CodeRun;
 
@@ -107,29 +108,98 @@ pub async fn resume_workflow_for_no_pr(
     Ok(())
 }
 
-/// Resume workflow via direct API call
+/// Resume workflow by forcing re-evaluation of stuck resource nodes
 async fn resume_workflow_via_http(
-    _client: &Client,
-    _namespace: &str,
+    client: &Client,
+    namespace: &str,
     workflow_name: &str,
     pr_url: Option<&str>,
     pr_number: Option<u32>,
     error_message: Option<&str>,
 ) -> Result<()> {
-    // For now, just log the action
-    // TODO: Implement actual Argo Workflows API calls
+    info!(
+        "🚀 Attempting to force workflow {} to re-evaluate stuck nodes in namespace {}",
+        workflow_name, namespace
+    );
+
+    // Use the Kubernetes client to get the workflow
+    use kube::Api;
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    
+    // Create a dynamic API for workflows
+    let workflows: Api<serde_json::Value> = Api::namespaced_with(
+        client.clone(),
+        namespace,
+        &kube::api::ApiResource {
+            group: "argoproj.io".to_string(),
+            version: "v1alpha1".to_string(),
+            api_version: "argoproj.io/v1alpha1".to_string(),
+            kind: "Workflow".to_string(),
+            plural: "workflows".to_string(),
+        },
+    );
+
+    // Get the current workflow
+    let workflow = workflows
+        .get(workflow_name)
+        .await
+        .context("Failed to get workflow")?;
+
+    // Find nodes that are waiting for CodeRun completion
+    let nodes = workflow
+        .get("status")
+        .and_then(|s| s.get("nodes"))
+        .ok_or_else(|| anyhow::anyhow!("No nodes found in workflow"))?;
+
+    let mut stuck_nodes = Vec::new();
+    
+    if let Some(nodes_obj) = nodes.as_object() {
+        for (node_id, node_data) in nodes_obj {
+            if let (Some(template_name), Some(phase)) = (
+                node_data.get("templateName").and_then(|t| t.as_str()),
+                node_data.get("phase").and_then(|p| p.as_str())
+            ) {
+                // Look for wait-coderun-completion nodes that are running
+                if template_name == "wait-coderun-completion" && phase == "Running" {
+                    info!("🔍 Found stuck wait-coderun-completion node: {}", node_id);
+                    stuck_nodes.push(node_id.clone());
+                }
+            }
+        }
+    }
+
+    if stuck_nodes.is_empty() {
+        info!("ℹ️ No stuck wait-coderun-completion nodes found in workflow {}", workflow_name);
+        return Ok(());
+    }
+
+    // Force workflow controller to re-evaluate by adding a retry annotation
+    // This is similar to what `argo retry` does
+    let retry_patch = json!({
+        "metadata": {
+            "annotations": {
+                "workflows.argoproj.io/force-retry": chrono::Utc::now().to_rfc3339()
+            }
+        }
+    });
+
+    info!("🔄 Forcing workflow controller to re-evaluate workflow: {}", workflow_name);
+    
+    let patch_params = kube::api::PatchParams::default();
+    workflows
+        .patch(workflow_name, &patch_params, &kube::api::Patch::Merge(retry_patch))
+        .await
+        .context("Failed to patch workflow with retry annotation")?;
+
+    info!("✅ Successfully triggered workflow re-evaluation: {}", workflow_name);
+
+    // Log the context for debugging
     if let Some(pr_url) = pr_url {
-        info!(
-            "Would resume workflow {} with PR: {} (#{:?})",
-            workflow_name, pr_url, pr_number
-        );
+        info!("📝 Workflow triggered with PR context: {} (#{:?})", pr_url, pr_number);
     } else if let Some(error) = error_message {
-        info!(
-            "Would resume workflow {} with error: {}",
-            workflow_name, error
-        );
+        info!("❌ Workflow triggered with error context: {}", error);
     } else {
-        info!("Would resume workflow {} with no-PR status", workflow_name);
+        info!("⚠️ Workflow triggered with no-PR context");
     }
 
     Ok(())
