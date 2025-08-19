@@ -274,10 +274,10 @@ rm -f /workspace/CLAUDE.md
 # Generate configuration files from templates
 echo "🔧 Generating Tess-specific configuration files..."
 
-# Create settings.json for Claude Desktop
-cat > "$CLAUDE_WORK_DIR/settings.json" << 'EOF'
-{{> settings.json.hbs}}
-EOF
+# Enterprise managed settings are mounted directly from ConfigMap  
+echo "=== ENTERPRISE MANAGED SETTINGS ==="
+echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
+echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
 
 # Create MCP client configuration with testing tools
 cat > "$CLAUDE_WORK_DIR/client-config.json" << 'EOF'
