@@ -127,7 +127,13 @@ else
 fi
 
 # Set working directory for the agent
-CLAUDE_WORK_DIR="/workspace/claude"
+# Set Working Directory (Critical for Claude Execution) - Match Rex pattern
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
+else
+  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
+fi
 mkdir -p "$CLAUDE_WORK_DIR"
 cd "$CLAUDE_WORK_DIR"
 
@@ -243,15 +249,20 @@ rm -f /workspace/CLAUDE.md
 # Generate configuration files from templates
 echo "🔧 Generating Cleo-specific configuration files..."
 
-# Create settings.json for Claude Desktop
-cat > "$CLAUDE_WORK_DIR/settings.json" << 'EOF'
-{{> settings.json.hbs}}
-EOF
+# Enterprise managed settings are mounted directly from ConfigMap  
+echo "=== ENTERPRISE MANAGED SETTINGS ==="
+echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
+echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
 
-# Create MCP client configuration
-cat > "$CLAUDE_WORK_DIR/client-config.json" << 'EOF'
-{{> client-config.json.hbs}}
-EOF
+# Copy MCP client configuration from task files
+if [ -f "/task-files/client-config.json" ]; then
+  cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
+  echo "✓ client-config.json copied from ConfigMap"
+  export MCP_CLIENT_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
+  echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
+else
+  echo "⚠️ client-config.json not found in task-files - MCP client may not work correctly"
+fi
 
 # Create initial CLAUDE.md if needed
 if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
@@ -311,20 +322,24 @@ EOF
     echo "✓ Created Cleo-specific CLAUDE.md memory"
 fi
 
-# Create coding guidelines
-cat > "$CLAUDE_WORK_DIR/coding-guidelines.md" << 'EOF'
-{{> coding-guidelines.md.hbs}}
-EOF
+# Copy guidelines files to working directory (match Rex pattern)
+if [ -f "/task-files/coding-guidelines.md" ]; then
+  cp /task-files/coding-guidelines.md "$CLAUDE_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
 
-# Create GitHub guidelines  
-cat > "$CLAUDE_WORK_DIR/github-guidelines.md" << 'EOF'
-{{> github-guidelines.md.hbs}}
-EOF
+if [ -f "/task-files/github-guidelines.md" ]; then
+  cp /task-files/github-guidelines.md "$CLAUDE_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"  
+fi
 
-# Create MCP configuration
-cat > "$CLAUDE_WORK_DIR/mcp.json" << 'EOF'
-{{> mcp.json.hbs}}
-EOF
+# Copy MCP configuration from ConfigMap to project root (project scope)
+if [ -f "/task-files/mcp.json" ]; then
+  cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
+  echo "✓ Copied mcp.json to .mcp.json (project scope)"
+else
+  echo "⚠️ mcp.json template not found"
+fi
 
 # Setup hook scripts
 echo "🔧 Setting up Cleo-specific hook scripts..."
