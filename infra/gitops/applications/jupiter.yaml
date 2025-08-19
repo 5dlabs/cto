@@ -34,11 +34,8 @@ spec:
             memory: 1Gi
 
         autoscaling:
-          enabled: true
-          minReplicas: 2
-          maxReplicas: 10
-          targetCPUUtilizationPercentage: 70
-          targetMemoryUtilizationPercentage: 70
+          enabled: false
+        replicaCount: 1
 
         env:
           RUST_LOG: "info"
