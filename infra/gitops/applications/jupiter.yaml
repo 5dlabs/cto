@@ -48,7 +48,7 @@ spec:
             enabled: true
             secretName: "jupiter-solana-credentials"
           
-          rpcEndpoint: "https://api.mainnet-beta.solana.com"
+
           debug: false
   destination:
     server: https://kubernetes.default.svc
