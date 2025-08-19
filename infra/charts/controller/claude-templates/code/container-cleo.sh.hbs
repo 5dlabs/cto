@@ -230,7 +230,12 @@ rm -rf /tmp/docs-repo
 {{/if}}
 
 # Copy prepared files to Claude working directory
-cp -r "/workspace/$TARGET_REPO_DIR/." "$CLAUDE_WORK_DIR/"
+# Copy repository files to working directory, avoiding recursive copy
+if [ "$TARGET_REPO_DIR" != "$(basename "$CLAUDE_WORK_DIR")" ]; then
+    cp -r "/workspace/$TARGET_REPO_DIR/." "$CLAUDE_WORK_DIR/"
+else
+    echo "✓ Working directory is repository root, no copy needed"
+fi
 
 # Check if we should continue previous session
 {{#if continue_session}}
