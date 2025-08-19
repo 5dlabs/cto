@@ -27,3 +27,29 @@ subjects:
     name: argo-events-sa
     namespace: argo
 
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-events-workflows-agent-platform
+  namespace: agent-platform
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-events-workflows-binding
+  namespace: agent-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-events-workflows-agent-platform
+subjects:
+  - kind: ServiceAccount
+    name: argo-events-sa
+    namespace: argo
+

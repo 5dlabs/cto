@@ -94,7 +94,7 @@ spec:
                   target-stage: waiting-pr-created
               spec:
                 entrypoint: resume-workflow
-                serviceAccountName: argo-events-sa
+                serviceAccountName: argo-workflow
                 templates:
                   - name: resume-workflow
                     script:
@@ -190,7 +190,7 @@ spec:
                   target-stage: waiting-pr-merged
               spec:
                 entrypoint: resume-workflow
-                serviceAccountName: argo-events-sa
+                serviceAccountName: argo-workflow
                 templates:
                   - name: resume-workflow
                     script:
@@ -255,7 +255,7 @@ spec:
                   target-stage: waiting-ready-for-qa
               spec:
                 entrypoint: resume-workflow
-                serviceAccountName: argo-events-sa
+                serviceAccountName: argo-workflow
                 templates:
                   - name: resume-workflow
                     script:
@@ -355,7 +355,7 @@ spec:
                   target-stage: waiting-pr-approved
               spec:
                 entrypoint: resume-workflow
-                serviceAccountName: argo-events-sa
+                serviceAccountName: argo-workflow
                 templates:
                   - name: resume-workflow
                     script:
