@@ -650,6 +650,19 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }),
+            // Add CodeRun metadata for status updates
+            json!({
+                "name": "CODERUN_NAME",
+                "value": code_run.name_any()
+            }),
+            json!({
+                "name": "NAMESPACE",
+                "valueFrom": {
+                    "fieldRef": {
+                        "fieldPath": "metadata.namespace"
+                    }
+                }
+            }),
         ];
 
         // Process task requirements if present
