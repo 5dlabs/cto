@@ -39,7 +39,7 @@ pub async fn check_github_for_pr_by_branch(
         .pulls(&owner, &repo)
         .list()
         .state(octocrab::params::State::Open)
-        .head(&format!("{owner}:{expected_branch}"))
+        .head(format!("{owner}:{expected_branch}"))
         .send()
         .await
         .with_context(|| format!("Failed to search for PRs in {owner}/{repo}"))?;
