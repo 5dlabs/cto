@@ -23,24 +23,7 @@ spec:
           pullPolicy: Always
         
         ingress:
-          enabled: true
-          className: alb
-          annotations:
-            alb.ingress.kubernetes.io/scheme: internet-facing
-            alb.ingress.kubernetes.io/group.name: alb-public
-            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-            alb.ingress.kubernetes.io/healthcheck-path: /v6/health
-            alb.ingress.kubernetes.io/healthcheck-interval-seconds: '10'
-            alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=20
-          hosts:
-            - host: jupiter-api.5dlabs.com
-              paths:
-                - path: /
-                  pathType: ImplementationSpecific
-          tls:
-            - secretName: jupiter-api-tls
-              hosts:
-                - jupiter-api.5dlabs.com
+          enabled: false
         
         resources:
           limits:
