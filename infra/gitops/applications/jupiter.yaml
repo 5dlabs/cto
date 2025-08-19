@@ -18,7 +18,7 @@ spec:
     helm:
       values: |
         image:
-          repository: "ghcr.io/5dlabs/jupiter-swap-api"
+          repository: "ghcr.io/jup-ag/jupiter-swap-api"
           tag: "v6.0.62"
           pullPolicy: Always
 
