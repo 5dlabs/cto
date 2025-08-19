@@ -51,13 +51,12 @@ spec:
           filesystem:
             archivePath: /tmp/artifacts
         persistence: {}
-        
+
         workflow:
           serviceAccount:
             annotations: {}
           rbac:
             create: true
-        
 
   # Destination configuration
   destination:
