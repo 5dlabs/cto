@@ -1140,6 +1140,34 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   if [ -n "$PR_NUMBER" ]; then
     echo "✅ Found PR #${PR_NUMBER}"
     
+    # Get the PR URL
+    PR_URL="https://github.com/{{repository_url}}/pull/${PR_NUMBER}"
+    echo "📝 PR URL: $PR_URL"
+    
+    # Update CodeRun status with PR URL via Kubernetes API
+    echo "🔄 Updating CodeRun status with PR URL..."
+    if command -v kubectl >/dev/null 2>&1; then
+      # Create a patch to update the CodeRun status
+      PATCH_JSON=$(cat <<EOF
+{
+  "status": {
+    "pullRequestUrl": "$PR_URL",
+    "lastUpdate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  }
+}
+EOF
+)
+      
+      # Apply the patch to update CodeRun status
+      if kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$PATCH_JSON" 2>/dev/null; then
+        echo "✅ Updated CodeRun status with PR URL"
+      else
+        echo "⚠️ Failed to update CodeRun status (kubectl patch failed)"
+      fi
+    else
+      echo "⚠️ kubectl not available, cannot update CodeRun status"
+    fi
+    
     # Apply correlation labels
     echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
     RUN_LABEL="run-${WORKFLOW_NAME:-unknown}"
