@@ -43,7 +43,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: cleanup-quality-agents-
-                namespace: argo
+                namespace: agent-platform
               spec:
                 entrypoint: cleanup-quality-agents
                 arguments:
@@ -67,39 +67,39 @@ spec:
                         echo "Cancelling quality/testing agent CodeRuns for task-{{inputs.parameters.task-id}}"
 
                         # Delete quality agent CodeRuns for this specific task only
-                        kubectl delete coderun -n argo \
+                        kubectl delete coderun -n agent-platform \
                           -l "task-id={{inputs.parameters.task-id}},github-app notin (5DLabs-Rex,5DLabs-Blaze,5DLabs-Morgan)" \
                           || true
                         echo "QA pipeline cleanup complete for task-{{inputs.parameters.task-id}}"
-          parameters:
-            # Extract task ID from branch name for task-specific cleanup
-            - src:
-                dependencyName: implementation-push-event
-                dataTemplate: |
-                  {{ $ref := .Input.body.ref }}
-                  {{ if hasPrefix $ref "refs/heads/task-" }}
-                    {{ $branch := trimPrefix "refs/heads/task-" $ref }}
-                    {{ $parts := splitList "-" $branch }}
-                    {{ if gt (len $parts) 0 }}
-                      {{ index $parts 0 }}
-                    {{ end }}
-                  {{ else }}
-                    0
-                  {{ end }}
-              dest: spec.arguments.parameters.0.value
-            # Extract the pushing agent name for logging
-            - src:
-                dependencyName: implementation-push-event
-                dataTemplate: |
-                  {{ $login := .Input.body.sender.login }}
-                  {{ if hasPrefix $login "5DLabs-" }}
-                    {{ $agent := trimPrefix "5DLabs-" $login }}
-                    {{ $agent := trimSuffix "[bot]" $agent }}
-                    {{ lower $agent }}
-                  {{ else }}
-                    unknown
-                  {{ end }}
-              dest: spec.arguments.parameters.1.value
+      parameters:
+        # Extract task ID from branch name for task-specific cleanup
+        - src:
+            dependencyName: implementation-push-event
+            dataTemplate: |
+              {{ $ref := .Input.body.ref }}
+              {{ if hasPrefix $ref "refs/heads/task-" }}
+                {{ $branch := trimPrefix "refs/heads/task-" $ref }}
+                {{ $parts := splitList "-" $branch }}
+                {{ if gt (len $parts) 0 }}
+                  {{ index $parts 0 }}
+                {{ end }}
+              {{ else }}
+                0
+              {{ end }}
+          dest: spec.arguments.parameters.0.value
+        # Extract the pushing agent name for logging
+        - src:
+            dependencyName: implementation-push-event
+            dataTemplate: |
+              {{ $login := .Input.body.sender.login }}
+              {{ if hasPrefix $login "5DLabs-" }}
+                {{ $agent := trimPrefix "5DLabs-" $login }}
+                {{ $agent := trimSuffix "[bot]" $agent }}
+                {{ lower $agent }}
+              {{ else }}
+                unknown
+              {{ end }}
+          dest: spec.arguments.parameters.1.value
       retryStrategy:
         steps: 3
         duration: "5s"
@@ -117,18 +117,18 @@ spec:
               kind: Event
               metadata:
                 generateName: implementation-remediation-
-                namespace: argo
+                namespace: agent-platform
               involvedObject:
                 apiVersion: agents.platform/v1
                 kind: CodeRun
                 name: task-remediation
-                namespace: argo
+                namespace: agent-platform
               type: Normal
               reason: "AgentPushDetected"
-          parameters:
-            # Dynamic message with agent and task info
-            - src:
-                dependencyName: implementation-push-event
-                dataTemplate: "Implementation agent pushed to task branch, restarting QA pipeline"
-              dest: message
+        parameters:
+          # Dynamic message with agent and task info
+          - src:
+              dependencyName: implementation-push-event
+              dataTemplate: "Implementation agent pushed to task branch, restarting QA pipeline"
+            dest: message
 

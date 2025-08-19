@@ -88,7 +88,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: stage-resume-pr-created-
-                namespace: argo
+                namespace: agent-platform
                 labels:
                   type: stage-resume
                   target-stage: waiting-pr-created
@@ -137,7 +137,7 @@ spec:
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n argo \
+                          -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
@@ -146,7 +146,7 @@ spec:
 
                           # Update workflow parameters with PR details
                           kubectl patch workflow $WORKFLOW_NAME \
-                            -n argo \
+                            -n agent-platform \
                             --type='merge' \
                             --patch='{
                               "spec": {
@@ -160,7 +160,7 @@ spec:
                             }'
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n argo
+                          argo resume $WORKFLOW_NAME -n agent-platform
 
                           echo "✅ Workflow resumed successfully"
                         else
@@ -184,7 +184,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: stage-resume-pr-merged-
-                namespace: argo
+                namespace: agent-platform
                 labels:
                   type: stage-resume
                   target-stage: waiting-pr-merged
@@ -217,7 +217,7 @@ spec:
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n argo \
+                          -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
@@ -225,7 +225,7 @@ spec:
                           echo "Found workflow at correct stage, resuming..."
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n argo
+                          argo resume $WORKFLOW_NAME -n agent-platform
 
                           echo "✅ Workflow resumed successfully"
                         else
@@ -303,7 +303,7 @@ spec:
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n argo \
+                          -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
@@ -312,7 +312,7 @@ spec:
 
                           # Update workflow parameters
                           kubectl patch workflow $WORKFLOW_NAME \
-                            -n argo \
+                            -n agent-platform \
                             --type='merge' \
                             --patch='{
                               "spec": {
@@ -325,7 +325,7 @@ spec:
                             }'
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n argo
+                          argo resume $WORKFLOW_NAME -n agent-platform
 
                           echo "✅ Workflow resumed successfully"
                         else
