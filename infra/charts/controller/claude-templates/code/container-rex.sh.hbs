@@ -1113,11 +1113,64 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           ) & HANG_DIAG_PID=$!
         fi
 
-        # Wait for Claude process to complete, then stop diagnostics if running
-        wait "$CLAUDE_PID"
+        # Wait for Claude process to complete with timeout and proper cleanup
+        echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
+        
+        # Wait with timeout to prevent indefinite hanging
+        CLAUDE_TIMEOUT=300  # 5 minutes timeout for Claude completion
+        CLAUDE_WAIT_INTERVAL=5
+        CLAUDE_WAIT_ELAPSED=0
+        CLAUDE_COMPLETED=false
+        
+        while [ $CLAUDE_WAIT_ELAPSED -lt $CLAUDE_TIMEOUT ]; do
+          if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
+            echo "✅ Claude process completed naturally"
+            CLAUDE_COMPLETED=true
+            break
+          fi
+          
+          # Show progress every 30 seconds
+          if [ $((CLAUDE_WAIT_ELAPSED % 30)) -eq 0 ] && [ $CLAUDE_WAIT_ELAPSED -gt 0 ]; then
+            echo "⏳ Still waiting for Claude completion... (${CLAUDE_WAIT_ELAPSED}s elapsed)"
+          fi
+          
+          sleep $CLAUDE_WAIT_INTERVAL
+          CLAUDE_WAIT_ELAPSED=$((CLAUDE_WAIT_ELAPSED + CLAUDE_WAIT_INTERVAL))
+        done
+        
+        # Handle Claude process cleanup
+        if [ "$CLAUDE_COMPLETED" = "false" ]; then
+          echo "⚠️ Claude process did not exit within ${CLAUDE_TIMEOUT}s timeout"
+          echo "🔧 Force terminating Claude process to prevent indefinite hanging..."
+          
+          # First try graceful termination
+          if kill -TERM "$CLAUDE_PID" 2>/dev/null; then
+            echo "📤 Sent SIGTERM to Claude process"
+            sleep 5
+            
+            # Check if it exited gracefully
+            if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
+              echo "✅ Claude process terminated gracefully"
+              CLAUDE_COMPLETED=true
+            fi
+          fi
+          
+          # Force kill if still running
+          if [ "$CLAUDE_COMPLETED" = "false" ] && kill -0 "$CLAUDE_PID" 2>/dev/null; then
+            echo "💀 Force killing Claude process"
+            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+            sleep 2
+            echo "✅ Claude process force terminated"
+          fi
+        fi
+        
+        # Stop diagnostics if running
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
         
-        # Close FIFO writer if it was opened (in fallback) now that Claude has exited
+        # Ensure FIFO cleanup happens regardless of how Claude exited
+        echo "🔧 Performing FIFO cleanup..."
+        
+        # Close FIFO writer if it was opened (in fallback)
         if [ "$FIFO_OPENED" = "true" ]; then
           echo "🔧 Closing FIFO file descriptor..."
           # Try multiple methods to ensure fd 9 gets closed
@@ -1128,7 +1181,13 @@ Before starting implementation, you MUST read and follow the task-specific tool 
             }
           }
         else
-          echo "ℹ️ FIFO was not opened, no need to close"
+          echo "ℹ️ FIFO was not opened via fallback, checking sidecar"
+        fi
+        
+        # Clean up FIFO file to ensure no processes are blocked
+        if [ -p "$FIFO_PATH" ]; then
+          echo "🔧 Removing FIFO to ensure clean shutdown"
+          rm -f "$FIFO_PATH" 2>/dev/null || echo "⚠️ Could not remove FIFO"
         fi
         
         # Gracefully stop sidecar to allow Job to complete (all containers must exit)
