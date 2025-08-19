@@ -317,8 +317,14 @@ Map code changes to required documentation:
 - <10s analysis time for typical PRs
 - Zero tolerance for quality issues
 
-{{> code_claude.md.hbs}}
 EOF
+
+    # Copy base CLAUDE.md from ConfigMap if it exists (match Rex pattern)
+    if [ -f "/task-files/CLAUDE.md" ]; then
+        cat /task-files/CLAUDE.md >> "$CLAUDE_WORK_DIR/CLAUDE.md"
+        echo "✓ Appended base CLAUDE.md content from ConfigMap"
+    fi
+    
     echo "✓ Created Cleo-specific CLAUDE.md memory"
 fi
 

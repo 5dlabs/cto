@@ -359,8 +359,14 @@ After confirming functionality:
 - Do NOT merge PR - only approve
 - Human (CTO) performs final merge
 
-{{> code_claude.md.hbs}}
 EOF
+
+    # Copy base CLAUDE.md from ConfigMap if it exists (match Rex pattern)
+    if [ -f "/task-files/CLAUDE.md" ]; then
+        cat /task-files/CLAUDE.md >> "$CLAUDE_WORK_DIR/CLAUDE.md"
+        echo "✓ Appended base CLAUDE.md content from ConfigMap"
+    fi
+    
     echo "✓ Created Tess-specific CLAUDE.md memory"
 fi
 
