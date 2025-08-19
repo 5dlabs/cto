@@ -40,6 +40,24 @@ spec:
         env:
           RUST_LOG: "info"
 
+        livenessProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /v6/health
+            port: http
+          initialDelaySeconds: 300
+          timeoutSeconds: 10
+          periodSeconds: 60
+
+        readinessProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /v6/health
+            port: http
+          initialDelaySeconds: 300
+          timeoutSeconds: 10
+          periodSeconds: 60
+
         jupiter:
           solanaCredentials:
             enabled: true
