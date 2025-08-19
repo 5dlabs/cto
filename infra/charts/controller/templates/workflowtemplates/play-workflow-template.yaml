@@ -490,6 +490,8 @@ spec:
               PR_NUMBER: "{{`{{inputs.parameters.pr-number}}`}}"
               QA_READY: "{{`{{inputs.parameters.qa-ready}}`}}"
               WORKFLOW_STAGE: "{{`{{inputs.parameters.stage}}`}}"
+              WORKFLOW_NAME: "{{`{{workflow.name}}`}}"
+              SERVICE_NAME: "{{`{{workflow.parameters.service}}`}}"
 
     # Helper to reliably resolve the created CodeRun name before waiting for completion
     - name: resolve-coderun-name

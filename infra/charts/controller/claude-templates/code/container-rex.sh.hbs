@@ -1118,6 +1118,33 @@ echo '════════════════════════�
 # Claude execution completed - no hooks configured
 echo "Claude has completed successfully."
 
+# =============================================================================
+# PR LABELING (task/run/service) — applied by Rex at PR creation/update time
+# =============================================================================
+if [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${PR_NUMBER:-}" ]; then
+  echo "🏷️ Ensuring correlation labels on PR #${PR_NUMBER}"
+  TASK_LABEL="task-${TASK_ID}"
+  RUN_LABEL="run-${WORKFLOW_NAME:-unknown}"
+  SERVICE_LABEL="service-${SERVICE_NAME:-unknown}"
+  add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
+  REPO_SLUG="{{repository_url}}"
+  # Normalize URL to owner/repo slug if needed
+  if echo "$REPO_SLUG" | grep -q '^https://github.com/'; then
+    OWNER=$(echo "$REPO_SLUG" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+    NAME=$(echo "$REPO_SLUG" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+    REPO_SLUG="$OWNER/$NAME"
+  fi
+  curl -s -X POST \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    -H "Content-Type: application/json" \
+    -d "$add_labels_payload" \
+    "https://api.github.com/repos/${REPO_SLUG}/issues/${PR_NUMBER}/labels" >/dev/null 2>&1 || true
+  echo "🏷️ Labels ensured: $TASK_LABEL, $RUN_LABEL, $SERVICE_LABEL"
+else
+  echo "ℹ️ Skipping PR labeling: missing GITHUB_TOKEN or PR_NUMBER"
+fi
+
 # Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
 touch /workspace/.agent_done 2>/dev/null || true
 
