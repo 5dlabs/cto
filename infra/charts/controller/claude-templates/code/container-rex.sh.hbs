@@ -1046,6 +1046,7 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
 
         # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
+        FIFO_OPENED=false
         if printf '{"text":%s}\n' "$USER_COMBINED" | \
              curl -fsS -X POST http://127.0.0.1:8080/input \
                -H 'Content-Type: application/json' \
@@ -1055,6 +1056,7 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
           # Fallback: open FIFO writer and keep it open until Claude exits
           exec 9>"$FIFO_PATH"
+          FIFO_OPENED=true
           printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
         fi
 
@@ -1094,8 +1096,20 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         # Wait for Claude process to complete, then stop diagnostics if running
         wait "$CLAUDE_PID"
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
+        
         # Close FIFO writer if it was opened (in fallback) now that Claude has exited
-        exec 9>&- 2>/dev/null || true
+        if [ "$FIFO_OPENED" = "true" ]; then
+          echo "🔧 Closing FIFO file descriptor..."
+          # Try multiple methods to ensure fd 9 gets closed
+          exec 9>&- 2>/dev/null || {
+            echo "⚠️ exec 9>&- failed, trying alternative close method"
+            eval "exec 9>&-" 2>/dev/null || {
+              echo "⚠️ Alternative close failed, FIFO fd may remain open"
+            }
+          }
+        else
+          echo "ℹ️ FIFO was not opened, no need to close"
+        fi
         
         # Gracefully stop sidecar to allow Job to complete (all containers must exit)
         if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
