@@ -535,7 +535,7 @@ spec:
         retryPolicy: "OnError"
         backoff:
           duration: "20s"
-          factor: 1.5
+          factor: 2
           maxDuration: "2m"
 
     # Template for waiting for CodeRun completion

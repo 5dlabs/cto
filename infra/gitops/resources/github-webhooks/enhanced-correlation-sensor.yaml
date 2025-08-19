@@ -349,4 +349,4 @@ spec:
       retryStrategy:
         steps: 2
         duration: "5s"
-        factor: 1.5
+        factor: 2
