@@ -109,7 +109,9 @@ impl AgentClassifier {
                 } else {
                     service
                 };
-                Ok(format!("{workspace_prefix}{truncated_service}-{agent_name}"))
+                Ok(format!(
+                    "{workspace_prefix}{truncated_service}-{agent_name}"
+                ))
             } else {
                 Ok(pvc_name[..63].to_string())
             }
@@ -125,7 +127,9 @@ impl AgentClassifier {
         }
 
         if name.len() > 63 {
-            return Err(format!("Name '{name}' exceeds Kubernetes limit of 63 characters"));
+            return Err(format!(
+                "Name '{name}' exceeds Kubernetes limit of 63 characters"
+            ));
         }
 
         // Check for valid characters (alphanumeric and hyphens)
