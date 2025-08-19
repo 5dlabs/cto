@@ -6,13 +6,12 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
   annotations:
-    # Force ConfigMap update on redeploy by including template file checksums
-    {{- range $path, $content := .Files.Glob "claude-templates/**/*.hbs" }}
-    checksum/{{ $path | trimPrefix "claude-templates/" | replace "/" "_" }}: {{ $.Files.Get $path | sha256sum }}
+    # Force ConfigMap update on redeploy with aggregated template checksum
+    {{- $allFiles := "" }}
+    {{- range $path, $content := .Files.Glob "claude-templates/**/*" }}
+    {{- $allFiles = print $allFiles $path ($.Files.Get $path) }}
     {{- end }}
-    {{- range $path, $content := .Files.Glob "claude-templates/**/*.sh" }}
-    checksum/{{ $path | trimPrefix "claude-templates/" | replace "/" "_" }}: {{ $.Files.Get $path | sha256sum }}
-    {{- end }}
+    checksum/claude-templates: {{ $allFiles | sha256sum }}
 data:
 {{- range $path, $content := .Files.Glob "claude-templates/**/*.hbs" }}
   {{ $path | trimPrefix "claude-templates/" | replace "/" "_" }}: |
