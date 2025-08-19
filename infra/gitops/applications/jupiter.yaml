@@ -1,0 +1,64 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jupiter
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: jupiter
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://5dlabs.github.io/charts
+    chart: jupiter
+    targetRevision: 0.1.0
+    helm:
+      values: |
+        image:
+          repository: "ghcr.io/5dlabs/jupiter-swap-api"
+          tag: "v6.0.62"
+          pullPolicy: Always
+
+        ingress:
+          enabled: false
+
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+
+        autoscaling:
+          enabled: true
+          minReplicas: 2
+          maxReplicas: 10
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 70
+
+        env:
+          RUST_LOG: "info"
+
+        jupiter:
+          solanaCredentials:
+            enabled: true
+            secretName: "jupiter-solana-credentials"
+
+          debug: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: jupiter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+  revisionHistoryLimit: 10

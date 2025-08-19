@@ -88,6 +88,9 @@ agent_*.md
 # Solana credentials
 sol.env
 
+# Charts repository (for local development)
+charts-repo/
+
 # Task files
 # tasks.json
 # tasks/ 
