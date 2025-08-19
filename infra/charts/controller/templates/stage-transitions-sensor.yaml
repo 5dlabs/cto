@@ -1,4 +1,6 @@
-{{- if and .Values.argo.enabled .Values.argo.sensors.enabled }}
+{{- $argo := default (dict) .Values.argo }}
+{{- $sensors := default (dict) $argo.sensors }}
+{{- if and (default false $argo.enabled) (default false $sensors.enabled) }}
 ---
 # Stage Transitions Sensor for Multi-Agent Workflow Orchestration
 # This sensor handles GitHub webhook events and manages workflow stage transitions
@@ -7,7 +9,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: stage-transitions-sensor
-  namespace: {{ .Values.argo.sensors.namespace }}
+  namespace: {{ default .Release.Namespace $sensors.namespace }}
   labels:
     app.kubernetes.io/name: stage-transitions-sensor
     app.kubernetes.io/part-of: platform
