@@ -277,7 +277,7 @@ spec:
               kind: Workflow
               metadata:
                 generateName: remediation-cleanup-
-                namespace: argo
+                namespace: agent-platform
                 labels:
                   type: remediation
                   task: "5"
@@ -330,7 +330,7 @@ spec:
                           echo "Updating workflow stage for $WORKFLOW_NAME"
 
                           # Check if workflow exists
-                          if kubectl get workflow $WORKFLOW_NAME -n argo &>/dev/null; then
+                          if kubectl get workflow $WORKFLOW_NAME -n agent-platform &>/dev/null; then
                             echo "Workflow $WORKFLOW_NAME found, will be resumed from Cleo stage"
                             # The workflow resume will happen via the PR created trigger
                           else
