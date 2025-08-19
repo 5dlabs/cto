@@ -500,14 +500,27 @@ spec:
             exit 0
           fi
           # Fallback: resolve by labels (assumes a single CodeRun for this workflow/task/stage)
-          NAME=$(kubectl get coderun.agents.platform -n {{ .Release.Namespace }} \
-            -l workflow-name={{`{{workflow.name}}`}},workflow-stage={{`{{inputs.parameters.stage}}`}},task-id={{`{{inputs.parameters.task-id}}`}} \
-            -o jsonpath='{.items[0].metadata.name}' || true)
-          if [ -z "$NAME" ]; then
-            echo "" > /tmp/coderun-name.txt
-            exit 0
-          fi
-          echo "$NAME" > /tmp/coderun-name.txt
+          ATTEMPTS=12
+          while [ $ATTEMPTS -gt 0 ]; do
+            NAME=$(kubectl get coderun.agents.platform -n {{ .Release.Namespace }} \
+              -l workflow-name={{`{{workflow.name}}`}},workflow-stage={{`{{inputs.parameters.stage}}`}},task-id={{`{{inputs.parameters.task-id}}`}} \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            if [ -n "$NAME" ]; then
+              echo "$NAME" > /tmp/coderun-name.txt
+              exit 0
+            fi
+            sleep 5
+            ATTEMPTS=$((ATTEMPTS-1))
+          done
+          echo "No CodeRun found for labels after waiting" >&2
+          exit 1
+      retryStrategy:
+        limit: 6
+        retryPolicy: "OnError"
+        backoff:
+          duration: "20s"
+          factor: 1.5
+          maxDuration: "2m"
 
     # Template for waiting for CodeRun completion
     - name: wait-coderun-completion
