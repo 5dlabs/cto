@@ -458,7 +458,6 @@ spec:
       resource:
         action: create
         setOwnerReference: true
-        successCondition: metadata.name != ""
         manifest: |
           apiVersion: agents.platform/v1
           kind: CodeRun
