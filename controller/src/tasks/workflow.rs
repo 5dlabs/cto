@@ -126,13 +126,13 @@ async fn resume_workflow_via_http(
     // and the kube dynamic API is complex for this use case
     let token = std::fs::read_to_string("/var/run/secrets/kubernetes.io/serviceaccount/token")
         .context("Failed to read service account token")?;
-    
+
     let ca_cert = std::fs::read("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
         .context("Failed to read CA certificate")?;
-    
-    let cert = reqwest::Certificate::from_pem(&ca_cert)
-        .context("Failed to parse CA certificate")?;
-    
+
+    let cert =
+        reqwest::Certificate::from_pem(&ca_cert).context("Failed to parse CA certificate")?;
+
     let http_client = reqwest::Client::builder()
         .add_root_certificate(cert)
         .build()
@@ -154,10 +154,15 @@ async fn resume_workflow_via_http(
 
     if !workflow_response.status().is_success() {
         let status = workflow_response.status();
-        let error_text = workflow_response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        let error_text = workflow_response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(anyhow::anyhow!(
             "Failed to get workflow {}: HTTP {} - {}",
-            workflow_name, status, error_text
+            workflow_name,
+            status,
+            error_text
         ));
     }
 
@@ -173,12 +178,12 @@ async fn resume_workflow_via_http(
         .ok_or_else(|| anyhow::anyhow!("No nodes found in workflow"))?;
 
     let mut stuck_nodes = Vec::new();
-    
+
     if let Some(nodes_obj) = nodes.as_object() {
         for (node_id, node_data) in nodes_obj {
             if let (Some(template_name), Some(phase)) = (
                 node_data.get("templateName").and_then(|t| t.as_str()),
-                node_data.get("phase").and_then(|p| p.as_str())
+                node_data.get("phase").and_then(|p| p.as_str()),
             ) {
                 // Look for wait-coderun-completion nodes that are running
                 if template_name == "wait-coderun-completion" && phase == "Running" {
@@ -190,7 +195,10 @@ async fn resume_workflow_via_http(
     }
 
     if stuck_nodes.is_empty() {
-        info!("ℹ️ No stuck wait-coderun-completion nodes found in workflow {}", workflow_name);
+        info!(
+            "ℹ️ No stuck wait-coderun-completion nodes found in workflow {}",
+            workflow_name
+        );
         return Ok(());
     }
 
@@ -204,8 +212,11 @@ async fn resume_workflow_via_http(
         }
     });
 
-    info!("🔄 Forcing workflow controller to re-evaluate workflow: {}", workflow_name);
-    
+    info!(
+        "🔄 Forcing workflow controller to re-evaluate workflow: {}",
+        workflow_name
+    );
+
     // Patch the workflow via HTTP API
     let patch_url = format!(
         "{}/apis/argoproj.io/v1alpha1/namespaces/{}/workflows/{}",
@@ -223,18 +234,29 @@ async fn resume_workflow_via_http(
 
     if !patch_response.status().is_success() {
         let status = patch_response.status();
-        let error_text = patch_response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        let error_text = patch_response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(anyhow::anyhow!(
             "Failed to patch workflow {}: HTTP {} - {}",
-            workflow_name, status, error_text
+            workflow_name,
+            status,
+            error_text
         ));
     }
 
-    info!("✅ Successfully triggered workflow re-evaluation: {}", workflow_name);
+    info!(
+        "✅ Successfully triggered workflow re-evaluation: {}",
+        workflow_name
+    );
 
     // Log the context for debugging
     if let Some(pr_url) = pr_url {
-        info!("📝 Workflow triggered with PR context: {} (#{:?})", pr_url, pr_number);
+        info!(
+            "📝 Workflow triggered with PR context: {} (#{:?})",
+            pr_url, pr_number
+        );
     } else if let Some(error) = error_message {
         info!("❌ Workflow triggered with error context: {}", error);
     } else {
