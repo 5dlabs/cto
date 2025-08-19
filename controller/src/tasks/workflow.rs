@@ -9,15 +9,11 @@ use crate::crds::coderun::CodeRun;
 
 /// Extract workflow name from CodeRun labels
 pub fn extract_workflow_name(code_run: &CodeRun) -> Result<String> {
-    let labels = code_run
-        .metadata
-        .labels
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("CodeRun has no labels"))?;
-
-    // Try to get workflow name from label
-    if let Some(workflow_name) = labels.get("workflow-name") {
-        return Ok(workflow_name.clone());
+    // Try to get workflow name from label if labels exist
+    if let Some(labels) = code_run.metadata.labels.as_ref() {
+        if let Some(workflow_name) = labels.get("workflow-name") {
+            return Ok(workflow_name.clone());
+        }
     }
 
     // Fallback: construct from task ID
@@ -141,13 +137,12 @@ async fn resume_workflow_via_http(
     // Get the current workflow via HTTP API
     let api_server = "https://kubernetes.default.svc";
     let get_url = format!(
-        "{}/apis/argoproj.io/v1alpha1/namespaces/{}/workflows/{}",
-        api_server, namespace, workflow_name
+        "{api_server}/apis/argoproj.io/v1alpha1/namespaces/{namespace}/workflows/{workflow_name}"
     );
 
     let workflow_response = http_client
         .get(&get_url)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .send()
         .await
         .context("Failed to get workflow")?;
@@ -219,13 +214,12 @@ async fn resume_workflow_via_http(
 
     // Patch the workflow via HTTP API
     let patch_url = format!(
-        "{}/apis/argoproj.io/v1alpha1/namespaces/{}/workflows/{}",
-        api_server, namespace, workflow_name
+        "{api_server}/apis/argoproj.io/v1alpha1/namespaces/{namespace}/workflows/{workflow_name}"
     );
 
     let patch_response = http_client
         .patch(&patch_url)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .header("Content-Type", "application/merge-patch+json")
         .json(&retry_patch)
         .send()
