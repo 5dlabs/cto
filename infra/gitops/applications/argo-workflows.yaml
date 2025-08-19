@@ -54,6 +54,8 @@ spec:
             annotations: {}
           rbac:
             create: true
+        controller:
+          parallelism: 10
 
   # Destination configuration
   destination:
