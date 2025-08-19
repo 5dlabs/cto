@@ -287,7 +287,9 @@ spec:
           REPO="{{`{{inputs.parameters.repository}}`}}"
           TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
           LABEL="task-${TASK_ID}"
-          echo "🔎 Looking for PR with label ${LABEL} in ${REPO}"
+          RUN_LABEL="run-{{`{{workflow.name}}`}}"
+          SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
+          echo "🔎 Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
 
           # Ensure tools
           apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
@@ -350,13 +352,27 @@ spec:
             else
               resp=$(curl -sL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
             fi
-            pr_url=$(echo "$resp" | jq -r '.[] | select(.labels // [] | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
-            pr_number=$(echo "$resp" | jq -r '.[] | select(.labels // [] | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+            pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .html_url' | head -n1)
+            pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .number' | head -n1)
+            if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+              pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
+              pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+            fi
 
             if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
               echo "$pr_url" > /tmp/pr-url.txt
               echo "$pr_number" > /tmp/pr-number.txt
               echo "✅ Found PR #$pr_number"
+              if [ -n "$TOKEN" ]; then
+                add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
+                curl -s -X POST \
+                  -H "Authorization: Bearer $TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Content-Type: application/json" \
+                  -d "$add_labels_payload" \
+                  "https://api.github.com/repos/${REPO}/issues/${pr_number}/labels" >/dev/null 2>&1 || true
+                echo "🏷️ Ensured PR #$pr_number has labels: $LABEL, $RUN_LABEL, $SERVICE_LABEL"
+              fi
               exit 0
             fi
 
