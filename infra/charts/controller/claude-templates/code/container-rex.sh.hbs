@@ -861,6 +861,26 @@ if [ "$(pwd)" != "$CLAUDE_WORK_DIR" ]; then
   echo "✓ Successfully changed to: $(pwd)"
 fi
 
+# Verify git repository is accessible from Claude working directory
+echo "=== GIT REPOSITORY VERIFICATION ==="
+if [ ! -d ".git" ]; then
+  echo "❌ ERROR: No .git directory found in Claude working directory: $(pwd)"
+  echo "📂 Checking parent directory structure:"
+  echo "  Current: $(pwd)"
+  echo "  Contents: $(ls -la . | head -5)"
+  if [ -d "/workspace/$REPO_NAME/.git" ]; then
+    echo "  Found .git at: /workspace/$REPO_NAME/"
+    echo "🔧 This indicates a working directory path mismatch"
+    echo "🔧 CLAUDE_WORK_DIR: $CLAUDE_WORK_DIR"
+    echo "🔧 Expected git repo: /workspace/$REPO_NAME"
+  fi
+  exit 1
+else
+  echo "✅ Git repository verified at: $(pwd)/.git"
+  echo "✅ Repository status: $(git status --porcelain | wc -l) modified files"
+  echo "✅ Current branch: $(git branch --show-current 2>/dev/null || echo 'detached')"
+fi
+
 # Verify setup
 echo "✓ Code implementation environment ready"
 
