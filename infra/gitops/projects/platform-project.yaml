@@ -127,6 +127,8 @@ spec:
       kind: '*'
     - group: 'apps'
       kind: '*'
+    - group: 'autoscaling'
+      kind: '*'
     - group: 'batch'
       kind: '*'
     - group: 'extensions'
