@@ -30,9 +30,17 @@ spec:
         controller:
           image:
             tag: v3.7.0-rc4
+          workflowDefaults:
+            spec:
+              parallelism: 10
         server:
           image:
             tag: v3.7.0-rc4
+          authModes:
+            - server
+          service:
+            type: NodePort
+            nodePort: 30081
         executor:
           image:
             tag: v3.7.0-rc4
@@ -43,19 +51,13 @@ spec:
           filesystem:
             archivePath: /tmp/artifacts
         persistence: {}
-        server:
-          authModes:
-            - server
-          service:
-            type: NodePort
-            nodePort: 30081
+        
         workflow:
           serviceAccount:
             annotations: {}
           rbac:
             create: true
-        controller:
-          parallelism: 10
+        
 
   # Destination configuration
   destination:
