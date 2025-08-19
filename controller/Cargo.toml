@@ -54,12 +54,14 @@ reqwest = { workspace = true }
 # GitHub API
 octocrab = "0.38"
 
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
 # Async utilities
 futures = { workspace = true }
 async-trait = { workspace = true }
 
 # Time handling
-chrono = { workspace = true }
 
 # Text processing
 regex = { workspace = true }
