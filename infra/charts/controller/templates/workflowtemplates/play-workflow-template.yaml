@@ -116,11 +116,20 @@ spec:
               - name: stage
                 value: "implementation"
 
-          # (Removed suspend on PR-created; handled by implementation-cycle polling)
+          # Update stage after implementation cycle completes (PR created)
+          - name: update-to-waiting-pr-created
+            dependencies: [implementation-cycle]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "waiting-pr-created"
+              - name: verify-update
+                value: "true"
 
           # Stage 2: Quality work
           - name: quality-work
-            dependencies: [implementation-cycle]
+            dependencies: [update-to-waiting-pr-created]
             template: agent-coderun
             arguments:
               parameters:
@@ -610,8 +619,8 @@ spec:
             local current_stage=$1
             local new_stage=$2
 
-            # Special case: Allow setting initial stage to "pending"
-            if [[ $current_stage == "pending" && $new_stage == "pending" ]]; then
+            # Special case: Allow setting initial stage to "pending" when no stage exists
+            if [[ -z "$current_stage" || "$current_stage" == "null" ]] && [[ $new_stage == "pending" ]]; then
               return 0
             fi
 
