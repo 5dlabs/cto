@@ -93,8 +93,19 @@ spec:
     - name: main
       dag:
         tasks:
+          # Stage 0: Initialize workflow stage tracking
+          - name: initialize-stage
+            template: update-workflow-stage
+            arguments:
+              parameters:
+              - name: new-stage
+                value: "pending"
+              - name: verify-update
+                value: "true"
+
           # Stage 1: Implementation cycle (Rex runs; if no PR, retry cycle)
           - name: implementation-cycle
+            dependencies: [initialize-stage]
             template: implementation-cycle
             arguments:
               parameters:
@@ -598,6 +609,11 @@ spec:
           validate_stage_transition() {
             local current_stage=$1
             local new_stage=$2
+
+            # Special case: Allow setting initial stage to "pending"
+            if [[ $current_stage == "pending" && $new_stage == "pending" ]]; then
+              return 0
+            fi
 
             # Define valid transitions
             case $current_stage in
