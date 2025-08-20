@@ -104,39 +104,87 @@ spec:
     - template:
         name: resume-after-ready-for-qa
         conditions: "github-label-added"
-        argoWorkflow:
-          operation: resume
+        k8s:
+          operation: create
           source:
             resource:
-              # Only resume workflows waiting for QA ready state
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
+                generateName: resume-ready-qa-
                 namespace: agent-platform
-              selector:
-                matchLabels:
-                  workflow-type: play-orchestration
-                  current-stage: waiting-ready-for-qa
-          args: []
-          parameters:
-            # Extract task ID from PR labels to find workflow
-            - src:
-                dependencyName: github-label-added
-                dataTemplate: |
-                  {{ range $i, $l := .Input.body.pull_request.labels }}
-                    {{ if hasPrefix $l.name "task-" }}
-                      {{ $p := splitList "-" $l.name }}
-                      {{ if gt (len $p) 1 }}
-                        play-task-{{ index $p 1 }}-workflow
-                      {{ end }}
-                    {{ end }}
-                  {{ end }}
-              dest: args.0
-            # Pass QA ready status
-            - src:
-                dependencyName: github-label-added
-                dataTemplate: "ready"
-              dest: spec.arguments.parameters.qa-status
+                labels:
+                  type: webhook-resume
+                  target-stage: waiting-ready-for-qa
+              spec:
+                entrypoint: resume-workflow
+                serviceAccountName: argo-workflow
+                templates:
+                  - name: resume-workflow
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+                        
+                        echo "=== Ready-for-QA Workflow Resume ==="
+                        echo "Label Added: {{ .Input.body.label.name }}"
+                        echo "Added By: {{ .Input.body.sender.login }}"
+
+                        # Extract task ID from PR labels  
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ERROR: No task-* label found on PR"
+                          exit 1
+                        fi
+
+                        echo "Task ID: $TASK_ID"
+
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
+
+                        # Check if workflow exists and is at correct stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
+                          -n agent-platform \
+                          -o jsonpath='{.metadata.labels.current-stage}' \
+                          2>/dev/null || echo "")
+
+                        if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
+                          echo "Found workflow at correct stage, resuming..."
+
+                          # Update workflow parameters
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            --patch='{
+                              "spec": {
+                                "arguments": {
+                                  "parameters": [
+                                    {"name": "qa-status", "value": "ready"}
+                                  ]
+                                }
+                              }
+                            }'
+
+                          # Resume the workflow
+                          argo resume $WORKFLOW_NAME -n agent-platform
+
+                          echo "✅ Workflow resumed successfully"
+                        else
+                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
+                          echo "Skipping resume to prevent incorrect stage progression"
+                        fi
       retryStrategy:
         steps: 3
         duration: "10s"
