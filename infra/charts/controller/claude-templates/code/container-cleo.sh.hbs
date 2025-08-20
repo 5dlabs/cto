@@ -381,6 +381,11 @@ echo "🎯 Focus: Rigorous code quality enforcement"
 echo "⚠️  CRITICAL: Must pass all quality checks before adding 'ready-for-qa' label"
 echo "════════════════════════════════════════════════════════════════"
 
+# Export necessary variables for Claude execution
+export SERVICE_NAME="{{service}}"
+export TASK_ID="{{task_id}}"
+export GITHUB_APP="{{github_app}}"
+
 # Start Claude with Cleo-specific configuration
 cd "$CLAUDE_WORK_DIR"
 

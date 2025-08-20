@@ -1231,22 +1231,24 @@ EOF
     
     # Apply correlation labels
     echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
+    TASK_LABEL="task-${TASK_ID}"
     RUN_LABEL="run-${WORKFLOW_NAME:-unknown}"
     SERVICE_LABEL="service-${SERVICE_NAME:-unknown}"
     
     # Use gh CLI to add labels (simpler than curl)
-    if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
-      echo "✅ Added correlation labels: $RUN_LABEL, $SERVICE_LABEL"
+    if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
+      echo "✅ Added correlation labels: $TASK_LABEL, $RUN_LABEL, $SERVICE_LABEL"
     else
       echo "⚠️ Failed to add correlation labels (they may not exist)"
       
       # Try to create the labels if they don't exist
       echo "🏷️ Creating missing labels..."
+      gh label create "$TASK_LABEL" -R "{{docs_repository_url}}" --color "f29513" --description "Task correlation" 2>/dev/null || true
       gh label create "$RUN_LABEL" -R "{{docs_repository_url}}" --color "0366d6" --description "Workflow run correlation" 2>/dev/null || true
       gh label create "$SERVICE_LABEL" -R "{{docs_repository_url}}" --color "0e8a16" --description "Service correlation" 2>/dev/null || true
       
       # Try again to add the labels
-      if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
+      if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
         echo "✅ Labels created and added successfully"
       else
         echo "⚠️ Could not add labels even after creating them"
