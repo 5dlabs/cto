@@ -48,13 +48,14 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== PR Created Workflow Resume ==="
                         echo "PR Number: {{ .Input.body.pull_request.number }}"
                         echo "PR URL: {{ .Input.body.pull_request.html_url }}"
 
-                        # Extract task ID from PR labels  
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+                        # Extract task ID from PR labels
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                          jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
@@ -171,13 +172,14 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== Ready-for-QA Workflow Resume ==="
                         echo "Label Added: {{ .Input.body.label.name }}"
                         echo "Added By: {{ .Input.body.sender.login }}"
 
-                        # Extract task ID from PR labels  
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+                        # Extract task ID from PR labels
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                          jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
@@ -294,13 +296,14 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== PR Approved Workflow Resume ==="
                         echo "Reviewer: {{ .Input.body.review.user.login }}"
                         echo "Review State: {{ .Input.body.review.state }}"
 
-                        # Extract task ID from PR labels  
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+                        # Extract task ID from PR labels
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                          jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
