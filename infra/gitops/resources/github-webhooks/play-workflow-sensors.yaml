@@ -40,6 +40,14 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: pr-number
+                      value: "{{ .Input.body.pull_request.number }}"
+                    - name: pr-url
+                      value: "{{ .Input.body.pull_request.html_url }}"
+                    - name: pr-labels
+                      value: "{{ .Input.body.pull_request.labels | toJson }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -50,11 +58,11 @@ spec:
                         set -e
 
                         echo "=== PR Created Workflow Resume ==="
-                        echo "PR Number: {{ .Input.body.pull_request.number }}"
-                        echo "PR URL: {{ .Input.body.pull_request.html_url }}"
+                        echo "PR Number: {{workflow.parameters.pr-number}}"
+                        echo "PR URL: {{workflow.parameters.pr-url}}"
 
                         # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
                           jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
@@ -86,8 +94,8 @@ spec:
                           echo "Found workflow at correct stage, resuming..."
 
                           # Store PR details in environment variables to prevent injection
-                          PR_URL="{{ .Input.body.pull_request.html_url }}"
-                          PR_NUMBER="{{ .Input.body.pull_request.number }}"
+                          PR_URL="{{workflow.parameters.pr-url}}"
+                          PR_NUMBER="{{workflow.parameters.pr-number}}"
 
                           # Update workflow parameters with PR details using strategic patch
                           kubectl patch workflow $WORKFLOW_NAME \
