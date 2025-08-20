@@ -264,7 +264,7 @@ spec:
           - path: body.review.user.login
             type: string
             comparator: "~"
-            value: "tess-5dlabs\\[bot\\]"
+            value: ["tess-5dlabs\\[bot\\]"]
   triggers:
     - template:
         name: resume-after-pr-approved
@@ -388,12 +388,12 @@ spec:
           - path: body.pusher.name
             type: string
             comparator: "~"
-            value: "(rex|blaze|morgan)-5dlabs\\[bot\\]"
+            value: ["(rex|blaze|morgan)-5dlabs\\[bot\\]"]
           # Ensure push is to a task branch
           - path: body.ref
             type: string
             comparator: "~"
-            value: "refs/heads/(task|feature/task)-.*"
+            value: ["refs/heads/(task|feature/task)-.*"]
   triggers:
     # Cancel running quality/testing agents
     - template:
