@@ -30,6 +30,10 @@ spec:
           source:
             resource:
               # Only resume workflows waiting for PR creation
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                namespace: agent-platform
               selector:
                 matchLabels:
                   workflow-type: play-orchestration
@@ -105,6 +109,10 @@ spec:
           source:
             resource:
               # Only resume workflows waiting for QA ready state
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                namespace: agent-platform
               selector:
                 matchLabels:
                   workflow-type: play-orchestration
@@ -176,6 +184,10 @@ spec:
           source:
             resource:
               # Only resume workflows waiting for PR approval
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                namespace: agent-platform
               selector:
                 matchLabels:
                   workflow-type: play-orchestration
@@ -257,7 +269,7 @@ spec:
               kind: Job
               metadata:
                 generateName: cancel-quality-agents-
-                namespace: argo
+                namespace: agent-platform
               spec:
                 template:
                   spec:
@@ -278,8 +290,8 @@ spec:
                             echo "Task ID: $TASK_ID"
 
                             # Cancel Cleo and Tess CodeRuns for this task
-                            kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
-                            kubectl delete coderun -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
+                            kubectl delete coderun -n agent-platform -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
+                            kubectl delete coderun -n agent-platform -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
 
                             echo "Quality agents canceled for task $TASK_ID"
                 ttlSecondsAfterFinished: 60
