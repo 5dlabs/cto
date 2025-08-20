@@ -15,8 +15,7 @@ metadata:
     agents.platform/orchestration: full-project
     workflow-type: project-orchestration
 spec:
-  # Extended deadline for full project execution
-  activeDeadlineSeconds: 2592000  # 30 days
+  # No deadline - allow unlimited time for realistic development cycles
 
   # Service account with proper permissions
   serviceAccountName: argo-workflow

@@ -47,8 +47,7 @@ spec:
   # Service account for workflow execution
   serviceAccountName: argo-workflow
 
-  # Workflow timeout (3 hours)
-  activeDeadlineSeconds: 10800
+  # No timeout - allow unlimited time for complex development tasks
 
   # Main workflow entry point
   entrypoint: coderun-main

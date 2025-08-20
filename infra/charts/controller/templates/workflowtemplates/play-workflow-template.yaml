@@ -15,8 +15,7 @@ metadata:
     agents.platform/orchestration: multi-agent
     workflow-type: play-orchestration
 spec:
-  # Extended deadline for realistic multi-day development cycles
-  activeDeadlineSeconds: 1209600  # 14 days
+  # No deadline - allow unlimited time for realistic development cycles
 
   # Service account with proper permissions for CRD operations
   serviceAccountName: argo-workflow
@@ -533,12 +532,12 @@ spec:
           echo "No CodeRun found for labels after waiting" >&2
           exit 1
       retryStrategy:
-        limit: 10
+        limit: 50
         retryPolicy: "OnError"
         backoff:
           duration: "30s"
           factor: 2
-          maxDuration: "15m"
+          # No maxDuration - allow unlimited time for CodeRun creation
 
     # Template for waiting for CodeRun completion
     - name: wait-coderun-completion
@@ -556,12 +555,12 @@ spec:
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
       retryStrategy:
-        limit: 50
+        limit: 200
         retryPolicy: "OnError"
         backoff:
-          duration: "30s"
-          factor: 2
-          maxDuration: "60m"
+          duration: "60s"
+          factor: 1.5
+          # No maxDuration - allow unlimited time for CodeRun completion
 
     # Template for atomic workflow stage updates with optimistic locking
     - name: update-workflow-stage
@@ -761,12 +760,12 @@ spec:
           echo "Retries required: $RETRY_COUNT"
           echo "Verification attempts: $VERIFY_COUNT"
       retryStrategy:
-        limit: 10
+        limit: 20
         retryPolicy: "OnFailure" 
         backoff:
-          duration: "30s"
-          factor: 2
-          maxDuration: "30m"
+          duration: "60s"
+          factor: 1.5
+          # No maxDuration - allow unlimited time for workflow stage updates
 
     # Template for suspend points waiting for external events
     - name: suspend-for-event
