@@ -619,8 +619,9 @@ spec:
             local current_stage=$1
             local new_stage=$2
 
-            # Special case: Allow setting initial stage to "pending" when no stage exists
-            if [[ -z "$current_stage" || "$current_stage" == "null" ]] && [[ $new_stage == "pending" ]]; then
+            # Special case: Allow setting initial stage to "pending" when no stage label exists
+            if [[ -z "$current_stage" ]] && [[ "$new_stage" == "pending" ]]; then
+              echo "✅ Allowing initial stage setting: (none) → $new_stage"
               return 0
             fi
 
@@ -650,10 +651,17 @@ spec:
             -n {{ .Release.Namespace }} \
             -o json)
 
-          CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"] // "pending"')
+          # Check if current-stage label actually exists (not just defaulted)
+          CURRENT_STAGE_RAW=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"]')
+          if [ "$CURRENT_STAGE_RAW" = "null" ]; then
+            CURRENT_STAGE=""
+            echo "Current stage: (no label exists)"
+          else
+            CURRENT_STAGE="$CURRENT_STAGE_RAW"
+            echo "Current stage: $CURRENT_STAGE"
+          fi
+          
           RESOURCE_VERSION=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.resourceVersion')
-
-          echo "Current stage: $CURRENT_STAGE"
           echo "Resource version: $RESOURCE_VERSION"
 
           # Validate stage transition
