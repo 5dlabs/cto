@@ -130,10 +130,19 @@ spec:
                         fi
 
                         echo "Task ID: $TASK_ID"
-                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
 
-                        # Find workflow with matching stage and task
-                        echo "Looking for workflow: $WORKFLOW_NAME at stage: waiting-pr-created"
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
+                        echo "Looking for stage: waiting-pr-created"
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
@@ -213,7 +222,18 @@ spec:
                         fi
 
                         echo "Task ID: $TASK_ID"
-                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
+
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
@@ -299,7 +319,18 @@ spec:
                         fi
 
                         echo "Task ID: $TASK_ID"
-                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
+
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
@@ -399,11 +430,22 @@ spec:
                         fi
 
                         echo "Task ID: $TASK_ID"
-                        WORKFLOW_NAME="play-task-${TASK_ID}-workflow"
+
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
 
                         # Check if workflow exists and is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n argo \
+                          -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
@@ -412,7 +454,7 @@ spec:
 
                           # Update workflow parameters
                           kubectl patch workflow $WORKFLOW_NAME \
-                            -n argo \
+                            -n agent-platform \
                             --type='merge' \
                             --patch='{
                               "spec": {
@@ -426,7 +468,7 @@ spec:
                             }'
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n argo
+                          argo resume $WORKFLOW_NAME -n agent-platform
 
                           echo "✅ Workflow resumed successfully"
                         else
