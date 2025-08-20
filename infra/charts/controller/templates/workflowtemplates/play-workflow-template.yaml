@@ -557,7 +557,7 @@ spec:
         retryPolicy: "OnError"
         backoff:
           duration: "60s"
-          factor: 1.5
+          factor: 2
           # No maxDuration - allow unlimited time for CodeRun completion
 
     # Template for atomic workflow stage updates with optimistic locking
@@ -762,7 +762,7 @@ spec:
         retryPolicy: "OnFailure" 
         backoff:
           duration: "60s"
-          factor: 1.5
+          factor: 2
           # No maxDuration - allow unlimited time for workflow stage updates
 
     # Template for suspend points waiting for external events
