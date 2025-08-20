@@ -166,23 +166,21 @@ else
 fi
 
 echo "════════════════════════════════════════════════════════════════"
-echo "🔍 QA DOCUMENTATION ENFORCEMENT CHECK"
+echo "🔍 CODE QUALITY ANALYSIS PREPARATION"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo "CRITICAL MISSION: Before approving any PR, verify that:"
-echo "1. Implementation changes are reflected in documentation"
-echo "2. Or a rationale is provided when docs are not needed"
+echo "MISSION: Enforce rigorous code quality standards:"
+echo "1. Run Clippy pedantic checks on all Rust code changes"
+echo "2. Verify code formatting with cargo fmt --check"
+echo "3. Execute all tests with cargo test"
+echo "4. Lint YAML files when YAML changes are detected"
+echo "5. Add 'ready-for-qa' label only when all quality checks pass"
 echo ""
-echo "Detection logic:"
-echo "- controller/** → engineering and controller references required"
-echo "- infra/** (charts/CRDs) → infra docs and references required"
-echo "- mcp/** → CLI/tooling docs required"
-echo "- API/config changes → README/examples updates required"
-echo ""
-echo "If docs missing, must:"
-echo "- Post structured PR comment with required docs checklist"
-echo "- Block approval until docs updated or rationale provided"
-echo "- Exit non-zero to fail QA step"
+echo "Quality Standards:"
+echo "- Zero clippy warnings (pedantic level)"
+echo "- Perfect code formatting"
+echo "- 100% test passing rate"
+echo "- Clean YAML syntax and structure"
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
@@ -231,8 +229,16 @@ rm -rf /tmp/docs-repo
 
 # Copy prepared files to Claude working directory
 # Copy repository files to working directory, avoiding recursive copy
-if [ "$TARGET_REPO_DIR" != "$(basename "$CLAUDE_WORK_DIR")" ]; then
-    cp -r "/workspace/$TARGET_REPO_DIR/." "$CLAUDE_WORK_DIR/"
+SOURCE_PATH="/workspace/$TARGET_REPO_DIR"
+DEST_PATH="$CLAUDE_WORK_DIR"
+
+# Resolve absolute paths to avoid directory-into-itself issues
+SOURCE_REAL=$(realpath "$SOURCE_PATH" 2>/dev/null || echo "$SOURCE_PATH")
+DEST_REAL=$(realpath "$DEST_PATH" 2>/dev/null || echo "$DEST_PATH")
+
+if [ "$SOURCE_REAL" != "$DEST_REAL" ] && [ "$TARGET_REPO_DIR" != "." ]; then
+    echo "📁 Copying repository files from $SOURCE_PATH to $DEST_PATH"
+    cp -r "$SOURCE_PATH/." "$DEST_PATH/"
 else
     echo "✓ Working directory is repository root, no copy needed"
 fi
@@ -272,55 +278,56 @@ fi
 # Create initial CLAUDE.md if needed
 if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
     cat > /workspace/CLAUDE.md << 'EOF'
-# CLEO - Code Quality & Documentation Enforcement Agent
+# CLEO - Code Quality Enforcement Agent
 
 ## Agent Role
-- **Primary**: Code quality enforcement (Clippy pedantic, formatting)
-- **Secondary**: Documentation verification and enforcement
-- **Critical**: Add "ready-for-qa" label when satisfied with quality AND tests pass
+- **Primary**: Rigorous code quality enforcement using automated tools
+- **Focus**: Clippy pedantic checks, code formatting, test execution
+- **Secondary**: YAML linting for infrastructure changes
+- **Critical**: Add "ready-for-qa" label only when ALL quality checks pass
 
-## QA Documentation Enforcement Requirements
+## Code Quality Requirements
 
-### Detection Logic
-Map code changes to required documentation:
-- `controller/**` → `docs/engineering/*` and `docs/references/*`
-- `infra/charts/**` → chart docs and `docs/references/*`
-- `workflows/sensors` → `docs/references/argo-events/*`
-- API/config changes → `docs/README.md`, `docs/examples/*`
-
-### Enforcement Process
-1. Parse git diff for implementation changes
-2. Check if corresponding docs were updated
-3. If missing docs:
-   - Post structured PR comment with checklist
-   - Include suggested doc paths and sections
-   - Provide rationale template option
-   - Exit non-zero to block approval
-
-### PR Comment Template
+### Change Detection Logic
+Analyze git diff to determine appropriate quality checks:
+```bash
+RUST_CHANGES=$(git diff --name-only origin/main...HEAD | grep -E '\.(rs|toml)$' || true)
+YAML_CHANGES=$(git diff --name-only origin/main...HEAD | grep -E '\.(yaml|yml)$' || true)
 ```
-🔍 QA Documentation Check
 
-**Detected change areas requiring documentation:**
-- [List areas detected]
+### Quality Check Execution
+**For Rust Changes:**
+1. `cargo clippy -- -D warnings -D clippy::pedantic` (zero tolerance)
+2. `cargo fmt --check` (enforce consistent formatting)
+3. `cargo test` (all tests must pass)
 
-**Required documentation updates:**
-- [ ] Path: suggested/doc/path.md - Section to update
-- [ ] Path: another/doc/path.md - Another section
+**For YAML Changes:**
+1. YAML syntax validation with yamllint or equivalent
+2. Schema validation where applicable
 
-**Actions:**
-- [ ] I have updated the documentation listed above
-- [ ] Documentation not required for this change
-  > Rationale: [provide brief explanation]
+**For Mixed Changes:**
+- Execute both Rust and YAML quality checks
+- All must pass before approval
 
-**Note:** PR approval blocked until documentation is verified or rationale provided.
-```
+### Error Handling
+- Handle projects without Rust gracefully (skip Rust checks)
+- Handle projects without YAML gracefully (skip YAML checks)  
+- Provide clear error messages for failed quality checks
+- Never approve when quality checks fail
+
+### GitHub Integration
+- Checkout the PR branch for testing
+- Run quality checks against actual changes
+- Post detailed PR comments with quality check results
+- Add "ready-for-qa" label only when all checks pass
+- Use GitHub CLI for PR management
 
 ## Success Criteria
-- 95% of behavior-changing PRs include docs or rationale
-- <1% false positives on doc requirements
-- <10s analysis time for typical PRs
-- Zero tolerance for quality issues
+- Zero clippy warnings at pedantic level
+- Perfect code formatting consistency
+- 100% test pass rate
+- Clean YAML syntax and structure
+- Clear PR feedback with actionable items
 
 EOF
 
@@ -388,47 +395,95 @@ cd "$CLAUDE_WORK_DIR"
 # Build Claude command
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
-# Check if prompt.md exists and use it as main prompt
-if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
-    echo "✓ Using task-specific prompt from docs service: task/prompt.md"
-    
-    # Seed initial user turn via a FIFO
-    FIFO_PATH="/workspace/agent-input.jsonl"
-    rm -f "$FIFO_PATH" 2>/dev/null || true
-    mkfifo "$FIFO_PATH"
-    chmod 666 "$FIFO_PATH" || true
-    
-    # Start Claude (reader) first in background
-    $CLAUDE_CMD < "$FIFO_PATH" &
-    CLAUDE_PID=$!
-    
-    # Compose initial user turn
-    USER_COMBINED=$(printf "%s" "$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
-    
-    # Send via sidecar HTTP endpoint
-    if printf '{"text":%s}\n' "$USER_COMBINED" | \
-         curl -fsS -X POST http://127.0.0.1:8080/input \
-           -H 'Content-Type: application/json' \
-           --data-binary @- >/dev/null 2>&1; then
-      echo "✓ Initial prompt sent via sidecar /input"
-    else
-      echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-      exec 9>"$FIFO_PATH"
-      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-    fi
-    
-    # Wait for Claude process to complete
-    wait "$CLAUDE_PID"
-    # Close FIFO writer if it was opened
-    exec 9>&- 2>/dev/null || true
-    
-    # Gracefully stop sidecar
-    if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ Requested sidecar shutdown"
-    else
-      echo "⚠️ Failed to request sidecar shutdown"
-    fi
+# Create Cleo's static prompt
+echo "✓ Creating Cleo's static code quality enforcement prompt"
+
+# Build static prompt with task context
+CLEO_PROMPT="# Code Quality Review Assignment
+
+You are Cleo, a rigorous code quality enforcement agent. Your mission is to ensure zero-tolerance quality standards for this pull request.
+
+## Your Role
+- **Primary Focus**: Code quality enforcement using automated tools
+- **Quality Tools**: Clippy (pedantic), cargo fmt, cargo test, YAML linting
+- **Decision Authority**: Add 'ready-for-qa' label only when ALL quality checks pass
+- **Standards**: Zero warnings, perfect formatting, 100% test pass rate
+
+## Current Context"
+
+# Add task context if available
+if [ -f "$CLAUDE_WORK_DIR/task/task.md" ]; then
+    CLEO_PROMPT="$CLEO_PROMPT
+
+### Task Information (for context)
+$(cat "$CLAUDE_WORK_DIR/task/task.md")
+
+### Task Requirements (Rex was asked to implement)
+$(cat "$CLAUDE_WORK_DIR/task/prompt.md" 2>/dev/null || echo "No prompt.md found")
+
+### Acceptance Criteria (what Rex needed to achieve)
+$(cat "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" 2>/dev/null || echo "No acceptance-criteria.md found")"
 else
-    echo "❌ ERROR: No prompt.md found from docs service"
-    exit 1
+    CLEO_PROMPT="$CLEO_PROMPT
+
+### Task Information
+No task files found - proceeding with general code quality review."
+fi
+
+# Complete the prompt
+CLEO_PROMPT="$CLEO_PROMPT
+
+## Your Instructions
+1. **Checkout the PR branch** and analyze the actual changes made
+2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
+3. **Run quality checks**:
+   - For Rust: cargo clippy (pedantic), cargo fmt --check, cargo test
+   - For YAML: YAML linting and validation
+4. **Review against task requirements**: Verify implementation matches acceptance criteria
+5. **Post detailed feedback**: Comment on PR with specific quality issues found
+6. **Apply label**: Add 'ready-for-qa' label ONLY if all quality checks pass
+
+## Quality Standards
+- **Zero tolerance** for clippy warnings (even at pedantic level)
+- **Perfect formatting** required (cargo fmt --check must pass)
+- **All tests pass** (cargo test must succeed)
+- **Clean YAML** syntax and structure
+- **Task compliance** (implementation should meet acceptance criteria)
+
+Begin your code quality review now."
+
+# Send the static prompt to Claude
+FIFO_PATH="/workspace/agent-input.jsonl"
+rm -f "$FIFO_PATH" 2>/dev/null || true
+mkfifo "$FIFO_PATH"
+chmod 666 "$FIFO_PATH" || true
+
+# Start Claude (reader) first in background
+$CLAUDE_CMD < "$FIFO_PATH" &
+CLAUDE_PID=$!
+
+# Compose initial user turn with the static prompt
+USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
+
+# Send via sidecar HTTP endpoint
+if printf '{"text":%s}\n' "$USER_COMBINED" | \
+     curl -fsS -X POST http://127.0.0.1:8080/input \
+       -H 'Content-Type: application/json' \
+       --data-binary @- >/dev/null 2>&1; then
+  echo "✓ Static Cleo prompt sent via sidecar /input"
+else
+  echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+  exec 9>"$FIFO_PATH"
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+  exec 9>&- 2>/dev/null || true  # Close immediately
+fi
+
+# Wait for Claude process to complete
+wait "$CLAUDE_PID"
+
+# Gracefully stop sidecar
+if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+  echo "✓ Requested sidecar shutdown"
+else
+  echo "⚠️ Failed to request sidecar shutdown"
 fi

@@ -533,12 +533,12 @@ spec:
           echo "No CodeRun found for labels after waiting" >&2
           exit 1
       retryStrategy:
-        limit: 6
+        limit: 10
         retryPolicy: "OnError"
         backoff:
-          duration: "20s"
+          duration: "30s"
           factor: 2
-          maxDuration: "2m"
+          maxDuration: "15m"
 
     # Template for waiting for CodeRun completion
     - name: wait-coderun-completion
@@ -556,12 +556,12 @@ spec:
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
       retryStrategy:
-        limit: 30
+        limit: 50
         retryPolicy: "OnError"
         backoff:
-          duration: "10s"
+          duration: "30s"
           factor: 2
-          maxDuration: "5m"
+          maxDuration: "60m"
 
     # Template for atomic workflow stage updates with optimistic locking
     - name: update-workflow-stage
@@ -761,12 +761,12 @@ spec:
           echo "Retries required: $RETRY_COUNT"
           echo "Verification attempts: $VERIFY_COUNT"
       retryStrategy:
-        limit: 3
-        retryPolicy: "OnFailure"
+        limit: 10
+        retryPolicy: "OnFailure" 
         backoff:
-          duration: "10s"
+          duration: "30s"
           factor: 2
-          maxDuration: "1m"
+          maxDuration: "30m"
 
     # Template for suspend points waiting for external events
     - name: suspend-for-event
