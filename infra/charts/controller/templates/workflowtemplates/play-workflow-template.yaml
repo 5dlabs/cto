@@ -129,7 +129,7 @@ spec:
 
           # Stage 2: Quality work
           - name: quality-work
-            dependencies: [update-to-waiting-pr-created]
+            dependencies: [implementation-cycle, update-to-waiting-pr-created]
             template: agent-coderun
             arguments:
               parameters:
@@ -168,7 +168,7 @@ spec:
 
           # Stage 3: Testing work
           - name: testing-work
-            dependencies: [wait-ready-for-qa]
+            dependencies: [implementation-cycle, wait-ready-for-qa]
             template: agent-coderun
             arguments:
               parameters:
