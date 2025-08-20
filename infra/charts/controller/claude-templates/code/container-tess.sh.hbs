@@ -176,6 +176,12 @@ if [ -d "$CLAUDE_WORK_DIR/.git" ]; then
     cd "$CLAUDE_WORK_DIR"
     git fetch origin --prune
 else
+    # If directory exists but isn't a git repo, remove it first
+    if [ -d "$CLAUDE_WORK_DIR" ] && [ ! -d "$CLAUDE_WORK_DIR/.git" ]; then
+        echo "🧹 Removing non-git directory to prepare for clone..."
+        rm -rf "$CLAUDE_WORK_DIR"
+    fi
+    
     echo "📥 Cloning repository to working directory..."
     REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
     if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
