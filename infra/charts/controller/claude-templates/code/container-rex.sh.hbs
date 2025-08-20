@@ -1113,55 +1113,17 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           ) & HANG_DIAG_PID=$!
         fi
 
-        # Wait for Claude process to complete with timeout and proper cleanup
+        # Wait for Claude process to complete naturally
         echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
         
-        # Wait with timeout to prevent indefinite hanging
-        CLAUDE_TIMEOUT=300  # 5 minutes timeout for Claude completion
-        CLAUDE_WAIT_INTERVAL=5
-        CLAUDE_WAIT_ELAPSED=0
-        CLAUDE_COMPLETED=false
+        # Simple wait - Claude should exit naturally when done
+        wait "$CLAUDE_PID"
+        CLAUDE_EXIT_CODE=$?
         
-        while [ $CLAUDE_WAIT_ELAPSED -lt $CLAUDE_TIMEOUT ]; do
-          if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
-            echo "✅ Claude process completed naturally"
-            CLAUDE_COMPLETED=true
-            break
-          fi
-          
-          # Show progress every 30 seconds
-          if [ $((CLAUDE_WAIT_ELAPSED % 30)) -eq 0 ] && [ $CLAUDE_WAIT_ELAPSED -gt 0 ]; then
-            echo "⏳ Still waiting for Claude completion... (${CLAUDE_WAIT_ELAPSED}s elapsed)"
-          fi
-          
-          sleep $CLAUDE_WAIT_INTERVAL
-          CLAUDE_WAIT_ELAPSED=$((CLAUDE_WAIT_ELAPSED + CLAUDE_WAIT_INTERVAL))
-        done
-        
-        # Handle Claude process cleanup
-        if [ "$CLAUDE_COMPLETED" = "false" ]; then
-          echo "⚠️ Claude process did not exit within ${CLAUDE_TIMEOUT}s timeout"
-          echo "🔧 Force terminating Claude process to prevent indefinite hanging..."
-          
-          # First try graceful termination
-          if kill -TERM "$CLAUDE_PID" 2>/dev/null; then
-            echo "📤 Sent SIGTERM to Claude process"
-            sleep 5
-            
-            # Check if it exited gracefully
-            if ! kill -0 "$CLAUDE_PID" 2>/dev/null; then
-              echo "✅ Claude process terminated gracefully"
-              CLAUDE_COMPLETED=true
-            fi
-          fi
-          
-          # Force kill if still running
-          if [ "$CLAUDE_COMPLETED" = "false" ] && kill -0 "$CLAUDE_PID" 2>/dev/null; then
-            echo "💀 Force killing Claude process"
-            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
-            sleep 2
-            echo "✅ Claude process force terminated"
-          fi
+        if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+          echo "✅ Claude process completed successfully"
+        else
+          echo "⚠️ Claude process exited with code: $CLAUDE_EXIT_CODE"
         fi
         
         # Stop diagnostics if running
@@ -1191,10 +1153,10 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         fi
         
         # Gracefully stop sidecar to allow Job to complete (all containers must exit)
-        if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+        if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
           echo "✓ Requested sidecar shutdown"
         else
-          echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
+          echo "⚠️ Failed to request sidecar shutdown (timeout or not running)"
         fi
     else
         echo "❌ ERROR: No prompt.md found from docs service"
