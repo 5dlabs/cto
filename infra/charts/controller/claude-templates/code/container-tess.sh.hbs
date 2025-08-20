@@ -170,22 +170,44 @@ export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 echo "✓ Git configured"
 
-# Target repository directory name
-TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
-
-# Clone or update repository
-if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
-    echo "📁 Found existing repository '$TARGET_REPO_DIR', updating..."
-    cd "/workspace/$TARGET_REPO_DIR"
-    git fetch origin
+# Clone or update repository (directly to Claude working directory)
+if [ -d "$CLAUDE_WORK_DIR/.git" ]; then
+    echo "📁 Found existing repository at working directory, updating..."
     cd "$CLAUDE_WORK_DIR"
+    git fetch origin --prune
 else
-    echo "📥 Cloning repository..."
+    echo "📥 Cloning repository to working directory..."
     REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
-    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+    if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
         echo "❌ Failed to clone repository"
         exit 1
     fi
+    cd "$CLAUDE_WORK_DIR"
+fi
+
+# Checkout PR branch for testing review
+if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+    echo "🔄 Checking out PR #$PR_NUMBER for QA testing..."
+    cd "$CLAUDE_WORK_DIR"
+    git fetch origin --prune
+    PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    if [ -n "$PR_BRANCH" ]; then
+        git checkout "$PR_BRANCH" || git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH"
+        git pull origin "$PR_BRANCH" || echo "⚠️  Could not pull latest changes"
+        echo "✓ Checked out PR branch: $PR_BRANCH"
+    else
+        echo "⚠️ Could not determine PR branch name, staying on default branch"
+    fi
+    
+    # Add PR context to CLAUDE.md for reference
+    echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "# PR Context for Testing" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **PR Number**: $PR_NUMBER" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **PR URL**: $PR_URL" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **Branch**: $PR_BRANCH" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+else
+    echo "ℹ️ No PR context provided - working on default branch"
 fi
 
 echo "════════════════════════════════════════════════════════════════"
@@ -254,7 +276,7 @@ fi
 cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd "$CLAUDE_WORK_DIR"
 
 # Copy task files
-mkdir -p "/workspace/$TARGET_REPO_DIR/task"
+mkdir -p "$CLAUDE_WORK_DIR/task"
 {{#if docs_project_directory}}
 if [ "{{docs_project_directory}}" = "." ]; then
     DOCS_PATH="/tmp/docs-repo/.taskmaster"
@@ -267,29 +289,24 @@ DOCS_PATH="/tmp/docs-repo/.taskmaster"
 
 TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
 if [ -d "$TASK_DIR" ]; then
-    cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
     echo "✓ Task {{task_id}} files copied"
 fi
 
 # Copy architecture.md
 if [ -f "$DOCS_PATH/docs/architecture.md" ]; then
-    cp "$DOCS_PATH/docs/architecture.md" "/workspace/$TARGET_REPO_DIR/task/"
+    cp "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/"
 fi
 
 # Clean up docs repo
 rm -rf /tmp/docs-repo
 {{/if}}
 
-# Copy prepared files to Claude working directory
-# Copy repository files to working directory, avoiding recursive copy
-if [ "$TARGET_REPO_DIR" != "$(basename "$CLAUDE_WORK_DIR")" ]; then
-    cp -r "/workspace/$TARGET_REPO_DIR/." "$CLAUDE_WORK_DIR/"
-else
-    echo "✓ Working directory is repository root, no copy needed"
-fi
+# Repository is now cloned directly to Claude working directory - no copy needed
+echo "✓ Repository cloned directly to working directory"
 
 # Check if we should continue previous session
 {{#if continue_session}}
@@ -435,7 +452,7 @@ export CLAUDE_WORK_DIR
 export GITHUB_TOKEN
 export REPO_OWNER
 export REPO_NAME
-export TARGET_REPO_DIR
+# TARGET_REPO_DIR no longer needed - repository cloned directly to CLAUDE_WORK_DIR
 
 echo "════════════════════════════════════════════════════════════════"
 echo "✅ TESS TESTING AGENT READY"
