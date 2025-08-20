@@ -15,8 +15,6 @@ metadata:
     agents.platform/orchestration: multi-agent
     workflow-type: play-orchestration
 spec:
-  # No deadline - allow unlimited time for realistic development cycles
-
   # Service account with proper permissions for CRD operations
   serviceAccountName: argo-workflow
 
