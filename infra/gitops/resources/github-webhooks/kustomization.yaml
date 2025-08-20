@@ -8,4 +8,5 @@ resources:
   - externalsecret.yaml
   - sa-rbac.yaml
   - stage-aware-resume-sensor.yaml
+  - play-workflow-sensors.yaml
 
