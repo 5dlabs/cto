@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# Source Rust environment if available (fixes cargo not found issues)
+if [ -f "$HOME/.cargo/env" ]; then
+    . "$HOME/.cargo/env"
+fi
+
 echo '════════════════════════════════════════════════════════════════'
 echo '║              CLEO CODE QUALITY WORKFLOW STARTING             ║'
 echo '║        Code Quality & Documentation Enforcement Agent        ║'
