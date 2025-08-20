@@ -25,7 +25,6 @@ spec:
   workflowMetadata:
     labels:
       workflow-type: play-orchestration
-      workflows.argoproj.io/controller-instanceid: default
 
   # Main entry point
   entrypoint: main
@@ -464,7 +463,7 @@ spec:
           apiVersion: agents.platform/v1
           kind: CodeRun
           metadata:
-            generateName: "coderun-{{`{{inputs.parameters.stage}}`}}-task{{`{{inputs.parameters.task-id}}`}}-"
+            generateName: "coderun-{{`{{inputs.parameters.stage}}`}}-task{{`{{inputs.parameters.task-id}}`}}"
             namespace: {{ .Release.Namespace }}
             labels:
               task-id: "{{`{{inputs.parameters.task-id}}`}}"

@@ -26,16 +26,16 @@ spec:
     helm:
       valueFiles: []
       values: |
-        # Override images to use v3.7.0-rc4 pre-release
+        # Use v3.7.1 stable release
         controller:
           image:
-            tag: v3.7.0-rc4
+            tag: v3.7.1
           workflowDefaults:
             spec:
               parallelism: 10
         server:
           image:
-            tag: v3.7.0-rc4
+            tag: v3.7.1
           authModes:
             - server
           service:
@@ -43,7 +43,7 @@ spec:
             nodePort: 30081
         executor:
           image:
-            tag: v3.7.0-rc4
+            tag: v3.7.1
 
         # Use values from our local configuration file
         artifactRepository:
