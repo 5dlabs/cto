@@ -131,16 +131,14 @@ else
     exit 1
 fi
 
-# Set working directory for the agent
-# Set Working Directory (Critical for Claude Execution) - Match Rex pattern
-WORK_DIR="{{working_directory}}"
-if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
-else
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
-fi
+# Target repository directory name - this is where the git repo will be
+TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
+
+# Set working directory for the agent - should match the repository location
+CLAUDE_WORK_DIR="/workspace/$TARGET_REPO_DIR"
 mkdir -p "$CLAUDE_WORK_DIR"
 cd "$CLAUDE_WORK_DIR"
+echo "🔧 Working directory set to: $CLAUDE_WORK_DIR"
 
 # Prepare environment for QA checks
 echo "════════════════════════════════════════════════════════════════"
@@ -152,28 +150,25 @@ git config --global user.email "cleo@5dlabs.com"
 git config --global user.name "5DLabs-Cleo"
 git config --global init.defaultBranch main
 
-# Target repository directory name
-TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
-
 # Clone or update repository
-if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
-    echo "📁 Found existing repository '$TARGET_REPO_DIR', updating..."
-    cd "/workspace/$TARGET_REPO_DIR"
-    git fetch origin
+if [ -d "$CLAUDE_WORK_DIR" ] && [ -d "$CLAUDE_WORK_DIR/.git" ]; then
+    echo "📁 Found existing repository at '$CLAUDE_WORK_DIR', updating..."
     cd "$CLAUDE_WORK_DIR"
+    git fetch origin
 else
-    echo "📥 Cloning repository..."
+    echo "📥 Cloning repository to '$CLAUDE_WORK_DIR'..."
     REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
-    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+    if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
         echo "❌ Failed to clone repository"
         exit 1
     fi
+    cd "$CLAUDE_WORK_DIR"
 fi
 
 # Checkout PR branch for quality review
 if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
-    cd "/workspace/$TARGET_REPO_DIR"
+    cd "$CLAUDE_WORK_DIR"
     
     # Fetch all latest changes including PR branches
     git fetch origin --prune
@@ -200,7 +195,7 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     CURRENT_SHA=$(git rev-parse HEAD)
     echo "📍 Current commit: $CURRENT_SHA"
     
-    cd "$CLAUDE_WORK_DIR"
+    # Don't change directory yet - we'll cd to CLAUDE_WORK_DIR at the end
     echo "✅ Repository positioned at PR #$PR_NUMBER with latest changes"
 else
     echo "⚠️  No PR context found (PR_NUMBER=$PR_NUMBER, PR_URL=$PR_URL)"
@@ -228,28 +223,15 @@ echo "════════════════════════�
 
 # Task files should already be present in the project repository at /task
 echo "📋 Checking for task files in project repository..."
-if [ -d "/workspace/$TARGET_REPO_DIR/task" ]; then
+if [ -d "$CLAUDE_WORK_DIR/task" ]; then
     echo "✓ Found task directory in project repository"
-    ls -la "/workspace/$TARGET_REPO_DIR/task/"
+    ls -la "$CLAUDE_WORK_DIR/task/"
 else
     echo "⚠️ No /task directory found in project repository"
 fi
 
-# Copy prepared files to Claude working directory
-# Copy repository files to working directory, avoiding recursive copy
-SOURCE_PATH="/workspace/$TARGET_REPO_DIR"
-DEST_PATH="$CLAUDE_WORK_DIR"
-
-# Resolve absolute paths to avoid directory-into-itself issues
-SOURCE_REAL=$(realpath "$SOURCE_PATH" 2>/dev/null || echo "$SOURCE_PATH")
-DEST_REAL=$(realpath "$DEST_PATH" 2>/dev/null || echo "$DEST_PATH")
-
-if [ "$SOURCE_REAL" != "$DEST_REAL" ]; then
-    echo "📁 Copying repository files from $SOURCE_PATH to $DEST_PATH"
-    cp -r "$SOURCE_PATH/." "$DEST_PATH/"
-else
-    echo "✓ Working directory is repository root, no copy needed"
-fi
+# Ensure we're in the git repository working directory  
+echo "✓ Working directly in git repository at: $CLAUDE_WORK_DIR"
 
 # Check if we should continue previous session
 {{#if continue_session}}
