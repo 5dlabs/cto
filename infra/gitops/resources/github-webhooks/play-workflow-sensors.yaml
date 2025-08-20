@@ -25,44 +25,88 @@ spec:
     - template:
         name: resume-after-pr-created
         conditions: "github-pr-created"
-        argoWorkflow:
-          operation: resume
+        k8s:
+          operation: create
           source:
             resource:
-              # Only resume workflows waiting for PR creation
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
+                generateName: resume-pr-created-
                 namespace: agent-platform
-              selector:
-                matchLabels:
-                  workflow-type: play-orchestration
-                  current-stage: waiting-pr-created
-          args: []
-          parameters:
-            # Extract task ID from PR labels and construct deterministic workflow name
-            - src:
-                dependencyName: github-pr-created
-                dataTemplate: |
-                  {{ range $i, $l := .Input.body.pull_request.labels }}
-                    {{ if hasPrefix $l.name "task-" }}
-                      {{ $p := splitList "-" $l.name }}
-                      {{ if gt (len $p) 1 }}
-                        play-task-{{ index $p 1 }}-workflow
-                      {{ end }}
-                    {{ end }}
-                  {{ end }}
-              dest: args.0
-            # Pass PR URL to resumed workflow
-            - src:
-                dependencyName: github-pr-created
-                dataKey: body.pull_request.html_url
-              dest: spec.arguments.parameters.pr-url
-            # Pass PR number to resumed workflow
-            - src:
-                dependencyName: github-pr-created
-                dataKey: body.pull_request.number
-              dest: spec.arguments.parameters.pr-number
+                labels:
+                  type: webhook-resume
+                  target-stage: waiting-pr-created
+              spec:
+                entrypoint: resume-workflow
+                serviceAccountName: argo-workflow
+                templates:
+                  - name: resume-workflow
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+                        
+                        echo "=== PR Created Workflow Resume ==="
+                        echo "PR Number: {{ .Input.body.pull_request.number }}"
+                        echo "PR URL: {{ .Input.body.pull_request.html_url }}"
+
+                        # Extract task ID from PR labels  
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ERROR: No task-* label found on PR"
+                          exit 1
+                        fi
+
+                        echo "Task ID: $TASK_ID"
+
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
+
+                        # Check if workflow exists and is at correct stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
+                          -n agent-platform \
+                          -o jsonpath='{.metadata.labels.current-stage}' \
+                          2>/dev/null || echo "")
+
+                        if [ "$CURRENT_STAGE" = "waiting-pr-created" ]; then
+                          echo "Found workflow at correct stage, resuming..."
+
+                          # Update workflow parameters with PR details
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            --patch='{
+                              "spec": {
+                                "arguments": {
+                                  "parameters": [
+                                    {"name": "pr-url", "value": "{{ .Input.body.pull_request.html_url }}"},
+                                    {"name": "pr-number", "value": "{{ .Input.body.pull_request.number }}"}
+                                  ]
+                                }
+                              }
+                            }'
+
+                          # Resume the workflow
+                          argo resume $WORKFLOW_NAME -n agent-platform
+
+                          echo "✅ Workflow resumed successfully"
+                        else
+                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
+                          echo "Skipping resume to prevent incorrect stage progression"
+                        fi
       retryStrategy:
         steps: 3
         duration: "10s"
@@ -227,44 +271,88 @@ spec:
     - template:
         name: resume-after-pr-approved
         conditions: "github-pr-approved"
-        argoWorkflow:
-          operation: resume
+        k8s:
+          operation: create
           source:
             resource:
-              # Only resume workflows waiting for PR approval
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
+                generateName: resume-pr-approved-
                 namespace: agent-platform
-              selector:
-                matchLabels:
-                  workflow-type: play-orchestration
-                  current-stage: waiting-pr-approved
-          args: []
-          parameters:
-            # Extract task ID from PR labels to find workflow
-            - src:
-                dependencyName: github-pr-approved
-                dataTemplate: |
-                  {{ range $i, $l := .Input.body.pull_request.labels }}
-                    {{ if hasPrefix $l.name "task-" }}
-                      {{ $p := splitList "-" $l.name }}
-                      {{ if gt (len $p) 1 }}
-                        play-task-{{ index $p 1 }}-workflow
-                      {{ end }}
-                    {{ end }}
-                  {{ end }}
-              dest: args.0
-            # Pass approval status
-            - src:
-                dependencyName: github-pr-approved
-                dataTemplate: "approved"
-              dest: spec.arguments.parameters.qa-status
-            # Pass merge commit SHA if available
-            - src:
-                dependencyName: github-pr-approved
-                dataKey: body.pull_request.merge_commit_sha
-              dest: spec.arguments.parameters.merge-sha
+                labels:
+                  type: webhook-resume
+                  target-stage: waiting-pr-approved
+              spec:
+                entrypoint: resume-workflow
+                serviceAccountName: argo-workflow
+                templates:
+                  - name: resume-workflow
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+                        
+                        echo "=== PR Approved Workflow Resume ==="
+                        echo "Reviewer: {{ .Input.body.review.user.login }}"
+                        echo "Review State: {{ .Input.body.review.state }}"
+
+                        # Extract task ID from PR labels  
+                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ERROR: No task-* label found on PR"
+                          exit 1
+                        fi
+
+                        echo "Task ID: $TASK_ID"
+
+                        # Find workflow by labels (since actual names have random suffixes)
+                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$WORKFLOW_NAME" ]; then
+                          echo "ERROR: No workflow found for task-id=$TASK_ID"
+                          exit 1
+                        fi
+
+                        echo "Found workflow: $WORKFLOW_NAME"
+
+                        # Check if workflow exists and is at correct stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
+                          -n agent-platform \
+                          -o jsonpath='{.metadata.labels.current-stage}' \
+                          2>/dev/null || echo "")
+
+                        if [ "$CURRENT_STAGE" = "waiting-pr-approved" ]; then
+                          echo "Found workflow at correct stage, resuming..."
+
+                          # Update workflow parameters
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            --patch='{
+                              "spec": {
+                                "arguments": {
+                                  "parameters": [
+                                    {"name": "qa-status", "value": "approved"},
+                                    {"name": "merge-sha", "value": "{{ .Input.body.pull_request.merge_commit_sha }}"}
+                                  ]
+                                }
+                              }
+                            }'
+
+                          # Resume the workflow
+                          argo resume $WORKFLOW_NAME -n agent-platform
+
+                          echo "✅ Workflow resumed successfully"
+                        else
+                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
+                          echo "Skipping resume to prevent incorrect stage progression"
+                        fi
       retryStrategy:
         steps: 3
         duration: "10s"
