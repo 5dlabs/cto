@@ -40,8 +40,6 @@ spec:
         env:
           RUST_LOG: "info"
 
-
-
         jupiter:
           solanaCredentials:
             enabled: true
