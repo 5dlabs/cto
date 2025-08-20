@@ -170,22 +170,44 @@ export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 echo "✓ Git configured"
 
-# Target repository directory name
-TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
-
-# Clone or update repository
-if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
-    echo "📁 Found existing repository '$TARGET_REPO_DIR', updating..."
-    cd "/workspace/$TARGET_REPO_DIR"
-    git fetch origin
+# Clone or update repository (directly to Claude working directory)
+if [ -d "$CLAUDE_WORK_DIR/.git" ]; then
+    echo "📁 Found existing repository at working directory, updating..."
     cd "$CLAUDE_WORK_DIR"
+    git fetch origin --prune
 else
-    echo "📥 Cloning repository..."
+    echo "📥 Cloning repository to working directory..."
     REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
-    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+    if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
         echo "❌ Failed to clone repository"
         exit 1
     fi
+    cd "$CLAUDE_WORK_DIR"
+fi
+
+# Checkout PR branch for testing review
+if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+    echo "🔄 Checking out PR #$PR_NUMBER for QA testing..."
+    cd "$CLAUDE_WORK_DIR"
+    git fetch origin --prune
+    PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    if [ -n "$PR_BRANCH" ]; then
+        git checkout "$PR_BRANCH" || git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH"
+        git pull origin "$PR_BRANCH" || echo "⚠️  Could not pull latest changes"
+        echo "✓ Checked out PR branch: $PR_BRANCH"
+    else
+        echo "⚠️ Could not determine PR branch name, staying on default branch"
+    fi
+    
+    # Add PR context to CLAUDE.md for reference
+    echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "# PR Context for Testing" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **PR Number**: $PR_NUMBER" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **PR URL**: $PR_URL" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "- **Branch**: $PR_BRANCH" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+    echo "" >> "$CLAUDE_WORK_DIR/CLAUDE.md" || true
+else
+    echo "ℹ️ No PR context provided - working on default branch"
 fi
 
 echo "════════════════════════════════════════════════════════════════"
@@ -254,7 +276,7 @@ fi
 cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd "$CLAUDE_WORK_DIR"
 
 # Copy task files
-mkdir -p "/workspace/$TARGET_REPO_DIR/task"
+mkdir -p "$CLAUDE_WORK_DIR/task"
 {{#if docs_project_directory}}
 if [ "{{docs_project_directory}}" = "." ]; then
     DOCS_PATH="/tmp/docs-repo/.taskmaster"
@@ -267,29 +289,24 @@ DOCS_PATH="/tmp/docs-repo/.taskmaster"
 
 TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
 if [ -d "$TASK_DIR" ]; then
-    cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
-    cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
+    cp "$TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
     echo "✓ Task {{task_id}} files copied"
 fi
 
 # Copy architecture.md
 if [ -f "$DOCS_PATH/docs/architecture.md" ]; then
-    cp "$DOCS_PATH/docs/architecture.md" "/workspace/$TARGET_REPO_DIR/task/"
+    cp "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/"
 fi
 
 # Clean up docs repo
 rm -rf /tmp/docs-repo
 {{/if}}
 
-# Copy prepared files to Claude working directory
-# Copy repository files to working directory, avoiding recursive copy
-if [ "$TARGET_REPO_DIR" != "$(basename "$CLAUDE_WORK_DIR")" ]; then
-    cp -r "/workspace/$TARGET_REPO_DIR/." "$CLAUDE_WORK_DIR/"
-else
-    echo "✓ Working directory is repository root, no copy needed"
-fi
+# Repository is now cloned directly to Claude working directory - no copy needed
+echo "✓ Repository cloned directly to working directory"
 
 # Check if we should continue previous session
 {{#if continue_session}}
@@ -435,7 +452,7 @@ export CLAUDE_WORK_DIR
 export GITHUB_TOKEN
 export REPO_OWNER
 export REPO_NAME
-export TARGET_REPO_DIR
+# TARGET_REPO_DIR no longer needed - repository cloned directly to CLAUDE_WORK_DIR
 
 echo "════════════════════════════════════════════════════════════════"
 echo "✅ TESS TESTING AGENT READY"
@@ -473,71 +490,79 @@ echo "════════════════════════�
 echo "Command: $CLAUDE_CMD"
 echo "Note: Claude will automatically read CLAUDE.md from the working directory"
 
-# Check if prompt.md exists and use it as main prompt
-if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
-    echo "✓ Using task-specific prompt from docs service: task/prompt.md"
-    
-    # Prepare prompt prefix for toolman guidance
-    PROMPT_PREFIX=""
-    if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
-        PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**
+# Tess uses her own system prompt and focuses on acceptance criteria
+echo "✓ Starting Tess with specialized QA system prompt"
+echo "✓ Tess will focus on acceptance criteria and comprehensive testing"
 
-Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/toolman-guide.md\`. This file contains:
-- Selected tools for this specific task
-- When and how to use each tool
-- Tool arguments, parameters, and configuration options
-- Implementation workflow and best practices
-- Tool relationships and sequencing
-
-**The toolman-guide.md is your authoritative reference for tool usage in this task.**
-
----
-
-"
-        echo "✓ Including toolman guidance prefix"
-    else
-        echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
-    fi
-    
-    # Seed initial user turn via a FIFO
-    FIFO_PATH="/workspace/agent-input.jsonl"
-    rm -f "$FIFO_PATH" 2>/dev/null || true
-    mkfifo "$FIFO_PATH"
-    chmod 666 "$FIFO_PATH" || true
-    
-    # Start Claude (reader) first in background
-    $CLAUDE_CMD < "$FIFO_PATH" &
-    CLAUDE_PID=$!
-    
-    # Compose initial user turn
-    USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
-    
-    # Send via sidecar HTTP endpoint
-    if printf '{"text":%s}\n' "$USER_COMBINED" | \
-         curl -fsS -X POST http://127.0.0.1:8080/input \
-           -H 'Content-Type: application/json' \
-           --data-binary @- >/dev/null 2>&1; then
-      echo "✓ Initial prompt sent via sidecar /input"
-    else
-      echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-      exec 9>"$FIFO_PATH"
-      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-    fi
-    
-    # Wait for Claude process to complete
-    wait "$CLAUDE_PID"
-    # Close FIFO writer if it was opened
-    exec 9>&- 2>/dev/null || true
-    
-    # Gracefully stop sidecar
-    if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ Requested sidecar shutdown"
-    else
-      echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
-    fi
+if [ -f "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" ]; then
+    echo "✓ Found acceptance-criteria.md - this is Tess's primary focus"
 else
-    echo "❌ ERROR: No prompt.md found from docs service"
-    echo "The docs service should always provide task/prompt.md"
-    echo "Check docs repository and task configuration"
-    exit 1
+    echo "⚠️ No acceptance-criteria.md found - Tess may need to work with available task files"
+fi
+
+# Prepare initial guidance for Tess
+INITIAL_GUIDANCE="🧪 **TESS QA TESTING WORKFLOW**
+
+You are now starting QA testing for this task. Your focus areas are:
+
+1. **Acceptance Criteria Review**: 
+   - Check task/acceptance-criteria.md (if available)
+   - Verify all requirements are implemented correctly
+
+2. **Code Quality Assessment**:
+   - Review the PR changes thoroughly 
+   - Ensure code follows best practices
+
+3. **Testing & Validation**:
+   - Run existing tests and ensure they pass
+   - Add missing test coverage where needed
+   - Test the application functionality
+
+4. **Live Deployment Testing** (if applicable):
+   - Deploy to test environment
+   - Validate endpoints and functionality
+   - Check integration points
+
+Remember: You must be 120% satisfied before approving this PR. Only add approval when everything meets the highest quality standards."
+
+# Start Claude with initial guidance
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    STARTING TESS QA EXECUTION                 ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Seed initial user turn via a FIFO
+FIFO_PATH="/workspace/agent-input.jsonl"
+rm -f "$FIFO_PATH" 2>/dev/null || true
+mkfifo "$FIFO_PATH"
+chmod 666 "$FIFO_PATH" || true
+
+# Start Claude (reader) first in background
+$CLAUDE_CMD < "$FIFO_PATH" &
+CLAUDE_PID=$!
+
+# Compose initial user turn
+USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE" | jq -Rs .)
+
+# Send via sidecar HTTP endpoint
+if printf '{"text":%s}\n' "$USER_COMBINED" | \
+     curl -fsS -X POST http://127.0.0.1:8080/input \
+       -H 'Content-Type: application/json' \
+       --data-binary @- >/dev/null 2>&1; then
+  echo "✓ Initial QA guidance sent via sidecar /input"
+else
+  echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+  exec 9>"$FIFO_PATH"
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+fi
+
+# Wait for Claude process to complete
+wait "$CLAUDE_PID"
+# Close FIFO writer if it was opened
+exec 9>&- 2>/dev/null || true
+
+# Gracefully stop sidecar
+if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+  echo "✓ Requested sidecar shutdown"
+else
+  echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
 fi
