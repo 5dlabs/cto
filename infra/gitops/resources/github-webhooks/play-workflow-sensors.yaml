@@ -148,7 +148,7 @@ spec:
           - path: body.sender.login
             type: string
             comparator: "~"
-            value: "cleo-5dlabs\\[bot\\]"
+            value: ["cleo-5dlabs\\[bot\\]"]
   triggers:
     - template:
         name: resume-after-ready-for-qa
