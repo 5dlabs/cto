@@ -202,7 +202,7 @@ DEST_PATH="$CLAUDE_WORK_DIR"
 SOURCE_REAL=$(realpath "$SOURCE_PATH" 2>/dev/null || echo "$SOURCE_PATH")
 DEST_REAL=$(realpath "$DEST_PATH" 2>/dev/null || echo "$DEST_PATH")
 
-if [ "$SOURCE_REAL" != "$DEST_REAL" ] && [ "$TARGET_REPO_DIR" != "." ]; then
+if [ "$SOURCE_REAL" != "$DEST_REAL" ]; then
     echo "📁 Copying repository files from $SOURCE_PATH to $DEST_PATH"
     cp -r "$SOURCE_PATH/." "$DEST_PATH/"
 else
@@ -349,8 +349,8 @@ echo "════════════════════════�
 echo "📁 Working Directory: $CLAUDE_WORK_DIR"
 echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
 echo "📋 Task: {{task_id}}"
-echo "🎯 Focus: Code quality + Documentation enforcement"
-echo "⚠️  CRITICAL: Must verify docs before adding 'ready-for-qa' label"
+echo "🎯 Focus: Rigorous code quality enforcement"
+echo "⚠️  CRITICAL: Must pass all quality checks before adding 'ready-for-qa' label"
 echo "════════════════════════════════════════════════════════════════"
 
 # Start Claude with Cleo-specific configuration
