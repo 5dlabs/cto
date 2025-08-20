@@ -191,10 +191,11 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN --mount=type=cache,target=/root/.cache \
   . $HOME/.cargo/env && cargo install sccache || true
 
-# Configure mold and sccache defaults (will also apply to node later)
+# Configure mold defaults but disable problematic sccache by default
 ENV CC=clang \
     CXX=clang++ \
     RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+# Note: RUSTC_WRAPPER intentionally not set to avoid sccache path issues
 
 # Prepare npm global and permissions
 RUN mkdir -p /usr/local/share/npm-global && chown -R 1000:1000 /usr/local/share
@@ -271,13 +272,22 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     cargo-expand \
     cargo-udeps || true
 
-# Prefer sccache and mold for faster Rust builds
-ENV RUSTC_WRAPPER=/home/node/.cargo/bin/sccache \
-    SCCACHE_DIR=/home/node/.cache/sccache \
-    SCCACHE_CACHE_SIZE=10G \
-    CC=clang \
+# Configure Rust build environment (without problematic sccache wrapper)
+ENV CC=clang \
     CXX=clang++ \
     RUSTFLAGS="-C link-arg=-fuse-ld=mold" \
     CARGO_TERM_COLOR=always
+# Note: sccache available at /home/node/.cargo/bin/sccache but not set as RUSTC_WRAPPER
+# to avoid path conflicts when containers run as different users
+
+# Create global rustup default to work regardless of which user the container runs as
+USER root
+RUN rustup default stable 2>/dev/null || true
+USER node
+RUN rustup default stable 2>/dev/null || true
+# Final fallback: ensure rustup has a default even if container runs as different user
+USER root
+RUN echo '#!/bin/sh\nrustup default stable 2>/dev/null || true' > /usr/local/bin/ensure-rust-default \
+  && chmod +x /usr/local/bin/ensure-rust-default
 
 

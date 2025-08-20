@@ -1,38 +1,9 @@
 #!/bin/sh
 
 # Source Rust environment if available (fixes cargo not found issues)
-# Try multiple possible locations for Rust installation
-RUST_ENV_SOURCED=false
-for rust_env in "$HOME/.cargo/env" "/home/node/.cargo/env" "/home/ubuntu/.cargo/env"; do
-    if [ -f "$rust_env" ]; then
-        echo "🦀 Sourcing Rust environment from: $rust_env"
-        . "$rust_env"
-        RUST_ENV_SOURCED=true
-        break
-    fi
-done
-
-# If no pre-installed Rust found, set up minimal Rust environment
-if [ "$RUST_ENV_SOURCED" = "false" ]; then
-    echo "⚠️  No Rust environment found, checking if Rust tools are available..."
-    if ! command -v cargo >/dev/null 2>&1; then
-        echo "🦀 Setting up Rust toolchain..."
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-        . "$HOME/.cargo/env"
-    fi
+if [ -f "$HOME/.cargo/env" ]; then
+    . "$HOME/.cargo/env"
 fi
-
-# Disable problematic sccache if it's causing issues
-if [ -n "$RUSTC_WRAPPER" ] && [ "$RUSTC_WRAPPER" != "cargo" ]; then
-    echo "⚠️  Disabling RUSTC_WRAPPER ($RUSTC_WRAPPER) to avoid path issues"
-    unset RUSTC_WRAPPER
-fi
-
-# Verify Rust tools are available
-echo "🔍 Rust tool verification:"
-echo "  cargo: $(command -v cargo || echo 'NOT FOUND')"
-echo "  rustc: $(command -v rustc || echo 'NOT FOUND')" 
-echo "  clippy: $(command -v cargo-clippy || echo 'NOT FOUND')"
 
 echo '════════════════════════════════════════════════════════════════'
 echo '║              CLEO CODE QUALITY WORKFLOW STARTING             ║'
