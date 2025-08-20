@@ -85,20 +85,24 @@ spec:
                         if [ "$CURRENT_STAGE" = "waiting-pr-created" ]; then
                           echo "Found workflow at correct stage, resuming..."
 
-                          # Update workflow parameters with PR details
+                          # Store PR details in environment variables to prevent injection
+                          PR_URL="{{ .Input.body.pull_request.html_url }}"
+                          PR_NUMBER="{{ .Input.body.pull_request.number }}"
+
+                          # Update workflow parameters with PR details using strategic patch
                           kubectl patch workflow $WORKFLOW_NAME \
                             -n agent-platform \
-                            --type='merge' \
-                            --patch='{
-                              "spec": {
-                                "arguments": {
-                                  "parameters": [
-                                    {"name": "pr-url", "value": "{{ .Input.body.pull_request.html_url }}"},
-                                    {"name": "pr-number", "value": "{{ .Input.body.pull_request.number }}"}
+                            --type='strategic' \
+                            --patch="{
+                              \"spec\": {
+                                \"arguments\": {
+                                  \"parameters\": [
+                                    {\"name\": \"pr-url\", \"value\": \"$PR_URL\"},
+                                    {\"name\": \"pr-number\", \"value\": \"$PR_NUMBER\"}
                                   ]
                                 }
                               }
-                            }'
+                            }"
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n agent-platform
@@ -209,19 +213,11 @@ spec:
                         if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
                           echo "Found workflow at correct stage, resuming..."
 
-                          # Update workflow parameters
+                          # Update workflow parameters using strategic patch to preserve existing parameters
                           kubectl patch workflow $WORKFLOW_NAME \
                             -n agent-platform \
-                            --type='merge' \
-                            --patch='{
-                              "spec": {
-                                "arguments": {
-                                  "parameters": [
-                                    {"name": "qa-status", "value": "ready"}
-                                  ]
-                                }
-                              }
-                            }'
+                            --type='strategic' \
+                            --patch='{"spec": {"arguments": {"parameters": [{"name": "qa-status", "value": "ready"}]}}}'
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n agent-platform
@@ -333,20 +329,23 @@ spec:
                         if [ "$CURRENT_STAGE" = "waiting-pr-approved" ]; then
                           echo "Found workflow at correct stage, resuming..."
 
-                          # Update workflow parameters
+                          # Store merge SHA in environment variable to prevent injection
+                          MERGE_SHA="{{ .Input.body.pull_request.merge_commit_sha }}"
+
+                          # Update workflow parameters using strategic patch to preserve existing parameters
                           kubectl patch workflow $WORKFLOW_NAME \
                             -n agent-platform \
-                            --type='merge' \
-                            --patch='{
-                              "spec": {
-                                "arguments": {
-                                  "parameters": [
-                                    {"name": "qa-status", "value": "approved"},
-                                    {"name": "merge-sha", "value": "{{ .Input.body.pull_request.merge_commit_sha }}"}
+                            --type='strategic' \
+                            --patch="{
+                              \"spec\": {
+                                \"arguments\": {
+                                  \"parameters\": [
+                                    {\"name\": \"qa-status\", \"value\": \"approved\"},
+                                    {\"name\": \"merge-sha\", \"value\": \"$MERGE_SHA\"}
                                   ]
                                 }
                               }
-                            }'
+                            }"
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n agent-platform
