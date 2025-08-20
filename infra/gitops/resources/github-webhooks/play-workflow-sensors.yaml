@@ -176,6 +176,14 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: label-name
+                      value: "{{ .Input.body.label.name }}"
+                    - name: sender-login
+                      value: "{{ .Input.body.sender.login }}"
+                    - name: pr-labels
+                      value: "{{ .Input.body.pull_request.labels | toJson }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -186,11 +194,11 @@ spec:
                         set -e
 
                         echo "=== Ready-for-QA Workflow Resume ==="
-                        echo "Label Added: {{ .Input.body.label.name }}"
-                        echo "Added By: {{ .Input.body.sender.login }}"
+                        echo "Label Added: {{workflow.parameters.label-name}}"
+                        echo "Added By: {{workflow.parameters.sender-login}}"
 
                         # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
                           jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
@@ -292,6 +300,16 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: reviewer-login
+                      value: "{{ .Input.body.review.user.login }}"
+                    - name: review-state
+                      value: "{{ .Input.body.review.state }}"
+                    - name: pr-labels
+                      value: "{{ .Input.body.pull_request.labels | toJson }}"
+                    - name: merge-sha
+                      value: "{{ .Input.body.pull_request.merge_commit_sha }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -302,11 +320,11 @@ spec:
                         set -e
 
                         echo "=== PR Approved Workflow Resume ==="
-                        echo "Reviewer: {{ .Input.body.review.user.login }}"
-                        echo "Review State: {{ .Input.body.review.state }}"
+                        echo "Reviewer: {{workflow.parameters.reviewer-login}}"
+                        echo "Review State: {{workflow.parameters.review-state}}"
 
                         # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
                           jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
@@ -338,7 +356,7 @@ spec:
                           echo "Found workflow at correct stage, resuming..."
 
                           # Store merge SHA in environment variable to prevent injection
-                          MERGE_SHA="{{ .Input.body.pull_request.merge_commit_sha }}"
+                          MERGE_SHA="{{workflow.parameters.merge-sha}}"
 
                           # Update workflow parameters using strategic patch to preserve existing parameters
                           kubectl patch workflow $WORKFLOW_NAME \
