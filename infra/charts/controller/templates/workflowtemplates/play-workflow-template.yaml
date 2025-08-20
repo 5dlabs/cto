@@ -168,7 +168,7 @@ spec:
 
           # Stage 3: Testing work
           - name: testing-work
-            dependencies: [implementation-cycle, wait-ready-for-qa]
+            dependencies: [wait-ready-for-qa]
             template: agent-coderun
             arguments:
               parameters:
