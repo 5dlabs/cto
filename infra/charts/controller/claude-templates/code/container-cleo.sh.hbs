@@ -170,6 +170,43 @@ else
     fi
 fi
 
+# Checkout PR branch for quality review
+if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+    echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
+    cd "/workspace/$TARGET_REPO_DIR"
+    
+    # Fetch all latest changes including PR branches
+    git fetch origin --prune
+    
+    # Get PR branch information and checkout
+    PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    if [ -n "$PR_BRANCH" ]; then
+        echo "📦 Checking out PR branch: $PR_BRANCH"
+        if git checkout "$PR_BRANCH" 2>/dev/null; then
+            echo "📥 Pulling latest changes from $PR_BRANCH..."
+            git pull origin "$PR_BRANCH" || echo "⚠️  Could not pull latest changes"
+        elif git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null; then
+            echo "✅ Created and checked out tracking branch for $PR_BRANCH"
+        else
+            echo "⚠️  Branch checkout failed, trying GitHub CLI method..."
+            gh pr checkout "$PR_NUMBER" || echo "❌ Failed to checkout PR via gh CLI"
+        fi
+    else
+        echo "⚠️  Could not determine PR branch name, using GitHub CLI to checkout PR directly"
+        gh pr checkout "$PR_NUMBER" || echo "❌ Failed to checkout PR"
+    fi
+    
+    # Verify we're on the right commit
+    CURRENT_SHA=$(git rev-parse HEAD)
+    echo "📍 Current commit: $CURRENT_SHA"
+    
+    cd "$CLAUDE_WORK_DIR"
+    echo "✅ Repository positioned at PR #$PR_NUMBER with latest changes"
+else
+    echo "⚠️  No PR context found (PR_NUMBER=$PR_NUMBER, PR_URL=$PR_URL)"
+    echo "📋 Will perform quality review on current repository state"
+fi
+
 echo "════════════════════════════════════════════════════════════════"
 echo "🔍 CODE QUALITY ANALYSIS PREPARATION"
 echo "════════════════════════════════════════════════════════════════"
@@ -378,7 +415,13 @@ You are Cleo, a rigorous code quality enforcement agent. Your mission is to ensu
 - **Decision Authority**: Add 'ready-for-qa' label only when ALL quality checks pass
 - **Standards**: Zero warnings, perfect formatting, 100% test pass rate
 
-## Current Context"
+## Current Context
+
+### Pull Request Information
+- **PR Number**: ${PR_NUMBER:-"Not specified"}
+- **PR URL**: ${PR_URL:-"Not specified"}  
+- **Repository**: $REPO_OWNER/$REPO_NAME
+- **Working Directory**: $CLAUDE_WORK_DIR"
 
 # Add task context if available
 if [ -f "$CLAUDE_WORK_DIR/task/task.md" ]; then
@@ -406,8 +449,8 @@ fi
 CLEO_PROMPT="$CLEO_PROMPT
 
 ## Your Instructions
-1. **Checkout the PR branch** and analyze the actual changes made
-2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
+1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
+2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml) 
 3. **Run quality checks**:
    - For Rust: cargo clippy (pedantic), cargo fmt --check, cargo test
    - For YAML: YAML linting and validation
