@@ -490,71 +490,79 @@ echo "════════════════════════�
 echo "Command: $CLAUDE_CMD"
 echo "Note: Claude will automatically read CLAUDE.md from the working directory"
 
-# Check if prompt.md exists and use it as main prompt
-if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
-    echo "✓ Using task-specific prompt from docs service: task/prompt.md"
-    
-    # Prepare prompt prefix for toolman guidance
-    PROMPT_PREFIX=""
-    if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
-        PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**
+# Tess uses her own system prompt and focuses on acceptance criteria
+echo "✓ Starting Tess with specialized QA system prompt"
+echo "✓ Tess will focus on acceptance criteria and comprehensive testing"
 
-Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/toolman-guide.md\`. This file contains:
-- Selected tools for this specific task
-- When and how to use each tool
-- Tool arguments, parameters, and configuration options
-- Implementation workflow and best practices
-- Tool relationships and sequencing
-
-**The toolman-guide.md is your authoritative reference for tool usage in this task.**
-
----
-
-"
-        echo "✓ Including toolman guidance prefix"
-    else
-        echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
-    fi
-    
-    # Seed initial user turn via a FIFO
-    FIFO_PATH="/workspace/agent-input.jsonl"
-    rm -f "$FIFO_PATH" 2>/dev/null || true
-    mkfifo "$FIFO_PATH"
-    chmod 666 "$FIFO_PATH" || true
-    
-    # Start Claude (reader) first in background
-    $CLAUDE_CMD < "$FIFO_PATH" &
-    CLAUDE_PID=$!
-    
-    # Compose initial user turn
-    USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
-    
-    # Send via sidecar HTTP endpoint
-    if printf '{"text":%s}\n' "$USER_COMBINED" | \
-         curl -fsS -X POST http://127.0.0.1:8080/input \
-           -H 'Content-Type: application/json' \
-           --data-binary @- >/dev/null 2>&1; then
-      echo "✓ Initial prompt sent via sidecar /input"
-    else
-      echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-      exec 9>"$FIFO_PATH"
-      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-    fi
-    
-    # Wait for Claude process to complete
-    wait "$CLAUDE_PID"
-    # Close FIFO writer if it was opened
-    exec 9>&- 2>/dev/null || true
-    
-    # Gracefully stop sidecar
-    if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ Requested sidecar shutdown"
-    else
-      echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
-    fi
+if [ -f "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" ]; then
+    echo "✓ Found acceptance-criteria.md - this is Tess's primary focus"
 else
-    echo "❌ ERROR: No prompt.md found from docs service"
-    echo "The docs service should always provide task/prompt.md"
-    echo "Check docs repository and task configuration"
-    exit 1
+    echo "⚠️ No acceptance-criteria.md found - Tess may need to work with available task files"
+fi
+
+# Prepare initial guidance for Tess
+INITIAL_GUIDANCE="🧪 **TESS QA TESTING WORKFLOW**
+
+You are now starting QA testing for this task. Your focus areas are:
+
+1. **Acceptance Criteria Review**: 
+   - Check task/acceptance-criteria.md (if available)
+   - Verify all requirements are implemented correctly
+
+2. **Code Quality Assessment**:
+   - Review the PR changes thoroughly 
+   - Ensure code follows best practices
+
+3. **Testing & Validation**:
+   - Run existing tests and ensure they pass
+   - Add missing test coverage where needed
+   - Test the application functionality
+
+4. **Live Deployment Testing** (if applicable):
+   - Deploy to test environment
+   - Validate endpoints and functionality
+   - Check integration points
+
+Remember: You must be 120% satisfied before approving this PR. Only add approval when everything meets the highest quality standards."
+
+# Start Claude with initial guidance
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    STARTING TESS QA EXECUTION                 ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Seed initial user turn via a FIFO
+FIFO_PATH="/workspace/agent-input.jsonl"
+rm -f "$FIFO_PATH" 2>/dev/null || true
+mkfifo "$FIFO_PATH"
+chmod 666 "$FIFO_PATH" || true
+
+# Start Claude (reader) first in background
+$CLAUDE_CMD < "$FIFO_PATH" &
+CLAUDE_PID=$!
+
+# Compose initial user turn
+USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE" | jq -Rs .)
+
+# Send via sidecar HTTP endpoint
+if printf '{"text":%s}\n' "$USER_COMBINED" | \
+     curl -fsS -X POST http://127.0.0.1:8080/input \
+       -H 'Content-Type: application/json' \
+       --data-binary @- >/dev/null 2>&1; then
+  echo "✓ Initial QA guidance sent via sidecar /input"
+else
+  echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+  exec 9>"$FIFO_PATH"
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+fi
+
+# Wait for Claude process to complete
+wait "$CLAUDE_PID"
+# Close FIFO writer if it was opened
+exec 9>&- 2>/dev/null || true
+
+# Gracefully stop sidecar
+if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+  echo "✓ Requested sidecar shutdown"
+else
+  echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
 fi
