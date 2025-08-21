@@ -139,21 +139,15 @@ spec:
       eventName: org
       filters:
         data:
-          # Filter for pull_request labeled events and ensure it's a stage transition
           - path: headers.X-Github-Event
             type: string
             value: ["pull_request"]
           - path: body.action
             type: string
             value: ["labeled"]
-          # Check if the label added is "ready-for-qa" AND sender is Cleo
           - path: body.label.name
             type: string
             value: ["ready-for-qa"]
-          - path: body.sender.login
-            type: string
-            comparator: "~"
-            value: ["cleo-5dlabs\\[bot\\]"]
   triggers:
     - template:
         name: resume-after-ready-for-qa
@@ -173,14 +167,6 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
-                arguments:
-                  parameters:
-                    - name: label-name
-                      value: "{{ .Input.body.label.name }}"
-                    - name: sender-login
-                      value: "{{ .Input.body.sender.login }}"
-                    - name: pr-labels
-                      value: "{{ .Input.body.pull_request.labels | toJson }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -190,50 +176,23 @@ spec:
                         #!/bin/bash
                         set -e
 
-                        echo "=== Ready-for-QA Workflow Resume ==="
-                        echo "Label Added: {{workflow.parameters.label-name}}"
-                        echo "Added By: {{workflow.parameters.sender-login}}"
-
-                        # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
-                          jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
-
-                        if [ -z "$TASK_ID" ]; then
-                          echo "ERROR: No task-* label found on PR"
-                          exit 1
-                        fi
-
-                        echo "Task ID: $TASK_ID"
-
-                        # Find workflow by labels (since actual names have random suffixes)
+                        echo "=== Ready-for-QA Webhook Resume ==="
+                        
+                        # Find any workflow waiting for QA resumption
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -l current-stage=waiting-ready-for-qa,workflow-type=play-orchestration \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ERROR: No workflow found for task-id=$TASK_ID"
-                          exit 1
+                          echo "No workflow found waiting for ready-for-qa"
+                          exit 0
                         fi
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow is suspended at the expected stage
-                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform \
-                          -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "unknown")
-
-                        echo "Current stage: $CURRENT_STAGE"
-
-                        if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
-                          echo "✅ Workflow is at expected stage, resuming..."
-
-                          # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n agent-platform
-
-                          echo "✅ Workflow resumed successfully"
-                        else
-                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
-                          echo "Skipping resume to prevent incorrect stage progression"
-                        fi
+                        # Resume the workflow
+                        argo resume $WORKFLOW_NAME -n agent-platform
+                        echo "✅ Workflow resumed successfully"
       retryStrategy:
         steps: 3
         duration: "10s"
@@ -374,8 +333,7 @@ spec:
             value: ["push"]
           - path: body.pusher.name
             type: string
-            comparator: "~"
-            value: ["rex-5dlabs\\[bot\\]"]
+            value: ["rex-5dlabs[bot]"]
   triggers:
     - template:
         name: cancel-outdated-agents
