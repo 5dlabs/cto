@@ -28,6 +28,8 @@ struct WorkflowDefaults {
     code: CodeDefaults,
     #[serde(default)]
     intake: IntakeDefaults,
+    #[serde(default)]
+    play: PlayDefaults,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -72,6 +74,38 @@ impl Default for IntakeDefaults {
         IntakeDefaults {
             model: "claude-3-5-sonnet-20241022".to_string(),
             github_app: "agent-platform".to_string(), // Should be configured in cto-config.json
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct PlayDefaults {
+    model: String,
+    #[serde(rename = "implementationAgent")]
+    implementation_agent: String,
+    #[serde(rename = "qualityAgent")]
+    quality_agent: String,
+    #[serde(rename = "testingAgent")]
+    testing_agent: String,
+    repository: Option<String>,
+    service: Option<String>,
+    #[serde(rename = "docsRepository")]
+    docs_repository: Option<String>,
+    #[serde(rename = "docsProjectDirectory")]
+    docs_project_directory: Option<String>,
+}
+
+impl Default for PlayDefaults {
+    fn default() -> Self {
+        PlayDefaults {
+            model: "claude-3-5-sonnet-20241022".to_string(),
+            implementation_agent: "5DLabs-Rex".to_string(),
+            quality_agent: "5DLabs-Cleo".to_string(),
+            testing_agent: "5DLabs-Tess".to_string(),
+            repository: Some("5dlabs/cto".to_string()),
+            service: Some("cto".to_string()),
+            docs_repository: Some("5dlabs/cto".to_string()),
+            docs_project_directory: Some("docs".to_string()),
         }
     }
 }
@@ -614,7 +648,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 }
 
 #[allow(clippy::disallowed_macros)]
-fn handle_task_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+fn handle_code_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let task_id = arguments
         .get("task_id")
         .and_then(|v| v.as_u64())
@@ -850,6 +884,152 @@ fn handle_task_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             "parameters": params
         })),
         Err(e) => Err(anyhow!("Failed to submit task workflow: {}", e)),
+    }
+}
+
+#[allow(clippy::disallowed_macros)]
+fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+    let task_id = arguments
+        .get("task_id")
+        .and_then(|v| v.as_u64())
+        .ok_or(anyhow!("Missing required parameter: task_id"))?;
+
+    let config = CTO_CONFIG.get().unwrap();
+
+    // Handle repository - use provided value or config default
+    let repository = arguments
+        .get("repository")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| config.defaults.play.repository.clone())
+        .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
+
+    // Validate repository URL
+    validate_repository_url(&repository)?;
+
+    // Handle service - use provided value or config default
+    let service = arguments
+        .get("service")
+        .and_then(|v| v.as_str())
+        .or(config.defaults.play.service.as_deref())
+        .ok_or(anyhow!("Missing required parameter: service. Please provide it or set defaults.play.service in config"))?;
+
+    // Validate service name (must be valid for PVC naming)
+    if !service
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return Err(anyhow!(
+            "Invalid service name '{}'. Must contain only lowercase letters, numbers, and hyphens",
+            service
+        ));
+    }
+
+    // Handle docs repository - use provided value, config default, or error
+    let docs_repository = arguments.get("docs_repository")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| config.defaults.play.docs_repository.clone())
+        .ok_or(anyhow!("No docs_repository specified. Please provide a 'docs_repository' parameter or set defaults.play.docsRepository in config"))?;
+
+    validate_repository_url(&docs_repository)?;
+
+    // Handle docs project directory - use provided value or config default
+    let docs_project_directory = arguments
+        .get("docs_project_directory")
+        .and_then(|v| v.as_str())
+        .or(config.defaults.play.docs_project_directory.as_deref())
+        .ok_or(anyhow!("Missing required parameter: docs_project_directory. Please provide it or set defaults.play.docsProjectDirectory in config"))?;
+
+    // Handle implementation agent - use provided value or config default
+    let implementation_agent = arguments
+        .get("implementation_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| config.defaults.play.implementation_agent.clone());
+
+    // Handle quality agent - use provided value or config default
+    let quality_agent = arguments
+        .get("quality_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
+
+    // Handle testing agent - use provided value or config default
+    let testing_agent = arguments
+        .get("testing_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
+
+    // Handle model - use provided value or config default
+    let model = arguments
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| {
+            eprintln!(
+                "🐛 DEBUG: Using play default model: {}",
+                config.defaults.play.model
+            );
+            config.defaults.play.model.clone()
+        });
+
+    // Validate model name
+    if !model.starts_with("claude-") {
+        return Err(anyhow!(
+            "Invalid model '{}'. Must be a valid Claude model name",
+            model
+        ));
+    }
+
+    eprintln!("🐛 DEBUG: Play workflow submitting with task_id: {task_id}");
+    eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
+    eprintln!("🐛 DEBUG: Play workflow service: {service}");
+
+    let params = vec![
+        format!("task-id={task_id}"),
+        format!("repository={repository}"),
+        format!("service={service}"),
+        format!("docs-repository={docs_repository}"),
+        format!("docs-project-directory={docs_project_directory}"),
+        format!("implementation-agent={implementation_agent}"),
+        format!("quality-agent={quality_agent}"),
+        format!("testing-agent={testing_agent}"),
+        format!("model={model}"),
+    ];
+
+    let mut args = vec![
+        "submit",
+        "--from",
+        "workflowtemplate/play-workflow-template",
+        "-n",
+        "agent-platform",
+    ];
+
+    // Add all parameters to the command
+    for param in &params {
+        args.push("-p");
+        args.push(param);
+    }
+
+    match run_argo_cli(&args) {
+        Ok(output) => Ok(json!({
+            "success": true,
+            "message": "Play workflow submitted successfully",
+            "output": output,
+            "task_id": task_id,
+            "repository": repository,
+            "service": service,
+            "docs_repository": docs_repository,
+            "docs_project_directory": docs_project_directory,
+            "implementation_agent": implementation_agent,
+            "quality_agent": quality_agent,
+            "testing_agent": testing_agent,
+            "model": model,
+            "parameters": params
+        })),
+        Err(e) => Err(anyhow!("Failed to submit play workflow: {}", e)),
     }
 }
 
@@ -1112,7 +1292,13 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
                     }]
                 }))),
-                Ok("task") => Some(handle_task_workflow(&arguments).map(|result| json!({
+                Ok("code") => Some(handle_code_workflow(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("play") => Some(handle_play_workflow(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
@@ -1330,6 +1516,13 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
                 Err(e) => Err(anyhow!(format!("Failed to delete workflow {name}: {e}")))
             }
         }
+        "play" => {
+            // Stop play workflow using Argo CLI
+            match run_argo_cli(&["stop", name, "-n", namespace]) {
+                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped Play workflow {name}"), "namespace": namespace})),
+                Err(e) => Err(anyhow!(format!("Failed to stop play workflow {name}: {e}")))
+            }
+        }
         other => Err(anyhow!(format!("Unsupported job_type: {other}"))),
     }
 }
@@ -1411,12 +1604,12 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
 
     // Add user filter if provided
     if let Some(user_label) = user {
-        label_selectors.push(format!("agents.platform/user={}", user_label));
+        label_selectors.push(format!("agents.platform/user={user_label}"));
     }
 
     // Add service/name filter if provided
     if let Some(service_name) = service {
-        label_selectors.push(format!("agents.platform/name={}", service_name));
+        label_selectors.push(format!("agents.platform/name={service_name}"));
     }
 
     let selector = label_selectors.join(",");
@@ -1454,7 +1647,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .ok_or(anyhow!("Service missing port"))?;
 
     // Construct the service URL
-    let service_url = format!("http://{}.{}.svc.cluster.local:{}/input", service_name, namespace, service_port);
+    let service_url = format!("http://{service_name}.{namespace}.svc.cluster.local:{service_port}/input");
 
     // Format the message as JSON
     let message_data = json!({

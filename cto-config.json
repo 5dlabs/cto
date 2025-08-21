@@ -21,12 +21,24 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
       "service": "cto"
+    },
+    "play": {
+      "model": "claude-3-5-sonnet-20241022",
+      "implementationAgent": "5DLabs-Rex",
+      "qualityAgent": "5DLabs-Cleo",
+      "testingAgent": "5DLabs-Tess",
+      "repository": "5dlabs/cto",
+      "service": "cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "docs"
     }
   },
   "agents": {
     "morgan": "5DLabs-Morgan",
     "rex": "5DLabs-Rex",
     "blaze": "5DLabs-Blaze",
-    "cipher": "5DLabs-Cipher"
+    "cipher": "5DLabs-Cipher",
+    "cleo": "5DLabs-Cleo",
+    "tess": "5DLabs-Tess"
   }
 }

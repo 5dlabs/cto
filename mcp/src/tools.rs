@@ -6,7 +6,8 @@ pub fn get_tool_schemas() -> Value {
     json!({
         "tools": [
             get_docs_schema(),
-            get_task_schema(&HashMap::new()),
+            get_code_schema(&HashMap::new()),
+            get_play_schema(&HashMap::new()),
             get_export_schema(),
             get_intake_schema(),
             get_jobs_schema(),
@@ -21,7 +22,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, String>) -> Value {
     json!({
         "tools": [
             get_docs_schema(),
-            get_task_schema(agents),
+            get_code_schema(agents),
+            get_play_schema(agents),
             get_export_schema(),
             get_intake_schema(),
             get_jobs_schema(),
@@ -60,9 +62,9 @@ fn get_docs_schema() -> Value {
     })
 }
 
-fn get_task_schema(agents: &HashMap<String, String>) -> Value {
+fn get_code_schema(agents: &HashMap<String, String>) -> Value {
     json!({
-        "name": "task",
+        "name": "code",
         "description": "Submit a Task Master task for implementation using Claude with persistent workspace",
         "inputSchema": {
             "type": "object",
@@ -149,6 +151,72 @@ fn get_task_schema(agents: &HashMap<String, String>) -> Value {
     })
 }
 
+fn get_play_schema(agents: &HashMap<String, String>) -> Value {
+    json!({
+        "name": "play",
+        "description": "Submit a Play workflow for multi-agent orchestration (Rex/Blaze → Cleo → Tess) with event-driven coordination",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task_id": {
+                    "type": "integer",
+                    "description": "Task ID to implement from task files",
+                    "minimum": 1
+                },
+                "repository": {
+                    "type": "string",
+                    "description": "Target repository URL (e.g., 5dlabs/cto). Optional if defaults.play.repository is set in config."
+                },
+                "service": {
+                    "type": "string",
+                    "description": "Service identifier for persistent workspace. Optional if defaults.play.service is set in config.",
+                    "pattern": "^[a-z0-9-]+$"
+                },
+                "docs_repository": {
+                    "type": "string",
+                    "description": "Documentation repository URL. Optional if defaults.play.docsRepository is set in config."
+                },
+                "docs_project_directory": {
+                    "type": "string",
+                    "description": "Project directory within docs repository (e.g., docs). Optional if defaults.play.docsProjectDirectory is set in config."
+                },
+                "implementation_agent": {
+                    "type": "string",
+                    "description": if agents.is_empty() {
+                        "Agent for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)".to_string()
+                    } else {
+                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        format!("Agent for implementation work. Available agents: {agent_list}")
+                    }
+                },
+                "quality_agent": {
+                    "type": "string",
+                    "description": if agents.is_empty() {
+                        "Agent for quality assurance (e.g., 5DLabs-Cleo)".to_string()
+                    } else {
+                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        format!("Agent for quality assurance. Available agents: {agent_list}")
+                    }
+                },
+                "testing_agent": {
+                    "type": "string",
+                    "description": if agents.is_empty() {
+                        "Agent for testing and validation (e.g., 5DLabs-Tess)".to_string()
+                    } else {
+                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        format!("Agent for testing and validation. Available agents: {agent_list}")
+                    }
+                },
+                "model": {
+                    "type": "string",
+                    "description": "Claude model to use for all agents (optional, defaults to configuration)"
+                }
+            },
+            "required": ["task_id"]
+        }
+    })
+}
+
 fn get_export_schema() -> Value {
     json!({
         "name": "export",
@@ -195,11 +263,11 @@ fn get_jobs_schema() -> Value {
 fn get_stop_job_schema() -> Value {
     json!({
         "name": "stop_job",
-        "description": "Stop a running job: CodeRun (code), DocsRun (docs), or Argo intake workflow (intake).",
+        "description": "Stop a running job: CodeRun (code), DocsRun (docs), Argo intake workflow (intake), or Play workflow (play).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "job_type": {"type": "string", "enum": ["code", "docs", "intake"], "description": "Type of job to stop"},
+                "job_type": {"type": "string", "enum": ["code", "docs", "intake", "play"], "description": "Type of job to stop"},
                 "name": {"type": "string", "description": "Resource/workflow name"},
                 "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"}
             },

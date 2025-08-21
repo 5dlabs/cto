@@ -4,11 +4,12 @@ An AI-powered development platform that helps you generate documentation and imp
 
 ## What It Does
 
-The platform provides two main capabilities:
+The platform provides three main capabilities:
 - **📝 Documentation Generation**: Automatically creates comprehensive documentation for your Task Master projects
 - **⚡ Code Implementation**: Deploys autonomous Claude agents to implement specific tasks from your project
+- **🎮 Multi-Agent Play Workflows**: Orchestrates complex multi-agent workflows with event-driven coordination (Rex/Blaze → Cleo → Tess)
 
-Both operations run as Kubernetes jobs with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup. All results are automatically submitted via GitHub PRs.
+All operations run as Kubernetes jobs with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup. All results are automatically submitted via GitHub PRs.
 
 ## Getting Started
 
@@ -30,7 +31,7 @@ This is an integrated platform with a clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-1. Cursor calls `docs()` or `task()` via MCP protocol
+1. Cursor calls `docs()`, `code()`, or `play()` via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
@@ -131,13 +132,25 @@ Create a `cto-config.json` file in your project root to configure agents, models
       "docsRepository": "https://github.com/your-org/your-docs-repo",
       "docsProjectDirectory": "projects/your-project",
       "service": "your-service-name"
+    },
+    "play": {
+      "model": "claude-3-5-sonnet-20241022",
+      "implementationAgent": "5DLabs-Rex",
+      "qualityAgent": "5DLabs-Cleo",
+      "testingAgent": "5DLabs-Tess",
+      "repository": "5dlabs/cto",
+      "service": "cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "docs"
     }
   },
   "agents": {
     "morgan": "5DLabs-Morgan",
     "rex": "5DLabs-Rex", 
     "blaze": "5DLabs-Blaze",
-    "cipher": "5DLabs-Cipher"
+    "cipher": "5DLabs-Cipher",
+    "cleo": "5DLabs-Cleo",
+    "tess": "5DLabs-Tess"
   }
 }
 ```
@@ -162,7 +175,7 @@ After creating your configuration file, configure Cursor to use the MCP server b
 1. Create the `cto-config.json` file in your project root with your specific settings
 2. Create the `.cursor/mcp.json` file to enable MCP integration
 3. Restart Cursor to load the MCP server
-4. The `docs()` and `task()` functions will be available with your configured defaults
+4. The `docs()`, `code()`, and `play()` functions will be available with your configured defaults
 
 **Benefits of Configuration-Driven Approach:**
 - **Simplified MCP Calls**: Most parameters have sensible defaults from your config
@@ -189,7 +202,7 @@ cp target/release/cto-mcp /usr/local/bin/
 
 ### MCP Tools Available
 
-The platform exposes two primary MCP tools:
+The platform exposes three primary MCP tools:
 
 #### 1. `docs` - Generate Documentation
 Analyzes your Task Master project and creates comprehensive documentation.
@@ -228,18 +241,18 @@ docs({
 └── ...
 ```
 
-#### 2. `task` - Implement Code
+#### 2. `code` - Implement Code
 Deploys an autonomous Claude agent to implement a specific task from your Task Master project.
 
 ```javascript
 // Minimal call using config defaults
-task({
+code({
   task_id: 5,
   repository: "https://github.com/myorg/my-project"
 });
 
 // Override specific parameters
-task({
+code({
   task_id: 5,
   repository: "https://github.com/myorg/my-project",
   agent: "rex",
@@ -248,7 +261,7 @@ task({
 });
 
 // Continue working on a partially completed or failed task
-task({
+code({
   task_id: 5,
   repository: "https://github.com/myorg/my-project",
   continue_session: true
@@ -262,9 +275,48 @@ task({
 ✅ Runs tests and validation
 ✅ Submits a GitHub PR with the implementation
 
+#### 3. `play` - Multi-Agent Orchestration
+Executes complex multi-agent workflows with event-driven coordination. Perfect for large features that require implementation, quality assurance, and testing phases.
+
+```javascript
+// Minimal call using config defaults
+play({
+  task_id: 1
+});
+
+// Customize agent assignments
+play({
+  task_id: 1,
+  implementation_agent: "blaze",
+  quality_agent: "cleo", 
+  testing_agent: "tess"
+});
+
+// Override model and repository
+play({
+  task_id: 1,
+  model: "claude-opus-4-1-20250805",
+  repository: "myorg/my-custom-repo"
+});
+```
+
+**What happens:**
+✅ **Phase 1 - Implementation**: Rex/Blaze agent implements the core functionality
+✅ **Phase 2 - Quality Assurance**: Cleo agent reviews, refactors, and improves the code
+✅ **Phase 3 - Testing**: Tess agent creates comprehensive tests and validates the implementation
+✅ **Event-Driven Coordination**: Each phase triggers the next automatically
+✅ **GitHub Integration**: All phases submit PRs with detailed explanations
+
+**Play Workflow Benefits:**
+- **Multi-Phase Approach**: Breaks complex tasks into implementation → QA → testing phases
+- **Agent Specialization**: Different agents handle different aspects of development
+- **Quality Assurance**: Dedicated QA phase ensures code quality and best practices
+- **Comprehensive Testing**: Automated testing phase validates functionality
+- **Event-Driven**: Seamless handoffs between phases with automatic triggering
+
 ## MCP Tool Reference
 
-Complete parameter reference for both MCP tools.
+Complete parameter reference for all MCP tools.
 
 ### `docs` Tool Parameters
 
@@ -277,7 +329,7 @@ Complete parameter reference for both MCP tools.
 - `source_branch` - Source branch to work from (defaults to `defaults.docs.sourceBranch`)
 - `include_codebase` - Include existing codebase as context (defaults to `defaults.docs.includeCodebase`)
 
-### `task` Tool Parameters
+### `code` Tool Parameters
 
 **Required:**
 - `task_id` - Task ID to implement from task files (integer, minimum 1)
@@ -294,6 +346,21 @@ Complete parameter reference for both MCP tools.
 - `overwrite_memory` - Whether to overwrite CLAUDE.md memory file (defaults to `defaults.code.overwriteMemory`)
 - `env` - Environment variables to set in the container (object with key-value pairs)
 - `env_from_secrets` - Environment variables from secrets (array of objects with `name`, `secretName`, `secretKey`)
+
+### `play` Tool Parameters
+
+**Required:**
+- `task_id` - Task ID to implement from task files (integer, minimum 1)
+
+**Optional (with config defaults):**
+- `repository` - Target repository URL (e.g., `"5dlabs/cto"`) (defaults to `defaults.play.repository`)
+- `service` - Service identifier for persistent workspace (defaults to `defaults.play.service`)
+- `docs_repository` - Documentation repository URL (defaults to `defaults.play.docsRepository`)
+- `docs_project_directory` - Project directory within docs repository (defaults to `defaults.play.docsProjectDirectory`)
+- `implementation_agent` - Agent for implementation work (defaults to `defaults.play.implementationAgent`)
+- `quality_agent` - Agent for quality assurance (defaults to `defaults.play.qualityAgent`)
+- `testing_agent` - Agent for testing and validation (defaults to `defaults.play.testingAgent`)
+- `model` - Claude model to use for all agents (defaults to `defaults.play.model`)
 
 ## Template Customization
 
@@ -314,6 +381,12 @@ The platform uses a template system to customize Claude agent behavior, settings
 - **Prompts**: Read from docs repository at `{docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md` (or `_projects/{service}/.taskmaster/docs/task-{id}/prompt.md`)
 - **Settings**: `code/settings.json.hbs` controls model, permissions, MCP tools
 - **Container Script**: `code/container.sh.hbs` handles dual-repo workflow and Claude execution
+
+**Play Workflows**: Multi-agent orchestration with event-driven coordination
+
+- **Workflow Template**: `play-workflow-template.yaml` defines the multi-phase workflow
+- **Phase Coordination**: Each phase triggers the next phase automatically
+- **Agent Handoffs**: Seamless transitions between implementation → QA → testing phases
 
 ### How to Customize
 
@@ -356,7 +429,22 @@ vim {docs_project_directory}/.taskmaster/docs/task-{id}/task.md
 vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
 ```
 
-#### 3. Adding Custom Hooks
+#### 3. Customizing Play Workflows
+
+**For play workflows** (affects multi-agent orchestration):
+
+```bash
+# Edit the play workflow template
+vim infra/charts/agent-platform/templates/workflowtemplates/play-workflow-template.yaml
+```
+
+The play workflow template controls:
+- Phase sequencing and dependencies
+- Agent assignments for each phase
+- Event triggers between phases
+- Parameter passing between phases
+
+#### 4. Adding Custom Hooks
 
 Hooks are shell scripts that run during agent execution. Add new hook files to the `claude-templates` directory:
 
@@ -372,7 +460,7 @@ Hook files are automatically discovered and rendered. Ensure the hook name match
 
 See [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide) for detailed hook configuration and examples.
 
-#### 4. Deploying Template Changes
+#### 5. Deploying Template Changes
 
 After editing any template files, redeploy the agent-platform:
 
@@ -402,11 +490,15 @@ Common variables available in templates:
 
 1. **Configure `cto-config.json` first** to set up your agents, models, and repository defaults
 2. **Always generate docs first** to establish baseline documentation  
-3. **Implement tasks sequentially** based on dependencies
-4. **Use minimal MCP calls** - let configuration defaults handle most parameters
-5. **Use `continue_session: true`** for retries on the same task
-6. **Review GitHub PRs promptly** - agents provide detailed logs and explanations
-7. **Update config file** when adding new agents or changing project structure
+3. **Choose the right tool for the job**:
+   - Use `docs()` for documentation generation
+   - Use `code()` for single-agent implementation tasks
+   - Use `play()` for complex multi-phase features requiring implementation, QA, and testing
+4. **Implement tasks sequentially** based on dependencies
+5. **Use minimal MCP calls** - let configuration defaults handle most parameters
+6. **Use `continue_session: true`** for retries on the same task
+7. **Review GitHub PRs promptly** - agents provide detailed logs and explanations
+8. **Update config file** when adding new agents or changing project structure
 
 ## Support
 
@@ -432,7 +524,7 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ## Related Projects
 
-- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this agent-platform platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `task()` MCP tool.
+- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this agent-platform platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `code()` and `play()` MCP tools.
 
 ## Roadmap
 
