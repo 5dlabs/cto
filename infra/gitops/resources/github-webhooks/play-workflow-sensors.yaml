@@ -204,25 +204,45 @@ spec:
                           if [ -n "$WORKFLOW_NAME" ]; then
                             echo "Found workflow: $WORKFLOW_NAME"
 
-                            # Find the suspended node ID for wait-ready-for-qa
-                            NODE_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
-                              jq -r '.status.nodes | to_entries | .[] | 
-                              select(.value.displayName == "wait-ready-for-qa" and .value.type == "Suspend") | 
-                              .key')
+                            # There's a second race condition: the suspend node might not be created yet
+                            # Keep trying to find and resume the suspend node
+                            NODE_ATTEMPTS=0
+                            MAX_NODE_ATTEMPTS=12  # Try for 1 minute
 
-                            if [ -n "$NODE_ID" ]; then
-                              echo "Found suspended node: $NODE_ID"
-                              # Resume the specific suspend node
-                              kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                                --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
-                              echo "✅ Suspend node resumed successfully"
-                            else
-                              echo "Warning: Could not find suspend node, trying workflow-level resume"
-                              kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                                --type='merge' -p '{"spec":{"suspend":false}}'
-                              echo "✅ Workflow resumed (fallback method)"
-                            fi
-                            exit 0
+                            while [ $NODE_ATTEMPTS -lt $MAX_NODE_ATTEMPTS ]; do
+                              # Find the suspended node ID for wait-ready-for-qa
+                              NODE_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
+                                jq -r '.status.nodes | to_entries | .[] |
+                                select(.value.displayName == "wait-ready-for-qa" and .value.type == "Suspend") |
+                                .key')
+
+                              if [ -n "$NODE_ID" ]; then
+                                echo "Found suspended node: $NODE_ID"
+                                # Get the phase of the node
+                                NODE_PHASE=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
+                                  jq -r ".status.nodes.\"$NODE_ID\".phase")
+
+                                if [ "$NODE_PHASE" = "Running" ]; then
+                                  echo "Resuming suspend node..."
+                                  kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                                    --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                                  echo "✅ Suspend node resumed successfully"
+                                  exit 0
+                                else
+                                  echo "Node already in phase: $NODE_PHASE"
+                                  exit 0
+                                fi
+                              fi
+
+                              NODE_ATTEMPTS=$((NODE_ATTEMPTS + 1))
+                              if [ $NODE_ATTEMPTS -lt $MAX_NODE_ATTEMPTS ]; then
+                                echo "Suspend node not found yet (attempt $NODE_ATTEMPTS/$MAX_NODE_ATTEMPTS), waiting 5 seconds..."
+                                sleep 5
+                              fi
+                            done
+
+                            echo "Warning: Suspend node never appeared, workflow might be in unexpected state"
+                            exit 1
                           fi
 
                           if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
@@ -312,8 +332,8 @@ spec:
 
                         # Find the suspended node ID for wait-pr-approved
                         NODE_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
-                          jq -r '.status.nodes | to_entries | .[] | 
-                          select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") | 
+                          jq -r '.status.nodes | to_entries | .[] |
+                          select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
                           .key')
 
                         if [ -n "$NODE_ID" ]; then
