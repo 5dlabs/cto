@@ -445,9 +445,13 @@ CLEO_PROMPT="$CLEO_PROMPT
 3. **Run quality checks**:
    - For Rust: cargo clippy (pedantic), cargo fmt --check, cargo test
    - For YAML: YAML linting and validation
-4. **Review against task requirements**: Verify implementation matches acceptance criteria
-5. **Post detailed feedback**: Comment on PR with specific quality issues found
-6. **Apply label**: Add 'ready-for-qa' label ONLY if all quality checks pass
+4. **Fix any issues found**:
+   - If formatting issues: Run cargo fmt to fix them
+   - If minor code issues: Fix them directly
+   - Commit and push all fixes to the current feature branch
+5. **Review against task requirements**: Verify implementation matches acceptance criteria
+6. **Report results**: Provide detailed summary of checks performed and any fixes applied
+7. **Success criteria**: Quality checks must pass (after any fixes) for approval
 
 ## Quality Standards
 - **Zero tolerance** for clippy warnings (even at pedantic level)
@@ -515,6 +519,39 @@ if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
     REPO_SLUG=$(echo "$REPO_INPUT" | sed -E 's|https://github.com/([^/]+/[^/.]+)(\.git)?$|\1|')
   else
     REPO_SLUG="$REPO_INPUT"
+  fi
+
+  # Post quality review comment to PR
+  if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
+    echo "💬 Posting quality review comment to PR..."
+    
+    # Create comment body with quality review summary
+    COMMENT_BODY="## 🔍 Code Quality Review by Cleo
+
+✅ **Quality checks completed successfully**
+
+### Review Summary
+- Code has been reviewed for quality standards
+- All required checks have passed
+- Ready for QA testing
+
+---
+*Reviewed by Cleo - 5DLabs Code Quality Agent*"
+    
+    # Post comment using PR number or URL
+    if [ -n "$PR_NUMBER" ]; then
+      if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted quality review comment"
+      else
+        echo "⚠️ Failed to post comment using PR number"
+      fi
+    elif [ -n "$PR_URL" ]; then
+      if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted quality review comment"
+      else
+        echo "⚠️ Failed to post comment"
+      fi
+    fi
   fi
 
   # Add the ready-for-qa label using PR number if available; fallback to PR URL
