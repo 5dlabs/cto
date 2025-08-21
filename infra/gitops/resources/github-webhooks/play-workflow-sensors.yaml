@@ -6,6 +6,7 @@ metadata:
   name: play-workflow-pr-created
   namespace: argo
 spec:
+  replicas: 2
   template:
     serviceAccountName: argo-events-sa
   dependencies:
@@ -139,6 +140,7 @@ metadata:
   name: play-workflow-ready-for-qa
   namespace: argo
 spec:
+  replicas: 2
   template:
     serviceAccountName: argo-events-sa
   dependencies:
@@ -270,6 +272,7 @@ metadata:
   name: play-workflow-pr-approved
   namespace: argo
 spec:
+  replicas: 2
   template:
     serviceAccountName: argo-events-sa
   dependencies:
@@ -362,6 +365,7 @@ metadata:
   name: implementation-agent-remediation
   namespace: argo
 spec:
+  replicas: 2
   template:
     serviceAccountName: argo-events-sa
   dependencies:
