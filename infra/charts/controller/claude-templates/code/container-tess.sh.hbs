@@ -552,7 +552,15 @@ Your focus areas are:
    - If critical issues found, request Rex to fix them
    - Only approve PR when 120% satisfied
 
-Remember: Your job is to TEST and provide FEEDBACK. Rex handles all code changes."
+**HOW TO POST PR COMMENTS**:
+Use the GitHub CLI to post your findings as a comment:
+\`\`\`bash
+gh pr comment {{pr_number}} --body \"Your detailed feedback here\"
+\`\`\`
+
+After completing ALL testing, post a comprehensive comment with your findings using the gh pr comment command. Format it with markdown, use emojis for clarity (🔴 for issues, ✅ for passed checks), and be specific about what needs to be fixed.
+
+Remember: Your job is to TEST and provide FEEDBACK via PR comments. Rex handles all code changes."
 
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
