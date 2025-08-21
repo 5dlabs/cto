@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+<<<<<<< HEAD
 tokio = { version = "1.0", features = ["full"] }
 axum = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+=======
+>>>>>>> 58e076c (feat(task-1): initialize Rust HTTP API project)

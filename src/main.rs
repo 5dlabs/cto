@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 use axum::{
     routing::get,
     Router,
@@ -27,3 +28,8 @@ async fn main() {
     .await
     .unwrap();
 }
+=======
+fn main() {
+    println!("Hello, world!");
+}
+>>>>>>> 58e076c (feat(task-1): initialize Rust HTTP API project)

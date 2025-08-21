@@ -94,3 +94,8 @@ charts-repo/
 # Task files
 # tasks.json
 # tasks/ 
+
+
+# Added by cargo
+
+/target
