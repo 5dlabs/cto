@@ -264,98 +264,100 @@ spec:
         factor: 2
         jitter: 0.1
 
----
-# Sensor for PR Approved - Resume after testing work
-apiVersion: argoproj.io/v1alpha1
-kind: Sensor
-metadata:
-  name: play-workflow-pr-approved
-  namespace: argo
-spec:
-  replicas: 2
-  template:
-    serviceAccountName: argo-events-sa
-  dependencies:
-    - name: github-pr-approved
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          # Filter for pull_request_review submitted events with approval
-          - path: headers.X-Github-Event
-            type: string
-            value: ["pull_request_review"]
-          - path: body.action
-            type: string
-            value: ["submitted"]
-          - path: body.review.state
-            type: string
-            value: ["approved"]
-  triggers:
-    - template:
-        name: resume-after-pr-approved
-        conditions: "github-pr-approved"
-        k8s:
-          operation: create
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                generateName: resume-pr-approved-
-                namespace: agent-platform
-                labels:
-                  type: webhook-resume
-                  target-stage: waiting-pr-approved
-              spec:
-                entrypoint: resume-workflow
-                serviceAccountName: argo-workflow
-                templates:
-                  - name: resume-workflow
-                    script:
-                      image: alpine/k8s:1.31.0
-                      command: [bash]
-                      source: |
-                        #!/bin/bash
-                        set -e
-
-                        echo "=== PR Approved Workflow Resume ==="
-
-                        # Find any workflow waiting for PR approval
-                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l current-stage=waiting-pr-approved,workflow-type=play-orchestration \
-                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
-                        if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "No workflow found waiting for PR approval"
-                          exit 0
-                        fi
-
-                        echo "Found workflow: $WORKFLOW_NAME"
-
-                        # Find the suspended node ID for wait-pr-approved
-                        NODE_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
-                          jq -r '.status.nodes | to_entries | .[] |
-                          select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
-                          .key')
-
-                        if [ -n "$NODE_ID" ]; then
-                          echo "Found suspended node: $NODE_ID"
-                          # Resume the specific suspend node
-                          kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                            --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
-                          echo "✅ Suspend node resumed successfully"
-                        else
-                          echo "Warning: Could not find suspend node, trying workflow-level resume"
-                          kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                            --type='merge' -p '{"spec":{"suspend":false}}'
-                          echo "✅ Workflow resumed (fallback method)"
-                        fi
-      retryStrategy:
-        steps: 3
-        duration: "10s"
-        factor: 2
-        jitter: 0.1
+# ---
+# # DEPRECATED: Replaced by merge-to-main-sensor.yaml
+# # We now wait for merge to main instead of PR approval
+# # Sensor for PR Approved - Resume after testing work
+# apiVersion: argoproj.io/v1alpha1
+# kind: Sensor
+# metadata:
+#   name: play-workflow-pr-approved
+#   namespace: argo
+# spec:
+#   replicas: 2
+#   template:
+#     serviceAccountName: argo-events-sa
+#   dependencies:
+#     - name: github-pr-approved
+#       eventSourceName: github
+#       eventName: org
+#       filters:
+#         data:
+#           # Filter for pull_request_review submitted events with approval
+#           - path: headers.X-Github-Event
+#             type: string
+#             value: ["pull_request_review"]
+#           - path: body.action
+#             type: string
+#             value: ["submitted"]
+#           - path: body.review.state
+#             type: string
+#             value: ["approved"]
+#   triggers:
+#     - template:
+#         name: resume-after-pr-approved
+#         conditions: "github-pr-approved"
+#         k8s:
+#           operation: create
+#           source:
+#             resource:
+#               apiVersion: argoproj.io/v1alpha1
+#               kind: Workflow
+#               metadata:
+#                 generateName: resume-pr-approved-
+#                 namespace: agent-platform
+#                 labels:
+#                   type: webhook-resume
+#                   target-stage: waiting-pr-approved
+#               spec:
+#                 entrypoint: resume-workflow
+#                 serviceAccountName: argo-workflow
+#                 templates:
+#                   - name: resume-workflow
+#                     script:
+#                       image: alpine/k8s:1.31.0
+#                       command: [bash]
+#                       source: |
+#                         #!/bin/bash
+#                         set -e
+# 
+#                         echo "=== PR Approved Workflow Resume ==="
+# 
+#                         # Find any workflow waiting for PR approval
+#                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+#                           -l current-stage=waiting-pr-approved,workflow-type=play-orchestration \
+#                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+# 
+#                         if [ -z "$WORKFLOW_NAME" ]; then
+#                           echo "No workflow found waiting for PR approval"
+#                           exit 0
+#                         fi
+# 
+#                         echo "Found workflow: $WORKFLOW_NAME"
+# 
+#                         # Find the suspended node ID for wait-pr-approved
+#                         NODE_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
+#                           jq -r '.status.nodes | to_entries | .[] |
+#                           select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
+#                           .key')
+# 
+#                         if [ -n "$NODE_ID" ]; then
+#                           echo "Found suspended node: $NODE_ID"
+#                           # Resume the specific suspend node
+#                           kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+#                             --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+#                           echo "✅ Suspend node resumed successfully"
+#                         else
+#                           echo "Warning: Could not find suspend node, trying workflow-level resume"
+#                           kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+#                             --type='merge' -p '{"spec":{"suspend":false}}'
+#                           echo "✅ Workflow resumed (fallback method)"
+#                         fi
+#       retryStrategy:
+#         steps: 3
+#         duration: "10s"
+#         factor: 2
+#         jitter: 0.1
 
 ---
 # Sensor for Implementation Agent Remediation - Cancel outdated work
