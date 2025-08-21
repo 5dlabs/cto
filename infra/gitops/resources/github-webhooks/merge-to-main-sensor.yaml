@@ -149,19 +149,19 @@ spec:
                           cd "$PROGRESS_REPO"
 
                           # Create .completed directory if it doesn't exist
-                          mkdir -p .completed
+                          mkdir -p docs/.taskmaster/docs/.completed
 
-                          # Move the completed task file
-                          TASK_FILE="task/HELLO-${TASK_ID}.md"
-                          if [ -f "$TASK_FILE" ]; then
-                            mv "$TASK_FILE" ".completed/HELLO-${TASK_ID}.md"
-                            echo "✅ Moved $TASK_FILE to .completed/"
+                          # Move the completed task folder
+                          TASK_DIR="docs/.taskmaster/docs/task-${TASK_ID}"
+                          if [ -d "$TASK_DIR" ]; then
+                            mv "$TASK_DIR" "docs/.taskmaster/docs/.completed/task-${TASK_ID}"
+                            echo "✅ Moved $TASK_DIR to .completed/"
 
                             # Commit and push the change
                             git config user.name "Task Orchestrator"
                             git config user.email "orchestrator@5dlabs.com"
                             git add -A
-                            git commit -m "chore: move HELLO-${TASK_ID}.md to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
+                            git commit -m "chore: move task-${TASK_ID} to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
 
                             if ! git push origin main 2>/dev/null; then
                               echo "⚠️ Failed to push task move, continuing anyway..."
@@ -169,7 +169,7 @@ spec:
                               echo "✅ Task $TASK_ID moved to .completed/ folder"
                             fi
                           else
-                            echo "ℹ️ Task file $TASK_FILE not found, may already be moved"
+                            echo "ℹ️ Task directory $TASK_DIR not found, may already be moved"
                           fi
 
                           # Clean up
@@ -275,11 +275,11 @@ spec:
                         else
                           cd "$TASK_CHECK_REPO"
 
-                          # Find the lowest numbered task file not in .completed
+                          # Find the lowest numbered task directory not in .completed
                           NEXT_TASK_ID=""
                           for i in $(seq 1 29); do
-                            if [ -f "task/HELLO-${i}.md" ]; then
-                              echo "✅ Found next task: HELLO-${i}.md"
+                            if [ -d "docs/.taskmaster/docs/task-${i}" ]; then
+                              echo "✅ Found next task: task-${i}"
                               NEXT_TASK_ID=$i
                               break
                             fi
