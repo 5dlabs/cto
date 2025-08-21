@@ -124,63 +124,52 @@ spec:
                         echo "✅ Task $TASK_ID completed via merge to main"
 
                         # ============================================================
-                        # STEP 1: Update task progress tracker file
+                        # STEP 1: Move completed task to .completed folder
                         # ============================================================
                         echo ""
-                        echo "📝 Updating task progress tracker..."
+                        echo "📝 Moving completed task to .completed folder..."
 
                         # Extract repository from PR URL (e.g., "https://github.com/5dlabs/cto/pull/123" -> "5dlabs/cto")
                         PR_URL="{{workflow.parameters.pr-url}}"
                         REPO_PATH=$(echo "$PR_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)/pull/.*|\1|')
 
                         if [ -z "$REPO_PATH" ]; then
-                          echo "⚠️ Could not extract repository from PR URL, skipping progress update"
+                          echo "⚠️ Could not extract repository from PR URL, skipping task move"
                           exit 0
                         fi
 
                         echo "📚 Repository: $REPO_PATH"
 
-                        # Clone the repo with progress tracker (shallow clone for speed)
-                        PROGRESS_REPO="/tmp/progress-$$"
+                        # Clone the repo to move the task file
+                        PROGRESS_REPO="/tmp/task-move-$$"
                         CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_PATH}.git"
                         if ! git clone --depth 1 "$CLONE_URL" "$PROGRESS_REPO" 2>/dev/null; then
-                          echo "⚠️ Failed to clone progress repo, continuing anyway..."
+                          echo "⚠️ Failed to clone repo, continuing anyway..."
                         else
                           cd "$PROGRESS_REPO"
 
-                          # Create or update the progress file
-                          PROGRESS_FILE="completed-tasks.md"
-                          TIMESTAMP=$(date -Iseconds)
-                          PR_TITLE="{{workflow.parameters.pr-title}}"
-                          PR_NUMBER="{{workflow.parameters.pr-number}}"
+                          # Create .completed directory if it doesn't exist
+                          mkdir -p .completed
 
-                          # Ensure file exists with header
-                          if [ ! -f "$PROGRESS_FILE" ]; then
-                            echo "# Completed Tasks" > "$PROGRESS_FILE"
-                            echo "" >> "$PROGRESS_FILE"
-                            echo "Tasks automatically marked complete when PRs merge to main." >> "$PROGRESS_FILE"
-                            echo "" >> "$PROGRESS_FILE"
-                          fi
+                          # Move the completed task file
+                          TASK_FILE="task/HELLO-${TASK_ID}.md"
+                          if [ -f "$TASK_FILE" ]; then
+                            mv "$TASK_FILE" ".completed/HELLO-${TASK_ID}.md"
+                            echo "✅ Moved $TASK_FILE to .completed/"
 
-                          # Add the newly completed task
-                          echo "- ✅ Task $TASK_ID: $PR_TITLE (PR #$PR_NUMBER, merged $TIMESTAMP)" >> "$PROGRESS_FILE"
+                            # Commit and push the change
+                            git config user.name "Task Orchestrator"
+                            git config user.email "orchestrator@5dlabs.com"
+                            git add -A
+                            git commit -m "chore: move HELLO-${TASK_ID}.md to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
 
-                          # Calculate next task based on completed tasks
-                          NEXT_TASK_ID=$((TASK_ID + 1))
-                          MAX_TASKS=29
-
-                          echo "📊 Progress: Task $TASK_ID completed, $((MAX_TASKS - TASK_ID)) remaining"
-
-                          # Commit and push the update
-                          git config user.name "Task Orchestrator"
-                          git config user.email "orchestrator@5dlabs.com"
-                          git add "$PROGRESS_FILE"
-                          git commit -m "chore: mark task $TASK_ID complete - $PR_TITLE (PR #$PR_NUMBER)" || echo "No changes to commit"
-
-                          if ! git push origin main 2>/dev/null; then
-                            echo "⚠️ Failed to push progress update, continuing anyway..."
+                            if ! git push origin main 2>/dev/null; then
+                              echo "⚠️ Failed to push task move, continuing anyway..."
+                            else
+                              echo "✅ Task $TASK_ID moved to .completed/ folder"
+                            fi
                           else
-                            echo "✅ Task $TASK_ID marked complete in $PROGRESS_FILE"
+                            echo "ℹ️ Task file $TASK_FILE not found, may already be moved"
                           fi
 
                           # Clean up
@@ -274,8 +263,36 @@ spec:
                         # STEP 3: Start next task in queue
                         # ============================================================
 
-                        # Calculate next task from the completed task
-                        NEXT_TASK_ID=$((TASK_ID + 1))
+                        # Find the next available task by looking for task files not in .completed
+                        echo "🔍 Looking for next available task..."
+
+                        # Clone repo again to check for next task
+                        TASK_CHECK_REPO="/tmp/task-check-$$"
+                        if ! git clone --depth 1 "$CLONE_URL" "$TASK_CHECK_REPO" 2>/dev/null; then
+                          echo "⚠️ Failed to clone repo for task check"
+                          # Fall back to simple increment
+                          NEXT_TASK_ID=$((TASK_ID + 1))
+                        else
+                          cd "$TASK_CHECK_REPO"
+
+                          # Find the lowest numbered task file not in .completed
+                          NEXT_TASK_ID=""
+                          for i in $(seq 1 29); do
+                            if [ -f "task/HELLO-${i}.md" ]; then
+                              echo "✅ Found next task: HELLO-${i}.md"
+                              NEXT_TASK_ID=$i
+                              break
+                            fi
+                          done
+
+                          cd /
+                          rm -rf "$TASK_CHECK_REPO"
+
+                          if [ -z "$NEXT_TASK_ID" ]; then
+                            echo "🎉 No more task files found - all tasks may be complete!"
+                            exit 0
+                          fi
+                        fi
 
                         echo ""
                         echo "🚀 Preparing to start Task $NEXT_TASK_ID..."
@@ -300,6 +317,10 @@ spec:
 
                         echo "Creating orchestration workflow for Task $NEXT_TASK_ID..."
 
+                        # Parse owner and repo from REPO_PATH (e.g., "5dlabs/cto" -> owner: 5dlabs, repo: cto)
+                        GITHUB_OWNER=$(echo "$REPO_PATH" | cut -d'/' -f1)
+                        GITHUB_REPO=$(echo "$REPO_PATH" | cut -d'/' -f2)
+
                         # Create the next task workflow
                         cat <<EOF | kubectl create -f -
                         apiVersion: argoproj.io/v1alpha1
@@ -321,11 +342,11 @@ spec:
                               - name: task-id
                                 value: "$NEXT_TASK_ID"
                               - name: github-owner
-                                value: "5dlabs"
+                                value: "$GITHUB_OWNER"
                               - name: github-repo
-                                value: "cto-play-test"
+                                value: "$GITHUB_REPO"
                               - name: docs-repo
-                                value: "cto"
+                                value: "$GITHUB_REPO"
                           templates:
                             - name: orchestrate
                               steps:
