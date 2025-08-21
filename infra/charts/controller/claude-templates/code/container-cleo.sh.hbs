@@ -509,14 +509,21 @@ CLAUDE_EXIT_CODE=$?
 if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
   echo "✅ Claude quality review completed successfully"
   
-  # Add the ready-for-qa label to the PR
+  # Determine OWNER/REPO slug for gh -R
+  REPO_INPUT="{{repository_url}}"
+  if echo "$REPO_INPUT" | grep -q "^https://github.com/"; then
+    REPO_SLUG=$(echo "$REPO_INPUT" | sed -E 's|https://github.com/([^/]+/[^/.]+)(\.git)?$|\1|')
+  else
+    REPO_SLUG="$REPO_INPUT"
+  fi
+
+  # Add the ready-for-qa label using PR number if available; fallback to PR URL
   if [ -n "$PR_NUMBER" ]; then
     echo "🏷️ Adding 'ready-for-qa' label to PR #$PR_NUMBER..."
-    if gh pr edit "$PR_NUMBER" -R "{{repository_url}}" --add-label "ready-for-qa" 2>/dev/null; then
+    if gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-qa" 2>/dev/null; then
       echo "✅ Successfully added 'ready-for-qa' label"
     else
-      echo "⚠️ Failed to add 'ready-for-qa' label - attempting with full URL..."
-      # Try with the full PR URL as fallback
+      echo "⚠️ Failed to add label using PR number - attempting with PR URL..."
       if [ -n "$PR_URL" ]; then
         if gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>/dev/null; then
           echo "✅ Successfully added 'ready-for-qa' label using PR URL"
@@ -525,8 +532,15 @@ if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
         fi
       fi
     fi
+  elif [ -n "$PR_URL" ]; then
+    echo "🏷️ Adding 'ready-for-qa' label using PR URL..."
+    if gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>/dev/null; then
+      echo "✅ Successfully added 'ready-for-qa' label"
+    else
+      echo "❌ Failed to add 'ready-for-qa' label"
+    fi
   else
-    echo "⚠️ No PR_NUMBER available, cannot add label"
+    echo "⚠️ No PR_NUMBER or PR_URL available, cannot add label"
   fi
 else
   echo "⚠️ Claude process exited with code: $CLAUDE_EXIT_CODE - not adding label"
