@@ -86,9 +86,20 @@ spec:
                     script:
                       image: alpine/k8s:1.31.0
                       command: [bash]
+                      env:
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-token
+                              key: token
                       source: |
                         #!/bin/bash
                         set -e
+                        
+                        # Install git if not present
+                        if ! command -v git &> /dev/null; then
+                          apk add --no-cache git
+                        fi
 
                         echo "════════════════════════════════════════════════════════════════"
                         echo "║                 TASK COMPLETION HANDLER                      ║"
@@ -113,7 +124,104 @@ spec:
                         echo "✅ Task $TASK_ID completed via merge to main"
 
                         # ============================================================
-                        # STEP 1: Complete current orchestration workflow
+                        # STEP 1: Update task progress tracker file
+                        # ============================================================
+                        echo ""
+                        echo "📝 Updating task progress tracker..."
+                        
+                        # Clone the repo with progress tracker (shallow clone for speed)
+                        PROGRESS_REPO="/tmp/cto-progress-$$"
+                        if ! git clone --depth 1 https://x-access-token:${GITHUB_TOKEN}@github.com/5dlabs/cto.git "$PROGRESS_REPO" 2>/dev/null; then
+                          echo "⚠️ Failed to clone progress repo, continuing anyway..."
+                        else
+                          cd "$PROGRESS_REPO"
+                          
+                          # Create or update the progress file
+                          PROGRESS_FILE="task-progress.md"
+                          TIMESTAMP=$(date -Iseconds)
+                          PR_TITLE="{{workflow.parameters.pr-title}}"
+                          PR_NUMBER="{{workflow.parameters.pr-number}}"
+                          
+                          # Read existing completed tasks if file exists
+                          if [ -f "$PROGRESS_FILE" ]; then
+                            COMPLETED_TASKS=$(grep "^- ✅" "$PROGRESS_FILE" 2>/dev/null || echo "")
+                          else
+                            COMPLETED_TASKS=""
+                          fi
+                          
+                          # Add current task to completed list
+                          NEW_COMPLETED="- ✅ Task $TASK_ID: $PR_TITLE (PR #$PR_NUMBER, merged $TIMESTAMP)"
+                          if [ -n "$COMPLETED_TASKS" ]; then
+                            COMPLETED_TASKS="$COMPLETED_TASKS
+$NEW_COMPLETED"
+                          else
+                            COMPLETED_TASKS="$NEW_COMPLETED"
+                          fi
+                          
+                          # Calculate next task
+                          NEXT_TASK_ID=$((TASK_ID + 1))
+                          MAX_TASKS=29
+                          
+                          # Generate upcoming tasks list
+                          UPCOMING_TASKS=""
+                          for i in $(seq $((NEXT_TASK_ID + 1)) $MAX_TASKS); do
+                            UPCOMING_TASKS="$UPCOMING_TASKS
+- ⏳ Task $i: [Pending]"
+                          done
+                          
+                          # Write the updated progress file
+                          cat > "$PROGRESS_FILE" << EOF
+# Task Progress Tracker
+
+## Current Status
+- **Current Task**: $NEXT_TASK_ID
+- **Status**: Starting
+- **Last Completed**: Task $TASK_ID
+- **Last Updated**: $TIMESTAMP
+
+## Completed Tasks
+$COMPLETED_TASKS
+
+## In Progress
+- 🚧 Task $NEXT_TASK_ID: [Starting implementation with Rex...]
+
+## Upcoming
+$UPCOMING_TASKS
+
+## Statistics
+- **Total Tasks**: $MAX_TASKS
+- **Completed**: $TASK_ID
+- **Remaining**: $((MAX_TASKS - TASK_ID))
+- **Progress**: $((TASK_ID * 100 / MAX_TASKS))%
+
+---
+*This file is automatically updated when tasks complete. To restart from a specific task, edit the "Current Task" number above and manually trigger the workflow.*
+EOF
+                          
+                          # Commit and push the update
+                          git config user.name "Task Orchestrator"
+                          git config user.email "orchestrator@5dlabs.com"
+                          git add "$PROGRESS_FILE"
+                          git commit -m "chore: task $TASK_ID completed, starting task $NEXT_TASK_ID
+
+Task $TASK_ID: $PR_TITLE
+PR: #$PR_NUMBER
+Merged at: $TIMESTAMP
+Next: Starting task $NEXT_TASK_ID" || echo "No changes to commit"
+                          
+                          if ! git push 2>/dev/null; then
+                            echo "⚠️ Failed to push progress update, continuing anyway..."
+                          else
+                            echo "✅ Task progress tracker updated successfully"
+                          fi
+                          
+                          # Clean up
+                          cd /
+                          rm -rf "$PROGRESS_REPO"
+                        fi
+
+                        # ============================================================
+                        # STEP 2: Complete current orchestration workflow
                         # ============================================================
                         echo ""
                         echo "🔍 Looking for orchestration workflow for task $TASK_ID..."
@@ -195,9 +303,26 @@ spec:
                         fi
 
                         # ============================================================
-                        # STEP 2: Start next task in queue
+                        # STEP 3: Start next task in queue
                         # ============================================================
+                        
+                        # Check the progress file to see what task should be next
+                        # This allows CTO to manually override by editing the file
                         NEXT_TASK_ID=$((TASK_ID + 1))
+                        
+                        # Try to read from progress file if it exists
+                        PROGRESS_REPO_CHECK="/tmp/cto-check-$$"
+                        if git clone --depth 1 https://x-access-token:${GITHUB_TOKEN}@github.com/5dlabs/cto.git "$PROGRESS_REPO_CHECK" 2>/dev/null; then
+                          if [ -f "$PROGRESS_REPO_CHECK/task-progress.md" ]; then
+                            # Extract current task from progress file
+                            FILE_TASK=$(grep "^- \*\*Current Task\*\*:" "$PROGRESS_REPO_CHECK/task-progress.md" 2>/dev/null | sed 's/.*: //' | tr -d ' ')
+                            if [ -n "$FILE_TASK" ] && [ "$FILE_TASK" -ne "$NEXT_TASK_ID" ]; then
+                              echo "📋 Progress file says current task should be: $FILE_TASK (overriding calculated $NEXT_TASK_ID)"
+                              NEXT_TASK_ID=$FILE_TASK
+                            fi
+                          fi
+                          rm -rf "$PROGRESS_REPO_CHECK"
+                        fi
 
                         echo ""
                         echo "🚀 Preparing to start Task $NEXT_TASK_ID..."
