@@ -503,6 +503,34 @@ fi
 
 # Wait for Claude process to complete
 wait "$CLAUDE_PID"
+CLAUDE_EXIT_CODE=$?
+
+# Add ready-for-qa label if Claude completed successfully
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  echo "✅ Claude quality review completed successfully"
+  
+  # Add the ready-for-qa label to the PR
+  if [ -n "$PR_NUMBER" ]; then
+    echo "🏷️ Adding 'ready-for-qa' label to PR #$PR_NUMBER..."
+    if gh pr edit "$PR_NUMBER" -R "{{repository_url}}" --add-label "ready-for-qa" 2>/dev/null; then
+      echo "✅ Successfully added 'ready-for-qa' label"
+    else
+      echo "⚠️ Failed to add 'ready-for-qa' label - attempting with full URL..."
+      # Try with the full PR URL as fallback
+      if [ -n "$PR_URL" ]; then
+        if gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>/dev/null; then
+          echo "✅ Successfully added 'ready-for-qa' label using PR URL"
+        else
+          echo "❌ Failed to add 'ready-for-qa' label"
+        fi
+      fi
+    fi
+  else
+    echo "⚠️ No PR_NUMBER available, cannot add label"
+  fi
+else
+  echo "⚠️ Claude process exited with code: $CLAUDE_EXIT_CODE - not adding label"
+fi
 
 # Gracefully stop sidecar
 if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
