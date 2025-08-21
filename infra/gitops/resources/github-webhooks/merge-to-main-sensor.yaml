@@ -116,27 +116,60 @@ spec:
                         # STEP 1: Complete current orchestration workflow
                         # ============================================================
                         echo ""
-                        echo "🔍 Looking for running orchestration workflow for task $TASK_ID..."
+                        echo "🔍 Looking for orchestration workflow for task $TASK_ID..."
                         
-                        CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
-                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
-                          --field-selector status.phase=Running \
-                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                        # LESSON LEARNED: Race condition - workflow might still be transitioning
+                        # Try multiple times with delay
+                        MAX_ATTEMPTS=12  # 1 minute total
+                        ATTEMPT=1
+                        CURRENT_WORKFLOW=""
+                        
+                        while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ -z "$CURRENT_WORKFLOW" ]; do
+                          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Looking for workflow..."
+                          
+                          # Don't filter by Running status - workflow might be suspended
+                          CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
+                            -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                          
+                          if [ -z "$CURRENT_WORKFLOW" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                            echo "Workflow not found yet, waiting 5 seconds..."
+                            sleep 5
+                          fi
+                          ATTEMPT=$((ATTEMPT + 1))
+                        done
                         
                         if [ -n "$CURRENT_WORKFLOW" ]; then
                           echo "Found workflow: $CURRENT_WORKFLOW"
                           
-                          # Find and resume the wait-merge-to-main suspend node
+                          # LESSON LEARNED: Check workflow phase to understand state
+                          WORKFLOW_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform \
+                            -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                          echo "Workflow phase: $WORKFLOW_PHASE"
+                          
+                          # LESSON LEARNED: Find the specific suspend node by display name
+                          # Must check both node type and displayName
                           NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
                             jq -r '.status.nodes | to_entries | .[] |
                             select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
                             .key')
                           
                           if [ -n "$NODE_ID" ]; then
-                            echo "Resuming suspend node: $NODE_ID"
-                            kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
-                              --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
-                            echo "✅ Task $TASK_ID workflow completed successfully"
+                            echo "Found suspend node: $NODE_ID"
+                            
+                            # LESSON LEARNED: Check node phase before trying to resume
+                            NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                              jq -r ".status.nodes.\"$NODE_ID\".phase")
+                            echo "Node phase: $NODE_PHASE"
+                            
+                            if [ "$NODE_PHASE" = "Running" ]; then
+                              echo "Resuming suspend node..."
+                              kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
+                                --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                              echo "✅ Task $TASK_ID workflow completed successfully"
+                            else
+                              echo "⚠️ Node already in phase: $NODE_PHASE"
+                            fi
                           else
                             echo "⚠️ No wait-merge-to-main suspend node found"
                             # Try legacy wait-pr-approved node
@@ -145,14 +178,20 @@ spec:
                               select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
                               .key')
                             if [ -n "$NODE_ID" ]; then
-                              echo "Found legacy wait-pr-approved node, resuming..."
-                              kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
-                                --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
-                              echo "✅ Task $TASK_ID workflow completed (legacy)"
+                              NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                                jq -r ".status.nodes.\"$NODE_ID\".phase")
+                              if [ "$NODE_PHASE" = "Running" ]; then
+                                echo "Found legacy wait-pr-approved node, resuming..."
+                                kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
+                                  --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                                echo "✅ Task $TASK_ID workflow completed (legacy)"
+                              else
+                                echo "⚠️ Legacy node already in phase: $NODE_PHASE"
+                              fi
                             fi
                           fi
                         else
-                          echo "ℹ️ No running orchestration workflow found for task $TASK_ID"
+                          echo "ℹ️ No orchestration workflow found for task $TASK_ID"
                         fi
                         
                         # ============================================================
