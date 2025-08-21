@@ -1,0 +1,490 @@
+---
+# Sensor for PR Merged to Main - Complete task and start next
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: play-workflow-pr-merged
+  namespace: argo
+spec:
+  replicas: 2
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: github-pr-merged
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for pull_request closed events with merged=true
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request"]
+          - path: body.action
+            type: string
+            value: ["closed"]
+          - path: body.pull_request.merged
+            type: bool
+            value: [true]
+          - path: body.pull_request.base.ref
+            type: string
+            value: ["main"]
+  triggers:
+    - template:
+        name: task-completion-handler
+        conditions: "github-pr-merged"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: task-complete-
+                namespace: agent-platform
+                labels:
+                  type: task-completion
+                  trigger: merge-to-main
+              spec:
+                entrypoint: handle-task-completion
+                serviceAccountName: argo-workflow
+                activeDeadlineSeconds: 600  # 10 minute timeout
+                arguments:
+                  parameters:
+                    - name: pr-title
+                      # Will be populated from event
+                    - name: pr-number
+                      # Will be populated from event
+                    - name: pr-url
+                      # Will be populated from event
+                    - name: merge-sha
+                      # Will be populated from event
+                    - name: merged-by
+                      # Will be populated from event
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.title
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.number
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.html_url
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.merge_commit_sha
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.merged_by.login
+                templates:
+                  - name: handle-task-completion
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      env:
+                        - name: GITHUB_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: github-token
+                              key: token
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                        # Install git if not present
+                        if ! command -v git &> /dev/null; then
+                          apk add --no-cache git
+                        fi
+
+                        echo "════════════════════════════════════════════════════════════════"
+                        echo "║                 TASK COMPLETION HANDLER                      ║"
+                        echo "════════════════════════════════════════════════════════════════"
+                        echo "📋 PR Title: {{workflow.parameters.pr-title}}"
+                        echo "🔢 PR Number: {{workflow.parameters.pr-number}}"
+                        echo "🔗 PR URL: {{workflow.parameters.pr-url}}"
+                        echo "📦 Merge SHA: {{workflow.parameters.merge-sha}}"
+                        echo "👤 Merged by: {{workflow.parameters.merged-by}}"
+                        echo "════════════════════════════════════════════════════════════════"
+
+                        # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
+                        PR_TITLE="{{workflow.parameters.pr-title}}"
+                        TASK_ID=$(echo "$PR_TITLE" | grep -oE '[Tt]ask[- ]?([0-9]+)' | sed -E 's/[Tt]ask[- ]?//')
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "⚠️ No task ID found in PR title, checking PR body and branch..."
+                          # Could also check branch name or PR body for task ID
+                          exit 0
+                        fi
+
+                        echo "✅ Task $TASK_ID completed via merge to main"
+
+                        # ============================================================
+                        # STEP 1: Move completed task to .completed folder
+                        # ============================================================
+                        echo ""
+                        echo "📝 Moving completed task to .completed folder..."
+
+                        # Extract repository from PR URL (e.g., "https://github.com/5dlabs/cto/pull/123" -> "5dlabs/cto")
+                        PR_URL="{{workflow.parameters.pr-url}}"
+                        REPO_PATH=$(echo "$PR_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)/pull/.*|\1|')
+
+                        if [ -z "$REPO_PATH" ]; then
+                          echo "⚠️ Could not extract repository from PR URL, skipping task move"
+                          exit 0
+                        fi
+
+                        echo "📚 Repository: $REPO_PATH"
+
+                        # Clone the repo to move the task file
+                        PROGRESS_REPO="/tmp/task-move-$$"
+                        CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_PATH}.git"
+                        if ! git clone --depth 1 "$CLONE_URL" "$PROGRESS_REPO" 2>/dev/null; then
+                          echo "⚠️ Failed to clone repo, continuing anyway..."
+                        else
+                          cd "$PROGRESS_REPO"
+
+                          # Create .completed directory if it doesn't exist
+                          mkdir -p docs/.taskmaster/docs/.completed
+
+                          # Move the completed task folder
+                          TASK_DIR="docs/.taskmaster/docs/task-${TASK_ID}"
+                          if [ -d "$TASK_DIR" ]; then
+                            mv "$TASK_DIR" "docs/.taskmaster/docs/.completed/task-${TASK_ID}"
+                            echo "✅ Moved $TASK_DIR to .completed/"
+
+                            # Commit and push the change
+                            git config user.name "Task Orchestrator"
+                            git config user.email "orchestrator@5dlabs.com"
+                            git add -A
+                            git commit -m "chore: move task-${TASK_ID} to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
+
+                            if ! git push origin main 2>/dev/null; then
+                              echo "⚠️ Failed to push task move, continuing anyway..."
+                            else
+                              echo "✅ Task $TASK_ID moved to .completed/ folder"
+                            fi
+                          else
+                            echo "ℹ️ Task directory $TASK_DIR not found, may already be moved"
+                          fi
+
+                          # Clean up
+                          cd /
+                          rm -rf "$PROGRESS_REPO"
+                        fi
+
+                        # ============================================================
+                        # STEP 2: Complete current orchestration workflow
+                        # ============================================================
+                        echo ""
+                        echo "🔍 Looking for orchestration workflow for task $TASK_ID..."
+
+                        # LESSON LEARNED: Race condition - workflow might still be transitioning
+                        # Try multiple times with delay
+                        MAX_ATTEMPTS=12  # 1 minute total
+                        ATTEMPT=1
+                        CURRENT_WORKFLOW=""
+
+                        while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ -z "$CURRENT_WORKFLOW" ]; do
+                          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Looking for workflow..."
+
+                          # Don't filter by Running status - workflow might be suspended
+                          CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
+                            -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -z "$CURRENT_WORKFLOW" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                            echo "Workflow not found yet, waiting 5 seconds..."
+                            sleep 5
+                          fi
+                          ATTEMPT=$((ATTEMPT + 1))
+                        done
+
+                        if [ -n "$CURRENT_WORKFLOW" ]; then
+                          echo "Found workflow: $CURRENT_WORKFLOW"
+
+                          # LESSON LEARNED: Check workflow phase to understand state
+                          WORKFLOW_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform \
+                            -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+                          echo "Workflow phase: $WORKFLOW_PHASE"
+
+                          # LESSON LEARNED: Find the specific suspend node by display name
+                          # Must check both node type and displayName
+                          NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                            jq -r '.status.nodes | to_entries | .[] |
+                            select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
+                            .key')
+
+                          if [ -n "$NODE_ID" ]; then
+                            echo "Found suspend node: $NODE_ID"
+
+                            # LESSON LEARNED: Check node phase before trying to resume
+                            NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                              jq -r ".status.nodes.\"$NODE_ID\".phase")
+                            echo "Node phase: $NODE_PHASE"
+
+                            if [ "$NODE_PHASE" = "Running" ]; then
+                              echo "Resuming suspend node..."
+                              kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
+                                --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                              echo "✅ Task $TASK_ID workflow completed successfully"
+                            else
+                              echo "⚠️ Node already in phase: $NODE_PHASE"
+                            fi
+                          else
+                            echo "⚠️ No wait-merge-to-main suspend node found"
+                            # Try legacy wait-pr-approved node
+                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                              jq -r '.status.nodes | to_entries | .[] |
+                              select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
+                              .key')
+                            if [ -n "$NODE_ID" ]; then
+                              NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                                jq -r ".status.nodes.\"$NODE_ID\".phase")
+                              if [ "$NODE_PHASE" = "Running" ]; then
+                                echo "Found legacy wait-pr-approved node, resuming..."
+                                kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
+                                  --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
+                                echo "✅ Task $TASK_ID workflow completed (legacy)"
+                              else
+                                echo "⚠️ Legacy node already in phase: $NODE_PHASE"
+                              fi
+                            fi
+                          fi
+                        else
+                          echo "ℹ️ No orchestration workflow found for task $TASK_ID"
+                        fi
+
+                        # ============================================================
+                        # STEP 3: Start next task in queue
+                        # ============================================================
+
+                        # Find the next available task by looking for task files not in .completed
+                        echo "🔍 Looking for next available task..."
+
+                        # Clone repo again to check for next task
+                        TASK_CHECK_REPO="/tmp/task-check-$$"
+                        if ! git clone --depth 1 "$CLONE_URL" "$TASK_CHECK_REPO" 2>/dev/null; then
+                          echo "⚠️ Failed to clone repo for task check"
+                          # Fall back to simple increment
+                          NEXT_TASK_ID=$((TASK_ID + 1))
+                        else
+                          cd "$TASK_CHECK_REPO"
+
+                          # Find the lowest numbered task directory not in .completed
+                          NEXT_TASK_ID=""
+                          for i in $(seq 1 29); do
+                            if [ -d "docs/.taskmaster/docs/task-${i}" ]; then
+                              echo "✅ Found next task: task-${i}"
+                              NEXT_TASK_ID=$i
+                              break
+                            fi
+                          done
+
+                          cd /
+                          rm -rf "$TASK_CHECK_REPO"
+
+                          if [ -z "$NEXT_TASK_ID" ]; then
+                            echo "🎉 No more task files found - all tasks may be complete!"
+                            exit 0
+                          fi
+                        fi
+
+                        echo ""
+                        echo "🚀 Preparing to start Task $NEXT_TASK_ID..."
+
+                        # Check if we've reached the end of tasks
+                        MAX_TASKS=29  # Configure this based on your task set
+                        if [ $NEXT_TASK_ID -gt $MAX_TASKS ]; then
+                          echo "🎉 All tasks completed! No more tasks in queue."
+                          exit 0
+                        fi
+
+                        # Check if next task is already running (avoid duplicates)
+                        EXISTING_NEXT=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$NEXT_TASK_ID,workflow-type=play-orchestration \
+                          --field-selector status.phase=Running \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -n "$EXISTING_NEXT" ]; then
+                          echo "⚠️ Task $NEXT_TASK_ID is already running: $EXISTING_NEXT"
+                          exit 0
+                        fi
+
+                        echo "Creating orchestration workflow for Task $NEXT_TASK_ID..."
+
+                        # Parse owner and repo from REPO_PATH (e.g., "5dlabs/cto" -> owner: 5dlabs, repo: cto)
+                        GITHUB_OWNER=$(echo "$REPO_PATH" | cut -d'/' -f1)
+                        GITHUB_REPO=$(echo "$REPO_PATH" | cut -d'/' -f2)
+
+                        # Create the next task workflow
+                        cat <<EOF | kubectl create -f -
+                        apiVersion: argoproj.io/v1alpha1
+                        kind: Workflow
+                        metadata:
+                          generateName: play-task-${NEXT_TASK_ID}-
+                          namespace: agent-platform
+                          labels:
+                            task-id: "$NEXT_TASK_ID"
+                            workflow-type: play-orchestration
+                            triggered-by: task-completion
+                            previous-task: "$TASK_ID"
+                        spec:
+                          entrypoint: orchestrate
+                          serviceAccountName: argo-workflow
+                          activeDeadlineSeconds: 172800  # 48 hours
+                          arguments:
+                            parameters:
+                              - name: task-id
+                                value: "$NEXT_TASK_ID"
+                              - name: github-owner
+                                value: "$GITHUB_OWNER"
+                              - name: github-repo
+                                value: "$GITHUB_REPO"
+                              - name: docs-repo
+                                value: "$GITHUB_REPO"
+                          templates:
+                            - name: orchestrate
+                              steps:
+                                # Stage 1: Rex Implementation
+                                - - name: implementation
+                                    template: run-rex
+
+                                # Stage 2: Wait for PR creation
+                                - - name: wait-pr-created
+                                    template: suspend-for-stage
+                                    arguments:
+                                      parameters:
+                                        - name: stage
+                                          value: "waiting-pr-created"
+
+                                # Stage 3: Cleo Code Quality
+                                - - name: quality
+                                    template: run-cleo
+
+                                # Stage 4: Wait for ready-for-qa label
+                                - - name: wait-ready-for-qa
+                                    template: suspend-for-stage
+                                    arguments:
+                                      parameters:
+                                        - name: stage
+                                          value: "waiting-ready-for-qa"
+
+                                # Stage 5: Tess QA Testing
+                                - - name: testing
+                                    template: run-tess
+
+                                # Stage 6: Wait for merge to main
+                                - - name: wait-merge-to-main
+                                    template: suspend-for-stage
+                                    arguments:
+                                      parameters:
+                                        - name: stage
+                                          value: "waiting-merge-to-main"
+
+                                # Stage 7: Task complete
+                                - - name: task-complete
+                                    template: log-completion
+
+                            - name: suspend-for-stage
+                              inputs:
+                                parameters:
+                                  - name: stage
+                              suspend: {}
+                              metadata:
+                                labels:
+                                  current-stage: "{{inputs.parameters.stage}}"
+
+                            - name: run-rex
+                              resource:
+                                action: create
+                                manifest: |
+                                  apiVersion: agents.platform/v1
+                                  kind: CodeRun
+                                  metadata:
+                                    generateName: coderun-implementation-task{{workflow.parameters.task-id}}-
+                                    namespace: agent-platform
+                                    labels:
+                                      task-id: "{{workflow.parameters.task-id}}"
+                                      workflow-stage: "implementation"
+                                      agent-type: "rex"
+                                  spec:
+                                    service: "task{{workflow.parameters.task-id}}"
+                                    github_app: "5DLabs-Rex"
+                                    github_owner: "{{workflow.parameters.github-owner}}"
+                                    github_repo: "{{workflow.parameters.github-repo}}"
+                                    docs_repository_url: "https://github.com/{{workflow.parameters.github-owner}}/{{workflow.parameters.docs-repo}}"
+                                    task_id: {{workflow.parameters.task-id}}
+
+                            - name: run-cleo
+                              resource:
+                                action: create
+                                manifest: |
+                                  apiVersion: agents.platform/v1
+                                  kind: CodeRun
+                                  metadata:
+                                    generateName: coderun-quality-task{{workflow.parameters.task-id}}-
+                                    namespace: agent-platform
+                                    labels:
+                                      task-id: "{{workflow.parameters.task-id}}"
+                                      workflow-stage: "quality"
+                                      agent-type: "cleo"
+                                  spec:
+                                    service: "task{{workflow.parameters.task-id}}"
+                                    github_app: "5DLabs-Cleo"
+                                    github_owner: "{{workflow.parameters.github-owner}}"
+                                    github_repo: "{{workflow.parameters.github-repo}}"
+                                    # Cleo will find the PR created by Rex
+
+                            - name: run-tess
+                              resource:
+                                action: create
+                                manifest: |
+                                  apiVersion: agents.platform/v1
+                                  kind: CodeRun
+                                  metadata:
+                                    generateName: coderun-testing-task{{workflow.parameters.task-id}}-
+                                    namespace: agent-platform
+                                    labels:
+                                      task-id: "{{workflow.parameters.task-id}}"
+                                      workflow-stage: "testing"
+                                      agent-type: "tess"
+                                  spec:
+                                    service: "task{{workflow.parameters.task-id}}"
+                                    github_app: "5DLabs-Tess"
+                                    github_owner: "{{workflow.parameters.github-owner}}"
+                                    github_repo: "{{workflow.parameters.github-repo}}"
+                                    # Tess will find the PR with ready-for-qa label
+
+                            - name: log-completion
+                              script:
+                                image: alpine:3.18
+                                command: [sh]
+                                source: |
+                                  echo "✅ Task {{workflow.parameters.task-id}} completed successfully!"
+                                  echo "Merged to main and ready for production."
+                        EOF
+
+                        if [ $? -eq 0 ]; then
+                          echo "✅ Successfully started Task $NEXT_TASK_ID workflow"
+                          echo ""
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "║                    TASK PROGRESSION                          ║"
+                          echo "════════════════════════════════════════════════════════════════"
+                          echo "✅ Task $TASK_ID: COMPLETED"
+                          echo "🚀 Task $NEXT_TASK_ID: STARTED"
+                          echo "📊 Progress: $TASK_ID/$MAX_TASKS tasks completed"
+                          echo "════════════════════════════════════════════════════════════════"
+                        else
+                          echo "❌ Failed to start Task $NEXT_TASK_ID workflow"
+                          exit 1
+                        fi
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
