@@ -8,4 +8,5 @@ resources:
   - externalsecret.yaml
   - sa-rbac.yaml
   - play-workflow-sensors.yaml
+  - merge-to-main-sensor.yaml
 
