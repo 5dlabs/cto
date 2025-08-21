@@ -182,6 +182,8 @@ else
     # If directory exists but isn't a git repo, remove it first
     if [ -d "$CLAUDE_WORK_DIR" ] && [ ! -d "$CLAUDE_WORK_DIR/.git" ]; then
         echo "🧹 Removing non-git directory to prepare for clone..."
+        # Change to parent directory before removing current directory
+        cd "$(dirname "$CLAUDE_WORK_DIR")"
         rm -rf "$CLAUDE_WORK_DIR"
     fi
     
