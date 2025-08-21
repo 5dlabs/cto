@@ -109,8 +109,11 @@ spec:
 
                           # Update workflow parameters with PR info
                           if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
-                            kubectl patch workflow $WORKFLOW_NAME -n agent-platform --type='merge' \
-                              -p "{\"spec\":{\"arguments\":{\"parameters\":[{\"name\":\"pr-url\",\"value\":\"$PR_URL\"},{\"name\":\"pr-number\",\"value\":\"$PR_NUMBER\"}]}}}"
+                            PATCH_JSON="{\"spec\":{\"arguments\":{\"parameters\":["
+                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-url\",\"value\":\"$PR_URL\"},"
+                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-number\",\"value\":\"$PR_NUMBER\"}]}}}"
+                            kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                              --type='merge' -p "$PATCH_JSON"
                           fi
 
                           # Resume the workflow
@@ -183,22 +186,42 @@ spec:
 
                         echo "=== Ready-for-QA Webhook Resume ==="
 
-                        # Find any workflow waiting for QA resumption
-                        WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l current-stage=waiting-ready-for-qa,workflow-type=play-orchestration \
-                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                        # Since we received the webhook, we know Cleo added the label
+                        # The workflow WILL transition to waiting-ready-for-qa, but it might take a few seconds
+                        # Keep trying for up to 2 minutes (24 attempts with 5 second delays)
 
-                        if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "No workflow found waiting for ready-for-qa"
-                          exit 0
-                        fi
+                        MAX_ATTEMPTS=24
+                        ATTEMPT=1
 
-                        echo "Found workflow: $WORKFLOW_NAME"
+                        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Looking for workflow in waiting-ready-for-qa stage..."
 
-                        # Resume the workflow using kubectl patch
-                        kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                          --type='merge' -p '{"spec":{"suspend":false}}'
-                        echo "✅ Workflow resumed successfully"
+                          # Find any workflow waiting for QA resumption
+                          WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
+                            -l current-stage=waiting-ready-for-qa,workflow-type=play-orchestration \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -n "$WORKFLOW_NAME" ]; then
+                            echo "Found workflow: $WORKFLOW_NAME"
+
+                            # Resume the workflow using kubectl patch
+                            kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                              --type='merge' -p '{"spec":{"suspend":false}}'
+                            echo "✅ Workflow resumed successfully"
+                            exit 0
+                          fi
+
+                          if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                            echo "Workflow not found yet, waiting 5 seconds..."
+                            sleep 5
+                          fi
+
+                          ATTEMPT=$((ATTEMPT + 1))
+                        done
+
+                        echo "❌ ERROR: No workflow found after $MAX_ATTEMPTS attempts"
+                        echo "This suggests the workflow stage transition failed"
+                        exit 1
       retryStrategy:
         steps: 3
         duration: "10s"
