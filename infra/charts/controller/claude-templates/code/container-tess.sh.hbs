@@ -182,20 +182,23 @@ else
     # If directory exists but isn't a git repo, remove it first
     if [ -d "$CLAUDE_WORK_DIR" ] && [ ! -d "$CLAUDE_WORK_DIR/.git" ]; then
         echo "🧹 Removing non-git directory to prepare for clone..."
-        # Change to parent directory before removing current directory
-        cd "$(dirname "$CLAUDE_WORK_DIR")"
         rm -rf "$CLAUDE_WORK_DIR"
     fi
     
     echo "📥 Cloning repository to working directory..."
+    # Make sure parent directory exists and we're in a valid location
+    PARENT_DIR="$(dirname "$CLAUDE_WORK_DIR")"
+    mkdir -p "$PARENT_DIR"
+    cd "$PARENT_DIR"
+    
     REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
-    if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
+    if ! git clone "$REPO_HTTP_URL" "$(basename "$CLAUDE_WORK_DIR")"; then
         echo "❌ Failed to clone repository"
         echo "Debug: CLAUDE_WORK_DIR=$CLAUDE_WORK_DIR"
-        echo "Debug: Parent directory exists: $(ls -la "$(dirname "$CLAUDE_WORK_DIR")" 2>/dev/null || echo 'No')"
+        echo "Debug: Parent directory exists: $(ls -la "$PARENT_DIR" 2>/dev/null || echo 'No')"
         exit 1
     fi
-    cd "$CLAUDE_WORK_DIR"
+    cd "$(basename "$CLAUDE_WORK_DIR")"
 fi
 
 # Checkout PR branch for testing review
