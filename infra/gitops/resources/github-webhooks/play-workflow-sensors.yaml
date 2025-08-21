@@ -115,7 +115,8 @@ spec:
 
                           # Resume the workflow
                           echo "Resuming workflow $WORKFLOW_NAME"
-                          argo resume $WORKFLOW_NAME -n agent-platform
+                          kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                            --type='merge' -p '{"spec":{"suspend":false}}'
 
                           echo "✅ Workflow resumed successfully"
                         done
@@ -194,8 +195,9 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Resume the workflow
-                        argo resume $WORKFLOW_NAME -n agent-platform
+                        # Resume the workflow using kubectl patch
+                        kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                          --type='merge' -p '{"spec":{"suspend":false}}'
                         echo "✅ Workflow resumed successfully"
       retryStrategy:
         steps: 3
@@ -271,8 +273,9 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Resume the workflow
-                        argo resume $WORKFLOW_NAME -n agent-platform
+                        # Resume the workflow using kubectl patch
+                        kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                          --type='merge' -p '{"spec":{"suspend":false}}'
                         echo "✅ Workflow resumed successfully"
       retryStrategy:
         steps: 3
