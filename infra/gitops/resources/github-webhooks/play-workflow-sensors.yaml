@@ -25,7 +25,7 @@ spec:
     - template:
         name: resume-after-pr-created
         conditions: "github-pr-created"
-        k8s:
+        argoWorkflow:
           operation: create
           source:
             resource:
@@ -40,6 +40,14 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: pr-number
+                      value: "{{ .Input.body.pull_request.number }}"
+                    - name: pr-url
+                      value: "{{ .Input.body.pull_request.html_url }}"
+                    - name: pr-labels
+                      value: "{{ .Input.body.pull_request.labels | toJson }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -50,11 +58,11 @@ spec:
                         set -e
 
                         echo "=== PR Created Workflow Resume ==="
-                        echo "PR Number: {{ .Input.body.pull_request.number }}"
-                        echo "PR URL: {{ .Input.body.pull_request.html_url }}"
+                        echo "PR Number: {{workflow.parameters.pr-number}}"
+                        echo "PR URL: {{workflow.parameters.pr-url}}"
 
                         # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
                           jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
@@ -76,33 +84,30 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow exists and is at correct stage
-                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n agent-platform \
-                          -o jsonpath='{.metadata.labels.current-stage}' \
-                          2>/dev/null || echo "")
+                        # Check if workflow is suspended at the expected stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform \
+                          -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "unknown")
+
+                        echo "Current stage: $CURRENT_STAGE"
 
                         if [ "$CURRENT_STAGE" = "waiting-pr-created" ]; then
-                          echo "Found workflow at correct stage, resuming..."
+                          echo "✅ Workflow is at expected stage, resuming..."
 
-                          # Store PR details in environment variables to prevent injection
-                          PR_URL="{{ .Input.body.pull_request.html_url }}"
-                          PR_NUMBER="{{ .Input.body.pull_request.number }}"
+                          # Set environment variables for PR context
+                          PR_NUMBER={{workflow.parameters.pr-number}}
+                          PR_URL={{workflow.parameters.pr-url}}
 
-                          # Update workflow parameters with PR details using strategic patch
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='strategic' \
-                            --patch="{
-                              \"spec\": {
-                                \"arguments\": {
-                                  \"parameters\": [
-                                    {\"name\": \"pr-url\", \"value\": \"$PR_URL\"},
-                                    {\"name\": \"pr-number\", \"value\": \"$PR_NUMBER\"}
-                                  ]
-                                }
+                          # Patch the workflow to add PR context parameters
+                          kubectl patch workflow $WORKFLOW_NAME -n agent-platform --type='merge' -p "{
+                            \"spec\": {
+                              \"arguments\": {
+                                \"parameters\": [
+                                  {\"name\": \"pr-url\", \"value\": \"$PR_URL\"},
+                                  {\"name\": \"pr-number\", \"value\": \"$PR_NUMBER\"}
+                                ]
                               }
-                            }"
+                            }
+                          }"
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n agent-platform
@@ -153,7 +158,7 @@ spec:
     - template:
         name: resume-after-ready-for-qa
         conditions: "github-label-added"
-        k8s:
+        argoWorkflow:
           operation: create
           source:
             resource:
@@ -168,6 +173,14 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: label-name
+                      value: "{{ .Input.body.label.name }}"
+                    - name: sender-login
+                      value: "{{ .Input.body.sender.login }}"
+                    - name: pr-labels
+                      value: "{{ .Input.body.pull_request.labels | toJson }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -178,11 +191,11 @@ spec:
                         set -e
 
                         echo "=== Ready-for-QA Workflow Resume ==="
-                        echo "Label Added: {{ .Input.body.label.name }}"
-                        echo "Added By: {{ .Input.body.sender.login }}"
+                        echo "Label Added: {{workflow.parameters.label-name}}"
+                        echo "Added By: {{workflow.parameters.sender-login}}"
 
                         # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
                           jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
@@ -204,20 +217,14 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow exists and is at correct stage
-                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n agent-platform \
-                          -o jsonpath='{.metadata.labels.current-stage}' \
-                          2>/dev/null || echo "")
+                        # Check if workflow is suspended at the expected stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform \
+                          -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "unknown")
+
+                        echo "Current stage: $CURRENT_STAGE"
 
                         if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
-                          echo "Found workflow at correct stage, resuming..."
-
-                          # Update workflow parameters using strategic patch to preserve existing parameters
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='strategic' \
-                            --patch='{"spec": {"arguments": {"parameters": [{"name": "qa-status", "value": "ready"}]}}}'
+                          echo "✅ Workflow is at expected stage, resuming..."
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n agent-platform
@@ -249,27 +256,21 @@ spec:
       eventName: org
       filters:
         data:
-          # Filter for pull_request_review events
+          # Filter for pull_request_review submitted events with approval
           - path: headers.X-Github-Event
             type: string
             value: ["pull_request_review"]
           - path: body.action
             type: string
             value: ["submitted"]
-          # Check if the review state is approved
           - path: body.review.state
             type: string
             value: ["approved"]
-          # Check if reviewer is Tess
-          - path: body.review.user.login
-            type: string
-            comparator: "~"
-            value: ["tess-5dlabs\\[bot\\]"]
   triggers:
     - template:
         name: resume-after-pr-approved
         conditions: "github-pr-approved"
-        k8s:
+        argoWorkflow:
           operation: create
           source:
             resource:
@@ -284,6 +285,14 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: review-state
+                      value: "{{ .Input.body.review.state }}"
+                    - name: reviewer
+                      value: "{{ .Input.body.review.user.login }}"
+                    - name: pr-labels
+                      value: "{{ .Input.body.pull_request.labels | toJson }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -294,11 +303,11 @@ spec:
                         set -e
 
                         echo "=== PR Approved Workflow Resume ==="
-                        echo "Reviewer: {{ .Input.body.review.user.login }}"
-                        echo "Review State: {{ .Input.body.review.state }}"
+                        echo "Review State: {{workflow.parameters.review-state}}"
+                        echo "Reviewer: {{workflow.parameters.reviewer}}"
 
                         # Extract task ID from PR labels
-                        TASK_ID=$(echo '{{ .Input.body.pull_request.labels }}' | \
+                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
                           jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
@@ -320,32 +329,14 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow exists and is at correct stage
-                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n agent-platform \
-                          -o jsonpath='{.metadata.labels.current-stage}' \
-                          2>/dev/null || echo "")
+                        # Check if workflow is suspended at the expected stage
+                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform \
+                          -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "unknown")
+
+                        echo "Current stage: $CURRENT_STAGE"
 
                         if [ "$CURRENT_STAGE" = "waiting-pr-approved" ]; then
-                          echo "Found workflow at correct stage, resuming..."
-
-                          # Store merge SHA in environment variable to prevent injection
-                          MERGE_SHA="{{ .Input.body.pull_request.merge_commit_sha }}"
-
-                          # Update workflow parameters using strategic patch to preserve existing parameters
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='strategic' \
-                            --patch="{
-                              \"spec\": {
-                                \"arguments\": {
-                                  \"parameters\": [
-                                    {\"name\": \"qa-status\", \"value\": \"approved\"},
-                                    {\"name\": \"merge-sha\", \"value\": \"$MERGE_SHA\"}
-                                  ]
-                                }
-                              }
-                            }"
+                          echo "✅ Workflow is at expected stage, resuming..."
 
                           # Resume the workflow
                           argo resume $WORKFLOW_NAME -n agent-platform
@@ -362,77 +353,98 @@ spec:
         jitter: 0.1
 
 ---
-# Sensor for Implementation Agent Remediation - Cancel running quality/testing agents
+# Sensor for Implementation Agent Remediation - Cancel outdated work
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: implementation-agent-remediation
   namespace: argo
-  labels:
-    sensor-type: multi-agent-orchestration
-    agent-class: implementation
 spec:
   template:
     serviceAccountName: argo-events-sa
   dependencies:
-    - name: implementation-push-event
+    - name: github-rex-push
       eventSourceName: github
       eventName: org
       filters:
         data:
-          # Filter for push events
+          # Filter for push events from Rex implementation agent
           - path: headers.X-Github-Event
             type: string
             value: ["push"]
-          # Match any 5DLabs implementation agent (Rex, Blaze, Morgan)
           - path: body.pusher.name
             type: string
             comparator: "~"
-            value: ["(rex|blaze|morgan)-5dlabs\\[bot\\]"]
-          # Ensure push is to a task branch
-          - path: body.ref
-            type: string
-            comparator: "~"
-            value: ["refs/heads/(task|feature/task)-.*"]
+            value: ["rex-5dlabs\\[bot\\]"]
   triggers:
-    # Cancel running quality/testing agents
     - template:
-        name: cancel-quality-agents
-        conditions: "implementation-push-event"
-        k8s:
+        name: cancel-outdated-agents
+        conditions: "github-rex-push"
+        argoWorkflow:
           operation: create
           source:
             resource:
-              apiVersion: batch/v1
-              kind: Job
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
               metadata:
-                generateName: cancel-quality-agents-
+                generateName: cancel-outdated-
                 namespace: agent-platform
+                labels:
+                  type: remediation
               spec:
-                template:
-                  spec:
-                    serviceAccountName: argo-events-sa
-                    restartPolicy: Never
-                    containers:
-                      - name: cancel-agents
-                        image: bitnami/kubectl:latest
-                        command:
-                          - /bin/sh
-                          - -c
-                          - |
-                            echo "Implementation agent pushed, canceling quality/testing agents..."
+                entrypoint: cancel-outdated-workflows
+                serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: pusher-name
+                      value: "{{ .Input.body.pusher.name }}"
+                    - name: ref
+                      value: "{{ .Input.body.ref }}"
+                    - name: head-commit
+                      value: "{{ .Input.body.head_commit.id }}"
+                templates:
+                  - name: cancel-outdated-workflows
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
 
-                            # Get task ID from branch name
-                            BRANCH="{{ .Input.body.ref }}"
-                            TASK_ID=$(echo "$BRANCH" | grep -oE 'task-[0-9]+' | cut -d'-' -f2)
-                            echo "Task ID: $TASK_ID"
+                        echo "=== Implementation Agent Remediation ==="
+                        echo "Pusher: {{workflow.parameters.pusher-name}}"
+                        echo "Ref: {{workflow.parameters.ref}}"
+                        echo "Head Commit: {{workflow.parameters.head-commit}}"
 
-                            # Cancel Cleo and Tess CodeRuns for this task
-                            kubectl delete coderun -n agent-platform -l task-id=$TASK_ID,github-app=5DLabs-Cleo --ignore-not-found=true
-                            kubectl delete coderun -n agent-platform -l task-id=$TASK_ID,github-app=5DLabs-Tess --ignore-not-found=true
+                        # Extract branch name
+                        BRANCH_NAME=$(echo "{{workflow.parameters.ref}}" | sed 's|refs/heads/||')
+                        echo "Branch: $BRANCH_NAME"
 
-                            echo "Quality agents canceled for task $TASK_ID"
-                ttlSecondsAfterFinished: 60
+                        # Extract task ID from branch name
+                        TASK_ID=$(echo "$BRANCH_NAME" | grep -oE 'task-?([0-9]+)' | head -1 | sed 's/task-\?//')
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "No task ID found in branch name, skipping remediation"
+                          exit 0
+                        fi
+
+                        echo "Task ID: $TASK_ID"
+
+                        # Find CodeRuns for quality and testing agents on this task
+                        echo "Looking for outdated CodeRuns to cancel..."
+                        kubectl get coderuns -n agent-platform \
+                          -l task-id=$TASK_ID \
+                          -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.agent-type}{"\n"}{end}' | \
+                        while read coderun_name agent_type; do
+                          if [ "$agent_type" = "cleo" ] || [ "$agent_type" = "tess" ]; then
+                            echo "Cancelling outdated CodeRun: $coderun_name (agent: $agent_type)"
+                            kubectl patch coderun $coderun_name -n agent-platform --type='merge' -p '{"spec":{"suspend":true}}'
+                          fi
+                        done
+
+                        echo "✅ Remediation completed"
       retryStrategy:
-        steps: 2
-        duration: "5s"
+        steps: 3
+        duration: "10s"
+        factor: 2
+        jitter: 0.1
