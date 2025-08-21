@@ -1597,12 +1597,12 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
 
     // Add user filter if provided
     if let Some(user_label) = user {
-        label_selectors.push(format!("agents.platform/user={}", user_label));
+        label_selectors.push(format!("agents.platform/user={user_label}"));
     }
 
     // Add service/name filter if provided
     if let Some(service_name) = service {
-        label_selectors.push(format!("agents.platform/name={}", service_name));
+        label_selectors.push(format!("agents.platform/name={service_name}"));
     }
 
     let selector = label_selectors.join(",");
@@ -1640,7 +1640,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .ok_or(anyhow!("Service missing port"))?;
 
     // Construct the service URL
-    let service_url = format!("http://{}.{}.svc.cluster.local:{}/input", service_name, namespace, service_port);
+    let service_url = format!("http://{service_name}.{namespace}.svc.cluster.local:{service_port}/input");
 
     // Format the message as JSON
     let message_data = json!({
