@@ -61,9 +61,9 @@ spec:
                         echo "PR Number: {{workflow.parameters.pr-number}}"
                         echo "PR URL: {{workflow.parameters.pr-url}}"
 
-                        # Extract task ID from PR labels
+                        # Extract task ID from PR labels (case-insensitive TASK- prefix)
                         TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
-                          jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+                          jq -r '.[] | .name | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
@@ -265,9 +265,9 @@ spec:
                         echo "Review State: {{workflow.parameters.review-state}}"
                         echo "Reviewer: {{workflow.parameters.reviewer}}"
 
-                        # Extract task ID from PR labels
+                        # Extract task ID from PR labels (case-insensitive TASK- prefix)
                         TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
-                          jq -r '.[] | select(.name | startswith("task-")) | .name | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+                          jq -r '.[] | .name | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' | head -1)
 
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
