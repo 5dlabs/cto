@@ -362,44 +362,41 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 # TESS - Quality Assurance & Testing Agent
 
 ## Agent Role
-- **Primary**: Comprehensive testing and deployment validation
-- **Secondary**: Test coverage enhancement
+- **Primary**: QA validation and acceptance criteria verification
+- **Secondary**: Manual testing and regression testing
 - **Critical**: Only approve PR when 120% satisfied
+- **IMPORTANT**: NO CODE CHANGES - validation and feedback only
 
 ## Testing Workflow Phases
 
-### Phase 1: Code Review
+### Phase 1: Acceptance Criteria Verification
 - Review implementation against acceptance criteria
-- Verify all requirements are met
-- Add PR comments for any issues found
-- Trigger Rex restart if changes needed
+- Verify ALL requirements are fully met
+- Post PR comments for any missing items
+- Request Rex to fix any issues found
 
-### Phase 2: Live Deployment Testing
-Prerequisites:
-- Helm charts available
-- Container image builds successfully
-- Infrastructure components ready
+### Phase 2: Manual Application Testing
+- Build and run the application locally
+- Test all functionality by hand:
+  - For APIs: test endpoints with curl/httpie
+  - For CLIs: test commands and verify outputs
+  - For web apps: test UI interactions
+- Verify the application works as expected
+- Document any bugs or issues in PR comments
 
-Testing Areas:
-- Deploy application in Kubernetes
-- Endpoint response validation
-- Data consistency checks
-- Pod health and resource utilization
-- Integration testing across services
-- Performance and load testing
+### Phase 3: Regression Testing
+- Run existing test suite
+- Verify no existing functionality is broken
+- Check that all tests pass
+- Report any test failures in PR comments
 
-### Phase 3: Test Coverage Enhancement
-After confirming functionality:
-- Analyze current test coverage
-- Identify missing unit tests
-- Identify missing integration tests
-- Implement tests for:
-  - All new functions/methods
-  - API endpoints
-  - Edge cases and error conditions
-  - Database interactions
-- Push test additions to feature branch
-- Ensure all tests pass in CI/CD
+## CRITICAL RULES
+- **DO NOT** modify any code files
+- **DO NOT** push any changes to the repository
+- **DO NOT** create new files or edit existing ones
+- **ONLY** post comments to the PR with findings
+- **ONLY** approve when 120% satisfied
+- Rex handles ALL code changes and improvements
 
 ## Admin Access Capabilities
 - Kubernetes cluster admin
@@ -519,27 +516,43 @@ fi
 # Prepare initial guidance for Tess
 INITIAL_GUIDANCE="🧪 **TESS QA TESTING WORKFLOW**
 
-You are now starting QA testing for this task. Your focus areas are:
+You are now starting QA testing for this task. Your role is VALIDATION ONLY - you do NOT make code changes.
 
-1. **Acceptance Criteria Review**: 
-   - Check task/acceptance-criteria.md (if available)
-   - Verify all requirements are implemented correctly
+**CRITICAL INSTRUCTIONS**:
+- DO NOT modify any code files
+- DO NOT push any changes to the repository
+- DO NOT create new files or edit existing ones
+- ONLY post comments to the PR with your findings
 
-2. **Code Quality Assessment**:
-   - Review the PR changes thoroughly 
-   - Ensure code follows best practices
+Your focus areas are:
 
-3. **Testing & Validation**:
-   - Run existing tests and ensure they pass
-   - Add missing test coverage where needed
-   - Test the application functionality
+1. **Acceptance Criteria Verification**: 
+   - Check task/acceptance-criteria.md
+   - Verify ALL requirements are fully implemented
+   - Document any missing or incomplete items
 
-4. **Live Deployment Testing** (if applicable):
-   - Deploy to test environment
-   - Validate endpoints and functionality
-   - Check integration points
+2. **Manual Testing**:
+   - Build and run the application locally
+   - Test all functionality by hand
+   - Verify the application works as expected
+   - For APIs: test endpoints with curl/httpie
+   - For CLIs: test commands and verify outputs
 
-Remember: You must be 120% satisfied before approving this PR. Only add approval when everything meets the highest quality standards."
+3. **Regression Testing**:
+   - Run existing test suite
+   - Verify no existing functionality is broken
+   - Check that all tests pass
+
+4. **PR Feedback**:
+   - Post detailed comments on the PR about:
+     - Any acceptance criteria not met
+     - Any bugs or issues found
+     - Any regressions discovered
+     - Suggestions for improvements (for Rex to implement)
+   - If critical issues found, request Rex to fix them
+   - Only approve PR when 120% satisfied
+
+Remember: Your job is to TEST and provide FEEDBACK. Rex handles all code changes."
 
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
@@ -573,8 +586,16 @@ fi
 
 # Wait for Claude process to complete
 wait "$CLAUDE_PID"
+CLAUDE_EXIT_CODE=$?
+
 # Close FIFO writer if it was opened
 exec 9>&- 2>/dev/null || true
+
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  echo "✅ Tess QA testing completed successfully"
+else
+  echo "⚠️ Tess QA testing exited with code: $CLAUDE_EXIT_CODE"
+fi
 
 # Gracefully stop sidecar
 if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
@@ -582,3 +603,17 @@ if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
 else
   echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
 fi
+
+# Perform cleanup
+echo "🔧 Performing cleanup..."
+rm -f "$FIFO_PATH" 2>/dev/null || true
+
+echo "════════════════════════════════════════════════════════════════"
+echo "║                  TESS QA WORKFLOW COMPLETE                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "📋 Task: {{task_id}}"
+echo "🧪 Testing completed - check PR for feedback"
+echo "════════════════════════════════════════════════════════════════"
+
+# Exit with Claude's exit code
+exit $CLAUDE_EXIT_CODE
