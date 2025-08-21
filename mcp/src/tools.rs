@@ -263,11 +263,11 @@ fn get_jobs_schema() -> Value {
 fn get_stop_job_schema() -> Value {
     json!({
         "name": "stop_job",
-        "description": "Stop a running job: CodeRun (code), DocsRun (docs), or Argo intake workflow (intake).",
+        "description": "Stop a running job: CodeRun (code), DocsRun (docs), Argo intake workflow (intake), or Play workflow (play).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "job_type": {"type": "string", "enum": ["code", "docs", "intake"], "description": "Type of job to stop"},
+                "job_type": {"type": "string", "enum": ["code", "docs", "intake", "play"], "description": "Type of job to stop"},
                 "name": {"type": "string", "description": "Resource/workflow name"},
                 "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"}
             },

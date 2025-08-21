@@ -1516,6 +1516,13 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
                 Err(e) => Err(anyhow!(format!("Failed to delete workflow {name}: {e}")))
             }
         }
+        "play" => {
+            // Stop play workflow using Argo CLI
+            match run_argo_cli(&["stop", name, "-n", namespace]) {
+                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped Play workflow {name}"), "namespace": namespace})),
+                Err(e) => Err(anyhow!(format!("Failed to stop play workflow {name}: {e}")))
+            }
+        }
         other => Err(anyhow!(format!("Unsupported job_type: {other}"))),
     }
 }
