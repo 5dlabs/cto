@@ -176,6 +176,9 @@ if [ -d "$CLAUDE_WORK_DIR/.git" ]; then
     cd "$CLAUDE_WORK_DIR"
     git fetch origin --prune
 else
+    # Ensure parent directories exist
+    mkdir -p "$(dirname "$CLAUDE_WORK_DIR")"
+    
     # If directory exists but isn't a git repo, remove it first
     if [ -d "$CLAUDE_WORK_DIR" ] && [ ! -d "$CLAUDE_WORK_DIR/.git" ]; then
         echo "🧹 Removing non-git directory to prepare for clone..."
@@ -186,6 +189,8 @@ else
     REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
     if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
         echo "❌ Failed to clone repository"
+        echo "Debug: CLAUDE_WORK_DIR=$CLAUDE_WORK_DIR"
+        echo "Debug: Parent directory exists: $(ls -la "$(dirname "$CLAUDE_WORK_DIR")" 2>/dev/null || echo 'No')"
         exit 1
     fi
     cd "$CLAUDE_WORK_DIR"
