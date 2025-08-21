@@ -40,16 +40,15 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
-                arguments:
-                  parameters:
-                    - name: pr-number
-                      value: "{{ .Input.body.pull_request.number }}"
-                    - name: pr-url
-                      value: "{{ .Input.body.pull_request.html_url }}"
-                    - name: pr-labels
-                      value: "{{ .Input.body.pull_request.labels | toJson }}"
+                activeDeadlineSeconds: 300
                 templates:
                   - name: resume-workflow
+                    inputs:
+                      parameters:
+                        - name: event-data
+                          # Pass the entire event body as base64-encoded JSON
+                          value: |
+                            {{ .Input.body | toJson | b64enc }}
                     script:
                       image: alpine/k8s:1.31.0
                       command: [bash]
@@ -58,15 +57,24 @@ spec:
                         set -e
 
                         echo "=== PR Created Workflow Resume ==="
-                        echo "PR Number: {{workflow.parameters.pr-number}}"
-                        echo "PR URL: {{workflow.parameters.pr-url}}"
-
-                        # Extract task ID from PR labels (case-insensitive TASK- prefix)
-                        TASK_ID=$(echo '{{workflow.parameters.pr-labels}}' | \
-                          jq -r '.[] | .name | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' | head -1)
-
+                        
+                        # Decode the event data
+                        EVENT_JSON=$(echo '{{inputs.parameters.event-data}}' | base64 -d)
+                        
+                        # Extract PR information
+                        PR_NUMBER=$(echo "$EVENT_JSON" | jq -r '.pull_request.number')
+                        PR_URL=$(echo "$EVENT_JSON" | jq -r '.pull_request.html_url')
+                        PR_LABELS=$(echo "$EVENT_JSON" | jq -c '.pull_request.labels')
+                        
+                        echo "PR Number: $PR_NUMBER"
+                        echo "PR URL: $PR_URL"
+                        
+                        # Extract task ID from PR labels
+                        TASK_ID=$(echo "$PR_LABELS" | jq -r '.[] | .name | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' | head -1)
+                        
                         if [ -z "$TASK_ID" ]; then
                           echo "ERROR: No task-* label found on PR"
+                          echo "PR Labels: $PR_LABELS"
                           exit 1
                         fi
 
@@ -92,10 +100,6 @@ spec:
 
                         if [ "$CURRENT_STAGE" = "waiting-pr-created" ]; then
                           echo "✅ Workflow is at expected stage, resuming..."
-
-                          # Set environment variables for PR context
-                          PR_NUMBER={{workflow.parameters.pr-number}}
-                          PR_URL={{workflow.parameters.pr-url}}
 
                           # Patch the workflow to add PR context parameters
                           kubectl patch workflow $WORKFLOW_NAME -n agent-platform --type='merge' -p "{
@@ -167,8 +171,15 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                activeDeadlineSeconds: 300
                 templates:
                   - name: resume-workflow
+                    inputs:
+                      parameters:
+                        - name: event-data
+                          # Pass the entire event body as base64-encoded JSON
+                          value: |
+                            {{ .Input.body | toJson | b64enc }}
                     script:
                       image: alpine/k8s:1.31.0
                       command: [bash]
@@ -177,6 +188,16 @@ spec:
                         set -e
 
                         echo "=== Ready-for-QA Webhook Resume ==="
+                        
+                        # Decode the event data
+                        EVENT_JSON=$(echo '{{inputs.parameters.event-data}}' | base64 -d)
+                        
+                        # Extract PR information for logging
+                        PR_NUMBER=$(echo "$EVENT_JSON" | jq -r '.pull_request.number')
+                        LABEL_NAME=$(echo "$EVENT_JSON" | jq -r '.label.name')
+                        
+                        echo "PR Number: $PR_NUMBER"
+                        echo "Label Added: $LABEL_NAME"
                         
                         # Find any workflow waiting for QA resumption
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
