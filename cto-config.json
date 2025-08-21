@@ -27,9 +27,9 @@
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
       "testingAgent": "5DLabs-Tess",
-      "repository": "5dlabs/cto",
+      "repository": "5dlabs/cto-play-test",
       "service": "cto",
-      "docsRepository": "5dlabs/cto",
+      "docsRepository": "5dlabs/cto-play-test",
       "docsProjectDirectory": "docs"
     }
   },
