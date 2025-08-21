@@ -89,7 +89,7 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "════════════════════════════════════════════════════════════════"
                         echo "║                 TASK COMPLETION HANDLER                      ║"
                         echo "════════════════════════════════════════════════════════════════"
@@ -99,69 +99,69 @@ spec:
                         echo "📦 Merge SHA: {{workflow.parameters.merge-sha}}"
                         echo "👤 Merged by: {{workflow.parameters.merged-by}}"
                         echo "════════════════════════════════════════════════════════════════"
-                        
+
                         # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
                         PR_TITLE="{{workflow.parameters.pr-title}}"
                         TASK_ID=$(echo "$PR_TITLE" | grep -oE '[Tt]ask[- ]?([0-9]+)' | sed -E 's/[Tt]ask[- ]?//')
-                        
+
                         if [ -z "$TASK_ID" ]; then
                           echo "⚠️ No task ID found in PR title, checking PR body and branch..."
                           # Could also check branch name or PR body for task ID
                           exit 0
                         fi
-                        
+
                         echo "✅ Task $TASK_ID completed via merge to main"
-                        
+
                         # ============================================================
                         # STEP 1: Complete current orchestration workflow
                         # ============================================================
                         echo ""
                         echo "🔍 Looking for orchestration workflow for task $TASK_ID..."
-                        
+
                         # LESSON LEARNED: Race condition - workflow might still be transitioning
                         # Try multiple times with delay
                         MAX_ATTEMPTS=12  # 1 minute total
                         ATTEMPT=1
                         CURRENT_WORKFLOW=""
-                        
+
                         while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ -z "$CURRENT_WORKFLOW" ]; do
                           echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Looking for workflow..."
-                          
+
                           # Don't filter by Running status - workflow might be suspended
                           CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
                             -l task-id=$TASK_ID,workflow-type=play-orchestration \
                             -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                          
+
                           if [ -z "$CURRENT_WORKFLOW" ] && [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
                             echo "Workflow not found yet, waiting 5 seconds..."
                             sleep 5
                           fi
                           ATTEMPT=$((ATTEMPT + 1))
                         done
-                        
+
                         if [ -n "$CURRENT_WORKFLOW" ]; then
                           echo "Found workflow: $CURRENT_WORKFLOW"
-                          
+
                           # LESSON LEARNED: Check workflow phase to understand state
                           WORKFLOW_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform \
                             -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
                           echo "Workflow phase: $WORKFLOW_PHASE"
-                          
+
                           # LESSON LEARNED: Find the specific suspend node by display name
                           # Must check both node type and displayName
                           NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
                             jq -r '.status.nodes | to_entries | .[] |
                             select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
                             .key')
-                          
+
                           if [ -n "$NODE_ID" ]; then
                             echo "Found suspend node: $NODE_ID"
-                            
+
                             # LESSON LEARNED: Check node phase before trying to resume
                             NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
                               jq -r ".status.nodes.\"$NODE_ID\".phase")
                             echo "Node phase: $NODE_PHASE"
-                            
+
                             if [ "$NODE_PHASE" = "Running" ]; then
                               echo "Resuming suspend node..."
                               kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
@@ -193,35 +193,35 @@ spec:
                         else
                           echo "ℹ️ No orchestration workflow found for task $TASK_ID"
                         fi
-                        
+
                         # ============================================================
                         # STEP 2: Start next task in queue
                         # ============================================================
                         NEXT_TASK_ID=$((TASK_ID + 1))
-                        
+
                         echo ""
                         echo "🚀 Preparing to start Task $NEXT_TASK_ID..."
-                        
+
                         # Check if we've reached the end of tasks
                         MAX_TASKS=29  # Configure this based on your task set
                         if [ $NEXT_TASK_ID -gt $MAX_TASKS ]; then
                           echo "🎉 All tasks completed! No more tasks in queue."
                           exit 0
                         fi
-                        
+
                         # Check if next task is already running (avoid duplicates)
                         EXISTING_NEXT=$(kubectl get workflows -n agent-platform \
                           -l task-id=$NEXT_TASK_ID,workflow-type=play-orchestration \
                           --field-selector status.phase=Running \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                        
+
                         if [ -n "$EXISTING_NEXT" ]; then
                           echo "⚠️ Task $NEXT_TASK_ID is already running: $EXISTING_NEXT"
                           exit 0
                         fi
-                        
+
                         echo "Creating orchestration workflow for Task $NEXT_TASK_ID..."
-                        
+
                         # Create the next task workflow
                         cat <<EOF | kubectl create -f -
                         apiVersion: argoproj.io/v1alpha1
@@ -254,7 +254,7 @@ spec:
                                 # Stage 1: Rex Implementation
                                 - - name: implementation
                                     template: run-rex
-                                
+
                                 # Stage 2: Wait for PR creation
                                 - - name: wait-pr-created
                                     template: suspend-for-stage
@@ -262,11 +262,11 @@ spec:
                                       parameters:
                                         - name: stage
                                           value: "waiting-pr-created"
-                                
+
                                 # Stage 3: Cleo Code Quality
                                 - - name: quality
                                     template: run-cleo
-                                
+
                                 # Stage 4: Wait for ready-for-qa label
                                 - - name: wait-ready-for-qa
                                     template: suspend-for-stage
@@ -274,11 +274,11 @@ spec:
                                       parameters:
                                         - name: stage
                                           value: "waiting-ready-for-qa"
-                                
+
                                 # Stage 5: Tess QA Testing
                                 - - name: testing
                                     template: run-tess
-                                
+
                                 # Stage 6: Wait for merge to main
                                 - - name: wait-merge-to-main
                                     template: suspend-for-stage
@@ -286,11 +286,11 @@ spec:
                                       parameters:
                                         - name: stage
                                           value: "waiting-merge-to-main"
-                                
+
                                 # Stage 7: Task complete
                                 - - name: task-complete
                                     template: log-completion
-                            
+
                             - name: suspend-for-stage
                               inputs:
                                 parameters:
@@ -299,7 +299,7 @@ spec:
                               metadata:
                                 labels:
                                   current-stage: "{{inputs.parameters.stage}}"
-                            
+
                             - name: run-rex
                               resource:
                                 action: create
@@ -320,7 +320,7 @@ spec:
                                     github_repo: "{{workflow.parameters.github-repo}}"
                                     docs_repository_url: "https://github.com/{{workflow.parameters.github-owner}}/{{workflow.parameters.docs-repo}}"
                                     task_id: {{workflow.parameters.task-id}}
-                            
+
                             - name: run-cleo
                               resource:
                                 action: create
@@ -340,7 +340,7 @@ spec:
                                     github_owner: "{{workflow.parameters.github-owner}}"
                                     github_repo: "{{workflow.parameters.github-repo}}"
                                     # Cleo will find the PR created by Rex
-                            
+
                             - name: run-tess
                               resource:
                                 action: create
@@ -360,7 +360,7 @@ spec:
                                     github_owner: "{{workflow.parameters.github-owner}}"
                                     github_repo: "{{workflow.parameters.github-repo}}"
                                     # Tess will find the PR with ready-for-qa label
-                            
+
                             - name: log-completion
                               script:
                                 image: alpine:3.18
@@ -369,7 +369,7 @@ spec:
                                   echo "✅ Task {{workflow.parameters.task-id}} completed successfully!"
                                   echo "Merged to main and ready for production."
                         EOF
-                        
+
                         if [ $? -eq 0 ]; then
                           echo "✅ Successfully started Task $NEXT_TASK_ID workflow"
                           echo ""
