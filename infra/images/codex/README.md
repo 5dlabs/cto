@@ -4,9 +4,9 @@ This image provides OpenAI Codex integration for code generation and analysis ta
 
 ## Features
 
-- OpenAI CLI tools
-- OpenAI Python SDK
-- OpenAI Node.js SDK
+- OpenAI CLI tools (installed in dedicated virtualenv)
+- OpenAI Python SDK (isolated installation)
+- OpenAI Node.js SDK (global installation)
 - Codex-specific utilities from the official repository
 - Pre-configured environment for OpenAI API access
 
