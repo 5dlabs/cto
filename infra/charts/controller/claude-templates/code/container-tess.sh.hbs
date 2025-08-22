@@ -581,15 +581,35 @@ Your focus areas are:
    - If critical issues found, request Rex to fix them
    - Only approve PR when 120% satisfied
 
-**HOW TO POST PR COMMENTS**:
-Use the GitHub CLI to post your findings as a comment:
+**HOW TO POST PR REVIEW COMMENTS**:
+Use GitHub CLI to create a REVIEW with comments (not just regular comments):
 \`\`\`bash
-gh pr comment {{pr_number}} --body \"Your detailed feedback here\"
+# Start a review
+gh pr review {{pr_number}} --comment --body \"Starting test review...\"
+
+# Add review comments for specific issues
+gh pr review {{pr_number}} --comment --body \"🔴 Missing test coverage for error handling in main.rs:45-60\"
+
+# Submit final review (REQUEST_CHANGES if issues found, APPROVE if all good)
+gh pr review {{pr_number}} --request-changes --body \"### Test Review Summary
+❌ Coverage: 78% (target: 100%)
+🔴 Missing tests for error scenarios
+🔴 No integration tests found
+
+Please add the missing tests.\"
+
+# OR if everything passes:
+gh pr review {{pr_number}} --approve --body \"### Test Review Summary
+✅ Coverage: 100%
+✅ All tests passing
+✅ CI/CD configured
+✅ Acceptance criteria met\"
 \`\`\`
 
-After completing ALL testing, post a comprehensive comment with your findings using the gh pr comment command. Format it with markdown, use emojis for clarity (🔴 for issues, ✅ for passed checks), and be specific about what needs to be fixed.
+Use REVIEW comments (not regular comments) so they can be tracked and marked as resolved.
+Submit REQUEST_CHANGES if any issues found, APPROVE only when 100% satisfied.
 
-Remember: Your job is to TEST and provide FEEDBACK via PR comments. Rex handles all code changes."
+Remember: Your job is to TEST and provide FEEDBACK via PR review comments. Rex handles implementation changes."
 
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
