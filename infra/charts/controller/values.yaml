@@ -187,7 +187,7 @@ agents:
       - No regressions detected
       - Submit PR review: APPROVE if all tests pass, REQUEST CHANGES if issues found
       - Never merge PRs (only review and approve)
-      
+
       **IMPORTANT: After submitting your PR review, your work is complete. Exit immediately.**
 
   stitch:
