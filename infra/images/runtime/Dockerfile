@@ -290,4 +290,15 @@ USER root
 RUN echo '#!/bin/sh\nrustup default stable 2>/dev/null || true' > /usr/local/bin/ensure-rust-default \
   && chmod +x /usr/local/bin/ensure-rust-default
 
+# Ensure Rust environment is always available in shell profiles
+RUN echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /etc/environment \
+  && echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /root/.bashrc \
+  && echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /home/node/.bashrc \
+  && echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /root/.profile \
+  && echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /home/node/.profile
+
+# Create a global Rust environment setup script
+RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HOME/.cargo/env" ]; then\n    . "$HOME/.cargo/env"\nfi\nif [ -f "/root/.cargo/env" ]; then\n    . "/root/.cargo/env"\nfi\nrustup default stable 2>/dev/null || true' > /usr/local/bin/setup-rust-env \
+  && chmod +x /usr/local/bin/setup-rust-env
+
 
