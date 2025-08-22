@@ -320,27 +320,27 @@ spec:
 #                       source: |
 #                         #!/bin/bash
 #                         set -e
-# 
+#
 #                         echo "=== PR Approved Workflow Resume ==="
-# 
+#
 #                         # Find any workflow waiting for PR approval
 #                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
 #                           -l current-stage=waiting-pr-approved,workflow-type=play-orchestration \
 #                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-# 
+#
 #                         if [ -z "$WORKFLOW_NAME" ]; then
 #                           echo "No workflow found waiting for PR approval"
 #                           exit 0
 #                         fi
-# 
+#
 #                         echo "Found workflow: $WORKFLOW_NAME"
-# 
+#
 #                         # Find the suspended node ID for wait-pr-approved
 #                         NODE_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json | \
 #                           jq -r '.status.nodes | to_entries | .[] |
 #                           select(.value.displayName == "wait-pr-approved" and .value.type == "Suspend") |
 #                           .key')
-# 
+#
 #                         if [ -n "$NODE_ID" ]; then
 #                           echo "Found suspended node: $NODE_ID"
 #                           # Resume the specific suspend node
