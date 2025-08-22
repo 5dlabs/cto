@@ -9,32 +9,38 @@ RUN python3 -m venv /opt/openai/.venv \
   && . /opt/openai/.venv/bin/activate \
   && pip install --no-cache-dir --upgrade pip \
   && if [ "$VERSION" = "latest" ]; then \
-       pip install --no-cache-dir openai openai-cli requests aiohttp; \
+       pip install --no-cache-dir openai requests aiohttp; \
      else \
-       pip install --no-cache-dir "openai==${VERSION}" openai-cli requests aiohttp; \
+       pip install --no-cache-dir "openai==${VERSION}" requests aiohttp; \
      fi
 
 # Install OpenAI Node.js SDK globally
-RUN npm install -g openai@latest
+RUN npm install -g openai@latest \
+  && echo "✅ OpenAI Node.js SDK installed" \
+  && node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed"
 
 # Make OpenAI venv available on PATH for all users
 ENV VIRTUAL_ENV=/opt/openai/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Install Codex-specific tools from the official repository
+# Install Codex-specific tools from the official repository (if available)
 RUN set -eux; \
-  # Clone the official Codex repository for examples and tools
-  git clone --depth=1 https://github.com/openai/codex.git /tmp/codex; \
-  # Install any additional requirements if they exist
-  if [ -f /tmp/codex/requirements.txt ]; then \
-    . /opt/openai/.venv/bin/activate && pip install -r /tmp/codex/requirements.txt; \
-  fi; \
-  # Copy useful scripts to system path if they exist
-  if [ -d /tmp/codex/scripts ]; then \
-    cp -r /tmp/codex/scripts/* /usr/local/bin/ 2>/dev/null || true; \
-  fi; \
-  # Clean up
-  rm -rf /tmp/codex
+  # Try to clone the official Codex repository for examples and tools
+  if git clone --depth=1 https://github.com/openai/codex.git /tmp/codex 2>/dev/null; then \
+    echo "Successfully cloned Codex repository"; \
+    # Install any additional requirements if they exist
+    if [ -f /tmp/codex/requirements.txt ]; then \
+      . /opt/openai/.venv/bin/activate && pip install -r /tmp/codex/requirements.txt; \
+    fi; \
+    # Copy useful scripts to system path if they exist
+    if [ -d /tmp/codex/scripts ]; then \
+      cp -r /tmp/codex/scripts/* /usr/local/bin/ 2>/dev/null || true; \
+    fi; \
+    # Clean up
+    rm -rf /tmp/codex; \
+  else \
+    echo "Codex repository not available, skipping additional tools installation"; \
+  fi
 
 # Create workspace and config directories and set permissions
 RUN mkdir -p /workspace /home/node/.openai \
@@ -49,8 +55,9 @@ USER node
 WORKDIR /workspace
 
 # Verify OpenAI CLI installation (non-fatal)
-RUN openai --version >/dev/null 2>&1 || true \
-  && python -c "import openai; print('OpenAI SDK available')" >/dev/null 2>&1 || true
+RUN . /opt/openai/.venv/bin/activate \
+  && python -c "import openai; print('✅ OpenAI SDK available:', openai.__version__)" 2>/dev/null || echo "⚠️ OpenAI SDK verification failed" \
+  && openai --help >/dev/null 2>&1 && echo "✅ OpenAI CLI available" || echo "⚠️ OpenAI CLI verification failed"
 
 # Default entrypoint (can be overridden)
 CMD ["openai", "--help"]
