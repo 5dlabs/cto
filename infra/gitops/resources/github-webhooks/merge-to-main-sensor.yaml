@@ -217,28 +217,65 @@ spec:
                         else
                           cd "$PROGRESS_REPO"
 
-                          # Create .completed directory if it doesn't exist
-                          mkdir -p docs/.taskmaster/docs/.completed
+                          # Try multiple possible task directory structures
+                          TASK_MOVED=false
+                          TASK_DIRS=(
+                            "docs/.taskmaster/docs/task-${TASK_ID}"
+                            "task-${TASK_ID}"
+                            ".taskmaster/docs/task-${TASK_ID}"
+                            "task/task-${TASK_ID}"
+                          )
 
-                          # Move the completed task folder
-                          TASK_DIR="docs/.taskmaster/docs/task-${TASK_ID}"
-                          if [ -d "$TASK_DIR" ]; then
-                            mv "$TASK_DIR" "docs/.taskmaster/docs/.completed/task-${TASK_ID}"
-                            echo "✅ Moved $TASK_DIR to .completed/"
+                          COMPLETED_DIRS=(
+                            "docs/.taskmaster/docs/.completed"
+                            ".taskmaster/docs/.completed"
+                            ".completed"
+                            "task/.completed"
+                          )
 
-                            # Commit and push the change
-                            git config user.name "Task Orchestrator"
-                            git config user.email "orchestrator@5dlabs.com"
-                            git add -A
-                            git commit -m "chore: move task-${TASK_ID} to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
+                          for TASK_DIR in "${TASK_DIRS[@]}"; do
+                            if [ -d "$TASK_DIR" ]; then
+                              echo "📁 Found task directory: $TASK_DIR"
 
-                            if ! git push origin main 2>/dev/null; then
-                              echo "⚠️ Failed to push task move, continuing anyway..."
-                            else
-                              echo "✅ Task $TASK_ID moved to .completed/ folder"
+                              # Determine corresponding completed directory
+                              if [[ "$TASK_DIR" == docs/.taskmaster/docs/* ]]; then
+                                COMPLETED_DIR="docs/.taskmaster/docs/.completed"
+                              elif [[ "$TASK_DIR" == .taskmaster/docs/* ]]; then
+                                COMPLETED_DIR=".taskmaster/docs/.completed"
+                              elif [[ "$TASK_DIR" == task/* ]]; then
+                                COMPLETED_DIR="task/.completed"
+                              else
+                                COMPLETED_DIR=".completed"
+                              fi
+
+                              # Create completed directory if it doesn't exist
+                              mkdir -p "$COMPLETED_DIR"
+
+                              # Move the task directory
+                              if mv "$TASK_DIR" "$COMPLETED_DIR/task-${TASK_ID}"; then
+                                echo "✅ Moved $TASK_DIR to $COMPLETED_DIR/"
+                                TASK_MOVED=true
+
+                                # Commit and push the change
+                                git config user.name "Task Orchestrator (Morgan)"
+                                git config user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
+                                git add -A
+                                git commit -m "chore: move task-${TASK_ID} to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
+
+                                if ! git push origin main 2>/dev/null; then
+                                  echo "⚠️ Failed to push task move, continuing anyway..."
+                                else
+                                  echo "✅ Task $TASK_ID moved to .completed/ folder"
+                                fi
+                                break
+                              else
+                                echo "⚠️ Failed to move $TASK_DIR"
+                              fi
                             fi
-                          else
-                            echo "ℹ️ Task directory $TASK_DIR not found, may already be moved"
+                          done
+
+                          if [ "$TASK_MOVED" = false ]; then
+                            echo "ℹ️ No task directory found for task-${TASK_ID}, may already be moved"
                           fi
 
                           # Clean up
@@ -332,24 +369,48 @@ spec:
                         # STEP 3: Start next task in queue
                         # ============================================================
 
-                        # Find the next available task by looking for task files not in .completed
-                        echo "🔍 Looking for next available task..."
+                        # Find the next sequential task
+                        echo "🔍 Looking for next sequential task..."
 
-                        # Clone repo again to check for next task
+                        # Calculate next task ID (simple increment)
+                        NEXT_TASK_ID=$((TASK_ID + 1))
+
+                        # Clone repo to verify the next task exists
                         TASK_CHECK_REPO="/tmp/task-check-$$"
                         if ! git clone --depth 1 "$CLONE_URL" "$TASK_CHECK_REPO" 2>/dev/null; then
-                          echo "⚠️ Failed to clone repo for task check"
-                          # Fall back to simple increment
-                          NEXT_TASK_ID=$((TASK_ID + 1))
+                          echo "⚠️ Failed to clone repo for task verification"
+                          echo "🚀 Proceeding with calculated next task: $NEXT_TASK_ID"
                         else
                           cd "$TASK_CHECK_REPO"
 
-                          # Find the lowest numbered task directory not in .completed
-                          NEXT_TASK_ID=""
-                          for i in $(seq 1 29); do
-                            if [ -d "docs/.taskmaster/docs/task-${i}" ]; then
-                              echo "✅ Found next task: task-${i}"
-                              NEXT_TASK_ID=$i
+                          # Check if the next sequential task exists and is not completed
+                          TASK_PATHS=(
+                            "docs/.taskmaster/docs/task-${NEXT_TASK_ID}"
+                            "task-${NEXT_TASK_ID}"
+                            ".taskmaster/docs/task-${NEXT_TASK_ID}"
+                            "task/task-${NEXT_TASK_ID}"
+                          )
+
+                          TASK_FOUND=false
+                          for TASK_PATH in "${TASK_PATHS[@]}"; do
+                            if [ -d "$TASK_PATH" ]; then
+                              echo "✅ Found next task at: $TASK_PATH"
+                              TASK_FOUND=true
+                              break
+                            fi
+                          done
+
+                          # Check if already completed
+                          COMPLETED_PATHS=(
+                            "docs/.taskmaster/docs/.completed/task-${NEXT_TASK_ID}"
+                            ".taskmaster/docs/.completed/task-${NEXT_TASK_ID}"
+                            ".completed/task-${NEXT_TASK_ID}"
+                          )
+
+                          for COMPLETED_PATH in "${COMPLETED_PATHS[@]}"; do
+                            if [ -d "$COMPLETED_PATH" ]; then
+                              echo "⚠️ Task $NEXT_TASK_ID already completed"
+                              TASK_FOUND=false
                               break
                             fi
                           done
@@ -357,8 +418,8 @@ spec:
                           cd /
                           rm -rf "$TASK_CHECK_REPO"
 
-                          if [ -z "$NEXT_TASK_ID" ]; then
-                            echo "🎉 No more task files found - all tasks may be complete!"
+                          if [ "$TASK_FOUND" = false ]; then
+                            echo "🎉 No more tasks found or task $NEXT_TASK_ID already completed!"
                             exit 0
                           fi
                         fi
@@ -494,19 +555,19 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: {{`{{workflow.parameters.service}}`}}-t{{`{{workflow.parameters.task-id}}`}}-rex-
+                                    generateName: \${SERVICE_NAME}-t\${NEXT_TASK_ID}-rex-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "{{`{{workflow.parameters.task-id}}`}}"
+                                      task-id: "\${NEXT_TASK_ID}"
                                       workflow-stage: "implementation"
                                       agent-type: "rex"
                                   spec:
-                                    service: "task{{`{{workflow.parameters.task-id}}`}}"
+                                    service: "task\${NEXT_TASK_ID}"
                                     github_app: "5DLabs-Rex"
-                                    github_owner: "{{`{{workflow.parameters.github-owner}}`}}"
-                                    github_repo: "{{`{{workflow.parameters.github-repo}}`}}"
-                                    docs_repository_url: "https://github.com/{{`{{workflow.parameters.github-owner}}`}}/{{`{{workflow.parameters.docs-repo}}`}}"
-                                    task_id: {{`{{workflow.parameters.task-id}}`}}
+                                    github_owner: "\${GITHUB_OWNER}"
+                                    github_repo: "\${GITHUB_REPO}"
+                                    docs_repository_url: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    task_id: \${NEXT_TASK_ID}
 
                             - name: run-cleo
                               resource:
@@ -515,17 +576,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: {{`{{workflow.parameters.service}}`}}-t{{`{{workflow.parameters.task-id}}`}}-cleo-
+                                    generateName: \${SERVICE_NAME}-t\${NEXT_TASK_ID}-cleo-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "{{`{{workflow.parameters.task-id}}`}}"
+                                      task-id: "\${NEXT_TASK_ID}"
                                       workflow-stage: "quality"
                                       agent-type: "cleo"
                                   spec:
-                                    service: "task{{`{{workflow.parameters.task-id}}`}}"
+                                    service: "task\${NEXT_TASK_ID}"
                                     github_app: "5DLabs-Cleo"
-                                    github_owner: "{{`{{workflow.parameters.github-owner}}`}}"
-                                    github_repo: "{{`{{workflow.parameters.github-repo}}`}}"
+                                    github_owner: "\${GITHUB_OWNER}"
+                                    github_repo: "\${GITHUB_REPO}"
                                     # Cleo will find the PR created by Rex
 
                             - name: run-tess
@@ -535,17 +596,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: {{`{{workflow.parameters.service}}`}}-t{{`{{workflow.parameters.task-id}}`}}-tess-
+                                    generateName: \${SERVICE_NAME}-t\${NEXT_TASK_ID}-tess-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "{{`{{workflow.parameters.task-id}}`}}"
+                                      task-id: "\${NEXT_TASK_ID}"
                                       workflow-stage: "testing"
                                       agent-type: "tess"
                                   spec:
-                                    service: "task{{`{{workflow.parameters.task-id}}`}}"
+                                    service: "task\${NEXT_TASK_ID}"
                                     github_app: "5DLabs-Tess"
-                                    github_owner: "{{`{{workflow.parameters.github-owner}}`}}"
-                                    github_repo: "{{`{{workflow.parameters.github-repo}}`}}"
+                                    github_owner: "\${GITHUB_OWNER}"
+                                    github_repo: "\${GITHUB_REPO}"
                                     # Tess will find the PR with ready-for-qa label
 
                             - name: log-completion
@@ -553,7 +614,7 @@ spec:
                                 image: alpine:3.18
                                 command: [sh]
                                 source: |
-                                  echo "✅ Task {{`{{workflow.parameters.task-id}}`}} completed successfully!"
+                                  echo "✅ Task \${NEXT_TASK_ID} completed successfully!"
                                   echo "Merged to main and ready for production."
                         EOF
 
