@@ -238,23 +238,23 @@ spec:
               parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-number}}`}}"
       steps:
         - - name: implementation-work
-          template: agent-coderun
-          arguments:
-            parameters:
-              - name: github-app
-                value: "{{`{{inputs.parameters.github-app}}`}}"
-              - name: task-id
-                value: "{{`{{inputs.parameters.task-id}}`}}"
-              - name: stage
-                value: "{{`{{inputs.parameters.stage}}`}}"
+            template: agent-coderun
+            arguments:
+              parameters:
+                - name: github-app
+                  value: "{{`{{inputs.parameters.github-app}}`}}"
+                - name: task-id
+                  value: "{{`{{inputs.parameters.task-id}}`}}"
+                - name: stage
+                  value: "{{`{{inputs.parameters.stage}}`}}"
         - - name: wait-for-pr
-          template: check-or-wait-for-pr
-          arguments:
-            parameters:
-              - name: repository
-                value: "{{`{{workflow.parameters.repository}}`}}"
-              - name: task-id
-                value: "{{`{{inputs.parameters.task-id}}`}}"
+            template: check-or-wait-for-pr
+            arguments:
+              parameters:
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: task-id
+                  value: "{{`{{inputs.parameters.task-id}}`}}"
 
     # Template to check/poll GitHub for PR existence for task label
     - name: check-or-wait-for-pr
@@ -410,37 +410,37 @@ spec:
               parameter: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
       steps:
         - - name: create-coderun-resource
-          template: create-coderun-resource
-          arguments:
-            parameters:
-              - name: github-app
-                value: "{{`{{inputs.parameters.github-app}}`}}"
-              - name: task-id
-                value: "{{`{{inputs.parameters.task-id}}`}}"
-              - name: stage
-                value: "{{`{{inputs.parameters.stage}}`}}"
-              - name: pr-url
-                value: "{{`{{inputs.parameters.pr-url}}`}}"
-              - name: pr-number
-                value: "{{`{{inputs.parameters.pr-number}}`}}"
-              - name: qa-ready
-                value: "{{`{{inputs.parameters.qa-ready}}`}}"
+            template: create-coderun-resource
+            arguments:
+              parameters:
+                - name: github-app
+                  value: "{{`{{inputs.parameters.github-app}}`}}"
+                - name: task-id
+                  value: "{{`{{inputs.parameters.task-id}}`}}"
+                - name: stage
+                  value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: pr-url
+                  value: "{{`{{inputs.parameters.pr-url}}`}}"
+                - name: pr-number
+                  value: "{{`{{inputs.parameters.pr-number}}`}}"
+                - name: qa-ready
+                  value: "{{`{{inputs.parameters.qa-ready}}`}}"
         - - name: resolve-coderun-name
-          template: resolve-coderun-name
-          arguments:
-            parameters:
-              - name: stage
-                value: "{{`{{inputs.parameters.stage}}`}}"
-              - name: task-id
-                value: "{{`{{inputs.parameters.task-id}}`}}"
-              - name: candidate-name
-                value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
+            template: resolve-coderun-name
+            arguments:
+              parameters:
+                - name: stage
+                  value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: task-id
+                  value: "{{`{{inputs.parameters.task-id}}`}}"
+                - name: candidate-name
+                  value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
         - - name: wait-for-completion
-          template: wait-coderun-completion
-          arguments:
-            parameters:
-              - name: coderun-name
-                value: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
+            template: wait-coderun-completion
+            arguments:
+              parameters:
+                - name: coderun-name
+                  value: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
 
     # Template for creating CodeRun resources
     - name: create-coderun-resource
