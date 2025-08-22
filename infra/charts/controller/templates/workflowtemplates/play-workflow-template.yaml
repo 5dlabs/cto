@@ -8,7 +8,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: play-workflow-template
-  namespace: {{ .Release.Namespace }}
+  namespace: {{.Release.Namespace}}
   labels:
     app.kubernetes.io/name: play-workflow-template
     app.kubernetes.io/part-of: platform
@@ -98,10 +98,10 @@ spec:
             template: update-workflow-stage
             arguments:
               parameters:
-              - name: new-stage
-                value: "pending"
-              - name: verify-update
-                value: "true"
+                - name: new-stage
+                  value: "pending"
+                - name: verify-update
+                  value: "true"
 
           # Stage 1: Implementation cycle (Rex runs; if no PR, retry cycle)
           - name: implementation-cycle
@@ -109,11 +109,11 @@ spec:
             template: implementation-cycle
             arguments:
               parameters:
-              - name: github-app
+                - name: github-app
                 value: "{{`{{workflow.parameters.implementation-agent}}`}}"
-              - name: task-id
+                - name: task-id
                 value: "{{`{{workflow.parameters.task-id}}`}}"
-              - name: stage
+                - name: stage
                 value: "implementation"
 
           # Update stage after implementation cycle completes (PR created)
@@ -122,9 +122,9 @@ spec:
             template: update-workflow-stage
             arguments:
               parameters:
-              - name: new-stage
+                - name: new-stage
                 value: "waiting-pr-created"
-              - name: verify-update
+                - name: verify-update
                 value: "true"
 
           # Stage 2: Quality work
@@ -133,15 +133,15 @@ spec:
             template: agent-coderun
             arguments:
               parameters:
-              - name: github-app
+                - name: github-app
                 value: "{{`{{workflow.parameters.quality-agent}}`}}"
-              - name: task-id
+                - name: task-id
                 value: "{{`{{workflow.parameters.task-id}}`}}"
-              - name: stage
+                - name: stage
                 value: "quality"
-              - name: pr-url
+                - name: pr-url
                 value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
-              - name: pr-number
+                - name: pr-number
                 value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
 
           # Update stage after quality work completes
@@ -150,9 +150,9 @@ spec:
             template: update-workflow-stage
             arguments:
               parameters:
-              - name: new-stage
+                - name: new-stage
                 value: "waiting-ready-for-qa"
-              - name: verify-update
+                - name: verify-update
                 value: "true"
 
           # Suspend point 2: Wait for ready-for-qa label
@@ -161,9 +161,9 @@ spec:
             template: suspend-for-event
             arguments:
               parameters:
-              - name: event-type
+                - name: event-type
                 value: "ready-for-qa"
-              - name: stage-name
+                - name: stage-name
                 value: "waiting-ready-for-qa"
 
           # Stage 3: Testing work
@@ -172,17 +172,17 @@ spec:
             template: agent-coderun
             arguments:
               parameters:
-              - name: github-app
+                - name: github-app
                 value: "{{`{{workflow.parameters.testing-agent}}`}}"
-              - name: task-id
+                - name: task-id
                 value: "{{`{{workflow.parameters.task-id}}`}}"
-              - name: stage
+                - name: stage
                 value: "testing"
-              - name: pr-url
+                - name: pr-url
                 value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
-              - name: pr-number
+                - name: pr-number
                 value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
-              - name: qa-ready
+                - name: qa-ready
                 value: "true"
 
           # Update stage after testing work completes
@@ -191,9 +191,9 @@ spec:
             template: update-workflow-stage
             arguments:
               parameters:
-              - name: new-stage
+                - name: new-stage
                 value: "waiting-pr-merged"
-              - name: verify-update
+                - name: verify-update
                 value: "true"
 
           # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
@@ -203,9 +203,9 @@ spec:
             template: suspend-for-event
             arguments:
               parameters:
-              - name: event-type
+                - name: event-type
                 value: "pr-merged"
-              - name: stage-name
+                - name: stage-name
                 value: "waiting-pr-merged"
 
           - name: complete-task
@@ -213,11 +213,11 @@ spec:
             template: task-completion
             arguments:
               parameters:
-              - name: task-id
+                - name: task-id
                 value: "{{`{{workflow.parameters.task-id}}`}}"
-              - name: approval-status
+                - name: approval-status
                 value: "{{`{{workflow.parameters.qa-status}}`}}"
-              - name: merge-sha
+                - name: merge-sha
                 value: "{{`{{workflow.parameters.merge-sha}}`}}"
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
@@ -470,7 +470,7 @@ spec:
           kind: CodeRun
           metadata:
             generateName: "{{`{{workflow.parameters.service}}`}}-t{{`{{inputs.parameters.task-id}}`}}-{{`{{inputs.parameters.stage}}`}}-"
-            namespace: {{ .Release.Namespace }}
+            namespace: {{.Release.Namespace}}
             labels:
               task-id: "{{`{{inputs.parameters.task-id}}`}}"
               service: "{{`{{workflow.parameters.service}}`}}"
@@ -559,7 +559,7 @@ spec:
           kind: CodeRun
           metadata:
             name: "{{`{{inputs.parameters.coderun-name}}`}}"
-            namespace: {{ .Release.Namespace }}
+            namespace: {{.Release.Namespace}}
         successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
       retryStrategy:
@@ -650,7 +650,7 @@ spec:
             CURRENT_STAGE="$CURRENT_STAGE_RAW"
             echo "Current stage: $CURRENT_STAGE"
           fi
-          
+
           RESOURCE_VERSION=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.resourceVersion')
           echo "Resource version: $RESOURCE_VERSION"
 
@@ -782,7 +782,7 @@ spec:
           echo "Verification attempts: $VERIFY_COUNT"
       retryStrategy:
         limit: 20
-        retryPolicy: "OnFailure" 
+        retryPolicy: "OnFailure"
         backoff:
           duration: "60s"
           factor: 2
