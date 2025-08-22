@@ -38,5 +38,5 @@ jobs:
           echo "gh workflow run infrastructure-build.yaml -f image=rust-builder"
           echo ""
           echo "⚠️  This workflow will be removed in a future update."
-          
+
           exit 1  # Fail the job to make it clear this is deprecated

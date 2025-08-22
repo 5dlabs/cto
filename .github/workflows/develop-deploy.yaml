@@ -146,7 +146,7 @@ jobs:
           CARGO_TARGET_DIR: "$HOME/cache/target"  # Build to cache directory for persistence
         run: |
           echo "🏗️ Building controller binary with pre-warmed dependencies..."
-          
+
           # Create cache directory
           mkdir -p $HOME/cache/target
 
@@ -191,7 +191,7 @@ jobs:
           echo "📦 Built binary info:"
           ls -lh agent-controller
           file agent-controller
-          
+
           # Verify binary is present for Docker build context (controller/agent-controller)
           echo "📋 Verifying agent-controller binary for Docker build context"
           test -f agent-controller && echo "agent-controller present in ./controller" || (echo "agent-controller missing" && exit 1)
@@ -324,17 +324,17 @@ jobs:
       - name: Force ArgoCD Sync
         run: |
           echo "🔄 Forcing ArgoCD to sync the updated configuration"
-          
+
           # Wait a moment for Git changes to propagate
           sleep 5
-          
+
           # Force ArgoCD application refresh and sync
           kubectl patch application controller -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
-          
+
           # Give ArgoCD time to process the sync (can't wait due to permissions)
           echo "⏳ ArgoCD sync triggered, waiting 30s for processing..."
           sleep 30
-          
+
           echo "✅ ArgoCD sync triggered successfully"
 
       - name: Verify deployment

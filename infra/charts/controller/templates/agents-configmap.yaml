@@ -1,3 +1,4 @@
+---
 {{- if .Values.agents }}
 apiVersion: v1
 kind: ConfigMap

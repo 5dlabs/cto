@@ -1,3 +1,4 @@
+---
 # Info on GitHub Webhook: https://developer.github.com/v3/repos/hooks/#create-a-hook
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
@@ -19,7 +20,7 @@ spec:
           names:
             - argo-events
             - argo-workflows
-      # Github application auth. Instead of using personal token `apiToken` use app PEM            
+      # Github application auth. Instead of using personal token `apiToken` use app PEM
 #     githubApp:
 #       privateKey:
 #         name: github-app-pem
@@ -69,7 +70,7 @@ spec:
       active: true
       # The media type used to serialize the payloads
       contentType: json
-      
+
     example-without-api-credentials:
       owner: "argoproj"
       repository: "argo"

@@ -1,3 +1,4 @@
+---
 groups:
   - name: claude_code_api
     interval: 30s
@@ -17,7 +18,7 @@ groups:
         annotations:
           summary: "High API error rate for {{ $labels.github_user }}"
           description: "Claude Code API error rate is {{ $value | humanize }}% for user {{ $labels.github_user }} on service {{ $labels.working_service }} (threshold: 5%)"
-      
+
       # Critical API error rate alert
       - alert: ClaudeCodeCriticalErrorRate
         expr: |
@@ -49,7 +50,7 @@ groups:
         annotations:
           summary: "High spending detected for {{ $labels.github_user }}"
           description: "User {{ $labels.github_user }} has spent ${{ $value | humanize }} in the last hour on service {{ $labels.working_service }}"
-      
+
       # Total platform spending over $500/hour
       - alert: ClaudeCodeHighPlatformSpend
         expr: |
@@ -62,7 +63,7 @@ groups:
         annotations:
           summary: "High platform-wide spending detected"
           description: "Total Claude Code spending is ${{ $value | humanize }} in the last hour (threshold: $500/hour)"
-      
+
       # Daily budget approaching limit
       - alert: ClaudeCodeDailyBudgetWarning
         expr: |
@@ -89,7 +90,7 @@ groups:
         annotations:
           summary: "OTLP Collector is down"
           description: "OpenTelemetry Collector in namespace telemetry has been down for more than 2 minutes"
-      
+
       # VictoriaMetrics down
       - alert: VictoriaMetricsDown
         expr: up{job="victoria-metrics"} == 0
@@ -100,7 +101,7 @@ groups:
         annotations:
           summary: "VictoriaMetrics is down"
           description: "VictoriaMetrics server has been down for more than 2 minutes"
-      
+
       # VictoriaLogs down
       - alert: VictoriaLogsDown
         expr: up{instance=~"victoria-logs.*"} == 0
@@ -111,7 +112,7 @@ groups:
         annotations:
           summary: "VictoriaLogs is down"
           description: "VictoriaLogs server has been down for more than 2 minutes"
-      
+
       # Grafana down
       - alert: GrafanaDown
         expr: up{job="grafana"} == 0
@@ -131,7 +132,7 @@ groups:
         expr: |
           (
             container_memory_working_set_bytes{namespace="telemetry",container!=""}
-            / 
+            /
             container_spec_memory_limit_bytes{namespace="telemetry",container!=""}
           ) * 100 > 80
         for: 5m
@@ -141,13 +142,13 @@ groups:
         annotations:
           summary: "High memory usage in {{ $labels.pod }}"
           description: "Pod {{ $labels.pod }} container {{ $labels.container }} is using {{ $value | humanize }}% of its memory limit"
-      
+
       # Critical memory usage
       - alert: CriticalMemoryUsage
         expr: |
           (
             container_memory_working_set_bytes{namespace="telemetry",container!=""}
-            / 
+            /
             container_spec_memory_limit_bytes{namespace="telemetry",container!=""}
           ) * 100 > 95
         for: 2m
@@ -157,7 +158,7 @@ groups:
         annotations:
           summary: "Critical memory usage in {{ $labels.pod }}"
           description: "Pod {{ $labels.pod }} container {{ $labels.container }} is using {{ $value | humanize }}% of its memory limit"
-      
+
       # Disk space usage (VictoriaMetrics)
       - alert: VictoriaMetricsDiskSpaceWarning
         expr: |
@@ -171,7 +172,7 @@ groups:
         annotations:
           summary: "VictoriaMetrics disk space running low"
           description: "VictoriaMetrics data directory is {{ $value | humanize }}% full"
-      
+
       # Disk space usage (VictoriaLogs)
       - alert: VictoriaLogsDiskSpaceWarning
         expr: |
@@ -200,7 +201,7 @@ groups:
         annotations:
           summary: "No metrics being ingested"
           description: "VictoriaMetrics has not received any new metrics for 10 minutes"
-      
+
       # No logs ingestion
       - alert: NoLogsIngestion
         expr: |
@@ -212,7 +213,7 @@ groups:
         annotations:
           summary: "No logs being ingested"
           description: "VictoriaLogs has not received any new logs for 10 minutes"
-      
+
       # High ingestion rate warning
       - alert: HighMetricsIngestionRate
         expr: |

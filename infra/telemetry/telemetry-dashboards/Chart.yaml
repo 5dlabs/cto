@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: telemetry-dashboards
 description: Claude Code Telemetry Dashboards for Grafana

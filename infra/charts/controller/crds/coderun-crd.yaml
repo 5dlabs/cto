@@ -1,3 +1,4 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -114,9 +115,9 @@ spec:
                       type: string
                       description: "Key within the secret"
                   required:
-                    - name
-                    - secretName
-                    - secretKey
+                  - name
+                  - secretName
+                  - secretKey
                 description: "Environment variables from secrets"
               enableDocker:
                 type: boolean

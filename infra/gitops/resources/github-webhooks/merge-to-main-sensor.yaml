@@ -300,12 +300,29 @@ spec:
                         GITHUB_OWNER=$(echo "$REPO_PATH" | cut -d'/' -f1)
                         GITHUB_REPO=$(echo "$REPO_PATH" | cut -d'/' -f2)
 
+                        # Extract service name from repo name (e.g., "cto-play-test" -> "cto")
+                        # Handle edge cases where removal would result in empty string
+                        SERVICE_NAME=$(echo "$GITHUB_REPO" | sed 's/-play-test$//' | sed 's/-test$//')
+
+                        # Ensure SERVICE_NAME is not empty - fallback to repo name if needed
+                        if [ -z "$SERVICE_NAME" ]; then
+                          SERVICE_NAME="$GITHUB_REPO"
+                        fi
+
+                        # Ensure SERVICE_NAME is valid for Kubernetes (no leading/trailing hyphens)
+                        SERVICE_NAME=$(echo "$SERVICE_NAME" | sed 's/^[-]*//' | sed 's/[-]*$//')
+
+                        # Final fallback if still empty
+                        if [ -z "$SERVICE_NAME" ]; then
+                          SERVICE_NAME="service"
+                        fi
+
                         # Create the next task workflow
                         cat <<EOF | kubectl create -f -
                         apiVersion: argoproj.io/v1alpha1
                         kind: Workflow
                         metadata:
-                          generateName: play-task-${NEXT_TASK_ID}-
+                          generateName: ${SERVICE_NAME}-task-${NEXT_TASK_ID}-play-
                           namespace: agent-platform
                           labels:
                             task-id: "$NEXT_TASK_ID"
@@ -320,6 +337,8 @@ spec:
                             parameters:
                               - name: task-id
                                 value: "$NEXT_TASK_ID"
+                              - name: service
+                                value: "$SERVICE_NAME"
                               - name: github-owner
                                 value: "$GITHUB_OWNER"
                               - name: github-repo
@@ -385,7 +404,7 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: coderun-implementation-task{{workflow.parameters.task-id}}-
+                                    generateName: {{workflow.parameters.service}}-t{{workflow.parameters.task-id}}-rex-
                                     namespace: agent-platform
                                     labels:
                                       task-id: "{{workflow.parameters.task-id}}"
@@ -406,7 +425,7 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: coderun-quality-task{{workflow.parameters.task-id}}-
+                                    generateName: {{workflow.parameters.service}}-t{{workflow.parameters.task-id}}-cleo-
                                     namespace: agent-platform
                                     labels:
                                       task-id: "{{workflow.parameters.task-id}}"
@@ -426,7 +445,7 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: coderun-testing-task{{workflow.parameters.task-id}}-
+                                    generateName: {{workflow.parameters.service}}-t{{workflow.parameters.task-id}}-tess-
                                     namespace: agent-platform
                                     labels:
                                       task-id: "{{workflow.parameters.task-id}}"

@@ -8,15 +8,15 @@ data:
   # Implementation agents that can trigger remediation
   implementation-agents: |
     - Rex
-    - Blaze  
+    - Blaze
     - Morgan
     - Nova
-  
+
   # Quality agents that get canceled during remediation
   quality-agents: |
     - Cleo
-    
-  # Testing agents that get canceled during remediation  
+
+  # Testing agents that get canceled during remediation
   testing-agents: |
     - Tess
 
