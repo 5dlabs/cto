@@ -31,47 +31,59 @@ spec:
     parameters:
       # Agent selection parameters (no hardcoded names)
       - name: implementation-agent
+
         description: "Agent to use for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)"
         value: "5DLabs-Rex"
       - name: quality-agent
+
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
         value: "5DLabs-Cleo"
       - name: testing-agent
+
         description: "Agent to use for testing and validation (e.g., 5DLabs-Tess)"
         value: "5DLabs-Tess"
 
       # Task and repository configuration
       - name: task-id
+
         description: "Unique task identifier for correlation (required)"
         value: ""
       - name: repository
+
         description: "GitHub repository for the work"
         value: "5dlabs/cto-play-test"
       - name: service
+
         description: "Service identifier for persistent workspace"
         value: "play-test"
 
       # Model configuration
       - name: model
+
         description: "Claude model to use for all agents"
         value: "claude-3-5-sonnet-20241022"
 
       # PR context (populated by suspend/resume)
       - name: pr-url
+
         description: "Pull request URL (populated after PR creation)"
         value: ""
       - name: pr-number
+
         description: "Pull request number (populated after PR creation)"
         value: ""
 
       # QA feedback (populated by suspend/resume)
       - name: qa-status
+
         description: "QA approval status (populated after QA)"
         value: ""
       - name: qa-comments
+
         description: "QA feedback comments (populated after QA)"
         value: ""
       - name: merge-sha
+
         description: "Merge commit SHA (populated after PR merge)"
         value: ""
 
@@ -110,11 +122,11 @@ spec:
             arguments:
               parameters:
                 - name: github-app
-                value: "{{`{{workflow.parameters.implementation-agent}}`}}"
+                  value: "{{`{{workflow.parameters.implementation-agent}}`}}"
                 - name: task-id
-                value: "{{`{{workflow.parameters.task-id}}`}}"
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
-                value: "implementation"
+                  value: "implementation"
 
           # Update stage after implementation cycle completes (PR created)
           - name: update-to-waiting-pr-created
@@ -123,9 +135,9 @@ spec:
             arguments:
               parameters:
                 - name: new-stage
-                value: "waiting-pr-created"
+                  value: "waiting-pr-created"
                 - name: verify-update
-                value: "true"
+                  value: "true"
 
           # Stage 2: Quality work
           - name: quality-work
@@ -134,15 +146,15 @@ spec:
             arguments:
               parameters:
                 - name: github-app
-                value: "{{`{{workflow.parameters.quality-agent}}`}}"
+                  value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: task-id
-                value: "{{`{{workflow.parameters.task-id}}`}}"
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
-                value: "quality"
+                  value: "quality"
                 - name: pr-url
-                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
+                  value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
-                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
 
           # Update stage after quality work completes
           - name: update-to-waiting-qa
@@ -151,9 +163,9 @@ spec:
             arguments:
               parameters:
                 - name: new-stage
-                value: "waiting-ready-for-qa"
+                  value: "waiting-ready-for-qa"
                 - name: verify-update
-                value: "true"
+                  value: "true"
 
           # Suspend point 2: Wait for ready-for-qa label
           - name: wait-ready-for-qa
@@ -162,9 +174,9 @@ spec:
             arguments:
               parameters:
                 - name: event-type
-                value: "ready-for-qa"
+                  value: "ready-for-qa"
                 - name: stage-name
-                value: "waiting-ready-for-qa"
+                  value: "waiting-ready-for-qa"
 
           # Stage 3: Testing work
           - name: testing-work
@@ -173,17 +185,17 @@ spec:
             arguments:
               parameters:
                 - name: github-app
-                value: "{{`{{workflow.parameters.testing-agent}}`}}"
+                  value: "{{`{{workflow.parameters.testing-agent}}`}}"
                 - name: task-id
-                value: "{{`{{workflow.parameters.task-id}}`}}"
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
-                value: "testing"
+                  value: "testing"
                 - name: pr-url
-                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
+                  value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
-                value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}}"
                 - name: qa-ready
-                value: "true"
+                  value: "true"
 
           # Update stage after testing work completes
           - name: update-to-waiting-approval
@@ -192,9 +204,9 @@ spec:
             arguments:
               parameters:
                 - name: new-stage
-                value: "waiting-pr-merged"
+                  value: "waiting-pr-merged"
                 - name: verify-update
-                value: "true"
+                  value: "true"
 
           # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
           # Suspend point 3: Wait for PR merged to main
@@ -204,9 +216,9 @@ spec:
             arguments:
               parameters:
                 - name: event-type
-                value: "pr-merged"
+                  value: "pr-merged"
                 - name: stage-name
-                value: "waiting-pr-merged"
+                  value: "waiting-pr-merged"
 
           - name: complete-task
             dependencies: [wait-pr-merged]
@@ -214,75 +226,85 @@ spec:
             arguments:
               parameters:
                 - name: task-id
-                value: "{{`{{workflow.parameters.task-id}}`}}"
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: approval-status
-                value: "{{`{{workflow.parameters.qa-status}}`}}"
+                  value: "{{`{{workflow.parameters.qa-status}}`}}"
                 - name: merge-sha
-                value: "{{`{{workflow.parameters.merge-sha}}`}}"
+                  value: "{{`{{workflow.parameters.merge-sha}}`}}"
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
     # Implementation cycle: run Rex, then check/poll for PR; if not found, repeat by failing upstream
     - name: implementation-cycle
       inputs:
         parameters:
-        - name: github-app
-        - name: task-id
-        - name: stage
+          - name: github-app
+          - name: task-id
+          - name: stage
       outputs:
         parameters:
-        - name: pr-url
-          valueFrom:
-            parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-url}}`}}"
-        - name: pr-number
-          valueFrom:
-            parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-number}}`}}"
+          - name: pr-url
+            valueFrom:
+
+              parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-url}}`}}"
+          - name: pr-number
+            valueFrom:
+
+              parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-number}}`}}"
       steps:
-      - - name: implementation-work
+        - - name: implementation-work
           template: agent-coderun
           arguments:
             parameters:
-            - name: github-app
+              - name: github-app
               value: "{{`{{inputs.parameters.github-app}}`}}"
-            - name: task-id
+              - name: task-id
               value: "{{`{{inputs.parameters.task-id}}`}}"
-            - name: stage
-              value: "{{`{{inputs.parameters.stage}}`}}"
-      - - name: wait-for-pr
+              - name: stage
+
+                value: "{{`{{inputs.parameters.stage}}`}}"
+        - - name: wait-for-pr
           template: check-or-wait-for-pr
           arguments:
             parameters:
-            - name: repository
-              value: "{{`{{workflow.parameters.repository}}`}}"
-            - name: task-id
+              - name: repository
+
+                value: "{{`{{workflow.parameters.repository}}`}}"
+              - name: task-id
               value: "{{`{{inputs.parameters.task-id}}`}}"
 
     # Template to check/poll GitHub for PR existence for task label
     - name: check-or-wait-for-pr
       inputs:
         parameters:
-        - name: repository
-        - name: task-id
+          - name: repository
+          - name: task-id
       outputs:
         parameters:
-        - name: pr-url
-          valueFrom:
-            path: /tmp/pr-url.txt
+          - name: pr-url
+            valueFrom:
+
+              path: /tmp/pr-url.txt
           default: ""
-        - name: pr-number
-          valueFrom:
-            path: /tmp/pr-number.txt
+          - name: pr-number
+            valueFrom:
+
+              path: /tmp/pr-number.txt
           default: ""
       script:
         image: alpine:3.20
         env:
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
+            - name: GITHUB_APP_ID
+
+              valueFrom:
+
+                secretKeyRef:
               name: github-app-5dlabs-morgan
               key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
+            - name: GITHUB_APP_PRIVATE_KEY
+
+              valueFrom:
+
+                secretKeyRef:
               name: github-app-5dlabs-morgan
               key: private-key
         command: [sh]
@@ -394,72 +416,82 @@ spec:
     - name: agent-coderun
       inputs:
         parameters:
-        - name: github-app
-        - name: task-id
-        - name: stage
-        - name: pr-url
-          default: ""
-        - name: pr-number
-          default: ""
-        - name: qa-ready
-          default: "false"
+          - name: github-app
+          - name: task-id
+          - name: stage
+          - name: pr-url
+
+            default: ""
+          - name: pr-number
+
+            default: ""
+          - name: qa-ready
+
+            default: "false"
       outputs:
         parameters:
-        - name: coderun-name
-          valueFrom:
-            parameter: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
+          - name: coderun-name
+            valueFrom:
+
+              parameter: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
       steps:
-      - - name: create-coderun-resource
+        - - name: create-coderun-resource
           template: create-coderun-resource
           arguments:
             parameters:
-            - name: github-app
+              - name: github-app
               value: "{{`{{inputs.parameters.github-app}}`}}"
-            - name: task-id
+              - name: task-id
               value: "{{`{{inputs.parameters.task-id}}`}}"
-            - name: stage
-              value: "{{`{{inputs.parameters.stage}}`}}"
-            - name: pr-url
+              - name: stage
+
+                value: "{{`{{inputs.parameters.stage}}`}}"
+              - name: pr-url
               value: "{{`{{inputs.parameters.pr-url}}`}}"
-            - name: pr-number
+              - name: pr-number
               value: "{{`{{inputs.parameters.pr-number}}`}}"
-            - name: qa-ready
+              - name: qa-ready
               value: "{{`{{inputs.parameters.qa-ready}}`}}"
-      - - name: resolve-coderun-name
+        - - name: resolve-coderun-name
           template: resolve-coderun-name
           arguments:
             parameters:
-            - name: stage
-              value: "{{`{{inputs.parameters.stage}}`}}"
-            - name: task-id
+              - name: stage
+
+                value: "{{`{{inputs.parameters.stage}}`}}"
+              - name: task-id
               value: "{{`{{inputs.parameters.task-id}}`}}"
-            - name: candidate-name
+              - name: candidate-name
               value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
-      - - name: wait-for-completion
+        - - name: wait-for-completion
           template: wait-coderun-completion
           arguments:
             parameters:
-            - name: coderun-name
+              - name: coderun-name
               value: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
 
     # Template for creating CodeRun resources
     - name: create-coderun-resource
       inputs:
         parameters:
-        - name: github-app
-        - name: task-id
-        - name: stage
-        - name: pr-url
-          default: ""
-        - name: pr-number
-          default: ""
-        - name: qa-ready
-          default: "false"
+          - name: github-app
+          - name: task-id
+          - name: stage
+          - name: pr-url
+
+            default: ""
+          - name: pr-number
+
+            default: ""
+          - name: qa-ready
+
+            default: "false"
       outputs:
         parameters:
-        - name: name
-          valueFrom:
-            jsonPath: '{.metadata.name}'
+          - name: name
+            valueFrom:
+
+              jsonPath: '{.metadata.name}'
       resource:
         action: create
         setOwnerReference: true
@@ -504,15 +536,17 @@ spec:
     - name: resolve-coderun-name
       inputs:
         parameters:
-        - name: stage
-        - name: task-id
-        - name: candidate-name
-          default: ""
+          - name: stage
+          - name: task-id
+          - name: candidate-name
+
+            default: ""
       outputs:
         parameters:
-        - name: coderun-name
-          valueFrom:
-            path: /tmp/coderun-name.txt
+          - name: coderun-name
+            valueFrom:
+
+              path: /tmp/coderun-name.txt
       script:
         image: alpine/k8s:1.31.0
         command: [sh]
@@ -551,7 +585,7 @@ spec:
     - name: wait-coderun-completion
       inputs:
         parameters:
-        - name: coderun-name
+          - name: coderun-name
       resource:
         action: get
         manifest: |
@@ -574,20 +608,24 @@ spec:
     - name: update-workflow-stage
       inputs:
         parameters:
-        - name: new-stage
-          description: "The new stage to transition to"
-        - name: verify-update
-          description: "Whether to verify the update succeeded"
+          - name: new-stage
+
+            description: "The new stage to transition to"
+          - name: verify-update
+
+            description: "Whether to verify the update succeeded"
           default: "true"
       outputs:
         parameters:
-        - name: update-status
-          valueFrom:
-            path: /tmp/update-status.txt
+          - name: update-status
+            valueFrom:
+
+              path: /tmp/update-status.txt
           default: "unknown"
-        - name: resource-version
-          valueFrom:
-            path: /tmp/resource-version.txt
+          - name: resource-version
+            valueFrom:
+
+              path: /tmp/resource-version.txt
           default: ""
       script:
         image: alpine/k8s:1.31.0
@@ -792,8 +830,8 @@ spec:
     - name: suspend-for-event
       inputs:
         parameters:
-        - name: event-type
-        - name: stage-name
+          - name: event-type
+          - name: stage-name
       metadata:
         labels:
           current-stage: "{{`{{inputs.parameters.stage-name}}`}}"
@@ -805,9 +843,9 @@ spec:
     - name: task-completion
       inputs:
         parameters:
-        - name: task-id
-        - name: approval-status
-        - name: merge-sha
+          - name: task-id
+          - name: approval-status
+          - name: merge-sha
       script:
         image: alpine:3.20
         command: [sh]
@@ -860,9 +898,11 @@ spec:
           echo ""
           echo "Workflow summary generated successfully"
           echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
-        volumeMounts:
-        - name: workspace
-          mountPath: /work
+          volumeMounts:
+
+            - name: workspace
+
+              mountPath: /work
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
