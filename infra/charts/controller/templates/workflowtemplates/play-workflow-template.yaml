@@ -192,25 +192,14 @@ spec:
             arguments:
               parameters:
               - name: new-stage
-                value: "waiting-pr-approved"
+                value: "waiting-pr-merged"
               - name: verify-update
                 value: "true"
 
-          # Suspend point 3: Wait for PR approval
-          - name: wait-pr-approved
-            dependencies: [update-to-waiting-approval]
-            template: suspend-for-event
-            arguments:
-              parameters:
-              - name: event-type
-                value: "pr-approved"
-              - name: stage-name
-                value: "waiting-pr-approved"
-
-          # Stage 4: Complete task
-          # Suspend point 4: Wait for PR merged before completing
+          # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
+          # Suspend point 3: Wait for PR merged to main
           - name: wait-pr-merged
-            dependencies: [wait-pr-approved]
+            dependencies: [update-to-waiting-approval]
             template: suspend-for-event
             arguments:
               parameters:

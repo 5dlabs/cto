@@ -60,27 +60,6 @@ spec:
                       # Will be populated from event
                     - name: merged-by
                       # Will be populated from event
-          parameters:
-            - dest: spec.arguments.parameters.0.value
-              src:
-                dependencyName: github-pr-merged
-                dataKey: body.pull_request.title
-            - dest: spec.arguments.parameters.1.value
-              src:
-                dependencyName: github-pr-merged
-                dataKey: body.pull_request.number
-            - dest: spec.arguments.parameters.2.value
-              src:
-                dependencyName: github-pr-merged
-                dataKey: body.pull_request.html_url
-            - dest: spec.arguments.parameters.3.value
-              src:
-                dependencyName: github-pr-merged
-                dataKey: body.pull_request.merge_commit_sha
-            - dest: spec.arguments.parameters.4.value
-              src:
-                dependencyName: github-pr-merged
-                dataKey: body.pull_request.merged_by.login
                 templates:
                   - name: handle-task-completion
                     script:
@@ -483,6 +462,27 @@ spec:
                           echo "❌ Failed to start Task $NEXT_TASK_ID workflow"
                           exit 1
                         fi
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.title
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.number
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.html_url
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.merge_commit_sha
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.merged_by.login
       retryStrategy:
         steps: 3
         duration: "10s"
