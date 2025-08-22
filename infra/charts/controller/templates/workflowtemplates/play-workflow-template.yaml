@@ -469,10 +469,11 @@ spec:
           apiVersion: agents.platform/v1
           kind: CodeRun
           metadata:
-            generateName: "coderun-{{`{{inputs.parameters.stage}}`}}-task{{`{{inputs.parameters.task-id}}`}}"
+            generateName: "{{`{{workflow.parameters.service}}`}}-t{{`{{inputs.parameters.task-id}}`}}-{{`{{inputs.parameters.stage}}`}}-"
             namespace: {{ .Release.Namespace }}
             labels:
               task-id: "{{`{{inputs.parameters.task-id}}`}}"
+              service: "{{`{{workflow.parameters.service}}`}}"
               github-app: "{{`{{inputs.parameters.github-app}}`}}"
               workflow-name: "{{`{{workflow.name}}`}}"
               workflow-stage: "{{`{{inputs.parameters.stage}}`}}"
