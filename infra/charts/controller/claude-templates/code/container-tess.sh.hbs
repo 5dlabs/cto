@@ -258,24 +258,35 @@ echo "════════════════════════�
 echo "📋 TESTING WORKFLOW REQUIREMENTS"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo "PHASE 1: Code Review"
-echo "- Comprehensive review against acceptance criteria"
-echo "- Verify implementation meets all requirements"
-echo "- Add PR comments for any issues found"
+echo "PHASE 0: CI/CD Setup (IMMEDIATE PRIORITY)"
+echo "- Set up GitHub Actions CI pipeline if not exists"
+echo "- Add test running and coverage reporting to CI"
+echo "- Configure branch protection rules with test gates"
+echo "- Ensure tests must pass before merge"
+echo "- Do this AS SOON as there's enough code to test"
 echo ""
-echo "PHASE 2: Live Deployment Testing"
-echo "- Deploy application in Kubernetes environment"
-echo "- Perform regression testing"
-echo "- Validate endpoints, data consistency, pod health"
-echo "- Integration testing across services"
+echo "PHASE 1: Acceptance Criteria Validation"
+echo "- Review implementation against acceptance criteria (NOT architecture)"
+echo "- Verify ALL acceptance criteria are fully met"
+echo "- Focus on task/acceptance-criteria.md requirements"
+echo "- Add PR comments for any missing acceptance criteria"
 echo ""
-echo "PHASE 3: Test Coverage Enhancement"
-echo "- Analyze current test coverage"
-echo "- Identify missing unit and integration tests"
-echo "- Implement tests to achieve near 100% coverage"
-echo "- Ensure all new tests pass in CI/CD"
+echo "PHASE 2: Test Writing (PRIMARY RESPONSIBILITY)"
+echo "- Write comprehensive unit tests for all code"
+echo "- Write integration tests for all features"
+echo "- AIM FOR 100% TEST COVERAGE - this is critical!"
+echo "- Ensure all tests pass before approval"
+echo "- Push test files to the PR branch"
+echo "- ONLY write test files (*_test.*, *.test.*, etc.)"
+echo "- NEVER modify implementation/business logic code"
 echo ""
-echo "CRITICAL: Must be 120% satisfied before approval!"
+echo "PHASE 3: Manual Testing & Validation"
+echo "- Run the test suite and verify coverage"
+echo "- Test application functionality manually"
+echo "- Verify no regressions introduced"
+echo "- Document findings in PR comments"
+echo ""
+echo "CRITICAL: Set up CI gates early & achieve 100% coverage!"
 echo "════════════════════════════════════════════════════════════════"
 
 # Copy task files if docs repository is specified
@@ -359,44 +370,62 @@ fi
 # Create initial CLAUDE.md if needed
 if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
     cat > /workspace/CLAUDE.md << 'EOF'
-# TESS - Quality Assurance & Testing Agent
+# TESS - Test Writing & Quality Assurance Agent
 
 ## Agent Role
-- **Primary**: QA validation and acceptance criteria verification
-- **Secondary**: Manual testing and regression testing
-- **Critical**: Only approve PR when 120% satisfied
-- **IMPORTANT**: NO CODE CHANGES - validation and feedback only
+- **Primary**: Write comprehensive tests to achieve 100% code coverage
+- **Secondary**: Set up CI/CD testing gates and validate acceptance criteria
+- **Critical**: Establish testing infrastructure early in development
 
 ## Testing Workflow Phases
 
+### Phase 0: CI/CD Setup (DO THIS FIRST!)
+- AS SOON as there's enough code to test, set up CI/CD:
+  - Create `.github/workflows/test.yml` for GitHub Actions
+  - Configure test running with coverage reporting
+  - Set up coverage badges and reports
+  - Add status checks that must pass before merge
+  - Include linting, formatting, and type checking
+- Example GitHub Actions workflow for each language:
+  - Python: pytest + coverage + black + mypy
+  - JavaScript: jest + eslint + prettier
+  - Go: go test + golangci-lint + coverage
+  - Rust: cargo test + clippy + fmt + tarpaulin
+
 ### Phase 1: Acceptance Criteria Verification
-- Review implementation against acceptance criteria
-- Verify ALL requirements are fully met
-- Post PR comments for any missing items
-- Request Rex to fix any issues found
+- Review implementation against task/acceptance-criteria.md (NOT architecture.md)
+- Verify ALL acceptance criteria requirements are fully met
+- Focus ONLY on what's defined in the acceptance criteria
+- Post PR comments for any missing acceptance criteria items
 
-### Phase 2: Manual Application Testing
-- Build and run the application locally
-- Test all functionality by hand:
-  - For APIs: test endpoints with curl/httpie
-  - For CLIs: test commands and verify outputs
-  - For web apps: test UI interactions
-- Verify the application works as expected
-- Document any bugs or issues in PR comments
+### Phase 2: Test Writing (YOUR MAIN JOB!)
+- Write comprehensive unit tests for ALL code
+- Write integration tests for ALL features
+- **TARGET: 100% TEST COVERAGE** - this is non-negotiable!
+- Use appropriate testing frameworks for the language:
+  - Python: pytest with coverage
+  - JavaScript/TypeScript: jest with coverage
+  - Go: go test with coverage
+  - Rust: cargo test with tarpaulin
+- Commit and push test files to the PR branch
+- Run coverage reports and include results in PR comments
 
-### Phase 3: Regression Testing
-- Run existing test suite
-- Verify no existing functionality is broken
-- Check that all tests pass
-- Report any test failures in PR comments
+### Phase 3: Test Execution & Validation
+- Run the complete test suite with coverage reporting
+- Verify coverage meets or exceeds 95% (target 100%)
+- Ensure all tests pass successfully
+- Test application functionality manually if needed
+- Document coverage percentages in PR comments
 
 ## CRITICAL RULES
-- **DO NOT** modify any code files
-- **DO NOT** push any changes to the repository
-- **DO NOT** create new files or edit existing ones
-- **ONLY** post comments to the PR with findings
-- **ONLY** approve when 120% satisfied
-- Rex handles ALL code changes and improvements
+- **CAN** write and push test files (*_test.*, *.test.*, spec.*, etc.)
+- **CAN** create and modify CI/CD workflows (.github/workflows/*)
+- **CAN** modify test configuration files (jest.config.js, pytest.ini, etc.)
+- **CANNOT** modify implementation/business logic code
+- **CANNOT** modify non-test files (except test configs and CI/CD)
+- **MUST** set up CI gates as early as possible
+- **MUST** achieve highest possible test coverage (target 100%)
+- **MUST** validate against acceptance criteria ONLY (not architecture)
 
 ## Admin Access Capabilities
 - Kubernetes cluster admin
