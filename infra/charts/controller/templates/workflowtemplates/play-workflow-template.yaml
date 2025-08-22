@@ -788,7 +788,7 @@ spec:
           factor: 2
           # No maxDuration - allow unlimited time for workflow stage updates
 
-    # Template for waiting for events by polling GitHub API
+    # Template for suspend points waiting for external events via webhooks
     - name: suspend-for-event
       inputs:
         parameters:
@@ -799,123 +799,7 @@ spec:
           current-stage: "{{`{{inputs.parameters.stage-name}}`}}"
           task-id: "{{`{{workflow.parameters.task-id}}`}}"
           workflow-type: "play-orchestration"
-      script:
-        image: alpine/k8s:1.31.0
-        env:
-        - name: GITHUB_APP_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: app-id
-        - name: GITHUB_APP_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: private-key
-        command: [sh]
-        source: |
-          #!/bin/sh
-          set -e
-          
-          echo "🔍 Waiting for event: {{`{{inputs.parameters.event-type}}`}}"
-          echo "🏷️ Stage: {{`{{inputs.parameters.stage-name}}`}}"
-          echo "📋 Task ID: {{`{{workflow.parameters.task-id}}`}}"
-          
-          # Install tools
-          apk add --no-cache curl jq git openssl
-          
-          case "{{`{{inputs.parameters.event-type}}`}}" in
-            "ready-for-qa")
-              echo "⏳ Waiting for 'ready-for-qa' label to be added to PR..."
-              # For ready-for-qa, just wait a short time since Cleo should add the label
-              sleep 60
-              echo "✅ Assuming ready-for-qa label has been added"
-              ;;
-            "pr-merged")
-              echo "⏳ Waiting for PR to be merged to main branch..."
-              
-              # Get repository info from workflow parameters
-              REPO_URL="{{`{{workflow.parameters.repository}}`}}"
-              case "$REPO_URL" in
-                http://*|https://*)
-                  REPO_OWNER=$(echo "$REPO_URL" | sed -E 's|https?://github.com/([^/]+)/.*|\1|')
-                  REPO_NAME=$(echo "$REPO_URL" | sed -E 's|https?://github.com/[^/]+/([^/]+)(\.git)?|\1|')
-                  ;;
-                *)
-                  REPO_OWNER=$(echo "$REPO_URL" | cut -d'/' -f1)
-                  REPO_NAME=$(echo "$REPO_URL" | cut -d'/' -f2)
-                  ;;
-              esac
-              
-              echo "📊 Repository: $REPO_OWNER/$REPO_NAME"
-              
-              # Authenticate with GitHub App (simplified version)
-              JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-              NOW=$(date +%s)
-              EXP=$((NOW + 600))
-              JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-              
-              # Create temporary key file
-              TEMP_KEY_FILE="/tmp/github-app-key.pem"
-              printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
-              chmod 600 "$TEMP_KEY_FILE"
-              
-              JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-              JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-              
-              # Get installation ID and access token
-              INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
-              INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
-              
-              if [ "$INSTALLATION_ID" = "null" ]; then
-                # Try org installation
-                ORG_INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/$REPO_OWNER/installation")
-                INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
-              fi
-              
-              TOKEN_RESPONSE=$(curl -s -X POST -H "Authorization: Bearer $JWT_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-              GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-              
-              rm -f "$TEMP_KEY_FILE"
-              
-              # Poll for PR merge with task correlation
-              TASK_ID="{{`{{workflow.parameters.task-id}}`}}"
-              TASK_LABEL="task-$TASK_ID"
-              
-              echo "🔍 Looking for merged PR with label: $TASK_LABEL"
-              
-              max_wait=3600  # 1 hour max wait
-              elapsed=0
-              interval=30
-              
-              while [ $elapsed -lt $max_wait ]; do
-                # Search for merged PRs with the task label
-                MERGED_PRS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/pulls?state=closed&base=main&sort=updated&direction=desc" | \
-                  jq -r --arg label "$TASK_LABEL" '.[] | select(.merged == true and (.labels[]?.name == $label)) | .number' | head -1)
-                
-                if [ -n "$MERGED_PRS" ] && [ "$MERGED_PRS" != "null" ]; then
-                  echo "✅ Found merged PR #$MERGED_PRS with task label $TASK_LABEL"
-                  echo "🎉 PR merge detected - workflow can proceed"
-                  exit 0
-                fi
-                
-                if [ $((elapsed % 300)) -eq 0 ]; then
-                  echo "⏳ Still waiting for PR merge... ($elapsed seconds elapsed)"
-                fi
-                
-                sleep $interval
-                elapsed=$((elapsed + interval))
-              done
-              
-              echo "⏱️ Timeout waiting for PR merge"
-              exit 1
-              ;;
-            *)
-              echo "❌ Unknown event type: {{`{{inputs.parameters.event-type}}`}}"
-              exit 1
-              ;;
-          esac
+      suspend: {}  # Indefinite suspend until external resume via webhooks
 
     # Template for task completion and cleanup
     - name: task-completion
