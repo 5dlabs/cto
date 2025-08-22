@@ -621,3 +621,15 @@ if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
 else
   echo "⚠️ Failed to request sidecar shutdown"
 fi
+
+# Cleanup and exit
+echo "════════════════════════════════════════════════════════════════"
+echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "📋 Task: {{task_id}}"
+echo "✅ Code quality checks completed"
+echo "════════════════════════════════════════════════════════════════"
+
+# Exit with the same code as Claude
+echo "✅ Exiting with code: $CLAUDE_EXIT_CODE"
+exit $CLAUDE_EXIT_CODE
