@@ -154,6 +154,12 @@ jobs:
             file: ./infra/images/opencode/Dockerfile
             version_type: script_hash
             script_url: https://opencode.ai/install
+          - id: codex
+            image: codex
+            context: ./infra/images/codex
+            file: ./infra/images/codex/Dockerfile
+            version_type: pip
+            version_pkg: "openai"
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js (ensure npm available in runner)
