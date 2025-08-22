@@ -672,5 +672,6 @@ echo "📋 Task: {{task_id}}"
 echo "🧪 Testing completed - check PR for feedback"
 echo "════════════════════════════════════════════════════════════════"
 
-# Exit with Claude's exit code
+# Exit with the same code as Claude
+echo "✅ Exiting with code: $CLAUDE_EXIT_CODE"
 exit $CLAUDE_EXIT_CODE
