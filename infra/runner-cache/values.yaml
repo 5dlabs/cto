@@ -26,25 +26,25 @@ template:
                   actions.github.com/scale-set-name: k8s-runner
               topologyKey: kubernetes.io/hostname
     containers:
-    - name: runner
-      image: ghcr.io/5dlabs/rust-builder:latest
-      imagePullPolicy: Always
-      command: ["/home/runner/run.sh"]
-      volumeMounts:
-      - name: work
-        mountPath: /home/runner/_work
-      - name: cache-volume
-        mountPath: /cache
-      - name: cache-volume
-        mountPath: /home/runner/.cargo
-        subPath: cargo
-      - name: cache-volume
-        mountPath: /home/runner/.cache
-        subPath: general
+      - name: runner
+        image: ghcr.io/5dlabs/rust-builder:latest
+        imagePullPolicy: Always
+        command: ["/home/runner/run.sh"]
+        volumeMounts:
+          - name: work
+            mountPath: /home/runner/_work
+          - name: cache-volume
+            mountPath: /cache
+          - name: cache-volume
+            mountPath: /home/runner/.cargo
+            subPath: cargo
+          - name: cache-volume
+            mountPath: /home/runner/.cache
+            subPath: general
     volumes:
-    - name: work
-      emptyDir:
-        sizeLimit: 1Gi
-    - name: cache-volume
-      persistentVolumeClaim:
-        claimName: runner-cache-pvc
+      - name: work
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: runner-cache-pvc

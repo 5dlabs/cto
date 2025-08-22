@@ -214,7 +214,6 @@ agents:
       Your goal: Turn red → green with minimal disruption.
 
 
-
 # Agent defaults are now managed through cto-config.json in the MCP server
 
 imagePullSecrets:
