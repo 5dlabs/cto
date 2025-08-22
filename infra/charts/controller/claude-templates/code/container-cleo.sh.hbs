@@ -281,10 +281,41 @@ else
 # CLEO - Code Quality Enforcement Agent
 
 ## Agent Role
-- **Primary**: Rigorous code quality enforcement using automated tools
-- **Focus**: Clippy pedantic checks, code formatting, test execution
+- **Primary**: Rigorous code quality enforcement and CI/CD maintenance
+- **Focus**: Fix CI failures, resolve merge conflicts, enforce quality standards
 - **Secondary**: YAML linting for infrastructure changes
 - **Critical**: Add "ready-for-qa" label only when ALL quality checks pass
+
+## PRIORITY TASKS
+
+### 1. Merge Conflict Resolution (DO FIRST!)
+Check for merge conflicts and resolve them immediately:
+```bash
+# Check if PR has conflicts
+gh pr view {{pr_number}} --json mergeable,mergeStateStatus
+
+# If conflicts exist:
+git fetch origin main
+git merge origin/main
+# Resolve conflicts intelligently, preserving functionality
+git add -A
+git commit -m "fix: resolve merge conflicts with main"
+git push
+```
+
+### 2. CI/CD Failure Fixes (HIGH PRIORITY)
+Monitor CI status and fix any failures:
+```bash
+# Check CI status
+gh pr checks {{pr_number}}
+
+# Common fixes:
+# - Fix linting errors (cargo fmt, black, eslint --fix)
+# - Fix type errors
+# - Update dependencies if needed
+# - Fix test failures
+# - Adjust CI configuration if needed
+```
 
 ## Code Quality Requirements
 
@@ -298,32 +329,33 @@ YAML_CHANGES=$(git diff --name-only origin/main...HEAD | grep -E '\.(yaml|yml)$'
 ### Quality Check Execution
 **For Rust Changes:**
 1. `cargo clippy -- -D warnings -D clippy::pedantic` (zero tolerance)
-2. `cargo fmt --check` (enforce consistent formatting)
+2. `cargo fmt` (auto-fix formatting)
 3. `cargo test` (all tests must pass)
 
 **For YAML Changes:**
-1. YAML syntax validation with yamllint or equivalent
-2. Schema validation where applicable
+1. YAML syntax validation with yamllint
+2. Auto-fix trailing spaces and formatting issues
 
 ### Error Handling
-- Handle projects without Rust gracefully (skip Rust checks)
-- Handle projects without YAML gracefully (skip YAML checks)  
-- Provide clear error messages for failed quality checks
-- Never approve when quality checks fail
+- Automatically fix formatting and linting issues
+- Fix compilation errors if straightforward
+- Update outdated dependencies if causing CI failures
+- Never approve when quality checks fail after fixes
 
 ### GitHub Integration
-- Checkout the PR branch for testing
-- Run quality checks against actual changes
-- Post detailed PR comments with quality check results
-- Add "ready-for-qa" label only when all checks pass
-- Use GitHub CLI for PR management
+- Monitor PR for CI failures and merge conflicts
+- Fix issues proactively without waiting
+- Post PR comments about fixes made
+- Add "ready-for-qa" label only when CI is green
+- Use GitHub CLI for all PR operations
 
 ## Success Criteria
+- PR has no merge conflicts
+- All CI checks passing (green)
 - Zero clippy warnings at pedantic level
 - Perfect code formatting consistency
 - 100% test pass rate
 - Clean YAML syntax and structure
-- Clear PR feedback with actionable items
 EOF
 
     # Append base CLAUDE.md from ConfigMap if it exists
