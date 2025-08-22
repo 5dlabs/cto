@@ -23,8 +23,8 @@ spec:
             type: string
             value: ["closed"]
           - path: body.pull_request.merged
-            type: bool
-            value: [true]
+            type: string
+            value: ["true"]
           - path: body.pull_request.base.ref
             type: string
             value: ["main"]
