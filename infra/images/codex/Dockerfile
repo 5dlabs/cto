@@ -17,7 +17,7 @@ RUN python3 -m venv /opt/openai/.venv \
 # Install OpenAI Node.js SDK globally
 RUN npm install -g openai@latest \
   && echo "✅ OpenAI Node.js SDK installed" \
-  && node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed"
+  && (node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed")
 
 # Make OpenAI venv available on PATH for all users
 ENV VIRTUAL_ENV=/opt/openai/.venv
@@ -56,8 +56,8 @@ WORKDIR /workspace
 
 # Verify OpenAI CLI installation (non-fatal)
 RUN . /opt/openai/.venv/bin/activate \
-  && python -c "import openai; print('✅ OpenAI SDK available:', openai.__version__)" 2>/dev/null || echo "⚠️ OpenAI SDK verification failed" \
-  && openai --help >/dev/null 2>&1 && echo "✅ OpenAI CLI available" || echo "⚠️ OpenAI CLI verification failed"
+  && (python -c "import openai; print('✅ OpenAI SDK available:', openai.__version__)" 2>/dev/null || echo "⚠️ OpenAI SDK verification failed") \
+  && (openai --help >/dev/null 2>&1 && echo "✅ OpenAI CLI available" || echo "⚠️ OpenAI CLI verification failed")
 
 # Default entrypoint (can be overridden)
 CMD ["openai", "--help"]
