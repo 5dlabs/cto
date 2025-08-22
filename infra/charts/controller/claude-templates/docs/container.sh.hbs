@@ -335,8 +335,53 @@ $details
 ## Test Strategy
 $test_strategy
 EOF
+      
+      # Also generate XML format for enhanced LLM processing
+      # Extract additional fields for XML structure
+      priority=$(_decode '.priority // "medium"')
+      dependencies=$(_decode '.dependencies // []' | jq -r 'if type == "array" then . else [] end | join(", ")')
+      status=$(_decode '.status // "pending"')
+      
+      cat > "$task_dir/task.xml" << XML_EOF
+<prompt>
+    <role>You are a senior software engineer and coding agent specializing in the project's technology stack.</role>
+    <task>
+        <id>$task_id</id>
+        <title>$title</title>
+        <description>$description</description>
+        <priority>$priority</priority>
+        <status>$status</status>
+        <dependencies>$dependencies</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Follow the project's existing architecture and coding patterns</spec>
+        <spec>Ensure compatibility with the current technology stack</spec>
+        <spec>Implement proper error handling and logging</spec>
+        <spec>Follow established security best practices</spec>
+    </technical_specifications>
+    <implementation_details>
+        $details
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Implementation must be complete and functional</criterion>
+        <criterion>Code must follow the project's style guidelines and conventions</criterion>
+        <criterion>All edge cases should be properly handled</criterion>
+        <criterion>Implementation should be well-documented with clear comments</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        $test_strategy
+    </test_strategy>
+    <instructions>
+        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns. 
+        Provide complete, production-ready code that follows best practices. Include necessary imports, 
+        error handling, and documentation. Test your solution thoroughly before finalizing.
+    </instructions>
+</prompt>
+XML_EOF
+      
       gen_count=$((gen_count+1))
       echo "✓ Generated docs/task-$task_id/task.txt"
+      echo "✓ Generated docs/task-$task_id/task.xml"
     done
   echo "Generated $gen_count task files from tasks.json"
 elif [ -d "$CLAUDE_WORK_DIR/.taskmaster/tasks" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/.taskmaster/tasks" 2>/dev/null)" ]; then
