@@ -404,19 +404,19 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: {{workflow.parameters.service}}-t{{workflow.parameters.task-id}}-rex-
+                                    generateName: {{`{{workflow.parameters.service}}`}}-t{{`{{workflow.parameters.task-id}}`}}-rex-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "{{workflow.parameters.task-id}}"
+                                      task-id: "{{`{{workflow.parameters.task-id}}`}}"
                                       workflow-stage: "implementation"
                                       agent-type: "rex"
                                   spec:
-                                    service: "task{{workflow.parameters.task-id}}"
+                                    service: "task{{`{{workflow.parameters.task-id}}`}}"
                                     github_app: "5DLabs-Rex"
-                                    github_owner: "{{workflow.parameters.github-owner}}"
-                                    github_repo: "{{workflow.parameters.github-repo}}"
-                                    docs_repository_url: "https://github.com/{{workflow.parameters.github-owner}}/{{workflow.parameters.docs-repo}}"
-                                    task_id: {{workflow.parameters.task-id}}
+                                    github_owner: "{{`{{workflow.parameters.github-owner}}`}}"
+                                    github_repo: "{{`{{workflow.parameters.github-repo}}`}}"
+                                    docs_repository_url: "https://github.com/{{`{{workflow.parameters.github-owner}}`}}/{{`{{workflow.parameters.docs-repo}}`}}"
+                                    task_id: {{`{{workflow.parameters.task-id}}`}}
 
                             - name: run-cleo
                               resource:
@@ -425,17 +425,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: {{workflow.parameters.service}}-t{{workflow.parameters.task-id}}-cleo-
+                                    generateName: {{`{{workflow.parameters.service}}`}}-t{{`{{workflow.parameters.task-id}}`}}-cleo-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "{{workflow.parameters.task-id}}"
+                                      task-id: "{{`{{workflow.parameters.task-id}}`}}"
                                       workflow-stage: "quality"
                                       agent-type: "cleo"
                                   spec:
-                                    service: "task{{workflow.parameters.task-id}}"
+                                    service: "task{{`{{workflow.parameters.task-id}}`}}"
                                     github_app: "5DLabs-Cleo"
-                                    github_owner: "{{workflow.parameters.github-owner}}"
-                                    github_repo: "{{workflow.parameters.github-repo}}"
+                                    github_owner: "{{`{{workflow.parameters.github-owner}}`}}"
+                                    github_repo: "{{`{{workflow.parameters.github-repo}}`}}"
                                     # Cleo will find the PR created by Rex
 
                             - name: run-tess
@@ -445,17 +445,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: {{workflow.parameters.service}}-t{{workflow.parameters.task-id}}-tess-
+                                    generateName: {{`{{workflow.parameters.service}}`}}-t{{`{{workflow.parameters.task-id}}`}}-tess-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "{{workflow.parameters.task-id}}"
+                                      task-id: "{{`{{workflow.parameters.task-id}}`}}"
                                       workflow-stage: "testing"
                                       agent-type: "tess"
                                   spec:
-                                    service: "task{{workflow.parameters.task-id}}"
+                                    service: "task{{`{{workflow.parameters.task-id}}`}}"
                                     github_app: "5DLabs-Tess"
-                                    github_owner: "{{workflow.parameters.github-owner}}"
-                                    github_repo: "{{workflow.parameters.github-repo}}"
+                                    github_owner: "{{`{{workflow.parameters.github-owner}}`}}"
+                                    github_repo: "{{`{{workflow.parameters.github-repo}}`}}"
                                     # Tess will find the PR with ready-for-qa label
 
                             - name: log-completion
@@ -463,7 +463,7 @@ spec:
                                 image: alpine:3.18
                                 command: [sh]
                                 source: |
-                                  echo "✅ Task {{workflow.parameters.task-id}} completed successfully!"
+                                  echo "✅ Task {{`{{workflow.parameters.task-id}}`}} completed successfully!"
                                   echo "Merged to main and ready for production."
                         EOF
 
