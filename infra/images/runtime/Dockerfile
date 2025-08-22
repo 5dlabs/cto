@@ -216,6 +216,10 @@ RUN curl --proto '=https' --tlsv1.2 -LsSf \
 # Install TaskMaster globally (latest version)
 RUN npm install -g task-master-ai@latest
 
+# Install OpenAI CLI and Node.js SDK globally
+RUN pip install --upgrade openai-cli openai requests aiohttp && \
+    npm install -g openai@latest
+
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     ARCH=$(dpkg --print-architecture) \
