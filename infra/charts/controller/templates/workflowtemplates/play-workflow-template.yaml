@@ -198,7 +198,7 @@ spec:
 
           # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
           # Suspend point 3: Wait for PR merged to main
-          - name: wait-pr-merged
+          - name: wait-merge-to-main
             dependencies: [update-to-waiting-merge]
             template: suspend-for-event
             arguments:
@@ -209,7 +209,7 @@ spec:
                   value: "waiting-pr-merged"
 
           - name: complete-task
-            dependencies: [wait-pr-merged]
+            dependencies: [wait-merge-to-main]
             template: task-completion
             arguments:
               parameters:
@@ -860,87 +860,8 @@ spec:
           echo ""
           echo "Workflow summary generated successfully"
           echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
-          
-          # AUTO-START NEXT TASK
           echo ""
-          echo "========================================="
-          echo "🚀 STARTING NEXT TASK AUTOMATICALLY"
-          echo "========================================="
-          
-          # Install kubectl if not available
-          if ! command -v kubectl >/dev/null 2>&1; then
-            echo "Installing kubectl..."
-            apk add --no-cache curl
-            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-            chmod +x kubectl
-            mv kubectl /usr/local/bin/
-          fi
-          
-          # Calculate next task ID
-          CURRENT_TASK="{{`{{inputs.parameters.task-id}}`}}"
-          NEXT_TASK=$((CURRENT_TASK + 1))
-          
-          echo "📋 Current task: $CURRENT_TASK"
-          echo "🎯 Next task: $NEXT_TASK"
-          
-          # Check if next task exists in docs repository
-          echo "🔍 Checking if task-$NEXT_TASK exists..."
-          
-          # Create next task workflow
-          cat > /tmp/next-workflow.yaml <<EOF
-          apiVersion: argoproj.io/v1alpha1
-          kind: Workflow
-          metadata:
-            generateName: play-task-${NEXT_TASK}-
-            namespace: {{ .Release.Namespace }}
-            labels:
-              task-id: "$NEXT_TASK"
-              repository: "$(echo "{{`{{workflow.parameters.repository}}`}}" | tr '/' '-')"
-              current-stage: "pending"
-              auto-started: "true"
-              previous-task: "$CURRENT_TASK"
-              project-play: "true"
-          spec:
-            workflowTemplateRef:
-              name: play-workflow-template
-            arguments:
-              parameters:
-                - name: task-id
-                  value: "$NEXT_TASK"
-                - name: repository
-                  value: "{{`{{workflow.parameters.repository}}`}}"
-                - name: service
-                  value: "{{`{{workflow.parameters.service}}`}}"
-                - name: docs-repository
-                  value: "{{`{{workflow.parameters.docs-repository}}`}}"
-                - name: docs-project-directory
-                  value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
-                - name: docs-branch
-                  value: "{{`{{workflow.parameters.docs-branch}}`}}"
-                - name: implementation-agent
-                  value: "{{`{{workflow.parameters.implementation-agent}}`}}"
-                - name: quality-agent
-                  value: "{{`{{workflow.parameters.quality-agent}}`}}"
-                - name: testing-agent
-                  value: "{{`{{workflow.parameters.testing-agent}}`}}"
-                - name: model
-                  value: "{{`{{workflow.parameters.model}}`}}"
-          EOF
-          
-          # Submit the next task workflow
-          echo "🚀 Starting task-$NEXT_TASK workflow..."
-          
-          if next_workflow_name=$(kubectl create -f /tmp/next-workflow.yaml -o jsonpath='{.metadata.name}' 2>/dev/null); then
-            echo "✅ Successfully started task-$NEXT_TASK: $next_workflow_name"
-            echo "🔗 Next task workflow: $next_workflow_name"
-            
-            # Create marker file for tracking
-            echo "task-$NEXT_TASK started by task-$CURRENT_TASK at $(date)" > /tmp/next-task-started.txt
-            echo "Next workflow: $next_workflow_name" >> /tmp/next-task-started.txt
-          else
-            echo "⚠️ Could not start task-$NEXT_TASK (may not exist or already running)"
-            echo "✅ Task sequence completed - no more tasks to process"
-          fi
+          echo "Note: Next task will be started automatically by webhook system"
         volumeMounts:
           - name: workspace
             mountPath: /work
