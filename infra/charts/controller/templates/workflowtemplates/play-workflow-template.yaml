@@ -31,59 +31,47 @@ spec:
     parameters:
       # Agent selection parameters (no hardcoded names)
       - name: implementation-agent
-
         description: "Agent to use for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)"
         value: "5DLabs-Rex"
       - name: quality-agent
-
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
         value: "5DLabs-Cleo"
       - name: testing-agent
-
         description: "Agent to use for testing and validation (e.g., 5DLabs-Tess)"
         value: "5DLabs-Tess"
 
       # Task and repository configuration
       - name: task-id
-
         description: "Unique task identifier for correlation (required)"
         value: ""
       - name: repository
-
         description: "GitHub repository for the work"
         value: "5dlabs/cto-play-test"
       - name: service
-
         description: "Service identifier for persistent workspace"
         value: "play-test"
 
       # Model configuration
       - name: model
-
         description: "Claude model to use for all agents"
         value: "claude-3-5-sonnet-20241022"
 
       # PR context (populated by suspend/resume)
       - name: pr-url
-
         description: "Pull request URL (populated after PR creation)"
         value: ""
       - name: pr-number
-
         description: "Pull request number (populated after PR creation)"
         value: ""
 
       # QA feedback (populated by suspend/resume)
       - name: qa-status
-
         description: "QA approval status (populated after QA)"
         value: ""
       - name: qa-comments
-
         description: "QA feedback comments (populated after QA)"
         value: ""
       - name: merge-sha
-
         description: "Merge commit SHA (populated after PR merge)"
         value: ""
 
@@ -244,11 +232,9 @@ spec:
         parameters:
           - name: pr-url
             valueFrom:
-
               parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-url}}`}}"
           - name: pr-number
             valueFrom:
-
               parameter: "{{`{{steps.wait-for-pr.outputs.parameters.pr-number}}`}}"
       steps:
         - - name: implementation-work
@@ -256,21 +242,19 @@ spec:
           arguments:
             parameters:
               - name: github-app
-              value: "{{`{{inputs.parameters.github-app}}`}}"
+                value: "{{`{{inputs.parameters.github-app}}`}}"
               - name: task-id
-              value: "{{`{{inputs.parameters.task-id}}`}}"
+                value: "{{`{{inputs.parameters.task-id}}`}}"
               - name: stage
-
                 value: "{{`{{inputs.parameters.stage}}`}}"
         - - name: wait-for-pr
           template: check-or-wait-for-pr
           arguments:
             parameters:
               - name: repository
-
                 value: "{{`{{workflow.parameters.repository}}`}}"
               - name: task-id
-              value: "{{`{{inputs.parameters.task-id}}`}}"
+                value: "{{`{{inputs.parameters.task-id}}`}}"
 
     # Template to check/poll GitHub for PR existence for task label
     - name: check-or-wait-for-pr
@@ -282,31 +266,25 @@ spec:
         parameters:
           - name: pr-url
             valueFrom:
-
               path: /tmp/pr-url.txt
-          default: ""
+            default: ""
           - name: pr-number
             valueFrom:
-
               path: /tmp/pr-number.txt
-          default: ""
+            default: ""
       script:
         image: alpine:3.20
         env:
-            - name: GITHUB_APP_ID
-
-              valueFrom:
-
-                secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: app-id
-            - name: GITHUB_APP_PRIVATE_KEY
-
-              valueFrom:
-
-                secretKeyRef:
-              name: github-app-5dlabs-morgan
-              key: private-key
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
         command: [sh]
         source: |
           #!/bin/sh
@@ -420,19 +398,15 @@ spec:
           - name: task-id
           - name: stage
           - name: pr-url
-
             default: ""
           - name: pr-number
-
             default: ""
           - name: qa-ready
-
             default: "false"
       outputs:
         parameters:
           - name: coderun-name
             valueFrom:
-
               parameter: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
       steps:
         - - name: create-coderun-resource
@@ -440,35 +414,33 @@ spec:
           arguments:
             parameters:
               - name: github-app
-              value: "{{`{{inputs.parameters.github-app}}`}}"
+                value: "{{`{{inputs.parameters.github-app}}`}}"
               - name: task-id
-              value: "{{`{{inputs.parameters.task-id}}`}}"
+                value: "{{`{{inputs.parameters.task-id}}`}}"
               - name: stage
-
                 value: "{{`{{inputs.parameters.stage}}`}}"
               - name: pr-url
-              value: "{{`{{inputs.parameters.pr-url}}`}}"
+                value: "{{`{{inputs.parameters.pr-url}}`}}"
               - name: pr-number
-              value: "{{`{{inputs.parameters.pr-number}}`}}"
+                value: "{{`{{inputs.parameters.pr-number}}`}}"
               - name: qa-ready
-              value: "{{`{{inputs.parameters.qa-ready}}`}}"
+                value: "{{`{{inputs.parameters.qa-ready}}`}}"
         - - name: resolve-coderun-name
           template: resolve-coderun-name
           arguments:
             parameters:
               - name: stage
-
                 value: "{{`{{inputs.parameters.stage}}`}}"
               - name: task-id
-              value: "{{`{{inputs.parameters.task-id}}`}}"
+                value: "{{`{{inputs.parameters.task-id}}`}}"
               - name: candidate-name
-              value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
+                value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
         - - name: wait-for-completion
           template: wait-coderun-completion
           arguments:
             parameters:
               - name: coderun-name
-              value: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
+                value: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
 
     # Template for creating CodeRun resources
     - name: create-coderun-resource
@@ -478,19 +450,15 @@ spec:
           - name: task-id
           - name: stage
           - name: pr-url
-
             default: ""
           - name: pr-number
-
             default: ""
           - name: qa-ready
-
             default: "false"
       outputs:
         parameters:
           - name: name
             valueFrom:
-
               jsonPath: '{.metadata.name}'
       resource:
         action: create
@@ -539,13 +507,11 @@ spec:
           - name: stage
           - name: task-id
           - name: candidate-name
-
             default: ""
       outputs:
         parameters:
           - name: coderun-name
             valueFrom:
-
               path: /tmp/coderun-name.txt
       script:
         image: alpine/k8s:1.31.0
@@ -609,24 +575,20 @@ spec:
       inputs:
         parameters:
           - name: new-stage
-
             description: "The new stage to transition to"
           - name: verify-update
-
             description: "Whether to verify the update succeeded"
-          default: "true"
+            default: "true"
       outputs:
         parameters:
           - name: update-status
             valueFrom:
-
               path: /tmp/update-status.txt
-          default: "unknown"
+            default: "unknown"
           - name: resource-version
             valueFrom:
-
               path: /tmp/resource-version.txt
-          default: ""
+            default: ""
       script:
         image: alpine/k8s:1.31.0
         command: [bash]
@@ -898,11 +860,9 @@ spec:
           echo ""
           echo "Workflow summary generated successfully"
           echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
-          volumeMounts:
-
-            - name: workspace
-
-              mountPath: /work
+        volumeMounts:
+          - name: workspace
+            mountPath: /work
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
