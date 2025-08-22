@@ -701,7 +701,6 @@ fi
 
 # Perform cleanup
 echo "🔧 Performing cleanup..."
-rm -f "$FIFO_PATH" 2>/dev/null || true
 
 echo "════════════════════════════════════════════════════════════════"
 echo "║                  TESS QA WORKFLOW COMPLETE                   ║"
@@ -721,6 +720,9 @@ ps aux | head -5
 
 # Write completion marker for workflow tracking
 echo "tess-qa-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
+
+# Cleanup FIFO
+rm -f "$FIFO_PATH" 2>/dev/null || true
 
 # Force exit to ensure container termination
 echo "🔚 Force terminating container..."
