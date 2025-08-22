@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: claude-agent
 description: Long-running Claude agent container for interactive SSH and MCP access

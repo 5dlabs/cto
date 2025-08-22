@@ -2,7 +2,7 @@
 # Shared cache PVC for GitHub Actions Runners
 # Supports multiple cache types via subpaths:
 # - /cache (general build cache)
-# - /cache/cargo (Rust dependencies) 
+# - /cache/cargo (Rust dependencies)
 # - /cache/general (npm, pip, etc.)
 apiVersion: v1
 kind: PersistentVolumeClaim

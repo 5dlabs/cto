@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: rustdocs-mcp
 description: Rust documentation MCP server

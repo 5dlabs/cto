@@ -299,19 +299,19 @@ spec:
                         # Parse owner and repo from REPO_PATH (e.g., "5dlabs/cto" -> owner: 5dlabs, repo: cto)
                         GITHUB_OWNER=$(echo "$REPO_PATH" | cut -d'/' -f1)
                         GITHUB_REPO=$(echo "$REPO_PATH" | cut -d'/' -f2)
-                        
+
                         # Extract service name from repo name (e.g., "cto-play-test" -> "cto")
                         # Handle edge cases where removal would result in empty string
                         SERVICE_NAME=$(echo "$GITHUB_REPO" | sed 's/-play-test$//' | sed 's/-test$//')
-                        
+
                         # Ensure SERVICE_NAME is not empty - fallback to repo name if needed
                         if [ -z "$SERVICE_NAME" ]; then
                           SERVICE_NAME="$GITHUB_REPO"
                         fi
-                        
+
                         # Ensure SERVICE_NAME is valid for Kubernetes (no leading/trailing hyphens)
                         SERVICE_NAME=$(echo "$SERVICE_NAME" | sed 's/^[-]*//' | sed 's/[-]*$//')
-                        
+
                         # Final fallback if still empty
                         if [ -z "$SERVICE_NAME" ]; then
                           SERVICE_NAME="service"

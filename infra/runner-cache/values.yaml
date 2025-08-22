@@ -1,9 +1,10 @@
+---
 # ARC Runner Scale Set Values - Cache Configuration
 # This configures runners with shared cache PVC
 
 # Runner labels for GitHub Actions targeting
 githubConfigSecret: github-pat
-runnerLabels: 
+runnerLabels:
   - k8s-runner
 
 template:
@@ -13,17 +14,17 @@ template:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
-          - matchExpressions:
-            - key: kubernetes.io/hostname
-              operator: Exists
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: Exists
       podAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                actions.github.com/scale-set-name: k8s-runner
-            topologyKey: kubernetes.io/hostname
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  actions.github.com/scale-set-name: k8s-runner
+              topologyKey: kubernetes.io/hostname
     containers:
     - name: runner
       image: ghcr.io/5dlabs/rust-builder:latest

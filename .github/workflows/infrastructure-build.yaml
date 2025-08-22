@@ -60,7 +60,7 @@ jobs:
             description: "Rust development environment with pre-warmed dependencies for CI/CD"
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Check if should build this image
         id: should-build
         run: |
@@ -150,11 +150,11 @@ jobs:
         if: steps.check-rust-builder.outputs.rust_builder_changed == 'true'
         run: |
           echo "🔄 Cycling Arc runners to use new rust-builder image..."
-          
+
           # Delete Arc runner pods to force them to pull new image
           kubectl delete pods -n arc-runners \
             -l runner-deployment-name=k8s-runner \
             --grace-period=30 || true
-          
+
           echo "✅ Runner pods deleted - new pods will use updated rust-builder image"
           echo "⏱️  Wait ~2-3 minutes for new runners to become available"
