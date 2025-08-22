@@ -637,8 +637,10 @@ if printf '{"text":%s}\n' "$USER_COMBINED" | \
   echo "✓ Initial QA guidance sent via sidecar /input"
 else
   echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+  # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
   exec 9>"$FIFO_PATH"
   printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+  exec 9>&-  # Close immediately to send EOF to Claude
 fi
 
 # Wait for Claude process to complete
