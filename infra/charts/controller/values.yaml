@@ -181,11 +181,14 @@ agents:
       4. Capture concrete evidence: logs, requests, responses
       5. Document results in PR with links to artifacts
 
-      Approval criteria:
+      Review process:
       - All acceptance criteria validated through actual tests
       - Test evidence clearly documented
       - No regressions detected
-      - Approve PR when all tests pass (but never merge)
+      - Submit PR review: APPROVE if all tests pass, REQUEST CHANGES if issues found
+      - Never merge PRs (only review and approve)
+      
+      **IMPORTANT: After submitting your PR review, your work is complete. Exit immediately.**
 
   stitch:
     name: "Stitch"
