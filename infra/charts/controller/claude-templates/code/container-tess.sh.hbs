@@ -258,6 +258,13 @@ echo "════════════════════════�
 echo "📋 TESTING WORKFLOW REQUIREMENTS"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
+echo "PHASE 0: CI/CD Setup (IMMEDIATE PRIORITY)"
+echo "- Set up GitHub Actions CI pipeline if not exists"
+echo "- Add test running and coverage reporting to CI"
+echo "- Configure branch protection rules with test gates"
+echo "- Ensure tests must pass before merge"
+echo "- Do this AS SOON as there's enough code to test"
+echo ""
 echo "PHASE 1: Acceptance Criteria Validation"
 echo "- Review implementation against acceptance criteria (NOT architecture)"
 echo "- Verify ALL acceptance criteria are fully met"
@@ -279,7 +286,7 @@ echo "- Test application functionality manually"
 echo "- Verify no regressions introduced"
 echo "- Document findings in PR comments"
 echo ""
-echo "CRITICAL: Write tests to achieve 100% coverage!"
+echo "CRITICAL: Set up CI gates early & achieve 100% coverage!"
 echo "════════════════════════════════════════════════════════════════"
 
 # Copy task files if docs repository is specified
@@ -367,10 +374,23 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 
 ## Agent Role
 - **Primary**: Write comprehensive tests to achieve 100% code coverage
-- **Secondary**: Validate implementation against acceptance criteria
-- **Critical**: Push test files to PR and ensure all tests pass
+- **Secondary**: Set up CI/CD testing gates and validate acceptance criteria
+- **Critical**: Establish testing infrastructure early in development
 
 ## Testing Workflow Phases
+
+### Phase 0: CI/CD Setup (DO THIS FIRST!)
+- AS SOON as there's enough code to test, set up CI/CD:
+  - Create `.github/workflows/test.yml` for GitHub Actions
+  - Configure test running with coverage reporting
+  - Set up coverage badges and reports
+  - Add status checks that must pass before merge
+  - Include linting, formatting, and type checking
+- Example GitHub Actions workflow for each language:
+  - Python: pytest + coverage + black + mypy
+  - JavaScript: jest + eslint + prettier
+  - Go: go test + golangci-lint + coverage
+  - Rust: cargo test + clippy + fmt + tarpaulin
 
 ### Phase 1: Acceptance Criteria Verification
 - Review implementation against task/acceptance-criteria.md (NOT architecture.md)
@@ -399,9 +419,11 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 
 ## CRITICAL RULES
 - **CAN** write and push test files (*_test.*, *.test.*, spec.*, etc.)
+- **CAN** create and modify CI/CD workflows (.github/workflows/*)
 - **CAN** modify test configuration files (jest.config.js, pytest.ini, etc.)
 - **CANNOT** modify implementation/business logic code
-- **CANNOT** modify non-test files (except test configs)
+- **CANNOT** modify non-test files (except test configs and CI/CD)
+- **MUST** set up CI gates as early as possible
 - **MUST** achieve highest possible test coverage (target 100%)
 - **MUST** validate against acceptance criteria ONLY (not architecture)
 
