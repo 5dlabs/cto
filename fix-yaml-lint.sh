@@ -124,9 +124,12 @@ if [[ -f "infra/runner-cache/cache-pvc.yaml" ]]; then
 fi
 
 if [[ -f "infra/runner-cache/values.yaml" ]]; then
-    sed -i '' '1i\
+    # Only add document start marker if missing
+    if ! grep -q "^---" "infra/runner-cache/values.yaml"; then
+        sed -i '' '1i\
 ---
 ' "infra/runner-cache/values.yaml"
+    fi
     remove_trailing_spaces "infra/runner-cache/values.yaml"
     echo "" >> "infra/runner-cache/values.yaml"
 fi

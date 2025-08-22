@@ -395,7 +395,7 @@ spec:
                               suspend: {}
                               metadata:
                                 labels:
-                                  current-stage: "{{inputs.parameters.stage}}"
+                                  current-stage: "{{`{{inputs.parameters.stage}}`}}"
 
                             - name: run-rex
                               resource:
