@@ -154,6 +154,12 @@ jobs:
             file: ./infra/images/opencode/Dockerfile
             version_type: script_hash
             script_url: https://opencode.ai/install
+          - id: codex
+            image: codex
+            context: ./infra/images/codex
+            file: ./infra/images/codex/Dockerfile
+            version_type: pip
+            version_pkg: "openai"
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js (ensure npm available in runner)
@@ -173,7 +179,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine version (npm for npm agents, PyPI for openhands, dir-hash otherwise)
+      - name: Determine version (npm for npm agents, PyPI for pypi/pip agents, dir-hash otherwise)
         id: version
         run: |
           set -euo pipefail
@@ -182,15 +188,20 @@ jobs:
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} npm version: $VERSION"
-          elif [ "${{ matrix.id }}" = "openhands" ]; then
+          elif [ "${{ matrix.version_type }}" = "pypi" ]; then
             VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json | jq -r .info.version)
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
-            echo "📦 openhands PyPI version: $VERSION"
+            echo "📦 ${{ matrix.id }} PyPI version: $VERSION"
+          elif [ "${{ matrix.version_type }}" = "pip" ]; then
+            VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.version_pkg }}/json | jq -r .info.version)
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
+            echo "📦 ${{ matrix.id }} PyPI version: $VERSION"
           else
             # Use latest commit hash touching the image context directory as image version (stable, offline)
             VERSION=$(git log -1 --format="%h" -- ${{ matrix.context }}/)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} version (dir hash): $VERSION"
           fi
