@@ -80,16 +80,26 @@ spec:
                         #!/bin/bash
                         set -e
 
-                        # Install required tools if not present
+                                                # Install required tools if not present
                         MISSING_TOOLS=""
-                        [ ! command -v git &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS git"
-                        [ ! command -v curl &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS curl"
-                        [ ! command -v jq &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS jq"
-                        [ ! command -v openssl &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS openssl"
+                        if ! command -v git >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS git"
+                        fi
+                        if ! command -v curl >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS curl"
+                        fi
+                        if ! command -v jq >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS jq"
+                        fi
+                        if ! command -v openssl >/dev/null 2>&1; then
+                          MISSING_TOOLS="$MISSING_TOOLS openssl"
+                        fi
 
                         if [ -n "$MISSING_TOOLS" ]; then
                           echo "Installing missing tools:$MISSING_TOOLS"
                           apk add --no-cache $MISSING_TOOLS
+                        else
+                          echo "All required tools are already available"
                         fi
 
                         # =============================================================================
