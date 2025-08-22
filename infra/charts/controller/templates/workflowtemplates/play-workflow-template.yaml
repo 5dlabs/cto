@@ -186,7 +186,7 @@ spec:
                   value: "true"
 
           # Update stage after testing work completes
-          - name: update-to-waiting-approval
+          - name: update-to-waiting-merge
             dependencies: [testing-work]
             template: update-workflow-stage
             arguments:
@@ -199,7 +199,7 @@ spec:
           # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
           # Suspend point 3: Wait for PR merged to main
           - name: wait-pr-merged
-            dependencies: [update-to-waiting-approval]
+            dependencies: [update-to-waiting-merge]
             template: suspend-for-event
             arguments:
               parameters:
@@ -624,9 +624,9 @@ spec:
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-ready-for-qa")
-                [[ $new_stage == "waiting-pr-approved" ]] && return 0
+                [[ $new_stage == "waiting-pr-merged" ]] && return 0
                 ;;
-              "waiting-pr-approved")
+              "waiting-pr-merged")
                 [[ $new_stage == "completed" ]] && return 0
                 ;;
             esac

@@ -146,23 +146,23 @@ spec:
             - name: github-app
               value: "5DLabs-Tess"
 
-        # Update stage after Tess completes
-        - name: update-to-waiting-approval
+        # Update stage after Tess completes (skip approval)
+        - name: update-to-waiting-merge
           dependencies: [tess-testing]
           template: update-workflow-stage
           arguments:
             parameters:
             - name: new-stage
-              value: waiting-pr-approved
+              value: waiting-pr-merged
 
-        # Wait for PR Approval
-        - name: wait-pr-approved
-          dependencies: [update-to-waiting-approval]
+        # Wait for PR Merge
+        - name: wait-pr-merged
+          dependencies: [update-to-waiting-merge]
           template: suspend-for-event
           arguments:
             parameters:
             - name: stage
-              value: waiting-pr-approved
+              value: waiting-pr-merged
 
     # Suspend template that sets workflow stage and waits for events
     - name: suspend-for-event
