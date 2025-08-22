@@ -240,7 +240,7 @@ if [ -d "$CLAUDE_WORK_DIR" ] && [ -d "$CLAUDE_WORK_DIR/.git" ]; then
     git fetch origin
 else
     echo "📥 Cloning repository to '$CLAUDE_WORK_DIR'..."
-    REPO_HTTP_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_OWNER}/${REPO_NAME}.git"
+    # Use the REPO_HTTP_URL constructed in authentication verification section
     if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
         echo "❌ Failed to clone repository"
         exit 1
