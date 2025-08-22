@@ -81,23 +81,28 @@ spec:
                         set -e
 
                         # Install required tools if not present
-                        if ! command -v git &> /dev/null; then
-                          apk add --no-cache git curl jq openssl
-                        elif ! command -v curl &> /dev/null || ! command -v jq &> /dev/null; then
-                          apk add --no-cache curl jq openssl
+                        MISSING_TOOLS=""
+                        [ ! command -v git &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS git"
+                        [ ! command -v curl &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS curl"
+                        [ ! command -v jq &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS jq"
+                        [ ! command -v openssl &> /dev/null ] && MISSING_TOOLS="$MISSING_TOOLS openssl"
+
+                        if [ -n "$MISSING_TOOLS" ]; then
+                          echo "Installing missing tools:$MISSING_TOOLS"
+                          apk add --no-cache $MISSING_TOOLS
                         fi
 
                         # =============================================================================
                         # GITHUB APP AUTHENTICATION
                         # =============================================================================
                         echo "🔐 Authenticating with Morgan GitHub App..."
-                        
+
                         if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
                             # Create temporary private key file (support escaped newlines)
                             TEMP_KEY_FILE="/tmp/github-app-key.pem"
                             printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
                             chmod 600 "$TEMP_KEY_FILE"
-                            
+
                             # Generate JWT token for GitHub App
                             JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
                             NOW=$(date +%s)
@@ -105,47 +110,47 @@ spec:
                             JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
                             JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
                             JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-                            
+
                             # Get installation access token for organization
                             INSTALLATIONS_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
                                 -H "Accept: application/vnd.github.v3+json" \
                                 "https://api.github.com/app/installations")
-                            
+
                             INSTALLATION_ID=$(echo "$INSTALLATIONS_RESPONSE" | jq -r '.[0].id')
-                            
+
                             if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
                                 echo "❌ Failed to get installation ID"
                                 echo "Response: $INSTALLATIONS_RESPONSE"
                                 rm -f "$TEMP_KEY_FILE"
                                 exit 1
                             fi
-                            
+
                             TOKEN_RESPONSE=$(curl -s -X POST \
                                 -H "Authorization: Bearer $JWT_TOKEN" \
                                 -H "Accept: application/vnd.github.v3+json" \
                                 "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-                            
+
                             GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-                            
+
                             if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
                                 echo "❌ Failed to get installation access token"
                                 echo "Response: $TOKEN_RESPONSE"
                                 rm -f "$TEMP_KEY_FILE"
                                 exit 1
                             fi
-                            
+
                             # Clean up temporary key file
                             rm -f "$TEMP_KEY_FILE"
-                            
+
                             # Export the token for git to use
                             export GITHUB_TOKEN
-                            
+
                             # Configure git to use the token
                             git config --global credential.helper store
                             echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-                            
+
                             echo "✅ Morgan GitHub App authenticated successfully"
-                            
+
                         else
                             echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
                             exit 1
