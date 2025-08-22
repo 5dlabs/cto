@@ -170,6 +170,86 @@ export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
 echo "✓ Git configured"
 
+# =============================================================================
+# AUTHENTICATION VERIFICATION
+# =============================================================================
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo "🔐 AUTHENTICATION VERIFICATION"
+echo "═══════════════════════════════════════════════════════════════"
+echo ""
+
+# Repository URLs - Handle both full URLs and org/repo format
+# Check if repository_url already contains https://github.com/
+if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+    REPO_HTTP_URL="{{repository_url}}"
+    if ! echo "{{repository_url}}" | grep -q "\.git$"; then
+        REPO_HTTP_URL="${REPO_HTTP_URL}.git"
+    fi
+else
+    REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
+fi
+
+# Same for docs repository
+if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+    DOCS_HTTP_URL="{{docs_repository_url}}"
+    if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
+        DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
+    fi
+else
+    DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
+fi
+
+# DEBUG: Show what URLs are being constructed
+echo "🔍 DEBUG: URL Construction & Parameters"
+echo "  Input repository_url: '{{repository_url}}'"
+echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+echo "  Input working_directory: '{{working_directory}}'"
+echo "  Input docs_branch: '{{docs_branch}}'"
+echo "  Input github_app: '{{github_app}}'"
+echo "  Input task_id: '{{task_id}}'"
+echo "  Input service: '{{service}}'"
+echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
+echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
+echo "  Current working directory: $(pwd)"
+echo "  Available environment variables:"
+env | grep -E "(GITHUB|ANTHROPIC)" | sort
+
+# Test HTTPS access to repository
+echo "🔍 DEBUG: Testing HTTPS repository access..."
+echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
+if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
+  echo "✓ HTTPS repository access successful"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Output: $(cat /tmp/repo_test.out | head -1)"
+else
+  echo "❌ HTTPS repository access failed"
+  echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/repo_test.out)"
+  echo "  Git credential helper status:"
+  git config --list | grep credential || echo "  No credential helpers configured"
+  echo ""
+  echo "🚫 ABORTING: Cannot access repository via HTTPS"
+  exit 1
+fi
+
+# Test docs repository access
+echo "🔍 DEBUG: Testing docs repository access..."
+echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
+if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
+  echo "✓ Docs repository access successful"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Output: $(cat /tmp/docs_test.out | head -1)"
+else
+  echo "❌ Docs repository access failed"
+  echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+  echo "  Error output: $(cat /tmp/docs_test.out)"
+  echo ""
+  echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
+  exit 1
+fi
+
 # Clone or update repository (directly to Claude working directory)
 if [ -d "$CLAUDE_WORK_DIR/.git" ]; then
     echo "📁 Found existing repository at working directory, updating..."
