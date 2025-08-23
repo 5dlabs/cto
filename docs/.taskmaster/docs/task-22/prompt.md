@@ -29,7 +29,7 @@ Establish precise resource specifications for each agent type:
 - Standard priority scheduling
 
 **Testing Agents (Tess)**:
-- High CPU for parallel test execution and deployment operations  
+- High CPU for parallel test execution and deployment operations
 - Large memory for comprehensive test environments and data
 - Extensive storage for deployment artifacts, test data, and logs
 - High priority due to quality gate requirements
@@ -111,13 +111,13 @@ agent_resources:
     limits: { cpu: "4000m", memory: "16Gi" }
     storage: "10Gi"
     priority_class: "agent-high-priority"
-    
+
   quality:
     requests: { cpu: "1000m", memory: "4Gi" }
     limits: { cpu: "2000m", memory: "8Gi" }
     storage: "10Gi"
     priority_class: "agent-standard-priority"
-    
+
   testing:
     requests: { cpu: "2000m", memory: "8Gi" }
     limits: { cpu: "4000m", memory: "16Gi" }
@@ -130,7 +130,7 @@ agent_resources:
 # HPA configuration for workflow-driven scaling
 hpa_metrics:
   - resource_based: { cpu: 70%, memory: 80% }
-  - custom_metrics: 
+  - custom_metrics:
     - workflow_queue_depth: { threshold: 10, scale_factor: 2 }
     - average_workflow_duration: { threshold: "30m", scale_factor: 1.5 }
   - behavior:
@@ -146,12 +146,12 @@ alerting_rules:
     condition: "cpu_utilization > 85% OR memory_utilization > 90%"
     duration: "10m"
     action: "Scale up or investigate resource constraints"
-    
+
   - name: "ResourceQuotaApproaching"
     condition: "quota_utilization > 80%"
-    duration: "5m" 
+    duration: "5m"
     action: "Review capacity planning and usage patterns"
-    
+
   - name: "StorageEfficiency"
     condition: "pvc_utilization < 50% AND age > 7d"
     action: "Review storage allocation and cleanup policies"
@@ -165,7 +165,7 @@ alerting_rules:
 - **Storage Optimization**: Keep PVC utilization between 50-80% with proper cleanup policies
 - **Scaling Responsiveness**: HPA scaling decisions within 5 minutes of load changes
 
-### System Reliability  
+### System Reliability
 - **High Availability**: 99.9% uptime for controller components through proper resource allocation
 - **Resource Isolation**: No resource contention issues between different workflow types
 - **Graceful Degradation**: System maintains functionality under resource pressure
@@ -191,7 +191,7 @@ alerting_rules:
 
 ### Phase 3: Advanced Scaling and Optimization
 7. **Autoscaling Deployment**: Configure HPA for controller components and VPA for agent pods
-8. **Pod Disruption Protection**: Implement PDBs and test availability during maintenance scenarios  
+8. **Pod Disruption Protection**: Implement PDBs and test availability during maintenance scenarios
 9. **Advanced Monitoring**: Deploy comprehensive dashboards and intelligent alerting
 
 ### Phase 4: Validation and Optimization

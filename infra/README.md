@@ -78,7 +78,7 @@ GitOps application definitions for Argo CD:
 
 #### `applications/`
 - `controller.yaml` - Controller service GitOps application
-- `argo-workflows.yaml` - Argo Workflows GitOps application  
+- `argo-workflows.yaml` - Argo Workflows GitOps application
 - `monitoring-stack.yaml` - Monitoring infrastructure
 
 #### `projects/`
@@ -170,7 +170,7 @@ Test manifests and simulators (not for production use):
 4. **Argo CD** → Detect changes and sync
 5. **Kubernetes** → Apply changes automatically
 
-### Task Execution Process  
+### Task Execution Process
 1. **Task Submission** → Via API or webhook
 2. **Workflow Creation** → Orchestrator creates Argo Workflow
 3. **Workflow Execution** → Argo Workflows manages execution
@@ -185,7 +185,7 @@ Test manifests and simulators (not for production use):
 - **CLI**: `argocd app list`
 
 ### Argo Workflows
-- **UI**: http://localhost:30081 (NodePort)  
+- **UI**: http://localhost:30081 (NodePort)
 - **Port Forward**: `kubectl port-forward svc/argo-workflows-server -n argo 2746:2746`
 - **CLI**: `kubectl get workflows -n argo`
 

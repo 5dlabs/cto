@@ -77,7 +77,7 @@ Modify the controller to select ServiceAccount based on agent type:
 fn extract_agent_name(github_app: &str) -> &str {
     match github_app {
         "5DLabs-Tess" => "tess",
-        "5DLabs-Cleo" => "cleo", 
+        "5DLabs-Cleo" => "cleo",
         _ => "default"
     }
 }

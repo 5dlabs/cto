@@ -61,7 +61,7 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
    stages:
      - name: pr-created-correlation
        targetStage: "waiting-pr-created"
-     - name: ready-for-qa-correlation  
+     - name: ready-for-qa-correlation
        targetStage: "waiting-ready-for-qa"
      - name: pr-approved-correlation
        targetStage: "waiting-pr-approved"
@@ -125,12 +125,12 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        source: |
          LABEL_TASK="{{task-id}}"
          BRANCH_TASK="{{branch-task-id}}"
-         
+
          if [ -n "$BRANCH_TASK" ] && [ "$LABEL_TASK" != "$BRANCH_TASK" ]; then
            echo "ERROR: Task ID mismatch - Label: $LABEL_TASK, Branch: $BRANCH_TASK"
            exit 1
          fi
-         
+
          echo "Task correlation validated: $LABEL_TASK"
    ```
 
@@ -165,7 +165,7 @@ spec:
       - path: action
         type: string
         value: "opened"
-  
+
   - name: github-pr-labeled
     eventSourceName: github
     eventName: pull_request
@@ -177,7 +177,7 @@ spec:
       - path: label.name
         type: string
         value: "ready-for-qa"
-  
+
   - name: github-pr-approved
     eventSourceName: github
     eventName: pull_request_review
@@ -189,7 +189,7 @@ spec:
       - path: review.state
         type: string
         value: "approved"
-  
+
   triggers:
   - template:
       name: correlate-and-resume
@@ -223,12 +223,12 @@ extract_task_from_branch() {
 validate_task_correlation() {
   LABEL_TASK=$(extract_task_from_labels)
   BRANCH_TASK=$(extract_task_from_branch)
-  
+
   if [ -n "$BRANCH_TASK" ] && [ "$LABEL_TASK" != "$BRANCH_TASK" ]; then
     echo "ERROR: Task correlation mismatch"
     return 1
   fi
-  
+
   echo "$LABEL_TASK"
 }
 ```

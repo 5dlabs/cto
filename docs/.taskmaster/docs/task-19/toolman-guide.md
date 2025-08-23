@@ -151,7 +151,7 @@ impl TessApprovalEngine {
             approval_threshold: threshold,
         }
     }
-    
+
     pub async fn evaluate_pr(&self, repo: &str, pr_number: u32) -> Result<ApprovalDecision> {
         // Implementation
         todo!()
@@ -205,14 +205,14 @@ CMD ["approval-engine"]
 test_pr_approval() {
   local repo=$1
   local pr_number=$2
-  
+
   response=$(curl -s -X POST http://localhost:8080/api/approve \
     -H "Content-Type: application/json" \
     -d "{\"repository\": \"$repo\", \"pr_number\": $pr_number}")
-  
+
   decision=$(echo "$response" | jq -r '.decision')
   score=$(echo "$response" | jq -r '.score')
-  
+
   echo "PR $pr_number decision: $decision (score: $score)"
 }
 
@@ -235,7 +235,7 @@ app = Flask(__name__)
 def submit_review(owner, repo, pr_number):
     review_data = request.json
     print(f"Review for {owner}/{repo}#{pr_number}: {review_data['event']}")
-    
+
     return jsonify({
         "id": 12345,
         "state": review_data["event"].lower(),
@@ -439,14 +439,14 @@ impl TessApprovalEngine {
     fn calculate_approval_score(&self, criteria: &TessApprovalCriteria) -> Result<f64, ApprovalError> {
         let mut score = 0.0;
         let mut total_weight = 0.0;
-        
+
         // Coverage scoring with validation
         if criteria.test_coverage_threshold < 0.0 || criteria.test_coverage_threshold > 100.0 {
             return Err(ApprovalError::InvalidCriteria("Invalid coverage percentage".to_string()));
         }
-        
+
         // Apply weighted scoring...
-        
+
         Ok((score / total_weight) * 100.0)
     }
 }
@@ -489,7 +489,7 @@ spec:
         duration: "30s"
         factor: 2
     activeDeadlineSeconds: 600
-    
+
     # Proper resource limits
     container:
       resources:
@@ -515,14 +515,14 @@ impl TessApprovalEngine {
             self.analyze_code_quality(repo, pr_number),
             self.analyze_security(repo, pr_number)
         );
-        
+
         let criteria = TessApprovalCriteria {
             test_coverage_threshold: coverage_result?,
             code_quality_score: quality_result?,
             security_scan_passed: security_result?,
             // ... other fields
         };
-        
+
         self.make_approval_decision(&criteria)
     }
 }
@@ -535,7 +535,7 @@ pub async fn get_pr_details_batch(&self, repo: &str, pr_numbers: &[u32]) -> Resu
     let futures = pr_numbers.iter().map(|&pr_number| {
         self.get_pr_details(repo, pr_number)
     });
-    
+
     let results = futures::future::join_all(futures).await;
     results.into_iter().collect()
 }
@@ -576,7 +576,7 @@ lazy_static! {
         "approval_decisions_total",
         "Total number of approval decisions made"
     ).unwrap();
-    
+
     static ref APPROVAL_DURATION: Histogram = register_histogram!(
         "approval_decision_duration_seconds",
         "Time taken to make approval decisions"
@@ -586,11 +586,11 @@ lazy_static! {
 impl TessApprovalEngine {
     pub async fn evaluate_pr_with_metrics(&self, repo: &str, pr_number: u32) -> Result<ApprovalDecision> {
         let _timer = APPROVAL_DURATION.start_timer();
-        
+
         let decision = self.evaluate_pr(repo, pr_number).await?;
-        
+
         APPROVAL_DECISIONS.inc();
-        
+
         Ok(decision)
     }
 }
@@ -605,14 +605,14 @@ impl TessApprovalEngine {
     #[instrument(skip(self))]
     pub async fn evaluate_pr(&self, repo: &str, pr_number: u32) -> Result<ApprovalDecision> {
         info!("Starting PR evaluation for {}/#{}", repo, pr_number);
-        
+
         let criteria = self.gather_approval_criteria(repo, pr_number).await?;
         let score = self.calculate_approval_score(&criteria)?;
-        
+
         info!("Calculated approval score: {:.1}%", score);
-        
+
         let decision = self.make_approval_decision(&criteria)?;
-        
+
         match &decision {
             ApprovalDecision::AutoApprove { score, .. } => {
                 info!("Auto-approving PR with score {:.1}%", score);
@@ -624,7 +624,7 @@ impl TessApprovalEngine {
                 info!("Human review required (score: {:.1}%): {}", score, reason);
             }
         }
-        
+
         Ok(decision)
     }
 }

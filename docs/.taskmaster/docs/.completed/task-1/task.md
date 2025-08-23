@@ -44,10 +44,10 @@ The CodeRun controller is the core infrastructure component that processes CRD s
    ```rust
    // controller/src/tasks/code/controller.rs
    // Main reconciliation logic and state machine
-   
+
    // controller/src/tasks/code/resources.rs
    // Pod, ConfigMap, and PVC creation logic
-   
+
    // controller/src/tasks/code/templates.rs
    // Handlebars template rendering pipeline
    ```
@@ -99,12 +99,12 @@ The CodeRun controller is the core infrastructure component that processes CRD s
 async fn reconcile(crd: Arc<CodeRun>, ctx: Arc<Context>) -> Result<Action> {
     // 1. Update status to Processing
     update_status(&crd, Phase::Processing).await?;
-    
+
     // 2. Create/update resources
     let pvc = create_pvc(&crd, &ctx).await?;
     let configmap = create_configmap(&crd, &ctx).await?;
     let pod = create_pod(&crd, &ctx, &pvc, &configmap).await?;
-    
+
     // 3. Update status based on pod state
     match pod.status {
         Some(status) if status.phase == "Succeeded" => {
@@ -115,7 +115,7 @@ async fn reconcile(crd: Arc<CodeRun>, ctx: Arc<Context>) -> Result<Action> {
         }
         _ => {}
     }
-    
+
     // 4. Requeue for status checks
     Ok(Action::requeue(Duration::from_secs(30)))
 }

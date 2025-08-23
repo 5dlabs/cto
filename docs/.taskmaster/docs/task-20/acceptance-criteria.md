@@ -181,7 +181,7 @@
    ```bash
    # Test exponential backoff with network failures
    ./test-retry-strategy.sh --stage=repository-clone --failure=network --attempts=3
-   
+
    # Test circuit breaker opening and recovery
    ./test-circuit-breaker.sh --failure-threshold=5 --recovery-timeout=300s
    ```
@@ -190,7 +190,7 @@
    ```bash
    # Test known failure pattern recognition
    ./test-failure-analysis.sh --pattern=github-rate-limit
-   
+
    # Test root cause analysis accuracy
    ./test-root-cause-analysis.sh --failure-type=resource-exhaustion
    ```
@@ -199,7 +199,7 @@
    ```bash
    # Test multi-channel notifications
    ./test-notifications.sh --severity=critical --channels=slack,pagerduty,email
-   
+
    # Test escalation rules
    ./test-escalation.sh --delay=5m --repeat-interval=15m
    ```
@@ -215,7 +215,7 @@
 1. **Unit Tests**
    ```bash
    cargo test --package controller failure::retry
-   cargo test --package controller failure::analysis  
+   cargo test --package controller failure::analysis
    cargo test --package controller failure::notification
    ```
 
@@ -223,7 +223,7 @@
    ```bash
    # Test workflow integration
    cargo test --test workflow_failure_integration
-   
+
    # Test external service integration
    cargo test --test external_integration
    ```
@@ -232,10 +232,10 @@
    ```bash
    # Network partition testing
    ./chaos-tests/network-partition.sh
-   
+
    # Resource exhaustion testing
    ./chaos-tests/resource-exhaustion.sh
-   
+
    # Random pod termination
    ./chaos-tests/pod-termination.sh
    ```
@@ -246,7 +246,7 @@
    ```bash
    # High-frequency failure scenarios
    k6 run --vus 50 --duration 10m failure-load-test.js
-   
+
    # Notification system under load
    k6 run --vus 100 --duration 5m notification-load-test.js
    ```
@@ -255,7 +255,7 @@
    ```bash
    # Circuit breaker under extreme load
    ./stress-tests/circuit-breaker-stress.sh
-   
+
    # Failure analysis system stress test
    ./stress-tests/analysis-stress.sh
    ```

@@ -13,7 +13,7 @@ You are building an automated testing agent (Tess) that ensures code quality thr
 
 The script must implement a complete 9-stage workflow:
 1. **Acceptance Criteria Review**: Analyze changes against defined criteria
-2. **Test Execution**: Run existing test suite with coverage instrumentation  
+2. **Test Execution**: Run existing test suite with coverage instrumentation
 3. **Coverage Analysis**: Generate detailed coverage reports using cargo llvm-cov
 4. **Uncovered Code Identification**: Find specific lines/branches lacking coverage
 5. **Test Generation**: Create tests for uncovered code paths
@@ -69,17 +69,17 @@ Test generation template structure:
 #[cfg(test)]
 mod generated_tests {
     use super::*;
-    
+
     #[test]
     fn test_uncovered_function() {
         // Generated test for specific uncovered function
     }
-    
-    #[test] 
+
+    #[test]
     fn test_error_conditions() {
         // Test error handling paths
     }
-    
+
     #[test]
     fn test_boundary_conditions() {
         // Test edge cases and boundary conditions
@@ -104,15 +104,15 @@ pub async fn submit_coverage_review(
     pr_number: u32,
     coverage_report: &CoverageReport,
 ) -> Result<()> {
-    let meets_thresholds = coverage_report.meets_existing_threshold 
+    let meets_thresholds = coverage_report.meets_existing_threshold
         && coverage_report.meets_new_code_threshold;
-    
+
     let review = if meets_thresholds {
         self.create_approval_review(coverage_report)
     } else {
         self.create_changes_requested_review(coverage_report)
     };
-    
+
     self.submit_github_review(repo_info, pr_number, &review).await
 }
 ```
@@ -120,7 +120,7 @@ pub async fn submit_coverage_review(
 ### 6. Coverage Threshold Configuration
 Implement configurable coverage thresholds:
 - **Existing Code**: Default 95% coverage requirement
-- **New Code**: Default 100% coverage requirement  
+- **New Code**: Default 100% coverage requirement
 - **Configurable**: Allow per-project threshold customization
 - **Gradual Improvement**: Support progressive coverage improvement targets
 
@@ -244,7 +244,7 @@ Validate performance characteristics:
 ### Phase 2: Test Generation
 - [ ] Develop uncovered code identification
 - [ ] Implement test template generation
-- [ ] Create test execution pipeline  
+- [ ] Create test execution pipeline
 - [ ] Validate generated test quality
 
 ### Phase 3: GitHub Integration

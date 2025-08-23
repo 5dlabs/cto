@@ -112,25 +112,25 @@ spec:
                         COMMENT_BODY='{{.Input.body.comment.body}}'
                         COMMENT_AUTHOR='{{.Input.body.comment.user.login}}'
                         PR_NUMBER='{{.Input.body.issue.number}}'
-                        
+
                         # Check if comment is from Tess
                         if [[ "$COMMENT_AUTHOR" != *"Tess"* ]]; then
                           # Could also check for human authors
                           echo "Comment not from Tess, ignoring"
                           exit 0
                         fi
-                        
+
                         # Check if comment is actionable (contains Required Changes)
                         if ! echo "$COMMENT_BODY" | grep -q "🔴 Required Changes"; then
                           echo "Comment is informational only"
                           exit 0
                         fi
-                        
+
                         # Extract task ID from PR labels or branch
                         TASK_ID=$(kubectl get workflows -n agent-platform \
                           -l pr-number=$PR_NUMBER \
                           -o jsonpath='{.items[0].metadata.labels.task-id}')
-                        
+
                         # Cancel any running Cleo/Tess for this task
                         kubectl get coderuns -n agent-platform \
                           -l task-id=$TASK_ID \
@@ -141,7 +141,7 @@ spec:
                               --type=merge -p '{"spec":{"suspend":true}}'
                           fi
                         done
-                        
+
                         # Create Rex CodeRun with comment context
                         cat <<EOF | kubectl create -f -
                         apiVersion: coderun.fivedsolutions.com/v1
@@ -171,32 +171,32 @@ if [ -n "$PR_COMMENT_ID" ]; then
   echo "════════════════════════════════════════════════════════════════"
   echo "📝 PROCESSING FEEDBACK FROM QA"
   echo "════════════════════════════════════════════════════════════════"
-  
+
   # Fetch the specific comment
   COMMENT_JSON=$(gh api /repos/$REPO_OWNER/$REPO_NAME/issues/comments/$PR_COMMENT_ID)
   COMMENT_BODY=$(echo "$COMMENT_JSON" | jq -r '.body')
-  
+
   # Parse structured feedback
   echo "$COMMENT_BODY" > /tmp/qa-feedback.md
-  
+
   # Extract issue type and severity
   ISSUE_TYPE=$(grep "Issue Type" /tmp/qa-feedback.md | sed 's/.*\[\(.*\)\].*/\1/')
   SEVERITY=$(grep "Severity" /tmp/qa-feedback.md | sed 's/.*\[\(.*\)\].*/\1/')
-  
+
   echo "Issue Type: $ISSUE_TYPE"
   echo "Severity: $SEVERITY"
-  
+
   # Prepare context for Claude
   FEEDBACK_CONTEXT="You have received QA feedback that requires remediation.
-  
+
   The feedback is in /tmp/qa-feedback.md. Please:
   1. Read and understand the issues raised
   2. Implement the necessary fixes
   3. Ensure all acceptance criteria mentioned are met
   4. Commit and push your changes
-  
+
   This is a $SEVERITY priority $ISSUE_TYPE that must be resolved."
-  
+
   # Continue with normal Claude execution but with feedback context
 fi
 ```
@@ -229,7 +229,7 @@ sequenceDiagram
     participant Cleo as Cleo (Quality)
     participant Tess as Tess (QA)
     participant WH as Webhook/Sensor
-    
+
     Rex->>PR: Push implementation
     PR->>WH: PR updated event
     WH->>Cleo: Start quality review
@@ -237,7 +237,7 @@ sequenceDiagram
     Cleo->>PR: Add ready-for-qa label
     PR->>WH: Label added event
     WH->>Tess: Start QA testing
-    
+
     alt Issues Found
         Tess->>PR: Post "🔴 Required Changes" comment
         PR->>WH: Comment created event

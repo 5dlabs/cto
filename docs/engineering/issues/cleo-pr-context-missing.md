@@ -10,9 +10,9 @@ Cleo cannot perform proper code quality review because it lacks awareness of whi
 - **Evidence**: No PR URL, number, or branch information in logs
 - **Impact**: Cannot checkout specific PR branch for quality review
 
-### 2. **Repository Management Issues**  
+### 2. **Repository Management Issues**
 - **Issue**: Multiple git repository errors and directory copy failures
-- **Evidence**: 
+- **Evidence**:
   ```
   fatal: not a git repository (or any parent up to mount point /)
   cp: cannot copy a directory, '/workspace/./.', into itself, '/workspace/cto-play-test/.'
@@ -26,7 +26,7 @@ Cleo cannot perform proper code quality review because it lacks awareness of whi
 ## Root Cause Analysis
 
 The current workflow assumes:
-1. Rex creates a PR 
+1. Rex creates a PR
 2. Cleo magically knows which PR to review
 3. Repository is properly initialized
 
@@ -43,7 +43,7 @@ The current workflow assumes:
     parameters:
       - name: pr-number
         value: "{{workflow.outputs.parameters.pr-number}}"
-      - name: pr-url  
+      - name: pr-url
         value: "{{workflow.outputs.parameters.pr-url}}"
 ```
 
@@ -60,7 +60,7 @@ gh pr checkout $PR_NUMBER
 env:
   - name: TARGET_PR_NUMBER
     value: "{{.Input.body.pull_request.number}}"
-  - name: TARGET_PR_URL  
+  - name: TARGET_PR_URL
     value: "{{.Input.body.pull_request.html_url}}"
 ```
 
@@ -86,7 +86,7 @@ PR_NUMBER=$(head -1 /workspace/.pr-context)
 **Hybrid Solution**: Combine Options 1, 2, and 4:
 
 1. **Deterministic Branch Naming**: Rex uses `task-{id}-implementation` branches
-2. **Workflow Parameters**: Pass PR context through workflow outputs  
+2. **Workflow Parameters**: Pass PR context through workflow outputs
 3. **GitHub API Fallback**: Query by task labels if parameters missing
 4. **Fresh Repository Clone**: Always clone clean and checkout target branch
 

@@ -12,10 +12,10 @@ This repository contains the configuration for a minimal Talos Kubernetes cluste
 
 ## Key Features
 
-✅ **Simple Configuration** - Minimal Talos setup without complex features  
-✅ **Persistent Storage** - Local Path Provisioner on worker's NVME drive  
-✅ **NGINX Ingress** - Accessible via NodePort (HTTP: 31251, HTTPS: 31981)  
-✅ **Stable Networking** - Single NIC configuration with DHCP  
+✅ **Simple Configuration** - Minimal Talos setup without complex features
+✅ **Persistent Storage** - Local Path Provisioner on worker's NVME drive
+✅ **NGINX Ingress** - Accessible via NodePort (HTTP: 31251, HTTPS: 31981)
+✅ **Stable Networking** - Single NIC configuration with DHCP
 
 ## Directory Structure
 
@@ -50,13 +50,13 @@ talos-home/
    ```bash
    # Find your USB device
    diskutil list
-   
+
    # Unmount the USB (replace diskX with your disk)
    diskutil unmountDisk /dev/diskX
-   
+
    # Write the ISO to USB (replace diskX with your disk)
    sudo dd if=metal-amd64.iso of=/dev/rdiskX bs=1m
-   
+
    # Eject the USB
    diskutil eject /dev/diskX
    ```
@@ -106,10 +106,10 @@ talos-home/
    ```bash
    # Apply storage volume configuration
    talosctl --talosconfig=config/simple/talosconfig --nodes 192.168.1.72 patch mc --patch @local-path-provisioner/local-path-storage.yaml
-   
+
    # Deploy Local Path Provisioner
    kubectl apply -k local-path-provisioner/
-   
+
    # Verify storage
    kubectl get storageclass
    ```

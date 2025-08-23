@@ -10,10 +10,10 @@ When implementing Argo Events sensors/triggers, **ALWAYS** reference these offic
 
 ### Core Sensor Patterns
 - **`github.yaml`** - Official GitHub webhook sensor with proper parameter extraction and workflow creation
-- **`complete-trigger-parameterization.yaml`** - Dynamic parameter extraction from event payloads  
+- **`complete-trigger-parameterization.yaml`** - Dynamic parameter extraction from event payloads
 - **`trigger-with-template.yaml`** - Template variable usage and dataTemplate patterns
 
-### Workflow Integration  
+### Workflow Integration
 - **`special-workflow-trigger.yaml`** - ArgoWorkflow operations (submit, resume) with proper syntax
 - **`trigger-standard-k8s-resource.yaml`** - Standard Kubernetes resource creation patterns
 
@@ -23,13 +23,13 @@ When implementing Argo Events sensors/triggers, **ALWAYS** reference these offic
 ## ⚠️ Critical Lessons Learned
 
 ### ❌ **Operations NOT Supported by Argo Events:**
-- `operation: delete` ❌ 
+- `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
 
 ### ✅ **Supported Operations:**
 - `operation: create` ✅ (k8s resources)
-- `operation: submit` ✅ (Argo Workflows)  
+- `operation: submit` ✅ (Argo Workflows)
 - `operation: resume` ✅ (Argo Workflows)
 - `operation: append` ✅ (parameter modification)
 - `operation: prepend` ✅ (parameter modification)
@@ -40,7 +40,7 @@ When implementing Argo Events sensors/triggers, **ALWAYS** reference these offic
 
 ### ✅ **Template Variables Supported in:**
 - `parameters[].dest` values ✅
-- `dataTemplate` expressions ✅  
+- `dataTemplate` expressions ✅
 - `metadata.name` and `metadata.generateName` ✅
 - `spec.arguments.parameters[].value` ✅
 
@@ -61,7 +61,7 @@ When implementing Argo Events sensors/triggers, **ALWAYS** reference these offic
    - For `resume`: pass the existing workflow name via `args` (equivalent to `argo resume <name>`); avoid dynamic `labelSelector`
 
 4. **For resource deletion/cleanup:**
-   - Create cleanup workflows with `argoWorkflow.operation: submit` 
+   - Create cleanup workflows with `argoWorkflow.operation: submit`
    - Use workflow scripts with `kubectl delete` commands
    - **DO NOT** use `k8s.operation: delete` (unsupported)
 

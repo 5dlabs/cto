@@ -116,10 +116,10 @@ use regex::Regex;
 
 fn extract_agent_name(github_app: &str) -> Result<String, String> {
     let re = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-    
+
     if let Some(caps) = re.captures(github_app) {
         let agent_name = caps.get(1).unwrap().as_str().to_lowercase();
-        
+
         // Validate Kubernetes naming constraints
         validate_k8s_name(&agent_name)?;
         Ok(agent_name)
@@ -132,11 +132,11 @@ fn validate_k8s_name(name: &str) -> Result<(), String> {
     if name.len() > 63 {
         return Err("Name exceeds Kubernetes limit".to_string());
     }
-    
+
     if !name.chars().all(|c| c.is_alphanumeric() || c == '-') {
         return Err("Name contains invalid characters".to_string());
     }
-    
+
     Ok(())
 }
 ```
@@ -152,16 +152,16 @@ async fn ensure_agent_pvc(
 ) -> Result<String, kube::Error> {
     let agent_name = extract_agent_name(&code_run.spec.github_app)
         .map_err(|e| kube::Error::Api(ErrorResponse::default()))?;
-        
+
     let pvc_name = format!(
         "workspace-{}-{}",
         code_run.spec.service,
         agent_name
     );
-    
+
     let namespace = code_run.metadata.namespace.as_ref().unwrap();
     let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
-    
+
     match pvc_api.get(&pvc_name).await {
         Ok(_) => Ok(pvc_name),
         Err(kube::Error::Api(e)) if e.code == 404 => {
@@ -182,7 +182,7 @@ async fn reconcile(
     ctx: Arc<Context>,
 ) -> Result<Action, Error> {
     let client = &ctx.client;
-    
+
     // Extract agent name early
     let agent_name = match extract_agent_name(&code_run.spec.github_app) {
         Ok(name) => name,
@@ -192,13 +192,13 @@ async fn reconcile(
             return Ok(Action::requeue(Duration::from_secs(60)));
         }
     };
-    
+
     // Ensure agent-specific PVC exists
     let pvc_name = ensure_agent_pvc(&code_run, client).await?;
-    
+
     // Create pod with agent workspace
     create_agent_pod(&code_run, &pvc_name, &agent_name, client).await?;
-    
+
     Ok(Action::requeue(Duration::from_secs(30)))
 }
 ```

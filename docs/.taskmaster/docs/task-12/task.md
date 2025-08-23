@@ -186,7 +186,7 @@ export ENABLE_DOCS_QUERIES="false"
 
 ### 4. Agent System Prompt Updates
 
-**Target Files**: 
+**Target Files**:
 - `infra/charts/controller/claude-templates/agents/rex-system-prompt.md.hbs`
 - `infra/charts/controller/claude-templates/agents/blaze-system-prompt.md.hbs`
 
@@ -268,18 +268,18 @@ data:
 test_docs_server() {
     local max_retries=3
     local retry_count=0
-    
+
     while [ $retry_count -lt $max_retries ]; do
         if curl -f -s "$MCP_DOCS_SERVER/health" >/dev/null; then
             echo "✅ Documentation server accessible"
             return 0
         fi
-        
+
         retry_count=$((retry_count + 1))
         echo "⏳ Retry $retry_count/$max_retries: Testing docs server..."
         sleep 2
     done
-    
+
     echo "❌ Documentation server not accessible after $max_retries retries"
     return 1
 }

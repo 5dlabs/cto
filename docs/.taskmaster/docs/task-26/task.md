@@ -108,19 +108,19 @@ spec:
       - |
         # Extract from PR labels
         LABEL_ID=$(echo '{{inputs.parameters.pr-labels}}' | jq -r '.[] | select(.name | startswith("task-")) | .name | split("-")[1]' | head -1)
-        
+
         # Extract from branch name
         BRANCH_ID=$(echo '{{inputs.parameters.branch-ref}}' | sed -n 's/^.*task-\([0-9]\+\).*$/\1/p')
-        
+
         # Read marker file
         if [ -f /workspace/docs/.taskmaster/current-task.json ]; then
           MARKER_ID=$(cat /workspace/docs/.taskmaster/current-task.json | jq -r '.task_id')
         else
           MARKER_ID=""
         fi
-        
+
         echo -n "$LABEL_ID" > /tmp/label-id
-        echo -n "$BRANCH_ID" > /tmp/branch-id  
+        echo -n "$BRANCH_ID" > /tmp/branch-id
         echo -n "$MARKER_ID" > /tmp/marker-id
       volumeMounts:
       - name: workspace
@@ -151,12 +151,12 @@ spec:
         LABEL_ID="{{inputs.parameters.label-task-id}}"
         BRANCH_ID="{{inputs.parameters.branch-task-id}}"
         MARKER_ID="{{inputs.parameters.marker-task-id}}"
-        
+
         echo "Validating task IDs:"
         echo "  Label ID: $LABEL_ID"
         echo "  Branch ID: $BRANCH_ID"
         echo "  Marker ID: $MARKER_ID"
-        
+
         # Check if all non-empty IDs match
         VALID_IDS=""
         if [ -n "$LABEL_ID" ]; then VALID_IDS="$LABEL_ID"; fi
@@ -178,13 +178,13 @@ spec:
             exit 1
           fi
         fi
-        
+
         if [ -z "$VALID_IDS" ]; then
           echo "ERROR: No valid task ID found in any method"
           echo "false" > /tmp/validation-passed
           exit 1
         fi
-        
+
         echo "SUCCESS: All methods agree on task ID: $VALID_IDS"
         echo "true" > /tmp/validation-passed
         echo "$VALID_IDS" > /tmp/agreed-task-id
@@ -207,7 +207,7 @@ spec:
       args:
       - |
         cd /workspace
-        
+
         # Create marker file
         cat > docs/.taskmaster/current-task.json <<EOF
         {
@@ -219,7 +219,7 @@ spec:
           "pr_number": "{{workflow.parameters.pr-number}}"
         }
         EOF
-        
+
         # Commit the marker file
         git add docs/.taskmaster/current-task.json
         git commit -m "chore: Set current task marker for task-{{inputs.parameters.task-id}}"
@@ -227,7 +227,7 @@ spec:
       volumeMounts:
       - name: workspace
         mountPath: /workspace
-  
+
   volumes:
   - name: workspace
     persistentVolumeClaim:
@@ -254,7 +254,7 @@ Implement GitHub comment creation for validation failures:
           "body": "## Task Association Validation Failed\n\n{{inputs.parameters.error-message}}\n\n### Required Actions:\n1. Ensure PR has correct 'task-{id}' label\n2. Verify branch name follows pattern 'task-{id}-description'\n3. Check marker file contains matching task ID\n\nAll three methods must agree for workflow to proceed."
         }
         EOF
-        
+
         curl -X POST \
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \

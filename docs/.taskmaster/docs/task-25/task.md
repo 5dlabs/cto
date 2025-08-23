@@ -229,7 +229,7 @@ spec:
       prometheus:
         address: http://prometheus.monitoring.svc.cluster.local:9090
         query: |
-          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.namespace}}",code!~"5.."}[5m])) / 
+          sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.namespace}}",code!~"5.."}[5m])) /
           sum(rate(http_requests_total{service="{{args.service-name}}",namespace="{{args.namespace}}"}[5m]))
   - name: avg-response-time
     interval: 60s
@@ -239,7 +239,7 @@ spec:
       prometheus:
         address: http://prometheus.monitoring.svc.cluster.local:9090
         query: |
-          histogram_quantile(0.95, 
+          histogram_quantile(0.95,
             sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}",namespace="{{args.namespace}}"}[5m])) by (le)
           ) * 1000
 
@@ -260,7 +260,7 @@ spec:
       prometheus:
         address: http://prometheus.monitoring.svc.cluster.local:9090
         query: |
-          sum(rate(argo_workflows_completed_total{status="Succeeded"}[10m])) / 
+          sum(rate(argo_workflows_completed_total{status="Succeeded"}[10m])) /
           sum(rate(argo_workflows_completed_total[10m]))
   - name: agent-pod-success-rate
     interval: 120s
@@ -270,7 +270,7 @@ spec:
       prometheus:
         address: http://prometheus.monitoring.svc.cluster.local:9090
         query: |
-          sum(rate(kube_pod_container_status_restarts_total{namespace="agent-platform"}[10m])) / 
+          sum(rate(kube_pod_container_status_restarts_total{namespace="agent-platform"}[10m])) /
           sum(kube_pod_status_ready{namespace="agent-platform"}) < 0.05
 ```
 
@@ -286,7 +286,7 @@ import (
     "fmt"
     "sync"
     "time"
-    
+
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     "k8s.io/client-go/kubernetes"
 )
@@ -315,16 +315,16 @@ type FeatureFlagCondition struct {
 func (ffc *FeatureFlagController) IsFeatureEnabled(ctx context.Context, flagName string, context map[string]string) bool {
     ffc.mutex.RLock()
     defer ffc.mutex.RUnlock()
-    
+
     flag, exists := ffc.flags[flagName]
     if !exists {
         return false
     }
-    
+
     if !flag.Enabled {
         return false
     }
-    
+
     // Check percentage rollout
     if flag.Percentage < 100.0 {
         hash := ffc.generateHash(flagName, context["user_id"])
@@ -332,14 +332,14 @@ func (ffc *FeatureFlagController) IsFeatureEnabled(ctx context.Context, flagName
             return false
         }
     }
-    
+
     // Check conditions
     for _, condition := range flag.Conditions {
         if !ffc.evaluateCondition(condition, context) {
             return false
         }
     }
-    
+
     return true
 }
 
@@ -349,11 +349,11 @@ func (ffc *FeatureFlagController) UpdateFlags(ctx context.Context) error {
     if err != nil {
         return fmt.Errorf("failed to get feature flags configmap: %w", err)
     }
-    
+
     // Parse and update flags from ConfigMap
     ffc.mutex.Lock()
     defer ffc.mutex.Unlock()
-    
+
     // Update flags from configMap.Data
     return ffc.parseFlags(configMap.Data["flags.yaml"])
 }
@@ -373,12 +373,12 @@ data:
       enabled: true
       percentage: 100.0
       environment: production
-      
+
     enhanced_monitoring:
       enabled: true
       percentage: 100.0
       environment: production
-      
+
     experimental_cleo_optimization:
       enabled: true
       percentage: 25.0  # Gradual rollout
@@ -387,7 +387,7 @@ data:
         - type: "label"
           value: "priority=high"
           operator: "equals"
-          
+
     advanced_tess_testing:
       enabled: true
       percentage: 50.0
@@ -396,7 +396,7 @@ data:
         - type: "task_complexity"
           value: "simple"
           operator: "equals"
-          
+
     beta_rex_performance_mode:
       enabled: false  # Disabled in production initially
       percentage: 0.0
@@ -424,7 +424,7 @@ global:
       persistence:
         enabled: true
         size: 20Gi
-  
+
   security:
     strictMode: true
     networkPolicies:
@@ -433,12 +433,12 @@ global:
       enabled: true
     rbac:
       create: true
-      
+
   backup:
     enabled: true
     schedule: "0 2 * * *"  # Daily at 2 AM
     retention: "30d"
-    
+
 coderunController:
   image:
     repository: registry.company.com/coderun-controller
@@ -463,7 +463,7 @@ coderunController:
     minReplicas: 3
     maxReplicas: 10
     targetCPUUtilizationPercentage: 70
-    
+
 argoWorkflows:
   controller:
     replicas: 3
@@ -489,7 +489,7 @@ argoWorkflows:
         - secretName: workflows-tls
           hosts:
             - workflows.production.company.com
-            
+
 argoEvents:
   controller:
     replicas: 2
@@ -590,12 +590,12 @@ data:
       response_time_p95_ms: 5000  # 5 seconds
       workflow_failure_rate: 0.10  # 10% workflow failures
       pod_restart_rate: 0.20      # 20% pod restart rate
-      
+
     rollback_conditions:
       min_observation_time: "10m"
       max_rollback_time: "30m"
       confirmation_samples: 3
-      
+
     rollback_actions:
       - type: "pause_rollout"
         immediate: true
@@ -625,81 +625,81 @@ class RollbackController:
         self.rollouts_api = client.CustomObjectsApi()
         self.prometheus = PrometheusConnect(url=prometheus_url)
         self.logger = logging.getLogger(__name__)
-        
+
     async def monitor_deployment_health(self, rollout_name: str, namespace: str):
         """Monitor deployment health and trigger rollback if needed"""
         while True:
             try:
                 health_status = await self.check_deployment_health(rollout_name, namespace)
-                
+
                 if not health_status.healthy:
                     self.logger.warning(f"Unhealthy deployment detected: {rollout_name}")
-                    
+
                     if self.should_rollback(health_status):
                         await self.execute_rollback(rollout_name, namespace, health_status)
-                    
+
                 await asyncio.sleep(60)  # Check every minute
-                
+
             except Exception as e:
                 self.logger.error(f"Error monitoring deployment health: {e}")
                 await asyncio.sleep(60)
-    
+
     async def check_deployment_health(self, rollout_name: str, namespace: str) -> 'HealthStatus':
         """Check various health metrics for deployment"""
         metrics = {}
-        
+
         # Error rate check
         error_rate_query = f'''
-        sum(rate(http_requests_total{{service="{rollout_name}",namespace="{namespace}",code=~"5.."}[5m])) / 
+        sum(rate(http_requests_total{{service="{rollout_name}",namespace="{namespace}",code=~"5.."}[5m])) /
         sum(rate(http_requests_total{{service="{rollout_name}",namespace="{namespace}"}}[5m]))
         '''
         error_rate = self.prometheus.custom_query(error_rate_query)
         metrics['error_rate'] = float(error_rate[0]['value'][1]) if error_rate else 0.0
-        
+
         # Response time check
         response_time_query = f'''
-        histogram_quantile(0.95, 
+        histogram_quantile(0.95,
           sum(rate(http_request_duration_seconds_bucket{{service="{rollout_name}",namespace="{namespace}"}}[5m])) by (le)
         ) * 1000
         '''
         response_time = self.prometheus.custom_query(response_time_query)
         metrics['response_time_p95'] = float(response_time[0]['value'][1]) if response_time else 0.0
-        
+
         # Pod restart rate check
         restart_rate_query = f'''
         sum(rate(kube_pod_container_status_restarts_total{{namespace="{namespace}"}}[5m]))
         '''
         restart_rate = self.prometheus.custom_query(restart_rate_query)
         metrics['restart_rate'] = float(restart_rate[0]['value'][1]) if restart_rate else 0.0
-        
+
         return HealthStatus(metrics)
-    
+
     def should_rollback(self, health_status: 'HealthStatus') -> bool:
         """Determine if rollback should be triggered based on health status"""
         rollback_policies = self.load_rollback_policies()
-        
+
         if health_status.error_rate > rollback_policies['error_rate_threshold']:
             self.logger.warning(f"Error rate threshold exceeded: {health_status.error_rate}")
             return True
-            
+
         if health_status.response_time_p95 > rollback_policies['response_time_p95_ms']:
             self.logger.warning(f"Response time threshold exceeded: {health_status.response_time_p95}")
             return True
-            
+
         if health_status.restart_rate > rollback_policies['pod_restart_rate']:
             self.logger.warning(f"Pod restart rate threshold exceeded: {health_status.restart_rate}")
             return True
-            
+
         return False
-    
+
     async def execute_rollback(self, rollout_name: str, namespace: str, health_status: 'HealthStatus'):
         """Execute automated rollback procedure"""
         self.logger.info(f"Initiating rollback for {rollout_name} in namespace {namespace}")
-        
+
         try:
             # Pause the current rollout
             await self.pause_rollout(rollout_name, namespace)
-            
+
             # Trigger rollback
             rollback_body = {
                 "spec": {
@@ -708,21 +708,21 @@ class RollbackController:
                     }
                 }
             }
-            
+
             self.rollouts_api.patch_namespaced_custom_object(
                 group="argoproj.io",
-                version="v1alpha1", 
+                version="v1alpha1",
                 namespace=namespace,
                 plural="rollouts",
                 name=rollout_name,
                 body=rollback_body
             )
-            
+
             # Send notifications
             await self.send_rollback_notifications(rollout_name, namespace, health_status)
-            
+
             self.logger.info(f"Rollback completed for {rollout_name}")
-            
+
         except Exception as e:
             self.logger.error(f"Failed to execute rollback: {e}")
             raise
@@ -753,7 +753,7 @@ spec:
         summary: "Multi-agent system controller is down"
         description: "The coderun-controller has been down for more than 1 minute"
         runbook_url: "https://runbooks.company.com/multi-agent-system-down"
-        
+
     - alert: WorkflowFailureRateHigh
       expr: |
         (
@@ -768,7 +768,7 @@ spec:
       annotations:
         summary: "High workflow failure rate detected"
         description: "Workflow failure rate is {{ $value | humanizePercentage }} over the last 5 minutes"
-        
+
     - alert: AgentPodOOMKillRate
       expr: |
         sum(rate(kube_pod_container_status_restarts_total{reason="OOMKilled",namespace="agent-platform"}[10m])) > 0.1
@@ -780,11 +780,11 @@ spec:
       annotations:
         summary: "High rate of agent pods killed due to OOM"
         description: "{{ $value }} agent pods per second are being OOM killed"
-        
+
     - alert: ProductionCapacityWarning
       expr: |
         (
-          sum(kube_node_status_allocatable{resource="cpu"}) - 
+          sum(kube_node_status_allocatable{resource="cpu"}) -
           sum(kube_pod_container_resource_requests{resource="cpu"})
         ) / sum(kube_node_status_allocatable{resource="cpu"}) < 0.2
       for: 15m
@@ -839,7 +839,7 @@ spec:
       - name: validate-results
         template: validate-performance
         depends: endurance-test
-        
+
   - name: performance-test
     inputs:
       parameters:
@@ -864,18 +864,18 @@ spec:
             DURATION=4h
             ;;
         esac
-        
+
         echo "Starting {{inputs.parameters.load-level}} load test..."
         echo "Concurrent workflows: $CONCURRENT_WORKFLOWS"
         echo "Duration: $DURATION"
-        
+
         # Execute load test
         python3 /app/load_test.py \
           --concurrent-workflows $CONCURRENT_WORKFLOWS \
           --duration $DURATION \
           --target-endpoint https://workflows.production.company.com \
           --output-format json > /tmp/results.json
-        
+
         # Upload results
         aws s3 cp /tmp/results.json s3://load-test-results/production/$(date +%Y%m%d-%H%M%S)-{{inputs.parameters.load-level}}.json
 ```

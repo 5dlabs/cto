@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 You are ENHANCING existing workflow stage management for multi-agent orchestration. The basic stage labeling and event correlation are already implemented - you need to add explicit stage transition steps and atomic label update mechanisms.
 
@@ -36,7 +35,7 @@ ENHANCE existing workflow template by adding explicit stage transition steps aft
 Multi-agent orchestration requires precise state management where:
 - **Workflows track their current stage** through metadata labels
 - **Stage transitions trigger event-driven agent handoffs**
-- **Atomic label updates prevent race conditions** 
+- **Atomic label updates prevent race conditions**
 - **Event sensors target workflows based on stage + task ID**
 
 The stage progression flow is:
@@ -67,7 +66,7 @@ Create Kubernetes resource templates for atomic label updates:
 
 Add stage transition steps after each agent completes:
 - After Rex: Update to `waiting-pr-created`
-- After Cleo: Update to `waiting-ready-for-qa`  
+- After Cleo: Update to `waiting-ready-for-qa`
 - After Tess: Update to `waiting-pr-approved`
 
 ### 3. Create Suspend/Resume Pattern with Stages
@@ -151,7 +150,7 @@ Support multiple concurrent workflows:
 ## Success Criteria
 
 1. **Atomic Updates**: Stage transitions are atomic and race-condition free
-2. **Event Correlation**: Sensors correctly target workflows by stage + task ID  
+2. **Event Correlation**: Sensors correctly target workflows by stage + task ID
 3. **State Consistency**: Workflow stage always reflects actual progress
 4. **Concurrent Safety**: Multiple workflows don't interfere with each other
 5. **Error Recovery**: Failed stage transitions are handled gracefully

@@ -12,7 +12,7 @@
 
 ### 2. Parameterized Agent Selection
 - [ ] `implementation-agent` parameter defined with default "5DLabs-Rex"
-- [ ] `quality-agent` parameter defined with default "5DLabs-Cleo" 
+- [ ] `quality-agent` parameter defined with default "5DLabs-Cleo"
 - [ ] `testing-agent` parameter defined with default "5DLabs-Tess"
 - [ ] `task-id` parameter defined for workflow correlation
 - [ ] `repository` parameter defined with default "5dlabs/cto"

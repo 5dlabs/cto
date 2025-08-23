@@ -15,7 +15,7 @@ You are tasked with integrating the MCP (Model Context Protocol) documentation s
 
 **Problem Statement**: Implementation agents currently start coding without researching existing patterns, leading to:
 - Rework cycles during code review (Cleo phase)
-- Testing failures due to API misuse (Tess phase) 
+- Testing failures due to API misuse (Tess phase)
 - Inconsistent implementation patterns
 - Missed opportunities to reuse existing components
 
@@ -76,20 +76,20 @@ export DOCS_FIRST_MODE="true"
 test_docs_connectivity() {
     local max_retries=3
     local retry_delay=2
-    
+
     for i in $(seq 1 $max_retries); do
         echo "🔍 Attempt $i/$max_retries: Testing MCP docs server..."
         if curl -f -s --connect-timeout 5 "$MCP_DOCS_SERVER/health" >/dev/null 2>&1; then
             echo "✅ Documentation server accessible"
             return 0
         fi
-        
+
         if [ $i -lt $max_retries ]; then
             echo "⏳ Retrying in ${retry_delay}s..."
             sleep $retry_delay
         fi
     done
-    
+
     echo "⚠️  Documentation server not accessible after $max_retries attempts"
     echo "📝 Proceeding without documentation queries"
     export DOCS_FIRST_MODE="false"
@@ -141,7 +141,7 @@ export DOCS_FIRST_MODE="false"
 
 ### Phase 4: System Prompt Enhancement
 
-**Target Files**: 
+**Target Files**:
 - `infra/charts/controller/claude-templates/agents/rex-system-prompt.md.hbs`
 - `infra/charts/controller/claude-templates/agents/blaze-system-prompt.md.hbs`
 

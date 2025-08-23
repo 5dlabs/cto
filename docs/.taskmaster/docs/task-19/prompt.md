@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 ## Objective
 Build a comprehensive automated PR approval workflow that integrates Tess validation results with GitHub's branch protection system. Create a multi-stage approval process with automated Tess approval (120% satisfaction threshold), event-driven workflow resumption, and human review checkpoints.
@@ -72,20 +71,20 @@ Score calculation example:
 ```rust
 fn calculate_approval_score(&self, result: &TessValidationResult) -> Result<f64> {
     let mut score = 0.0;
-    
+
     // Coverage scoring (30% weight)
     if criteria.test_coverage_threshold >= 95.0 {
         score += 30.0;
     } else {
         score += (criteria.test_coverage_threshold / 95.0) * 30.0;
     }
-    
+
     // Additional weighted components...
     // Breaking changes penalty
     if criteria.breaking_changes {
         score -= 15.0;  // Significant penalty
     }
-    
+
     Ok(score)
 }
 ```

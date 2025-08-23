@@ -67,7 +67,7 @@ impl TessApprovalEngine {
             approval_threshold,
         }
     }
-    
+
     pub async fn evaluate_pr_for_approval(
         &self,
         repo_owner: &str,
@@ -77,7 +77,7 @@ impl TessApprovalEngine {
     ) -> Result<ApprovalDecision> {
         // Calculate comprehensive approval score
         let approval_score = self.calculate_approval_score(validation_result)?;
-        
+
         // Make approval decision based on criteria
         let decision = if approval_score >= self.approval_threshold {
             if self.has_blocking_issues(validation_result) {
@@ -98,20 +98,20 @@ impl TessApprovalEngine {
                 required_improvements: self.generate_improvement_recommendations(validation_result),
             }
         };
-        
+
         // Execute the approval decision
         self.execute_approval_decision(repo_owner, repo_name, pr_number, &decision).await?;
-        
+
         Ok(decision)
     }
-    
+
     fn calculate_approval_score(&self, result: &TessValidationResult) -> Result<f64> {
         let criteria = &result.criteria;
-        
+
         // Weighted scoring system
         let mut score = 0.0;
         let mut total_weight = 0.0;
-        
+
         // Coverage score (30% weight)
         if criteria.test_coverage_threshold >= 95.0 {
             score += 30.0;
@@ -119,46 +119,46 @@ impl TessApprovalEngine {
             score += (criteria.test_coverage_threshold / 95.0) * 30.0;
         }
         total_weight += 30.0;
-        
+
         // Code quality score (25% weight)
         score += (criteria.code_quality_score / 100.0) * 25.0;
         total_weight += 25.0;
-        
+
         // Acceptance criteria (20% weight)
         if criteria.acceptance_criteria_met {
             score += 20.0;
         }
         total_weight += 20.0;
-        
+
         // Security scan (15% weight)
         if criteria.security_scan_passed {
             score += 15.0;
         }
         total_weight += 15.0;
-        
+
         // Performance regression (10% weight, negative scoring)
         if !criteria.performance_regression {
             score += 10.0;
         }
         total_weight += 10.0;
-        
+
         // Breaking changes penalty
         if criteria.breaking_changes {
             score -= 15.0; // Significant penalty
         }
-        
+
         Ok((score / total_weight) * 100.0)
     }
-    
+
     fn has_blocking_issues(&self, result: &TessValidationResult) -> bool {
         let criteria = &result.criteria;
-        
+
         // Critical blocking conditions
-        !criteria.security_scan_passed || 
+        !criteria.security_scan_passed ||
         criteria.breaking_changes ||
         criteria.test_coverage_threshold < 70.0 // Minimum acceptable coverage
     }
-    
+
     async fn execute_approval_decision(
         &self,
         repo_owner: &str,
@@ -176,7 +176,7 @@ impl TessApprovalEngine {
                     super::ReviewEvent::Approve,
                     &review_body,
                 ).await?;
-                
+
                 // Add approval label
                 self.github_client.add_labels(
                     repo_owner,
@@ -184,10 +184,10 @@ impl TessApprovalEngine {
                     pr_number,
                     vec!["tess-approved".to_string()],
                 ).await?;
-                
+
                 println!("✅ PR #{} automatically approved by Tess (score: {:.1}%)", pr_number, score);
             }
-            
+
             ApprovalDecision::RequestChanges { score, failed_criteria, required_improvements } => {
                 let review_body = self.generate_changes_requested_body(*score, failed_criteria, required_improvements);
                 self.github_client.submit_pr_review(
@@ -197,7 +197,7 @@ impl TessApprovalEngine {
                     super::ReviewEvent::RequestChanges,
                     &review_body,
                 ).await?;
-                
+
                 // Add needs-changes label
                 self.github_client.add_labels(
                     repo_owner,
@@ -205,10 +205,10 @@ impl TessApprovalEngine {
                     pr_number,
                     vec!["needs-changes".to_string()],
                 ).await?;
-                
+
                 println!("❌ PR #{} requires changes (score: {:.1}%)", pr_number, score);
             }
-            
+
             ApprovalDecision::RequiresHumanReview { reason, score } => {
                 let review_body = format!(
                     "## 🤖 Tess Analysis - Human Review Required\n\n\
@@ -218,7 +218,7 @@ impl TessApprovalEngine {
                      before final approval. Please review the detailed analysis below.",
                     score, reason
                 );
-                
+
                 self.github_client.submit_pr_review(
                     repo_owner,
                     repo_name,
@@ -226,7 +226,7 @@ impl TessApprovalEngine {
                     super::ReviewEvent::Comment,
                     &review_body,
                 ).await?;
-                
+
                 // Add human-review-required label
                 self.github_client.add_labels(
                     repo_owner,
@@ -234,14 +234,14 @@ impl TessApprovalEngine {
                     pr_number,
                     vec!["human-review-required".to_string()],
                 ).await?;
-                
+
                 println!("👀 PR #{} requires human review (score: {:.1}%)", pr_number, score);
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn generate_approval_review_body(&self, score: f64, criteria_met: &[String]) -> String {
         format!(
             "## ✅ Tess Analysis - APPROVED\n\n\
@@ -259,7 +259,7 @@ impl TessApprovalEngine {
                 .join("\n")
         )
     }
-    
+
     fn generate_changes_requested_body(
         &self,
         score: f64,
@@ -343,7 +343,7 @@ spec:
           "approval_timestamp": .body.review.submitted_at,
           "review_body": .body.review.body
         }
-  
+
   triggers:
   - template:
       name: resume-workflow-on-approval
@@ -367,7 +367,7 @@ spec:
                   value: "{{.Input.review_id}}"
                 - name: approval-timestamp
                   value: "{{.Input.approval_timestamp}}"
-              
+
               templates:
               - name: handle-tess-approval
                 inputs:
@@ -385,7 +385,7 @@ spec:
                         value: "{{inputs.parameters.repository}}"
                       - name: pr-number
                         value: "{{inputs.parameters.pr-number}}"
-                
+
                 - - name: resume-workflow
                     template: resume-suspended-workflow
                     arguments:
@@ -399,7 +399,7 @@ spec:
                             "approval_timestamp": "{{inputs.parameters.approval-timestamp}}",
                             "review_id": "{{inputs.parameters.review-id}}"
                           }
-              
+
               - name: find-suspended-workflow
                 inputs:
                   parameters:
@@ -415,26 +415,26 @@ spec:
                   command: [sh]
                   source: |
                     set -e
-                    
+
                     REPO="{{inputs.parameters.repository}}"
                     PR_NUM="{{inputs.parameters.pr-number}}"
-                    
+
                     echo "Searching for suspended workflow for PR #$PR_NUM in $REPO"
-                    
+
                     # Find workflow suspended at pr-approval checkpoint
                     WORKFLOW_NAME=$(kubectl get workflows -n taskmaster \
                       -l "taskmaster.io/pr-number=$PR_NUM" \
                       -l "taskmaster.io/repository=$REPO" \
                       -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | head -1)
-                    
+
                     if [ -z "$WORKFLOW_NAME" ]; then
                       echo "No suspended workflow found for PR #$PR_NUM"
                       exit 1
                     fi
-                    
+
                     echo "Found workflow: $WORKFLOW_NAME"
                     echo "$WORKFLOW_NAME" > /tmp/workflow-name.txt
-              
+
               - name: resume-suspended-workflow
                 inputs:
                   parameters:
@@ -445,13 +445,13 @@ spec:
                   command: [sh]
                   source: |
                     set -e
-                    
+
                     WORKFLOW_NAME="{{inputs.parameters.workflow-name}}"
                     APPROVAL_DATA='{{inputs.parameters.approval-data}}'
-                    
+
                     echo "Resuming workflow: $WORKFLOW_NAME"
                     echo "Approval data: $APPROVAL_DATA"
-                    
+
                     # Resume the workflow by setting the approval parameter
                     kubectl patch workflow "$WORKFLOW_NAME" -n taskmaster --type='merge' -p='{
                       "spec": {
@@ -466,7 +466,7 @@ spec:
                         }
                       }
                     }'
-                    
+
                     echo "✅ Workflow resumed successfully"
 
   - template:
@@ -501,7 +501,7 @@ metadata:
   namespace: taskmaster
 spec:
   entrypoint: pr-processing-pipeline
-  
+
   arguments:
     parameters:
     - name: repository
@@ -509,7 +509,7 @@ spec:
     - name: github-token
     - name: human-review-required
       value: "true"
-  
+
   templates:
   - name: pr-processing-pipeline
     dag:
@@ -522,7 +522,7 @@ spec:
             value: "{{workflow.parameters.repository}}"
           - name: pr-number
             value: "{{workflow.parameters.pr-number}}"
-      
+
       - name: wait-for-tess-approval
         dependencies: [tess-validation]
         template: wait-for-approval
@@ -534,7 +534,7 @@ spec:
             value: "{{workflow.parameters.pr-number}}"
           - name: validation-result
             value: "{{tasks.tess-validation.outputs.parameters.validation-result}}"
-      
+
       - name: human-review-gate
         dependencies: [wait-for-tess-approval]
         template: human-review-checkpoint
@@ -547,7 +547,7 @@ spec:
             value: "{{workflow.parameters.pr-number}}"
           - name: tess-approval
             value: "{{tasks.wait-for-tess-approval.outputs.parameters.approval-status}}"
-      
+
       - name: final-approval
         dependencies: [human-review-gate]
         template: finalize-pr-approval
@@ -611,10 +611,10 @@ spec:
       - |
         echo "Waiting for Tess approval on PR #{{inputs.parameters.pr-number}}"
         echo "Validation result: {{inputs.parameters.validation-result}}"
-        
+
         # This container will be suspended until Tess approves
         # The sensor will resume the workflow and provide approval data
-        
+
         if [ -n "$TESS_APPROVAL_DATA" ]; then
           echo "Tess approval received!"
           echo "$TESS_APPROVAL_DATA" > /tmp/approval-status.json
@@ -640,27 +640,27 @@ spec:
       command: [sh]
       source: |
         set -e
-        
+
         REPO="{{inputs.parameters.repository}}"
         PR_NUM="{{inputs.parameters.pr-number}}"
         TESS_APPROVAL='{{inputs.parameters.tess-approval}}'
-        
+
         echo "Human review checkpoint for PR #$PR_NUM"
         echo "Tess approval status: $TESS_APPROVAL"
-        
+
         # Check if human approval already exists
         HUMAN_APPROVALS=$(curl -s \
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/repos/$REPO/pulls/$PR_NUM/reviews" | \
           jq '[.[] | select(.state == "APPROVED" and .user.type == "User")] | length')
-        
+
         if [ "$HUMAN_APPROVALS" -gt 0 ]; then
           echo "Human approval found"
           echo '{"status": "approved", "reviewer": "human", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > /tmp/human-review-status.json
         else
           echo "Waiting for human review..."
-          
+
           # Add comment requesting human review
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
@@ -669,7 +669,7 @@ spec:
             -d '{
               "body": "🤖 **Tess Approval Complete - Human Review Required**\n\nTess has completed automated validation and approved this PR. A human reviewer must now approve before merging.\n\n**Next Steps:**\n- Review the Tess validation results\n- Verify the changes meet project standards\n- Approve the PR if everything looks good\n\n**Tess Approval:** ✅ Approved\n**Coverage:** See detailed report in PR review"
             }'
-          
+
           # For this demo, we'll assume human review is required but not wait
           echo '{"status": "pending", "message": "Human review requested"}' > /tmp/human-review-status.json
         fi
@@ -685,31 +685,31 @@ spec:
       command: [sh]
       source: |
         set -e
-        
+
         REPO="{{inputs.parameters.repository}}"
         PR_NUM="{{inputs.parameters.pr-number}}"
         APPROVAL_CHAIN='{{inputs.parameters.approval-chain}}'
-        
+
         echo "Finalizing approval for PR #$PR_NUM"
         echo "Approval chain: $APPROVAL_CHAIN"
-        
+
         # Verify all required approvals
         TESS_APPROVED=$(echo "$APPROVAL_CHAIN" | jq -r '.tess_approval.approved // false')
         HUMAN_REVIEWED=$(echo "$APPROVAL_CHAIN" | jq -r '.human_review.status == "approved"')
-        
+
         if [ "$TESS_APPROVED" = "true" ] && [ "$HUMAN_REVIEWED" = "true" ]; then
           echo "✅ All approvals complete - PR ready for merge"
-          
+
           # Add final approval label
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$REPO/issues/$PR_NUM/labels" \
             -d '{"labels": ["ready-to-merge"]}'
-          
+
           # Optional: Auto-merge if enabled
           # This would check branch protection rules and merge if possible
-          
+
         else
           echo "❌ Missing required approvals"
           echo "Tess approved: $TESS_APPROVED"
@@ -790,7 +790,7 @@ curl -s \
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_approval_score_calculation() {
         let criteria = TessApprovalCriteria {
@@ -801,7 +801,7 @@ mod tests {
             performance_regression: false,
             breaking_changes: false,
         };
-        
+
         let result = TessValidationResult {
             pr_number: 123,
             repository: "test/repo".to_string(),
@@ -811,31 +811,31 @@ mod tests {
             detailed_results: HashMap::new(),
             recommendation: ApprovalRecommendation::Approve,
         };
-        
+
         let engine = TessApprovalEngine::new(
             mock_github_client(),
             120.0  // 120% threshold
         );
-        
+
         let score = engine.calculate_approval_score(&result).unwrap();
         assert!(score >= 120.0);
     }
-    
+
     #[test]
     fn test_blocking_issues_detection() {
         let engine = TessApprovalEngine::new(mock_github_client(), 120.0);
-        
+
         let criteria_with_security_failure = TessApprovalCriteria {
             security_scan_passed: false,
             breaking_changes: false,
             test_coverage_threshold: 95.0,
             // ... other fields
         };
-        
+
         let result = create_test_validation_result(criteria_with_security_failure);
         assert!(engine.has_blocking_issues(&result));
     }
-    
+
     #[tokio::test]
     async fn test_pr_approval_workflow() {
         let mut mock_client = mock_github_client();
@@ -843,15 +843,15 @@ mod tests {
             .expect_submit_pr_review()
             .times(1)
             .returning(|_, _, _, _, _| Ok(()));
-        
+
         let engine = TessApprovalEngine::new(mock_client, 120.0);
         let validation_result = create_high_score_validation_result();
-        
+
         let decision = engine
             .evaluate_pr_for_approval("owner", "repo", 123, &validation_result)
             .await
             .unwrap();
-        
+
         match decision {
             ApprovalDecision::AutoApprove { score, .. } => {
                 assert!(score >= 120.0);

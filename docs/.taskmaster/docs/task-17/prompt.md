@@ -194,7 +194,7 @@ POST /api/workflows/{id}/resume
 
 ### Workflow Parameters
 - `max-parallel-tasks`: Number of concurrent task executions
-- `checkpoint-interval`: Tasks between checkpoint saves  
+- `checkpoint-interval`: Tasks between checkpoint saves
 - `retry-limit`: Maximum retries per failed task
 - `timeout`: Maximum workflow execution time
 

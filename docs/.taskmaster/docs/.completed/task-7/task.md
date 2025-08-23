@@ -22,7 +22,7 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
 
 2. **Label Update Mechanism**
    - Use Kubernetes resource template for atomic label updates
-   - Implement via kubectl patch commands with JSON merge strategy  
+   - Implement via kubectl patch commands with JSON merge strategy
    - Ensure idempotent operations to prevent duplicate updates
    - Add workflow correlation metadata for event targeting
 
@@ -64,19 +64,19 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
    ```bash
    #!/bin/bash
    # Atomic label update script for workflow stages
-   
+
    WORKFLOW_NAME="{{workflow.name}}"
    NEW_STAGE="{{inputs.parameters.new-stage}}"
    TASK_ID="{{workflow.parameters.task-id}}"
-   
+
    # Perform atomic label update
    kubectl patch workflow "$WORKFLOW_NAME" \
      --type='merge' \
      --patch="{\"metadata\":{\"labels\":{\"current-stage\":\"$NEW_STAGE\"}}}"
-   
+
    # Verify update succeeded
    CURRENT_LABEL=$(kubectl get workflow "$WORKFLOW_NAME" -o jsonpath='{.metadata.labels.current-stage}')
-   
+
    if [ "$CURRENT_LABEL" = "$NEW_STAGE" ]; then
      echo "✅ Stage transition successful: $NEW_STAGE"
    else
@@ -123,7 +123,7 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
      - name: github-pr-created
        eventSourceName: github-webhook
        eventName: pull-request-opened
-       
+
      triggers:
      - template:
          name: resume-after-pr-created
@@ -144,7 +144,7 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
    triggers:
    - template:
        name: resume-after-cleo-complete
-       conditions: "github-pr-labeled"  
+       conditions: "github-pr-labeled"
        argoWorkflow:
          operation: resume
          source:
@@ -169,7 +169,7 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
            parameters:
            - name: github-app
              value: "5DLabs-Rex"
-             
+
        - name: update-to-waiting-pr
          dependencies: [rex-implementation]
          template: update-workflow-stage
@@ -177,11 +177,11 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
            parameters:
            - name: new-stage
              value: "waiting-pr-created"
-             
+
        - name: wait-pr-created
          dependencies: [update-to-waiting-pr]
          template: suspend-for-webhook
-         
+
        - name: cleo-quality
          dependencies: [wait-pr-created]
          template: agent-coderun
@@ -189,7 +189,7 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
            parameters:
            - name: github-app
              value: "5DLabs-Cleo"
-             
+
        - name: update-to-waiting-qa
          dependencies: [cleo-quality]
          template: update-workflow-stage
@@ -212,13 +212,13 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
        command: [bash]
        source: |
          set -e
-         
+
          WORKFLOW_NAME="{{workflow.name}}"
          NEW_STAGE="{{inputs.parameters.new-stage}}"
          PREVIOUS_STAGE="{{inputs.parameters.previous-stage}}"
-         
+
          echo "Transitioning from $PREVIOUS_STAGE to $NEW_STAGE"
-         
+
          # Atomic update with verification
          kubectl patch workflow "$WORKFLOW_NAME" \
            --type='merge' \
@@ -231,16 +231,16 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
                }
              }
            }"
-         
+
          # Verify transition succeeded
          ACTUAL_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" \
            -o jsonpath='{.metadata.labels.current-stage}')
-           
+
          if [ "$ACTUAL_STAGE" != "$NEW_STAGE" ]; then
            echo "ERROR: Stage transition failed!"
            exit 1
          fi
-         
+
          echo "✅ Successfully transitioned to: $NEW_STAGE"
    ```
 
@@ -260,7 +260,7 @@ spec:
     - name: task-id
     - name: repository
       value: "5dlabs-cto"
-      
+
   templates:
   - name: main
     dag:
@@ -272,7 +272,7 @@ spec:
           parameters:
           - name: github-app
             value: "5DLabs-Rex"
-            
+
       - name: stage-1-complete
         dependencies: [rex-implementation]
         template: update-workflow-stage
@@ -280,12 +280,12 @@ spec:
           parameters:
           - name: new-stage
             value: "waiting-pr-created"
-            
+
       # Suspend for PR creation event
       - name: wait-pr-created
         dependencies: [stage-1-complete]
         template: suspend-for-webhook
-        
+
       # Stage 2: Cleo Quality
       - name: cleo-quality
         dependencies: [wait-pr-created]
@@ -294,7 +294,7 @@ spec:
           parameters:
           - name: github-app
             value: "5DLabs-Cleo"
-            
+
       - name: stage-2-complete
         dependencies: [cleo-quality]
         template: update-workflow-stage
@@ -302,13 +302,13 @@ spec:
           parameters:
           - name: new-stage
             value: "waiting-ready-for-qa"
-            
+
       # Suspend for ready-for-qa label event
       - name: wait-ready-for-qa
         dependencies: [stage-2-complete]
         template: suspend-for-webhook
-        
-      # Stage 3: Tess Testing  
+
+      # Stage 3: Tess Testing
       - name: tess-testing
         dependencies: [wait-ready-for-qa]
         template: agent-coderun
@@ -316,7 +316,7 @@ spec:
           parameters:
           - name: github-app
             value: "5DLabs-Tess"
-            
+
       - name: stage-3-complete
         dependencies: [tess-testing]
         template: update-workflow-stage
@@ -324,12 +324,12 @@ spec:
           parameters:
           - name: new-stage
             value: "waiting-pr-approved"
-            
+
       # Suspend for PR approval event
       - name: wait-pr-approved
         dependencies: [stage-3-complete]
         template: suspend-for-webhook
-        
+
       # Task Completion
       - name: complete-task
         dependencies: [wait-pr-approved]
@@ -338,7 +338,7 @@ spec:
   # Reusable templates
   - name: suspend-for-webhook
     suspend: {}
-    
+
   - name: update-workflow-stage
     inputs:
       parameters:
@@ -364,7 +364,7 @@ spec:
   - name: github-pr-events
     eventSourceName: github-webhook
     eventName: pull-request
-    
+
   triggers:
   # Resume workflow at waiting-pr-created stage
   - template:
@@ -378,13 +378,13 @@ spec:
               workflow-type=play-orchestration,
               current-stage=waiting-pr-created,
               task-id={{task-id-from-pr-labels}}
-              
-  # Resume workflow at waiting-ready-for-qa stage        
+
+  # Resume workflow at waiting-ready-for-qa stage
   - template:
       name: resume-waiting-ready-for-qa
       conditions: |
-        github-pr-events && 
-        github-pr-events.action == 'labeled' && 
+        github-pr-events &&
+        github-pr-events.action == 'labeled' &&
         github-pr-events.label.name == 'ready-for-qa'
       argoWorkflow:
         operation: resume
@@ -408,7 +408,7 @@ The workflow implements a finite state machine with these characteristics:
 ### Event-Driven Coordination
 ```
 Rex Complete → update-stage → suspend → GitHub Event → resume → Cleo Start
-Cleo Complete → update-stage → suspend → GitHub Event → resume → Tess Start  
+Cleo Complete → update-stage → suspend → GitHub Event → resume → Tess Start
 Tess Complete → update-stage → suspend → GitHub Event → resume → Task Complete
 ```
 
@@ -431,7 +431,7 @@ All label updates are idempotent to handle:
        --patch='{"metadata":{"labels":{"current-stage":"test-'$i'"}}}' &
    done
    wait
-   
+
    # Verify only one final state
    kubectl get workflow test-workflow -o jsonpath='{.metadata.labels.current-stage}'
    ```
@@ -440,18 +440,18 @@ All label updates are idempotent to handle:
    ```bash
    # Verify workflow progresses through all stages correctly
    stages=("waiting-pr-created" "waiting-ready-for-qa" "waiting-pr-approved")
-   
+
    for stage in "${stages[@]}"; do
      # Trigger stage update
      argo submit stage-update-test.yaml --parameter new-stage=$stage
-     
+
      # Verify update
      actual_stage=$(argo get workflow test-workflow -o jsonpath='{.metadata.labels.current-stage}')
      [ "$actual_stage" = "$stage" ] || echo "ERROR: Expected $stage, got $actual_stage"
    done
    ```
 
-### Event Integration Testing  
+### Event Integration Testing
 1. **Webhook Correlation Testing**
    - Send test GitHub webhooks with task labels
    - Verify correct workflows are resumed at correct stages
@@ -465,7 +465,7 @@ All label updates are idempotent to handle:
 ## Key Design Decisions
 
 1. **Kubernetes Native Labels**: Use workflow metadata labels for state tracking
-2. **Atomic Updates**: JSON merge patches prevent race conditions  
+2. **Atomic Updates**: JSON merge patches prevent race conditions
 3. **Stage Isolation**: Each stage explicitly updates workflow state
 4. **Event Correlation**: Combine task ID and stage for precise targeting
 5. **Idempotent Design**: All operations safe to retry and duplicate

@@ -16,7 +16,7 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
    ```bash
    # Examine existing Rex External Secrets configuration
    kubectl get externalsecret -n agents-platform github-app-5dlabs-rex -o yaml
-   
+
    # Check ClusterSecretStore configuration
    kubectl get clustersecretstore -o yaml
    ```
@@ -143,7 +143,7 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
    # Additional secrets for Tess testing capabilities
    # Path: github-apps/5dlabs-tess
    {
-     "app_id": "234567", 
+     "app_id": "234567",
      "private_key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
      "client_id": "Iv1.fedcba654321",
      "installation_id": "89012345",
@@ -162,7 +162,7 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
    export GITHUB_PRIVATE_KEY_FILE=/etc/github-app/private-key
    export GITHUB_CLIENT_ID=$(cat /etc/github-app/client-id)
    export GITHUB_INSTALLATION_ID=$(cat /etc/github-app/installation-id)
-   
+
    # Generate GitHub token for API operations
    GITHUB_TOKEN=$(generate-github-token.sh)
    export GITHUB_TOKEN
@@ -185,7 +185,7 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
        }
        "5DLabs-Tess" => {
            pod_spec.volumes.push(Volume {
-               name: "github-app-credentials".to_string(), 
+               name: "github-app-credentials".to_string(),
                secret: Some(SecretVolumeSource {
                    secret_name: Some("github-app-5dlabs-tess".to_string()),
                    ..Default::default()
@@ -203,23 +203,23 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
    ```bash
    #!/bin/bash
    # generate-github-token.sh - Generate GitHub App installation token
-   
+
    set -euo pipefail
-   
+
    APP_ID=$(cat /etc/github-app/app-id)
    PRIVATE_KEY_FILE=/etc/github-app/private-key
    INSTALLATION_ID=$(cat /etc/github-app/installation-id)
-   
+
    # Generate JWT for GitHub App authentication
    JWT=$(create-jwt.py "$APP_ID" "$PRIVATE_KEY_FILE")
-   
+
    # Get installation access token
    TOKEN_RESPONSE=$(curl -s \
      -X POST \
      -H "Authorization: Bearer $JWT" \
      -H "Accept: application/vnd.github.v3+json" \
      "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
-   
+
    # Extract token from response
    echo "$TOKEN_RESPONSE" | jq -r '.token'
    ```
@@ -228,32 +228,32 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
    ```python
    #!/usr/bin/env python3
    # create-jwt.py - Create GitHub App JWT
-   
+
    import jwt
    import time
    import sys
-   
+
    def create_github_app_jwt(app_id, private_key_path):
        with open(private_key_path, 'r') as key_file:
            private_key = key_file.read()
-       
+
        now = int(time.time())
        payload = {
            'iat': now,
            'exp': now + 600,  # 10 minutes
            'iss': app_id
        }
-       
+
        return jwt.encode(payload, private_key, algorithm='RS256')
-   
+
    if __name__ == "__main__":
        if len(sys.argv) != 3:
            print("Usage: create-jwt.py <app_id> <private_key_path>")
            sys.exit(1)
-           
+
        app_id = sys.argv[1]
        private_key_path = sys.argv[2]
-       
+
        token = create_github_app_jwt(app_id, private_key_path)
        print(token)
    ```
@@ -299,7 +299,7 @@ spec:
   - secretKey: privateKey
     remoteRef:
       key: github-apps/5dlabs-cleo
-      property: private_key  
+      property: private_key
   - secretKey: clientId
     remoteRef:
       key: github-apps/5dlabs-cleo
@@ -367,7 +367,7 @@ spec:
 // In controller/src/tasks/code/resources.rs
 fn create_agent_secret_volumes(github_app: &str) -> Vec<Volume> {
     let mut volumes = Vec::new();
-    
+
     match github_app {
         "5DLabs-Cleo" => {
             volumes.push(Volume {
@@ -404,7 +404,7 @@ fn create_agent_secret_volumes(github_app: &str) -> Vec<Volume> {
             });
         }
     }
-    
+
     volumes
 }
 
@@ -433,15 +433,15 @@ export GITHUB_INSTALLATION_ID=$(cat /etc/github-app/installation-id 2>/dev/null 
 
 if [ -n "$GITHUB_APP_ID" ] && [ -n "$GITHUB_INSTALLATION_ID" ]; then
     echo "📱 Generating GitHub App token..."
-    
+
     # Generate installation access token
     GITHUB_TOKEN=$(python3 /usr/local/bin/generate-github-token.py \
         "$GITHUB_APP_ID" \
         "/etc/github-app/private-key" \
         "$GITHUB_INSTALLATION_ID")
-    
+
     export GITHUB_TOKEN
-    
+
     # Verify token works
     if gh auth status --hostname github.com >/dev/null 2>&1; then
         echo "✅ GitHub API authentication successful"
@@ -480,10 +480,10 @@ External Secrets refreshes secrets every hour, ensuring:
    # Apply External Secret configurations
    kubectl apply -f external-secrets-cleo.yaml
    kubectl apply -f external-secrets-tess.yaml
-   
+
    # Verify External Secrets created successfully
    kubectl get externalsecret -n agents-platform
-   
+
    # Check secret creation
    kubectl get secret github-app-5dlabs-cleo -n agents-platform -o yaml
    kubectl get secret github-app-5dlabs-tess -n agents-platform -o yaml
@@ -493,7 +493,7 @@ External Secrets refreshes secrets every hour, ensuring:
    ```bash
    # Verify all required keys present
    kubectl get secret github-app-5dlabs-cleo -o jsonpath='{.data}' | jq keys
-   
+
    # Test base64 decoding works
    kubectl get secret github-app-5dlabs-cleo -o jsonpath='{.data.app-id}' | base64 -d
    ```
@@ -511,7 +511,7 @@ External Secrets refreshes secrets every hour, ensuring:
      github_app: "5DLabs-Cleo"
      service: "cto"
    EOF
-   
+
    # Verify secret mounted correctly
    kubectl exec test-cleo-pod -- ls -la /etc/github-app/
    kubectl exec test-cleo-pod -- cat /etc/github-app/app-id
@@ -521,7 +521,7 @@ External Secrets refreshes secrets every hour, ensuring:
    ```bash
    # Test GitHub token generation inside agent container
    kubectl exec test-cleo-pod -- generate-github-token.sh
-   
+
    # Test GitHub API access
    kubectl exec test-cleo-pod -- gh api /user
    ```

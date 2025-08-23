@@ -4,7 +4,7 @@
 
 ### ✅ Agent Template Mapping
 - [ ] **Rex/Blaze Mapping**: `5DLabs-Rex` and `5DLabs-Blaze` both map to `container-rex.sh.hbs`
-- [ ] **Cleo Mapping**: `5DLabs-Cleo` maps to `container-cleo.sh.hbs`  
+- [ ] **Cleo Mapping**: `5DLabs-Cleo` maps to `container-cleo.sh.hbs`
 - [ ] **Tess Mapping**: `5DLabs-Tess` maps to `container-tess.sh.hbs`
 - [ ] **Case Sensitivity**: Agent names are matched case-sensitively
 - [ ] **Bot Suffix Handling**: GitHub app names with "[bot]" suffix are correctly processed
@@ -21,7 +21,7 @@
 - [ ] **Path Security**: Template loading prevents path traversal attacks
 - [ ] **File Existence**: Missing template files return clear error messages
 
-### ✅ Fallback Behavior  
+### ✅ Fallback Behavior
 - [ ] **Unknown Agent**: Unknown agents default to `container-rex.sh.hbs`
 - [ ] **Logging**: Fallback usage is logged with warning level
 - [ ] **No Failure**: Fallback never causes system failure

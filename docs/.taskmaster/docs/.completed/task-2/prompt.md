@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 ## Mission
 
@@ -141,7 +140,7 @@ spec:
       - path: action
         type: string
         value: "opened"
-  
+
   triggers:
   - template:
       name: resume-after-implementation
@@ -198,7 +197,7 @@ spec:
         type: string
         comparator: "="
         value: "refs/heads/task-.*"
-        
+
   triggers:
   - template:
       name: cancel-running-agents

@@ -11,7 +11,7 @@ help: run 'rustup default stable' to download the latest stable release of Rust 
 ```
 
 The agent then has to:
-1. Run `rustup default stable` 
+1. Run `rustup default stable`
 2. Download and install entire Rust toolchain (cargo, clippy, rust-docs, rust-std, rustc, rustfmt)
 3. Then proceed with actual work
 

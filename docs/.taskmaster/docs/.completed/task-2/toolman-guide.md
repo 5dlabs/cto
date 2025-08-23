@@ -146,7 +146,7 @@ spec:
       - path: field.path
         type: string
         value: "expected-value"
-  
+
   triggers:
   - template:
       name: trigger-name

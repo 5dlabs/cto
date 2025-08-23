@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 You are setting up External Secrets resources for Cleo and Tess GitHub Apps to enable secure credential management for multi-agent orchestration. Create External Secrets configurations that follow existing patterns while providing agent-specific GitHub App authentication.
 
@@ -78,7 +77,7 @@ metadata:
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    kind: ClusterSecretStore 
+    kind: ClusterSecretStore
     name: aws-secrets-manager
   target:
     name: github-app-5dlabs-tess
@@ -113,7 +112,7 @@ export GITHUB_APP_ID=$(cat /etc/github-app/app-id)
 export GITHUB_INSTALLATION_ID=$(cat /etc/github-app/installation-id)
 # Generate GitHub token for Cleo operations
 {{else if (eq github_app "5DLabs-Tess")}}
-export GITHUB_APP_ID=$(cat /etc/github-app/app-id)  
+export GITHUB_APP_ID=$(cat /etc/github-app/app-id)
 export GITHUB_INSTALLATION_ID=$(cat /etc/github-app/installation-id)
 # Generate GitHub token for Tess operations
 {{/if}}

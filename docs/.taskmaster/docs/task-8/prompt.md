@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 You are implementing a dedicated Argo Events Sensor to detect Rex push events and automatically restart the QA pipeline with downstream agent cancellation. This ensures clean pipeline restarts when Rex addresses PR feedback.
 
@@ -122,14 +121,14 @@ dag:
   tasks:
   - name: validate-event
     template: validate-rex-push
-  - name: cancel-agents  
+  - name: cancel-agents
     dependencies: [validate-event]
     template: cancel-downstream-agents
   - name: remove-qa-label
     dependencies: [cancel-agents]
     template: remove-ready-for-qa-label
   - name: reset-workflow
-    dependencies: [remove-qa-label] 
+    dependencies: [remove-qa-label]
     template: reset-workflow-stage
   - name: resume-pipeline
     dependencies: [reset-workflow]
@@ -175,7 +174,7 @@ argo resume "$WORKFLOW_NAME"
 - Verify filtering correctly identifies Rex vs other user pushes
 - Test task ID extraction from branch names
 
-### Agent Cancellation Testing  
+### Agent Cancellation Testing
 - Create test CodeRun CRDs and verify they're cancelled correctly
 - Test label selector targeting doesn't affect unrelated agents
 - Verify cancellation completes before proceeding to next step
@@ -199,7 +198,7 @@ argo resume "$WORKFLOW_NAME"
 - Proper webhook endpoint and authentication setup
 - Event data extraction for task ID correlation
 
-### Sensor Implementation  
+### Sensor Implementation
 - Complete Rex remediation sensor with trigger logic
 - Remediation workflow template with all required steps
 - Error handling and validation throughout the flow

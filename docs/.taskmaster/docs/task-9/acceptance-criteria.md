@@ -4,7 +4,7 @@
 
 ### ✅ External Secret Resource Creation
 - [ ] **Cleo External Secret**: `github-app-5dlabs-cleo` ExternalSecret resource created
-- [ ] **Tess External Secret**: `github-app-5dlabs-tess` ExternalSecret resource created  
+- [ ] **Tess External Secret**: `github-app-5dlabs-tess` ExternalSecret resource created
 - [ ] **Namespace Targeting**: Both External Secrets deployed to `agents-platform` namespace
 - [ ] **Resource Labels**: Proper labels applied for resource organization and management
 - [ ] **Secret Store Reference**: Correct ClusterSecretStore referenced for credential backend
@@ -25,7 +25,7 @@
 - [ ] **Installation ID**: GitHub App installation ID for repository access present
 - [ ] **Secret Format**: All values properly base64 encoded in Kubernetes secret
 
-### ✅ Tess Secret Requirements  
+### ✅ Tess Secret Requirements
 - [ ] **App ID**: GitHub App ID for 5DLabs-Tess app present and valid
 - [ ] **Private Key**: RSA private key for JWT signing present and properly formatted
 - [ ] **Client ID**: OAuth client ID for GitHub App present and valid

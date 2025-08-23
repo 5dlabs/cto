@@ -8,7 +8,7 @@ Update the Rust controller to implement agent-specific container script selectio
 ### Architecture
 The template loading system maps GitHub App identifiers to specific container script templates:
 - `5DLabs-Rex` / `5DLabs-Blaze` → `container-rex.sh.hbs` (implementation workflow)
-- `5DLabs-Cleo` → `container-cleo.sh.hbs` (code quality workflow)  
+- `5DLabs-Cleo` → `container-cleo.sh.hbs` (code quality workflow)
 - `5DLabs-Tess` → `container-tess.sh.hbs` (testing workflow)
 
 ### Implementation Steps
@@ -28,30 +28,30 @@ pub struct AgentTemplateMapper {
 impl AgentTemplateMapper {
     pub fn new() -> Self {
         let mut agent_templates = HashMap::new();
-        
+
         // Implementation workflow agents
         agent_templates.insert("5DLabs-Rex".to_string(), "container-rex.sh.hbs".to_string());
         agent_templates.insert("5DLabs-Blaze".to_string(), "container-rex.sh.hbs".to_string());
-        
+
         // Code quality workflow agent
         agent_templates.insert("5DLabs-Cleo".to_string(), "container-cleo.sh.hbs".to_string());
-        
+
         // Testing workflow agent
         agent_templates.insert("5DLabs-Tess".to_string(), "container-tess.sh.hbs".to_string());
-        
+
         Self { agent_templates }
     }
-    
+
     pub fn get_template_for_agent(&self, github_app: &str) -> Result<String> {
         // Extract agent name from github_app field
         let agent_name = self.extract_agent_name(github_app)?;
-        
+
         self.agent_templates
             .get(&agent_name)
             .ok_or_else(|| anyhow!("No template found for agent: {}", agent_name))
             .map(|template| template.clone())
     }
-    
+
     fn extract_agent_name(&self, github_app: &str) -> Result<String> {
         // Handle various github_app formats
         if github_app.contains("[bot]") {
@@ -71,7 +71,7 @@ impl AgentTemplateMapper {
 pub fn load_agent_template(github_app: &str) -> Result<String> {
     let mapper = AgentTemplateMapper::new();
     let template_name = mapper.get_template_for_agent(github_app)?;
-    
+
     // Load template content from filesystem
     load_template_file(&template_name)
 }
@@ -79,7 +79,7 @@ pub fn load_agent_template(github_app: &str) -> Result<String> {
 fn load_template_file(template_name: &str) -> Result<String> {
     use std::fs;
     use std::path::Path;
-    
+
     let template_path = Path::new("templates").join(template_name);
     fs::read_to_string(&template_path)
         .map_err(|e| anyhow!("Failed to load template {}: {}", template_name, e))
@@ -92,14 +92,14 @@ fn load_template_file(template_name: &str) -> Result<String> {
 // In task processing logic
 pub fn process_code_task(task: &CodeTask) -> Result<String> {
     let template_content = load_agent_template(&task.github_app)?;
-    
+
     // Compile template with task context
     let mut handlebars = Handlebars::new();
     handlebars.register_template_string("container", &template_content)?;
-    
+
     let context = create_template_context(task)?;
     let rendered = handlebars.render("container", &context)?;
-    
+
     Ok(rendered)
 }
 ```
@@ -144,7 +144,7 @@ echo "Starting implementation workflow for {{github_app}}"
 # ... implementation steps
 ```
 
-**container-cleo.sh.hbs** - Code quality workflow  
+**container-cleo.sh.hbs** - Code quality workflow
 ```bash
 #!/bin/bash
 # Cleo Code Quality Workflow
@@ -162,7 +162,7 @@ echo "Starting code quality workflow for {{github_app}}"
 **container-tess.sh.hbs** - Testing workflow
 ```bash
 #!/bin/bash
-# Tess Testing Workflow  
+# Tess Testing Workflow
 set -euo pipefail
 
 # Setup environment
@@ -183,10 +183,10 @@ Update the main task processing function to use the new template selection:
 pub async fn execute_code_task(task: CodeTask) -> Result<TaskResult> {
     // Select appropriate template based on agent
     let container_script = load_agent_template(&task.github_app)?;
-    
+
     // Create and execute container with agent-specific script
     let result = execute_container_workflow(&container_script, &task).await?;
-    
+
     Ok(result)
 }
 ```
@@ -206,7 +206,7 @@ impl Default for TemplateConfig {
         let mut agent_templates = HashMap::new();
         agent_templates.insert("5DLabs-Rex".to_string(), "container-rex.sh.hbs".to_string());
         // ... other mappings
-        
+
         Self { agent_templates }
     }
 }
@@ -224,21 +224,21 @@ mod tests {
     #[test]
     fn test_agent_template_mapping() {
         let mapper = AgentTemplateMapper::new();
-        
+
         assert_eq!(
             mapper.get_template_for_agent("5DLabs-Rex").unwrap(),
             "container-rex.sh.hbs"
         );
         assert_eq!(
-            mapper.get_template_for_agent("5DLabs-Cleo").unwrap(), 
+            mapper.get_template_for_agent("5DLabs-Cleo").unwrap(),
             "container-cleo.sh.hbs"
         );
     }
-    
+
     #[test]
     fn test_agent_name_extraction() {
         let mapper = AgentTemplateMapper::new();
-        
+
         assert_eq!(
             mapper.extract_agent_name("5DLabs-Rex[bot]").unwrap(),
             "5DLabs-Rex"
@@ -248,15 +248,15 @@ mod tests {
             "5DLabs-Tess"
         );
     }
-    
+
     #[test]
     fn test_unknown_agent_fallback() {
         let mapper = AgentTemplateMapper::new();
         let template = mapper.get_template_for_agent_with_fallback("Unknown-Agent");
-        
+
         assert_eq!(template, "container-rex.sh.hbs");
     }
-    
+
     #[test]
     fn test_template_loading() {
         // Test that template files exist and are valid
@@ -276,10 +276,10 @@ async fn test_end_to_end_template_selection() {
         github_app: "5DLabs-Cleo".to_string(),
         // ... other fields
     };
-    
+
     let result = execute_code_task(task).await;
     assert!(result.is_ok());
-    
+
     // Verify Cleo-specific workflow was executed
     // Check for Cleo-specific outputs or side effects
 }
@@ -288,7 +288,7 @@ async fn test_end_to_end_template_selection() {
 ## Performance Considerations
 
 1. **Template Caching**: Cache loaded templates to avoid file I/O on every request
-2. **Agent Detection**: Optimize agent name extraction for high-frequency operations  
+2. **Agent Detection**: Optimize agent name extraction for high-frequency operations
 3. **Memory Usage**: Use string interning for template names to reduce allocations
 
 ## Security Considerations

@@ -98,17 +98,17 @@ storage_tiers:
     access_pattern: "frequent"
     retention_period: "30d"
     storage_class: "STANDARD"
-    
+
   warm_storage:
     access_pattern: "infrequent"
     retention_period: "1y"
     storage_class: "STANDARD_IA"
-    
+
   cold_storage:
     access_pattern: "archive"
     retention_period: "7y"
     storage_class: "GLACIER"
-    
+
   compliance_storage:
     access_pattern: "deep_archive"
     retention_period: "indefinite"
@@ -125,21 +125,21 @@ archival_pipeline:
         - workflow_status: ["Succeeded", "Failed", "Error"]
         - completion_age: "> 24h"
         - retention_policy_match: true
-        
+
     - name: "artifact_collection"
       operations:
         - collect_workflow_logs
         - gather_agent_artifacts
         - compress_and_validate
         - generate_manifest
-        
+
     - name: "metadata_preservation"
       data:
         - workflow_specification
         - execution_timeline
         - resource_utilization
         - compliance_annotations
-        
+
     - name: "storage_optimization"
       techniques:
         - deduplication
@@ -152,7 +152,7 @@ archival_pipeline:
 ```sql
 -- Example query patterns for archived workflow search
 -- Time-range queries with efficient indexing
-SELECT * FROM workflow_archives 
+SELECT * FROM workflow_archives
 WHERE archival_date BETWEEN ? AND ?
   AND workflow_labels @> ?
   AND retention_policy = ?
@@ -194,7 +194,7 @@ ORDER BY relevance_score DESC;
 2. **Basic Archival Process**: Implement core archival functionality for workflow metadata and artifacts
 3. **Policy Framework**: Create configurable retention policy engine with basic rule evaluation
 
-### Phase 2: Automation and Intelligence  
+### Phase 2: Automation and Intelligence
 4. **Automated Scheduling**: Deploy scheduled archival processes with intelligent batch processing
 5. **Advanced Policies**: Implement compliance-based retention with override mechanisms
 6. **Quality Assurance**: Add data integrity verification and corruption detection capabilities
@@ -217,7 +217,7 @@ ORDER BY relevance_score DESC;
 - Maintain data sovereignty and jurisdictional compliance for cross-border data storage
 - Provide litigation hold capabilities with immutable preservation guarantees
 
-### Performance and Scalability Constraints  
+### Performance and Scalability Constraints
 - Design for handling thousands of workflows with terabytes of artifacts
 - Minimize performance impact on active workflow execution during archival operations
 - Ensure query performance scales with archive size growth over time

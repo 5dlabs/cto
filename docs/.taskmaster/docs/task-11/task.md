@@ -123,7 +123,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: tess-app-permissions  
+  name: tess-app-permissions
   labels:
     rbac.authorization.k8s.io/aggregate-to-tess: "true"
 rules:

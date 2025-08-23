@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (for submit paths; for resume prefer args)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 ## Mission
 
@@ -81,7 +80,7 @@ spec:
     parameters:
     - name: implementation-agent
       value: "5DLabs-Rex"
-    - name: quality-agent  
+    - name: quality-agent
       value: "5DLabs-Cleo"
     - name: testing-agent
       value: "5DLabs-Tess"
@@ -99,27 +98,27 @@ templates:
     tasks:
     - name: implementation-work
       template: agent-coderun
-      
+
     - name: wait-pr-created
       dependencies: [implementation-work]
       template: suspend-for-event
-      
+
     - name: quality-work
       dependencies: [wait-pr-created]
       template: agent-coderun
-      
+
     - name: wait-ready-for-qa
       dependencies: [quality-work]
       template: suspend-for-event
-      
+
     - name: testing-work
       dependencies: [wait-ready-for-qa]
       template: agent-coderun
-      
+
     - name: wait-pr-approved
       dependencies: [testing-work]
       template: suspend-for-event
-      
+
     - name: complete-task
       dependencies: [wait-pr-approved]
       template: task-completion
@@ -227,15 +226,15 @@ arguments:
     source: |
       #!/bin/sh
       echo "Completing task {{inputs.parameters.task-id}}"
-      
+
       # Archive task to completed directory
       mv docs/.taskmaster/docs/task-{{inputs.parameters.task-id}} \
          docs/.taskmaster/docs/.completed/task-{{inputs.parameters.task-id}}
-      
+
       # Generate completion report
       echo "{{inputs.parameters.workflow-summary}}" > \
            docs/.taskmaster/reports/task-{{inputs.parameters.task-id}}-summary.md
-      
+
       # Trigger next task if available
       NEXT_TASK=$(({{inputs.parameters.task-id}} + 1))
       if [ -d "docs/.taskmaster/docs/task-$NEXT_TASK" ]; then

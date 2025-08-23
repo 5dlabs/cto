@@ -50,14 +50,14 @@ use regex::Regex;
 fn extract_agent_name(github_app: &str) -> Result<String, String> {
     // Handle patterns like:
     // '5DLabs-Rex' -> 'rex'
-    // '5DLabs-Cleo[bot]' -> 'cleo' 
+    // '5DLabs-Cleo[bot]' -> 'cleo'
     // '5DLabs-Tess' -> 'tess'
-    
+
     let re = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-    
+
     if let Some(caps) = re.captures(github_app) {
         let agent_name = caps.get(1).unwrap().as_str().to_lowercase();
-        
+
         // Validate Kubernetes naming constraints
         if validate_k8s_name(&agent_name)? {
             Ok(agent_name)
@@ -82,26 +82,26 @@ impl AgentClassifier {
         let mut implementation_agents = HashSet::new();
         implementation_agents.insert("rex".to_string());
         implementation_agents.insert("blaze".to_string());
-        
+
         let fallback_regex = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-        
+
         Self {
             implementation_agents,
             fallback_regex,
         }
     }
-    
+
     pub fn is_implementation_agent(&self, agent_name: &str) -> bool {
         self.implementation_agents.contains(agent_name)
     }
-    
+
     pub fn requires_isolated_workspace(&self, agent_name: &str) -> bool {
         !self.is_implementation_agent(agent_name)
     }
-    
+
     pub fn get_pvc_name(&self, service: &str, github_app: &str) -> Result<String, String> {
         let agent_name = self.extract_agent_name(github_app)?;
-        
+
         if self.is_implementation_agent(&agent_name) {
             Ok(format!("workspace-{}", service))
         } else {
@@ -123,10 +123,10 @@ async fn ensure_conditional_pvc(
     let classifier = AgentClassifier::new();
     let pvc_name = classifier.get_pvc_name(&code_run.spec.service, &code_run.spec.github_app)
         .map_err(|e| kube::Error::Api(ErrorResponse::default()))?;
-        
+
     let namespace = code_run.metadata.namespace.as_ref().unwrap();
     let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
-    
+
     // Check if PVC exists, create if missing
     match pvc_api.get(&pvc_name).await {
         Ok(_) => {
@@ -152,7 +152,7 @@ async fn reconcile(
     ctx: Arc<Context>,
 ) -> Result<Action, Error> {
     let client = &ctx.client;
-    
+
     // Extract agent name early for consistent usage
     let agent_name = match extract_agent_name(&code_run.spec.github_app) {
         Ok(name) => name,
@@ -162,14 +162,14 @@ async fn reconcile(
             return Ok(Action::requeue(Duration::from_secs(60)));
         }
     };
-    
+
     // Ensure conditional PVC exists
     let pvc_name = ensure_conditional_pvc(&code_run, client).await
         .map_err(|e| Error::PvcCreation(e.to_string()))?;
-    
+
     // Create pod with appropriate workspace
     create_agent_pod(&code_run, &pvc_name, &agent_name, client).await?;
-    
+
     Ok(Action::requeue(Duration::from_secs(30)))
 }
 ```
@@ -216,15 +216,15 @@ impl AgentClassifier {
         let mut implementation_agents = HashSet::new();
         implementation_agents.insert("rex".to_string());
         implementation_agents.insert("blaze".to_string());
-        
+
         let fallback_regex = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-        
+
         Self {
             known_implementation_agents: implementation_agents,
             fallback_regex,
         }
     }
-    
+
     pub fn extract_agent_name(&self, github_app: &str) -> Result<String, String> {
         if let Some(caps) = self.fallback_regex.captures(github_app) {
             let agent_name = caps.get(1).unwrap().as_str().to_lowercase();
@@ -234,28 +234,28 @@ impl AgentClassifier {
             Err(format!("Cannot extract agent name from: {}", github_app))
         }
     }
-    
+
     pub fn is_implementation_agent(&self, agent_name: &str) -> bool {
         self.known_implementation_agents.contains(agent_name)
     }
-    
+
     pub fn requires_isolated_workspace(&self, agent_name: &str) -> bool {
         !self.is_implementation_agent(agent_name)
     }
-    
+
     fn validate_agent_name(&self, name: &str) -> Result<(), String> {
         if name.len() > 63 {
             return Err("Agent name exceeds Kubernetes limit (63 chars)".to_string());
         }
-        
+
         if !name.chars().all(|c| c.is_alphanumeric() || c == '-') {
             return Err("Agent name contains invalid characters".to_string());
         }
-        
+
         if name.starts_with('-') || name.ends_with('-') {
             return Err("Agent name cannot start/end with hyphen".to_string());
         }
-        
+
         Ok(())
     }
 }
@@ -278,14 +278,14 @@ fn create_conditional_pvc_spec(
     labels.insert("app.kubernetes.io/name".to_string(), "agent-workspace".to_string());
     labels.insert("app.kubernetes.io/component".to_string(), "storage".to_string());
     labels.insert("service".to_string(), service.to_string());
-    
+
     if let Some(agent) = agent_name {
         labels.insert("agent".to_string(), agent.to_string());
         labels.insert("workspace-type".to_string(), "isolated".to_string());
     } else {
         labels.insert("workspace-type".to_string(), "shared".to_string());
     }
-    
+
     let mut annotations = BTreeMap::new();
     if let Some(agent) = agent_name {
         annotations.insert(
@@ -298,10 +298,10 @@ fn create_conditional_pvc_spec(
             format!("Shared workspace for implementation agents on {} service", service),
         );
     }
-    
+
     let mut resource_requests = BTreeMap::new();
     resource_requests.insert("storage".to_string(), Quantity("10Gi".to_string()));
-    
+
     PersistentVolumeClaim {
         metadata: ObjectMeta {
             name: Some(pvc_name.to_string()),

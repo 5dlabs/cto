@@ -79,7 +79,7 @@ Update the CRDs to include format specification:
 #[kube(group = "platform.5dlabs.com", version = "v1", kind = "CodeRun")]
 pub struct CodeRunSpec {
     // ... existing fields ...
-    
+
     /// Documentation format to use
     #[serde(default = "default_format")]
     pub format: DocumentFormat,
@@ -114,7 +114,7 @@ process_documentation() {
     local format="$1"
     local input_file="$2"
     local output_file="$3"
-    
+
     case "$format" in
         xml)
             echo "📄 Processing XML documentation format"
@@ -133,7 +133,7 @@ process_documentation() {
 generate_prompt() {
     local format="$1"
     local task_id="$2"
-    
+
     case "$format" in
         xml)
             cat > prompt.xml << 'EOF'
@@ -253,11 +253,11 @@ impl DocumentFormatter for MarkdownFormatter {
     fn format_task(&self, task: &Task) -> Result<String> {
         // Generate Markdown representation
     }
-    
+
     fn parse_response(&self, response: &str) -> Result<TaskResponse> {
         // Parse Markdown response
     }
-    
+
     fn validate(&self, content: &str) -> Result<()> {
         // Validate Markdown structure
     }
@@ -267,11 +267,11 @@ impl DocumentFormatter for XmlFormatter {
     fn format_task(&self, task: &Task) -> Result<String> {
         // Generate XML representation
     }
-    
+
     fn parse_response(&self, response: &str) -> Result<TaskResponse> {
         // Parse XML response
     }
-    
+
     fn validate(&self, content: &str) -> Result<()> {
         // Validate XML structure (DTD/XSD)
     }

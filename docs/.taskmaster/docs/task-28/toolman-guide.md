@@ -426,16 +426,16 @@ health_status = Gauge('agent_health_status', 'Agent health status', ['agent_type
 class HealthChecker:
     def __init__(self, agent_type):
         self.agent_type = agent_type
-        
+
     def check_git_access(self):
         """Check git repository access"""
         try:
-            result = subprocess.run(['git', 'status'], 
+            result = subprocess.run(['git', 'status'],
                                   capture_output=True, timeout=5)
             return result.returncode == 0
         except Exception:
             return False
-    
+
     def check_workspace_access(self):
         """Check workspace file system access"""
         try:
@@ -444,33 +444,33 @@ class HealthChecker:
             return os.path.exists(workspace_path) and os.access(workspace_path, os.W_OK)
         except Exception:
             return False
-    
+
     def check_mcp_connection(self):
         """Check MCP server connectivity (Rex-specific)"""
         if self.agent_type != 'rex':
             return True
-            
+
         try:
             mcp_endpoint = os.getenv('MCP_SERVER_URL', 'http://mcp-server:8080')
             response = requests.get(f"{mcp_endpoint}/health", timeout=5)
             return response.status_code == 200
         except Exception:
             return False
-    
+
     def check_cargo_tools(self):
         """Check cargo tool availability (Cleo/Tess-specific)"""
         if self.agent_type == 'rex':
             return True
-            
+
         tools = ['cargo']
         if self.agent_type == 'cleo':
             tools.extend(['cargo-fmt', 'cargo-clippy'])
         elif self.agent_type == 'tess':
             tools.extend(['cargo-test'])
-            
+
         for tool in tools:
             try:
-                result = subprocess.run([tool, '--version'], 
+                result = subprocess.run([tool, '--version'],
                                       capture_output=True, timeout=5)
                 if result.returncode != 0:
                     return False
@@ -483,7 +483,7 @@ class HealthChecker:
 def health_check():
     agent_type = os.getenv('AGENT_TYPE', 'unknown')
     checker = HealthChecker(agent_type)
-    
+
     with health_check_duration.labels(agent_type=agent_type).time():
         checks = {
             'git_access': checker.check_git_access(),
@@ -491,16 +491,16 @@ def health_check():
             'mcp_connection': checker.check_mcp_connection(),
             'cargo_tools': checker.check_cargo_tools()
         }
-        
+
         # Update metrics
         for check_name, status in checks.items():
             health_status.labels(agent_type=agent_type, check_name=check_name).set(1 if status else 0)
-        
+
         overall_status = all(checks.values())
         status_label = 'healthy' if overall_status else 'unhealthy'
-        
+
         health_check_requests.labels(agent_type=agent_type, status=status_label).inc()
-        
+
         return jsonify({
             'status': status_label,
             'timestamp': datetime.utcnow().isoformat(),
@@ -530,38 +530,38 @@ from prometheus_client import push_to_gateway, CollectorRegistry, Gauge
 
 def run_synthetic_checks():
     registry = CollectorRegistry()
-    synthetic_check_status = Gauge('synthetic_health_check_status', 
-                                 'Synthetic health check status', 
+    synthetic_check_status = Gauge('synthetic_health_check_status',
+                                 'Synthetic health check status',
                                  ['agent_type'], registry=registry)
-    
+
     agents = ['rex', 'cleo', 'tess']
     all_healthy = True
-    
+
     for agent in agents:
         try:
             response = requests.get(f'http://{agent}-agent:8080/health', timeout=10)
             healthy = response.status_code == 200
-            
+
             synthetic_check_status.labels(agent_type=agent).set(1 if healthy else 0)
-            
+
             if not healthy:
                 all_healthy = False
                 print(f"WARN: {agent} agent health check failed")
             else:
                 print(f"OK: {agent} agent health check passed")
-                
+
         except Exception as e:
             synthetic_check_status.labels(agent_type=agent).set(0)
             all_healthy = False
             print(f"ERROR: {agent} agent health check exception: {e}")
-    
+
     # Push metrics to Prometheus
     try:
-        push_to_gateway('pushgateway:9091', job='synthetic-health-checks', 
+        push_to_gateway('pushgateway:9091', job='synthetic-health-checks',
                        registry=registry)
     except Exception as e:
         print(f"ERROR: Failed to push metrics: {e}")
-    
+
     return 0 if all_healthy else 1
 
 if __name__ == '__main__':
@@ -615,10 +615,10 @@ class ResourceMonitor:
     def __init__(self):
         self.registry = CollectorRegistry()
         self.setup_metrics()
-        
+
     def setup_metrics(self):
-        self.cpu_usage = Gauge('workflow_detailed_cpu_usage_percent', 
-                             'Detailed CPU usage', 
+        self.cpu_usage = Gauge('workflow_detailed_cpu_usage_percent',
+                             'Detailed CPU usage',
                              ['workflow', 'agent'], registry=self.registry)
         self.memory_usage = Gauge('workflow_detailed_memory_usage_bytes',
                                 'Detailed memory usage',
@@ -627,63 +627,63 @@ class ResourceMonitor:
                            'Disk I/O bytes',
                            ['workflow', 'agent', 'type'], registry=self.registry)
         self.network_io = Gauge('workflow_network_io_bytes_total',
-                              'Network I/O bytes', 
+                              'Network I/O bytes',
                               ['workflow', 'agent', 'type'], registry=self.registry)
-    
+
     def collect_system_metrics(self):
         """Collect detailed system metrics"""
-        
+
         # CPU metrics
         cpu_percent = psutil.cpu_percent(interval=1, percpu=False)
-        
+
         # Memory metrics
         memory = psutil.virtual_memory()
-        
+
         # Disk I/O metrics
         disk_io = psutil.disk_io_counters()
-        
-        # Network I/O metrics  
+
+        # Network I/O metrics
         network_io = psutil.net_io_counters()
-        
+
         # Update metrics (simplified for example)
         workflow_name = os.getenv('WORKFLOW_NAME', 'unknown')
         agent_type = os.getenv('AGENT_TYPE', 'unknown')
-        
+
         self.cpu_usage.labels(workflow=workflow_name, agent=agent_type).set(cpu_percent)
-        
+
         self.memory_usage.labels(workflow=workflow_name, agent=agent_type, type='used').set(memory.used)
         self.memory_usage.labels(workflow=workflow_name, agent=agent_type, type='available').set(memory.available)
-        
+
         if disk_io:
             self.disk_io.labels(workflow=workflow_name, agent=agent_type, type='read').set(disk_io.read_bytes)
             self.disk_io.labels(workflow=workflow_name, agent=agent_type, type='write').set(disk_io.write_bytes)
-        
+
         if network_io:
             self.network_io.labels(workflow=workflow_name, agent=agent_type, type='received').set(network_io.bytes_recv)
             self.network_io.labels(workflow=workflow_name, agent=agent_type, type='sent').set(network_io.bytes_sent)
-    
+
     def collect_kubernetes_metrics(self):
         """Collect Kubernetes-specific metrics"""
         try:
             kubernetes.config.load_incluster_config()
             v1 = kubernetes.client.CoreV1Api()
-            
+
             # Get PVC usage
             pvcs = v1.list_namespaced_persistent_volume_claim('taskmaster')
-            
+
             pvc_usage = Gauge('workflow_pvc_usage_percent',
                             'PVC usage percentage',
                             ['pvc_name', 'namespace'], registry=self.registry)
-            
+
             for pvc in pvcs.items:
                 # This would require additional logic to get actual usage
                 # For now, using placeholder
-                pvc_usage.labels(pvc_name=pvc.metadata.name, 
+                pvc_usage.labels(pvc_name=pvc.metadata.name,
                                namespace=pvc.metadata.namespace).set(50)
-                
+
         except Exception as e:
             print(f"Error collecting Kubernetes metrics: {e}")
-    
+
     def push_metrics(self):
         """Push metrics to Prometheus Pushgateway"""
         try:
@@ -691,7 +691,7 @@ class ResourceMonitor:
                            registry=self.registry)
         except Exception as e:
             print(f"Error pushing metrics: {e}")
-    
+
     def run_collection(self):
         """Main collection loop"""
         self.collect_system_metrics()
@@ -758,21 +758,21 @@ archive_workflow() {
   local workflow_name="$1"
   local namespace="$2"
   local timestamp=$(date +%Y%m%d_%H%M%S)
-  
+
   echo "Archiving workflow: $workflow_name"
-  
+
   # Get workflow definition
   kubectl get workflow "$workflow_name" -n "$namespace" -o json > "/tmp/${workflow_name}.json"
-  
+
   # Compress and upload
   gzip "/tmp/${workflow_name}.json"
-  
+
   aws s3 cp "/tmp/${workflow_name}.json.gz" \
     "s3://taskmaster-workflow-archives/workflow-archives/$namespace/$workflow_name/${timestamp}.json.gz" \
     --metadata workflow-name="$workflow_name",namespace="$namespace",archive-date="$timestamp"
-  
+
   echo "Archived to s3://taskmaster-workflow-archives/workflow-archives/$namespace/$workflow_name/${timestamp}.json.gz"
-  
+
   # Cleanup local files
   rm -f "/tmp/${workflow_name}.json.gz"
 }
@@ -782,20 +782,20 @@ retrieve_workflow() {
   local workflow_name="$1"
   local namespace="$2"
   local archive_date="$3"
-  
+
   aws s3 cp \
     "s3://taskmaster-workflow-archives/workflow-archives/$namespace/$workflow_name/${archive_date}.json.gz" \
     "/tmp/${workflow_name}-${archive_date}.json.gz"
-  
+
   gunzip "/tmp/${workflow_name}-${archive_date}.json.gz"
-  
+
   echo "Retrieved workflow definition to /tmp/${workflow_name}-${archive_date}.json"
 }
 
 # List archived workflows
 list_archived_workflows() {
   local namespace="$1"
-  
+
   aws s3 ls --recursive "s3://taskmaster-workflow-archives/workflow-archives/$namespace/" \
     --human-readable --summarize
 }
@@ -809,26 +809,26 @@ list_archived_workflows() {
 # Comprehensive health check implementation
 implement_health_checks() {
   echo "=== Implementing Health Checks ==="
-  
+
   # 1. Create health check endpoints with proper timeouts
   # 2. Use appropriate HTTP status codes
   # 3. Include detailed check results in response
   # 4. Implement proper error handling
   # 5. Use structured logging
-  
+
   # Example health check validation
   validate_health_endpoint() {
     local agent="$1"
     local endpoint="http://${agent}-agent:8080/health"
-    
+
     echo "Testing $agent health endpoint..."
-    
+
     response=$(curl -s -w "%{http_code}" -o /tmp/health_response.json "$endpoint")
     http_code=${response: -3}
-    
+
     if [ "$http_code" = "200" ]; then
       echo "✓ $agent health check responding correctly"
-      
+
       # Validate response structure
       if jq -e '.status and .timestamp and .checks and .agent_type' /tmp/health_response.json > /dev/null; then
         echo "✓ $agent health response structure valid"
@@ -839,7 +839,7 @@ implement_health_checks() {
       echo "✗ $agent health check failed with HTTP $http_code"
     fi
   }
-  
+
   for agent in rex cleo tess; do
     validate_health_endpoint "$agent"
   done
@@ -852,33 +852,33 @@ implement_health_checks() {
 # Optimize monitoring performance
 optimize_monitoring() {
   echo "=== Optimizing Monitoring Performance ==="
-  
+
   # 1. Configure appropriate scrape intervals
   # 2. Use metric relabeling to reduce cardinality
   # 3. Implement efficient queries
   # 4. Configure proper retention policies
-  
+
   # Check Prometheus performance
   check_prometheus_performance() {
     echo "Checking Prometheus performance..."
-    
+
     # Query Prometheus self-metrics
     curl -G 'http://prometheus:9090/api/v1/query' \
       --data-urlencode 'query=prometheus_tsdb_head_samples_appended_total'
-    
+
     # Check ingestion rate
     curl -G 'http://prometheus:9090/api/v1/query' \
       --data-urlencode 'query=rate(prometheus_tsdb_head_samples_appended_total[5m])'
-    
+
     # Monitor memory usage
     curl -G 'http://prometheus:9090/api/v1/query' \
       --data-urlencode 'query=process_resident_memory_bytes{job="prometheus"}'
   }
-  
+
   # Optimize dashboard queries
   optimize_dashboard_queries() {
     echo "Optimizing dashboard queries..."
-    
+
     # Use recording rules for expensive queries
     cat > /tmp/recording-rules.yaml <<EOF
 groups:
@@ -892,10 +892,10 @@ groups:
   - record: workflow:stuck_count
     expr: count((time() - argo_workflow_status_phase_start_time{phase!="Succeeded",phase!="Failed"}) > 21600)
 EOF
-    
+
     kubectl apply -f /tmp/recording-rules.yaml
   }
-  
+
   check_prometheus_performance
   optimize_dashboard_queries
 }
@@ -907,33 +907,33 @@ EOF
 # Comprehensive alert management
 manage_alerts() {
   echo "=== Managing Alerts ==="
-  
+
   # Test alert firing
   test_alert_firing() {
     echo "Testing alert firing..."
-    
+
     # Create test metric to trigger alert
     curl -X POST http://pushgateway:9091/metrics/job/test-alert <<EOF
 test_metric{severity="critical"} 1
 EOF
-    
+
     # Wait for alert to fire
     sleep 60
-    
+
     # Check if alert is active
     alerts=$(curl -s http://alertmanager:9093/api/v1/alerts | jq '.data[] | select(.labels.alertname=="TestAlert")')
-    
+
     if [ -n "$alerts" ]; then
       echo "✓ Alert firing correctly"
     else
       echo "✗ Alert not firing"
     fi
   }
-  
+
   # Test alert routing
   test_alert_routing() {
     echo "Testing alert routing..."
-    
+
     # Send test alert to AlertManager
     curl -X POST http://alertmanager:9093/api/v1/alerts \
       -H "Content-Type: application/json" \
@@ -946,26 +946,26 @@ EOF
           "summary": "Test alert routing"
         }
       }]'
-    
+
     echo "Test alert sent to AlertManager"
   }
-  
+
   # Check alert manager status
   check_alertmanager_status() {
     echo "Checking AlertManager status..."
-    
+
     # Check AlertManager health
     curl -f http://alertmanager:9093/-/healthy
-    
+
     # List active alerts
     curl -s http://alertmanager:9093/api/v1/alerts | jq '.data[].labels.alertname' | sort | uniq -c
-    
+
     # Check silences
     curl -s http://alertmanager:9093/api/v1/silences | jq '.data[].comment'
   }
-  
+
   test_alert_firing
-  test_alert_routing  
+  test_alert_routing
   check_alertmanager_status
 }
 ```
@@ -976,11 +976,11 @@ EOF
 # Complete operational workflow
 operational_workflow() {
   echo "=== Running Operational Workflow ==="
-  
+
   # Daily health check
   daily_health_check() {
     echo "Running daily health check..."
-    
+
     # Check all agents
     for agent in rex cleo tess; do
       echo "Checking $agent agent health..."
@@ -991,38 +991,38 @@ operational_workflow() {
         echo "✗ $agent unhealthy"
       fi
     done
-    
+
     # Check stuck workflows
     stuck_workflows=$(curl -s -G 'http://prometheus:9090/api/v1/query' \
       --data-urlencode 'query=count((time() - argo_workflow_status_phase_start_time{phase!="Succeeded",phase!="Failed"}) > 21600)' | \
       jq -r '.data.result[0].value[1]')
-    
+
     echo "Stuck workflows: $stuck_workflows"
-    
+
     # Check resource usage
     high_cpu_pods=$(curl -s -G 'http://prometheus:9090/api/v1/query' \
       --data-urlencode 'query=workflow_cpu_usage_percent > 90' | \
       jq -r '.data.result[] | .metric.workflow')
-    
+
     if [ -n "$high_cpu_pods" ]; then
       echo "High CPU usage pods: $high_cpu_pods"
     fi
   }
-  
+
   # Weekly cleanup verification
   weekly_cleanup_verification() {
     echo "Running weekly cleanup verification..."
-    
+
     # Check cleanup job status
     kubectl get cronjobs workflow-cleanup -n taskmaster
-    
+
     # Verify archive upload
     aws s3 ls s3://taskmaster-workflow-archives/workflow-archives/ --recursive | tail -10
-    
+
     # Check PVC usage
     kubectl get pvc -n taskmaster --sort-by=.status.capacity.storage
   }
-  
+
   daily_health_check
   weekly_cleanup_verification
 }

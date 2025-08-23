@@ -86,7 +86,7 @@ pub struct GlobalRetryLimits {
 impl Default for RetryConfig {
     fn default() -> Self {
         let mut stage_strategies = HashMap::new();
-        
+
         // Repository operations
         stage_strategies.insert(
             WorkflowStage::RepositoryClone,
@@ -117,7 +117,7 @@ impl Default for RetryConfig {
                 },
             },
         );
-        
+
         // Code analysis operations
         stage_strategies.insert(
             WorkflowStage::CodeAnalysis,
@@ -141,7 +141,7 @@ impl Default for RetryConfig {
                 },
             },
         );
-        
+
         // Test execution
         stage_strategies.insert(
             WorkflowStage::TestExecution,
@@ -170,7 +170,7 @@ impl Default for RetryConfig {
                 },
             },
         );
-        
+
         Self {
             stage_strategies,
             global_limits: GlobalRetryLimits {
@@ -211,14 +211,14 @@ impl RetryExecutor {
                 (*stage, CircuitBreaker::new(strategy.circuit_breaker.clone()))
             })
             .collect();
-        
+
         Self {
             config,
             circuit_breakers,
             metrics: RetryMetrics::new(),
         }
     }
-    
+
     pub async fn execute_with_retry<T, F, Fut>(
         &mut self,
         stage: WorkflowStage,
@@ -231,42 +231,42 @@ impl RetryExecutor {
         let strategy = self.config.stage_strategies
             .get(&stage)
             .ok_or_else(|| RetryError::NoStrategyDefined { stage })?;
-        
+
         let circuit_breaker = self.circuit_breakers
             .get_mut(&stage)
             .ok_or_else(|| RetryError::CircuitBreakerNotFound { stage })?;
-        
+
         // Check circuit breaker state
         if circuit_breaker.is_open() {
             return Err(RetryError::CircuitBreakerOpen { stage });
         }
-        
+
         let mut attempt = 0;
         let start_time = Utc::now();
-        
+
         loop {
             attempt += 1;
-            
+
             // Check global limits
             if attempt > strategy.max_attempts {
                 self.metrics.record_final_failure(stage, attempt - 1);
-                return Err(RetryError::MaxAttemptsExceeded { 
-                    stage, 
-                    attempts: attempt - 1 
+                return Err(RetryError::MaxAttemptsExceeded {
+                    stage,
+                    attempts: attempt - 1
                 });
             }
-            
+
             let elapsed = Utc::now() - start_time;
             if elapsed.to_std().unwrap_or_default() > strategy.timeout {
                 self.metrics.record_timeout(stage, elapsed);
                 return Err(RetryError::TimeoutExceeded { stage, elapsed });
             }
-            
+
             // Execute operation
             let operation_start = Utc::now();
             let result = tokio::time::timeout(strategy.timeout, operation()).await;
             let operation_duration = Utc::now() - operation_start;
-            
+
             match result {
                 Ok(Ok(value)) => {
                     // Success
@@ -277,31 +277,31 @@ impl RetryExecutor {
                 Ok(Err(error)) => {
                     // Operation failed
                     let should_retry = self.should_retry(&error, strategy, attempt);
-                    
+
                     if should_retry {
                         circuit_breaker.record_failure();
                         self.metrics.record_retry_attempt(stage, attempt, &error);
-                        
+
                         if attempt < strategy.max_attempts {
                             let backoff_duration = self.calculate_backoff(
                                 &strategy.backoff_type,
                                 attempt,
                             );
-                            
+
                             tracing::warn!(
                                 "Operation failed for stage {:?}, attempt {}, retrying in {:?}: {}",
                                 stage, attempt, backoff_duration, error
                             );
-                            
+
                             tokio::time::sleep(backoff_duration).await;
                             continue;
                         }
                     }
-                    
+
                     circuit_breaker.record_failure();
                     self.metrics.record_final_failure(stage, attempt);
-                    return Err(RetryError::OperationFailed { 
-                        stage, 
+                    return Err(RetryError::OperationFailed {
+                        stage,
                         attempts: attempt,
                         last_error: error.to_string(),
                     });
@@ -315,7 +315,7 @@ impl RetryExecutor {
             }
         }
     }
-    
+
     fn should_retry(
         &self,
         error: &anyhow::Error,
@@ -325,22 +325,22 @@ impl RetryExecutor {
         if attempt >= strategy.max_attempts {
             return false;
         }
-        
+
         let error_string = error.to_string();
-        
+
         for condition in &strategy.retry_conditions {
             let error_type_matches = condition.error_types.iter()
                 .any(|error_type| error_string.contains(error_type));
-            
+
             if error_type_matches {
                 return condition.should_retry;
             }
         }
-        
+
         // Default: don't retry unknown errors
         false
     }
-    
+
     fn calculate_backoff(&self, backoff_type: &BackoffType, attempt: u32) -> Duration {
         let base_duration = match backoff_type {
             BackoffType::Fixed { interval } => *interval,
@@ -355,7 +355,7 @@ impl RetryExecutor {
                     .unwrap_or_else(|| intervals.last().copied().unwrap_or(Duration::from_secs(60)))
             }
         };
-        
+
         // Apply jitter if enabled
         if self.config.backoff_config.jitter_enabled {
             self.apply_jitter(base_duration)
@@ -363,14 +363,14 @@ impl RetryExecutor {
             base_duration
         }
     }
-    
+
     fn apply_jitter(&self, duration: Duration) -> Duration {
         use rand::Rng;
-        
+
         let jitter_factor = self.config.backoff_config.jitter_factor;
         let jitter_range = duration.as_millis() as f64 * jitter_factor;
         let jitter = rand::thread_rng().gen_range(-jitter_range..=jitter_range) as i64;
-        
+
         let adjusted_millis = (duration.as_millis() as i64 + jitter).max(0) as u64;
         Duration::from_millis(adjusted_millis)
     }
@@ -380,22 +380,22 @@ impl RetryExecutor {
 pub enum RetryError {
     #[error("No retry strategy defined for stage {stage:?}")]
     NoStrategyDefined { stage: WorkflowStage },
-    
+
     #[error("Circuit breaker is open for stage {stage:?}")]
     CircuitBreakerOpen { stage: WorkflowStage },
-    
+
     #[error("Circuit breaker not found for stage {stage:?}")]
     CircuitBreakerNotFound { stage: WorkflowStage },
-    
+
     #[error("Max attempts exceeded for stage {stage:?} after {attempts} attempts")]
     MaxAttemptsExceeded { stage: WorkflowStage, attempts: u32 },
-    
+
     #[error("Timeout exceeded for stage {stage:?} after {elapsed:?}")]
     TimeoutExceeded { stage: WorkflowStage, elapsed: chrono::Duration },
-    
+
     #[error("Operation failed for stage {stage:?} after {attempts} attempts: {last_error}")]
     OperationFailed { stage: WorkflowStage, attempts: u32, last_error: String },
-    
+
     #[error("Operation timeout for stage {stage:?}")]
     OperationTimeout { stage: WorkflowStage },
 }
@@ -426,12 +426,12 @@ impl CircuitBreaker {
             half_open_calls: 0,
         }
     }
-    
+
     pub fn is_open(&mut self) -> bool {
         self.update_state();
         matches!(self.state, CircuitBreakerState::Open)
     }
-    
+
     pub fn record_success(&mut self) {
         match self.state {
             CircuitBreakerState::HalfOpen => {
@@ -447,11 +447,11 @@ impl CircuitBreaker {
             }
         }
     }
-    
+
     pub fn record_failure(&mut self) {
         self.failure_count += 1;
         self.last_failure_time = Some(Utc::now());
-        
+
         match self.state {
             CircuitBreakerState::Closed => {
                 if self.failure_count >= self.config.failure_threshold {
@@ -467,7 +467,7 @@ impl CircuitBreaker {
             }
         }
     }
-    
+
     fn update_state(&mut self) {
         if let CircuitBreakerState::Open = self.state {
             if let Some(last_failure) = self.last_failure_time {
@@ -491,19 +491,19 @@ impl RetryMetrics {
     pub fn new() -> Self {
         Self {}
     }
-    
+
     pub fn record_success(&self, stage: WorkflowStage, attempts: u32, duration: chrono::Duration) {
         // Record success metrics
     }
-    
+
     pub fn record_retry_attempt(&self, stage: WorkflowStage, attempt: u32, error: &anyhow::Error) {
         // Record retry attempt metrics
     }
-    
+
     pub fn record_final_failure(&self, stage: WorkflowStage, attempts: u32) {
         // Record final failure metrics
     }
-    
+
     pub fn record_timeout(&self, stage: WorkflowStage, duration: chrono::Duration) {
         // Record timeout metrics
     }
@@ -622,7 +622,7 @@ impl FailureAnalyzer {
             historical_data: HistoricalFailureData::new(),
         }
     }
-    
+
     pub async fn analyze_failure(
         &self,
         workflow_id: &str,
@@ -631,23 +631,23 @@ impl FailureAnalyzer {
         context: HashMap<String, serde_json::Value>,
     ) -> Result<FailureAnalysis, AnalysisError> {
         let failure_id = uuid::Uuid::new_v4().to_string();
-        
+
         // Extract error details
         let error_details = self.extract_error_details(error, context).await?;
-        
+
         // Perform root cause analysis
         let root_cause = self.determine_root_cause(&error_details, stage).await;
-        
+
         // Assess impact
         let impact_assessment = self.assess_impact(workflow_id, stage, &error_details).await?;
-        
+
         // Generate recovery recommendations
         let recovery_recommendations = self.generate_recovery_recommendations(
             &root_cause,
             &impact_assessment,
             stage,
         ).await;
-        
+
         Ok(FailureAnalysis {
             failure_id,
             workflow_id: workflow_id.to_string(),
@@ -659,7 +659,7 @@ impl FailureAnalyzer {
             recovery_recommendations,
         })
     }
-    
+
     async fn extract_error_details(
         &self,
         error: &anyhow::Error,
@@ -669,17 +669,17 @@ impl FailureAnalyzer {
             .chain()
             .map(|e| e.to_string())
             .collect();
-        
+
         // Extract error type from error chain
         let error_type = self.classify_error_type(&error_chain);
-        
+
         // Get related logs
         let related_logs = self.get_related_logs(&context).await;
-        
+
         // Add system context
         context.insert("error_chain".to_string(), serde_json::json!(error_chain));
         context.insert("timestamp".to_string(), serde_json::json!(Utc::now()));
-        
+
         Ok(ErrorDetails {
             error_type,
             error_message: error.to_string(),
@@ -688,7 +688,7 @@ impl FailureAnalyzer {
             related_logs,
         })
     }
-    
+
     async fn determine_root_cause(
         &self,
         error_details: &ErrorDetails,
@@ -696,7 +696,7 @@ impl FailureAnalyzer {
     ) -> Option<RootCause> {
         // Pattern matching against known failure patterns
         let patterns = self.pattern_matcher.find_matching_patterns(error_details);
-        
+
         if let Some(pattern) = patterns.first() {
             Some(RootCause {
                 category: self.categorize_failure(&error_details.error_type, stage),
@@ -709,7 +709,7 @@ impl FailureAnalyzer {
             self.heuristic_root_cause_analysis(error_details, stage).await
         }
     }
-    
+
     fn categorize_failure(&self, error_type: &str, stage: WorkflowStage) -> FailureCategory {
         match error_type.to_lowercase().as_str() {
             s if s.contains("network") || s.contains("connection") => FailureCategory::Network,
@@ -763,7 +763,7 @@ impl PatternMatcher {
             patterns: Self::load_failure_patterns(),
         }
     }
-    
+
     fn load_failure_patterns() -> Vec<FailurePattern> {
         vec![
             FailurePattern {
@@ -805,31 +805,31 @@ impl PatternMatcher {
             // Add more patterns...
         ]
     }
-    
+
     fn find_matching_patterns(&self, error_details: &ErrorDetails) -> Vec<&FailurePattern> {
         self.patterns
             .iter()
             .filter(|pattern| self.pattern_matches(pattern, error_details))
             .collect()
     }
-    
+
     fn pattern_matches(&self, pattern: &FailurePattern, error_details: &ErrorDetails) -> bool {
         // Check error signatures
         let error_text = format!("{} {}", error_details.error_type, error_details.error_message);
         let signature_match = pattern.error_signatures
             .iter()
             .any(|sig| error_text.to_lowercase().contains(&sig.to_lowercase()));
-        
+
         if !signature_match {
             return false;
         }
-        
+
         // Check context conditions
         pattern.context_conditions
             .iter()
             .all(|condition| self.check_context_condition(condition, &error_details.context))
     }
-    
+
     fn check_context_condition(
         &self,
         condition: &ContextCondition,
@@ -991,47 +991,47 @@ impl NotificationService {
     pub fn new(config: NotificationConfig) -> Self {
         let rate_limiter = RateLimiter::new(config.rate_limiting.clone());
         let channel_handlers = Self::create_channel_handlers();
-        
+
         Self {
             config,
             rate_limiter,
             channel_handlers,
         }
     }
-    
+
     pub async fn send_failure_notification(
         &mut self,
         failure_analysis: &super::analysis::FailureAnalysis,
     ) -> Result<NotificationResult, NotificationError> {
         let notification_type = self.determine_notification_type(failure_analysis);
-        
+
         // Check rate limiting
         if !self.rate_limiter.can_send(&notification_type) {
             return Ok(NotificationResult::RateLimited);
         }
-        
+
         // Generate message from template
         let message = self.generate_message(notification_type, failure_analysis)?;
-        
+
         // Determine which channels to use based on severity
         let channels = self.get_channels_for_severity(&failure_analysis.impact_assessment.severity);
-        
+
         let mut results = Vec::new();
         for channel in channels {
             let result = self.send_to_channel(&channel, &message).await;
             results.push((channel.name.clone(), result));
         }
-        
+
         self.rate_limiter.record_sent(&notification_type);
-        
+
         // Handle escalation if needed
         if self.should_escalate(failure_analysis) {
             self.schedule_escalation(failure_analysis).await?;
         }
-        
+
         Ok(NotificationResult::Sent { results })
     }
-    
+
     fn determine_notification_type(
         &self,
         failure_analysis: &super::analysis::FailureAnalysis,
@@ -1042,7 +1042,7 @@ impl NotificationService {
             Severity::Medium | Severity::Low => NotificationType::RetryExhaustion,
         }
     }
-    
+
     fn generate_message(
         &self,
         notification_type: NotificationType,
@@ -1051,21 +1051,21 @@ impl NotificationService {
         let template = self.config.templates
             .get(&notification_type)
             .ok_or_else(|| NotificationError::TemplateNotFound { notification_type })?;
-        
+
         // Create context for template rendering
         let mut context = HashMap::new();
         context.insert("workflow_id", &failure_analysis.workflow_id);
         context.insert("stage", &format!("{:?}", failure_analysis.stage));
         context.insert("error_message", &failure_analysis.error_details.error_message);
         context.insert("timestamp", &failure_analysis.timestamp.to_rfc3339());
-        
+
         if let Some(root_cause) = &failure_analysis.root_cause {
             context.insert("root_cause", &root_cause.description);
         }
-        
+
         let subject = self.render_template(&template.subject, &context)?;
         let body = self.render_template(&template.body, &context)?;
-        
+
         Ok(NotificationMessage {
             subject,
             body,
@@ -1074,22 +1074,22 @@ impl NotificationService {
             metadata: failure_analysis.into(),
         })
     }
-    
+
     fn render_template(
         &self,
         template: &str,
         context: &HashMap<&str, &str>,
     ) -> Result<String, NotificationError> {
         let mut result = template.to_string();
-        
+
         for (key, value) in context {
             let placeholder = format!("{{{}}}", key);
             result = result.replace(&placeholder, value);
         }
-        
+
         Ok(result)
     }
-    
+
     async fn send_to_channel(
         &self,
         channel: &NotificationChannel,
@@ -1098,25 +1098,25 @@ impl NotificationService {
         if !channel.enabled {
             return Ok(());
         }
-        
+
         let handler = self.channel_handlers
             .get(&channel.channel_type)
-            .ok_or_else(|| NotificationError::HandlerNotFound { 
-                channel_type: channel.channel_type.clone() 
+            .ok_or_else(|| NotificationError::HandlerNotFound {
+                channel_type: channel.channel_type.clone()
             })?;
-        
+
         handler.send(channel, message).await
     }
-    
+
     fn create_channel_handlers() -> HashMap<ChannelType, Box<dyn ChannelHandler>> {
         let mut handlers: HashMap<ChannelType, Box<dyn ChannelHandler>> = HashMap::new();
-        
+
         handlers.insert(ChannelType::Slack, Box::new(SlackHandler::new()));
         handlers.insert(ChannelType::Email, Box::new(EmailHandler::new()));
         handlers.insert(ChannelType::PagerDuty, Box::new(PagerDutyHandler::new()));
         handlers.insert(ChannelType::Webhook, Box::new(WebhookHandler::new()));
         handlers.insert(ChannelType::Teams, Box::new(TeamsHandler::new()));
-        
+
         handlers
     }
 }
@@ -1149,7 +1149,7 @@ impl ChannelHandler for SlackHandler {
         let ChannelConfig::Slack { webhook_url, channel: slack_channel } = &channel.config else {
             return Err(NotificationError::InvalidChannelConfig);
         };
-        
+
         let payload = serde_json::json!({
             "channel": slack_channel,
             "text": message.subject,
@@ -1162,25 +1162,25 @@ impl ChannelHandler for SlackHandler {
                 }]
             }]
         });
-        
+
         let client = reqwest::Client::new();
         let response = client
             .post(webhook_url)
             .json(&payload)
             .send()
             .await
-            .map_err(|e| NotificationError::SendError { 
+            .map_err(|e| NotificationError::SendError {
                 channel: channel.name.clone(),
                 error: e.to_string(),
             })?;
-        
+
         if !response.status().is_success() {
             return Err(NotificationError::SendError {
                 channel: channel.name.clone(),
                 error: format!("HTTP {}", response.status()),
             });
         }
-        
+
         Ok(())
     }
 }
@@ -1227,16 +1227,16 @@ pub enum NotificationResult {
 pub enum NotificationError {
     #[error("Template not found for notification type {notification_type:?}")]
     TemplateNotFound { notification_type: NotificationType },
-    
+
     #[error("Handler not found for channel type {channel_type:?}")]
     HandlerNotFound { channel_type: ChannelType },
-    
+
     #[error("Invalid channel configuration")]
     InvalidChannelConfig,
-    
+
     #[error("Failed to send notification to channel {channel}: {error}")]
     SendError { channel: String, error: String },
-    
+
     #[error("Template rendering failed: {0}")]
     TemplateRenderError(String),
 }
@@ -1262,7 +1262,7 @@ impl RateLimiter {
             counters: HashMap::new(),
         }
     }
-    
+
     fn can_send(&mut self, notification_type: &NotificationType) -> bool {
         let counter = self.counters
             .entry(*notification_type)
@@ -1273,14 +1273,14 @@ impl RateLimiter {
                 last_reset_day: Utc::now(),
                 last_sent: None,
             });
-        
+
         // Check cooldown period
         if let Some(last_sent) = counter.last_sent {
             if Utc::now() - last_sent < self.config.cooldown_period {
                 return false;
             }
         }
-        
+
         // Reset counters if needed
         let now = Utc::now();
         if now - counter.last_reset_hour >= chrono::Duration::hours(1) {
@@ -1291,12 +1291,12 @@ impl RateLimiter {
             counter.daily_count = 0;
             counter.last_reset_day = now;
         }
-        
+
         // Check rate limits
         counter.hourly_count < self.config.max_notifications_per_hour &&
         counter.daily_count < self.config.max_notifications_per_day
     }
-    
+
     fn record_sent(&mut self, notification_type: &NotificationType) {
         if let Some(counter) = self.counters.get_mut(notification_type) {
             counter.hourly_count += 1;
@@ -1320,7 +1320,7 @@ metadata:
 spec:
   entrypoint: resilient-execution
   onExit: cleanup-and-analyze
-  
+
   arguments:
     parameters:
     - name: repository
@@ -1329,7 +1329,7 @@ spec:
       value: "3"
     - name: enable-recovery
       value: "true"
-  
+
   templates:
   - name: resilient-execution
     dag:
@@ -1344,7 +1344,7 @@ spec:
             value: "RepositoryClone"
           - name: max-attempts
             value: "{{workflow.parameters.max-retries}}"
-      
+
       - name: code-analysis
         dependencies: [repository-clone]
         template: resilient-step
@@ -1356,7 +1356,7 @@ spec:
             value: "CodeAnalysis"
           - name: max-attempts
             value: "2"
-      
+
       - name: test-execution
         dependencies: [code-analysis]
         template: resilient-step
@@ -1368,7 +1368,7 @@ spec:
             value: "TestExecution"
           - name: max-attempts
             value: "2"
-      
+
       - name: coverage-analysis
         dependencies: [test-execution]
         template: resilient-step
@@ -1380,7 +1380,7 @@ spec:
             value: "CoverageAnalysis"
           - name: max-attempts
             value: "2"
-      
+
       - name: pr-review
         dependencies: [coverage-analysis]
         template: resilient-step
@@ -1412,19 +1412,19 @@ spec:
       command: [bash]
       source: |
         set -e
-        
+
         # Load retry configuration and failure handling
         export STAGE="{{inputs.parameters.stage}}"
         export OPERATION="{{inputs.parameters.operation}}"
         export WORKFLOW_ID="{{workflow.uid}}"
         export MAX_ATTEMPTS="{{inputs.parameters.max-attempts}}"
-        
+
         echo "=== Resilient Step Execution ==="
         echo "Stage: $STAGE"
         echo "Operation: $OPERATION"
         echo "Max Attempts: $MAX_ATTEMPTS"
         echo "Current Attempt: $(({{retries.attempts}} + 1))"
-        
+
         # Execute the operation with comprehensive error handling
         execute_operation() {
           case "$OPERATION" in
@@ -1435,26 +1435,26 @@ spec:
               git fetch origin pull/{{workflow.parameters.pr-number}}/head:pr-{{workflow.parameters.pr-number}}
               git checkout pr-{{workflow.parameters.pr-number}}
               ;;
-            
+
             "analyze-code")
               echo "Analyzing code quality and structure"
               cd /workspace
               # Run code analysis tools
               cargo clippy --all-targets --all-features -- -D warnings
               ;;
-            
+
             "run-tests")
               echo "Executing test suite"
               cd /workspace
               cargo test --all-features
               ;;
-            
+
             "analyze-coverage")
               echo "Analyzing test coverage"
               cd /workspace
               cargo llvm-cov --html --output-dir /tmp/coverage test
               ;;
-            
+
             "submit-review")
               echo "Submitting PR review"
               # Submit review via GitHub API
@@ -1463,25 +1463,25 @@ spec:
                 "https://api.github.com/repos/{{workflow.parameters.repository}}/pulls/{{workflow.parameters.pr-number}}/reviews" \
                 -d '{"event":"APPROVE","body":"Automated approval after successful validation"}'
               ;;
-            
+
             *)
               echo "Unknown operation: $OPERATION"
               exit 1
               ;;
           esac
         }
-        
+
         # Execute with error capture
         if execute_operation 2>&1 | tee /tmp/operation.log; then
           echo "✅ Operation completed successfully"
-          
+
           # Record success metrics
           curl -X POST http://metrics-service/api/record \
             -d "{\"stage\": \"$STAGE\", \"status\": \"success\", \"attempt\": $(({{retries.attempts}} + 1))}"
         else
           OPERATION_EXIT_CODE=$?
           echo "❌ Operation failed with exit code: $OPERATION_EXIT_CODE"
-          
+
           # Capture failure context
           FAILURE_CONTEXT=$(cat <<EOF
         {
@@ -1498,23 +1498,23 @@ spec:
         }
         EOF
         )
-        
+
           # Send failure context to analysis service
           echo "$FAILURE_CONTEXT" > /tmp/failure-context.json
-          
+
           curl -X POST http://failure-analyzer/api/analyze \
             -H "Content-Type: application/json" \
             -d "$FAILURE_CONTEXT" || echo "Failed to send failure analysis"
-          
+
           # Check if this was the final attempt
           if [ $(({{retries.attempts}} + 1)) -ge $MAX_ATTEMPTS ]; then
             echo "Maximum retry attempts reached for $STAGE"
-            
+
             # Trigger failure notification
             curl -X POST http://notification-service/api/failure \
               -H "Content-Type: application/json" \
               -d "$FAILURE_CONTEXT" || echo "Failed to send failure notification"
-            
+
             # Check if manual intervention is required
             MANUAL_INTERVENTION=$(echo "$FAILURE_CONTEXT" | jq -r '.requires_manual_intervention // false')
             if [ "$MANUAL_INTERVENTION" = "true" ]; then
@@ -1523,10 +1523,10 @@ spec:
               echo "manual_intervention_required" > /tmp/manual-intervention-flag
             fi
           fi
-          
+
           exit $OPERATION_EXIT_CODE
         fi
-    
+
     # Resource limits and requests for resilience
     resources:
       requests:
@@ -1535,7 +1535,7 @@ spec:
       limits:
         memory: "2Gi"
         cpu: "1000m"
-    
+
     # Timeout configuration
     activeDeadlineSeconds: 1800  # 30 minutes per step
 
@@ -1548,14 +1548,14 @@ spec:
         import json
         import requests
         import os
-        
+
         workflow_id = "{{workflow.uid}}"
         workflow_status = "{{workflow.status}}"
-        
+
         print(f"=== Workflow Cleanup and Analysis ===")
         print(f"Workflow ID: {workflow_id}")
         print(f"Status: {workflow_status}")
-        
+
         # Collect workflow execution metrics
         workflow_data = {
             "workflow_id": workflow_id,
@@ -1567,33 +1567,33 @@ spec:
             "failure_points": [],
             "retry_attempts": {}
         }
-        
+
         # Analyze each stage
         stages = ["repository-clone", "code-analysis", "test-execution", "coverage-analysis", "pr-review"]
-        
+
         for stage in stages:
             try:
                 # Get stage status and metrics
                 # This would integrate with Argo to get detailed step information
                 print(f"Analyzing stage: {stage}")
-                
+
                 # Record stage completion data
                 workflow_data["stages_completed"].append(stage)
-                
+
             except Exception as e:
                 print(f"Failed to analyze stage {stage}: {e}")
                 workflow_data["failure_points"].append(stage)
-        
+
         # Generate final report
         if workflow_status == "Succeeded":
             print("✅ Workflow completed successfully")
-            
+
             # Send success notification
             requests.post("http://notification-service/api/success", json=workflow_data)
-            
+
         elif workflow_status == "Failed":
             print("❌ Workflow failed")
-            
+
             # Generate comprehensive failure analysis
             failure_analysis = {
                 "workflow_data": workflow_data,
@@ -1601,13 +1601,13 @@ spec:
                 "potential_fixes": [],
                 "escalation_required": workflow_data.get("failure_points", []) != []
             }
-            
+
             # Send to failure analysis service
             requests.post("http://failure-analyzer/api/final-analysis", json=failure_analysis)
-            
+
             # Send failure notification
             requests.post("http://notification-service/api/failure", json=failure_analysis)
-        
+
         print("=== Analysis Complete ===")
 
   # Manual intervention template
@@ -1621,10 +1621,10 @@ spec:
         echo "Workflow ID: {{workflow.uid}}"
         echo "Stage: {{inputs.parameters.stage}}"
         echo "Failure Context: {{inputs.parameters.failure-context}}"
-        
+
         echo "Waiting for manual resolution..."
         echo "To resume: argo resume {{workflow.name}} -n taskmaster"
-        
+
         # This step will remain suspended until manually resumed
         sleep infinity
 ```
@@ -1636,12 +1636,12 @@ spec:
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_retry_strategy_exponential_backoff() {
         let config = RetryConfig::default();
         let mut executor = RetryExecutor::new(config);
-        
+
         let mut call_count = 0;
         let result = executor.execute_with_retry(
             WorkflowStage::RepositoryClone,
@@ -1656,11 +1656,11 @@ mod tests {
                 }
             }
         ).await;
-        
+
         assert!(result.is_ok());
         assert_eq!(call_count, 3);
     }
-    
+
     #[test]
     fn test_failure_pattern_matching() {
         let analyzer = FailureAnalyzer::new();
@@ -1671,23 +1671,23 @@ mod tests {
             context: HashMap::new(),
             related_logs: vec![],
         };
-        
+
         let patterns = analyzer.pattern_matcher.find_matching_patterns(&error_details);
         assert!(!patterns.is_empty());
         assert_eq!(patterns[0].name, "GitHub API Rate Limiting");
     }
-    
+
     #[tokio::test]
     async fn test_notification_rate_limiting() {
         let config = NotificationConfig::default();
         let mut service = NotificationService::new(config);
-        
+
         let failure = create_test_failure_analysis();
-        
+
         // First notification should succeed
         let result1 = service.send_failure_notification(&failure).await.unwrap();
         assert!(matches!(result1, NotificationResult::Sent { .. }));
-        
+
         // Immediate second notification should be rate limited
         let result2 = service.send_failure_notification(&failure).await.unwrap();
         assert!(matches!(result2, NotificationResult::RateLimited));

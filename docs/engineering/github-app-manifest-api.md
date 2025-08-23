@@ -109,14 +109,14 @@ async fn create_github_app(
 ) -> Result<GitHubApp, Error> {
     // Note: Direct API creation requires GitHub Enterprise
     // or use of OAuth App with proper permissions
-    
+
     // Step 1: Create manifest URL
     let manifest_json = serde_json::to_string(&manifest)?;
     let encoded_manifest = urlencoding::encode(&manifest_json);
-    
+
     // Step 2: Use browser automation or OAuth flow
     // This is a limitation - full automation requires Enterprise
-    
+
     // Alternative: Use pre-existing app to manage others
     create_via_management_app(org, manifest).await
 }
@@ -143,7 +143,7 @@ async fn create_via_management_app(
         FACTORY_APP_ID,
         FACTORY_PRIVATE_KEY
     )?;
-    
+
     // Use management endpoints (if available)
     // Or implement custom workflow
 }
@@ -158,7 +158,7 @@ Pre-create a pool of GitHub Apps and assign them dynamically:
 app_pool:
   - name: agent-pool-001
     status: available
-  - name: agent-pool-002  
+  - name: agent-pool-002
     status: assigned
     assigned_to: Morgan
 ```
@@ -224,33 +224,33 @@ pub struct Permissions {
 impl AgentPersona {
     pub fn infer_permissions(&self) -> Permissions {
         let mut perms = Permissions::default();
-        
+
         // Analyze purpose keywords
         let purpose_lower = self.purpose.to_lowercase();
-        
+
         if purpose_lower.contains("review") || purpose_lower.contains("audit") {
             perms.contents = Some("read".to_string());
             perms.pull_requests = Some("write".to_string());
         }
-        
+
         if purpose_lower.contains("security") || purpose_lower.contains("vulnerability") {
             perms.security_events = Some("write".to_string());
             perms.contents = Some("read".to_string());
         }
-        
+
         if purpose_lower.contains("test") || purpose_lower.contains("quality") {
             perms.checks = Some("write".to_string());
             perms.actions = Some("read".to_string());
         }
-        
+
         if purpose_lower.contains("deploy") || purpose_lower.contains("release") {
             perms.deployments = Some("write".to_string());
             perms.packages = Some("write".to_string());
         }
-        
+
         // Always need metadata
         perms.metadata = Some("read".to_string());
-        
+
         perms
     }
 }
@@ -286,7 +286,7 @@ fn generate_webhook_secret() -> String {
                             abcdefghijklmnopqrstuvwxyz\
                             0123456789";
     let mut rng = rand::thread_rng();
-    
+
     (0..32)
         .map(|_| {
             let idx = rng.gen_range(0..CHARSET.len());
@@ -330,18 +330,18 @@ async fn handle_app_creation_callback(
 ) -> Result<AppCredentials, Error> {
     // Retrieve agent info from state
     let agent_persona = redis_client.get(&format!("app_creation:{}", state))?;
-    
+
     // Exchange code for app credentials
     let response = client
         .post(&format!("https://api.github.com/app-manifests/{}/conversions", code))
         .send()
         .await?;
-    
+
     let app_info: AppCredentials = response.json().await?;
-    
+
     // Store credentials securely
     store_app_credentials(&agent_persona.name, &app_info).await?;
-    
+
     Ok(app_info)
 }
 ```
@@ -401,7 +401,7 @@ data:
            .and_then(|v| v.to_str().ok())
            .and_then(|v| v.parse::<u64>().ok())
            .unwrap_or(60);
-       
+
        tokio::time::sleep(Duration::from_secs(retry_after)).await;
        // Retry
    }
@@ -437,7 +437,7 @@ mod tests {
             purpose: "Testing and validation".to_string(),
             // ...
         };
-        
+
         let manifest = AppManifest::for_agent(&agent);
         assert_eq!(manifest.name, "Agent-TestBot-Testing");
         assert!(manifest.default_permissions.checks.is_some());
@@ -455,7 +455,7 @@ async fn test_github_app_creation() {
         test_manifest(),
         &test_token()
     ).await;
-    
+
     assert!(result.is_ok());
     // Clean up test app
 }
@@ -464,7 +464,7 @@ async fn test_github_app_creation() {
 ## Security Best Practices
 
 1. **Never log private keys**
-2. **Rotate webhook secrets regularly**  
+2. **Rotate webhook secrets regularly**
 3. **Use least-privilege permissions**
 4. **Encrypt manifest in transit**
 5. **Validate webhook signatures**

@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -24,11 +24,10 @@
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 
-
 ## Objective
 Implement comprehensive error handling, retry logic, and failure recovery mechanisms for all workflow stages. Build a resilient system that can automatically recover from transient failures, analyze root causes, provide intelligent notifications, and support manual intervention when needed.
 
-## Context  
+## Context
 You are creating the foundation for a highly resilient Task Master orchestration system. This failure handling system must provide multiple layers of protection against various failure scenarios while maintaining system stability and providing clear visibility into issues and recovery actions.
 
 ## Core Implementation Requirements
@@ -55,7 +54,7 @@ pub struct RetryStrategy {
 
 Key retry types to implement:
 - **Exponential Backoff**: For network-related failures with jitter
-- **Linear Backoff**: For resource contention scenarios  
+- **Linear Backoff**: For resource contention scenarios
 - **Fixed Intervals**: For predictable recovery scenarios
 - **Custom Patterns**: For specific failure types with known recovery times
 
@@ -178,7 +177,7 @@ spec:
         memory: "512Mi"
         cpu: "200m"
       limits:
-        memory: "2Gi" 
+        memory: "2Gi"
         cpu: "1000m"
 ```
 
@@ -234,7 +233,7 @@ Implement comprehensive error context collection:
 ### Manual Intervention Framework
 Create framework for human intervention:
 - **Intervention Triggers**: Identify scenarios requiring human input
-- **Suspension Points**: Safe points to pause workflow execution  
+- **Suspension Points**: Safe points to pause workflow execution
 - **Context Preservation**: Maintain full context during suspension
 - **Resumption Validation**: Verify conditions before resuming
 - **Override Mechanisms**: Emergency bypass procedures
@@ -269,7 +268,7 @@ Focus on individual component testing:
 - Notification rate limiting and escalation logic
 - Backoff calculation including jitter application
 
-### Integration Tests  
+### Integration Tests
 End-to-end failure scenario testing:
 - Complete workflow failure and recovery cycles
 - Multi-stage failure propagation and containment
@@ -337,7 +336,7 @@ timeout = "1800s"
 ```yaml
 channels:
   - name: "slack-critical"
-    type: "slack" 
+    type: "slack"
     webhook_url: "${SLACK_WEBHOOK_URL}"
     enabled: true
   - name: "pagerduty-critical"
@@ -372,7 +371,7 @@ escalation_rules:
 ### Key Metrics
 - **Failure Rate**: Failures per workflow execution
 - **Recovery Rate**: Successful automatic recoveries
-- **Mean Time to Recovery (MTTR)**: Average time to resolve failures  
+- **Mean Time to Recovery (MTTR)**: Average time to resolve failures
 - **Retry Success Rate**: Percentage of failures resolved by retry
 - **Manual Intervention Rate**: Percentage requiring human input
 

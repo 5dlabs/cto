@@ -9,7 +9,7 @@ We're implementing a multi-agent orchestration system using Argo Events + Argo W
 # Desired workflow: PR approved for task-3 → Resume ONLY task-3 workflow
 GitHub PR #123 approved (labeled: task-3)
   ↓ GitHub webhook
-  ↓ Argo Events sensor  
+  ↓ Argo Events sensor
   ↓ Resume play-task-3-workflow (ONLY this one)
 ```
 
@@ -26,7 +26,7 @@ GitHub PR #123 approved (labeled: task-3)
 ```yaml
 # What happens now with static targeting:
 GitHub PR #123 approved (task-3)
-  ↓ Sensor: labelSelector: "workflow-type=play-orchestration,current-stage=waiting-pr-approved"  
+  ↓ Sensor: labelSelector: "workflow-type=play-orchestration,current-stage=waiting-pr-approved"
   ↓ Resumes: task-1, task-3, task-5, task-7 workflows (ALL OF THEM!) ❌
 ```
 
@@ -37,7 +37,7 @@ GitHub PR #123 approved (task-3)
 
 **Investigation Areas:**
 - Argo Events source code for advanced labelSelector capabilities
-- Custom template functions or filters for resource targeting  
+- Custom template functions or filters for resource targeting
 - Multi-step trigger configurations that enable task correlation
 - EventBus or inter-trigger communication patterns
 - Advanced dataTemplate/contextTemplate usage for resource selection
@@ -145,7 +145,7 @@ For each solution discovered, evaluate against:
 - `infra/charts/controller/templates/coderun-template.yaml` - Workflow creation pattern
 - `docs/.taskmaster/docs/prd.txt` - Complete system requirements
 
-### Reference Documentation  
+### Reference Documentation
 - `docs/references/argo-events/` - Official Argo Events examples we've gathered
 - `docs/.taskmaster/docs/architecture.md` - Current architectural assumptions
 

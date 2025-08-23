@@ -163,11 +163,11 @@ spec:
         parameters:
         - name: github-app
           value: "{{workflow.parameters.implementation-agent}}"
-    
+
     - name: wait-pr-created
       dependencies: [implementation-work]
       template: suspend-for-event
-    
+
     - name: quality-work
       dependencies: [wait-pr-created]
       template: agent-coderun
@@ -267,7 +267,7 @@ spec:
 
 ### Multi-Agent Workflow Pattern
 1. Start with parameterized template foundation
-2. Design sequential DAG with proper dependencies  
+2. Design sequential DAG with proper dependencies
 3. Implement suspend points for event coordination
 4. Add comprehensive labeling for correlation
 5. Include cleanup and progression logic

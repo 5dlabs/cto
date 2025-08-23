@@ -118,7 +118,7 @@ All scripts must implement:
 
 Place scripts in `infra/charts/controller/claude-templates/`:
 - `container-rex.sh.hbs` - Rex agent documentation-driven workflow
-- `container-cleo.sh.hbs` - Cleo agent code quality workflow  
+- `container-cleo.sh.hbs` - Cleo agent code quality workflow
 - `container-tess.sh.hbs` - Tess agent testing and validation workflow
 
 ### Integration Requirements
@@ -196,7 +196,7 @@ Scripts must integrate with:
 - Script initialization completes within 30 seconds
 - Agent-specific workflows complete within reasonable timeframes:
   - Rex documentation queries: <2 minutes
-  - Cleo quality checks: <5 minutes  
+  - Cleo quality checks: <5 minutes
   - Tess comprehensive testing: <15 minutes
 - GitHub API interactions handle rate limits gracefully
 - Workspace operations don't impact concurrent workflows

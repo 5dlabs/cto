@@ -107,7 +107,7 @@ Tools: kubernetes, filesystem, memory_create_entities
    kubectl patch workflow test-workflow \
      --type='merge' \
      --patch='{"metadata":{"labels":{"current-stage":"waiting-pr-created"}}}'
-   
+
    # Verify update succeeded
    kubectl get workflow test-workflow -o jsonpath='{.metadata.labels.current-stage}'
    ```
@@ -169,7 +169,7 @@ filesystem.list_directory("infra/argo-workflows/")
 ### Testing Kubernetes Operations
 ```bash
 # Use kubernetes for testing label operations
-kubernetes.kubectl_patch("workflow", "test-workflow", 
+kubernetes.kubectl_patch("workflow", "test-workflow",
   '{"metadata":{"labels":{"current-stage":"new-stage"}}}')
 kubernetes.kubectl_get("workflow", "test-workflow", "-o", "jsonpath='{.metadata.labels}'")
 ```

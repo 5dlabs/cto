@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 ## Mission
 
@@ -72,26 +71,26 @@ templates:
       TASK_ID="{{inputs.parameters.task-id}}"
       SOURCE_DIR="docs/.taskmaster/docs/task-$TASK_ID"
       TARGET_DIR="docs/.taskmaster/docs/.completed/task-$TASK_ID"
-      
+
       echo "Moving task $TASK_ID to completed directory"
-      
+
       # Validate source directory exists
       if [ ! -d "$SOURCE_DIR" ]; then
         echo "Error: Source directory $SOURCE_DIR not found"
         exit 1
       fi
-      
+
       # Create .completed directory if needed
       mkdir -p "docs/.taskmaster/docs/.completed"
-      
+
       # Move task directory
       mv "$SOURCE_DIR" "$TARGET_DIR"
-      
+
       # Commit completion
       cd /workspace/src
       git add -A
       git commit -m "Task $TASK_ID completed - moved to .completed directory"
-      
+
       echo "Task $TASK_ID successfully marked complete"
 ```
 
@@ -107,9 +106,9 @@ templates:
     source: |
       set -e
       cd /workspace/src
-      
+
       echo "Discovering next pending task..."
-      
+
       # Find next task using natural version sort
       NEXT_TASK_PATH=$(find docs/.taskmaster/docs/ \
         -maxdepth 1 \
@@ -118,10 +117,10 @@ templates:
         | grep -v ".completed" \
         | sort -V \
         | head -1)
-      
+
       if [ -n "$NEXT_TASK_PATH" ]; then
         NEXT_TASK_ID=$(echo "$NEXT_TASK_PATH" | grep -o 'task-[0-9]*' | cut -d'-' -f2)
-        
+
         # Validate task structure
         if [ -f "$NEXT_TASK_PATH/task.txt" ] && grep -q "^# Task ID: $NEXT_TASK_ID$" "$NEXT_TASK_PATH/task.txt"; then
           echo "Next task found: $NEXT_TASK_ID"
@@ -157,10 +156,10 @@ templates:
         parameters:
         - name: task-id
           value: "{{inputs.parameters.current-task-id}}"
-          
+
   - - name: discover-next-task
       template: find-next-task
-      
+
   - - name: start-next-workflow
       when: "{{steps.discover-next-task.outputs.parameters.next-task-id}} != ''"
       template: trigger-next-task-workflow
@@ -168,11 +167,11 @@ templates:
         parameters:
         - name: task-id
           value: "{{steps.discover-next-task.outputs.parameters.next-task-id}}"
-          
+
   - - name: finalize-queue-processing
       when: "{{steps.discover-next-task.outputs.parameters.next-task-id}} == ''"
       template: handle-queue-complete
-      
+
 - name: trigger-next-task-workflow
   inputs:
     parameters:
@@ -209,12 +208,12 @@ templates:
     command: [sh]
     source: |
       cd /workspace/src
-      
+
       echo "All tasks in queue have been processed"
-      
+
       # Count completed tasks
       COMPLETED_COUNT=$(ls docs/.taskmaster/docs/.completed/ | grep -c '^task-' || echo "0")
-      
+
       # Create completion marker
       cat > docs/.taskmaster/queue-complete.json << EOF
       {
@@ -224,11 +223,11 @@ templates:
         "queueProcessingComplete": true
       }
       EOF
-      
+
       # Commit completion state
       git add docs/.taskmaster/queue-complete.json
       git commit -m "Task queue processing complete - $COMPLETED_COUNT tasks processed"
-      
+
       echo "Task queue processing successfully completed"
 
 - name: handle-corrupted-task
@@ -241,22 +240,22 @@ templates:
     source: |
       cd /workspace/src
       TASK_ID="{{inputs.parameters.task-id}}"
-      
+
       echo "Handling corrupted task: $TASK_ID"
-      
+
       # Create quarantine directory
       mkdir -p "docs/.taskmaster/docs/.corrupted"
-      
+
       # Move corrupted task
       mv "docs/.taskmaster/docs/task-$TASK_ID" "docs/.taskmaster/docs/.corrupted/task-$TASK_ID"
-      
+
       # Log corruption
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ): Task $TASK_ID quarantined due to invalid structure" >> docs/.taskmaster/task-errors.log
-      
+
       # Commit quarantine
       git add -A
       git commit -m "Quarantine corrupted task $TASK_ID"
-      
+
       echo "Corrupted task $TASK_ID quarantined"
 ```
 
@@ -298,11 +297,11 @@ spec:
     dag:
       tasks:
       # ... existing workflow steps ...
-      
+
       - name: wait-pr-approved
         dependencies: [tess-testing]
         template: suspend-for-webhook
-        
+
       - name: complete-and-progress  # NEW STEP
         dependencies: [wait-pr-approved]
         template: task-completion-and-progression

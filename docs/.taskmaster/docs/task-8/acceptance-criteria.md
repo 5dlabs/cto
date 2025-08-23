@@ -4,7 +4,7 @@
 
 ### ✅ EventSource Configuration
 - [ ] **Rex Push EventSource**: EventSource created to detect GitHub push events from 5DLabs-Rex[bot]
-- [ ] **Event Filtering**: Events filtered to only task branches (refs/heads/task-*) 
+- [ ] **Event Filtering**: Events filtered to only task branches (refs/heads/task-*)
 - [ ] **Sender Validation**: Only events from 5DLabs-Rex[bot] processed
 - [ ] **Repository Filtering**: Events limited to target repository (5dlabs/cto)
 - [ ] **Webhook Setup**: Webhook endpoint configured and accessible
@@ -21,7 +21,7 @@
 ### ✅ CodeRun Deletion Logic
 - [ ] **Label Selector Targeting**: Uses precise label selectors to target only affected agents
 - [ ] **Cleo Agent Cancellation**: All Cleo CodeRun CRDs for task cancelled correctly
-- [ ] **Tess Agent Cancellation**: All Tess CodeRun CRDs for task cancelled correctly 
+- [ ] **Tess Agent Cancellation**: All Tess CodeRun CRDs for task cancelled correctly
 - [ ] **Rex Agent Preservation**: Rex agents not cancelled by remediation process
 - [ ] **Selective Targeting**: Only agents with matching task-id cancelled
 
@@ -41,7 +41,7 @@
 - [ ] **API Authentication**: GitHub API calls properly authenticated
 - [ ] **Error Handling**: GitHub API failures handled gracefully
 
-### ✅ PR Correlation  
+### ✅ PR Correlation
 - [ ] **Task Label Matching**: Finds PRs using task-{id} label correlation
 - [ ] **Multiple PR Handling**: Handles scenarios with multiple PRs for same task
 - [ ] **Missing PR Handling**: Gracefully handles when no PR found for task
@@ -98,7 +98,7 @@
 
 ## Performance Requirements
 
-### ✅ Response Times  
+### ✅ Response Times
 - [ ] **Event Processing**: Rex push events processed within 30 seconds
 - [ ] **Agent Cancellation**: Agent cancellation completes within 60 seconds
 - [ ] **Workflow Resumption**: Main workflow resumed within 2 minutes of push

@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 ## Mission Statement
 You are a senior DevOps engineer and platform architect tasked with creating a comprehensive GitOps deployment pipeline for a mission-critical multi-agent AI workflow orchestration system. Your goal is to build a production-ready deployment infrastructure that ensures zero-downtime deployments, automated rollbacks, and enterprise-grade reliability while maintaining the highest security and operational standards.
@@ -79,7 +78,7 @@ Build intelligent feature control and configuration systems:
 
 **Environment-Specific Configuration**:
 - Production hardening with security policies and resource constraints
-- Performance optimization settings based on production load characteristics  
+- Performance optimization settings based on production load characteristics
 - Compliance configuration meeting regulatory and audit requirements
 - Monitoring and logging configuration optimized for production operations
 
@@ -131,14 +130,14 @@ gitops_architecture:
     - policies/
       - security/       # Security policies and compliance
       - monitoring/     # Monitoring and alerting rules
-      
+
   deployment_pipeline:
     stages:
       - validation:     # Configuration validation and security scanning
       - staging:        # Staging environment deployment and testing
       - canary:         # Production canary deployment with analysis
       - production:     # Full production rollout with monitoring
-      
+
     gates:
       - code_review:    # Required code review and approval
       - security_scan:  # Security vulnerability assessment
@@ -159,15 +158,15 @@ deployment_strategies:
       - throughput: "> baseline * 0.95"
     rollback_triggers:
       - error_rate: "> 5%"
-      - response_time: "> 2000ms"  
+      - response_time: "> 2000ms"
       - custom_metrics: "> threshold"
-      
+
   blue_green_deployment:
     validation_period: 30m
     traffic_switch: instant
     rollback_capability: 5m
     database_strategy: compatible_migrations
-    
+
   feature_flags:
     percentage_rollouts: true
     user_targeting: true
@@ -185,20 +184,20 @@ production_hardening:
     rbac: least_privilege
     secrets_management: external_vault
     image_scanning: mandatory
-    
+
   reliability:
     multi_zone_deployment: true
     pod_disruption_budgets: configured
     resource_quotas: enforced
     autoscaling: horizontal_and_vertical
     backup_strategy: comprehensive
-    
+
   performance:
     resource_optimization: based_on_profiling
     caching_strategy: multi_layer
     connection_pooling: optimized
     monitoring_overhead: minimized
-    
+
   compliance:
     audit_logging: comprehensive
     data_retention: policy_compliant
@@ -214,7 +213,7 @@ production_hardening:
 - **Rollback Reliability**: 100% successful rollbacks when triggered within 5-minute target
 - **Deployment Success Rate**: > 98% successful deployments without manual intervention
 
-### System Reliability and Performance  
+### System Reliability and Performance
 - **Production Availability**: > 99.95% system uptime with proper SLA monitoring
 - **Performance Consistency**: Response times and throughput within 5% of baseline during deployments
 - **Scalability Validation**: System handles 150% of expected peak load without degradation
@@ -222,7 +221,7 @@ production_hardening:
 
 ### Operational Maturity
 - **Monitoring Coverage**: 100% of critical components monitored with predictive alerting
-- **Incident Detection**: < 2 minutes detection time for critical production issues  
+- **Incident Detection**: < 2 minutes detection time for critical production issues
 - **Documentation Quality**: Complete operational procedures with 100% accuracy validation
 - **Team Readiness**: Operations team capable of managing system with < 15 minute response times
 

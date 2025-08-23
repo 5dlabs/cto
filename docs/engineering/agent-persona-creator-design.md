@@ -24,20 +24,20 @@ interface CreateAgentPersonaParams {
   // Core agent definition
   purpose: string;           // What the agent does (e.g., "Security auditing and vulnerability detection")
   capabilities?: string[];   // Optional: Specific capabilities (inferred from purpose if not provided)
-  
+
   // Optional persona hints
   personality_hints?: {
     archetype?: string;      // e.g., "detective", "engineer", "artist"
     tone?: string;          // e.g., "professional", "friendly", "analytical"
     quirks?: string[];      // e.g., ["uses metaphors", "explains with examples"]
   };
-  
+
   // GitHub App configuration
   github_org?: string;       // Default from config
   permissions?: {           // Auto-generated based on purpose if not provided
     [key: string]: string;
   };
-  
+
   // Deployment options
   deploy?: boolean;         // Whether to deploy immediately
   namespace?: string;       // K8s namespace (default: agent-platform)
@@ -75,16 +75,16 @@ Transform the purpose and persona into structured prompts:
 system_prompts:
   core: |
     You are {name}, a {archetype} specialized in {purpose}.
-    
+
     Your core responsibilities:
     {formatted_capabilities}
-    
+
     Your approach:
     {personality_traits_as_guidelines}
-    
+
     Communication style:
     {communication_style_description}
-  
+
   task_specific:
     code_review: |
       When reviewing code, you {specific_review_approach}
@@ -178,23 +178,23 @@ data:
     name: Morgan
     type: security-analyst
     version: 1.0.0
-    
+
     persona:
       archetype: Strategic Security Analyst
       traits:
         - Methodical vulnerability detection
         - Pattern recognition expertise
         - Risk assessment focus
-    
+
     prompts:
       system: |
         You are Morgan, a Strategic Security Analyst...
-      
+
     capabilities:
       - security_audit
       - vulnerability_detection
       - risk_assessment
-    
+
     github:
       app_id: "123456"
       installation_id: "auto-detect"
@@ -256,7 +256,7 @@ mcp_cto_create_agent --purpose "Technical documentation and API reference genera
 ```
 
 Generated:
-- Name: "Lexie"  
+- Name: "Lexie"
 - Persona: Organized librarian who makes complex topics accessible
 - GitHub App: Read/write docs, create wiki pages
 

@@ -75,7 +75,7 @@ agents:
         - name: "task-manager"
           command: "npx"
           args: ["task-master-ai"]
-          
+
   rex:
     name: "Rex"
     role: "Senior Backend Architect"
@@ -98,7 +98,7 @@ agents:
         database:
           - "postgres_query"
           - "postgres_schema"
-          
+
   cleo:
     name: "Cleo"
     role: "Code Quality Specialist"
@@ -136,7 +136,7 @@ toolProfiles:
         - "read_file"
         - "write_file"
         - "list_directory"
-        
+
   developer:
     # Extends base
     extends: base
@@ -150,7 +150,7 @@ toolProfiles:
       git:
         - "git_status"
         - "git_diff"
-        
+
   infrastructure:
     # Extends developer
     extends: developer
@@ -169,10 +169,10 @@ Transform agent definitions into `client-config.json` at deployment time:
 impl AgentConfig {
     fn generate_client_config(&self) -> ClientConfig {
         let mut config = ClientConfig::default();
-        
+
         // Add remote tools
         config.remote_tools = self.tools.remote.clone();
-        
+
         // Configure local servers
         if !self.tools.local.filesystem.is_empty() {
             config.local_servers.insert(
@@ -189,7 +189,7 @@ impl AgentConfig {
                 }
             );
         }
-        
+
         // Add other local servers similarly
         config
     }
@@ -273,12 +273,12 @@ interface AgentCapabilities {
        ) -> Result<ClientConfig> {
            let agent_config = self.get_agent_config(agent).await?;
            let mut client_config = agent_config.generate_client_config();
-           
+
            // Merge task-specific tools if provided
            if let Some(task_tools) = task_tools {
                client_config.merge(task_tools);
            }
-           
+
            Ok(client_config)
        }
    }
@@ -303,7 +303,7 @@ interface AgentCapabilities {
    ```bash
    #!/bin/bash
    # scripts/migrate-tool-configs.sh
-   
+
    # Extract common tool patterns from existing configs
    # Generate recommended agent tool profiles
    # Update values.yaml with new structure
@@ -479,13 +479,13 @@ Integrate with existing tool catalog for validation:
 impl ToolValidator {
     fn validate_agent_tools(agent: &AgentConfig) -> Result<()> {
         let catalog = ToolCatalog::load()?;
-        
+
         for tool in &agent.tools.remote {
             if !catalog.has_remote_tool(tool) {
                 return Err(format!("Unknown remote tool: {}", tool));
             }
         }
-        
+
         // Validate local tools similarly
         Ok(())
     }

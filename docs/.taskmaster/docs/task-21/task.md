@@ -37,10 +37,10 @@ This task focuses on developing a basic end-to-end testing suite for the multi-a
 def create_test_pr(task_id: int):
     """Create simple test PR with task label for E2E testing"""
     branch_name = f"task-{task_id}-e2e-test"
-    
+
     # Create test branch with minimal changes
     create_test_branch_with_changes(branch_name)
-    
+
     # Create PR with required task label
     pr = github.create_pull_request(
         title=f"E2E Test - Task {task_id}",
@@ -48,7 +48,7 @@ def create_test_pr(task_id: int):
         base="main",
         body="Automated E2E test PR"
     )
-    
+
     # Add task correlation label
     pr.add_to_labels(f"task-{task_id}")
     return pr
@@ -67,24 +67,24 @@ def create_test_pr(task_id: int):
 def test_basic_multi_agent_flow():
     # 1. Create test PR
     pr = create_test_pr(task_id=99)
-    
+
     # 2. Wait for workflow to start
     workflow = wait_for_workflow_creation(task_id=99)
-    
+
     # 3. Verify Rex stage completion
     wait_for_agent_completion("Rex", workflow_id=workflow.id)
-    
+
     # 4. Verify Cleo stage and "ready-for-qa" label
     wait_for_label_addition(pr, "ready-for-qa")
     wait_for_agent_completion("Cleo", workflow_id=workflow.id)
-    
+
     # 5. Verify Tess stage and PR approval
     wait_for_pr_approval(pr, approver="5DLabs-Tess[bot]")
     wait_for_agent_completion("Tess", workflow_id=workflow.id)
-    
+
     # 6. Verify workflow completion
     wait_for_workflow_completion(workflow_id=workflow.id)
-    
+
     # 7. Cleanup test data
     cleanup_test_pr(pr)
     cleanup_test_workflow(workflow)
