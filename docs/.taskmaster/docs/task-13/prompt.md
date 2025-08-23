@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -38,10 +48,14 @@ You are tasked with implementing automatic task progression logic for the multi-
 
 **Solution Goal**: Implement automatic task queue processing where completing Task N automatically starts Task N+1, continuing until all tasks are processed.
 
+
+
 ## Primary Objectives
 
 ### 1. Task Completion Logic
 Implement workflow step that moves completed tasks from `docs/.taskmaster/docs/task-X/` to `docs/.taskmaster/docs/.completed/task-X/`
+
+
 
 ### 2. Next Task Discovery
 Create algorithm to find the next pending task using natural version sorting and validation
@@ -57,6 +71,9 @@ Handle scenarios: no more tasks, corrupted task structure, workflow failures
 ### Phase 1: Task Completion Workflow Step
 
 **Argo Workflow Template Addition**:
+
+
+
 ```yaml
 templates:
 - name: mark-task-complete
@@ -92,11 +109,22 @@ templates:
       git commit -m "Task $TASK_ID completed - moved to .completed directory"
 
       echo "Task $TASK_ID successfully marked complete"
+
+
+
+
+
+
 ```
+
+
 
 ### Phase 2: Next Task Discovery
 
 **Task Discovery Algorithm**:
+
+
+
 ```yaml
 templates:
 - name: find-next-task
@@ -111,8 +139,14 @@ templates:
 
       # Find next task using natural version sort
       NEXT_TASK_PATH=$(find docs/.taskmaster/docs/ \
+
+
         -maxdepth 1 \
+
+
         -name "task-*" \
+
+
         -type d \
         | grep -v ".completed" \
         | sort -V \
@@ -138,11 +172,22 @@ templates:
     - name: next-task-id
       valueFrom:
         path: /tmp/next-task-id
+
+
+
+
+
+
 ```
+
+
 
 ### Phase 3: Workflow Loop Logic
 
 **Recursive Workflow Pattern**:
+
+
+
 ```yaml
 templates:
 - name: task-completion-and-progression
@@ -195,11 +240,20 @@ templates:
             value: "{{inputs.parameters.task-id}}"
         workflowTemplateRef:
           name: play-workflow-template
+
+
+
+
+
+
 ```
 
 ### Phase 4: Edge Case Handling
 
 **Comprehensive Error Handling**:
+
+
+
 ```yaml
 templates:
 - name: handle-queue-complete
@@ -257,38 +311,83 @@ templates:
       git commit -m "Quarantine corrupted task $TASK_ID"
 
       echo "Corrupted task $TASK_ID quarantined"
+
+
+
+
+
+
 ```
+
+
 
 ## Critical Success Criteria
 
 ### 1. Functional Requirements
+
+
 - [ ] Completed tasks automatically moved to `.completed/` directory
+
+
 - [ ] Next pending task discovered using proper numerical sorting
+
+
 - [ ] New workflow triggered automatically for next task
+
+
 - [ ] Process continues until no more tasks remain
+
+
 - [ ] Queue completion marked with status file
 
 ### 2. Edge Case Handling
+
+
 - [ ] Corrupted tasks moved to `.corrupted/` directory
+
+
 - [ ] No more tasks scenario handled gracefully
+
+
 - [ ] Workflow failures don't break progression chain
+
+
 - [ ] Proper logging for all progression events
 
 ### 3. Integration Requirements
+
+
 - [ ] Works with existing multi-agent workflow (Rex → Cleo → Tess)
+
+
 - [ ] Maintains event correlation for GitHub webhooks
+
+
 - [ ] Preserves task labeling and branch naming conventions
+
+
 - [ ] No impact on individual workflow execution
 
 ### 4. Operational Requirements
+
+
 - [ ] Resource limits prevent infinite loops
+
+
 - [ ] Workflow cleanup prevents resource exhaustion
+
+
 - [ ] Comprehensive logging for troubleshooting
+
+
 - [ ] Monitoring integration for progression tracking
 
 ## Implementation Strategy
 
 ### Step 1: Workflow Template Integration
+
+
+
 ```yaml
 # Add task progression steps to existing play-workflow-template
 spec:
@@ -309,23 +408,49 @@ spec:
           parameters:
           - name: current-task-id
             value: "{{workflow.parameters.task-id}}"
+
+
+
+
+
+
 ```
 
 ### Step 2: Task Discovery Testing
+
+
+
 ```bash
+
+
 # Test task discovery algorithm
 cd docs/.taskmaster/docs/
+
+
 
 # Create test task structure
 mkdir -p task-2 task-3 task-10 .completed/task-1
 touch task-2/task.txt task-3/task.txt task-10/task.txt
 
+
+
 # Test discovery script
 find . -maxdepth 1 -name "task-*" -type d | grep -v ".completed" | sort -V | head -1
+
+
 # Expected result: ./task-2
+
+
+
+
+
+
 ```
 
 ### Step 3: Recursive Workflow Testing
+
+
+
 ```bash
 # Submit initial workflow
 argo submit play-workflow-template.yaml -p task-id=5
@@ -335,12 +460,23 @@ argo list -l workflow-type=play-orchestration
 
 # Check for automatic next workflow creation
 argo get $(argo list -l task-id=6 -o name)
+
+
+
+
+
+
 ```
 
 ### Step 4: End-to-End Validation
+
+
+
 ```bash
 # Prepare test task sequence
 ls docs/.taskmaster/docs/
+
+
 # Should show: task-5/ task-6/ task-7/
 
 # Start progression with task-5
@@ -351,30 +487,63 @@ watch argo list -l workflow-type=play-orchestration
 
 # Verify final state
 ls docs/.taskmaster/docs/.completed/
+
+
 # Should show: task-5/ task-6/ task-7/
 
 cat docs/.taskmaster/queue-complete.json
 # Should show completion status
+
+
+
+
+
+
 ```
+
+
 
 ## Key Files to Create/Modify
 
+
+
 ### New Workflow Templates
+
+
 - `argo-workflows/templates/task-progression.yaml` - Task progression logic
+
+
 - `argo-workflows/templates/task-discovery.yaml` - Next task discovery
+
+
 - `argo-workflows/templates/queue-management.yaml` - Queue completion handling
 
+
+
 ### Modified Templates
+
+
 - `argo-workflows/play-workflow-template.yaml` - Add progression step
+
+
 - `argo-workflows/sensors/github-events.yaml` - Ensure event correlation works with progression
 
+
+
 ### Test Resources
+
+
 - `test/task-progression-test.yaml` - End-to-end progression test
+
+
 - `test/edge-case-scenarios.yaml` - Corrupted task and error handling tests
 
 ## Error Handling Scenarios
 
 ### Scenario 1: Corrupted Task Structure
+
+
+
 ```bash
 # Task missing task.txt or invalid format
 if [ ! -f "$TASK_PATH/task.txt" ]; then
@@ -382,9 +551,18 @@ if [ ! -f "$TASK_PATH/task.txt" ]; then
   # Move to .corrupted/ directory
   # Continue with next task
 fi
+
+
+
+
+
+
 ```
 
 ### Scenario 2: Workflow Creation Failure
+
+
+
 ```yaml
 # Retry policy for workflow creation
 retryPolicy:
@@ -393,20 +571,38 @@ retryPolicy:
   backoff:
     duration: "30s"
     factor: 2
+
+
+
+
+
+
 ```
 
 ### Scenario 3: Git Operation Failures
+
+
+
 ```bash
 # Handle git commit failures gracefully
 if ! git commit -m "Task completion"; then
   echo "Git commit failed - manual intervention required"
   # Log failure but don't stop progression
 fi
+
+
+
+
+
+
 ```
 
 ## Testing Commands
 
 ### Task Completion Testing
+
+
+
 ```bash
 # Test task completion logic
 argo submit -f - <<EOF
@@ -429,12 +625,25 @@ spec:
         value: "{{workflow.parameters.task-id}}"
 EOF
 
+
+
 # Verify task moved to .completed
 ls docs/.taskmaster/docs/.completed/task-99/
+
+
+
+
+
+
 ```
 
 ### Next Task Discovery Testing
+
+
+
 ```bash
+
+
 # Test discovery algorithm
 argo submit -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
@@ -448,9 +657,19 @@ spec:
     template: find-next-task
 EOF
 
+
+
 # Check discovery results
 argo logs $(argo list -o name | head -1)
+
+
+
+
+
+
 ```
+
+
 
 ## Expected Deliverables
 
@@ -476,16 +695,34 @@ argo logs $(argo list -o name | head -1)
 - **Atomic Operations**: Task movement and workflow creation must be atomic
 - **Backward Compatibility**: Don't break existing single-task workflow execution
 
+
+
 ## Quality Gates
 
 Before marking complete:
+
+
 - [ ] Task completion moves directory correctly
+
+
 - [ ] Next task discovery finds correct task in sequence
+
+
 - [ ] Workflow loop creates new workflows automatically
+
+
 - [ ] Queue completion handled gracefully
+
+
 - [ ] All edge cases tested and handled
+
+
 - [ ] No resource leaks or infinite loops
+
+
 - [ ] Integration with multi-agent system verified
+
+
 - [ ] End-to-end task sequence processes successfully
 
 This implementation establishes automatic task queue processing that enables continuous multi-agent workflow execution without manual intervention, dramatically improving the system's automation capabilities.

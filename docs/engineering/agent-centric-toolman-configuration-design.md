@@ -253,7 +253,8 @@ interface AgentCapabilities {
        {{ .Values.agents.morgan.tools | toYaml }}
      rex-tools.yaml: |
        {{ .Values.agents.rex.tools | toYaml }}
-   ```
+
+```
 
 2. **Create Tool Profile Templates**
    - Define base profiles in `values.yaml`
@@ -282,7 +283,8 @@ interface AgentCapabilities {
            Ok(client_config)
        }
    }
-   ```
+
+```
 
 2. **Remove Dynamic Generation from Docs Agent**
    - Remove handlebars templates for client-config generation
@@ -297,7 +299,8 @@ interface AgentCapabilities {
        Dynamic(String),     // Old: from task files
        Static(AgentTools),  // New: from agent config
    }
-   ```
+
+```
 
 2. **Migration Script**
    ```bash
@@ -307,7 +310,8 @@ interface AgentCapabilities {
    # Extract common tool patterns from existing configs
    # Generate recommended agent tool profiles
    # Update values.yaml with new structure
-   ```
+
+```
 
 ### Phase 4: Tool Discovery & Management (Week 3)
 
@@ -330,7 +334,8 @@ interface AgentCapabilities {
            }
        })
    }
-   ```
+
+```
 
 2. **Web UI for Tool Configuration** (Future)
    - Visual tool selector

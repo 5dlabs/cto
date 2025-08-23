@@ -5,27 +5,58 @@ Arguments: $ARGUMENTS
 Parse the status from arguments and list only tasks matching that status.
 
 ## Status Options
+
+
 - `pending` - Not yet started
+
+
 - `in-progress` - Currently being worked on
+
+
 - `done` - Completed
+
+
 - `review` - Awaiting review
+
+
 - `deferred` - Postponed
+
+
 - `cancelled` - Cancelled
 
 ## Execution
 
 Based on $ARGUMENTS, run:
+
+
+
 ```bash
 task-master list --status=$ARGUMENTS
+
+
+
+
+
+
 ```
 
 ## Enhanced Display
 
 For the filtered results:
+
+
 - Group by priority within the status
+
+
 - Show time in current status
+
+
 - Highlight tasks approaching deadlines
+
+
 - Display blockers and dependencies
+
+
 - Suggest next actions for each status group
 
 ## Intelligent Insights

@@ -21,6 +21,8 @@
 - [ ] **Path Security**: Template loading prevents path traversal attacks
 - [ ] **File Existence**: Missing template files return clear error messages
 
+
+
 ### ✅ Fallback Behavior
 - [ ] **Unknown Agent**: Unknown agents default to `container-rex.sh.hbs`
 - [ ] **Logging**: Fallback usage is logged with warning level
@@ -47,6 +49,8 @@
 - [ ] **Backward Compatible**: Existing workflows continue to function
 - [ ] **Configuration**: Template mappings can be configured externally
 
+
+
 ## Test Coverage
 
 ### ✅ Unit Tests
@@ -61,6 +65,8 @@
 - [ ] **Performance Tests**: Template loading performance meets requirements
 - [ ] **Concurrency Tests**: Thread-safe operation under concurrent access
 
+
+
 ### ✅ Edge Cases
 - [ ] **Malformed Input**: Special characters and unusual formats
 - [ ] **File System Issues**: Permissions errors and disk space issues
@@ -70,41 +76,85 @@
 ## Validation Procedures
 
 ### ✅ Manual Testing
+
+
 1. **Agent Selection Verification**
    ```bash
    # Test with each agent type
    curl -X POST /api/tasks -d '{"github_app": "5DLabs-Rex"}'
    curl -X POST /api/tasks -d '{"github_app": "5DLabs-Cleo[bot]"}'
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Template Content Verification**
    ```bash
    # Verify template files exist and are valid
    ls -la templates/container-*.sh.hbs
    bash -n templates/container-rex.sh.hbs
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Error Handling Verification**
    ```bash
    # Test unknown agent handling
    curl -X POST /api/tasks -d '{"github_app": "Unknown-Agent"}'
-   ```
+
+
+
+
+
+```
 
 ### ✅ Automated Testing
+
+
 1. **Unit Test Execution**
    ```bash
    cargo test --package controller --lib tasks::code::templates
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Integration Test Execution**
    ```bash
    cargo test --test template_integration
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Performance Benchmarks**
    ```bash
    cargo bench --bench template_loading
-   ```
+
+
+
+
+
+```
+
+
 
 ## Success Metrics
 
@@ -114,11 +164,15 @@
 - [ ] **Memory Usage**: < 1MB additional memory footprint
 - [ ] **Throughput**: Handle 1000+ template selections per second
 
+
+
 ### ✅ Reliability Metrics
 - [ ] **Error Rate**: < 0.1% error rate under normal conditions
 - [ ] **Fallback Rate**: Unknown agent fallback usage is tracked and alerted
 - [ ] **Template Availability**: 99.9% template loading success rate
 - [ ] **Recovery Time**: < 1 second recovery from temporary failures
+
+
 
 ### ✅ Code Quality
 - [ ] **Test Coverage**: > 95% line coverage for new code
@@ -140,7 +194,11 @@
 - [ ] **Performance Impact**: No degradation in overall system performance
 - [ ] **Template Usage**: Confirm all templates are being used appropriately
 
+
+
 ## Rollback Criteria
+
+
 
 ### ✅ Automatic Rollback Triggers
 - [ ] **Error Rate Spike**: > 5% error rate in template selection

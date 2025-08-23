@@ -1,8 +1,12 @@
 # Toolman Guide: Create GitHub Webhook Correlation Logic
 
+
+
 ## Overview
 
 This task requires Kubernetes resource management for Argo Events Sensors and file operations for configuration. The selected tools focus on creating, configuring, and testing webhook correlation mechanisms.
+
+
 
 ## Core Tools
 
@@ -28,11 +32,15 @@ This task requires Kubernetes resource management for Argo Events Sensors and fi
 
 ### File Operations
 
+
+
 #### `read_file`
 - **Purpose**: Read existing Sensor configurations and templates
 - **When to Use**: Reviewing reference implementations like github-demo-sensor.yaml
 - **Example Usage**: Reading webhook payload samples for testing
 - **Best Practice**: Check multiple examples for patterns
+
+
 
 #### `write_file`
 - **Purpose**: Create Sensor YAML configurations
@@ -40,11 +48,15 @@ This task requires Kubernetes resource management for Argo Events Sensors and fi
 - **Example Usage**: Writing correlation logic configurations
 - **Best Practice**: Use proper YAML formatting and validation
 
+
+
 #### `edit_file`
 - **Purpose**: Modify existing Sensor configurations
 - **When to Use**: Updating JQ expressions, fixing correlation logic
 - **Example Usage**: Adjusting label selectors for workflow targeting
 - **Best Practice**: Test changes incrementally
+
+
 
 #### `search_files`
 - **Purpose**: Find related configuration files
@@ -52,7 +64,11 @@ This task requires Kubernetes resource management for Argo Events Sensors and fi
 - **Example Usage**: Finding all files with "sensor" in name
 - **Best Practice**: Search in argo namespace directories
 
+
+
 ### Research Tools
+
+
 
 #### `brave_web_search`
 - **Purpose**: Research JQ expressions and Argo Events features
@@ -63,69 +79,154 @@ This task requires Kubernetes resource management for Argo Events Sensors and fi
 ## Implementation Flow
 
 ### Phase 1: Analysis
+
+
 1. Use `kubernetes_listResources` to find existing Sensors
+
+
 2. Use `kubernetes_getResource` to examine github-demo-sensor
+
+
 3. Use `read_file` to review EventSource configuration
+
+
 4. Document webhook payload structure
 
 ### Phase 2: JQ Expression Development
+
+
 1. Create test webhook payloads
 2. Develop JQ extraction expressions:
    ```jq
    .pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]
-   ```
+
+
+
+
+
+```
+
+
 3. Test with sample data
+
+
 4. Implement fallback logic for branch names
 
 ### Phase 3: Sensor Creation
 1. Use `write_file` to create Sensor YAML:
+
+
    - Multi-agent workflow resume sensor
+
+
    - Ready-for-QA label sensor
+
+
    - PR approval sensor
+
+
    - Rex remediation sensor
+
+
 2. Configure dependencies and triggers
+
+
 3. Add correlation logic with label selectors
 
 ### Phase 4: Deployment
+
+
 1. Use `kubernetes_createResource` to deploy Sensors
+
+
 2. Verify with `kubernetes_listResources`
+
+
 3. Check logs with `kubernetes_getResource`
+
+
 4. Test correlation with suspended workflows
 
 ### Phase 5: Testing
+
+
 1. Create test workflows with proper labels
+
+
 2. Trigger webhook events
+
+
 3. Monitor Sensor processing
+
+
 4. Verify workflow resumption
+
+
 
 ## Best Practices
 
 ### JQ Expression Design
+
+
 - Start simple, add complexity gradually
+
+
 - Always include error handling
+
+
 - Test with malformed input
+
+
 - Document expression purpose
 
+
+
 ### Label Selector Strategy
+
+
+
 ```yaml
 labelSelector: |
   workflow-type=play-orchestration,
   task-id={{extracted-task-id}},
   current-stage={{target-stage}}
+
+
+
+
+
+
 ```
+
+
 - Use multiple labels for precision
+
+
 - Avoid overly broad selectors
+
+
 - Include workflow type discrimination
 
 ### Event Filtering
+
+
 - Filter by action (opened, labeled, etc.)
+
+
 - Validate sender for remediation events
+
+
 - Check event state for reviews
+
+
 - Handle duplicate events
 
 ## Common Patterns
 
 ### Webhook Payload Extraction
+
+
+
 ```yaml
 - name: extract-task-id
   inline:
@@ -135,9 +236,18 @@ labelSelector: |
         select(.name | startswith("task-")) |
         .name | split("-")[1]
       ' | head -1
+
+
+
+
+
+
 ```
 
 ### Workflow Targeting
+
+
+
 ```yaml
 triggers:
 - template:
@@ -150,27 +260,61 @@ triggers:
             matchLabels:
               workflow-type: play-orchestration
               task-id: "{{steps.extract-task-id.outputs.result}}"
+
+
+
+
+
+
 ```
 
 ## Troubleshooting
 
 ### Missing Correlations
+
+
 - Check JQ expression output
+
+
 - Verify label selector syntax
+
+
 - Ensure workflows have correct labels
+
+
 - Review Sensor logs for errors
 
+
+
 ### False Positives
+
+
 - Tighten label selectors
+
+
 - Add more discriminating fields
+
+
 - Validate extracted IDs
+
+
 - Check for duplicate events
 
 ### Performance Issues
+
+
 - Optimize JQ expressions
+
+
 - Add resource limits to Sensors
+
+
 - Check EventBus capacity
+
+
 - Monitor webhook backlog
+
+
 
 ## Notes
 

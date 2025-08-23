@@ -1,23 +1,47 @@
 # Agent Persona Creator MCP Tool Design
 
+
+
 ## Overview
 
 This document outlines the design for an MCP tool that automatically creates new agent personas, including:
+
+
 - GitHub App creation via REST API
+
+
 - Auto-generated character/persona traits
+
+
 - System prompt generation
+
+
 - Complete agent configuration
 
 ## Core Concept
 
 A single MCP call `create_agent_persona` that takes a description of what the agent should do and automatically:
+
+
 1. Generates a unique persona with personality traits
+
+
 2. Creates a GitHub App with appropriate permissions
+
+
 3. Generates system prompts and configuration
+
+
 4. Sets up Kubernetes secrets and configurations
+
+
 5. Returns all necessary setup information
 
 ## MCP Tool Interface
+
+
+
+
 
 ```typescript
 interface CreateAgentPersonaParams {
@@ -42,6 +66,14 @@ interface CreateAgentPersonaParams {
   deploy?: boolean;         // Whether to deploy immediately
   namespace?: string;       // K8s namespace (default: agent-platform)
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Auto-Generation Strategy
@@ -50,26 +82,54 @@ interface CreateAgentPersonaParams {
 
 Using a local LLM or the configured AI model to generate:
 
+
+
+
+
 ```yaml
 persona:
   name: "Morgan"              # Human-like name
   archetype: "Strategic Analyst"
   personality_traits:
+
+
     - Methodical and thorough
+
+
     - Questions assumptions
+
+
     - Seeks patterns and connections
   communication_style:
     tone: "Thoughtful and measured"
     quirks:
+
+
       - Uses data to support arguments
+
+
       - Asks clarifying questions
+
+
       - Provides multiple perspectives
   avatar_description: "A wise owl with reading glasses"  # For future avatar generation
+
+
+
+
+
+
+
+
 ```
 
 ### 2. System Prompt Generation
 
 Transform the purpose and persona into structured prompts:
+
+
+
+
 
 ```yaml
 system_prompts:
@@ -90,6 +150,14 @@ system_prompts:
       When reviewing code, you {specific_review_approach}
     problem_solving: |
       When solving problems, you {problem_solving_method}
+
+
+
+
+
+
+
+
 ```
 
 ## GitHub App Creation
@@ -98,11 +166,21 @@ system_prompts:
 
 GitHub supports creating apps via a manifest flow. The tool will:
 
+
+
 1. Generate a manifest based on the agent's purpose
+
+
 2. Use the GitHub API to create the app
+
+
 3. Complete the app setup flow programmatically
 
 ### Sample Manifest Structure
+
+
+
+
 
 ```json
 {
@@ -133,39 +211,87 @@ GitHub supports creating apps via a manifest flow. The tool will:
     "metadata": "read"
   }
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Implementation Workflow
 
 ### Phase 1: Persona Generation
+
+
+
+
 ```mermaid
 graph TD
     A[MCP Call: create_agent_persona] --> B[Analyze Purpose]
     B --> C[Generate Persona Traits]
     C --> D[Generate Name & Character]
     D --> E[Create System Prompts]
+
+
+
+
+
+
+
+
 ```
 
 ### Phase 2: GitHub App Creation
+
+
+
+
 ```mermaid
 graph TD
     F[Generate App Manifest] --> G[Call GitHub API]
     G --> H[Create App]
     H --> I[Generate Private Key]
     I --> J[Store Credentials]
+
+
+
+
+
+
+
+
 ```
 
 ### Phase 3: Configuration
+
+
+
+
 ```mermaid
 graph TD
     K[Generate agent-config.yaml] --> L[Create K8s Secrets]
     L --> M[Update ConfigMaps]
     M --> N[Deploy if requested]
+
+
+
+
+
+
+
+
 ```
 
 ## Generated Configuration Files
 
 ### 1. Agent Configuration (`agent-config.yaml`)
+
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -182,8 +308,14 @@ data:
     persona:
       archetype: Strategic Security Analyst
       traits:
+
+
         - Methodical vulnerability detection
+
+
         - Pattern recognition expertise
+
+
         - Risk assessment focus
 
     prompts:
@@ -191,16 +323,34 @@ data:
         You are Morgan, a Strategic Security Analyst...
 
     capabilities:
+
+
       - security_audit
+
+
       - vulnerability_detection
+
+
       - risk_assessment
 
     github:
       app_id: "123456"
       installation_id: "auto-detect"
+
+
+
+
+
+
+
+
 ```
 
 ### 2. Kubernetes Resources
+
+
+
+
 
 ```yaml
 # Secret for GitHub App credentials
@@ -214,6 +364,14 @@ data:
   app-id: <base64>
   private-key: <base64>
   webhook-secret: <base64>
+
+
+
+
+
+
+
+
 ```
 
 ## Permissions Inference
@@ -236,12 +394,26 @@ Based on the agent's purpose, automatically determine GitHub permissions:
 3. **Quota Limits**: Check GitHub App creation limits
 4. **Rollback Support**: Track all created resources for cleanup
 
+
+
 ## Usage Examples
 
 ### Example 1: Security Analyst
+
+
+
+
 ```bash
 mcp_cto_create_agent --purpose "Security vulnerability detection and code auditing" \
   --personality_hints '{"archetype": "detective", "tone": "analytical"}'
+
+
+
+
+
+
+
+
 ```
 
 Generated:
@@ -250,9 +422,21 @@ Generated:
 - GitHub App: Read code, write security alerts
 
 ### Example 2: Documentation Expert
+
+
+
+
 ```bash
 mcp_cto_create_agent --purpose "Technical documentation and API reference generation" \
   --personality_hints '{"archetype": "librarian", "quirks": ["loves organization", "explains clearly"]}'
+
+
+
+
+
+
+
+
 ```
 
 Generated:
@@ -261,8 +445,20 @@ Generated:
 - GitHub App: Read/write docs, create wiki pages
 
 ### Example 3: Performance Optimizer
+
+
+
+
 ```bash
 mcp_cto_create_agent --purpose "Performance optimization and bottleneck detection"
+
+
+
+
+
+
+
+
 ```
 
 Generated:
@@ -272,90 +468,210 @@ Generated:
 
 ## Integration Points
 
+
+
 ### 1. MCP Server (`mcp/src/tools.rs`)
+
+
 - Add new tool definition
+
+
 - Integrate with GitHub API client
+
+
 - Call persona generation service
 
 ### 2. Controller Updates
+
+
 - Watch for new agent ConfigMaps
+
+
 - Trigger deployment workflows
+
+
 - Update agent registry
 
 ### 3. External Secrets
+
+
 - Auto-create ExternalSecret resources
+
+
 - Map GitHub App credentials
+
+
 - Sync with secret store
 
 ## Security Considerations
 
+
+
 1. **Private Key Management**
+
+
    - Generate keys securely
+
+
    - Store in external secrets immediately
+
+
    - Never log or expose keys
 
+
+
 2. **Permission Scoping**
+
+
    - Minimal permissions by default
+
+
    - Require explicit elevation
+
+
    - Audit trail for all permissions
 
+
+
 3. **Webhook Security**
+
+
    - Generate strong webhook secrets
+
+
    - Validate all incoming webhooks
+
+
    - Rate limit webhook endpoints
 
 ## Future Enhancements
 
+
+
 1. **Avatar Generation**
+
+
    - Use DALL-E or Stable Diffusion for agent avatars
+
+
    - Based on persona description
 
+
+
 2. **Skill Specialization**
+
+
    - Auto-tune prompts based on observed performance
+
+
    - Learn from successful interactions
 
+
+
 3. **Team Dynamics**
+
+
    - Generate complementary personas
+
+
    - Design agents that work well together
 
+
+
 4. **Persona Evolution**
+
+
    - Track agent performance metrics
+
+
    - Evolve personality based on success patterns
 
 ## Implementation Priority
 
+
+
 ### Phase 1 (MVP)
+
+
 - [x] Design document (this doc)
+
+
 - [ ] Basic persona generation
+
+
 - [ ] GitHub App manifest creation
+
+
 - [ ] Manual app creation flow
 
+
+
 ### Phase 2
+
+
 - [ ] Full API automation
+
+
 - [ ] Kubernetes resource generation
+
+
 - [ ] MCP tool implementation
 
+
+
 ### Phase 3
+
+
 - [ ] Auto-deployment
+
+
 - [ ] Avatar generation
+
+
 - [ ] Performance tracking
 
 ## Testing Strategy
 
+
+
 1. **Unit Tests**
+
+
    - Persona generation variety
+
+
    - Prompt quality validation
+
+
    - Manifest structure verification
 
+
+
 2. **Integration Tests**
+
+
    - GitHub API interaction
+
+
    - K8s resource creation
+
+
    - End-to-end agent creation
 
+
+
 3. **Validation**
+
+
    - Generated personas make sense
+
+
    - Permissions match purpose
+
+
    - System prompts are effective
+
+
 
 ## Success Metrics
 

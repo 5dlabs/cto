@@ -1,14 +1,24 @@
 # Task 16: Implement Controller Template Loading
 
+
+
 ## Overview
 Update the Rust controller to implement agent-specific container script selection based on the `github_app` field. This creates clean separation between different agent workflows while avoiding complex template conditionals.
 
 ## Technical Implementation
 
+
+
 ### Architecture
 The template loading system maps GitHub App identifiers to specific container script templates:
+
+
 - `5DLabs-Rex` / `5DLabs-Blaze` → `container-rex.sh.hbs` (implementation workflow)
+
+
 - `5DLabs-Cleo` → `container-cleo.sh.hbs` (code quality workflow)
+
+
 - `5DLabs-Tess` → `container-tess.sh.hbs` (testing workflow)
 
 ### Implementation Steps
@@ -16,6 +26,9 @@ The template loading system maps GitHub App identifiers to specific container sc
 #### 1. Update Template Selection Logic
 
 **File**: `controller/src/tasks/code/templates.rs`
+
+
+
 
 ```rust
 use std::collections::HashMap;
@@ -84,9 +97,18 @@ fn load_template_file(template_name: &str) -> Result<String> {
     fs::read_to_string(&template_path)
         .map_err(|e| anyhow!("Failed to load template {}: {}", template_name, e))
 }
+
+
+
+
+
+
 ```
 
 #### 2. Update Task Processing Integration
+
+
+
 
 ```rust
 // In task processing logic
@@ -102,9 +124,18 @@ pub fn process_code_task(task: &CodeTask) -> Result<String> {
 
     Ok(rendered)
 }
+
+
+
+
+
+
 ```
 
 #### 3. Error Handling and Fallbacks
+
+
+
 
 ```rust
 impl AgentTemplateMapper {
@@ -119,13 +150,26 @@ impl AgentTemplateMapper {
         }
     }
 }
+
+
+
+
+
+
 ```
+
+
 
 ### Template Structure
 
 Each container template should be self-contained with complete workflow logic:
 
+
+
 **container-rex.sh.hbs** - Implementation workflow
+
+
+
 ```bash
 #!/bin/bash
 # Rex/Blaze Implementation Workflow
@@ -142,11 +186,24 @@ cd /workspace
 # Implementation-specific logic
 echo "Starting implementation workflow for {{github_app}}"
 # ... implementation steps
+
+
+
+
+
+
 ```
 
+
+
 **container-cleo.sh.hbs** - Code quality workflow
+
+
+
 ```bash
 #!/bin/bash
+
+
 # Cleo Code Quality Workflow
 set -euo pipefail
 
@@ -157,9 +214,20 @@ export REPO_URL="${{repo_url}}"
 # Quality analysis specific logic
 echo "Starting code quality workflow for {{github_app}}"
 # ... quality checks, linting, static analysis
+
+
+
+
+
+
 ```
 
+
+
 **container-tess.sh.hbs** - Testing workflow
+
+
+
 ```bash
 #!/bin/bash
 # Tess Testing Workflow
@@ -172,12 +240,21 @@ export REPO_URL="${{repo_url}}"
 # Testing specific logic
 echo "Starting testing workflow for {{github_app}}"
 # ... test execution, coverage analysis
+
+
+
+
+
+
 ```
 
 ## Integration Points
 
 ### 1. Controller Entry Point
 Update the main task processing function to use the new template selection:
+
+
+
 
 ```rust
 pub async fn execute_code_task(task: CodeTask) -> Result<TaskResult> {
@@ -189,13 +266,24 @@ pub async fn execute_code_task(task: CodeTask) -> Result<TaskResult> {
 
     Ok(result)
 }
+
+
+
+
+
+
 ```
 
 ### 2. Configuration Management
 Allow template mappings to be configured externally:
 
+
+
+
 ```rust
 // config.rs
+
+
 #[derive(Deserialize)]
 pub struct TemplateConfig {
     pub agent_templates: HashMap<String, String>,
@@ -210,13 +298,24 @@ impl Default for TemplateConfig {
         Self { agent_templates }
     }
 }
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
 
 ### Unit Tests
 
+
+
+
 ```rust
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -265,11 +364,22 @@ mod tests {
         assert!(template_content.contains("#!/bin/bash"));
     }
 }
+
+
+
+
+
+
 ```
 
 ### Integration Tests
 
+
+
+
 ```rust
+
+
 #[tokio::test]
 async fn test_end_to_end_template_selection() {
     let task = CodeTask {
@@ -283,6 +393,12 @@ async fn test_end_to_end_template_selection() {
     // Verify Cleo-specific workflow was executed
     // Check for Cleo-specific outputs or side effects
 }
+
+
+
+
+
+
 ```
 
 ## Performance Considerations
@@ -297,9 +413,19 @@ async fn test_end_to_end_template_selection() {
 2. **Path Security**: Prevent path traversal attacks in template loading
 3. **Agent Authentication**: Verify github_app authenticity before template selection
 
+
+
 ## Rollback Strategy
 
+
+
 1. Keep existing template loading as fallback
+
+
 2. Feature flag to enable/disable new agent-specific templates
+
+
 3. Monitoring and alerting for template selection failures
+
+
 4. Quick rollback capability through configuration change

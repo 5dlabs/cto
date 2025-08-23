@@ -1,5 +1,7 @@
 # Task 5: Create GitHub Webhook Correlation Logic (Aligned)
 
+
+
 ## Overview
 
 Implement Argo Events Sensor logic to extract task IDs from webhook payloads and correlate with suspended workflows using deterministic workflow names (no templated label selectors), enabling event-driven coordination between GitHub events and multi-agent workflows.
@@ -12,6 +14,8 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
 
 ### Phase 1: Task ID Extraction Logic
 
+
+
 1. **JQ Expression Development**
    ```yaml
    # Extract task ID from PR labels
@@ -20,7 +24,14 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        dataTemplate: |
          {{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}
      dest: parameters.task-id
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Fallback Branch Name Parsing**
    ```yaml
@@ -30,9 +41,16 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        dataTemplate: |
          {{jq '.pull_request.head.ref | capture("^task-(?<id>[0-9]+)-.*").id // empty'}}
      dest: parameters.branch-task-id
-   ```
+
+
+
+
+
+```
 
 ### Phase 2: Workflow Correlation Implementation
+
+
 
 1. **Deterministic Workflow Name Construction**
    ```yaml
@@ -53,7 +71,14 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
                dataTemplate: |
                  play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
              dest: argoWorkflow.source.resource.metadata.name
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Multi-Stage Targeting (Handled Internally)**
    ```yaml
@@ -65,9 +90,16 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        targetStage: "waiting-ready-for-qa"
      - name: pr-approved-correlation
        targetStage: "waiting-pr-approved"
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Event Type Processing
+
+
 
 1. **PR Creation Events**
    ```yaml
@@ -80,7 +112,14 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        - path: action
          type: string
          value: "opened"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **PR Labeling Events**
    ```yaml
@@ -96,7 +135,14 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        - path: label.name
          type: string
          value: "ready-for-qa"
-   ```
+
+
+
+
+
+```
+
+
 
 3. **PR Approval Events**
    ```yaml
@@ -112,9 +158,16 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
        - path: review.state
          type: string
          value: "approved"
-   ```
+
+
+
+
+
+```
 
 ### Phase 4: Validation and Error Handling
+
+
 
 1. **Multi-Method Validation**
    ```yaml
@@ -132,7 +185,14 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
          fi
 
          echo "Task correlation validated: $LABEL_TASK"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Workflow Existence Validation**
    ```yaml
@@ -144,11 +204,21 @@ The multi-agent orchestration system requires correlation logic to map GitHub we
          kind: Workflow
          metadata:
            name: play-task-{{task-id}}-workflow
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Complete Sensor Configuration
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -207,9 +277,18 @@ spec:
             dataTemplate: |
               play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
           dest: argoWorkflow.source.resource.metadata.name
+
+
+
+
+
+
 ```
 
 ### Task ID Extraction Functions
+
+
+
 ```bash
 # JQ expressions for different payload structures
 extract_task_from_labels() {
@@ -231,9 +310,18 @@ validate_task_correlation() {
 
   echo "$LABEL_TASK"
 }
+
+
+
+
+
+
 ```
 
 ### Deterministic Workflow Targeting
+
+
+
 ```yaml
 - template:
     name: dynamic-workflow-resume
@@ -249,6 +337,12 @@ validate_task_correlation() {
           dataTemplate: |
             play-task-{{jq '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]'}}-workflow
         dest: argoWorkflow.source.resource.metadata.name
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
@@ -259,17 +353,32 @@ validate_task_correlation() {
 - Task Association: Multiple validation methods ensure accurate correlation
 
 ### Multi-Method Validation Strategy
+
+
+
 ```yaml
 Validation Hierarchy:
 1. Primary: PR labels (task-3) - most reliable for automation
 2. Secondary: Branch names (task-3-feature) - human readable backup
 3. Validation: Both methods must agree or processing fails
 4. Fallback: Use primary if secondary missing, error if mismatch
+
+
+
+
+
+
 ```
 
 ### Precise Workflow Targeting
+
+
 - Deterministic `metadata.name` targeting for ArgoWorkflow triggers
+
+
 - Avoid templating within `labelSelector` fields
+
+
 - Namespace isolation respected by Sensor
 
 ## Testing Strategy
@@ -297,4 +406,6 @@ Validation Hierarchy:
 - [Argo Events Sensor Configuration](https://argoproj.github.io/argo-events/concepts/sensor/)
 - [GitHub Webhook Payloads](https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads)
 - [JQ Manual for JSON Processing](https://stedolan.github.io/jq/manual/)
+
+
 - [Multi-Agent Architecture](.taskmaster/docs/architecture.md)

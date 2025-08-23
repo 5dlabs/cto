@@ -1,5 +1,7 @@
 # Task 26: Implement Comprehensive Task Association Validation Using Multi-Method Approach
 
+
+
 ## Overview
 
 This task implements a robust three-tier validation system to ensure accurate correlation between GitHub workflows and Task Master tasks. The system prevents workflow execution errors by requiring agreement between PR labels, branch naming patterns, and marker files before allowing workflow execution.
@@ -8,14 +10,20 @@ This task implements a robust three-tier validation system to ensure accurate co
 
 ### Validation Methods
 
+
+
 1. **Primary Method - PR Labels**
    - Pattern: `task-{id}` labels on pull requests
    - JQ extraction: `.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]`
+
+
 
 2. **Secondary Method - Branch Naming**
    - Patterns: `task-{id}-{description}` or `feature/task-{id}`
    - Regex: `^(?:feature/)?task-(\d+)(?:-.*)?$`
    - Source: `pull_request.head.ref` field
+
+
 
 3. **Fallback Method - Marker File**
    - Location: `docs/.taskmaster/current-task.json`
@@ -26,6 +34,9 @@ This task implements a robust three-tier validation system to ensure accurate co
 ### Step 1: Argo Workflows Sensor Configuration
 
 Create or update the Argo Events Sensor with validation templates:
+
+
+
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -56,9 +67,18 @@ spec:
                   value: "{{.Input.pull_request.head.ref}}"
                 - name: commit-sha
                   value: "{{.Input.pull_request.head.sha}}"
+
+
+
+
+
+
 ```
 
 ### Step 2: Workflow Template Implementation
+
+
+
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -105,6 +125,8 @@ spec:
       image: stedolan/jq:latest
       command: [sh, -c]
       args:
+
+
       - |
         # Extract from PR labels
         LABEL_ID=$(echo '{{inputs.parameters.pr-labels}}' | jq -r '.[] | select(.name | startswith("task-")) | .name | split("-")[1]' | head -1)
@@ -147,6 +169,8 @@ spec:
       image: alpine:latest
       command: [sh, -c]
       args:
+
+
       - |
         LABEL_ID="{{inputs.parameters.label-task-id}}"
         BRANCH_ID="{{inputs.parameters.branch-task-id}}"
@@ -205,6 +229,8 @@ spec:
       image: alpine/git:latest
       command: [sh, -c]
       args:
+
+
       - |
         cd /workspace
 
@@ -232,11 +258,20 @@ spec:
   - name: workspace
     persistentVolumeClaim:
       claimName: task-workspace
+
+
+
+
+
+
 ```
 
 ### Step 3: Error Handling and GitHub Integration
 
 Implement GitHub comment creation for validation failures:
+
+
+
 
 ```yaml
   - name: report-validation-error
@@ -248,6 +283,8 @@ Implement GitHub comment creation for validation failures:
       image: curlimages/curl:latest
       command: [sh, -c]
       args:
+
+
       - |
         cat <<EOF > /tmp/comment.json
         {
@@ -258,6 +295,8 @@ Implement GitHub comment creation for validation failures:
         curl -X POST \
           -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
+
+
           -d @/tmp/comment.json \
           "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/{{inputs.parameters.pr-number}}/comments"
       env:
@@ -268,9 +307,18 @@ Implement GitHub comment creation for validation failures:
             key: token
       - name: GITHUB_REPOSITORY
         value: "5dlabs/cto"
+
+
+
+
+
+
 ```
 
 ### Step 4: Retry and Recovery Logic
+
+
+
 
 ```yaml
   - name: validation-with-retry
@@ -284,6 +332,12 @@ Implement GitHub comment creation for validation failures:
     steps:
     - - name: attempt-validation
         template: validate-task-ids
+
+
+
+
+
+
 ```
 
 ## Error Scenarios and Handling
@@ -298,18 +352,32 @@ Implement GitHub comment creation for validation failures:
 
 ### Metrics Collection
 
+
+
+
 ```yaml
   - name: emit-validation-metrics
     container:
       image: prom/pushgateway:latest
       command: [sh, -c]
       args:
+
+
       - |
         echo "task_validation_attempts_total{status=\"{{inputs.parameters.status}}\"} 1" | \
           curl -X POST --data-binary @- http://pushgateway:9091/metrics/job/task-validation
+
+
+
+
+
+
 ```
 
 ### Logging
+
+
+
 
 ```yaml
   - name: log-validation-result
@@ -317,8 +385,16 @@ Implement GitHub comment creation for validation failures:
       image: alpine:latest
       command: [sh, -c]
       args:
+
+
       - |
         echo "$(date -Iseconds) [INFO] Task validation: {{inputs.parameters.result}} for workflow {{workflow.name}}"
+
+
+
+
+
+
 ```
 
 ## Security Considerations

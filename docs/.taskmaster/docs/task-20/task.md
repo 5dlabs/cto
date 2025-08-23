@@ -1,9 +1,13 @@
 # Task 20: Setup Workflow Failure Handling
 
+
+
 ## Overview
 Implement comprehensive error handling, retry logic, and failure recovery mechanisms for all workflow stages. This system provides robust resilience through automated recovery, intelligent retry strategies, failure analysis, and manual intervention capabilities.
 
 ## Technical Implementation
+
+
 
 ### Architecture
 The failure handling system implements multi-layered resilience:
@@ -20,6 +24,9 @@ The failure handling system implements multi-layered resilience:
 #### 1. Retry Strategy Configuration
 
 **File**: `controller/src/failure/retry.rs`
+
+
+
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -376,6 +383,8 @@ impl RetryExecutor {
     }
 }
 
+
+
 #[derive(Debug, thiserror::Error)]
 pub enum RetryError {
     #[error("No retry strategy defined for stage {stage:?}")]
@@ -482,6 +491,8 @@ impl CircuitBreaker {
 }
 
 // Metrics collection
+
+
 #[derive(Debug)]
 pub struct RetryMetrics {
     // Implementation would include prometheus metrics
@@ -508,16 +519,27 @@ impl RetryMetrics {
         // Record timeout metrics
     }
 }
+
+
+
+
+
+
 ```
 
 #### 2. Failure Analysis and Root Cause Detection
 
 **File**: `controller/src/failure/analysis.rs`
 
+
+
+
 ```rust
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FailureAnalysis {
@@ -531,6 +553,8 @@ pub struct FailureAnalysis {
     pub recovery_recommendations: Vec<RecoveryRecommendation>,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorDetails {
     pub error_type: String,
@@ -540,6 +564,8 @@ pub struct ErrorDetails {
     pub related_logs: Vec<LogEntry>,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RootCause {
     pub category: FailureCategory,
@@ -547,6 +573,8 @@ pub struct RootCause {
     pub contributing_factors: Vec<String>,
     pub confidence_score: f64,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum FailureCategory {
@@ -561,6 +589,8 @@ pub enum FailureCategory {
     Unknown,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImpactAssessment {
     pub severity: Severity,
@@ -568,6 +598,8 @@ pub struct ImpactAssessment {
     pub business_impact: BusinessImpact,
     pub user_impact: UserImpact,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Severity {
@@ -577,6 +609,8 @@ pub enum Severity {
     Low,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BusinessImpact {
     pub estimated_delay: chrono::Duration,
@@ -584,12 +618,16 @@ pub struct BusinessImpact {
     pub cost_estimate: Option<f64>,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserImpact {
     pub affected_users: u32,
     pub degraded_experience: bool,
     pub blocked_operations: Vec<String>,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RecoveryRecommendation {
@@ -599,6 +637,8 @@ pub struct RecoveryRecommendation {
     pub automation_possible: bool,
     pub priority: u32,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RecoveryAction {
@@ -731,6 +771,8 @@ struct PatternMatcher {
     patterns: Vec<FailurePattern>,
 }
 
+
+
 #[derive(Debug)]
 struct FailurePattern {
     name: String,
@@ -741,12 +783,16 @@ struct FailurePattern {
     confidence: f64,
 }
 
+
+
 #[derive(Debug)]
 struct ContextCondition {
     field: String,
     condition: ConditionType,
     value: serde_json::Value,
 }
+
+
 
 #[derive(Debug)]
 enum ConditionType {
@@ -867,6 +913,8 @@ impl PatternMatcher {
     }
 }
 
+
+
 #[derive(Debug, thiserror::Error)]
 pub enum AnalysisError {
     #[error("Failed to extract error details: {0}")]
@@ -876,6 +924,8 @@ pub enum AnalysisError {
     #[error("Failed to generate recommendations: {0}")]
     RecommendationError(String),
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 struct LogEntry {
@@ -894,16 +944,27 @@ impl HistoricalFailureData {
         Self {}
     }
 }
+
+
+
+
+
+
 ```
 
 #### 3. Notification System
 
 **File**: `controller/src/failure/notification.rs`
 
+
+
+
 ```rust
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NotificationConfig {
@@ -913,6 +974,8 @@ pub struct NotificationConfig {
     pub templates: HashMap<NotificationType, MessageTemplate>,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NotificationChannel {
     pub name: String,
@@ -920,6 +983,8 @@ pub struct NotificationChannel {
     pub config: ChannelConfig,
     pub enabled: bool,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ChannelType {
@@ -930,6 +995,8 @@ pub enum ChannelType {
     Teams,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ChannelConfig {
     Slack { webhook_url: String, channel: String },
@@ -938,6 +1005,8 @@ pub enum ChannelConfig {
     Webhook { url: String, auth_header: Option<String> },
     Teams { webhook_url: String },
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SmtpConfig {
@@ -948,6 +1017,8 @@ pub struct SmtpConfig {
     pub tls: bool,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EscalationRule {
     pub severity: Severity,
@@ -957,12 +1028,16 @@ pub struct EscalationRule {
     pub max_repeats: Option<u32>,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RateLimitConfig {
     pub max_notifications_per_hour: u32,
     pub max_notifications_per_day: u32,
     pub cooldown_period: chrono::Duration,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum NotificationType {
@@ -972,6 +1047,8 @@ pub enum NotificationType {
     ManualInterventionRequired,
     SystemRecovery,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MessageTemplate {
@@ -1187,6 +1264,8 @@ impl ChannelHandler for SlackHandler {
 
 // Additional handler implementations...
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NotificationMessage {
     pub subject: String,
@@ -1195,6 +1274,8 @@ pub struct NotificationMessage {
     pub priority: Option<String>,
     pub metadata: NotificationMetadata,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NotificationMetadata {
@@ -1217,11 +1298,15 @@ impl From<&super::analysis::FailureAnalysis> for NotificationMetadata {
     }
 }
 
+
+
 #[derive(Debug)]
 pub enum NotificationResult {
     Sent { results: Vec<(String, Result<(), NotificationError>)> },
     RateLimited,
 }
+
+
 
 #[derive(Debug, thiserror::Error)]
 pub enum NotificationError {
@@ -1305,11 +1390,20 @@ impl RateLimiter {
         }
     }
 }
+
+
+
+
+
+
 ```
 
 #### 4. Argo Workflow Integration
 
 **File**: `workflows/failure-handling-workflow.yaml`
+
+
+
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -1464,6 +1558,8 @@ spec:
                 -d '{"event":"APPROVE","body":"Automated approval after successful validation"}'
               ;;
 
+
+
             *)
               echo "Unknown operation: $OPERATION"
               exit 1
@@ -1504,6 +1600,8 @@ spec:
 
           curl -X POST http://failure-analyzer/api/analyze \
             -H "Content-Type: application/json" \
+
+
             -d "$FAILURE_CONTEXT" || echo "Failed to send failure analysis"
 
           # Check if this was the final attempt
@@ -1513,6 +1611,8 @@ spec:
             # Trigger failure notification
             curl -X POST http://notification-service/api/failure \
               -H "Content-Type: application/json" \
+
+
               -d "$FAILURE_CONTEXT" || echo "Failed to send failure notification"
 
             # Check if manual intervention is required
@@ -1627,12 +1727,23 @@ spec:
 
         # This step will remain suspended until manually resumed
         sleep infinity
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
 
 ### Unit Tests
+
+
+
 ```rust
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1693,9 +1804,18 @@ mod tests {
         assert!(matches!(result2, NotificationResult::RateLimited));
     }
 }
+
+
+
+
+
+
 ```
 
 ### Integration Tests
+
+
+
 ```bash
 #!/bin/bash
 # Integration test for failure handling system
@@ -1707,10 +1827,20 @@ echo "=== Failure Handling Integration Test ==="
 # Test retry mechanism
 echo "Testing retry mechanism..."
 WORKFLOW_ID=$(argo submit workflows/failure-handling-workflow.yaml \
+
+
   --parameter repository=test/failure-prone-repo \
+
+
   --parameter pr-number=456 \
+
+
   --parameter max-retries=3 \
+
+
   --wait --output name)
+
+
 
 # Verify workflow completed despite retries
 WORKFLOW_STATUS=$(argo get $WORKFLOW_ID -o json | jq -r '.status.phase')
@@ -1739,6 +1869,12 @@ else
 fi
 
 echo "=== Integration test completed successfully ==="
+
+
+
+
+
+
 ```
 
 ## Performance Considerations

@@ -6,6 +6,9 @@
 **Primary Purpose**: Deploy, monitor, and manage Kubernetes resources for comprehensive resource management
 
 #### kubernetes_createResource & kubernetes_updateResource
+
+
+
 ```bash
 # Deploy resource quota for agent namespace
 kubernetes_createResource --file=./manifests/agent-platform-quota.yaml
@@ -19,15 +22,32 @@ metadata:
   name: agent-high-priority
 value: 1000
 description: "High priority for critical agent workflows"'
+
+
+
+
+
+
 ```
 
 **Best Practices**:
+
+
 - Always validate YAML manifests before creating resources
+
+
 - Use labels consistently for resource organization and cleanup
+
+
 - Test resource changes in non-production environment first
+
+
 - Include resource version in updates to prevent conflicts
 
 #### kubernetes_listResources & kubernetes_describeResource
+
+
+
 ```bash
 # Monitor resource quota utilization
 kubernetes_listResources --api-version=v1 --kind=ResourceQuota --namespace=agent-platform
@@ -40,18 +60,37 @@ kubernetes_describeResource --api-version=autoscaling.k8s.io/v1 --kind=VerticalP
 
 # Examine PodDisruptionBudget policies
 kubernetes_listResources --api-version=policy/v1 --kind=PodDisruptionBudget --all-namespaces=true
+
+
+
+
+
+
 ```
 
 **Monitoring Patterns**:
+
+
 - Regular quota utilization checks to prevent exhaustion
+
+
 - HPA metric evaluation to validate scaling triggers
+
+
 - VPA recommendation analysis for right-sizing opportunities
+
+
 - PDB status verification during maintenance windows
 
 #### kubernetes_listPods & kubernetes_getPodLogs
+
+
+
 ```bash
 # Monitor agent pod resource consumption
 kubernetes_listPods --namespace=agent-platform --show-metrics=true
+
+
 
 # Check for OOM-killed pods
 kubernetes_listPods --field-selector=status.phase=Failed --all-namespaces=true
@@ -61,15 +100,32 @@ kubernetes_getPodLogs --pod-name=coderun-rex-abc123 --namespace=agent-platform -
 
 # Monitor VPA-triggered pod restarts
 kubernetes_getPodLogs --pod-name=vpa-recommender --namespace=kube-system --follow=true
+
+
+
+
+
+
 ```
 
 **Resource Analysis Focus**:
+
+
 - Identify pods approaching resource limits
+
+
 - Monitor for resource-related failures and restarts
+
+
 - Track VPA and HPA scaling events and decisions
+
+
 - Analyze performance patterns during resource changes
 
 #### kubernetes_deleteResource
+
+
+
 ```bash
 # Clean up test resources after validation
 kubernetes_deleteResource --api-version=v1 --kind=ResourceQuota --name=test-quota
@@ -79,17 +135,36 @@ kubernetes_deleteResource --api-version=autoscaling/v2 --kind=HorizontalPodAutos
 
 # Emergency cleanup of resource-intensive workloads
 kubernetes_deleteResource --api-version=v1 --kind=Pod --label-selector="test-run=resource-stress"
+
+
+
+
+
+
 ```
 
 **Safety Guidelines**:
+
+
 - Always verify resource deletion impact before executing
+
+
 - Use dry-run mode for testing deletion commands
+
+
 - Maintain backups of critical resource configurations
+
+
 - Document deletion rationale for audit purposes
 
 ### Research and Documentation Tools
 
+
+
 #### brave-search_brave_web_search
+
+
+
 ```bash
 # Research Kubernetes resource management best practices
 brave-search_brave_web_search --query="Kubernetes VPA HPA integration best practices 2024"
@@ -99,17 +174,34 @@ brave-search_brave_web_search --query="Kubernetes resource quota troubleshooting
 
 # Research autoscaling patterns for AI workloads
 brave-search_brave_web_search --query="machine learning workload Kubernetes autoscaling patterns"
+
+
+
+
+
+
 ```
 
 **Research Focus Areas**:
+
+
 - Latest Kubernetes resource management features and capabilities
+
+
 - Best practices for AI/ML workload resource management
+
+
 - Troubleshooting guides for common resource management issues
+
+
 - Performance optimization techniques for containerized workloads
 
 ### Memory and Context Management
 
 #### memory_create_entities & memory_query_entities
+
+
+
 ```bash
 # Store resource configuration baselines
 memory_create_entities --entities='[{"type":"resource-baseline","name":"agent-cpu-memory-baseline","properties":{"rex_cpu":"2000m","rex_memory":"8Gi","cleo_cpu":"1000m","cleo_memory":"4Gi"}}]'
@@ -122,18 +214,37 @@ memory_query_entities --query="resource optimization results from past 30 days"
 
 # Retrieve troubleshooting knowledge
 memory_query_entities --query="solutions for resource quota violations and OOM issues"
+
+
+
+
+
+
 ```
 
 **Knowledge Management**:
+
+
 - Maintain repository of proven resource configurations
+
+
 - Track performance benchmarks and optimization results
+
+
 - Store troubleshooting procedures and solution patterns
+
+
 - Build knowledge base of resource management best practices
 
 ## Local Server Integration
 
+
+
 ### Prometheus Metrics Server
 **Purpose**: Collect and analyze resource utilization metrics for optimization decisions
+
+
+
 
 ```python
 # Example usage patterns for Prometheus integration
@@ -158,16 +269,33 @@ hpa_events = prometheus_metrics.query_range(
     start_time='-24h',
     step='5m'
 )
+
+
+
+
+
+
 ```
 
 **Metric Analysis Focus**:
+
+
 - CPU and memory utilization trends across agent types
+
+
 - Resource quota consumption patterns and growth rates
+
+
 - Autoscaling effectiveness and response times
+
+
 - Cost optimization opportunities based on usage data
 
 ### Resource Analyzer Tool
 **Purpose**: Automated analysis of resource configurations and usage patterns
+
+
+
 
 ```python
 # Resource configuration analysis
@@ -191,16 +319,33 @@ capacity_report = analyzer.generate_capacity_plan(
     growth_rate=0.2,  # 20% monthly growth
     planning_horizon_months=6
 )
+
+
+
+
+
+
 ```
 
 **Analysis Capabilities**:
+
+
 - Right-sizing recommendations based on actual usage
+
+
 - Waste identification and cost optimization opportunities
+
+
 - Capacity planning with growth projections
+
+
 - Resource efficiency scoring and benchmarking
 
 ### Autoscaler Manager
 **Purpose**: Configure and manage HPA and VPA autoscaling policies
+
+
+
 
 ```python
 # Autoscaler configuration management
@@ -233,17 +378,34 @@ vpa_config = {
 }
 
 autoscaler.configure_vpa(namespace='agent-platform', config=vpa_config)
+
+
+
+
+
+
 ```
 
 **Autoscaler Management**:
+
+
 - Dynamic HPA configuration based on workload patterns
+
+
 - VPA policy optimization for different agent types
+
+
 - Custom metrics integration for workflow-aware scaling
+
+
 - Scaling event monitoring and policy effectiveness analysis
 
 ## Tool Combination Strategies
 
 ### Resource Baseline Establishment
+
+
+
 ```bash
 # 1. Analyze current resource utilization
 kubernetes_listPods --namespace=agent-platform --show-metrics=true
@@ -257,9 +419,18 @@ memory_create_entities --type=resource-baseline --data="[current_configs]"
 
 # 4. Monitor baseline performance
 resource_analyzer --analyze-allocations --baseline-comparison=true
+
+
+
+
+
+
 ```
 
 ### Autoscaling Implementation and Tuning
+
+
+
 ```bash
 # 1. Deploy initial HPA configurations
 kubernetes_createResource --file=hpa-configs.yaml
@@ -276,9 +447,18 @@ autoscaler_manager --configure-vpa --update-mode=Auto --namespace=agent-platform
 
 # 5. Monitor and validate VPA recommendations
 kubernetes_describeResource --kind=VerticalPodAutoscaler --name=agent-pods-vpa
+
+
+
+
+
+
 ```
 
 ### Resource Quota and Limit Management
+
+
+
 ```bash
 # 1. Establish namespace resource quotas
 kubernetes_createResource --file=namespace-quotas.yaml
@@ -295,9 +475,18 @@ kubernetes_createResource --file=limit-ranges.yaml
 
 # 5. Validate resource governance effectiveness
 kubernetes_listPods --field-selector=status.phase=Failed --grep="quota\|limit"
+
+
+
+
+
+
 ```
 
 ### Performance Optimization Workflow
+
+
+
 ```bash
 # 1. Collect comprehensive resource usage data
 prometheus_metrics --export-metrics --namespace=agent-platform --period=30d
@@ -313,32 +502,72 @@ prometheus_metrics --compare-periods --before=30d --after=current
 
 # 5. Document results and update baselines
 memory_create_entities --type=optimization-result --improvements="[performance_gains]"
+
+
+
+
+
+
 ```
+
+
 
 ## Best Practices Summary
 
 ### Resource Configuration Management
+
+
 - Use infrastructure-as-code for all resource management configurations
+
+
 - Implement staged rollouts for resource policy changes
+
+
 - Maintain comprehensive documentation of resource allocation decisions
+
+
 - Regular review and optimization of resource specifications
 
 ### Monitoring and Alerting
+
+
 - Set up proactive alerts before reaching critical resource thresholds
+
+
 - Monitor both utilization and efficiency metrics
+
+
 - Implement capacity planning with automated forecasting
+
+
 - Track resource optimization improvements over time
 
 ### Autoscaling Best Practices
+
+
 - Start with conservative scaling policies and tune based on observed behavior
+
+
 - Implement appropriate stabilization windows to prevent thrashing
+
+
 - Use custom metrics relevant to workload patterns
+
+
 - Monitor scaling decisions and adjust policies based on effectiveness
 
 ### Operational Excellence
+
+
 - Create runbooks for common resource management scenarios
+
+
 - Implement automated capacity planning and reporting
+
+
 - Regular testing of resource management policies under load
+
+
 - Maintain cost visibility and optimization initiatives
 
 This comprehensive tool guide enables effective implementation and management of the resource management system, ensuring optimal performance, cost efficiency, and operational excellence for the multi-agent workflow orchestration platform.

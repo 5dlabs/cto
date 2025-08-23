@@ -1,5 +1,7 @@
 # Task 14: Build Workflow Resume Operations
 
+
+
 ## Overview
 
 Implement robust workflow resume operations for each suspension point in the multi-agent orchestration system with proper event correlation and failure handling. This task ensures reliable event-driven workflow transitions that can recover from failures and handle edge cases.
@@ -19,7 +21,12 @@ The multi-agent Play Workflow uses suspend/resume patterns to coordinate with Gi
 
 ### Resume Operation Requirements
 
+
+
+
 ```yaml
+
+
 # Workflow Resume API Structure
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowResume
@@ -43,9 +50,18 @@ spec:
     - field: "current-stage"
       operator: "equals"
       value: "waiting-pr-created"
+
+
+
+
+
+
 ```
 
 ### Event Correlation System
+
+
+
 
 ```yaml
 # Argo Events Sensor with Resume Logic
@@ -106,6 +122,12 @@ spec:
             dependencyName: github-pr-created
             dataKey: body.pull_request.number
           dest: spec.arguments.parameters.pr-number
+
+
+
+
+
+
 ```
 
 ## Implementation Requirements
@@ -113,6 +135,9 @@ spec:
 ### 1. Resume API Implementation
 
 **Core Resume Function**:
+
+
+
 ```go
 // Resume operation with validation and retry logic
 func ResumeWorkflow(ctx context.Context, resumeSpec *WorkflowResumeSpec) error {
@@ -185,11 +210,20 @@ func findTargetWorkflow(ctx context.Context, spec *WorkflowResumeSpec) (*v1alpha
 
     return &workflows.Items[0], nil
 }
+
+
+
+
+
+
 ```
 
 ### 2. Retry Logic with Exponential Backoff
 
 **Robust Retry Implementation**:
+
+
+
 ```go
 type RetryConfig struct {
     MaxAttempts   int           `json:"maxAttempts"`
@@ -264,11 +298,20 @@ func isRetryableError(err error) bool {
 
     return false
 }
+
+
+
+
+
+
 ```
 
 ### 3. Event Validation and Correlation
 
 **Comprehensive Event Validation**:
+
+
+
 ```go
 type EventValidationResult struct {
     Valid         bool     `json:"valid"`
@@ -372,11 +415,20 @@ func determineEventTypeAndStage(event *GitHubWebhookEvent) (eventType, targetSta
         return "unknown", "unknown"
     }
 }
+
+
+
+
+
+
 ```
 
 ### 4. Circuit Breaker Pattern
 
 **Failure Protection**:
+
+
+
 ```go
 type CircuitBreaker struct {
     MaxFailures     int           `json:"maxFailures"`
@@ -463,6 +515,12 @@ func (cb *CircuitBreaker) recordFailure() {
         log.Printf("Circuit breaker transitioned back to OPEN state")
     }
 }
+
+
+
+
+
+
 ```
 
 ## Resume Operations by Suspension Point
@@ -470,6 +528,9 @@ func (cb *CircuitBreaker) recordFailure() {
 ### 1. After Rex Implementation (PR Created)
 
 **Resume Specification**:
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowResume
@@ -495,11 +556,22 @@ spec:
       value: "{{pr-number}}"
     - name: "pr-url"
       value: "{{pr-url}}"
+
+
+
+
+
+
 ```
+
+
 
 ### 2. After Cleo Quality (Ready for QA)
 
 **Resume Specification**:
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowResume
@@ -526,11 +598,20 @@ spec:
   resumeParameters:
     - name: "cleo-completion-time"
       value: "{{event-timestamp}}"
+
+
+
+
+
+
 ```
 
 ### 3. After Tess Testing (PR Approved)
 
 **Resume Specification**:
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowResume
@@ -559,6 +640,12 @@ spec:
       value: "{{event-timestamp}}"
     - name: "review-id"
       value: "{{review-id}}"
+
+
+
+
+
+
 ```
 
 ## Implementation Steps
@@ -566,62 +653,129 @@ spec:
 ### Phase 1: Core Resume Infrastructure
 
 1. **Resume API Development**:
+
+
    - Implement workflow resume validation
+
+
    - Add event correlation logic
+
+
    - Create retry mechanism with exponential backoff
+
+
    - Build circuit breaker protection
 
 2. **Testing Framework**:
+
+
    - Create unit tests for resume operations
+
+
    - Build integration tests with actual workflows
+
+
    - Add performance tests for concurrent resumes
+
+
    - Create failure scenario tests
 
 ### Phase 2: Event Integration
 
 1. **Argo Events Sensor Enhancement**:
+
+
    - Update existing sensors with resume operations
+
+
    - Add comprehensive event validation
+
+
    - Implement correlation logic
+
+
    - Add error handling and logging
 
 2. **GitHub Webhook Processing**:
+
+
    - Enhance webhook payload parsing
+
+
    - Add task ID extraction from multiple sources
+
+
    - Implement event type determination
+
+
    - Add validation for event authenticity
 
 ### Phase 3: Monitoring and Observability
 
 1. **Resume Operation Logging**:
+
+
    - Structured logging for all resume attempts
+
+
    - Correlation ID tracking across operations
+
+
    - Performance metrics collection
+
+
    - Error categorization and tracking
 
 2. **Monitoring Dashboards**:
+
+
    - Resume success/failure rates
+
+
    - Event correlation accuracy
+
+
    - Retry attempt patterns
+
+
    - Circuit breaker state transitions
 
 ### Phase 4: Production Deployment
 
 1. **Deployment Strategy**:
+
+
    - Blue-green deployment for sensor updates
+
+
    - Gradual rollout with canary testing
+
+
    - Rollback procedures for failures
+
+
    - Health check implementation
 
 2. **Operational Procedures**:
+
+
    - Troubleshooting guides
+
+
    - Manual resume procedures
+
+
    - Alert configuration
+
+
    - Performance tuning guidelines
 
 ## Error Handling Scenarios
 
 ### Scenario 1: Workflow Not Found
+
+
+
 ```go
 func handleWorkflowNotFound(taskId, eventType string) error {
     log.Printf("No workflow found for task %s, event %s", taskId, eventType)
@@ -642,9 +796,18 @@ func handleWorkflowNotFound(taskId, eventType string) error {
     log.Printf("Unknown workflow state for task %s - manual investigation required", taskId)
     return fmt.Errorf("workflow not found and reason unknown")
 }
+
+
+
+
+
+
 ```
 
 ### Scenario 2: Multiple Workflows Found
+
+
+
 ```go
 func handleMultipleWorkflows(workflows []v1alpha1.Workflow, taskId string) error {
     log.Printf("Multiple workflows found for task %s: %d instances", taskId, len(workflows))
@@ -670,9 +833,18 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, taskId string) error
     // Resume the most recent workflow
     return resumeWorkflow(mostRecent)
 }
+
+
+
+
+
+
 ```
 
 ### Scenario 3: Event Correlation Failure
+
+
+
 ```go
 func handleCorrelationFailure(event *GitHubWebhookEvent, workflow *v1alpha1.Workflow, validationResult *EventValidationResult) error {
     log.Printf("Event correlation failed for workflow %s: %v", workflow.Name, validationResult.ValidationErrors)
@@ -693,11 +865,20 @@ func handleCorrelationFailure(event *GitHubWebhookEvent, workflow *v1alpha1.Work
     // Don't retry correlation failures - they indicate data issues
     return fmt.Errorf("event correlation failed - manual investigation required")
 }
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
 
 ### Unit Testing
+
+
+
 ```go
 func TestResumeWorkflowValidation(t *testing.T) {
     tests := []struct {
@@ -740,9 +921,18 @@ func TestResumeWorkflowValidation(t *testing.T) {
         })
     }
 }
+
+
+
+
+
+
 ```
 
 ### Integration Testing
+
+
+
 ```go
 func TestResumeWorkflowIntegration(t *testing.T) {
     // Setup test workflow
@@ -779,6 +969,12 @@ func TestResumeWorkflowIntegration(t *testing.T) {
         t.Error("workflow not resumed - still suspended")
     }
 }
+
+
+
+
+
+
 ```
 
 ## Performance Considerations
@@ -800,9 +996,17 @@ func TestResumeWorkflowIntegration(t *testing.T) {
 - **Task 5**: Event-driven workflow coordination foundation
 - **Task 7**: Comprehensive workflow event handling
 - **Task 10**: Workflow suspend/resume infrastructure
+
+
 - Argo Workflows API access
+
+
 - Argo Events webhook processing
+
+
 - Kubernetes API server connectivity
+
+
 
 ## Expected Outcomes
 

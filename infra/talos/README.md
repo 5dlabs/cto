@@ -10,6 +10,8 @@ This repository contains the configuration for a minimal Talos Kubernetes cluste
 - **Ingress**: NGINX Ingress Controller with NodePort
 - **Storage**: Local Path Provisioner with 100GB NVME volume
 
+
+
 ## Key Features
 
 ✅ **Simple Configuration** - Minimal Talos setup without complex features
@@ -17,7 +19,17 @@ This repository contains the configuration for a minimal Talos Kubernetes cluste
 ✅ **NGINX Ingress** - Accessible via NodePort (HTTP: 31251, HTTPS: 31981)
 ✅ **Stable Networking** - Single NIC configuration with DHCP
 
+
+
 ## Directory Structure
+
+
+
+
+
+
+
+
 
 ```
 talos-home/
@@ -28,15 +40,35 @@ talos-home/
 └── local-path-provisioner/  # Storage provisioner configuration
     ├── kustomization.yaml   # Kustomize deployment configuration
     └── local-path-storage.yaml  # User volume configuration
+
+
+
+
+
+
+
+
 ```
+
+
 
 ## Quick Start
 
+
+
 ### Prerequisites
 
+
+
 - macOS workstation with M2 chip (or any system with `kubectl` and `talosctl`)
+
+
 - Two Intel x86-64 systems for the cluster
+
+
 - USB drive for Talos installation
+
+
 - Network with DHCP
 
 ### Installation
@@ -44,7 +76,14 @@ talos-home/
 1. **Download Talos ISO**:
    ```bash
    curl -LO https://github.com/siderolabs/talos/releases/download/v1.10.4/metal-amd64.iso
-   ```
+
+
+
+
+
+
+
+```
 
 2. **Create bootable USB** (on macOS):
    ```bash
@@ -59,7 +98,14 @@ talos-home/
 
    # Eject the USB
    diskutil eject /dev/diskX
-   ```
+
+
+
+
+
+
+
+```
 
 3. **Prepare Hardware**:
    - Control plane: Intel Mac Mini or similar x86-64 system
@@ -67,40 +113,87 @@ talos-home/
    - **IMPORTANT**: Disconnect all extra disks from worker, leave only NVME
 
 4. **Boot Control Plane**:
+
+
    - Boot Mac Mini from USB into maintenance mode
+
+
    - Note the IP address (should get 192.168.1.77 via DHCP)
    - Apply configuration:
      ```bash
      talosctl apply-config --insecure --nodes 192.168.1.77 --file config/simple/controlplane.yaml
-     ```
+
+
+
+
+
+
+
+```
+
+
    - Wait for it to reboot and start up
 
 5. **Bootstrap Cluster** (first time only):
    ```bash
    talosctl --talosconfig=config/simple/talosconfig bootstrap -n 192.168.1.77
-   ```
+
+
+
+
+
+
+
+```
 
 6. **Boot Worker Node**:
+
+
    - Boot Dell/worker from USB into maintenance mode
+
+
    - Note the IP address (should get 192.168.1.72 via DHCP)
    - Apply configuration:
      ```bash
      talosctl apply-config --insecure --nodes 192.168.1.72 --file config/simple/worker.yaml
-     ```
+
+
+
+
+
+
+
+```
    - **IMPORTANT**: Remove USB after configuration is applied
+
+
    - System will install to NVME and reboot
 
 7. **Get kubeconfig**:
    ```bash
    talosctl --talosconfig=config/simple/talosconfig kubeconfig -n 192.168.1.77
    # This will save to ~/.kube/config by default
-   ```
+
+
+
+
+
+
+
+```
 
 8. **Verify Cluster**:
    ```bash
    kubectl get nodes
    # Should show both nodes as Ready
-   ```
+
+
+
+
+
+
+
+```
 
 9. **Deploy Storage** (Local Path Provisioner):
    ```bash
@@ -112,7 +205,14 @@ talos-home/
 
    # Verify storage
    kubectl get storageclass
-   ```
+
+
+
+
+
+
+
+```
 
 ## Accessing Services
 
@@ -120,11 +220,17 @@ talos-home/
 - **NGINX Ingress HTTP**: `http://192.168.1.77:31251` or `http://192.168.1.72:31251`
 - **NGINX Ingress HTTPS**: `https://192.168.1.77:31981` or `https://192.168.1.72:31981`
 
+
+
 ## Storage
 
 The cluster uses Local Path Provisioner with a 100GB NVME volume on the worker node. Any PVC created will automatically provision storage from `/var/mnt/local-path-provisioner`.
 
 Example PVC:
+
+
+
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -132,10 +238,20 @@ metadata:
   name: my-pvc
 spec:
   accessModes:
+
+
     - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
+
+
+
+
+
+
+
+
 ```
 
 ## Important Notes
@@ -147,14 +263,28 @@ spec:
 ## Troubleshooting
 
 ### Worker Won't Join
+
+
 - Ensure the worker is booting from NVME, not USB
+
+
 - Check that only one disk is connected during initial setup
+
+
 - Verify network connectivity between nodes
 
 ### Pods Stuck in Init
+
+
 - Usually indicates container runtime issues
+
+
 - Check `talosctl logs kubelet -n <node-ip>`
+
+
 - Ensure proper disk configuration
+
+
 
 ### Storage Issues
 - Verify the user volume exists: `talosctl -n 192.168.1.72 get volumestatus`
@@ -163,8 +293,20 @@ spec:
 ## Kubeconfig for External Tools
 
 Generate a kubeconfig for tools like Lens or k9s:
+
+
+
+
 ```bash
 talosctl --talosconfig=config/simple/talosconfig kubeconfig -n 192.168.1.77 > talos-kubeconfig.yaml
+
+
+
+
+
+
+
+
 ```
 
 ## Maintenance

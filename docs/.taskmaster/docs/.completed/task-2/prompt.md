@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -32,30 +42,72 @@ You are tasked with creating and configuring specialized Argo Events Sensors for
 
 The multi-agent orchestration system requires sophisticated event handling to coordinate sequential agent execution. The existing Argo Events infrastructure (EventBus, EventSource) is functional, but specialized Sensors are needed to handle the complex state transitions and correlation logic required for the play workflow.
 
+
+
 ## Objectives
 
+
+
 1. **Create Multi-Agent Workflow Resume Sensor**
+
+
    - Handle PR creation events from GitHub
+
+
    - Extract task IDs from PR labels and branch names
+
+
    - Resume suspended workflows after Rex completes implementation
+
+
    - Implement multi-method validation to prevent false positives
 
+
+
 2. **Build Ready-for-QA Label Sensor**
+
+
    - Detect when Cleo adds "ready-for-qa" label to PRs
+
+
    - Verify the label was added by 5DLabs-Cleo[bot]
+
+
    - Resume workflows to trigger Tess testing phase
+
+
    - Ensure proper workflow stage targeting
 
+
+
 3. **Implement PR Approval Sensor**
+
+
    - Process PR review approval events
+
+
    - Confirm approval comes from 5DLabs-Tess[bot]
+
+
    - Extract task correlation data from PR metadata
+
+
    - Resume workflow completion and task progression
 
+
+
 4. **Develop Rex Remediation Sensor**
+
+
    - Detect push events from 5DLabs-Rex[bot] to task branches
+
+
    - Implement immediate cancellation of running Cleo/Tess work
+
+
    - Reset workflow state and remove stale labels
+
+
    - Restart QA pipeline with fresh code changes
 
 ## Technical Requirements
@@ -67,6 +119,9 @@ The multi-agent orchestration system requires sophisticated event handling to co
 - **RBAC**: Ensure sensors have permissions for workflow resume operations
 
 ### Event Correlation Logic
+
+
+
 ```yaml
 # Standard task ID extraction pattern
 - src:
@@ -80,6 +135,12 @@ labelSelector: |
   workflow-type=play-orchestration,
   task-id={{task-id}},
   current-stage={{target-stage}}
+
+
+
+
+
+
 ```
 
 ### Webhook Field Processing
@@ -98,32 +159,67 @@ Each sensor must extract and validate:
 ## Implementation Strategy
 
 ### Phase 1: Basic Sensor Creation
+
+
 1. Start with multi-agent workflow resume sensor
+
+
 2. Test with simple suspended workflow
+
+
 3. Validate task ID extraction and correlation
+
+
 4. Confirm workflow resumption works correctly
 
 ### Phase 2: Label-Based Progression
+
+
 1. Implement ready-for-QA label sensor
+
+
 2. Test Cleo → Tess handoff mechanism
+
+
 3. Validate label actor verification
+
+
 4. Ensure proper stage targeting
 
 ### Phase 3: Approval Handling
+
+
 1. Create PR approval sensor
+
+
 2. Test Tess approval processing
+
+
 3. Validate workflow completion flow
+
+
 4. Implement task progression logic
 
 ### Phase 4: Remediation System
+
+
 1. Build Rex remediation sensor
+
+
 2. Test push event detection
+
+
 3. Implement CodeRun cancellation
+
+
 4. Validate QA pipeline restart
 
 ## Sensor Configuration Templates
 
 ### Multi-Agent Resume Sensor
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -152,9 +248,18 @@ spec:
               workflow-type=play-orchestration,
               task-id={{task-id}},
               current-stage=waiting-pr-created
+
+
+
+
+
+
 ```
 
 ### Ready-for-QA Label Sensor
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -174,9 +279,18 @@ spec:
       - path: label.name
         type: string
         value: "ready-for-qa"
+
+
+
+
+
+
 ```
 
 ### Rex Remediation Sensor
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -209,6 +323,12 @@ spec:
             kind: CodeRun
             metadata:
               labelSelector: "task-id={{task-id}},github-app!=5DLabs-Rex"
+
+
+
+
+
+
 ```
 
 ## Testing and Validation
@@ -231,13 +351,27 @@ spec:
 3. **Error Rates**: Implement alerting for correlation failures
 4. **Scalability Testing**: Verify handling of concurrent workflows
 
+
+
 ## Success Criteria
 
+
+
 - All four sensors deployed and operational in Argo namespace
+
+
 - Successful correlation of GitHub events with suspended workflows
+
+
 - Reliable workflow resumption at appropriate stages
+
+
 - Robust Rex remediation with proper cancellation logic
+
+
 - Comprehensive testing validates all event handling scenarios
+
+
 - No disruption to existing Argo Events infrastructure
 
 ## Key Implementation Notes

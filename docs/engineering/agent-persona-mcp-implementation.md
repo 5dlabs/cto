@@ -4,6 +4,10 @@
 
 ### Tool Registration in `mcp/src/tools.rs`
 
+
+
+
+
 ```rust
 Tool {
     name: "create_agent_persona",
@@ -60,11 +64,23 @@ Tool {
         }
     })
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Implementation Flow
 
 ### 1. Character Generation Phase
+
+
+
+
 
 ```rust
 async fn generate_agent_character(
@@ -82,10 +98,20 @@ async fn generate_agent_character(
         - Quirks: {:?}
 
         Generate:
+
+
         1. A human-like name (single first name)
+
+
         2. A detailed personality profile
+
+
         3. Communication style guidelines
+
+
         4. Three key personality traits
+
+
         5. A visual description for an avatar
 
         Format as JSON with fields: name, archetype, traits, communication_style, avatar_description"#,
@@ -100,9 +126,21 @@ async fn generate_agent_character(
 
     Ok(persona)
 }
+
+
+
+
+
+
+
+
 ```
 
 Example Generated Persona:
+
+
+
+
 ```json
 {
   "name": "Cipher",
@@ -122,9 +160,21 @@ Example Generated Persona:
   },
   "avatar_description": "A sleek black cat with glowing green eyes, wearing a detective's magnifying glass as a monocle"
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 2. System Prompt Generation
+
+
+
+
 
 ```rust
 async fn generate_system_prompts(
@@ -157,8 +207,14 @@ Communication style:
     if capabilities.contains(&"code_review".to_string()) {
         task_prompts.insert("code_review", format!(
             r#"When reviewing code, you:
+
+
 - {}
+
+
 - Focus on {}
+
+
 - Communicate findings by {}"#,
             persona.review_approach(),
             persona.focus_areas(),
@@ -169,8 +225,14 @@ Communication style:
     if capabilities.contains(&"problem_solving".to_string()) {
         task_prompts.insert("problem_solving", format!(
             r#"When solving problems, you:
+
+
 - Start by {}
+
+
 - Apply {} methodology
+
+
 - Present solutions by {}"#,
             persona.problem_approach(),
             persona.methodology(),
@@ -183,9 +245,21 @@ Communication style:
         task_specific: task_prompts,
     })
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 3. GitHub App Creation
+
+
+
+
 
 ```rust
 async fn create_github_app_for_agent(
@@ -237,9 +311,21 @@ async fn create_github_app_for_agent(
         state,
     })
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 4. Kubernetes Configuration
+
+
+
+
 
 ```rust
 async fn create_k8s_resources(
@@ -306,9 +392,21 @@ async fn create_k8s_resources(
 
     Ok(())
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 5. Deployment (Optional)
+
+
+
+
 
 ```rust
 async fn deploy_agent(
@@ -338,9 +436,21 @@ async fn deploy_agent(
 
     Ok(())
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Complete MCP Tool Handler
+
+
+
+
 
 ```rust
 async fn handle_create_agent_persona(params: Value) -> Result<Value> {
@@ -455,11 +565,25 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
         }
     }))
 }
+
+
+
+
+
+
+
+
 ```
+
+
 
 ## Usage Examples
 
 ### Example 1: Create Security Analyst
+
+
+
+
 
 ```typescript
 // MCP call from Cursor/IDE
@@ -472,9 +596,21 @@ await mcp.call("create_agent_persona", {
   },
   deploy: true
 });
+
+
+
+
+
+
+
+
 ```
 
 Response:
+
+
+
+
 ```json
 {
   "success": true,
@@ -503,9 +639,21 @@ Response:
     "status": "running"
   }
 }
+
+
+
+
+
+
+
+
 ```
 
 ### Example 2: Create Documentation Expert
+
+
+
+
 
 ```typescript
 await mcp.call("create_agent_persona", {
@@ -515,6 +663,14 @@ await mcp.call("create_agent_persona", {
     quirks: ["loves organization", "provides examples"]
   }
 });
+
+
+
+
+
+
+
+
 ```
 
 Generated Agent:
@@ -524,6 +680,10 @@ Generated Agent:
 
 ### Example 3: Performance Optimizer
 
+
+
+
+
 ```typescript
 await mcp.call("create_agent_persona", {
   purpose: "Performance optimization and bottleneck detection",
@@ -531,6 +691,14 @@ await mcp.call("create_agent_persona", {
   github_org: "5dlabs",
   namespace: "agent-platform"
 });
+
+
+
+
+
+
+
+
 ```
 
 Generated Agent:
@@ -542,7 +710,13 @@ Generated Agent:
 
 ### Unit Tests
 
+
+
+
+
 ```rust
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,11 +768,25 @@ mod tests {
         assert!(prompts.task_specific.contains_key("code_review"));
     }
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Error Handling
 
+
+
+
+
 ```rust
+
+
 #[derive(Debug, thiserror::Error)]
 enum PersonaCreationError {
     #[error("Failed to generate persona: {0}")]
@@ -616,9 +804,21 @@ enum PersonaCreationError {
     #[error("Timeout waiting for app creation")]
     CreationTimeout,
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Monitoring & Observability
+
+
+
+
 
 ```rust
 // Add metrics for tracking
@@ -635,9 +835,19 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
         "Time taken to create an agent persona"
     ).unwrap()
 });
+
+
+
+
+
+
+
+
 ```
 
 ## Future Enhancements
+
+
 
 1. **Avatar Generation Integration**
    ```rust
@@ -648,7 +858,16 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
            .await?;
        Ok(image_bytes)
    }
-   ```
+
+
+
+
+
+
+
+```
+
+
 
 2. **Persona Learning**
    ```rust
@@ -662,7 +881,16 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
        }
        Ok(())
    }
-   ```
+
+
+
+
+
+
+
+```
+
+
 
 3. **Team Composition**
    ```rust
@@ -675,4 +903,11 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
        let hints = generate_complementary_hints(gaps, need);
        Ok(hints)
    }
-   ```
+
+
+
+
+
+
+
+```

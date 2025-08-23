@@ -1,5 +1,7 @@
 # Task 9: Configure External Secrets for Agent Apps
 
+
+
 ## Overview
 
 Setup External Secrets resources for Cleo and Tess GitHub Apps with proper secret store integration. This enables the new agent GitHub Apps to authenticate with GitHub API for their specialized workflows while maintaining secure credential management.
@@ -12,6 +14,8 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
 
 ### Phase 1: Analyze Existing External Secrets Pattern
 
+
+
 1. **Review Current Implementation**
    ```bash
    # Examine existing Rex External Secrets configuration
@@ -19,7 +23,14 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
 
    # Check ClusterSecretStore configuration
    kubectl get clustersecretstore -o yaml
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Document Required Secret Structure**
    ```yaml
@@ -33,9 +44,16 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
      private-key: <base64-encoded-private-key>
      client-id: <base64-encoded-client-id>
      installation-id: <base64-encoded-installation-id>
-   ```
+
+
+
+
+
+```
 
 ### Phase 2: Create Cleo External Secrets Configuration
+
+
 
 1. **Cleo GitHub App External Secret**
    ```yaml
@@ -76,7 +94,14 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
        remoteRef:
          key: github-apps/5dlabs-cleo
          property: installation_id
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Secret Store Backend Configuration**
    ```yaml
@@ -88,9 +113,16 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
      "client_id": "Iv1.abcdef123456",
      "installation_id": "78901234"
    }
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Create Tess External Secrets Configuration
+
+
 
 1. **Tess GitHub App External Secret**
    ```yaml
@@ -136,7 +168,14 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
        remoteRef:
          key: github-apps/5dlabs-tess
          property: webhook_secret
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Tess-Specific Secret Requirements**
    ```yaml
@@ -149,9 +188,16 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
      "installation_id": "89012345",
      "webhook_secret": "random-webhook-secret-string"
    }
-   ```
+
+
+
+
+
+```
 
 ### Phase 4: Integrate with Agent Container Templates
+
+
 
 1. **Secret Mounting in Container Templates**
    ```handlebars
@@ -167,7 +213,14 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
    GITHUB_TOKEN=$(generate-github-token.sh)
    export GITHUB_TOKEN
    {{/if}}
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Secret Volume Mounts in CodeRun Controller**
    ```rust
@@ -195,9 +248,16 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
        }
        _ => {} // Rex uses existing secret
    }
-   ```
+
+
+
+
+
+```
 
 ### Phase 5: Create GitHub Token Generation Helper
+
+
 
 1. **Token Generation Script Template**
    ```bash
@@ -215,6 +275,8 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
 
    # Get installation access token
    TOKEN_RESPONSE=$(curl -s \
+
+
      -X POST \
      -H "Authorization: Bearer $JWT" \
      -H "Accept: application/vnd.github.v3+json" \
@@ -222,7 +284,14 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
 
    # Extract token from response
    echo "$TOKEN_RESPONSE" | jq -r '.token'
-   ```
+
+
+
+
+
+```
+
+
 
 2. **JWT Creation Helper Script**
    ```python
@@ -256,11 +325,21 @@ Multi-agent orchestration requires each agent to have its own GitHub App identit
 
        token = create_github_app_jwt(app_id, private_key_path)
        print(token)
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Complete Cleo External Secret Configuration
+
+
+
 ```yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
@@ -308,6 +387,8 @@ spec:
     remoteRef:
       key: github-apps/5dlabs-cleo
       property: installation_id
+
+
 ---
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
@@ -360,9 +441,18 @@ spec:
     remoteRef:
       key: github-apps/5dlabs-tess
       property: webhook_secret
+
+
+
+
+
+
 ```
 
 ### Controller Integration for Secret Mounting
+
+
+
 ```rust
 // In controller/src/tasks/code/resources.rs
 fn create_agent_secret_volumes(github_app: &str) -> Vec<Volume> {
@@ -418,9 +508,18 @@ fn create_agent_volume_mounts() -> Vec<VolumeMount> {
         }
     ]
 }
+
+
+
+
+
+
 ```
 
 ### GitHub API Authentication in Agents
+
+
+
 ```handlebars
 # In container-cleo.sh.hbs
 {{#if (eq github_app "5DLabs-Cleo")}}
@@ -452,13 +551,31 @@ else
     echo "⚠️  GitHub App credentials not available"
 fi
 {{/if}}
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
 
 ### Secret Management Flow
+
+
+
+
+
+
 ```
 AWS Secrets Manager → External Secrets Operator → Kubernetes Secret → Pod Volume Mount → Agent Container
+
+
+
+
+
+
 ```
 
 ### Agent-Specific Secret Mapping
@@ -468,13 +585,21 @@ AWS Secrets Manager → External Secrets Operator → Kubernetes Secret → Pod 
 
 ### Automatic Rotation
 External Secrets refreshes secrets every hour, ensuring:
+
+
 - Credential rotation compliance
+
+
 - Automatic token refresh
+
+
 - Minimal downtime during rotation
 
 ## Testing Strategy
 
 ### Secret Creation Testing
+
+
 1. **External Secret Validation**
    ```bash
    # Apply External Secret configurations
@@ -487,7 +612,14 @@ External Secrets refreshes secrets every hour, ensuring:
    # Check secret creation
    kubectl get secret github-app-5dlabs-cleo -n agents-platform -o yaml
    kubectl get secret github-app-5dlabs-tess -n agents-platform -o yaml
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Secret Content Validation**
    ```bash
@@ -496,9 +628,16 @@ External Secrets refreshes secrets every hour, ensuring:
 
    # Test base64 decoding works
    kubectl get secret github-app-5dlabs-cleo -o jsonpath='{.data.app-id}' | base64 -d
-   ```
+
+
+
+
+
+```
 
 ### Agent Integration Testing
+
+
 1. **Secret Mounting Verification**
    ```bash
    # Create test CodeRun for Cleo
@@ -515,7 +654,14 @@ External Secrets refreshes secrets every hour, ensuring:
    # Verify secret mounted correctly
    kubectl exec test-cleo-pod -- ls -la /etc/github-app/
    kubectl exec test-cleo-pod -- cat /etc/github-app/app-id
-   ```
+
+
+
+
+
+```
+
+
 
 2. **GitHub API Authentication Testing**
    ```bash
@@ -524,7 +670,12 @@ External Secrets refreshes secrets every hour, ensuring:
 
    # Test GitHub API access
    kubectl exec test-cleo-pod -- gh api /user
-   ```
+
+
+
+
+
+```
 
 ## Key Design Decisions
 
@@ -537,18 +688,36 @@ External Secrets refreshes secrets every hour, ensuring:
 ## Security Considerations
 
 ### Secret Access Control
+
+
 - Secrets mounted read-only in agent containers
+
+
 - File permissions set to 0400 for private key protection
+
+
 - Each agent only accesses its own GitHub App credentials
 
 ### Credential Isolation
+
+
 - Separate GitHub Apps prevent cross-agent access
+
+
 - External Secrets operator manages credential lifecycle
+
+
 - AWS Secrets Manager provides backend security
 
 ### Audit and Monitoring
+
+
 - External Secrets logs all sync operations
+
+
 - Secret access tracked through Kubernetes audit logs
+
+
 - GitHub App activity visible in GitHub audit logs
 
 ## References

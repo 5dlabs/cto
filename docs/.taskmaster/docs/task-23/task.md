@@ -1,4 +1,8 @@
+
+
 # Task 23: Setup Workflow Archival
+
+
 
 ## Overview
 
@@ -9,6 +13,9 @@ This task implements comprehensive workflow archival and cleanup policies for th
 ### 1. Argo Workflows Artifact Repository Configuration
 
 #### MinIO/S3 Artifact Repository Setup
+
+
+
 ```yaml
 # MinIO deployment for workflow artifact storage
 apiVersion: apps/v1
@@ -30,7 +37,11 @@ spec:
       - name: minio
         image: minio/minio:latest
         command:
+
+
         - /bin/bash
+
+
         - -c
         args:
         - minio server /data --console-address :9001
@@ -62,9 +73,18 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: minio-storage
+
+
+
+
+
+
 ```
 
 #### Argo Workflows Artifact Repository Configuration
+
+
+
 ```yaml
 # Workflow artifact repository configuration
 apiVersion: v1
@@ -100,20 +120,49 @@ data:
       archive: true
       compress: true
       metadata:
+
+
         - name
+
+
         - namespace
+
+
         - labels
+
+
         - annotations
+
+
         - creationTimestamp
+
+
         - startedAt
+
+
         - finishedAt
+
+
         - phase
+
+
         - duration
+
+
+
+
+
+
 ```
 
 ### 2. Workflow Lifecycle Management
 
+
+
 #### Workflow Archive CRD
+
+
+
 ```yaml
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -151,9 +200,18 @@ spec:
     plural: workflowarchives
     singular: workflowarchive
     kind: WorkflowArchive
+
+
+
+
+
+
 ```
 
 #### Archive Controller Implementation
+
+
+
 ```go
 // Archive controller for workflow lifecycle management
 type ArchiveController struct {
@@ -218,11 +276,20 @@ func (ac *ArchiveController) getRetentionPeriod(wf *wfv1.Workflow) time.Duration
         return ac.retentionConfig.CompletedTTL
     }
 }
+
+
+
+
+
+
 ```
 
 ### 3. Compliance-Based Retention Policies
 
 #### Retention Policy Engine
+
+
+
 ```yaml
 # Retention policy configuration
 apiVersion: v1
@@ -261,9 +328,18 @@ data:
             category: "security"
         retention: "5y"
         archive_immediately: true
+
+
+
+
+
+
 ```
 
 #### Policy Enforcement Controller
+
+
+
 ```python
 # Python-based retention policy enforcement
 import kubernetes
@@ -322,11 +398,24 @@ class RetentionPolicyController:
         archive_date = finished_at + retention_period
 
         return datetime.now() >= archive_date
+
+
+
+
+
+
 ```
+
+
 
 ### 4. Workflow History API
 
+
+
 #### Archive Query Service
+
+
+
 ```go
 // RESTful API for querying archived workflows
 type ArchiveQueryService struct {
@@ -393,10 +482,21 @@ func (aqs *ArchiveQueryService) RestoreWorkflow(ctx context.Context, archiveID s
 
     return workflow, nil
 }
+
+
+
+
+
+
 ```
 
 #### GraphQL API for Advanced Queries
+
+
+
 ```graphql
+
+
 # GraphQL schema for workflow archive queries
 type WorkflowArchive {
   id: ID!
@@ -437,11 +537,20 @@ type Mutation {
     newRetentionDate: DateTime!
   ): WorkflowArchive!
 }
+
+
+
+
+
+
 ```
 
 ### 5. Automated Garbage Collection
 
 #### Workflow Cleanup Controller
+
+
+
 ```yaml
 # CronJob for automated workflow cleanup
 apiVersion: batch/v1
@@ -460,9 +569,15 @@ spec:
           - name: cleanup
             image: workflow-archiver:latest
             command:
+
+
             - /bin/bash
+
+
             - -c
             args:
+
+
             - |
               echo "Starting workflow cleanup process..."
 
@@ -495,9 +610,18 @@ spec:
           - name: reports
             persistentVolumeClaim:
               claimName: cleanup-reports
+
+
+
+
+
+
 ```
 
 #### Cleanup Logic Implementation
+
+
+
 ```python
 # Comprehensive cleanup implementation
 class WorkflowCleanupManager:
@@ -592,11 +716,20 @@ class WorkflowCleanupManager:
             "deleted_objects": deleted_objects,
             "size_freed": size_freed
         }
+
+
+
+
+
+
 ```
 
 ### 6. Monitoring and Metrics
 
 #### Archive Metrics Collection
+
+
+
 ```yaml
 # Prometheus monitoring for workflow archival
 apiVersion: monitoring.coreos.com/v1
@@ -639,53 +772,125 @@ spec:
         severity: critical
       annotations:
         summary: "Workflow cleanup has not run successfully in 24 hours"
+
+
+
+
+
+
 ```
 
 ## Implementation Steps
 
 ### Phase 1: Infrastructure Setup (Week 1)
+
+
 1. **Artifact Repository Deployment**
+
+
    - Deploy MinIO for S3-compatible object storage
+
+
    - Configure Argo Workflows to use artifact repository
+
+
    - Test artifact storage and retrieval functionality
 
+
+
 2. **Archive CRD and Controller**
+
+
    - Deploy WorkflowArchive custom resource definition
+
+
    - Implement basic archive controller functionality
+
+
    - Test workflow archival process
 
 ### Phase 2: Retention Policies (Week 2)
+
+
 3. **Policy Configuration**
+
+
    - Implement configurable retention policies
+
+
    - Add compliance-based retention requirements
+
+
    - Create policy override mechanisms
 
+
+
 4. **Automated Archival**
+
+
    - Deploy CronJob for scheduled archival
+
+
    - Implement TTL-based workflow cleanup
+
+
    - Add monitoring and alerting
 
 ### Phase 3: Query and Restoration (Week 3)
+
+
 5. **Archive Query API**
+
+
    - Implement RESTful API for archive queries
+
+
    - Add GraphQL interface for advanced queries
+
+
    - Create workflow restoration capabilities
 
+
+
 6. **User Interface Integration**
+
+
    - Integrate archive queries with Argo UI
+
+
    - Add archive management dashboard
+
+
    - Implement workflow restoration UI
 
 ### Phase 4: Optimization and Monitoring (Week 4)
+
+
 7. **Performance Optimization**
+
+
    - Implement artifact compression and deduplication
+
+
    - Optimize storage and query performance
+
+
    - Add caching for frequently accessed archives
 
+
+
 8. **Comprehensive Monitoring**
+
+
    - Deploy metrics collection and alerting
+
+
    - Create operational dashboards
+
+
    - Implement capacity planning and reporting
+
+
 
 ## Success Metrics
 
@@ -722,21 +927,45 @@ spec:
 ## Risk Mitigation
 
 ### Data Loss Prevention
+
+
 - Implement comprehensive backup strategies for archive storage
+
+
 - Use replication and versioning for critical archive data
+
+
 - Maintain audit logs for all archival and deletion operations
+
+
 - Test restoration procedures regularly
 
 ### Performance Impact Mitigation
+
+
 - Schedule cleanup operations during low-activity periods
+
+
 - Implement incremental archival to minimize system impact
+
+
 - Use compression and efficient storage formats
+
+
 - Monitor and alert on archival performance issues
 
 ### Compliance Risk Management
+
+
 - Regular review and validation of retention policies
+
+
 - Automated compliance reporting and monitoring
+
+
 - Legal hold capabilities for litigation and investigation
+
+
 - Secure deletion verification for expired archives
 
 This comprehensive workflow archival system ensures efficient resource utilization while maintaining compliance requirements and providing reliable access to historical workflow data for audit, debugging, and analysis purposes.

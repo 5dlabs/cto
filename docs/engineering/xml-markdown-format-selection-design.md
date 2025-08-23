@@ -1,5 +1,7 @@
 # XML/Markdown Format Selection Design
 
+
+
 ## Overview
 
 This document outlines the design for supporting both XML and Markdown formats for task documentation and agent communication, with the ability to dynamically select the format through the MCP server when calling workflows.
@@ -8,9 +10,17 @@ This document outlines the design for supporting both XML and Markdown formats f
 
 While Markdown has been our primary format for task documentation and agent instructions, XML provides structured data advantages that can be beneficial for certain workflows. We need a flexible system that:
 
+
+
 1. Supports both XML and Markdown formats
+
+
 2. Allows format selection at runtime via MCP
+
+
 3. Defaults to Markdown for backward compatibility
+
+
 4. Handles format-specific processing in container scripts
 
 ## Design Goals
@@ -26,6 +36,10 @@ While Markdown has been our primary format for task documentation and agent inst
 ### 1. MCP Server Enhancement
 
 Add a `format` parameter to relevant MCP tools:
+
+
+
+
 
 ```rust
 // In mcp/src/tools.rs
@@ -67,11 +81,23 @@ Tool {
         }
     })
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 2. Controller CRD Updates
 
 Update the CRDs to include format specification:
+
+
+
+
 
 ```rust
 // In controller/src/crds/code_run.rs
@@ -95,6 +121,14 @@ pub enum DocumentFormat {
 fn default_format() -> DocumentFormat {
     DocumentFormat::Markdown
 }
+
+
+
+
+
+
+
+
 ```
 
 Similar updates for `DocsRunSpec` and `PlayRunSpec`.
@@ -102,6 +136,10 @@ Similar updates for `DocsRunSpec` and `PlayRunSpec`.
 ### 3. Container Script Adaptation
 
 Update container scripts to handle both formats:
+
+
+
+
 
 ```bash
 # In container scripts (e.g., container-rex.sh.hbs)
@@ -151,6 +189,8 @@ EOF
             ;;
         markdown|*)
             cat > prompt.md << 'EOF'
+
+
 # Task ${task_id}
 
 ## Instructions
@@ -162,11 +202,23 @@ EOF
             ;;
     esac
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 4. Handlebars Template Updates
 
 Update handlebars templates to support format selection:
+
+
+
+
 
 ```handlebars
 {{!-- In claude-templates/code/container-rex.sh.hbs --}}
@@ -185,11 +237,23 @@ echo "🔧 Configuring for Markdown documentation format"
 export PROMPT_EXTENSION="md"
 export RESPONSE_FORMAT="markdown"
 {{/if}}
+
+
+
+
+
+
+
+
 ```
 
 ### 5. Format-Specific Processing
 
 #### XML Processing Benefits
+
+
+
+
 ```xml
 <!-- Structured task definition -->
 <task>
@@ -214,11 +278,27 @@ export RESPONSE_FORMAT="markdown"
         </files>
     </context>
 </task>
+
+
+
+
+
+
+
+
 ```
 
 #### Markdown Processing (Default)
+
+
+
+
 ```markdown
+
+
 # Task 42
+
+
 
 ## Metadata
 - Priority: high
@@ -226,17 +306,41 @@ export RESPONSE_FORMAT="markdown"
 
 ## Requirements
 ### Functional Requirements
+
+
 - Implement user authentication
+
+
   - [ ] JWT tokens are generated
+
+
   - [ ] Refresh tokens are supported
 
 ## Context
+
+
 ### Files to Modify
+
+
 - `src/auth.rs` (modify)
+
+
 - `tests/auth_test.rs` (create)
+
+
+
+
+
+
+
+
 ```
 
 ### 6. Format Detection and Validation
+
+
+
+
 
 ```rust
 // In controller/src/tasks/format.rs
@@ -276,43 +380,97 @@ impl DocumentFormatter for XmlFormatter {
         // Validate XML structure (DTD/XSD)
     }
 }
+
+
+
+
+
+
+
+
 ```
 
 ## Implementation Strategy
 
 ### Phase 1: MCP Parameter Addition (Day 1-2)
+
+
 1. Add `format` parameter to MCP tools
+
+
 2. Pass format through to controller
+
+
 3. Default to markdown if not specified
 
 ### Phase 2: Controller Support (Day 3-4)
+
+
 1. Update CRDs with format field
+
+
 2. Add format to ConfigMap generation
+
+
 3. Pass format to container environment
 
 ### Phase 3: Container Script Updates (Day 5-7)
+
+
 1. Update container scripts to read format
+
+
 2. Implement format-specific processing functions
+
+
 3. Test both formats end-to-end
 
 ### Phase 4: Format Processing (Week 2)
+
+
 1. Implement XML formatter
+
+
 2. Update Markdown formatter
+
+
 3. Add validation for both formats
+
+
 4. Create conversion utilities
+
+
 
 ## Usage Examples
 
 ### Example 1: Default Markdown Usage
+
+
+
+
 ```typescript
 // No format specified - uses markdown by default
 await mcp.call("mcp_cto_code", {
     task_id: 42,
     agent: "rex"
 });
+
+
+
+
+
+
+
+
 ```
 
+
+
 ### Example 2: Explicit XML Format
+
+
+
+
 ```typescript
 // Specify XML format for structured data
 await mcp.call("mcp_cto_code", {
@@ -320,9 +478,23 @@ await mcp.call("mcp_cto_code", {
     agent: "rex",
     format: "xml"
 });
+
+
+
+
+
+
+
+
 ```
 
+
+
 ### Example 3: Play Workflow with XML
+
+
+
+
 ```typescript
 // Use XML for all agents in play workflow
 await mcp.call("mcp_cto_play", {
@@ -332,9 +504,21 @@ await mcp.call("mcp_cto_play", {
     testing_agent: "tess",
     format: "xml"  // All agents will use XML
 });
+
+
+
+
+
+
+
+
 ```
 
 ### Example 4: A/B Testing Formats
+
+
+
+
 ```typescript
 // Run same task with different formats for comparison
 const markdownRun = await mcp.call("mcp_cto_code", {
@@ -350,9 +534,21 @@ const xmlRun = await mcp.call("mcp_cto_code", {
 });
 
 // Compare performance, token usage, accuracy
+
+
+
+
+
+
+
+
 ```
 
 ## Environment Variables
+
+
+
+
 
 ```bash
 # Container environment variables
@@ -360,11 +556,23 @@ DOC_FORMAT=xml|markdown          # Documentation format
 PROMPT_EXTENSION=xml|md          # File extension for prompts
 RESPONSE_FORMAT=xml|markdown     # Expected response format
 VALIDATE_FORMAT=true|false       # Enable format validation
+
+
+
+
+
+
+
+
 ```
 
 ## Monitoring and Metrics
 
 Track format usage and performance:
+
+
+
+
 
 ```rust
 // Metrics to collect
@@ -391,6 +599,14 @@ static TOKEN_USAGE_BY_FORMAT: Lazy<IntCounterVec> = Lazy::new(|| {
         &["format", "agent"]
     ).unwrap()
 });
+
+
+
+
+
+
+
+
 ```
 
 ## Migration Path
@@ -417,27 +633,49 @@ static TOKEN_USAGE_BY_FORMAT: Lazy<IntCounterVec> = Lazy::new(|| {
 ## Security Considerations
 
 1. **XML Security**:
+
+
    - Disable external entity processing (XXE prevention)
+
+
    - Limit XML document size
+
+
    - Validate against schema/DTD
 
 2. **Format Injection**:
+
+
    - Sanitize format parameter input
+
+
    - Validate format values against enum
 
 3. **Resource Usage**:
+
+
    - Monitor memory usage for XML parsing
+
+
    - Set timeouts for format processing
 
 ## Testing Strategy
 
 ### Unit Tests
+
+
+
+
 ```rust
+
+
 #[test]
 fn test_markdown_format_default() {
     let spec = CodeRunSpec::default();
     assert_eq!(spec.format, DocumentFormat::Markdown);
 }
+
+
 
 #[test]
 fn test_xml_format_selection() {
@@ -447,29 +685,63 @@ fn test_xml_format_selection() {
     };
     assert_eq!(spec.format, DocumentFormat::Xml);
 }
+
+
+
+
+
+
+
+
 ```
 
 ### Integration Tests
+
+
+
+
 ```bash
 # Test Markdown format (default)
 mcp_cto_code --task-id 42
+
+
 
 # Test XML format
 mcp_cto_code --task-id 42 --format xml
 
 # Verify outputs are equivalent
 diff -u output_markdown.txt output_xml.txt
+
+
+
+
+
+
+
+
 ```
 
 ### Performance Tests
+
+
 - Measure token usage for same task in both formats
+
+
 - Compare completion times
+
+
 - Analyze accuracy of responses
+
+
 - Monitor resource consumption
 
 ## Future Enhancements
 
 ### 1. Format Auto-Selection
+
+
+
+
 ```rust
 // Automatically choose format based on task complexity
 fn auto_select_format(task: &Task) -> DocumentFormat {
@@ -479,9 +751,23 @@ fn auto_select_format(task: &Task) -> DocumentFormat {
         DocumentFormat::Markdown  // Better for simple tasks
     }
 }
+
+
+
+
+
+
+
+
 ```
 
+
+
 ### 2. Custom Formats
+
+
+
+
 ```rust
 enum DocumentFormat {
     Markdown,
@@ -490,9 +776,21 @@ enum DocumentFormat {
     Yaml,
     Custom(String),
 }
+
+
+
+
+
+
+
+
 ```
 
 ### 3. Format Conversion
+
+
+
+
 ```rust
 // Convert between formats
 impl From<MarkdownDocument> for XmlDocument {
@@ -500,9 +798,23 @@ impl From<MarkdownDocument> for XmlDocument {
         // Conversion logic
     }
 }
+
+
+
+
+
+
+
+
 ```
 
+
+
 ### 4. Format Templates
+
+
+
+
 ```yaml
 # Format templates per agent/task type
 format_templates:
@@ -512,6 +824,14 @@ format_templates:
   cleo:
     quality_checks: xml
     reports: markdown
+
+
+
+
+
+
+
+
 ```
 
 ## Conclusion

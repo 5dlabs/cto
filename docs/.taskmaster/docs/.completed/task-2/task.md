@@ -1,5 +1,7 @@
 # Task 2: Setup Argo Events Infrastructure
 
+
+
 ## Overview
 
 Create and configure specialized Argo Events Sensors for multi-agent workflow orchestration, enabling event-driven coordination between Rex, Cleo, and Tess agents through GitHub webhook processing and workflow resumption.
@@ -11,6 +13,8 @@ The existing Argo Events infrastructure (EventBus, EventSource) is already deplo
 ## Implementation Guide
 
 ### Phase 1: Multi-Agent Workflow Resume Sensor
+
+
 
 1. **Create PR Creation Event Sensor**
    ```yaml
@@ -29,14 +33,25 @@ The existing Argo Events infrastructure (EventBus, EventSource) is already deplo
          - path: action
            type: string
            value: "opened"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Implement Workflow Correlation Logic**
    - Extract task ID from PR labels using jq: `.pull_request.labels[?(@.name | startswith("task-"))].name | split("-")[1]`
    - Target workflows with label selector: `workflow-type=play-orchestration,task-id={{extracted-task-id}},current-stage=waiting-pr-created`
+
+
    - Use Argo Workflow resume operation to continue suspended workflows
 
 ### Phase 2: Ready-for-QA Label Sensor
+
+
 
 1. **Create PR Labeling Event Sensor**
    ```yaml
@@ -58,14 +73,29 @@ The existing Argo Events infrastructure (EventBus, EventSource) is already deplo
          - path: label.name
            type: string
            value: "ready-for-qa"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Configure Workflow Targeting**
+
+
    - Ensure label was added by Cleo (5DLabs-Cleo[bot])
+
+
    - Target workflows in `waiting-ready-for-qa` stage
+
+
    - Resume Tess stage after successful correlation
 
 ### Phase 3: PR Approval Sensor
+
+
 
 1. **Create PR Review Event Sensor**
    ```yaml
@@ -87,14 +117,29 @@ The existing Argo Events infrastructure (EventBus, EventSource) is already deplo
          - path: review.state
            type: string
            value: "approved"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Verify Tess Approval**
+
+
    - Confirm reviewer is 5DLabs-Tess[bot]
+
+
    - Extract task ID from PR labels
+
+
    - Resume workflow completion stage
 
 ### Phase 4: Rex Remediation Sensor
+
+
 
 1. **Create Push Event Detection**
    ```yaml
@@ -117,7 +162,14 @@ The existing Argo Events infrastructure (EventBus, EventSource) is already deplo
            type: string
            comparator: "="
            value: "refs/heads/task-.*"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Implement QA Pipeline Restart Logic**
    ```yaml
@@ -132,11 +184,21 @@ The existing Argo Events infrastructure (EventBus, EventSource) is already deplo
              kind: CodeRun
              metadata:
                labelSelector: "task-id={{extracted-task-id}},github-app!=5DLabs-Rex"
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Event Correlation Pattern
+
+
+
 ```yaml
 # Standard pattern for task ID extraction and workflow targeting
 - src:
@@ -150,10 +212,21 @@ labelSelector: |
   workflow-type=play-orchestration,
   task-id={{task-id}},
   current-stage={{target-stage}}
+
+
+
+
+
+
 ```
 
 ### Webhook Field Extraction
+
+
+
 ```bash
+
+
 # Extract task ID from PR labels
 TASK_ID=$(echo '$webhook_payload' | jq -r '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]')
 
@@ -165,9 +238,18 @@ if [ "$TASK_ID" != "$BRANCH_TASK" ]; then
   echo "ERROR: Task association mismatch"
   exit 1
 fi
+
+
+
+
+
+
 ```
 
 ### Workflow Resume Configuration
+
+
+
 ```yaml
 triggers:
 - template:
@@ -183,6 +265,12 @@ triggers:
               workflow-type=play-orchestration,
               task-id={{task-id}},
               current-stage=waiting-pr-created
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
@@ -250,5 +338,9 @@ All sensors depend on:
 - [Argo Events Sensor Documentation](https://argoproj.github.io/argo-events/concepts/sensor/)
 - [GitHub Webhook Payloads](https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads)
 - [Argo Workflows Resume Operations](https://argoproj.github.io/argo-workflows/rest-api/#operation/WorkflowServiceResumeWorkflow)
+
+
 - [Multi-Agent Architecture](.taskmaster/docs/architecture.md)
+
+
 - [Product Requirements](.taskmaster/docs/prd.txt)

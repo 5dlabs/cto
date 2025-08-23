@@ -8,42 +8,93 @@ You are tasked with modifying the Rust controller to implement conditional agent
 
 The current controller creates PVCs with a generic `workspace-{service}` naming pattern. This pattern is **correct for implementation agents** who work on the same workspace surface. The multi-agent orchestration system needs to support future agent types that may require isolated workspaces for independent operation, session continuity, and knowledge accumulation without interference.
 
+
+
 ## Objectives
 
+
+
 1. **Implement Agent Name Extraction**
+
+
    - Create robust parsing logic for GitHub App field (`5DLabs-Rex` → `rex`)
+
+
    - Handle various naming patterns including bot suffixes
+
+
    - Implement proper error handling and validation
+
+
    - Support current and future agent naming conventions
 
+
+
 2. **Implement Agent Classification System**
+
+
    - Identify implementation agents (Rex, Blaze) that use shared workspace
+
+
    - Classify non-implementation agents that may need isolated workspaces
+
+
    - Create extensible system for future agent types
+
+
    - Maintain backward compatibility for existing implementation agents
 
+
+
 3. **Modify PVC Creation Logic**
+
+
    - Update PVC naming to use conditional pattern based on agent type
    - Implementation agents: `workspace-{service}` (shared)
    - Non-implementation agents: `workspace-{service}-{agent}` (isolated)
+
+
    - Ensure Kubernetes naming constraint compliance
+
+
    - Implement idempotent PVC creation using kube-rs
+
+
 
 4. **Maintain Backward Compatibility**
    - **CRITICAL**: Implementation agents continue using existing `workspace-{service}` pattern
+
+
    - No disruption to currently running CodeRun instances
+
+
    - Existing PVCs remain accessible to implementation agents
+
+
    - Provide graceful fallback mechanisms
 
+
+
 5. **Update Controller Integration**
+
+
    - Modify reconciliation logic to use conditional PVC naming
+
+
    - Update pod creation to mount correct workspaces based on agent type
+
+
    - Implement comprehensive error handling
+
+
    - Add proper logging and monitoring
 
 ## Technical Requirements
 
 ### Agent Name Extraction Function
+
+
+
 ```rust
 use regex::Regex;
 
@@ -68,9 +119,18 @@ fn extract_agent_name(github_app: &str) -> Result<String, String> {
         Err(format!("Cannot extract agent name from: {}", github_app))
     }
 }
+
+
+
+
+
+
 ```
 
 ### Agent Classification System
+
+
+
 ```rust
 pub struct AgentClassifier {
     implementation_agents: HashSet<String>,
@@ -109,9 +169,18 @@ impl AgentClassifier {
         }
     }
 }
+
+
+
+
+
+
 ```
 
 ### Conditional PVC Management Logic
+
+
+
 ```rust
 use kube::api::{Api, PostParams};
 use k8s_openapi::api::core::v1::PersistentVolumeClaim;
@@ -142,9 +211,18 @@ async fn ensure_conditional_pvc(
         Err(e) => Err(e),
     }
 }
+
+
+
+
+
+
 ```
 
 ### Controller Integration
+
+
+
 ```rust
 // In reconcile function
 async fn reconcile(
@@ -172,37 +250,78 @@ async fn reconcile(
 
     Ok(Action::requeue(Duration::from_secs(30)))
 }
+
+
+
+
+
+
 ```
 
 ## Implementation Strategy
 
 ### Phase 1: Foundation Development
+
+
 1. Create agent name extraction function with comprehensive testing
+
+
 2. Implement agent classification system with implementation agent identification
+
+
 3. Build error handling and logging infrastructure
+
+
 4. Create unit tests for extraction and classification logic
 
 ### Phase 2: Conditional PVC Logic Implementation
+
+
 1. Modify PVC creation functions to use conditional naming based on agent type
+
+
 2. Implement idempotent PVC creation with proper error handling
+
+
 3. Add PVC labeling for workspace type identification (shared vs isolated)
+
+
 4. Create integration tests for conditional PVC management
 
 ### Phase 3: Controller Integration
+
+
 1. Update reconciliation logic to use conditional PVC naming
+
+
 2. Modify pod creation to mount appropriate workspaces based on agent type
+
+
 3. Implement comprehensive error handling and recovery
+
+
 4. Add monitoring and observability features
 
 ### Phase 4: Backward Compatibility and Testing
+
+
 1. Ensure implementation agents continue using existing workspace pattern
+
+
 2. Add validation scripts for existing workflows
+
+
 3. Create comprehensive test suite for all agent types
+
+
 4. Document upgrade procedures for operators
 
 ## Code Implementation Details
 
 ### Agent Classification Patterns
+
+
+
 ```rust
 use std::collections::HashSet;
 
@@ -259,9 +378,18 @@ impl AgentClassifier {
         Ok(())
     }
 }
+
+
+
+
+
+
 ```
 
 ### PVC Specification Builder
+
+
+
 ```rust
 use k8s_openapi::api::core::v1::{
     PersistentVolumeClaim, PersistentVolumeClaimSpec, ResourceRequirements,
@@ -320,6 +448,12 @@ fn create_conditional_pvc_spec(
         ..Default::default()
     }
 }
+
+
+
+
+
+
 ```
 
 ## Testing and Validation Requirements
@@ -343,15 +477,33 @@ fn create_conditional_pvc_spec(
 3. **Session Continuity**: Confirm agents resume previous sessions correctly
 4. **Performance Impact**: Measure controller performance changes
 
+
+
 ## Success Criteria
 
+
+
 - Agent name extraction works for all current and expected GitHub App patterns
+
+
 - Implementation agents (Rex, Blaze) continue using shared `workspace-{service}` pattern
+
+
 - Non-implementation agents get isolated `workspace-{service}-{agent}` workspaces
+
+
 - Existing workflows continue functioning without disruption
+
+
 - Agent workspaces are properly managed based on classification
+
+
 - Controller performance remains within acceptable bounds
+
+
 - Comprehensive error handling provides clear troubleshooting information
+
+
 - No migration required for existing deployments
 
 ## Key Implementation Notes
@@ -373,6 +525,8 @@ fn create_conditional_pvc_spec(
 - **Logging**: Comprehensive structured logging for troubleshooting
 - **Documentation**: Clear upgrade procedures for existing deployments
 - **Validation**: Tools to verify classification success and workspace assignment
+
+
 
 ### Backward Compatibility
 - **CRITICAL**: Implementation agents must continue using existing workspace pattern

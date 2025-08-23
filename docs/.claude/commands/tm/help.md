@@ -16,6 +16,8 @@ Type `/project:tm/` and use tab completion to explore all commands.
 - `/project:tm/setup/install` - Comprehensive installation guide
 - `/project:tm/setup/quick-install` - One-line global install
 
+
+
 #### 📋 Project Setup
 - `/project:tm/init` - Initialize new project
 - `/project:tm/init/quick` - Quick setup with auto-confirm
@@ -52,10 +54,14 @@ Type `/project:tm/` and use tab completion to explore all commands.
 - `/project:tm/remove-dependency` - Remove dependency
 - `/project:tm/validate-dependencies` - Check for issues
 
+
+
 #### 🤖 Workflows
 - `/project:tm/workflows/smart-flow` - Intelligent workflows
 - `/project:tm/workflows/pipeline` - Command chaining
 - `/project:tm/workflows/auto-implement` - Auto-implementation
+
+
 
 #### 📊 Utilities
 - `/project:tm/utils/analyze` - Project analysis
@@ -64,11 +70,23 @@ Type `/project:tm/` and use tab completion to explore all commands.
 
 ### Natural Language Examples
 
+
+
+
+
+
+
 ```
 /project:tm/list pending high priority
 /project:tm/update mark all API tasks as done
 /project:tm/add-task create login system with OAuth
 /project:tm/show current
+
+
+
+
+
+
 ```
 
 ### Getting Started

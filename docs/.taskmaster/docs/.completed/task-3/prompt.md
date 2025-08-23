@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -32,41 +42,98 @@ You are tasked with designing and implementing the core Argo Workflow template t
 
 The multi-agent orchestration system requires a sophisticated workflow template that can coordinate Rex, Cleo, and Tess agents (or their alternatives) through a series of implementation, quality assurance, and testing phases. The workflow must support suspend/resume patterns, event-driven state transitions, and comprehensive parameter propagation between stages.
 
+
+
 ## Objectives
 
+
+
 1. **Create Base Workflow Template Structure**
+
+
    - Design WorkflowTemplate with parameterized agent selection
+
+
    - Configure 14-day timeout for realistic development cycles
+
+
    - Implement comprehensive labeling for event correlation
+
+
    - Set up proper metadata and workflow generation patterns
 
+
+
 2. **Implement Sequential DAG Tasks**
+
+
    - Create implementation-work task for Rex/Blaze execution
+
+
    - Design quality-work task for Cleo processing
+
+
    - Build testing-work task for Tess validation
+
+
    - Implement complete-task for workflow finalization
 
+
+
 3. **Design Suspend Points for Event Coordination**
+
+
    - Create wait-pr-created suspend after implementation
+
+
    - Implement wait-ready-for-qa suspend after quality work
+
+
    - Design wait-pr-approved suspend after testing
+
+
    - Configure indefinite suspend with proper correlation labels
 
+
+
 4. **Build Parameter Propagation System**
+
+
    - Enable data flow between workflow stages
+
+
    - Implement PR context sharing across tasks
+
+
    - Design QA feedback propagation to testing phase
+
+
    - Create workflow summary and completion reporting
 
+
+
 5. **Implement Workflow State Management**
+
+
    - Dynamic label updates for stage tracking
+
+
    - Event correlation through task-id and stage labels
+
+
    - Proper workflow lifecycle management
+
+
    - Resource cleanup and task progression logic
 
 ## Technical Requirements
 
+
+
 ### Workflow Template Structure
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -88,9 +155,18 @@ spec:
       value: ""
     - name: repository
       value: "5dlabs/cto"
+
+
+
+
+
+
 ```
 
 ### DAG Task Dependencies
+
+
+
 ```yaml
 templates:
 - name: main
@@ -122,9 +198,18 @@ templates:
     - name: complete-task
       dependencies: [wait-pr-approved]
       template: task-completion
+
+
+
+
+
+
 ```
 
 ### Agent CodeRun Template
+
+
+
 ```yaml
 - name: agent-coderun
   inputs:
@@ -148,37 +233,80 @@ templates:
         service: "cto"
         model: "claude-3-5-sonnet-20241022"
         continue_session: true
+
+
+
+
+
+
 ```
 
 ## Implementation Strategy
 
 ### Phase 1: Foundation Setup
+
+
 1. Create base WorkflowTemplate with proper metadata
+
+
 2. Define all required parameters with sensible defaults
+
+
 3. Set up workflow generation naming and labeling
+
+
 4. Configure 14-day timeout and resource management
 
 ### Phase 2: Core DAG Implementation
+
+
 1. Design main DAG template with task dependencies
+
+
 2. Create agent-coderun template for all agent types
+
+
 3. Implement suspend-for-event template for pauses
+
+
 4. Build task-completion template for finalization
 
 ### Phase 3: Event Correlation System
+
+
 1. Implement dynamic label management for stage tracking
+
+
 2. Create correlation labels for event targeting
+
+
 3. Design parameter passing between stages
+
+
 4. Build workflow state transition logic
 
 ### Phase 4: Advanced Features
+
+
 1. Implement resource cleanup and archival
+
+
 2. Create next-task progression logic
+
+
 3. Build comprehensive workflow summary
+
+
 4. Add error handling and recovery patterns
 
 ## Workflow Template Components
 
+
+
 ### Parameter System
+
+
+
 ```yaml
 arguments:
   parameters:
@@ -196,9 +324,18 @@ arguments:
   - name: repository
     description: "GitHub repository for the work"
     value: "5dlabs/cto"
+
+
+
+
+
+
 ```
 
 ### Suspend Template Design
+
+
+
 ```yaml
 - name: suspend-for-event
   inputs:
@@ -211,9 +348,18 @@ arguments:
       current-stage: "waiting-{{inputs.parameters.event-type}}"
       task-id: "{{workflow.parameters.task-id}}"
       workflow-type: play-orchestration
+
+
+
+
+
+
 ```
 
 ### Completion Template
+
+
+
 ```yaml
 - name: task-completion
   inputs:
@@ -240,11 +386,25 @@ arguments:
       if [ -d "docs/.taskmaster/docs/task-$NEXT_TASK" ]; then
         # Submit workflow for next task
         argo submit play-workflow-template \
+
+
           --parameter task-id="$NEXT_TASK" \
+
+
           --parameter implementation-agent="{{workflow.parameters.implementation-agent}}" \
+
+
           --parameter quality-agent="{{workflow.parameters.quality-agent}}" \
+
+
           --parameter testing-agent="{{workflow.parameters.testing-agent}}"
       fi
+
+
+
+
+
+
 ```
 
 ## Quality Assurance Patterns
@@ -256,6 +416,9 @@ arguments:
 - **Consistent Interface**: Same template works for all agent types
 
 ### Event Correlation Design
+
+
+
 ```yaml
 # Workflow labels for event targeting
 metadata:
@@ -276,6 +439,12 @@ metadata:
         name: "{{workflow.name}}"
         labels:
           current-stage: "{{inputs.parameters.new-stage}}"
+
+
+
+
+
+
 ```
 
 ### Resource Management
@@ -304,15 +473,33 @@ metadata:
 3. **Error Scenarios**: Handle agent failures and timeout conditions
 4. **Concurrent Workflows**: Test multiple tasks running simultaneously
 
+
+
 ## Success Criteria
 
+
+
 - WorkflowTemplate deploys successfully to Argo namespace
+
+
 - DAG visualization displays correctly in Argo UI
+
+
 - Parameter system enables flexible agent selection
+
+
 - Suspend points pause workflow execution indefinitely
+
+
 - Event correlation labels enable precise workflow targeting
+
+
 - Resource cleanup executes properly on workflow completion
+
+
 - Next-task progression triggers automatically when appropriate
+
+
 - No hardcoded agent names in any template component
 
 ## Key Implementation Notes

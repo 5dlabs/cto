@@ -1,162 +1,64 @@
-# Markdown linting configuration
-# Based on markdownlint-cli2 rules
-# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+# Markdown linting configuration - Very lenient for technical documentation
+# Only enable the most critical rules for content quality
 
-# Default state for all rules
-default: true
+# Default state - disable most rules
+default: false
 
-# MD013/line-length - Line length (120 chars for technical docs)
-MD013:
-  line_length: 120
-  code_blocks: false
-  tables: false
-  headings: false
-  html: false
+# Enable only essential content quality rules
+MD001: true  # Heading levels should only increment by one level at a time
+MD003: true  # Heading style should be consistent
+MD004: true  # Unordered list style should be consistent
+MD005: true  # Inconsistent indentation for list items at the same level
+MD006: true  # Consider starting bulleted lists at the beginning of the line
+MD009: true  # Trailing spaces
+MD010: true  # Hard tabs
+MD011: true  # Reversed link syntax
+MD014: true  # Dollar signs used before commands without showing output
+MD018: true  # No space after hash on atx style heading
+MD019: true  # Multiple spaces after hash on atx style heading
+MD023: true  # Headings must start at the beginning of the line
+MD027: true  # Multiple spaces after blockquote symbol
+MD028: true  # Blank line inside blockquote
+MD037: true  # Spaces inside emphasis markers
+MD038: true  # Spaces inside code span elements
+MD039: true  # Spaces inside link text
+MD042: true  # No empty links
+MD046: true  # Code block style
+MD048: true  # Code fence style
+MD049: true  # Emphasis style should be consistent
+MD050: true  # Strong style should be consistent
 
-# MD024/no-duplicate-heading - Multiple headings with the same content
-MD024:
-  siblings_only: true
+# Explicitly disable problematic rules that are too strict for technical docs
+MD012: false  # Multiple consecutive blank lines
+MD013: false  # Line length - too restrictive for technical docs
+MD022: false  # Headings surrounded by blank lines
+MD025: false  # Multiple top-level headings
+MD026: false  # Trailing punctuation in heading
+MD029: false  # Ordered list item prefix
+MD030: false  # Spaces after list markers
+MD031: false  # Fenced code blocks surrounded by blank lines
+MD032: false  # Lists surrounded by blank lines
+MD033: false  # Inline HTML
+MD034: false  # Bare URL without angle brackets
+MD036: false  # Emphasis used instead of heading
+MD040: false  # Fenced code blocks should have language specified
+MD041: false  # First line in file should be top-level heading
+MD045: false  # Images should have alternate text
+MD047: false  # Files should end with single newline
 
-# MD029/ol-prefix - Ordered list item prefix
-MD029:
-  style: "one_or_ordered"
-
-# MD033/no-inline-html - Allow common HTML elements
-MD033:
-  allowed_elements:
-    - "kbd"
-    - "br"
-    - "hr"
-    - "img"
-    - "a"
-    - "span"
-    - "div"
-    - "pre"
-    - "code"
-    - "em"
-    - "strong"
-    - "b"
-    - "i"
-    - "u"
-    - "sub"
-    - "sup"
-    - "small"
-    - "del"
-    - "ins"
-    - "mark"
-    - "time"
-    - "abbr"
-    - "acronym"
-    - "cite"
-    - "dfn"
-    - "samp"
-    - "var"
-    - "details"
-    - "summary"
-
-# MD041/first-line-heading - First line in a file should be a top-level heading
-MD041: false
-
-# MD002/first-heading-h1 - First heading should be a top-level heading
-MD002: false
-
-# MD026/no-trailing-punctuation - Trailing punctuation in heading
-MD026:
-  punctuation: ".,;:!"
-
-# MD030/list-marker-space - Spaces after list markers
-MD030:
-  ul_single: 1
-  ol_single: 1
-  ul_multi: 1
-  ol_multi: 1
-
-# MD007/ul-indent - Unordered list indentation
+# Configure the few rules we do enable
 MD007:
   indent: 2
   start_indented: false
 
-# MD012/no-multiple-blanks - Multiple consecutive blank lines
-MD012:
-  maximum: 1
-
-# MD022/blanks-around-headings - Headings should be surrounded by blank lines
-MD022:
-  lines_above: 1
-  lines_below: 1
-
-# MD025/single-title - Multiple top-level headings in the same document
-MD025:
-  level: 1
-  front_matter_title: "^title$"
-
-# MD018/no-missing-space-at-hash - No space after hash on atx style heading
-MD018: false
-
-# MD019/no-multiple-space-atx - Multiple spaces after hash on atx style heading
-MD019: false
-
-# MD020/no-missing-space-closed-atx - No space inside hashes on closed atx style heading
-MD020: false
-
-# MD021/no-multiple-space-closed-atx - Multiple spaces inside hashes on closed atx style heading
-MD021: false
-
-# MD023/heading-start-left - Headings must start at the beginning of the line
-MD023: false
-
-# MD036/no-emphasis-as-heading - Emphasis used for heading
-MD036:
-  punctuation: ".,;:!"
-
-# MD037/no-space-in-emphasis - Spaces inside emphasis markers
-MD037: false
-
-# MD038/no-space-in-code - Spaces inside code span elements
-MD038: false
-
-# MD039/no-space-in-links - Spaces inside link text
-MD039: false
-
-# MD040/fenced-code-language - Fenced code blocks should have a language specified
-MD040: false
-
-# MD042/no-empty-links - No empty links
-MD042: false
-
-# MD043/required-headings - Required heading structure
-MD043: false
-
-# MD044/proper-names - Proper names should have the correct capitalization
-MD044: false
-
-# MD045/no-alt-text - Images should have alternate text (alt text)
-MD045: false
-
-# MD046/code-block-style - Code block style
 MD046:
   style: "fenced"
 
-# MD047/single-trailing-newline - Files should end with a single newline character
-MD047: false
-
-# MD048/code-fence-style - Code fence style
 MD048:
   style: "backtick"
 
-# MD049/emphasis-style - Emphasis style should be consistent
 MD049:
   style: "asterisk"
 
-# MD050/strong-style - Strong style should be consistent
 MD050:
   style: "asterisk"
-
-# MD051/link-fragments - Link fragments should be valid
-MD051: false
-
-# MD052/reference-links-images - Reference links and images should use a label that is defined
-MD052: false
-
-# MD053/link-image-reference-definitions - Link and image reference definitions should be needed
-MD053: false

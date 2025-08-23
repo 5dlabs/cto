@@ -1,5 +1,7 @@
 # Task 3: Design Multi-Agent Workflow DAG Structure
 
+
+
 ## Overview
 
 Create the core Argo Workflow template with parameterized agent selection, DAG task dependencies, and suspend points for event-driven transitions. This template forms the backbone of the multi-agent orchestration system, providing flexible agent assignment and reliable workflow state management.
@@ -10,7 +12,11 @@ The workflow template must support configurable agent selection while maintainin
 
 ## Implementation Guide
 
+
+
 ### Phase 1: Base Workflow Template Structure
+
+
 
 1. **Create Workflow Template Foundation**
    ```yaml
@@ -34,7 +40,14 @@ The workflow template must support configurable agent selection while maintainin
          value: ""
        - name: repository
          value: "5dlabs/cto"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Configure Workflow Labels**
    ```yaml
@@ -44,9 +57,16 @@ The workflow template must support configurable agent selection while maintainin
        workflow-type: play-orchestration
        task-id: "{{workflow.parameters.task-id}}"
        repository: "{{workflow.parameters.repository}}"
-   ```
+
+
+
+
+
+```
 
 ### Phase 2: Implementation Work Task
+
+
 
 1. **Define Implementation Task**
    ```yaml
@@ -60,7 +80,14 @@ The workflow template must support configurable agent selection while maintainin
          value: "{{workflow.parameters.task-id}}"
        - name: stage
          value: "implementation"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Agent CodeRun Template**
    ```yaml
@@ -86,9 +113,16 @@ The workflow template must support configurable agent selection while maintainin
            service: "cto"
            model: "claude-3-5-sonnet-20241022"
            continue_session: true
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Suspend Point Implementation
+
+
 
 1. **Wait-PR-Created Suspend Template**
    ```yaml
@@ -98,7 +132,14 @@ The workflow template must support configurable agent selection while maintainin
        labels:
          current-stage: waiting-pr-created
          task-id: "{{workflow.parameters.task-id}}"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Stage Label Management**
    ```yaml
@@ -113,9 +154,18 @@ The workflow template must support configurable agent selection while maintainin
            name: "{{workflow.name}}"
            labels:
              current-stage: "{{inputs.parameters.new-stage}}"
-   ```
+
+
+
+
+
+```
+
+
 
 ### Phase 4: Quality Work Task
+
+
 
 1. **Quality Assurance Task Definition**
    ```yaml
@@ -130,7 +180,14 @@ The workflow template must support configurable agent selection while maintainin
          value: "{{workflow.parameters.task-id}}"
        - name: stage
          value: "quality"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **PR Information Propagation**
    ```yaml
@@ -139,9 +196,16 @@ The workflow template must support configurable agent selection while maintainin
      value: "{{steps.wait-pr-created.outputs.parameters.pr-url}}"
    - name: pr-number
      value: "{{steps.wait-pr-created.outputs.parameters.pr-number}}"
-   ```
+
+
+
+
+
+```
 
 ### Phase 5: Testing Work Implementation
+
+
 
 1. **Testing Task Configuration**
    ```yaml
@@ -158,7 +222,14 @@ The workflow template must support configurable agent selection while maintainin
          value: "testing"
        - name: pr-context
          value: "{{steps.wait-ready-for-qa.outputs.parameters.qa-status}}"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Test Environment Setup**
    ```yaml
@@ -170,9 +241,16 @@ The workflow template must support configurable agent selection while maintainin
      value: "{{inputs.parameters.qa-status}}"
    - name: ENABLE_LIVE_TESTING
      value: "true"
-   ```
+
+
+
+
+
+```
 
 ### Phase 6: Workflow Completion
+
+
 
 1. **Complete Task Implementation**
    ```yaml
@@ -185,7 +263,14 @@ The workflow template must support configurable agent selection while maintainin
          value: "{{workflow.parameters.task-id}}"
        - name: workflow-summary
          value: "{{steps.generate-summary.outputs.result}}"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Cleanup and Archive**
    ```yaml
@@ -211,11 +296,23 @@ The workflow template must support configurable agent selection while maintainin
            echo "Starting next task: $NEXT_TASK"
            # Submit new workflow for next task
          fi
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
+
+
 ### Complete DAG Structure
+
+
+
 ```yaml
 templates:
 - name: main
@@ -271,19 +368,45 @@ templates:
     - name: complete-task
       dependencies: [wait-pr-approved]
       template: task-completion
+
+
+
+
+
+
 ```
 
 ### Parameterized Agent Selection
+
+
+
 ```yaml
 # Workflow can be started with different agent combinations
 argo submit play-workflow-template \
+
+
   --parameter implementation-agent="5DLabs-Blaze" \
+
+
   --parameter quality-agent="5DLabs-Cleo" \
+
+
   --parameter testing-agent="5DLabs-Tess" \
+
+
   --parameter task-id="5"
+
+
+
+
+
+
 ```
 
 ### Event Correlation Labels
+
+
+
 ```yaml
 # Dynamic label management for event correlation
 metadata:
@@ -294,6 +417,12 @@ metadata:
     implementation-agent: "{{workflow.parameters.implementation-agent}}"
     quality-agent: "{{workflow.parameters.quality-agent}}"
     testing-agent: "{{workflow.parameters.testing-agent}}"
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
@@ -313,6 +442,9 @@ The DAG implements a sophisticated state machine:
 - **Multi-Agent Remediation**: Event-driven system supports any implementation agent (Rex, Blaze, Morgan) triggering QA pipeline restarts
 
 ### Workflow Lifecycle Management
+
+
+
 ```yaml
 # Workflow progresses through defined stages:
 Stage 1: implementation-work (Rex/Blaze/Morgan execution)
@@ -328,9 +460,17 @@ Stage 5: testing-work (Tess execution)
 Stage 6: wait-pr-approved (suspend for approval event)
   ↓
 Stage 7: complete-task (cleanup and next task trigger)
+
+
+
+
+
+
 ```
 
 ## Key Implementation Details
+
+
 
 ### Workflow Template Structure
 - **WorkflowTemplate**: Reusable template for multiple task executions
@@ -375,6 +515,10 @@ Stage 7: complete-task (cleanup and next task trigger)
 - [Argo Workflows DAG Documentation](https://argoproj.github.io/argo-workflows/walk-through/dag/)
 - [Suspend and Resume](https://argoproj.github.io/argo-workflows/walk-through/suspend-resume/)
 - [Workflow Templates](https://argoproj.github.io/argo-workflows/workflow-templates/)
+
+
 - [Multi-Agent Architecture](.taskmaster/docs/architecture.md)
+
+
 - [CodeRun CRD Specification](controller/src/crds/coderun.rs)
 - **[Argo Events Reference Examples](../../references/argo-events/)** - CRITICAL: Review before implementing any Argo Events sensors/triggers

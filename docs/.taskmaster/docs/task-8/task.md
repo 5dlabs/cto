@@ -1,5 +1,7 @@
 # Task 8: Build Rex Remediation Sensor
 
+
+
 ## Overview
 
 Create a dedicated Argo Events Sensor to detect Rex push events and trigger QA pipeline restart with downstream cancellation. This ensures that when Rex addresses PR feedback, any running Cleo/Tess work is cancelled and the QA pipeline restarts cleanly.
@@ -11,6 +13,8 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
 ## Implementation Guide
 
 ### Phase 1: Create Rex Remediation EventSource
+
+
 
 1. **GitHub Push Event Detection**
    ```yaml
@@ -37,7 +41,14 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
                body.pusher.name == "5DLabs-Rex[bot]"
              ) &&
              body.ref matches "refs/heads/task-.*"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Task ID Extraction Setup**
    ```yaml
@@ -51,9 +62,16 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
      type: string
    - path: "body.sender.login"
      type: string
-   ```
+
+
+
+
+
+```
 
 ### Phase 2: Implement Agent Cancellation Logic
+
+
 
 1. **CodeRun Deletion Template**
    ```yaml
@@ -71,7 +89,14 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
                github-app in (5DLabs-Cleo,5DLabs-Tess)
        successCondition: "status.phase == Succeeded"
        failureCondition: "status.phase == Failed"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Label-Based Agent Selection**
    ```bash
@@ -94,9 +119,16 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
    else
      echo "⚠️  $REMAINING agents still running, may need manual intervention"
    fi
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Create Rex Remediation Sensor
+
+
 
 1. **Complete Sensor Configuration**
    ```yaml
@@ -115,6 +147,8 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
          - path: "body.sender.login"
            type: string
            value:
+
+
            - "5DLabs-Rex[bot]"
          - path: "body.ref"
            type: string
@@ -146,7 +180,14 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
                      value: "{{rex-push-event.repository}}"
                    - name: branch-ref
                      value: "{{rex-push-event.ref}}"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Remediation Workflow Template**
    ```yaml
@@ -187,9 +228,16 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
            parameters:
            - name: task-id
              value: "{{workflow.parameters.task-id}}"
-   ```
+
+
+
+
+
+```
 
 ### Phase 4: Implement Ready-for-QA Label Removal
+
+
 
 1. **GitHub API Label Management**
    ```bash
@@ -212,7 +260,14 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
    else
      echo "⚠️  No PR found for task ${TASK_ID}"
    fi
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Workflow State Reset**
    ```yaml
@@ -230,20 +285,33 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
 
          # Find and update main workflow for this task
          WORKFLOW_NAME=$(kubectl get workflow \
+
+
            -l "workflow-type=play-orchestration,task-id=${TASK_ID}" \
+
+
            -o jsonpath='{.items[0].metadata.name}')
 
          if [ -n "$WORKFLOW_NAME" ]; then
            kubectl patch workflow "$WORKFLOW_NAME" \
+
+
              --type='merge' \
              --patch="{\"metadata\":{\"labels\":{\"current-stage\":\"$NEW_STAGE\"}}}"
            echo "✅ Workflow $WORKFLOW_NAME reset to stage: $NEW_STAGE"
          else
            echo "⚠️  No workflow found for task $TASK_ID"
          fi
-   ```
+
+
+
+
+
+```
 
 ### Phase 5: Implement Idempotency and Safety Measures
+
+
 
 1. **Duplicate Event Prevention**
    ```yaml
@@ -256,7 +324,14 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
      context:
        # Store processed commit IDs to prevent duplicate processing
        processedCommits: []
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Safety Checks and Validation**
    ```bash
@@ -286,11 +361,21 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
    else
      echo "🎯 Found $AGENTS_TO_CANCEL agents to cancel for task $TASK_ID"
    fi
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Complete Rex Remediation Sensor
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -417,7 +502,11 @@ spec:
 
                     # Find PR for this task
                     PR_NUMBER=$(gh pr list --repo 5dlabs/cto \
+
+
                       --label "task-${TASK_ID}" \
+
+
                       --json number --jq '.[0].number')
 
                     if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
@@ -443,12 +532,18 @@ spec:
 
                     # Find main workflow for this task
                     WORKFLOW_NAME=$(kubectl get workflow \
+
+
                       -l "workflow-type=play-orchestration,task-id=${TASK_ID}" \
+
+
                       -o jsonpath='{.items[0].metadata.name}')
 
                     if [ -n "$WORKFLOW_NAME" ]; then
                       echo "🔄 Resetting workflow $WORKFLOW_NAME to waiting-pr-created"
                       kubectl patch workflow "$WORKFLOW_NAME" \
+
+
                         --type='merge' \
                         --patch='{"metadata":{"labels":{"current-stage":"waiting-pr-created"}}}'
                       echo "✅ Workflow stage reset"
@@ -465,7 +560,11 @@ spec:
 
                     # Resume main workflow at quality stage
                     WORKFLOW_NAME=$(kubectl get workflow \
+
+
                       -l "workflow-type=play-orchestration,task-id=${TASK_ID}" \
+
+
                       -o jsonpath='{.items[0].metadata.name}')
 
                     if [ -n "$WORKFLOW_NAME" ]; then
@@ -475,43 +574,90 @@ spec:
                     else
                       echo "⚠️  No workflow to resume for task $TASK_ID"
                     fi
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
 
 ### Event-Driven Cancellation Flow
+
+
+
+
+
+
 ```
 Rex Push Event → Sensor Detection → Agent Cancellation → Label Removal → Workflow Reset → Pipeline Restart
+
+
+
+
+
+
 ```
 
 ### Idempotent Operations
 All remediation operations are designed to be idempotent:
+
+
 - Agent cancellation ignores already-deleted agents
+
+
 - Label removal checks if label exists before removal
+
+
 - Workflow stage updates verify current state
+
+
 - Resume operations check workflow status first
 
+
+
 ### Safety-First Approach
+
+
 - Validate sender is actually Rex before any cancellation
+
+
 - Extract task ID from branch name with validation
+
+
 - Verify agents exist before attempting cancellation
+
+
 - Include comprehensive logging for debugging
 
 ## Testing Strategy
 
 ### Event Detection Testing
+
+
 1. **Rex Push Event Simulation**
    ```bash
    # Test Rex push event detection
    curl -X POST http://rex-remediation-events:12000/rex-push-events \
      -H "Content-Type: application/json" \
+
+
      -d '{
        "sender": {"login": "5DLabs-Rex[bot]"},
        "ref": "refs/heads/task-3-implement-auth",
        "repository": {"name": "cto"},
        "after": "abc123def456"
      }'
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Agent Cancellation Testing**
    ```bash
@@ -531,12 +677,25 @@ All remediation operations are designed to be idempotent:
    # Trigger remediation
    # Verify CodeRuns are deleted
    kubectl get coderun -l "task-id=3,github-app=5DLabs-Cleo"
-   ```
+
+
+
+
+
+```
 
 ### Integration Testing
+
+
 - Test rapid sequential Rex pushes don't cause conflicts
+
+
 - Verify QA pipeline restarts cleanly after remediation
+
+
 - Test multiple concurrent tasks don't interfere
+
+
 - Validate error handling for edge cases
 
 ## Key Design Decisions
@@ -552,4 +711,6 @@ All remediation operations are designed to be idempotent:
 - [Argo Events Sensor Configuration](https://argoproj.github.io/argo-events/sensors/)
 - [GitHub Webhook Events](https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#push)
 - [Kubernetes Label Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)
+
+
 - [Multi-Agent Architecture](/.taskmaster/docs/architecture.md)

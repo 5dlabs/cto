@@ -1,41 +1,85 @@
 # PR Comment Feedback Loop Design
 
+
+
 ## Overview
 Design for implementing a recursive feedback loop where Rex responds to PR comments from Tess (and potentially humans), implementing fixes until all acceptance criteria are met.
 
 ## Core Principles
 
+
+
 1. **Tess is the Quality Gate** - Only Tess's comments trigger Rex remediation
+
+
 2. **Cleo is Silent** - Cleo fixes issues directly, no comment-based feedback
+
+
 3. **Recursive Until Satisfied** - Loop continues until Tess approves (120% satisfied)
+
+
 4. **Stateless Restarts** - Each iteration starts fresh, no complex state management
 
 ## Agent Responsibilities
 
 ### Rex (Implementation)
+
+
 - Monitors PR comments for actionable feedback
+
+
 - Implements fixes based on Tess's findings
+
+
 - Pushes updates to feature branch
+
+
 - Restarts the validation cycle
 
+
+
 ### Cleo (Code Quality)
+
+
 - Silently fixes linting, formatting, build issues
+
+
 - Pushes fixes directly to feature branch
+
+
 - Does NOT post comments requiring action
+
+
 - Adds "ready-for-qa" label when done
 
 ### Tess (QA Testing)
 - Posts detailed PR comments about:
+
+
   - Missing acceptance criteria
+
+
   - Bugs and issues found
+
+
   - Failed manual tests
+
+
   - Regression failures
+
+
 - Uses structured comment format for actionability
+
+
 - Only approves when 120% satisfied
 
 ## Comment Classification
 
 ### Actionable Comments (Trigger Rex)
+
+
+
+
 ```markdown
 ## 🔴 Required Changes
 
@@ -46,28 +90,64 @@ Design for implementing a recursive feedback loop where Rex responds to PR comme
 [Clear description of the issue]
 
 ### Acceptance Criteria Not Met
+
+
 - [ ] Specific criterion not satisfied
+
+
 - [ ] Another missing requirement
 
+
+
 ### Steps to Reproduce (if bug)
+
+
 1. Step one
+
+
 2. Step two
+
+
 
 ### Expected vs Actual
 - **Expected**: [what should happen]
 - **Actual**: [what actually happens]
+
+
+
+
+
+
+
+
 ```
 
 ### Non-Actionable Comments (Informational Only)
+
+
+
+
 ```markdown
 ## ✅ Testing Progress Update
 
 [Status update, no action required]
+
+
+
+
+
+
+
+
 ```
 
 ## Proposed Implementation
 
 ### 1. New Sensor: PR Comment Handler
+
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -128,12 +208,20 @@ spec:
 
                         # Extract task ID from PR labels or branch
                         TASK_ID=$(kubectl get workflows -n agent-platform \
+
+
                           -l pr-number=$PR_NUMBER \
+
+
                           -o jsonpath='{.items[0].metadata.labels.task-id}')
 
                         # Cancel any running Cleo/Tess for this task
                         kubectl get coderuns -n agent-platform \
+
+
                           -l task-id=$TASK_ID \
+
+
                           -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.agent-type}{"\n"}{end}' | \
                         while read coderun agent; do
                           if [[ "$agent" == "cleo" || "$agent" == "tess" ]]; then
@@ -162,9 +250,21 @@ spec:
                           pr_number: $PR_NUMBER
                           pr_comment_id: "{{.Input.body.comment.id}}"
                         EOF
+
+
+
+
+
+
+
+
 ```
 
 ### 2. Rex Container Enhancement
+
+
+
+
 ```bash
 # In container-rex.sh.hbs
 if [ -n "$PR_COMMENT_ID" ]; then
@@ -190,37 +290,77 @@ if [ -n "$PR_COMMENT_ID" ]; then
   FEEDBACK_CONTEXT="You have received QA feedback that requires remediation.
 
   The feedback is in /tmp/qa-feedback.md. Please:
+
+
   1. Read and understand the issues raised
+
+
   2. Implement the necessary fixes
+
+
   3. Ensure all acceptance criteria mentioned are met
+
+
   4. Commit and push your changes
 
   This is a $SEVERITY priority $ISSUE_TYPE that must be resolved."
 
   # Continue with normal Claude execution but with feedback context
 fi
+
+
+
+
+
+
+
+
 ```
 
 ### 3. Workflow State Tracking
 
 Add labels to track iteration count:
+
+
+
+
 ```yaml
 metadata:
   labels:
     task-id: "1"
     iteration: "3"  # Increments each time Rex responds to feedback
     max-iterations: "10"  # Safety limit
+
+
+
+
+
+
+
+
 ```
 
 ### 4. Loop Termination Conditions
 
 The loop ends when:
+
+
 1. **Tess Approves** - Posts approval comment and adds "approved" label
+
+
 2. **Max Iterations** - Safety limit reached (configurable)
+
+
 3. **Human Override** - CTO adds "skip-automation" label
+
+
 4. **Timeout** - Overall workflow timeout (e.g., 48 hours)
 
 ## Sequence Diagram
+
+
+
+
 
 ```mermaid
 sequenceDiagram
@@ -250,45 +390,107 @@ sequenceDiagram
         Tess->>PR: Add approved label
         Note over PR: Ready for human review
     end
+
+
+
+
+
+
+
+
 ```
 
 ## Edge Cases to Handle
 
+
+
 1. **Concurrent Comments** - Queue or process most recent only
+
+
 2. **Conflicting Feedback** - Tess's comments take priority
+
+
 3. **Invalid Comment Format** - Log and ignore
+
+
 4. **Rex Failures** - Escalate to human after N attempts
+
+
 5. **Infinite Loops** - Max iteration safety limit
 
 ## Labels for State Management
 
+
+
 - `needs-remediation` - Tess found issues
+
+
 - `remediation-in-progress` - Rex is fixing
+
+
 - `iteration-{n}` - Track attempt number
+
+
 - `approved` - Tess is satisfied
+
+
 - `skip-automation` - Human override
 
 ## Benefits of This Design
 
+
+
 1. **Simple State Model** - Labels and comments drive state
+
+
 2. **Auditability** - All feedback visible in PR
+
+
 3. **Interruptible** - Humans can intervene at any point
+
+
 4. **Scalable** - Can handle multiple PRs/tasks concurrently
+
+
 5. **Resilient** - Stateless restarts, no complex recovery
 
 ## Open Questions
 
+
+
 1. Should we differentiate between bugs vs missing features in handling?
+
+
 2. Should Rex acknowledge receipt of feedback with a comment?
+
+
 3. Should there be a cooldown between iterations?
+
+
 4. How to handle partial fixes (some criteria met, others not)?
+
+
 5. Should we track metrics on iteration counts for learning?
+
+
 
 ## Next Steps
 
+
+
 1. Implement basic sensor for PR comments
+
+
 2. Add comment parsing logic to Rex
+
+
 3. Define structured comment format for Tess
+
+
 4. Test with simple feedback loop
+
+
 5. Add safety limits and monitoring
+
+
 6. Iterate based on real usage patterns
