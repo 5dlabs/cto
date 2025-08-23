@@ -11,7 +11,7 @@ RUN mkdir -p /workspace /home/node/.opencode && \
   chown -R 1000:1000 /home/node/.opencode
 WORKDIR /workspace
 
-# Install Open Code (as root), then place binary in /usr/local/bin for all users
+# Install Open Code CLI (as root), then place binary in /usr/local/bin for all users
 USER root
 RUN set -eux; \
   # Install required tools for Debian/Ubuntu
@@ -35,6 +35,11 @@ RUN set -eux; \
     echo '#!/bin/bash\necho "OpenCode CLI placeholder - installation may have failed"' > /usr/local/bin/opencode; \
     chmod +x /usr/local/bin/opencode; \
   fi
+
+# Install OpenAI Node.js SDK for compatibility
+RUN npm install -g openai@latest && \
+  echo "✅ OpenAI Node.js SDK installed" && \
+  (node -e "console.log('OpenAI Node.js SDK version:', require('openai/package.json').version)" || echo "⚠️ Node.js SDK verification failed")
 
 USER node
 

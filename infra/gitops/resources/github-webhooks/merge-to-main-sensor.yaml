@@ -562,12 +562,17 @@ spec:
                                       workflow-stage: "implementation"
                                       agent-type: "rex"
                                   spec:
-                                    service: "task\${NEXT_TASK_ID}"
-                                    github_app: "5DLabs-Rex"
-                                    github_owner: "\${GITHUB_OWNER}"
-                                    github_repo: "\${GITHUB_REPO}"
-                                    docs_repository_url: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
-                                    task_id: \${NEXT_TASK_ID}
+                                    taskId: \${NEXT_TASK_ID}
+                                    service: "\${SERVICE_NAME}"
+                                    repositoryUrl: "\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    docsRepositoryUrl: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    docsProjectDirectory: "docs"
+                                    workingDirectory: "."
+                                    githubApp: "5DLabs-Rex"
+                                    model: "claude-sonnet-4-20250514"
+                                    continueSession: true
+                                    overwriteMemory: false
+                                    contextVersion: 1
 
                             - name: run-cleo
                               resource:
@@ -583,10 +588,17 @@ spec:
                                       workflow-stage: "quality"
                                       agent-type: "cleo"
                                   spec:
-                                    service: "task\${NEXT_TASK_ID}"
-                                    github_app: "5DLabs-Cleo"
-                                    github_owner: "\${GITHUB_OWNER}"
-                                    github_repo: "\${GITHUB_REPO}"
+                                    taskId: \${NEXT_TASK_ID}
+                                    service: "\${SERVICE_NAME}"
+                                    repositoryUrl: "\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    docsRepositoryUrl: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    docsProjectDirectory: "docs"
+                                    workingDirectory: "."
+                                    githubApp: "5DLabs-Cleo"
+                                    model: "claude-sonnet-4-20250514"
+                                    continueSession: true
+                                    overwriteMemory: false
+                                    contextVersion: 1
                                     # Cleo will find the PR created by Rex
 
                             - name: run-tess
@@ -603,10 +615,17 @@ spec:
                                       workflow-stage: "testing"
                                       agent-type: "tess"
                                   spec:
-                                    service: "task\${NEXT_TASK_ID}"
-                                    github_app: "5DLabs-Tess"
-                                    github_owner: "\${GITHUB_OWNER}"
-                                    github_repo: "\${GITHUB_REPO}"
+                                    taskId: \${NEXT_TASK_ID}
+                                    service: "\${SERVICE_NAME}"
+                                    repositoryUrl: "\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    docsRepositoryUrl: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    docsProjectDirectory: "docs"
+                                    workingDirectory: "."
+                                    githubApp: "5DLabs-Tess"
+                                    model: "claude-sonnet-4-20250514"
+                                    continueSession: true
+                                    overwriteMemory: false
+                                    contextVersion: 1
                                     # Tess will find the PR with ready-for-qa label
 
                             - name: log-completion
