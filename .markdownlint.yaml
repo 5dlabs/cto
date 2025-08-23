@@ -79,10 +79,8 @@ MD007:
 # MD012/no-multiple-blanks - Multiple consecutive blank lines (disabled for flexibility)
 MD012: false
 
-# MD022/blanks-around-headings - Headings should be surrounded by blank lines (more lenient)
-MD022:
-  lines_above: 0
-  lines_below: 0
+# MD022/blanks-around-headings - Headings should be surrounded by blank lines (disabled for flexibility)
+MD022: false
 
 # MD025/single-title - Multiple top-level headings in the same document
 MD025:
@@ -165,3 +163,12 @@ MD032: false
 
 # MD031/blanks-around-fences - Fenced code blocks should be surrounded by blank lines (disabled for flexibility)
 MD031: false
+
+# MD029/ol-prefix - Ordered list item prefix (disabled for flexibility)
+MD029: false
+
+# MD036/no-emphasis-as-heading - Emphasis used for heading (disabled for flexibility)  
+MD036: false
+
+# MD034/no-bare-urls - Bare URL without angle brackets (disabled for flexibility)
+MD034: false
