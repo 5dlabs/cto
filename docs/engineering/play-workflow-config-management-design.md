@@ -11,11 +11,21 @@ This creates inconsistency and prevents users from changing agent assignments mi
 
 ## Solution: Project-Scoped ConfigMap
 
+
+
 ### Overview
 
 Use a Kubernetes ConfigMap to store project-specific configuration that persists across task completions and can be updated between tasks.
 
+
+
 ### Architecture
+
+
+
+
+
+
 
 ```
 ┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
@@ -29,12 +39,21 @@ Use a Kubernetes ConfigMap to store project-specific configuration that persists
 │   Task 1        │     │ Across All Tasks    │    │   CodeRuns          │
 │   Workflow      │     └─────────────────────┘    │   (Rex/Cleo/Tess)   │
 └─────────────────┘                                └─────────────────────┘
+
+
+
+
+
+
 ```
 
 ### ConfigMap Structure
 
 **Name**: `{service}-play-project-config` (e.g., `cto-play-project-config`)
 **Namespace**: `agent-platform`
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -64,19 +83,42 @@ data:
   continueSession: "true"
   overwriteMemory: "false"
   contextVersion: "1"
+
+
+
+
+
+
 ```
 
 ## Implementation Plan
+
+
 
 ### Phase 1: MCP Tool Updates
 
 **File**: `mcp/src/tools.rs` (or equivalent)
 
+
+
+
 ```rust
 // In mcp_cto_play function:
+
+
 1. Create/update ConfigMap with user-provided settings
+
+
 2. Use ConfigMap values as defaults if parameters not provided
+
+
 3. Start workflow with task_id as usual
+
+
+
+
+
+
 ```
 
 **Behavior**:
@@ -84,12 +126,19 @@ data:
 - **Subsequent runs**: Updates ConfigMap with new settings, starts specified task
 - **No changes**: Uses existing ConfigMap values
 
+
+
 ### Phase 2: Task-Complete Workflow Updates
 
 **File**: `infra/gitops/resources/github-webhooks/merge-to-main-sensor.yaml`
 
 Replace hardcoded values:
+
+
+
 ```bash
+
+
 # OLD (hardcoded):
 githubApp: "5DLabs-Rex"
 model: "claude-sonnet-4-20250514"
@@ -101,6 +150,12 @@ MODEL=$(kubectl get configmap ${SERVICE}-play-project-config -o jsonpath='{.data
 # Use in YAML generation:
 githubApp: "$IMPL_AGENT"
 model: "$MODEL"
+
+
+
+
+
+
 ```
 
 ### Phase 3: Error Handling & Fallbacks
@@ -112,35 +167,78 @@ model: "$MODEL"
 ## User Experience
 
 ### Scenario 1: Fresh Project Start
+
+
+
 ```bash
+
+
 # User starts with Blaze
 mcp_cto_play task_id=1 implementation_agent=5DLabs-Blaze model=claude-opus-4-1-20250805
 
+
+
 # Result:
 # - ConfigMap created with Blaze + Opus settings
+
+
 # - Task 1 uses Blaze + Opus
+
+
 # - Future tasks (2,3,4...) will use Blaze + Opus
+
+
+
+
+
+
 ```
 
 ### Scenario 2: Mid-Project Agent Change
+
+
+
 ```bash
 # After Task 2 completes, user wants to switch to Rex
 mcp_cto_play task_id=3 implementation_agent=5DLabs-Rex
 
+
+
 # Result:
 # - ConfigMap updated to use Rex (keeping other settings)
+
+
 # - Task 3 starts with Rex
+
+
 # - Future tasks (4,5,6...) will use Rex
+
+
+
+
+
+
 ```
 
 ### Scenario 3: Resume Without Changes
+
+
+
 ```bash
 # User just wants to resume from Task 4
 mcp_cto_play task_id=4
 
+
+
 # Result:
 # - ConfigMap unchanged
 # - Task 4 uses existing ConfigMap settings
+
+
+
+
+
+
 ```
 
 ## Benefits
@@ -153,30 +251,60 @@ mcp_cto_play task_id=4
 
 ## Migration Strategy
 
+
+
 ### Backwards Compatibility
+
+
 - Keep hardcoded defaults as fallback if ConfigMap doesn't exist
+
+
 - Gradually migrate existing projects on next MCP call
 
 ### Rollout Plan
+
+
 1. **Deploy MCP changes** (create ConfigMaps)
+
+
 2. **Deploy sensor changes** (read from ConfigMaps)
+
+
 3. **Test with new projects** first
+
+
 4. **Migrate existing projects** as they're used
 
 ## Testing Strategy
 
 ### Unit Tests
+
+
 - ConfigMap creation/update logic
+
+
 - Fallback behavior when ConfigMap missing
+
+
 - Value validation and sanitization
 
 ### Integration Tests
+
+
 - Full task sequence with consistent settings
+
+
 - Mid-project agent changes
+
+
 - Error conditions and fallbacks
 
 ### Manual Testing
+
+
 - Start fresh project → verify consistency
+
+
 - Change agents mid-project → verify new settings propagate
 - Edge cases: missing ConfigMap, invalid agents, etc.
 
@@ -188,19 +316,34 @@ mcp_cto_play task_id=4
 - **Testing & Validation**: 2 hours
 
 **Risk Level**: Low-Medium
+
+
 - Non-breaking change (fallbacks maintained)
+
+
 - Isolated to play workflow functionality
+
+
 - Well-defined scope and interfaces
 
 ## Future Enhancements
 
 ### Project Isolation
 Support multiple parallel projects:
+
+
+
 ```yaml
 # Multiple ConfigMaps:
 cto-play-project-config        # Default project
 cto-play-feature-xyz-config    # Feature branch project
 cto-play-experiment-config     # Experimental project
+
+
+
+
+
+
 ```
 
 ### Web UI Integration
@@ -208,6 +351,12 @@ Provide web interface to view/modify project configurations without kubectl.
 
 ### Configuration Templates
 Pre-defined templates for common workflows:
+
+
 - "Fast Development" (Rex/Sonnet)
+
+
 - "High Quality" (Blaze/Opus)
+
+
 - "Cost Optimized" (Rex/Haiku)

@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -25,6 +35,8 @@
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 
 You are implementing the critical handoff mechanism between Cleo's code quality work and Tess's comprehensive testing phase. Create logic for Cleo to add 'ready-for-qa' label to PRs as an explicit signal that triggers Tess workflow resumption.
+
+
 
 ## Objective
 
@@ -43,20 +55,44 @@ The ready-for-qa label serves as the explicit handoff signal in multi-agent work
 ### 1. Implement Cleo Workflow Sequence
 
 Create complete workflow in container-cleo.sh.hbs:
+
+
+
 ```bash
 # Cleo workflow sequence
+
+
 1. Run comprehensive code quality checks (Clippy pedantic, rustfmt)
+
+
 2. Push quality fixes to same feature branch
+
+
 3. Wait for GitHub Actions CI tests to pass
+
+
 4. Add 'ready-for-qa' label via GitHub API
+
+
 5. Complete Cleo workflow successfully
+
+
+
+
+
+
 ```
 
 ### 2. Create CI Test Validation
 
 Implement robust CI status checking:
+
+
+
 ```bash
 #!/bin/bash
+
+
 # wait-for-ci-success.sh
 check_ci_status() {
     # Monitor GitHub Actions status
@@ -64,23 +100,47 @@ check_ci_status() {
     # Timeout after reasonable period
     # Return success only when all checks green
 }
+
+
+
+
+
+
 ```
 
 ### 3. Implement GitHub API Label Management
 
 Create idempotent label addition:
+
+
+
 ```bash
 #!/bin/bash
+
+
 # add-ready-for-qa-label.sh
 # Check if label already exists (idempotent operation)
+
+
 # Add ready-for-qa label via GitHub CLI/API
+
+
 # Verify label was added successfully
 # Handle GitHub API errors gracefully
+
+
+
+
+
+
 ```
 
 ### 4. Create Argo Events Integration
 
 Configure sensor to detect ready-for-qa label:
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -95,6 +155,12 @@ spec:
         value: ["ready-for-qa"]
       - path: "body.sender.login"
         value: ["5DLabs-Cleo[bot]"]
+
+
+
+
+
+
 ```
 
 ## Technical Specifications
@@ -111,6 +177,8 @@ spec:
 - **Event Correlation**: Enable Argo Events to correlate label events with workflows
 - **State Validation**: Verify PR is in correct state for labeling
 
+
+
 ### Tess Prerequisites
 - **Label Validation**: Tess checks for ready-for-qa label before starting
 - **Workflow Coordination**: Tess waits until label present to begin comprehensive testing
@@ -119,6 +187,9 @@ spec:
 ## Workflow Coordination Patterns
 
 ### Cleo Container Script Integration
+
+
+
 ```handlebars
 {{#if (eq github_app "5DLabs-Cleo")}}
 # Setup PR context and GitHub authentication
@@ -135,9 +206,18 @@ add-ready-for-qa-label.sh "$PR_NUMBER"
 
 echo "✅ Handoff to Tess complete"
 {{/if}}
+
+
+
+
+
+
 ```
 
 ### Event-Driven Workflow Resumption
+
+
+
 ```yaml
 triggers:
 - template:
@@ -150,9 +230,18 @@ triggers:
             workflow-type=play-orchestration,
             current-stage=waiting-ready-for-qa,
             task-id={{extracted-task-id}}
+
+
+
+
+
+
 ```
 
 ### Tess Integration Points
+
+
+
 ```handlebars
 {{#if (eq github_app "5DLabs-Tess")}}
 # Validate prerequisites before starting
@@ -163,7 +252,15 @@ fi
 
 echo "✅ Ready-for-qa confirmed, starting comprehensive testing"
 {{/if}}
+
+
+
+
+
+
 ```
+
+
 
 ## Success Criteria
 
@@ -177,45 +274,97 @@ echo "✅ Ready-for-qa confirmed, starting comprehensive testing"
 
 ## Implementation Deliverables
 
+
+
 ### Cleo Workflow Scripts
+
+
 - Complete container-cleo.sh.hbs with ready-for-qa workflow
+
+
 - CI status monitoring script (wait-for-ci-success.sh)
+
+
 - Label addition script (add-ready-for-qa-label.sh)
+
+
 - PR context setup and discovery scripts
 
 ### Argo Events Configuration
+
+
 - Sensor configuration for ready-for-qa label detection
+
+
 - Event filtering to target Cleo-generated label events
+
+
 - Workflow resumption triggers with proper task correlation
 
 ### Tess Integration
+
+
 - Prerequisites validation for ready-for-qa label
+
+
 - Workflow coordination logic in container-tess.sh.hbs
+
+
 - Error handling when prerequisites not met
 
 ### Testing and Validation
+
+
 - Integration tests for complete Cleo → Tess handoff
+
+
 - GitHub API error simulation and recovery testing
+
+
 - Concurrent workflow coordination testing
 
 ## Testing Requirements
 
 ### Label Management Testing
+
+
 - Test idempotent label addition (multiple calls don't create duplicates)
+
+
 - Test label addition with various GitHub API response scenarios
+
+
 - Test CI status monitoring with passing and failing checks
+
+
 - Test timeout behavior for slow CI processes
 
 ### Event Integration Testing
+
+
 - Test Argo Events sensor detects label additions correctly
+
+
 - Test event filtering excludes non-Cleo label additions
+
+
 - Test task ID extraction from PR labels for correlation
+
+
 - Test workflow resumption at correct stage
 
 ### End-to-End Workflow Testing
+
+
 - Test complete Cleo workflow with quality checks → CI wait → labeling
+
+
 - Test Tess prerequisite validation and workflow initiation
+
+
 - Test error scenarios (failed CI, GitHub API errors, missing PRs)
+
+
 - Test multiple concurrent tasks don't interfere
 
 Focus on creating a reliable, event-driven handoff system that ensures code quality requirements are met before comprehensive testing begins, while providing clear audit trails and robust error handling.

@@ -160,6 +160,8 @@
 - [ ] **Data Retention**: Implement appropriate data retention policies
 - [ ] **Privacy Compliance**: Comply with applicable privacy regulations
 
+
+
 ### ✅ System Security
 - [ ] **Input Validation**: Validate all input data for security issues
 - [ ] **Injection Prevention**: Prevent code injection through approval content
@@ -171,40 +173,77 @@
 
 ### ✅ Manual Testing Scenarios
 
+
+
 1. **High-Quality PR Approval**
    ```bash
    # Create PR with excellent coverage, quality, and security
    # Expected: Auto-approval with detailed positive review
    curl -X POST /api/pr-approval/evaluate \
      -d '{"repository": "test/repo", "pr_number": 123}'
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Low-Quality PR Rejection**
    ```bash
    # Create PR with poor coverage and quality issues
    # Expected: Request changes with specific improvement requirements
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Human Review Required**
    ```bash
    # Create PR with good scores but breaking changes
    # Expected: Comment review requesting human oversight
-   ```
+
+
+
+
+
+```
+
+
 
 4. **Workflow Suspension/Resumption**
    ```bash
    # Submit PR and verify workflow suspends at approval checkpoint
    # Trigger Tess approval and verify workflow resumes
    kubectl get workflow pr-workflow-123 -o yaml
-   ```
+
+
+
+
+
+```
 
 ### ✅ Automated Testing
+
+
 
 1. **Unit Tests**
    ```bash
    cargo test --package controller github::tess_approval
    cargo test --package controller approval_scoring
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Integration Tests**
    ```bash
@@ -213,32 +252,67 @@
 
    # Test sensor functionality
    ./test-approval-sensor.sh
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Load Tests**
    ```bash
    # Test concurrent PR processing
    k6 run pr-approval-load-test.js
-   ```
+
+
+
+
+
+```
 
 ### ✅ Workflow Validation
+
+
 
 1. **Argo Workflow Validation**
    ```bash
    argo lint workflows/pr-workflow-with-approval.yaml
    argo submit --dry-run workflows/pr-workflow-with-approval.yaml
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Sensor Validation**
    ```bash
    kubectl apply --dry-run=client -f workflows/pr-approval-sensor.yaml
-   ```
+
+
+
+
+
+```
+
+
 
 3. **End-to-End Testing**
    ```bash
    # Create test PR, trigger complete workflow, verify all stages
    ./end-to-end-approval-test.sh
-   ```
+
+
+
+
+
+```
+
+
 
 ## Success Metrics
 
@@ -255,6 +329,8 @@
 - [ ] **Workflow Resumption**: >95% of workflows resume within 30 seconds
 - [ ] **Throughput**: Handle peak load of 100 concurrent approvals
 - [ ] **Resource Usage**: Stay within allocated resource limits
+
+
 
 ### ✅ Quality Success Metrics
 - [ ] **Decision Consistency**: <1% variation in approval decisions for identical PRs
@@ -286,6 +362,8 @@
 - [ ] **Documentation**: Complete operational documentation available
 - [ ] **Runbooks**: Incident response procedures documented and tested
 
+
+
 ## Rollback Criteria
 
 ### ✅ Critical Failure Conditions
@@ -294,6 +372,8 @@
 - [ ] **Data Loss**: Any loss of approval state or workflow data
 - [ ] **Security Breach**: Evidence of unauthorized access or approval spoofing
 - [ ] **Performance Degradation**: Response times >5x expected values
+
+
 
 ### ✅ Quality Issues
 - [ ] **Review Quality**: Significant complaints about review quality or usefulness

@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -31,19 +41,37 @@ You are tasked with implementing robust workflow resume operations for the multi
 ## Context
 
 **System Architecture**: Multi-agent Play Workflow with event-driven suspend/resume patterns
+
+
 - **Rex/Blaze Implementation** → Suspend → **GitHub PR Created** → Resume → **Cleo Quality**
+
+
 - **Cleo Quality** → Suspend → **GitHub PR Labeled "ready-for-qa"** → Resume → **Tess Testing**
+
+
 - **Tess Testing** → Suspend → **GitHub PR Approved** → Resume → **Task Completion**
 
 **Your Role**: Reliability engineer building bullet-proof workflow resume infrastructure
 
 **Critical Problem**: Current suspend/resume operations are fragile and fail under various conditions:
+
+
 - Network timeouts during resume operations
+
+
 - Multiple workflows matching the same event
+
+
 - Events arriving for non-existent workflows
+
+
 - Event correlation failures between GitHub and workflow state
 
+
+
 ## Primary Objectives
+
+
 
 ### 1. Reliable Resume API
 Implement resume operations with proper validation, event correlation, and comprehensive error handling.
@@ -62,6 +90,9 @@ Ensure GitHub webhook events correctly match and resume the appropriate workflow
 ### Phase 1: Core Resume Infrastructure
 
 **Resume Operation Structure**:
+
+
+
 ```go
 // Core resume function with full error handling
 func ResumeWorkflow(ctx context.Context, resumeRequest *WorkflowResumeRequest) (*ResumeResult, error) {
@@ -111,11 +142,20 @@ type ResumeResult struct {
     ValidationErrors []string          `json:"validationErrors,omitempty"`
     RetryDelays      []time.Duration   `json:"retryDelays,omitempty"`
 }
+
+
+
+
+
+
 ```
 
 ### Phase 2: Event Correlation and Validation
 
 **Comprehensive Event Correlation**:
+
+
+
 ```go
 func findTargetWorkflowWithCorrelation(ctx context.Context, request *WorkflowResumeRequest) (*v1alpha1.Workflow, error) {
     argoClient := getArgoWorkflowsClient()
@@ -186,11 +226,20 @@ func validateWorkflowStateForResume(workflow *v1alpha1.Workflow, request *Workfl
     // Run custom validation rules
     return runValidationRules(workflow, request)
 }
+
+
+
+
+
+
 ```
 
 ### Phase 3: Retry Logic with Exponential Backoff
 
 **Robust Retry Implementation**:
+
+
+
 ```go
 type RetryConfig struct {
     MaxAttempts      int           `json:"maxAttempts"`
@@ -306,11 +355,20 @@ func isRetryableError(err error) bool {
 
     return false
 }
+
+
+
+
+
+
 ```
 
 ### Phase 4: Circuit Breaker Implementation
 
 **Circuit Breaker Pattern**:
+
+
+
 ```go
 type CircuitBreaker struct {
     name            string
@@ -417,37 +475,80 @@ func (cb *CircuitBreaker) recordFailure() {
         cb.onStateChange(oldState, cb.state)
     }
 }
+
+
+
+
+
+
 ```
+
+
 
 ## Critical Success Criteria
 
 ### 1. Resume Operation Reliability
+
+
 - [ ] 99%+ success rate for valid resume requests
+
+
 - [ ] Proper correlation between GitHub events and workflow instances
+
+
 - [ ] Comprehensive validation prevents invalid resume attempts
+
+
 - [ ] Graceful handling of edge cases (multiple workflows, missing workflows)
 
 ### 2. Error Handling and Recovery
+
+
 - [ ] Exponential backoff retry logic implemented correctly
+
+
 - [ ] Circuit breaker protects against cascading failures
+
+
 - [ ] Non-retryable errors handled without unnecessary retries
+
+
 - [ ] Comprehensive error logging for troubleshooting
 
 ### 3. Event Correlation Accuracy
+
+
 - [ ] Task ID extraction from GitHub events works reliably
+
+
 - [ ] Workflow stage validation matches event types correctly
+
+
 - [ ] Multiple event sources (PR labels, branch names) supported
+
+
 - [ ] Event timestamp and ordering handled properly
 
 ### 4. Performance and Scalability
+
+
 - [ ] Resume operations complete within 10 seconds for normal cases
+
+
 - [ ] System handles concurrent resume requests efficiently
+
+
 - [ ] Circuit breaker prevents system overload
+
+
 - [ ] Resource usage remains bounded under load
 
 ## Implementation Strategy
 
 ### Step 1: Core Resume API Development
+
+
+
 ```go
 // Create comprehensive resume service
 type WorkflowResumeService struct {
@@ -467,9 +568,18 @@ func (svc *WorkflowResumeService) ResumeWorkflow(ctx context.Context, request *W
 func TestResumeWorkflowService(t *testing.T) {
     // Unit tests for all resume scenarios
 }
+
+
+
+
+
+
 ```
 
 ### Step 2: Argo Events Integration
+
+
+
 ```yaml
 # Enhanced Argo Events sensor for resume operations
 apiVersion: argoproj.io/v1alpha1
@@ -513,9 +623,18 @@ spec:
                 "eventPayload": {{toJson .body}}
               }
           dest: payload
+
+
+
+
+
+
 ```
 
 ### Step 3: Monitoring and Observability
+
+
+
 ```go
 type ResumeMetrics struct {
     TotalResumeAttempts   prometheus.Counter
@@ -538,9 +657,18 @@ func (svc *WorkflowResumeService) recordMetrics(result *ResumeResult, duration t
 
     svc.metrics.RetryAttempts.Observe(float64(result.AttemptCount))
 }
+
+
+
+
+
+
 ```
 
 ### Step 4: End-to-End Testing
+
+
+
 ```bash
 # Create comprehensive test scenarios
 # Test 1: Normal resume operation
@@ -549,6 +677,8 @@ kubectl apply -f test-workflow-suspended.yaml
 # Simulate GitHub event
 curl -X POST http://workflow-resume-service/resume \
   -H "Content-Type: application/json" \
+
+
   -d '{
     "taskId": "123",
     "eventType": "pr-created",
@@ -556,8 +686,12 @@ curl -X POST http://workflow-resume-service/resume \
     "eventPayload": {...}
   }'
 
+
+
 # Verify workflow resumed
 argo get test-workflow-123
+
+
 
 # Test 2: Retry logic with temporary failures
 # Simulate network issues during resume
@@ -567,28 +701,57 @@ argo get test-workflow-123
 
 # Test 4: Event correlation edge cases
 # Test multiple workflows, missing workflows, etc.
+
+
+
+
+
+
 ```
+
+
 
 ## Key Files to Create/Modify
 
 ### New Components
+
+
 - `services/workflow-resume/main.go` - Resume service implementation
+
+
 - `services/workflow-resume/circuit-breaker.go` - Circuit breaker implementation
+
+
 - `services/workflow-resume/retry.go` - Retry logic with exponential backoff
+
+
 - `services/workflow-resume/correlation.go` - Event correlation logic
+
+
 - `services/workflow-resume/metrics.go` - Monitoring and metrics
 
 ### Enhanced Components
+
+
 - `argo-events/sensors/workflow-resume-sensor.yaml` - Enhanced event processing
+
+
 - `argo-events/event-sources/github-webhook.yaml` - Improved webhook handling
 
 ### Testing
+
+
 - `test/resume-operations/` - Comprehensive test suite
+
+
 - `test/integration/resume-e2e-test.yaml` - End-to-end integration tests
 
 ## Error Scenarios and Handling
 
 ### Scenario 1: Network Timeout During Resume
+
+
+
 ```go
 func handleNetworkTimeout(ctx context.Context, workflow *v1alpha1.Workflow, request *WorkflowResumeRequest) error {
     log.Printf("Network timeout during resume for workflow %s - will retry", workflow.Name)
@@ -596,9 +759,18 @@ func handleNetworkTimeout(ctx context.Context, workflow *v1alpha1.Workflow, requ
     // This is retryable - let retry logic handle it
     return fmt.Errorf("network timeout - retryable error")
 }
+
+
+
+
+
+
 ```
 
 ### Scenario 2: Multiple Workflows Match Event
+
+
+
 ```go
 func handleMultipleWorkflows(workflows []v1alpha1.Workflow, request *WorkflowResumeRequest) (*v1alpha1.Workflow, error) {
     log.Printf("Found %d workflows matching task %s - determining correct target",
@@ -626,9 +798,18 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, request *WorkflowRes
 
     return target, nil
 }
+
+
+
+
+
+
 ```
 
 ### Scenario 3: Event for Non-existent Workflow
+
+
+
 ```go
 func handleMissingWorkflow(request *WorkflowResumeRequest) error {
     log.Printf("No workflow found for task %s, event type %s",
@@ -651,11 +832,20 @@ func handleMissingWorkflow(request *WorkflowResumeRequest) error {
     // Unknown state - requires manual investigation
     return fmt.Errorf("workflow not found for unknown reason - manual investigation required")
 }
+
+
+
+
+
+
 ```
 
 ## Testing Commands
 
 ### Unit Testing
+
+
+
 ```bash
 # Test resume service components
 go test ./services/workflow-resume/... -v
@@ -663,14 +853,25 @@ go test ./services/workflow-resume/... -v
 # Test circuit breaker implementation
 go test ./services/workflow-resume/circuit-breaker_test.go -v
 
+
+
 # Test retry logic
 go test ./services/workflow-resume/retry_test.go -v
 
 # Test event correlation
 go test ./services/workflow-resume/correlation_test.go -v
+
+
+
+
+
+
 ```
 
 ### Integration Testing
+
+
+
 ```bash
 # Deploy test environment
 kubectl apply -f test/resume-operations/test-environment.yaml
@@ -680,7 +881,15 @@ kubectl apply -f test/resume-operations/e2e-test-suite.yaml
 
 # Monitor test results
 kubectl logs -l app=resume-test-runner -f
+
+
+
+
+
+
 ```
+
+
 
 ## Expected Deliverables
 
@@ -708,16 +917,34 @@ kubectl logs -l app=resume-test-runner -f
 - **Response Times**: Resume operations complete within reasonable time
 - **Concurrent Safety**: Handle multiple resume requests safely
 
+
+
 ## Quality Gates
 
 Before marking complete:
+
+
 - [ ] Resume service handles all event types correctly
+
+
 - [ ] Retry logic with exponential backoff implemented
+
+
 - [ ] Circuit breaker protects against failures
+
+
 - [ ] Event correlation accuracy >95%
+
+
 - [ ] All error scenarios tested and handled
+
+
 - [ ] Performance under load acceptable
+
+
 - [ ] Monitoring and alerting configured
+
+
 - [ ] Integration with existing multi-agent system verified
 
 This implementation establishes reliable workflow resume operations that ensure the multi-agent orchestration system can handle failures gracefully and maintain high availability.

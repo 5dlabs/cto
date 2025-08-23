@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -23,6 +33,8 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 
 ## Objective
 Build a comprehensive automated PR approval workflow that integrates Tess validation results with GitHub's branch protection system. Create a multi-stage approval process with automated Tess approval (120% satisfaction threshold), event-driven workflow resumption, and human review checkpoints.
@@ -36,6 +48,9 @@ You are implementing the final stage of the Task Master quality assurance pipeli
 **Location**: `controller/src/github/tess_approval.rs`
 
 Implement comprehensive PR evaluation system:
+
+
+
 ```rust
 pub struct TessApprovalEngine {
     github_client: GitHubClient,
@@ -50,12 +65,26 @@ pub struct TessApprovalCriteria {
     pub performance_regression: bool,      // Performance impact analysis
     pub breaking_changes: bool,            // API/interface changes
 }
+
+
+
+
+
+
 ```
 
 Key functions to implement:
+
+
 - `calculate_approval_score()` - Weighted scoring algorithm (120% threshold)
+
+
 - `evaluate_pr_for_approval()` - Complete PR evaluation and decision making
+
+
 - `has_blocking_issues()` - Identify critical blocking conditions
+
+
 - `execute_approval_decision()` - Submit GitHub reviews and labels
 
 ### 2. Weighted Scoring Algorithm
@@ -68,6 +97,9 @@ Implement comprehensive scoring system:
 - **Breaking Changes Penalty**: Significant deduction for API changes
 
 Score calculation example:
+
+
+
 ```rust
 fn calculate_approval_score(&self, result: &TessValidationResult) -> Result<f64> {
     let mut score = 0.0;
@@ -87,6 +119,12 @@ fn calculate_approval_score(&self, result: &TessValidationResult) -> Result<f64>
 
     Ok(score)
 }
+
+
+
+
+
+
 ```
 
 ### 3. Argo Workflows PR Approval Sensor
@@ -99,6 +137,9 @@ Create event-driven sensor for Tess approval detection:
 - **Data Transformation**: Extract PR number, repository, and approval timestamp
 
 Sensor configuration:
+
+
+
 ```yaml
 dependencies:
 - name: tess-approval
@@ -110,6 +151,12 @@ dependencies:
       value: ["approved"]
     - path: body.review.user.login
       value: ["5DLabs-Tess[bot]"]
+
+
+
+
+
+
 ```
 
 ### 4. Main Workflow with Approval Gates
@@ -122,6 +169,9 @@ Design comprehensive workflow with multiple approval stages:
 4. **Final Approval**: Combine all approvals and finalize
 
 Workflow structure:
+
+
+
 ```yaml
 templates:
 - name: pr-processing-pipeline
@@ -138,6 +188,12 @@ templates:
     - name: final-approval
       dependencies: [human-review-gate]
       template: finalize-pr-approval
+
+
+
+
+
+
 ```
 
 ### 5. GitHub Branch Protection Integration
@@ -151,9 +207,14 @@ Configure GitHub branch protection rules:
 - **Admin Enforcement**: Apply rules to administrators
 
 Branch protection API call:
+
+
+
 ```bash
 curl -X PUT \
   "https://api.github.com/repos/$OWNER/$REPO/branches/$BRANCH/protection" \
+
+
   -d '{
     "required_pull_request_reviews": {
       "required_approving_review_count": 2,
@@ -165,37 +226,73 @@ curl -X PUT \
       "contexts": ["tess-validation"]
     }
   }'
+
+
+
+
+
+
 ```
 
 ### 6. Approval Decision Types
 Implement three decision types based on evaluation:
 
 **Auto-Approve** (Score ≥ 120%, no blocking issues):
+
+
 - Submit GitHub approval review
+
+
 - Add "tess-approved" label
+
+
 - Log successful approval
 
 **Request Changes** (Score < 120%):
+
+
 - Submit change request review
+
+
 - Detail failed criteria and required improvements
+
+
 - Add "needs-changes" label
 
 **Requires Human Review** (Score ≥ 120% but has blocking issues):
+
+
 - Submit comment review requesting human oversight
+
+
 - Add "human-review-required" label
+
+
 - Provide detailed analysis for human reviewer
 
 ## Technical Implementation Details
 
 ### Workflow Suspension and Resumption
 Implement robust workflow suspension mechanism:
+
+
+
 ```yaml
 - name: wait-for-approval
   suspend: {}  # Suspend until sensor triggers resumption
   activeDeadlineSeconds: 3600  # 1 hour timeout
+
+
+
+
+
+
 ```
 
 Sensor triggers workflow resumption:
+
+
+
 ```yaml
 triggers:
 - template:
@@ -203,13 +300,27 @@ triggers:
       operation: resume
       source:
         # Patch workflow to resume with approval data
+
+
+
+
+
+
 ```
 
 ### Human Review Checkpoint
 Implement optional human review stage:
+
+
 - Check for existing human approvals via GitHub API
+
+
 - Request human review with informative comment
+
+
 - Continue workflow based on human approval status
+
+
 - Support bypassing human review for low-risk changes
 
 ### Error Handling and Recovery
@@ -222,47 +333,97 @@ Implement optional human review stage:
 
 ### 1. Task 18 Integration
 Seamlessly integrate with Tess coverage analysis:
+
+
 - Consume coverage reports and test results
+
+
 - Use acceptance criteria validation results
+
+
 - Incorporate security scan outcomes
+
+
 - Leverage generated test quality metrics
 
 ### 2. GitHub API Integration
 Comprehensive GitHub integration:
+
+
 - Submit PR reviews with detailed feedback
+
+
 - Manage PR labels for workflow states
+
+
 - Update PR status checks
+
+
 - Handle GitHub webhook events
 
 ### 3. Argo Workflows Integration
 Deep integration with workflow system:
+
+
 - Suspend and resume workflows dynamically
+
+
 - Pass approval data between workflow steps
+
+
 - Handle workflow timeouts and failures
+
+
 - Manage workflow metadata and labels
 
 ## Testing Strategy
 
 ### Unit Tests
 Focus on core approval logic:
+
+
 - Approval score calculation accuracy
+
+
 - Decision making logic for different scenarios
+
+
 - GitHub API integration functions
+
+
 - Error handling and edge cases
 
 ### Integration Tests
 End-to-end workflow validation:
+
+
 - Complete PR workflow from validation to approval
+
+
 - Sensor trigger and workflow resumption
+
+
 - Human review checkpoint functionality
+
+
 - Branch protection rule enforcement
 
 ### Scenario Testing
 Test various approval scenarios:
+
+
 - High-quality PRs that auto-approve
+
+
 - PRs requiring changes due to low scores
+
+
 - PRs requiring human review despite high scores
+
+
 - Emergency override and manual approval processes
+
+
 
 ## Success Criteria
 
@@ -287,7 +448,12 @@ Test various approval scenarios:
 
 ## Configuration Options
 
+
+
 ### Approval Thresholds
+
+
+
 ```rust
 pub struct ApprovalConfig {
     pub auto_approval_threshold: f64,     // 120.0
@@ -295,7 +461,15 @@ pub struct ApprovalConfig {
     pub blocking_issue_override: bool,    // false
     pub emergency_bypass: bool,           // false
 }
+
+
+
+
+
+
 ```
+
+
 
 ### Workflow Timeouts
 - Tess validation timeout: 30 minutes
@@ -311,35 +485,81 @@ pub struct ApprovalConfig {
 
 ## Security and Compliance
 
+
+
 ### Security Measures
+
+
 - Secure GitHub token storage and rotation
+
+
 - Validate approval authenticity (prevent spoofing)
+
+
 - Audit all approval decisions and overrides
+
+
 - Implement role-based access for emergency procedures
 
 ### Compliance Features
+
+
 - Complete audit trail of approval decisions
+
+
 - Immutable approval history
+
+
 - Compliance reporting for regulatory requirements
+
+
 - Emergency override procedures with proper authorization
 
 ## Monitoring and Observability
 
+
+
 ### Key Metrics
+
+
 - Approval decision distribution (auto/changes/human review)
+
+
 - Average time from validation to approval
+
+
 - Human review response times
+
+
 - Workflow suspension and resumption success rates
 
 ### Alerting
+
+
 - Failed approval processing
+
+
 - Workflow suspension timeouts
+
+
 - GitHub API rate limiting
+
+
 - Unusual approval patterns or failures
 
 ## Dependencies and Prerequisites
+
+
 - Task 10 (GitHub integration foundation)
+
+
 - Task 18 (Tess coverage analysis completion)
+
+
 - Argo Workflows and Argo Events installation
+
+
 - GitHub App configuration with appropriate permissions
+
+
 - Branch protection rule management access

@@ -1,5 +1,7 @@
 # Toolman Guide: Implement Task Progression Logic
 
+
+
 ## Overview
 
 This guide provides comprehensive instructions for implementing automatic task progression logic in the multi-agent orchestration system. This system automatically moves completed tasks to `.completed` directories, discovers next pending tasks, and triggers continuous workflow processing.
@@ -21,15 +23,29 @@ This guide provides comprehensive instructions for implementing automatic task p
 
 #### Phase 1: Research and Design
 
+
+
+
 ```bash
+
+
 # Use brave-search_brave_web_search for research
 Search: "argo workflows recursive templates task processing"
 Search: "kubernetes workflow automation continuous processing"
 Search: "argo workflows DAG conditional steps best practices"
 Search: "workflow loop prevention resource limits"
+
+
+
+
+
+
 ```
 
 #### Phase 2: Implementation and Testing
+
+
+
 
 ```bash
 # Use memory_create_entities to store successful patterns
@@ -42,22 +58,42 @@ Store: Testing procedures and validation scripts
 Query: "task progression workflow templates"
 Query: "next task discovery algorithms"
 Query: "error handling patterns"
+
+
+
+
+
+
 ```
 
 #### Phase 3: Validation and Monitoring
+
+
+
 
 ```bash
 # If mcp-argo available, use for direct workflow interaction
 mcp-argo list-workflows --label="workflow-type=play-orchestration"
 mcp-argo get-workflow <workflow-name>
 mcp-argo submit-workflow task-progression-template.yaml
+
+
+
+
+
+
 ```
+
+
 
 ## Best Practices
 
 ### 1. Workflow Template Design
 
 **Task Completion Template Pattern**:
+
+
+
 ```yaml
 templates:
 - name: mark-task-complete
@@ -91,11 +127,22 @@ templates:
       else
         echo "WARNING: Git commit failed but task move succeeded"
       fi
+
+
+
+
+
+
 ```
+
+
 
 ### 2. Task Discovery Algorithm
 
 **Robust Discovery with Validation**:
+
+
+
 ```yaml
 templates:
 - name: find-next-task
@@ -109,8 +156,14 @@ templates:
 
       # Find next task with natural version sort
       NEXT_TASK_PATH=$(find docs/.taskmaster/docs/ \
+
+
         -maxdepth 1 \
+
+
         -name "task-*" \
+
+
         -type d \
         | grep -v ".completed" \
         | sort -V \
@@ -166,11 +219,20 @@ templates:
     - name: next-task-id
       valueFrom:
         path: /tmp/next-task-id
+
+
+
+
+
+
 ```
 
 ### 3. Workflow Loop Implementation
 
 **Safe Recursive Pattern**:
+
+
+
 ```yaml
 templates:
 - name: task-completion-and-progression
@@ -235,11 +297,20 @@ templates:
             value: "{{inputs.parameters.task-id}}"
         workflowTemplateRef:
           name: play-workflow-template
+
+
+
+
+
+
 ```
 
 ### 4. Error Handling and Recovery
 
 **Comprehensive Error Management**:
+
+
+
 ```yaml
 templates:
 - name: handle-corrupted-task
@@ -283,11 +354,19 @@ templates:
       git commit -m "Quarantine corrupted task $TASK_ID: $ERROR_REASON"
 
       echo "Task $TASK_ID successfully quarantined"
+
+
+
+
+
+
 ```
 
 ## Common Workflows
 
 ### Workflow 1: Complete Task Progression Implementation
+
+
 
 1. **Research and Design Phase**
    ```bash
@@ -302,7 +381,14 @@ templates:
      "findings": "Argo workflows support recursive patterns with proper resource limits",
      "best_practices": ["Use activeDeadlineSeconds", "Implement ttlStrategy", "Add parallelism limits"]
    })
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Template Development Phase**
    ```yaml
@@ -318,7 +404,14 @@ templates:
      entrypoint: process-task-progression
      templates:
      # [Include all templates from best practices above]
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Integration with Existing Workflow**
    ```yaml
@@ -337,7 +430,14 @@ templates:
            parameters:
            - name: current-task-id
              value: "{{workflow.parameters.task-id}}"
-   ```
+
+
+
+
+
+```
+
+
 
 4. **Testing and Validation Phase**
    ```bash
@@ -352,9 +452,16 @@ templates:
 
    # Monitor progression
    watch argo list -l workflow-type=play-orchestration
-   ```
+
+
+
+
+
+```
 
 ### Workflow 2: Error Handling and Recovery Testing
+
+
 
 1. **Create Test Scenarios**
    ```bash
@@ -363,7 +470,14 @@ templates:
    echo "# Task ID: 201" > docs/.taskmaster/docs/task-201/task.txt  # Valid
    # task-202 missing task.txt (corrupted)
    echo "Invalid format" > docs/.taskmaster/docs/task-203/task.txt  # Invalid
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Test Discovery Algorithm**
    ```bash
@@ -382,7 +496,14 @@ templates:
 
    # Verify results
    argo logs $(argo list -o name | head -1)
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Validate Error Handling**
    ```bash
@@ -392,9 +513,16 @@ templates:
 
    # Verify error recovery continues with valid tasks
    argo logs <workflow> | grep "Next task found: 201"
-   ```
+
+
+
+
+
+```
 
 ### Workflow 3: Performance and Resource Testing
+
+
 
 1. **Large Queue Testing**
    ```bash
@@ -410,7 +538,14 @@ templates:
    # Monitor resource usage
    kubectl top nodes
    kubectl top pods -n argo
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Resource Limit Testing**
    ```bash
@@ -420,7 +555,12 @@ templates:
 
    # Verify TTL cleanup working
    argo list --completed | grep "seconds ago"
-   ```
+
+
+
+
+
+```
 
 ## Troubleshooting Guide
 
@@ -428,6 +568,9 @@ templates:
 **Symptoms**: Workflow completes but task remains in main directory
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check workflow logs for task completion step
 argo logs <workflow-name> -c mark-task-complete
@@ -437,18 +580,37 @@ ls -la docs/.taskmaster/docs/
 
 # Check git status for uncommitted changes
 git status
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Verify script has proper permissions for directory operations
+
+
 2. Check git configuration for commit operations
+
+
 3. Validate task directory structure and naming
+
+
 4. Ensure no file locks or permission issues
+
+
 
 ### Issue 2: Next Task Discovery Fails
 **Symptoms**: No next task found despite pending tasks existing
 
 **Diagnosis**:
+
+
+
 ```bash
 # Test discovery algorithm manually
 find docs/.taskmaster/docs/ -maxdepth 1 -name "task-*" -type d | grep -v ".completed" | sort -V
@@ -458,18 +620,35 @@ grep "^# Task ID:" docs/.taskmaster/docs/task-*/task.txt
 
 # Verify no hidden characters or encoding issues
 hexdump -C docs/.taskmaster/docs/task-*/task.txt | head
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Verify task.txt format matches expected pattern exactly
+
+
 2. Check for hidden characters or encoding issues
+
+
 3. Validate directory naming conventions
+
+
 4. Test sort command behavior with current task numbers
 
 ### Issue 3: Infinite Workflow Creation
 **Symptoms**: Continuous workflow creation without progression
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check workflow creation rate
 argo list | grep "play-workflow" | wc -l
@@ -479,18 +658,35 @@ watch 'argo list | grep "Running" | wc -l'
 
 # Check for workflow creation failures
 argo logs <workflow> | grep -E '(failed|error|retry)'
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Verify activeDeadlineSeconds and resource limits set
+
+
 2. Check workflow creation success/failure rates
+
+
 3. Implement circuit breaker pattern for repeated failures
+
+
 4. Add workflow count monitoring and alerts
 
 ### Issue 4: Corrupted Task Handling Failures
 **Symptoms**: System stuck on corrupted tasks without quarantine
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check quarantine directory
 ls -la docs/.taskmaster/docs/.corrupted/
@@ -500,91 +696,207 @@ cat docs/.taskmaster/task-errors.log
 
 # Check validation logic
 argo logs <workflow> | grep -E '(validation|corrupt|quarantine)'
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Verify quarantine directory creation permissions
+
+
 2. Check validation logic covers all corruption scenarios
+
+
 3. Ensure error logging is working correctly
+
+
 4. Test manual quarantine operations
+
+
 
 ## Tool-Specific Tips
 
+
+
 ### brave-search_brave_web_search
+
+
 - Search for "argo workflows" + specific functionality needed
+
+
 - Look for official Argo documentation and examples
+
+
 - Research Kubernetes workflow automation best practices
+
+
 - Find troubleshooting guides for common issues
 
 ### memory_create_entities / memory_query_entities
+
+
 - Store successful workflow template patterns
+
+
 - Document error handling strategies that work
+
+
 - Keep track of testing procedures and validation scripts
+
+
 - Record performance benchmarks and optimization tips
 
+
+
 ### Direct Workflow Tools (if available)
+
+
 - Use workflow submission and monitoring for testing
+
+
 - Implement real-time workflow status checking
+
+
 - Enable detailed logging and debugging
+
+
 - Monitor resource usage during progression
+
+
 
 ## Quality Checks
 
 ### Pre-Implementation Checklist
+
+
 - [ ] Research completed on Argo Workflows recursive patterns
+
+
 - [ ] Resource limit strategies defined
+
+
 - [ ] Error handling scenarios identified
+
+
 - [ ] Testing strategy planned
 
 ### Implementation Checklist
+
+
 - [ ] Task completion logic implemented with validation
+
+
 - [ ] Next task discovery algorithm robust and tested
+
+
 - [ ] Workflow loop logic includes proper resource limits
+
+
 - [ ] Error handling covers all edge cases
+
+
 - [ ] Integration with existing multi-agent workflow complete
 
 ### Post-Implementation Checklist
+
+
 - [ ] End-to-end task progression tested successfully
+
+
 - [ ] Error scenarios handled gracefully
+
+
 - [ ] Resource limits prevent infinite loops
+
+
 - [ ] Performance acceptable with large task queues
+
+
 - [ ] Monitoring and logging provide adequate visibility
 
 ## Success Indicators
 
 1. **Functional Success**:
+
+
    - Tasks automatically progress without manual intervention
+
+
    - Completed tasks moved to `.completed` directory correctly
+
+
    - Queue completion handled gracefully
 
 2. **Quality Success**:
+
+
    - All error scenarios handled without system failure
+
+
    - Resource usage remains within acceptable limits
+
+
    - No infinite loops or runaway workflows
 
 3. **Integration Success**:
+
+
    - Multi-agent workflow compatibility maintained
+
+
    - Event correlation continues working correctly
+
+
    - GitHub integration unaffected by progression logic
 
 ## Performance Optimization
 
 ### Task Discovery Optimization
+
+
 - Use efficient sorting algorithms for large task numbers
+
+
 - Minimize file system operations during discovery
+
+
 - Cache validation results when possible
+
+
 - Implement parallel validation for multiple tasks
 
 ### Workflow Resource Optimization
+
+
 - Set appropriate resource limits and deadlines
+
+
 - Implement efficient cleanup policies
+
+
 - Monitor and tune parallelism settings
+
+
 - Use workflow priorities for important progressions
 
 ### Error Handling Optimization
+
+
 - Implement fast-fail strategies for obvious corruption
+
+
 - Use batch operations for multiple corrupted tasks
+
+
 - Optimize logging and monitoring overhead
+
+
 - Implement intelligent retry strategies
 
 This guide provides the foundation for successfully implementing automatic task progression logic that enables continuous multi-agent workflow processing while maintaining system stability and reliability.

@@ -4,7 +4,11 @@
 **Status:** Complete
 **Scope:** Comprehensive analysis of existing CodeRun controller, template system, Argo Events integration, and multi-agent requirements
 
+
+
 ---
+
+
 
 ## Executive Summary
 
@@ -16,6 +20,8 @@ The existing CodeRun controller provides a solid foundation for multi-agent orch
 - **✅ Workspace Isolation**: PVC system ready for agent-specific naming (`workspace-{service}-{agent}`)
 - **⚠️ Gaps**: Need agent-specific templates, enhanced RBAC, and multi-method task association
 
+
+
 ---
 
 ## 1. CodeRun CRD Architecture Analysis
@@ -23,6 +29,9 @@ The existing CodeRun controller provides a solid foundation for multi-agent orch
 ### 1.1 CRD Specification (`controller/src/crds/coderun.rs`)
 
 **Key Fields for Multi-Agent Support:**
+
+
+
 
 ```rust
 pub struct CodeRunSpec {
@@ -36,9 +45,18 @@ pub struct CodeRunSpec {
     pub env_from_secrets: Vec<SecretEnvVar>, // ✅ Agent-specific secrets
     // ... other fields
 }
+
+
+
+
+
+
 ```
 
 **Status Tracking:**
+
+
+
 ```rust
 pub struct CodeRunStatus {
     pub phase: String,                   // "Running", "Succeeded", "Failed"
@@ -48,6 +66,12 @@ pub struct CodeRunStatus {
     pub session_id: Option<String>,     // Session continuity
     // ... other status fields
 }
+
+
+
+
+
+
 ```
 
 **✅ Assessment**: CRD is fully ready for multi-agent use. No schema changes required.
@@ -55,6 +79,9 @@ pub struct CodeRunStatus {
 ### 1.2 Controller Reconciliation Flow (`controller/src/tasks/code/controller.rs`)
 
 **Primary Reconcile Loop:**
+
+
+
 ```rust
 // 1. Status-first idempotency check
 if status.work_completed == Some(true) {
@@ -68,6 +95,12 @@ match job_state {
     JobState::Completed => mark_work_completed(),
     JobState::Failed => mark_failed(),
 }
+
+
+
+
+
+
 ```
 
 **Resource Creation Pattern:**
@@ -78,13 +111,20 @@ match job_state {
 
 **✅ Assessment**: Controller follows solid patterns. PVC naming is the main modification needed.
 
+
+
 ---
+
+
 
 ## 2. Template System Deep Dive
 
 ### 2.1 Template Architecture (`controller/src/tasks/code/templates.rs`)
 
 **Template Generation Flow:**
+
+
+
 ```rust
 pub fn generate_all_templates(code_run: &CodeRun, config: &ControllerConfig) -> Result<BTreeMap<String, String>> {
     let mut templates = BTreeMap::new();
@@ -105,9 +145,21 @@ pub fn generate_all_templates(code_run: &CodeRun, config: &ControllerConfig) -> 
         templates.insert(format!("hooks-{filename}"), content);
     }
 }
+
+
+
+
+
+
 ```
 
 ### 2.2 Current Template Structure
+
+
+
+
+
+
 
 ```
 infra/charts/controller/claude-templates/
@@ -128,11 +180,20 @@ infra/charts/controller/claude-templates/
 │       └── stop-pr-creation.sh.hbs
 └── docs/                               # Documentation task templates
     └── ...
+
+
+
+
+
+
 ```
 
 ### 2.3 Handlebars Context Structure
 
 **Current Context Variables:**
+
+
+
 ```rust
 let context = json!({
     "task_id": code_run.spec.task_id,
@@ -145,6 +206,12 @@ let context = json!({
     "working_directory": get_working_directory(code_run),
     // ... other variables
 });
+
+
+
+
+
+
 ```
 
 **✅ Assessment**: Template system is ready for agent-specific conditionals using `{{#if (eq github_app "5DLabs-Cleo")}}` syntax.
@@ -157,6 +224,8 @@ let context = json!({
 - **Agent Support**: Uses `{{github_app}}` variable throughout
 - **Modification Needed**: Add agent-specific setup sections
 
+
+
 #### Claude Memory (`claude.md.hbs`)
 - **Current**: Generic memory initialization
 - **Agent Support**: Ready for `{{#if github_app}}` conditionals
@@ -167,6 +236,8 @@ let context = json!({
 - **Agent Support**: Ready for conditional tool lists
 - **Modification Needed**: Agent-specific `remoteTools` arrays
 
+
+
 ---
 
 ## 3. Resource Management Analysis
@@ -174,11 +245,23 @@ let context = json!({
 ### 3.1 PVC Management (`controller/src/tasks/code/resources.rs`)
 
 **Current PVC Naming:**
+
+
+
 ```rust
 let pvc_name = format!("workspace-{service_name}");
+
+
+
+
+
+
 ```
 
 **PVC Creation Logic:**
+
+
+
 ```rust
 async fn ensure_pvc_exists(&self, pvc_name: &str, service_name: &str) -> Result<()> {
     // Check if PVC exists
@@ -197,9 +280,18 @@ async fn ensure_pvc_exists(&self, pvc_name: &str, service_name: &str) -> Result<
         Err(e) => Err(e.into()),
     }
 }
+
+
+
+
+
+
 ```
 
 **Required Modification:**
+
+
+
 ```rust
 // Extract agent name from github_app field
 fn extract_agent_name(github_app: &str) -> String {
@@ -209,11 +301,20 @@ fn extract_agent_name(github_app: &str) -> String {
 // New PVC naming: workspace-{service}-{agent}
 let agent_name = extract_agent_name(&code_run.spec.github_app.unwrap_or_default());
 let pvc_name = format!("workspace-{}-{}", service_name, agent_name);
+
+
+
+
+
+
 ```
 
 ### 3.2 Job Creation and Management
 
 **Job Naming Pattern:**
+
+
+
 ```rust
 fn generate_code_job_name(code_run: &CodeRun) -> String {
     format!("coderun-{}-{}-{}",
@@ -222,15 +323,32 @@ fn generate_code_job_name(code_run: &CodeRun) -> String {
         code_run.name_any()
     )
 }
+
+
+
+
+
+
 ```
 
 **Job Labels:**
+
+
+
 ```rust
 "workflow-name": workflow_name,
 "task-id": task_id,
 "service": service,
 "github-app": github_app,  // ✅ Already supports agent correlation
+
+
+
+
+
+
 ```
+
+
 
 ---
 
@@ -239,6 +357,9 @@ fn generate_code_job_name(code_run: &CodeRun) -> String {
 ### 4.1 Current Setup (`infra/gitops/resources/github-webhooks/`)
 
 **EventSource Configuration:**
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
@@ -256,9 +377,18 @@ spec:
       secret:
         name: github-webhook-secret
         key: secret
+
+
+
+
+
+
 ```
 
 **Existing Sensor (Test/Demo):**
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -279,6 +409,12 @@ spec:
               apiVersion: v1
               kind: Pod
               # Creates busybox pod that logs webhook payload
+
+
+
+
+
+
 ```
 
 **✅ Assessment**: Infrastructure is functional (rate-limited but working). Ready for workflow correlation sensors.
@@ -286,12 +422,23 @@ spec:
 ### 4.2 ngrok Integration
 
 **HTTP Route Configuration:**
+
+
+
 ```yaml
 # infra/gitops/resources/github-webhooks/httproute.yaml
 # Routes GitHub webhooks through ngrok Gateway to EventSource
+
+
+
+
+
+
 ```
 
 **Status**: Working but currently rate-limited. User will resolve billing issue.
+
+
 
 ---
 
@@ -300,6 +447,9 @@ spec:
 ### 5.1 Agent Definitions (`infra/charts/controller/values.yaml`)
 
 **Current Agent Structure:**
+
+
+
 ```yaml
 agents:
   rex:
@@ -328,6 +478,12 @@ agents:
     role: "Quality Assurance & Testing Specialist"
     systemPrompt: |
       # Testing and QA focus with K8s deployment validation
+
+
+
+
+
+
 ```
 
 **✅ Assessment**: Agent definitions are comprehensive with role-specific system prompts. Ready for template integration.
@@ -335,7 +491,12 @@ agents:
 ### 5.2 External Secrets Configuration
 
 **Pattern Analysis:**
+
+
+
 ```yaml
+
+
 # Example: Rex GitHub App secrets
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
@@ -351,9 +512,17 @@ spec:
     remoteRef:
       key: github-app-rex
       property: private_key
+
+
+
+
+
+
 ```
 
 **✅ Assessment**: Pattern established for Cleo and Tess secrets. Ready for controller integration.
+
+
 
 ---
 
@@ -362,6 +531,9 @@ spec:
 ### 6.1 Existing CodeRun Template (`infra/charts/controller/templates/coderun-template.yaml`)
 
 **Current Structure:**
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -383,9 +555,17 @@ spec:
           template: create-coderun-resource
       - - name: wait-for-completion
           template: wait-coderun-completion
+
+
+
+
+
+
 ```
 
 **✅ Assessment**: Template ready for multi-agent workflows. Parameterized agent selection already implemented.
+
+
 
 ---
 
@@ -404,6 +584,9 @@ spec:
 ### 7.2 Session Continuity Implementation
 
 **Current Logic:**
+
+
+
 ```bash
 # In container.sh.hbs
 if [ "{{continue_session}}" = "true" ]; then
@@ -413,9 +596,17 @@ else
     echo "🆕 Starting fresh session..."
     # Initializes clean workspace
 fi
+
+
+
+
+
+
 ```
 
 **Agent Isolation**: Each agent gets their own PVC, so `continue_session` is agent-specific.
+
+
 
 ---
 
@@ -424,6 +615,9 @@ fi
 ### 8.1 HIGH PRIORITY - Core Multi-Agent Support
 
 #### PVC Naming Update (`resources.rs`)
+
+
+
 ```rust
 // Current
 let pvc_name = format!("workspace-{service_name}");
@@ -434,9 +628,21 @@ fn extract_agent_name(github_app: &str) -> String {
 }
 let agent_name = extract_agent_name(&code_run.spec.github_app.unwrap_or_default());
 let pvc_name = format!("workspace-{}-{}", service_name, agent_name);
+
+
+
+
+
+
 ```
 
 #### Agent-Specific Templates (`claude-templates/`)
+
+
+
+
+
+
 ```
 # Required new structure
 claude-templates/
@@ -448,9 +654,18 @@ claude-templates/
     ├── claude.md.hbs                # MODIFY: Add agent conditionals
     ├── client-config.json.hbs       # MODIFY: Agent-specific MCP tools
     └── container.sh.hbs             # MODIFY: Agent-specific setup
+
+
+
+
+
+
 ```
 
 #### Template Conditional Logic
+
+
+
 ```handlebars
 {{#if (eq github_app "5DLabs-Cleo")}}
   "remoteTools": ["rustdocs_query_rust_docs", "brave-search_brave_web_search"]
@@ -459,31 +674,63 @@ claude-templates/
 {{else}}
   <!-- Default Rex/Blaze tools -->
 {{/if}}
+
+
+
+
+
+
 ```
 
 ### 8.2 MEDIUM PRIORITY - Workflow Orchestration
 
 #### Multi-Agent Workflow Template
+
+
 - Create `play-template.yaml` with parameterized agent selection
+
+
 - Implement suspend/resume points for event-driven transitions
+
+
 - Add workflow correlation labels and stage management
 
 #### Argo Events Sensors
+
+
 - GitHub PR creation → Resume after Rex
+
+
 - PR labeled "ready-for-qa" → Resume after Cleo
+
+
 - PR approved → Resume after Tess
+
+
 - Rex push events → Cancel Cleo/Tess, restart QA pipeline
 
 ### 8.3 LOW PRIORITY - Operational Enhancements
 
 #### Enhanced RBAC for Tess
+
+
 - Cluster-admin permissions for K8s testing
+
+
 - Database admin credentials (Postgres, Redis)
+
+
 - Argo CD admin access
 
 #### Task Association Validation
+
+
 - Multi-method validation (PR labels + branch naming + marker file)
+
+
 - Workflow failure on correlation mismatch
+
+
 
 ---
 
@@ -511,6 +758,8 @@ claude-templates/
 - **Operational Monitoring**: Long-running workflow health tracking
 - **Production Deployment**: GitOps pipeline for multi-agent system
 
+
+
 ---
 
 ## 10. Discovery Validation
@@ -531,14 +780,24 @@ claude-templates/
 - [x] **Template System**: Handlebars conditionals support agent-specific configuration
 - [x] **Multi-Method Task Association**: PR labels + branch parsing + marker files all implementable
 
+
+
 ---
 
 ## 11. Next Steps Recommendation
 
 **Immediate Actions:**
+
+
 1. ✅ **Discovery Complete** - All systems analyzed and documented
+
+
 2. 🔄 **Start Implementation** - Begin with Task 4 (PVC naming modification)
+
+
 3. 🔄 **Template Enhancement** - Create agent-specific templates (Task 6)
+
+
 4. 🔄 **Workflow Design** - Implement multi-agent DAG structure (Task 3)
 
 **Key Success Factors:**
@@ -548,6 +807,8 @@ claude-templates/
 - **Event Reliability**: Implement robust correlation and error handling
 
 The existing infrastructure provides an excellent foundation for multi-agent orchestration. The required modifications are well-scoped and technically feasible within the current architecture.
+
+
 
 ---
 

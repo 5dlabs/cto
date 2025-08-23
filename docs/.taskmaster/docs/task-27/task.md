@@ -1,5 +1,7 @@
 # Task 27: Configure Comprehensive Admin Access for Tess Agent
 
+
+
 ## Overview
 
 This task configures comprehensive administrative access for the Tess agent, providing full infrastructure credentials for databases, Argo CD, and other critical systems. The implementation goes beyond standard Kubernetes RBAC to enable live deployment testing and administrative operations.
@@ -8,19 +10,43 @@ This task configures comprehensive administrative access for the Tess agent, pro
 
 ### Infrastructure Access Components
 
+
+
 1. **Database Administrative Access**
+
+
    - PostgreSQL superuser credentials (host, port, username, password, database)
+
+
    - Redis admin access (host, port, password, cluster endpoints)
+
+
    - Connection pooling and TLS certificate management
 
+
+
 2. **Argo CD Administrative Rights**
+
+
    - Admin token for full Argo CD operations
+
+
    - AppProject configuration with elevated permissions
+
+
    - Application lifecycle management capabilities
 
+
+
 3. **Secret Management Infrastructure**
+
+
    - External Secrets Operator integration
+
+
    - AWS Secrets Manager or HashiCorp Vault backend
+
+
    - Dynamic secret injection via Kubernetes CSI
 
 ## Implementation Guide
@@ -28,6 +54,9 @@ This task configures comprehensive administrative access for the Tess agent, pro
 ### Step 1: External Secrets Configuration
 
 Create External Secrets Store configuration:
+
+
+
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -48,6 +77,8 @@ spec:
           secretAccessKey:
             name: aws-creds
             key: secret-access-key
+
+
 ---
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
@@ -87,9 +118,18 @@ spec:
       key: /infrastructure/tess-admin/postgres
       property: connection_url
   refreshInterval: 24h
+
+
+
+
+
+
 ```
 
 ### Step 2: Redis Admin Secrets
+
+
+
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -126,9 +166,18 @@ spec:
       key: /infrastructure/tess-admin/redis
       property: connection_url
   refreshInterval: 24h
+
+
+
+
+
+
 ```
 
 ### Step 3: Argo CD Admin Configuration
+
+
+
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -157,6 +206,8 @@ spec:
       key: /infrastructure/tess-admin/argocd
       property: admin_username
   refreshInterval: 24h
+
+
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -167,6 +218,8 @@ spec:
   description: "Administrative project for Tess agent operations"
   sourceRepos:
   - 'https://github.com/5dlabs/cto'
+
+
   - '*'
   destinations:
   - namespace: '*'
@@ -186,12 +239,23 @@ spec:
     - p, proj:tess-admin-project:tess-admin, clusters, *, *, allow
     - p, proj:tess-admin-project:tess-admin, exec, *, *, allow
     groups:
+
+
     - tess-service-account
+
+
+
+
+
+
 ```
 
 ### Step 4: Tess Agent Pod Configuration
 
 Update the Tess agent deployment with admin access:
+
+
+
 
 ```yaml
 apiVersion: apps/v1
@@ -208,6 +272,8 @@ spec:
         image: postgres:15-alpine
         command: ["/bin/sh", "-c"]
         args:
+
+
         - |
           # Validate PostgreSQL connection
           echo "Testing PostgreSQL connection..."
@@ -317,9 +383,18 @@ spec:
       - name: config-volume
         configMap:
           name: tess-admin-config
+
+
+
+
+
+
 ```
 
 ### Step 5: ConfigMap for Non-Sensitive Configuration
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -352,9 +427,18 @@ data:
     metrics_enabled: true
     log_level: info
     performance_tracking: true
+
+
+
+
+
+
 ```
 
 ### Step 6: Service Account and RBAC
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -364,6 +448,8 @@ metadata:
   namespace: taskmaster
   annotations:
     eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/TessAdminRole
+
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -382,6 +468,8 @@ rules:
 - apiGroups: ["external-secrets.io"]
   resources: ["externalsecrets", "secretstores"]
   verbs: ["get", "list", "watch"]
+
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -395,15 +483,28 @@ roleRef:
   kind: ClusterRole
   name: tess-admin-role
   apiGroup: rbac.authorization.k8s.io
+
+
+
+
+
+
 ```
 
 ### Step 7: Database Admin Privileges
 
 PostgreSQL admin setup:
 
+
+
+
 ```sql
+
+
 -- Create admin user for Tess
 CREATE USER tess_admin WITH SUPERUSER CREATEDB CREATEROLE LOGIN PASSWORD 'secure-password';
+
+
 
 -- Grant additional privileges
 GRANT ALL PRIVILEGES ON DATABASE taskmaster TO tess_admin;
@@ -412,13 +513,24 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO tess_admin;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO tess_admin;
 GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO tess_admin;
 
+
+
 -- Create audit role for monitoring
 CREATE ROLE tess_audit;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO tess_audit;
 GRANT tess_audit TO tess_admin;
+
+
+
+
+
+
 ```
 
 Redis admin setup:
+
+
+
 
 ```bash
 # Configure Redis ACL for Tess admin
@@ -429,9 +541,18 @@ cat > /etc/redis/tess-admin-acl.conf <<EOF
 user tess_admin on >secure-password ~* &* +@all -flushall -flushdb -shutdown -debug -eval -script
 user tess_audit on >audit-password ~* &* +@read -@dangerous
 EOF
+
+
+
+
+
+
 ```
 
 ### Step 8: TLS Certificate Management
+
+
+
 
 ```yaml
 apiVersion: cert-manager.io/v1
@@ -446,11 +567,21 @@ spec:
     kind: ClusterIssuer
   commonName: tess-admin-client
   dnsNames:
+
+
   - tess-admin.taskmaster.local
   usages:
+
+
   - client auth
+
+
   - digital signature
+
+
   - key encipherment
+
+
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -464,10 +595,21 @@ spec:
     kind: ClusterIssuer
   commonName: postgres-client
   usages:
+
+
   - client auth
+
+
+
+
+
+
 ```
 
 ### Step 9: Audit Logging Configuration
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -502,6 +644,12 @@ data:
     loglevel: notice
     syslog-enabled: yes
     syslog-ident: redis-tess
+
+
+
+
+
+
 ```
 
 ## Security Considerations
@@ -516,7 +664,12 @@ data:
 | Kubernetes | ClusterRole binding | Audit policy enabled |
 | Secrets | Full access to assigned secrets | Access logged |
 
+
+
 ### Break-Glass Access Procedures
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -532,6 +685,8 @@ data:
   postgres-emergency: <base64-encoded-emergency-credentials>
   redis-emergency: <base64-encoded-emergency-credentials>
   argocd-emergency: <base64-encoded-emergency-token>
+
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -543,11 +698,20 @@ rules:
 - apiGroups: ["*"]
   resources: ["*"]
   verbs: ["*"]
+
+
+
+
+
+
 ```
 
 ## Monitoring and Observability
 
 ### Metrics Collection
+
+
+
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -563,6 +727,8 @@ spec:
   - port: metrics
     interval: 30s
     path: /metrics
+
+
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -587,6 +753,12 @@ spec:
         severity: warning
       annotations:
         summary: "Tess admin secrets require rotation"
+
+
+
+
+
+
 ```
 
 ## Integration Points

@@ -10,13 +10,26 @@ Uses AI to analyze tasks and recommend which ones need breakdown.
 
 ## Execution Options
 
+
+
+
 ```bash
 task-master analyze-complexity [--research] [--threshold=5]
+
+
+
+
+
+
 ```
 
 ## Analysis Parameters
 
+
+
 - `--research` → Use research AI for deeper analysis
+
+
 - `--threshold=5` → Only flag tasks above complexity 5
 - Default: Analyze all pending tasks
 
@@ -24,48 +37,114 @@ task-master analyze-complexity [--research] [--threshold=5]
 
 ### 1. **Task Evaluation**
 For each task, AI evaluates:
+
+
 - Technical complexity
+
+
 - Time requirements
+
+
 - Dependency complexity
+
+
 - Risk factors
+
+
 - Knowledge requirements
 
 ### 2. **Complexity Scoring**
 Assigns score 1-10 based on:
+
+
 - Implementation difficulty
+
+
 - Integration challenges
+
+
 - Testing requirements
+
+
 - Unknown factors
+
+
 - Technical debt risk
 
 ### 3. **Recommendations**
 For complex tasks:
+
+
 - Suggest expansion approach
+
+
 - Recommend subtask breakdown
+
+
 - Identify risk areas
+
+
 - Propose mitigation strategies
 
 ## Smart Analysis Features
 
+
+
 1. **Pattern Recognition**
+
+
    - Similar task comparisons
+
+
    - Historical complexity accuracy
+
+
    - Team velocity consideration
+
+
    - Technology stack factors
 
+
+
 2. **Contextual Factors**
+
+
    - Team expertise
+
+
    - Available resources
+
+
    - Timeline constraints
+
+
    - Business criticality
 
+
+
 3. **Risk Assessment**
+
+
    - Technical risks
+
+
    - Timeline risks
+
+
    - Dependency risks
+
+
    - Knowledge gaps
 
+
+
 ## Output Format
+
+
+
+
+
+
 
 ```
 Task Complexity Analysis Report
@@ -93,29 +172,65 @@ Summary:
 - Expand immediately: 2 tasks
 - Consider expanding: 5 tasks
 - Keep as-is: 15 tasks
+
+
+
+
+
+
 ```
 
 ## Actionable Output
 
 For each high-complexity task:
+
+
 1. Complexity score with reasoning
+
+
 2. Specific expansion suggestions
+
+
 3. Risk mitigation approaches
+
+
 4. Recommended subtask structure
 
 ## Integration
 
 Results are:
+
+
 - Saved to `.taskmaster/reports/complexity-analysis.md`
+
+
 - Used by expand command
+
+
 - Inform sprint planning
+
+
 - Guide resource allocation
+
+
 
 ## Next Steps
 
 After analysis:
+
+
+
+
+
+
 ```
 /project:tm/expand 5    # Expand specific task
 /project:tm/expand/all  # Expand all recommended
 /project:tm/complexity-report  # View detailed report
+
+
+
+
+
+
 ```

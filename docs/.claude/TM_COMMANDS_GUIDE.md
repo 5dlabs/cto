@@ -2,11 +2,18 @@
 
 Complete guide to using Task Master through Claude Code's slash commands.
 
+
+
 ## Overview
 
 All Task Master functionality is available through the `/project:tm/` namespace with natural language support and intelligent features.
 
+
+
 ## Quick Start
+
+
+
 
 ```bash
 # Install Task Master
@@ -20,6 +27,12 @@ All Task Master functionality is available through the `/project:tm/` namespace 
 
 # Start working
 /project:tm/next
+
+
+
+
+
+
 ```
 
 ## Command Structure
@@ -27,6 +40,8 @@ All Task Master functionality is available through the `/project:tm/` namespace 
 Commands are organized hierarchically to match Task Master's CLI:
 - Main commands at `/project:tm/[command]`
 - Subcommands for specific operations `/project:tm/[command]/[subcommand]`
+
+
 - Natural language arguments accepted throughout
 
 ## Complete Command Reference
@@ -73,10 +88,14 @@ Commands are organized hierarchically to match Task Master's CLI:
 - `/project:tm/validate-dependencies` - Check issues
 - `/project:tm/fix-dependencies` - Auto-fix
 
+
+
 ### Workflows
 - `/project:tm/workflows/smart-flow` - Adaptive workflows
 - `/project:tm/workflows/pipeline` - Chain commands
 - `/project:tm/workflows/auto-implement` - AI implementation
+
+
 
 ### Utilities
 - `/project:tm/status` - Project dashboard
@@ -84,50 +103,116 @@ Commands are organized hierarchically to match Task Master's CLI:
 - `/project:tm/utils/analyze` - Project analysis
 - `/project:tm/learn` - Interactive help
 
+
+
 ## Key Features
 
 ### Natural Language Support
 All commands understand natural language:
+
+
+
+
+
+
 ```
 /project:tm/list pending high priority
 /project:tm/update mark 23 as done
 /project:tm/add-task implement OAuth login
+
+
+
+
+
+
 ```
 
 ### Smart Context
 Commands analyze project state and provide intelligent suggestions based on:
+
+
 - Current task status
+
+
 - Dependencies
+
+
 - Team patterns
+
+
 - Project phase
 
 ### Visual Enhancements
+
+
 - Progress bars and indicators
+
+
 - Status badges
+
+
 - Organized displays
+
+
 - Clear hierarchies
 
 ## Common Workflows
 
 ### Daily Development
+
+
+
+
+
+
 ```
 /project:tm/workflows/smart-flow morning
 /project:tm/next
 /project:tm/set-status/to-in-progress <id>
 /project:tm/set-status/to-done <id>
+
+
+
+
+
+
 ```
 
 ### Task Breakdown
+
+
+
+
+
+
 ```
 /project:tm/show <id>
 /project:tm/expand <id>
 /project:tm/list/with-subtasks
+
+
+
+
+
+
 ```
 
 ### Sprint Planning
+
+
+
+
+
+
 ```
 /project:tm/analyze-complexity
 /project:tm/workflows/pipeline init → expand/all → status
+
+
+
+
+
+
 ```
 
 ## Migration from Old Commands
@@ -138,10 +223,18 @@ Commands analyze project state and provide intelligent suggestions based on:
 | `/project:task-master:complete` | `/project:tm/set-status/to-done` |
 | `/project:workflows:auto-implement` | `/project:tm/workflows/auto-implement` |
 
+
+
 ## Tips
 
 1. Use `/project:tm/` + Tab for command discovery
+
+
 2. Natural language is supported everywhere
+
+
 3. Commands provide smart defaults
+
+
 4. Chain commands for automation
 5. Check `/project:tm/learn` for interactive help

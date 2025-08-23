@@ -1,9 +1,13 @@
 # Task 17: Setup Multi-Task Processing
 
+
+
 ## Overview
 Extend the workflow system to handle multiple tasks in sequence with proper state management, progress tracking, and checkpointing. This enables complex workflows that span multiple related tasks while maintaining resilience and observability.
 
 ## Technical Implementation
+
+
 
 ### Architecture
 The multi-task processing system implements:
@@ -18,6 +22,9 @@ The multi-task processing system implements:
 #### 1. Multi-Task Workflow Definition
 
 **File**: `workflows/multi-task-processing.yaml`
+
+
+
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -253,9 +260,17 @@ spec:
 
             # Update workflow state
             jq --arg task_id "$TASK_ID" \
+
+
                --arg result "$TASK_RESULT" \
+
+
                --arg start_time "$start_time" \
+
+
                --arg end_time "$end_time" \
+
+
                --argjson index "$TASK_INDEX" '
                .completed_tasks += 1 |
                .current_task_index = $index |
@@ -270,7 +285,11 @@ spec:
 
             # Update workflow state with failure
             jq --arg task_id "$TASK_ID" \
+
+
                --arg error "$TASK_RESULT" \
+
+
                --argjson index "$TASK_INDEX" '
                .failed_tasks += 1 |
                .current_task_index = $index |
@@ -325,11 +344,20 @@ spec:
         # Save to checkpoint storage (Redis/database)
         print(f"Created checkpoint at {checkpoint['timestamp']}")
         print(f"Progress: {checkpoint['progress_percentage']:.1f}%")
+
+
+
+
+
+
 ```
 
 #### 2. State Management Service
 
 **File**: `controller/src/workflow/state.rs`
+
+
+
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -454,6 +482,8 @@ pub trait StateStorage: Send + Sync {
     async fn delete_state(&self, workflow_id: &Uuid) -> Result<(), StateError>;
 }
 
+
+
 #[derive(Debug, thiserror::Error)]
 pub enum StateError {
     #[error("Serialization error: {0}")]
@@ -461,11 +491,20 @@ pub enum StateError {
     #[error("Storage error: {0}")]
     Storage(String),
 }
+
+
+
+
+
+
 ```
 
 #### 3. Progress Tracking and Reporting
 
 **File**: `controller/src/workflow/progress.rs`
+
+
+
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -550,11 +589,20 @@ impl ProgressTracker {
         Some(chrono::Utc::now() + avg_task_time * remaining_tasks as i32)
     }
 }
+
+
+
+
+
+
 ```
 
 ### Integration with Argo Workflows
 
 #### 1. Workflow Parameters and Memoization
+
+
+
 
 ```yaml
 # Enable memoization for expensive operations
@@ -568,9 +616,18 @@ spec:
           name: workflow-cache
           key: "{{inputs.parameters.task-id}}"
     # ... rest of template
+
+
+
+
+
+
 ```
 
 #### 2. Retry and Error Handling
+
+
+
 
 ```yaml
 # Comprehensive retry strategy
@@ -585,12 +642,23 @@ retryStrategy:
 
 # Failure handling
 onExit: workflow-cleanup
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
 
 ### Unit Tests
+
+
+
 ```rust
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -625,10 +693,21 @@ mod tests {
         assert_eq!(state.checkpoints.len(), 1);
     }
 }
+
+
+
+
+
+
 ```
 
 ### Integration Tests
+
+
+
 ```rust
+
+
 #[tokio::test]
 async fn test_multi_task_workflow_execution() {
     let workflow_def = MultiTaskWorkflow::new(vec!["task-1", "task-2", "task-3"]);
@@ -638,6 +717,12 @@ async fn test_multi_task_workflow_execution() {
     assert_eq!(result.failed_tasks, 0);
     assert!(result.task_results.contains_key("task-1"));
 }
+
+
+
+
+
+
 ```
 
 ## Performance Considerations
@@ -650,6 +735,9 @@ async fn test_multi_task_workflow_execution() {
 ## Monitoring and Observability
 
 ### Metrics Collection
+
+
+
 ```rust
 // Prometheus metrics
 lazy_static! {
@@ -665,11 +753,29 @@ lazy_static! {
         &["status"]
     ).unwrap();
 }
+
+
+
+
+
+
 ```
 
+
+
 ### Progress Dashboard
+
+
 - Real-time workflow progress visualization
+
+
 - Task execution timeline
+
+
 - Resource utilization monitoring
+
+
 - Error rate tracking
+
+
 - Estimated completion times

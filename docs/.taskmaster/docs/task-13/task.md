@@ -1,5 +1,7 @@
 # Task 13: Implement Task Progression Logic
 
+
+
 ## Overview
 
 Build workflow logic to automatically move completed tasks to the `.completed` directory and discover the next pending task for processing. This task enables continuous task processing in the multi-agent orchestration system, allowing workflows to automatically progress through the task queue without manual intervention.
@@ -15,7 +17,15 @@ The multi-agent Play Workflow processes individual tasks through sequential qual
 
 ## Technical Architecture
 
+
+
 ### Task Directory Structure
+
+
+
+
+
+
 
 ```
 docs/.taskmaster/docs/
@@ -34,9 +44,18 @@ docs/.taskmaster/docs/
 │   │   └── [documentation files]
 │   └── [other completed tasks]
 └── architecture.md
+
+
+
+
+
+
 ```
 
 ### Workflow Integration Points
+
+
+
 
 ```yaml
 # Argo Workflow template with task progression
@@ -143,6 +162,12 @@ spec:
               value: "{{inputs.parameters.task-id}}"
           workflowTemplateRef:
             name: play-workflow-template
+
+
+
+
+
+
 ```
 
 ## Implementation Requirements
@@ -150,6 +175,9 @@ spec:
 ### 1. Task Completion Logic
 
 **Directory Movement Operation**:
+
+
+
 ```bash
 #!/bin/bash
 # Task completion script
@@ -167,6 +195,8 @@ fi
 # Ensure .completed directory exists
 mkdir -p "docs/.taskmaster/docs/.completed"
 
+
+
 # Move task directory
 echo "Moving $SOURCE_DIR to $TARGET_DIR"
 mv "$SOURCE_DIR" "$TARGET_DIR"
@@ -178,22 +208,43 @@ else
     exit 1
 fi
 
+
+
 # Update task marker file
 echo '{"lastCompletedTask":"'$TASK_ID'","completedAt":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > docs/.taskmaster/last-completed.json
+
+
+
+
+
+
 ```
+
+
 
 ### 2. Next Task Discovery
 
 **Discovery Algorithm**:
+
+
+
 ```bash
 #!/bin/bash
+
+
 # Next task discovery script
 
 # Find next pending task
 find_next_task() {
     find docs/.taskmaster/docs/ \
+
+
         -maxdepth 1 \
+
+
         -name "task-*" \
+
+
         -type d \
         | grep -v ".completed" \
         | sort -V \
@@ -219,11 +270,20 @@ else
     echo "No more tasks to process - queue complete"
     echo ""
 fi
+
+
+
+
+
+
 ```
 
 ### 3. Workflow Loop Implementation
 
 **Argo Workflows Loop Pattern**:
+
+
+
 ```yaml
 # Recursive workflow pattern for continuous task processing
 apiVersion: argoproj.io/v1alpha1
@@ -289,11 +349,20 @@ spec:
           parameters:
           - name: task-id
             value: "{{steps.find-next.outputs.parameters.next-task-id}}"
+
+
+
+
+
+
 ```
 
 ### 4. Edge Case Handling
 
 **Validation and Error Handling**:
+
+
+
 ```bash
 # Comprehensive edge case handling
 
@@ -352,6 +421,12 @@ handle_no_more_tasks() {
 
     echo "Task queue processing complete"
 }
+
+
+
+
+
+
 ```
 
 ## Implementation Steps
@@ -359,64 +434,137 @@ handle_no_more_tasks() {
 ### Phase 1: Task Completion Workflow Step
 
 1. **Create task completion template**:
+
+
    - Implement directory movement logic
+
+
    - Add git commit for completion tracking
+
+
    - Include validation and error handling
+
+
    - Test with individual task completion
 
 2. **Integrate with existing workflow**:
+
+
    - Add completion step after PR approval
+
+
    - Test completion logic in isolation
+
+
    - Validate directory structure changes
+
+
 
 ### Phase 2: Next Task Discovery
 
 1. **Implement discovery algorithm**:
+
+
    - Create task finding script with proper sorting
+
+
    - Add task structure validation
+
+
    - Handle edge cases (no tasks, corrupted tasks)
+
+
    - Test discovery with various directory states
 
 2. **Output parameter handling**:
+
+
    - Configure Argo workflow parameter passing
+
+
    - Test parameter propagation between steps
+
+
    - Validate conditional logic for next steps
+
+
 
 ### Phase 3: Workflow Loop Logic
 
 1. **Implement conditional continuation**:
+
+
    - Create recursive workflow pattern
+
+
    - Add loop termination conditions
+
+
    - Test workflow chaining between tasks
+
+
    - Validate resource cleanup and limits
 
 2. **Error handling and recovery**:
+
+
    - Handle workflow failures gracefully
+
+
    - Implement retry logic for transient failures
+
+
    - Add monitoring and alerting for stuck workflows
 
 ### Phase 4: Integration and Testing
 
 1. **End-to-end testing**:
+
+
    - Test complete task progression sequence
+
+
    - Validate multiple task processing
+
+
    - Test edge cases and error conditions
+
+
    - Monitor resource usage and performance
 
 2. **Production readiness**:
+
+
    - Add comprehensive logging and monitoring
+
+
    - Implement workflow resource limits
+
+
    - Create operational documentation
+
+
    - Set up alerts for processing failures
+
+
 
 ## Task Discovery Algorithm
 
 ### Sorting Logic
+
+
+
 ```bash
 # Natural version sorting for proper task ordering
 find docs/.taskmaster/docs/ \
+
+
     -maxdepth 1 \
+
+
     -name "task-*" \
+
+
     -type d \
     | grep -v ".completed" \
     | sort -V \
@@ -424,12 +572,27 @@ find docs/.taskmaster/docs/ \
 
 # Example sorting behavior:
 # task-2   -> Selected (lowest number)
+
+
 # task-3
+
+
 # task-10
+
+
 # task-15
+
+
+
+
+
+
 ```
 
 ### Task Validation
+
+
+
 ```bash
 validate_next_task() {
     local task_path="$1"
@@ -444,11 +607,22 @@ validate_next_task() {
         return 1
     fi
 }
+
+
+
+
+
+
 ```
 
 ## Integration with Multi-Agent System
 
+
+
 ### Workflow Parameter Flow
+
+
+
 ```yaml
 # Task ID propagation through workflow
 spec:
@@ -466,9 +640,18 @@ spec:
     # 1. Read task file: docs/.taskmaster/docs/task-{{inputs.parameters.task-id}}/task.txt
     # 2. Create PR with label: task-{{inputs.parameters.task-id}}
     # 3. Use branch name: task-{{inputs.parameters.task-id}}-feature-name
+
+
+
+
+
+
 ```
 
 ### Event Correlation Updates
+
+
+
 ```yaml
 # Argo Events sensor updates for dynamic task correlation
 apiVersion: argoproj.io/v1alpha1
@@ -486,23 +669,53 @@ spec:
               current-stage={{target-stage}}
         # Task ID extracted from PR labels dynamically matches
         # the task ID from workflow parameters
+
+
+
+
+
+
 ```
 
 ## Monitoring and Observability
 
 ### Task Processing Metrics
+
+
+
 ```yaml
 # Metrics to track task progression
 metrics:
+
+
 - task_completion_rate
+
+
 - task_processing_duration
+
+
 - queue_length (pending tasks)
+
+
 - workflow_chain_length (continuous processing)
+
+
 - task_failure_rate
+
+
 - corrupted_task_count
+
+
+
+
+
+
 ```
 
 ### Logging Strategy
+
+
+
 ```bash
 # Structured logging for task progression
 log_task_event() {
@@ -514,15 +727,28 @@ log_task_event() {
     echo "[TASK_PROGRESSION] $timestamp event=$event task_id=$task_id workflow=$workflow_name" >> docs/.taskmaster/progression.log
 }
 
+
+
 # Usage examples:
 log_task_event "TASK_COMPLETED" "$TASK_ID" "$WORKFLOW_NAME"
 log_task_event "NEXT_TASK_DISCOVERED" "$NEXT_TASK" "$WORKFLOW_NAME"
 log_task_event "QUEUE_COMPLETE" "" "$WORKFLOW_NAME"
+
+
+
+
+
+
 ```
 
 ## Error Handling Strategies
 
+
+
 ### Workflow Failure Recovery
+
+
+
 ```yaml
 # Retry policy for task progression failures
 spec:
@@ -553,9 +779,18 @@ templates:
         echo "Next task was identified: $NEXT_TASK"
         # Could trigger manual recovery workflow
       fi
+
+
+
+
+
+
 ```
 
 ### Deadlock Prevention
+
+
+
 ```yaml
 # Prevent infinite loops and resource exhaustion
 spec:
@@ -567,6 +802,12 @@ spec:
     strategy: OnWorkflowCompletion
   ttlStrategy:
     secondsAfterCompletion: 3600  # Clean up after 1 hour
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
@@ -594,9 +835,17 @@ spec:
 
 - **Task 3**: Multi-agent orchestration system foundation
 - **Task 7**: Event-driven workflow coordination
+
+
 - Argo Workflows with DAG and recursive template support
+
+
 - Git repository with proper directory permissions
+
+
 - Kubernetes cluster with sufficient resources for workflow chaining
+
+
 
 ## Expected Outcomes
 

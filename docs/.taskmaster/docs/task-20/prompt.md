@@ -5,15 +5,25 @@
 **BEFORE implementing ANY Argo Events sensors/triggers, MUST review official examples:**
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
+
+
   - `github.yaml` - GitHub webhook sensor patterns
+
+
   - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
+
+
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
+
+
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
 - `operation: patch` ❌
 - `operation: update` ❌
+
+
 - Template variables in `labelSelector` ❌
 
 **✅ SUPPORTED Operations:**
@@ -23,6 +33,8 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
+
+
 
 ## Objective
 Implement comprehensive error handling, retry logic, and failure recovery mechanisms for all workflow stages. Build a resilient system that can automatically recover from transient failures, analyze root causes, provide intelligent notifications, and support manual intervention when needed.
@@ -36,6 +48,9 @@ You are creating the foundation for a highly resilient Task Master orchestration
 **Location**: `controller/src/failure/retry.rs`
 
 Implement comprehensive retry configuration system:
+
+
+
 ```rust
 pub struct RetryConfig {
     pub stage_strategies: HashMap<WorkflowStage, RetryStrategy>,
@@ -50,6 +65,12 @@ pub struct RetryStrategy {
     pub retry_conditions: Vec<RetryCondition>,
     pub circuit_breaker: CircuitBreakerConfig,
 }
+
+
+
+
+
+
 ```
 
 Key retry types to implement:
@@ -67,6 +88,9 @@ Stage-specific retry strategies:
 
 ### 2. Circuit Breaker Implementation
 Implement circuit breaker pattern for each workflow stage:
+
+
+
 ```rust
 pub struct CircuitBreaker {
     config: CircuitBreakerConfig,
@@ -74,6 +98,12 @@ pub struct CircuitBreaker {
     failure_count: u32,
     last_failure_time: Option<DateTime<Utc>>,
 }
+
+
+
+
+
+
 ```
 
 Circuit breaker behavior:
@@ -86,6 +116,9 @@ Circuit breaker behavior:
 **Location**: `controller/src/failure/analysis.rs`
 
 Create comprehensive failure analysis system:
+
+
+
 ```rust
 pub struct FailureAnalyzer {
     pattern_matcher: PatternMatcher,
@@ -101,6 +134,12 @@ pub struct FailureAnalysis {
     pub impact_assessment: ImpactAssessment,
     pub recovery_recommendations: Vec<RecoveryRecommendation>,
 }
+
+
+
+
+
+
 ```
 
 Pattern matching capabilities:
@@ -110,16 +149,29 @@ Pattern matching capabilities:
 - **Confidence Scoring**: Reliability of root cause identification
 
 Root cause categories:
+
+
 - Infrastructure (Kubernetes, network, storage)
+
+
 - Configuration (invalid settings, missing secrets)
+
+
 - External Dependencies (GitHub API, third-party services)
+
+
 - Code Quality (test failures, compilation errors)
+
+
 - Resource Exhaustion (memory, CPU, disk)
 
 ### 4. Multi-Channel Notification System
 **Location**: `controller/src/failure/notification.rs`
 
 Implement comprehensive notification system:
+
+
+
 ```rust
 pub struct NotificationService {
     config: NotificationConfig,
@@ -134,6 +186,12 @@ pub enum ChannelType {
     Webhook,
     Teams,
 }
+
+
+
+
+
+
 ```
 
 Notification features:
@@ -160,6 +218,9 @@ Design resilient workflow templates:
 - **Manual Intervention Points**: Suspend workflows for human intervention
 
 Workflow template structure:
+
+
+
 ```yaml
 spec:
   templates:
@@ -179,29 +240,56 @@ spec:
       limits:
         memory: "2Gi"
         cpu: "1000m"
+
+
+
+
+
+
 ```
 
 ### 6. Recovery and Rollback Mechanisms
 Implement automated recovery strategies:
 
 **Checkpoint System**:
+
+
 - Save workflow state at key points
+
+
 - Enable resumption from last successful checkpoint
+
+
 - Implement state validation before resumption
 
 **Rollback Procedures**:
+
+
 - Identify rollback points for different failure types
+
+
 - Implement safe rollback for partial completions
+
+
 - Validate system state after rollback
 
 **Self-Healing Capabilities**:
+
+
 - Automatic resource cleanup after failures
+
+
 - Reset circuit breakers after successful operations
+
+
 - Clear temporary files and containers
 
 ## Technical Implementation Details
 
 ### Retry Execution Engine
+
+
+
 ```rust
 impl RetryExecutor {
     pub async fn execute_with_retry<T, F, Fut>(
@@ -221,6 +309,12 @@ impl RetryExecutor {
         // - Metrics collection
     }
 }
+
+
+
+
+
+
 ```
 
 ### Error Context Capture
@@ -262,34 +356,74 @@ Create framework for human intervention:
 
 ### Unit Tests
 Focus on individual component testing:
+
+
 - Retry strategy logic with various failure scenarios
+
+
 - Circuit breaker state transitions and timing
+
+
 - Pattern matching accuracy for known failure types
+
+
 - Notification rate limiting and escalation logic
+
+
 - Backoff calculation including jitter application
 
 ### Integration Tests
 End-to-end failure scenario testing:
+
+
 - Complete workflow failure and recovery cycles
+
+
 - Multi-stage failure propagation and containment
+
+
 - Notification delivery across multiple channels
+
+
 - Manual intervention suspension and resumption
+
+
 - Cross-system failure impact and recovery
 
 ### Chaos Engineering Tests
 Systematic failure injection testing:
+
+
 - Network partitions and connectivity issues
+
+
 - Resource exhaustion scenarios (memory, CPU, disk)
+
+
 - External service failures (GitHub API, registries)
+
+
 - Random pod termination and node failures
+
+
 - Configuration corruption and invalid states
 
 ### Load Testing
 Failure handling under load:
+
+
 - High-frequency failure scenarios
+
+
 - Notification system performance under load
+
+
 - Circuit breaker behavior with concurrent failures
+
+
 - Resource usage during massive retry scenarios
+
+
 
 ## Success Criteria
 
@@ -317,6 +451,9 @@ Failure handling under load:
 ## Configuration Examples
 
 ### Retry Configuration
+
+
+
 ```toml
 [retry.repository_clone]
 max_attempts = 3
@@ -330,9 +467,18 @@ max_attempts = 2
 backoff_type = "linear"
 increment = "30s"
 timeout = "1800s"
+
+
+
+
+
+
 ```
 
 ### Notification Configuration
+
+
+
 ```yaml
 channels:
   - name: "slack-critical"
@@ -350,6 +496,12 @@ escalation_rules:
     channels: ["slack-critical", "pagerduty-critical"]
     repeat_interval: "15m"
     max_repeats: 4
+
+
+
+
+
+
 ```
 
 ## Security Considerations
@@ -368,12 +520,16 @@ escalation_rules:
 
 ## Monitoring and Alerting
 
+
+
 ### Key Metrics
 - **Failure Rate**: Failures per workflow execution
 - **Recovery Rate**: Successful automatic recoveries
 - **Mean Time to Recovery (MTTR)**: Average time to resolve failures
 - **Retry Success Rate**: Percentage of failures resolved by retry
 - **Manual Intervention Rate**: Percentage requiring human input
+
+
 
 ### Critical Alerts
 - **Circuit Breaker Trips**: When circuit breakers open
@@ -383,8 +539,18 @@ escalation_rules:
 - **Manual Intervention Required**: When human input is needed
 
 ## Dependencies and Prerequisites
+
+
 - Tasks 14, 17 (workflow foundation and multi-task processing)
+
+
 - Argo Workflows with proper RBAC configuration
+
+
 - Monitoring infrastructure (Prometheus, Grafana)
+
+
 - External notification systems (Slack, email, PagerDuty)
+
+
 - Persistent storage for failure analysis data

@@ -1,17 +1,30 @@
 # Merge to Main Workflow Design
 
+
+
 ## Overview
 Replace the current "wait for PR approval" pattern with "wait for merge to main" to properly complete tasks and start the next one in queue.
 
 ## Current State
+
+
 - Workflow suspends after Tess approval waiting for "PR approved" webhook
+
+
 - This is incomplete - PR approval doesn't mean task is done
+
+
 - Human (CTO) performs the actual merge
+
+
 - No mechanism to start next task after merge
 
 ## Proposed Changes
 
 ### 1. New Sensor: PR Merged to Main
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -82,8 +95,14 @@ spec:
 
                         # 1. Mark current orchestration workflow as complete
                         CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
+
+
                           -l task-id=$TASK_ID,workflow-type=play-orchestration \
+
+
                           --field-selector status.phase=Running \
+
+
                           -o jsonpath='{.items[0].metadata.name}')
 
                         if [ -n "$CURRENT_WORKFLOW" ]; then
@@ -141,10 +160,19 @@ spec:
                         else
                           echo "No more tasks in queue. All tasks completed!"
                         fi
+
+
+
+
+
+
 ```
 
 ### 2. Update Orchestration Workflow
 Change the final suspend stage from `wait-pr-approved` to `wait-merge-to-main`:
+
+
+
 
 ```yaml
 # In the orchestration workflow template
@@ -154,6 +182,12 @@ Change the final suspend stage from `wait-pr-approved` to `wait-merge-to-main`:
       parameters:
         - name: stage
           value: "waiting-merge-to-main"
+
+
+
+
+
+
 ```
 
 ### 3. Task Queue Management
@@ -161,10 +195,17 @@ Options for managing the task queue:
 
 **Option A: Sequential Processing**
 - Simple: Task N+1 starts when Task N merges
+
+
 - Each task gets its own PR/branch
+
+
 - Easy to track progress
 
 **Option B: ConfigMap-Based Queue**
+
+
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -179,12 +220,21 @@ data:
     task-2: in-progress
     task-3: pending
     ...
+
+
+
+
+
+
 ```
 
 **Option C: CRD-Based Queue**
 Create a TaskQueue CRD to track state more robustly.
 
 ## Workflow Sequence
+
+
+
 
 ```mermaid
 sequenceDiagram
@@ -202,6 +252,12 @@ sequenceDiagram
     WF->>WF: Mark task complete
     WH->>Next: Start next task workflow
     Next->>Next: Begin Rex implementation
+
+
+
+
+
+
 ```
 
 ## Benefits
@@ -214,11 +270,23 @@ sequenceDiagram
 
 ## Implementation Steps
 
+
+
 1. Add PR merged sensor to play-workflow-sensors.yaml
+
+
 2. Update orchestration workflow template with wait-merge-to-main
+
+
 3. Create workflow template reference for consistent orchestration
+
+
 4. Test with tasks 1-3 in sequence
+
+
 5. Add task queue status monitoring
+
+
 
 ## Edge Cases
 
@@ -230,7 +298,15 @@ sequenceDiagram
 
 ## Monitoring
 
+
+
 - Add metrics for task completion time
+
+
 - Track queue depth
+
+
 - Alert on stuck workflows
+
+
 - Dashboard showing task progression

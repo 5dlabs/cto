@@ -1,8 +1,12 @@
 # Toolman Guide: Comprehensive Admin Access for Tess Agent
 
+
+
 ## Overview
 
 This guide provides detailed instructions for configuring, managing, and troubleshooting administrative access for the Tess agent. The system involves multiple components including external secret management, database administration, Argo CD integration, and comprehensive monitoring.
+
+
 
 ## Tool Categories
 
@@ -13,19 +17,35 @@ This guide provides detailed instructions for configuring, managing, and trouble
 **Purpose**: Manage dynamic secret injection from external secret stores
 
 **Installation and Setup**:
+
+
+
 ```bash
 # Install External Secrets Operator
 helm repo add external-secrets https://charts.external-secrets.io
 helm install external-secrets external-secrets/external-secrets \
+
+
   --namespace external-secrets-system \
+
+
   --create-namespace
 
 # Verify installation
 kubectl get pods -n external-secrets-system
 kubectl get crd | grep external-secrets
+
+
+
+
+
+
 ```
 
 **Key Operations**:
+
+
+
 ```bash
 # Create AWS Secrets Manager SecretStore
 kubectl apply -f - <<EOF
@@ -81,21 +101,42 @@ spec:
       property: password
   refreshInterval: 24h
 EOF
+
+
+
+
+
+
 ```
 
 **Monitoring and Troubleshooting**:
+
+
+
 ```bash
 # Check ExternalSecret status
 kubectl get externalsecret tess-postgres-admin -o yaml
 
+
+
 # View secret refresh logs
 kubectl logs -f deployment/external-secrets -n external-secrets-system
+
+
 
 # Force secret refresh
 kubectl annotate externalsecret tess-postgres-admin force-sync=$(date +%s)
 
+
+
 # Debug secret retrieval
 kubectl describe externalsecret tess-postgres-admin
+
+
+
+
+
+
 ```
 
 #### AWS Secrets Manager (`aws_secrets_manager`)
@@ -103,6 +144,9 @@ kubectl describe externalsecret tess-postgres-admin
 **Purpose**: Secure storage and retrieval of administrative credentials
 
 **Setup and Configuration**:
+
+
+
 ```bash
 # Install AWS CLI
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -115,14 +159,29 @@ aws configure set region us-west-2
 
 # Verify connectivity
 aws sts get-caller-identity
+
+
+
+
+
+
 ```
 
 **Secret Management Operations**:
+
+
+
 ```bash
 # Create PostgreSQL admin secret
 aws secretsmanager create-secret \
+
+
   --name "/infrastructure/tess-admin/postgres" \
+
+
   --description "PostgreSQL admin credentials for Tess agent" \
+
+
   --secret-string '{
     "host": "postgres-primary.taskmaster.local",
     "port": "5432",
@@ -134,8 +193,14 @@ aws secretsmanager create-secret \
 
 # Create Redis admin secret
 aws secretsmanager create-secret \
+
+
   --name "/infrastructure/tess-admin/redis" \
+
+
   --description "Redis admin credentials for Tess agent" \
+
+
   --secret-string '{
     "host": "redis-cluster.taskmaster.local",
     "port": "6379",
@@ -146,8 +211,14 @@ aws secretsmanager create-secret \
 
 # Create Argo CD admin secret
 aws secretsmanager create-secret \
+
+
   --name "/infrastructure/tess-admin/argocd" \
+
+
   --description "Argo CD admin credentials for Tess agent" \
+
+
   --secret-string '{
     "admin_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "server_url": "https://argocd.taskmaster.local",
@@ -156,30 +227,63 @@ aws secretsmanager create-secret \
 
 # Update existing secret
 aws secretsmanager update-secret \
+
+
   --secret-id "/infrastructure/tess-admin/postgres" \
   --secret-string '{"password": "new-secure-password"}'
 
+
+
 # Retrieve secret value
 aws secretsmanager get-secret-value \
+
+
   --secret-id "/infrastructure/tess-admin/postgres" \
+
+
   --query SecretString --output text | jq .
 
 # List all Tess admin secrets
 aws secretsmanager list-secrets \
+
+
   --filters Key=name,Values="/infrastructure/tess-admin"
+
+
+
+
+
+
 ```
 
 **Secret Rotation**:
+
+
+
 ```bash
 # Enable automatic rotation
 aws secretsmanager rotate-secret \
+
+
   --secret-id "/infrastructure/tess-admin/postgres" \
+
+
   --rotation-rules AutomaticallyAfterDays=30
 
 # Manual rotation trigger
 aws secretsmanager rotate-secret \
+
+
   --secret-id "/infrastructure/tess-admin/postgres" \
+
+
   --force-rotate-immediately
+
+
+
+
+
+
 ```
 
 ### 2. Database Administration Tools
@@ -189,15 +293,27 @@ aws secretsmanager rotate-secret \
 **Purpose**: Administrative operations on PostgreSQL databases
 
 **Installation**:
+
+
+
 ```bash
 # Install PostgreSQL client
 apt-get update && apt-get install -y postgresql-client
 
 # Verify installation
 psql --version
+
+
+
+
+
+
 ```
 
 **Administrative Operations**:
+
+
+
 ```bash
 # Connect as admin user
 export PGPASSWORD="admin-password"
@@ -214,6 +330,8 @@ psql -h postgres-primary.taskmaster.local -U tess_admin -d taskmaster -c "
 SELECT current_user, session_user, usesuper FROM pg_user WHERE usename = current_user;
 "
 
+
+
 # Create test database
 psql -h postgres-primary.taskmaster.local -U tess_admin -c "
 CREATE DATABASE tess_test_db;
@@ -222,23 +340,40 @@ DROP DATABASE tess_test_db;
 
 # Administrative queries
 psql -h postgres-primary.taskmaster.local -U tess_admin -d taskmaster <<EOF
+
+
 -- Check database size
 SELECT pg_size_pretty(pg_database_size('taskmaster'));
 
+
+
 -- List all databases
 \l
+
+
 
 -- Show active connections
 SELECT datname, usename, client_addr, state
 FROM pg_stat_activity
 WHERE state = 'active';
 
+
+
 -- Vacuum and analyze
 VACUUM ANALYZE;
 EOF
+
+
+
+
+
+
 ```
 
 **Connection Testing Script**:
+
+
+
 ```bash
 #!/bin/bash
 test_postgres_connection() {
@@ -260,8 +395,16 @@ test_postgres_connection() {
   fi
 }
 
+
+
 # Usage
 test_postgres_connection "postgres-primary.taskmaster.local" "5432" "tess_admin" "password" "taskmaster"
+
+
+
+
+
+
 ```
 
 #### Redis Client (`redis_client`)
@@ -269,15 +412,27 @@ test_postgres_connection "postgres-primary.taskmaster.local" "5432" "tess_admin"
 **Purpose**: Administrative operations on Redis instances and clusters
 
 **Installation**:
+
+
+
 ```bash
 # Install Redis client
 apt-get update && apt-get install -y redis-tools
 
 # Verify installation
 redis-cli --version
+
+
+
+
+
+
 ```
 
 **Administrative Operations**:
+
+
+
 ```bash
 # Connect to Redis with authentication
 redis-cli -h redis-cluster.taskmaster.local -p 6379 -a "admin-password"
@@ -300,16 +455,29 @@ EOF
 redis-cli --cluster info redis-node-1:6379
 redis-cli --cluster check redis-node-1:6379
 
+
+
 # Create Redis ACL for Tess
 redis-cli -h redis-cluster.taskmaster.local -p 6379 -a "admin-password" \
   ACL SETUSER tess_admin on '>secure-password' ~* &* +@all -flushall -flushdb
 
 # Test ACL permissions
 redis-cli -h redis-cluster.taskmaster.local -p 6379 -a "secure-password" \
+
+
   --user tess_admin ACL WHOAMI
+
+
+
+
+
+
 ```
 
 **Redis Health Check Script**:
+
+
+
 ```bash
 #!/bin/bash
 test_redis_connection() {
@@ -335,8 +503,16 @@ test_redis_connection() {
   fi
 }
 
+
+
 # Usage
 test_redis_connection "redis-cluster.taskmaster.local" "6379" "admin-password"
+
+
+
+
+
+
 ```
 
 ### 3. Argo CD Administration Tools
@@ -346,6 +522,9 @@ test_redis_connection "redis-cluster.taskmaster.local" "6379" "admin-password"
 **Purpose**: Administrative operations on Argo CD applications and projects
 
 **Installation**:
+
+
+
 ```bash
 # Download Argo CD CLI
 VERSION=$(curl --silent "https://api.github.com/repos/argoproj/argo-cd/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
@@ -354,42 +533,92 @@ sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
 
 # Verify installation
 argocd version --client
+
+
+
+
+
+
 ```
 
 **Authentication and Setup**:
+
+
+
 ```bash
 # Login with admin credentials
 argocd login argocd.taskmaster.local \
+
+
   --username admin \
+
+
   --password "$ARGOCD_TOKEN" \
+
+
   --insecure
 
 # Create admin project for Tess
 argocd proj create tess-admin-project \
+
+
   --description "Administrative project for Tess agent operations" \
+
+
   --src '*' \
+
+
   --dest '*,*' \
+
+
   --allow-cluster-resource '*/*' \
+
+
   --allow-namespaced-resource '*/*'
+
+
 
 # Add role to project
 argocd proj role create tess-admin-project tess-admin \
+
+
   --description "Full administrative access for Tess agent"
 
 # Grant permissions
 argocd proj role add-policy tess-admin-project tess-admin \
+
+
   --action '*' \
+
+
   --permission allow \
+
+
   --resource '*'
+
+
+
+
+
+
 ```
 
 **Application Management**:
+
+
+
 ```bash
 # Create test application
 argocd app create tess-test-app \
+
+
   --project tess-admin-project \
   --repo https://github.com/5dlabs/cto \
+
+
   --path manifests/test-app \
+
+
   --dest-namespace default \
   --dest-server https://kubernetes.default.svc
 
@@ -407,14 +636,29 @@ argocd app delete tess-test-app --yes
 
 # Manage repositories
 argocd repo add https://github.com/5dlabs/cto \
+
+
   --username git \
+
+
   --password "$GITHUB_TOKEN"
+
+
 
 # List clusters
 argocd cluster list
+
+
+
+
+
+
 ```
 
 **Health Check Script**:
+
+
+
 ```bash
 #!/bin/bash
 test_argocd_connection() {
@@ -440,38 +684,72 @@ test_argocd_connection() {
   fi
 }
 
+
+
 # Usage
 test_argocd_connection "argocd.taskmaster.local" "admin" "$ARGOCD_TOKEN"
+
+
+
+
+
+
 ```
 
 ### 4. Kubernetes Management Tools
+
+
 
 #### Kubectl (`kubectl`)
 
 **Purpose**: Kubernetes cluster resource management and administration
 
 **Authentication Setup**:
+
+
+
 ```bash
 # Configure kubectl context
 kubectl config set-cluster taskmaster \
   --server=https://kubernetes.taskmaster.local:6443 \
+
+
   --certificate-authority=ca.crt
 
 kubectl config set-credentials tess-admin \
+
+
   --token="$TESS_ADMIN_TOKEN"
 
 kubectl config set-context tess-admin-context \
+
+
   --cluster=taskmaster \
+
+
   --user=tess-admin \
+
+
   --namespace=taskmaster
 
 kubectl config use-context tess-admin-context
+
+
+
+
+
+
 ```
 
 **Resource Management**:
+
+
+
 ```bash
 # Create service account
 kubectl create serviceaccount tess-admin-service-account -n taskmaster
+
+
 
 # Create cluster role
 kubectl apply -f - <<EOF
@@ -493,34 +771,67 @@ EOF
 
 # Create cluster role binding
 kubectl create clusterrolebinding tess-admin-binding \
+
+
   --clusterrole=tess-admin-role \
   --serviceaccount=taskmaster:tess-admin-service-account
 
 # Verify permissions
 kubectl auth can-i create secrets --as=system:serviceaccount:taskmaster:tess-admin-service-account
 kubectl auth can-i delete deployments --as=system:serviceaccount:taskmaster:tess-admin-service-account
+
+
+
+
+
+
 ```
 
 **Secret Management**:
+
+
+
 ```bash
 # Create admin secrets manually (for testing)
 kubectl create secret generic tess-postgres-admin \
+
+
   --from-literal=host="postgres-primary.taskmaster.local" \
+
+
   --from-literal=port="5432" \
+
+
   --from-literal=username="tess_admin" \
+
+
   --from-literal=password="secure-password" \
+
+
   --from-literal=database="taskmaster" \
+
+
   --namespace=taskmaster
 
 # View secret (base64 encoded)
 kubectl get secret tess-postgres-admin -o yaml
 
+
+
 # Decode secret values
 kubectl get secret tess-postgres-admin -o jsonpath='{.data.password}' | base64 -d
+
+
 
 # Update secret
 kubectl patch secret tess-postgres-admin \
   -p='{"data":{"password":"'$(echo -n "new-password" | base64)'"}}'
+
+
+
+
+
+
 ```
 
 ### 5. TLS Certificate Management Tools
@@ -530,7 +841,12 @@ kubectl patch secret tess-postgres-admin \
 **Purpose**: TLS certificate operations and validation
 
 **Certificate Validation**:
+
+
+
 ```bash
+
+
 # Check certificate details
 openssl x509 -in tess-client.crt -text -noout
 
@@ -542,17 +858,32 @@ openssl x509 -in tess-client.crt -noout -dates
 
 # Test TLS connection
 openssl s_client -connect postgres-primary.taskmaster.local:5432 \
+
+
   -cert tess-client.crt -key tess-client.key -CAfile ca.crt
 
 # Generate CSR for certificate renewal
 openssl req -new -key tess-client.key -out tess-client.csr \
+
+
   -subj "/CN=tess-admin-client/O=taskmaster"
+
+
+
+
+
+
 ```
 
 **Certificate Management with cert-manager**:
+
+
+
 ```bash
 # Install cert-manager
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+
+
 
 # Create certificate for Tess
 kubectl apply -f - <<EOF
@@ -568,29 +899,52 @@ spec:
     kind: ClusterIssuer
   commonName: tess-admin-client
   usages:
+
+
   - client auth
+
+
   - digital signature
+
+
   - key encipherment
 EOF
+
+
 
 # Check certificate status
 kubectl describe certificate tess-client-cert -n taskmaster
 
 # View generated secret
 kubectl get secret tess-tls-certificates -o yaml
+
+
+
+
+
+
 ```
 
 ### 6. Monitoring and Troubleshooting Tools
+
+
 
 #### JSON Processor (`jq`)
 
 **Purpose**: Parse API responses and configuration files
 
 **Secret Processing**:
+
+
+
 ```bash
 # Parse AWS Secrets Manager response
 aws secretsmanager get-secret-value \
+
+
   --secret-id "/infrastructure/tess-admin/postgres" \
+
+
   --query SecretString --output text | \
   jq -r '.host'
 
@@ -601,6 +955,12 @@ kubectl get secret tess-postgres-admin -o json | \
 # Extract connection details
 kubectl get secret tess-postgres-admin -o json | \
   jq -r '.data | to_entries[] | "\(.key): \(.value | @base64d)"'
+
+
+
+
+
+
 ```
 
 #### HTTP Client (`curl`)
@@ -608,7 +968,12 @@ kubectl get secret tess-postgres-admin -o json | \
 **Purpose**: API operations and health checks
 
 **Health Check Operations**:
+
+
+
 ```bash
+
+
 # Check Argo CD API health
 curl -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
   https://argocd.taskmaster.local/api/v1/version
@@ -620,13 +985,28 @@ curl -s http://external-secrets-metrics:8080/metrics | \
 # Test database health endpoint
 curl -f http://postgres-exporter:9187/metrics
 
+
+
 # Check Redis metrics
 curl -s http://redis-exporter:9121/metrics
+
+
+
+
+
+
 ```
+
+
 
 ## Best Practices
 
+
+
 ### 1. Security Best Practices
+
+
+
 
 ```bash
 # Never log sensitive credentials
@@ -636,6 +1016,8 @@ echo "Password: $DB_PASSWORD"   # Never do this
 # Use environment variables for secrets
 export PGPASSWORD="$POSTGRES_PASSWORD"
 psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DATABASE"
+
+
 
 # Validate certificates
 validate_cert() {
@@ -648,13 +1030,24 @@ validate_cert() {
   fi
 }
 
+
+
 # Secure temporary files
 temp_file=$(mktemp)
 trap "rm -f $temp_file" EXIT
 echo "sensitive data" > "$temp_file"
+
+
+
+
+
+
 ```
 
 ### 2. Error Handling
+
+
+
 
 ```bash
 # Robust error handling
@@ -680,13 +1073,26 @@ retry_command() {
   return 1
 }
 
+
+
 # Usage
 retry_command "psql -h postgres-primary.taskmaster.local -c 'SELECT 1'"
+
+
+
+
+
+
 ```
 
 ### 3. Monitoring Integration
 
+
+
+
 ```bash
+
+
 # Health check with metrics
 perform_health_check() {
   local service="$1"
@@ -712,9 +1118,18 @@ tess_admin_health_check_duration_seconds{service="$service",status="$status"} $d
 tess_admin_health_check_total{service="$service",status="$status"} 1
 EOF
 }
+
+
+
+
+
+
 ```
 
 ### 4. Operational Procedures
+
+
+
 
 ```bash
 # Complete admin access validation
@@ -779,6 +1194,12 @@ EOF
 
   echo "Break-glass access enabled for 4 hours"
 }
+
+
+
+
+
+
 ```
 
 This comprehensive guide provides all necessary tools and procedures for managing Tess agent administrative access. Follow these patterns and best practices to ensure secure, reliable, and well-monitored administrative operations.

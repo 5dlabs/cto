@@ -1,18 +1,27 @@
 # Toolman Guide: Comprehensive Monitoring and Alerting for Long-Running Multi-Agent Workflows
 
+
+
 ## Overview
 
 This guide provides comprehensive instructions for implementing, configuring, and managing monitoring and alerting systems for long-running multi-agent workflows. The system includes health checking, stuck workflow detection, resource monitoring, automated cleanup, and operational dashboards.
 
+
+
 ## Tool Categories
 
 ### 1. Prometheus Monitoring Stack
+
+
 
 #### Prometheus (`prometheus`)
 
 **Purpose**: Core metrics collection and alerting for workflow monitoring
 
 **Installation and Configuration**:
+
+
+
 ```bash
 # Install Prometheus Operator
 kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
@@ -49,9 +58,18 @@ spec:
       memory: 4Gi
       cpu: 2000m
 EOF
+
+
+
+
+
+
 ```
 
 **Custom Metrics Collection**:
+
+
+
 ```bash
 # Create ServiceMonitor for agent health endpoints
 kubectl apply -f - <<EOF
@@ -77,6 +95,8 @@ spec:
       targetLabel: __name__
       replacement: 'workflow_${1}'
 EOF
+
+
 
 # Create PrometheusRule for workflow alerts
 kubectl apply -f - <<EOF
@@ -113,25 +133,50 @@ spec:
         summary: "Workflow {{ \$labels.name }} stuck for over 6 hours"
         description: "Workflow {{ \$labels.name }} has been in {{ \$labels.phase }} phase for {{ humanizeDuration \$value }}"
 EOF
+
+
+
+
+
+
 ```
 
 **Query Examples**:
+
+
+
 ```bash
 # Check workflow age distribution
 curl -G 'http://prometheus:9090/api/v1/query' \
+
+
   --data-urlencode 'query=argo_workflow_start_time'
 
 # Monitor resource usage by agent
 curl -G 'http://prometheus:9090/api/v1/query' \
+
+
   --data-urlencode 'query=avg by (agent) (workflow_cpu_usage_percent)'
 
 # Find stuck workflows
 curl -G 'http://prometheus:9090/api/v1/query' \
+
+
   --data-urlencode 'query=(time() - argo_workflow_status_phase_start_time{phase!="Succeeded"}) > 21600'
+
+
 
 # Check PVC usage alerts
 curl -G 'http://prometheus:9090/api/v1/query' \
+
+
   --data-urlencode 'query=workflow_pvc_usage_percent > 80'
+
+
+
+
+
+
 ```
 
 #### Prometheus CLI Tools (`prometheus_client`)
@@ -139,14 +184,21 @@ curl -G 'http://prometheus:9090/api/v1/query' \
 **Purpose**: Rule validation and query testing
 
 **Rule Validation**:
+
+
+
 ```bash
 # Install promtool
 wget https://github.com/prometheus/prometheus/releases/download/v2.40.0/prometheus-2.40.0.linux-amd64.tar.gz
 tar xzf prometheus-2.40.0.linux-amd64.tar.gz
 sudo cp prometheus-2.40.0.linux-amd64/promtool /usr/local/bin/
 
+
+
 # Validate PrometheusRule files
 promtool check rules workflow-monitoring-rules.yaml
+
+
 
 # Test queries
 promtool query instant 'http://prometheus:9090' 'up{job="workflow-monitoring"}'
@@ -160,6 +212,12 @@ groups:
     expr: up == 0
     for: 1m
 EOF
+
+
+
+
+
+
 ```
 
 ### 2. Grafana Visualization
@@ -169,6 +227,9 @@ EOF
 **Purpose**: Operational dashboards and workflow visualization
 
 **Dashboard Creation**:
+
+
+
 ```bash
 # Install Grafana
 kubectl apply -f - <<EOF
@@ -223,9 +284,18 @@ datasources:
   access: proxy
   isDefault: true
 "
+
+
+
+
+
+
 ```
 
 **Long-Running Workflow Dashboard**:
+
+
+
 ```bash
 # Create dashboard ConfigMap
 kubectl create configmap workflow-dashboard --from-literal=dashboard.json='
@@ -278,10 +348,20 @@ kubectl create configmap workflow-dashboard --from-literal=dashboard.json='
   }
 }'
 
+
+
 # Import dashboard
 curl -X POST http://admin:admin123@grafana:3000/api/dashboards/db \
   -H "Content-Type: application/json" \
+
+
   -d @dashboard.json
+
+
+
+
+
+
 ```
 
 ### 3. AlertManager Configuration
@@ -291,6 +371,9 @@ curl -X POST http://admin:admin123@grafana:3000/api/dashboards/db \
 **Purpose**: Alert routing and notification management
 
 **Configuration Setup**:
+
+
+
 ```bash
 # Create AlertManager configuration
 kubectl apply -f - <<EOF
@@ -358,13 +441,24 @@ stringData:
         severity: 'warning'
       equal: ['alertname', 'workflow_name']
 EOF
+
+
+
+
+
+
 ```
 
 **Alert Testing**:
+
+
+
 ```bash
 # Test alert firing
 curl -X POST http://alertmanager:9093/api/v1/alerts \
   -H "Content-Type: application/json" \
+
+
   -d '[
     {
       "labels": {
@@ -379,12 +473,16 @@ curl -X POST http://alertmanager:9093/api/v1/alerts \
     }
   ]'
 
+
+
 # Check alert status
 curl http://alertmanager:9093/api/v1/alerts
 
 # Silence alert
 curl -X POST http://alertmanager:9093/api/v1/silences \
   -H "Content-Type: application/json" \
+
+
   -d '{
     "matchers": [
       {
@@ -397,6 +495,12 @@ curl -X POST http://alertmanager:9093/api/v1/silences \
     "createdBy": "admin",
     "comment": "Testing silence functionality"
   }'
+
+
+
+
+
+
 ```
 
 ### 4. Health Check Implementation
@@ -406,6 +510,9 @@ curl -X POST http://alertmanager:9093/api/v1/silences \
 **Purpose**: Custom health checks and metrics collection
 
 **Health Check Server Implementation**:
+
+
+
 ```python
 #!/usr/bin/env python3
 import json
@@ -417,6 +524,8 @@ from flask import Flask, jsonify
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 
 app = Flask(__name__)
+
+
 
 # Metrics
 health_check_requests = Counter('agent_health_check_requests_total', 'Health check requests', ['agent_type', 'status'])
@@ -515,9 +624,18 @@ def metrics():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+
+
+
+
+
+
 ```
 
 **Synthetic Health Check Workflow**:
+
+
+
 ```bash
 # Create synthetic health check script
 cat > /tmp/synthetic-health-check.py <<'EOF'
@@ -594,6 +712,12 @@ spec:
             configMap:
               name: synthetic-health-script
 EOF
+
+
+
+
+
+
 ```
 
 ### 5. Resource Monitoring Tools
@@ -603,6 +727,9 @@ EOF
 **Purpose**: Detailed system resource collection and analysis
 
 **Resource Metrics Collector**:
+
+
+
 ```python
 #!/usr/bin/env python3
 import psutil
@@ -701,23 +828,38 @@ class ResourceMonitor:
 if __name__ == '__main__':
     monitor = ResourceMonitor()
     monitor.run_collection()
+
+
+
+
+
+
 ```
 
 ### 6. Workflow Cleanup and Archival
+
+
 
 #### AWS CLI (`aws_cli`)
 
 **Purpose**: S3 archival operations and lifecycle management
 
 **Archive Management**:
+
+
+
 ```bash
 # Configure AWS CLI
 aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
 aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
 aws configure set region us-west-2
 
+
+
 # Create S3 bucket for archives
 aws s3 mb s3://taskmaster-workflow-archives
+
+
 
 # Set up lifecycle policy
 cat > /tmp/lifecycle-policy.json <<EOF
@@ -750,6 +892,8 @@ cat > /tmp/lifecycle-policy.json <<EOF
 EOF
 
 aws s3api put-bucket-lifecycle-configuration \
+
+
   --bucket taskmaster-workflow-archives \
   --lifecycle-configuration file:///tmp/lifecycle-policy.json
 
@@ -769,6 +913,8 @@ archive_workflow() {
 
   aws s3 cp "/tmp/${workflow_name}.json.gz" \
     "s3://taskmaster-workflow-archives/workflow-archives/$namespace/$workflow_name/${timestamp}.json.gz" \
+
+
     --metadata workflow-name="$workflow_name",namespace="$namespace",archive-date="$timestamp"
 
   echo "Archived to s3://taskmaster-workflow-archives/workflow-archives/$namespace/$workflow_name/${timestamp}.json.gz"
@@ -776,6 +922,8 @@ archive_workflow() {
   # Cleanup local files
   rm -f "/tmp/${workflow_name}.json.gz"
 }
+
+
 
 # Retrieve archived workflow
 retrieve_workflow() {
@@ -792,18 +940,35 @@ retrieve_workflow() {
   echo "Retrieved workflow definition to /tmp/${workflow_name}-${archive_date}.json"
 }
 
+
+
 # List archived workflows
 list_archived_workflows() {
   local namespace="$1"
 
   aws s3 ls --recursive "s3://taskmaster-workflow-archives/workflow-archives/$namespace/" \
+
+
     --human-readable --summarize
 }
+
+
+
+
+
+
 ```
+
+
 
 ## Best Practices
 
+
+
 ### 1. Health Check Best Practices
+
+
+
 
 ```bash
 # Comprehensive health check implementation
@@ -844,9 +1009,18 @@ implement_health_checks() {
     validate_health_endpoint "$agent"
   done
 }
+
+
+
+
+
+
 ```
 
 ### 2. Monitoring Performance Optimization
+
+
+
 
 ```bash
 # Optimize monitoring performance
@@ -864,14 +1038,20 @@ optimize_monitoring() {
 
     # Query Prometheus self-metrics
     curl -G 'http://prometheus:9090/api/v1/query' \
+
+
       --data-urlencode 'query=prometheus_tsdb_head_samples_appended_total'
 
     # Check ingestion rate
     curl -G 'http://prometheus:9090/api/v1/query' \
+
+
       --data-urlencode 'query=rate(prometheus_tsdb_head_samples_appended_total[5m])'
 
     # Monitor memory usage
     curl -G 'http://prometheus:9090/api/v1/query' \
+
+
       --data-urlencode 'query=process_resident_memory_bytes{job="prometheus"}'
   }
 
@@ -899,9 +1079,18 @@ EOF
   check_prometheus_performance
   optimize_dashboard_queries
 }
+
+
+
+
+
+
 ```
 
 ### 3. Alert Management
+
+
+
 
 ```bash
 # Comprehensive alert management
@@ -937,6 +1126,8 @@ EOF
     # Send test alert to AlertManager
     curl -X POST http://alertmanager:9093/api/v1/alerts \
       -H "Content-Type: application/json" \
+
+
       -d '[{
         "labels": {
           "alertname": "RoutingTest",
@@ -968,9 +1159,18 @@ EOF
   test_alert_routing
   check_alertmanager_status
 }
+
+
+
+
+
+
 ```
 
 ### 4. Operational Procedures
+
+
+
 
 ```bash
 # Complete operational workflow
@@ -994,6 +1194,8 @@ operational_workflow() {
 
     # Check stuck workflows
     stuck_workflows=$(curl -s -G 'http://prometheus:9090/api/v1/query' \
+
+
       --data-urlencode 'query=count((time() - argo_workflow_status_phase_start_time{phase!="Succeeded",phase!="Failed"}) > 21600)' | \
       jq -r '.data.result[0].value[1]')
 
@@ -1001,6 +1203,8 @@ operational_workflow() {
 
     # Check resource usage
     high_cpu_pods=$(curl -s -G 'http://prometheus:9090/api/v1/query' \
+
+
       --data-urlencode 'query=workflow_cpu_usage_percent > 90' | \
       jq -r '.data.result[] | .metric.workflow')
 
@@ -1026,6 +1230,12 @@ operational_workflow() {
   daily_health_check
   weekly_cleanup_verification
 }
+
+
+
+
+
+
 ```
 
 This comprehensive guide provides all the tools and procedures needed to implement, monitor, and maintain a robust monitoring system for long-running multi-agent workflows. Follow these patterns and best practices to ensure operational excellence and proactive issue detection.

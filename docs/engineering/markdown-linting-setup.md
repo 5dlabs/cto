@@ -2,12 +2,22 @@
 
 This document describes the comprehensive Markdown linting setup implemented for the CTO project to ensure consistent, high-quality documentation across all 263+ Markdown files.
 
+
+
 ## Overview
 
 The project now includes:
+
+
 - **Pre-commit hooks** for automatic linting on commit
+
+
 - **GitHub Actions workflow** for CI/CD linting
+
+
 - **Manual linting script** for local development
+
+
 - **Comprehensive configuration** with sensible defaults for technical documentation
 
 ## Configuration Files
@@ -26,15 +36,26 @@ Updated to include Markdown linting alongside existing YAML and shell script che
 
 ### `.github/workflows/markdown-lint.yaml`
 GitHub Actions workflow that runs on:
+
+
 - Push to `main` or `develop` branches
+
+
 - Pull requests to `main` or `develop` branches
+
+
 - Only when Markdown files are changed
+
+
 
 ## Usage
 
 ### Automatic Linting (Recommended)
 
 The linting runs automatically via pre-commit hooks:
+
+
+
 
 ```bash
 # Install pre-commit hooks (if not already done)
@@ -45,11 +66,20 @@ pre-commit run --all-files
 
 # Run only markdownlint
 pre-commit run markdownlint --all-files
+
+
+
+
+
+
 ```
 
 ### Manual Linting
 
 Use the provided script for manual linting and fixing:
+
+
+
 
 ```bash
 # Show linting statistics
@@ -64,13 +94,26 @@ Use the provided script for manual linting and fixing:
 # Install markdownlint-cli if not present
 ./fix-markdown-lint.sh install
 
+
+
 # Show help
 ./fix-markdown-lint.sh help
+
+
+
+
+
+
 ```
+
+
 
 ### Direct CLI Usage
 
 You can also use markdownlint directly:
+
+
+
 
 ```bash
 # Install globally
@@ -81,6 +124,12 @@ markdownlint --config .markdownlint.yaml "**/*.md"
 
 # Run on specific files
 markdownlint --config .markdownlint.yaml README.md docs/
+
+
+
+
+
+
 ```
 
 ## Common Issues and Fixes
@@ -114,16 +163,26 @@ As of the initial setup:
 
 ## Integration with Development Workflow
 
+
+
 ### Pre-commit
 Linting runs automatically before each commit, preventing issues from being committed.
+
+
 
 ### CI/CD
 GitHub Actions runs linting on all PRs and pushes to main branches, ensuring quality gates.
 
 ### Local Development
 Use the manual script for:
+
+
 - Checking specific files
+
+
 - Bulk fixing common issues
+
+
 - Understanding linting statistics
 
 ## Customization
@@ -131,26 +190,54 @@ Use the manual script for:
 ### Modifying Rules
 Edit `.markdownlint.yaml` to adjust rules:
 
+
+
+
 ```yaml
 # Example: Increase line length limit
 MD013:
   line_length: 140
 
+
+
 # Example: Disable a rule
 MD036: false
+
+
+
+
+
+
 ```
 
 ### Adding Exclusions
 Add files to exclude in `.markdownlint.yaml`:
 
+
+
+
 ```yaml
 # Exclude specific files or patterns
 exclude:
+
+
   - "docs/legacy/*.md"
+
+
   - "*.template.md"
+
+
+
+
+
+
 ```
 
+
+
 ## Best Practices
+
+
 
 ### For Developers
 1. **Run linting before committing**: Use `pre-commit run --all-files`
@@ -172,23 +259,53 @@ exclude:
 
 ### Common Problems
 
+
+
 **Pre-commit fails on markdownlint**
+
+
+
 ```bash
 # Install markdownlint-cli
 npm install -g markdownlint-cli
 
 # Reinstall pre-commit hooks
 pre-commit install
+
+
+
+
+
+
 ```
 
+
+
 **GitHub Actions fails**
+
+
 - Check the workflow logs for specific error messages
+
+
 - Ensure markdownlint-cli is properly installed in the workflow
+
+
 - Verify the configuration file is valid
 
+
+
 **Script permission denied**
+
+
+
 ```bash
 chmod +x fix-markdown-lint.sh
+
+
+
+
+
+
 ```
 
 ### Getting Help

@@ -1,8 +1,12 @@
 # Play Workflow - Multi-Agent Event-Driven Requirements
 
+
+
 ## Overview
 
 The play workflow is an event-driven, multi-agent orchestration that processes tasks through quality gates with real GitHub PR interactions and live Kubernetes deployment testing.
+
+
 
 ## Workflow Stages
 
@@ -11,39 +15,83 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 **Trigger:** Manual start of play workflow
 
 **Process:**
+
+
 1. Implementation agent (Rex or Blaze) starts on current task (lowest numbered task directory)
 2. **Documentation-First Approach:** Agent checks MCP documentation server for:
+
+
    - Relevant Rust crate documentation
+
+
    - Best practices for the specific implementation
+
+
    - API documentation for any integrations
+
+
    - Existing implementation patterns
+
+
 3. Agent completes implementation work following documented patterns
+
+
 4. Agent pushes pull request
+
+
 5. **Agent's task is NOT complete yet** - still needs to pass quality gates
 
 **Output:** Pull request created
 
+
+
 ---
+
+
 
 ### Stage 2: Code Quality (Cleo)
 
 **Trigger:** GitHub webhook detects PR creation (via Argo Events)
 
 **Process:**
+
+
 1. Cleo detects that Rex has submitted a PR for the current task
 2. Cleo performs relentless code quality work:
+
+
    - All Clippy pedantic warnings must be 100% resolved
+
+
    - Full formatting compliance required
+
+
    - Zero tolerance for quality issues
+
+
 3. Cleo pushes changes to the **same feature branch** (not a new PR)
+
+
 4. **Cleo waits for GitHub Actions tests to pass** - this is Cleo's measure of success
+
+
    - Must see green checkmarks on all CI/CD tests
+
+
    - Any test failures require Cleo to investigate and fix
+
+
 5. **Cleo adds "ready-for-qa" label to PR** - explicit completion signal
+
+
    - Only when fully satisfied with code quality AND tests passing
+
+
    - Clear handoff to Tess for comprehensive testing
 
 **Output:** PR labeled with "ready-for-qa"
+
+
 
 ---
 
@@ -51,55 +99,115 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 **Trigger:** GitHub webhook detects PR labeled with "ready-for-qa"
 
+
+
 #### 3A: Code Review Phase
 
 **Process:**
+
+
 1. Tess performs comprehensive code review against acceptance criteria
+
+
 2. **Before attempting to run any code**
 3. If issues found: Tess adds comments to the PR
+
+
 4. Comments trigger Rex to restart (separate process, not in main workflow)
 
 #### 3B: Live Deployment Testing Phase
 
 **Prerequisites:**
+
+
 - Helm charts available
+
+
 - Container image builds successfully
+
+
 - All required infrastructure components available
 
 **Process:**
+
+
 1. Tess deploys application in live Kubernetes environment
 2. Tess performs comprehensive regression testing:
+
+
    - Endpoint testing for correct responses
+
+
    - Data consistency validation
+
+
    - Pod health and resource utilization
+
+
    - Integration testing across services
 3. Tess has full admin access to verify functionality:
+
+
    - Postgres Admin access
+
+
    - Redis Admin access
+
+
    - Kubernetes Admin access
+
+
    - Argo CD Admin access
+
+
    - GitHub Actions access
 
 #### 3C: Test Coverage Enhancement Phase
 
 **Process:**
+
+
 1. **After confirming functionality works**, Tess analyzes test coverage
+
+
 2. Identifies missing unit tests and integration tests
 3. Implements additional tests to achieve near 100% coverage:
+
+
    - Unit tests for all new functions/methods
+
+
    - Integration tests for API endpoints
+
+
    - Edge case testing for error conditions
+
+
    - Database interaction testing
+
+
 4. Pushes test additions to the same feature branch
+
+
 5. Ensures all new tests pass in CI/CD pipeline
 
 **Requirements:**
+
+
 - Must be 120% satisfied before approval
+
+
 - Must test against real acceptance criteria
+
+
 - Must verify in actual live environment (not mocks/stubs)
+
+
 - **Must achieve comprehensive test coverage before approval**
 
 **Output:** PR approval (but NOT merge)
+
+
 
 ---
 
@@ -108,10 +216,20 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 **Trigger:** Tess approves PR
 
 **Process:**
+
+
 1. CTO (human) reviews and merges the PR
+
+
 2. Task is marked as completed
+
+
 3. Task directory moved to `.completed/`
+
+
 4. Workflow proceeds to next task (if available)
+
+
 
 ---
 
@@ -124,9 +242,17 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 - **PR Merged:** Triggers task completion and next task start
 
 ### Argo Events Configuration
+
+
 - Existing Argo Events → Argo Workflows integration already configured
+
+
 - Need to identify task association from PR/webhook data
+
+
 - Workflow steps wait for specific GitHub webhook events before proceeding
+
+
 
 ---
 
@@ -136,10 +262,20 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 **Trigger:** Any new comment added to PR (by Tess, CTO, or other agents)
 
 **Process:**
+
+
 1. Implementation agent (Rex, Blaze, or Morgan) detects new PR comments
+
+
 2. Agent starts with session resume
+
+
 3. Agent pulls down **only unresolved/relevant comments**
+
+
 4. Agent addresses issues and pushes fixes
+
+
 5. **Implementation agent push triggers QA pipeline restart** (see below)
 
 ### QA Pipeline Restart Logic
@@ -148,18 +284,34 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 **The Problem:** When implementation agents fix issues, any running Cleo/Tess work becomes obsolete
 
 **Cancellation Process:**
+
+
 1. **GitHub webhook detects push by implementation agent** to feature branch
 2. **Cancel running Cleo/Tess CRDs** for this task immediately:
    ```bash
    # Cancels ALL quality/testing agent CodeRuns (not task-specific due to sensor limitations)
    kubectl delete coderun -l github-app=5DLabs-Cleo
    kubectl delete coderun -l github-app=5DLabs-Tess
-   ```
+
+
+
+
+
+```
+
+
 3. **Remove "ready-for-qa" label** (if present) to reset state
+
+
 4. **Update workflow stage** back to waiting-pr-created
+
+
 5. **Resume workflow from Cleo stage** with fresh code
 
 ### Event-Based Coordination
+
+
+
 ```yaml
 # Multi-agent sensor for implementation agent remediation
 apiVersion: argoproj.io/v1alpha1
@@ -203,6 +355,12 @@ spec:
               operator: NotIn
               values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan"]
         # Additional logging and workflow resume triggers follow
+
+
+
+
+
+
 ```
 
 ### Adding New Implementation Agents
@@ -212,12 +370,22 @@ The implementation agent remediation sensor supports multiple agents via regex m
 1. **Update Sensor Regex**: Add "Nova" to the regex pattern in `implementation-agent-remediation-sensor.yaml`
    ```yaml
    value: "5DLabs-(Rex|Blaze|Morgan|Nova)\\[bot\\]|5DLabs-(Rex|Blaze|Morgan|Nova)"
-   ```
+
+
+
+
+
+```
 
 2. **Update Agent Exclusion**: Add "5DLabs-Nova" to the exclusion list
    ```yaml
    values: ["5DLabs-Rex", "5DLabs-Blaze", "5DLabs-Morgan", "5DLabs-Nova"]
-   ```
+
+
+
+
+
+```
 
 3. **Create GitHub App**: Set up 5DLabs-Nova GitHub App with appropriate permissions
 
@@ -225,7 +393,11 @@ The implementation agent remediation sensor supports multiple agents via regex m
 
 The sensor will automatically detect pushes from the new agent and trigger QA pipeline restarts.
 
+
+
 ---
+
+
 
 ## Quality Gates Summary
 
@@ -234,6 +406,8 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 3. **Review Gate:** Tess performs code review against acceptance criteria
 4. **Deployment Gate:** Tess verifies functionality in live Kubernetes environment
 5. **Approval Gate:** Human (CTO) merges PR after full validation
+
+
 
 ---
 
@@ -251,7 +425,11 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 
 **Legitimate Long-Running Process:** Software development cycles naturally span days to weeks, not minutes or hours.
 
+
+
 ---
+
+
 
 ## Key Workflow Characteristics
 
@@ -262,13 +440,21 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 - **Feedback Loops:** Rex can be recalled based on review feedback
 - **Single Workflow Visibility:** Entire process visible in Argo Workflows UI
 
+
+
 ---
 
 ## Technical Requirements
 
 ### Workflow Engine
+
+
 - Argo Workflows with event-based step triggers
+
+
 - Integration with existing Argo Events setup
+
+
 - Ability to pause/wait for external events (GitHub webhooks)
 
 ### Agent Capabilities
@@ -286,10 +472,20 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 - **Documentation-First Approach:** Verify implementation patterns against available docs to reduce iteration cycles
 
 ### Infrastructure Access
+
+
 - Full Kubernetes admin access for Tess
+
+
 - Database admin access (Postgres, Redis)
+
+
 - CI/CD system access (GitHub Actions, Argo CD)
+
+
 - Ability to deploy and test in live environments
+
+
 
 ---
 
@@ -302,6 +498,9 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 - **Validation:** All methods must agree, **workflow fails if mismatch** (no false positives)
 
 ### Implementation Requirements
+
+
+
 ```yaml
 # In workflow template - before agent execution
 - name: create-task-marker
@@ -319,9 +518,18 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 #  2. Use branch name format: 'task-{current-task-id}-{description}'
 #  3. Verify current task ID from docs/.taskmaster/current-task.json
 #  Workflow will FAIL if these don't match - no exceptions."
+
+
+
+
+
+
 ```
 
 ### Webhook Detection Logic
+
+
+
 ```bash
 # Argo Events webhook processing
 TASK_FROM_LABEL=$(jq -r '.pull_request.labels[] | select(.name | startswith("task-")) | .name | split("-")[1]' webhook.json)
@@ -332,6 +540,12 @@ if [ "$TASK_FROM_LABEL" != "$TASK_FROM_BRANCH" ]; then
   echo "ERROR: Task association mismatch - Label: $TASK_FROM_LABEL, Branch: $TASK_FROM_BRANCH"
   exit 1
 fi
+
+
+
+
+
+
 ```
 
 ## ✅ Event-Driven Architecture Feasibility (Confirmed)
@@ -340,6 +554,9 @@ fi
 **✅ FEASIBLE:** Argo Workflows supports mid-workflow pausing via `suspend` templates and resumption through Argo Events integration.
 
 ### Technical Implementation Structure
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
@@ -395,9 +612,18 @@ spec:
 
   - name: suspend-for-webhook
     suspend: {}  # Indefinite suspend until external resume
+
+
+
+
+
+
 ```
 
 ### Argo Events Integration
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -434,6 +660,12 @@ spec:
                 play-task-unknown-workflow
               {{ end }}
           dest: args.0
+
+
+
+
+
+
 ```
 
 ### Event Correlation Strategy
@@ -453,6 +685,9 @@ spec:
 - **Monitoring:** Track suspended workflow count to prevent etcd bloat
 
 ### Timeout Strategy Options
+
+
+
 ```yaml
 # Option 1: Extended but bounded (recommended)
 activeDeadlineSeconds: 1209600  # 14 days
@@ -465,6 +700,12 @@ activeDeadlineSeconds: {{workflow.parameters.timeout-days | default(14) | multip
 
 # Option 4: No timeout (risky - manual cleanup required)
 # activeDeadlineSeconds: null  # Not recommended
+
+
+
+
+
+
 ```
 
 ## CRD Modifications for Multi-Agent Support
@@ -494,16 +735,31 @@ activeDeadlineSeconds: {{workflow.parameters.timeout-days | default(14) | multip
 **Current:** Only Rex/Blaze implementation prompts exist
 
 **Needed:** Add Cleo and Tess system prompts to template system:
+
+
+
+
+
+
 ```
 infra/charts/controller/claude-templates/agents/
 ├── cleo-system-prompt.md.hbs
 └── tess-system-prompt.md.hbs
+
+
+
+
+
+
 ```
 
 #### 2. Agent-Specific Client Configuration
 **Current:** `client-config.json.hbs` optimized for implementation work
 
 **Needed:** Agent-specific MCP tool configurations:
+
+
+
 ```handlebars
 {{#if (eq github_app "5DLabs-Cleo")}}
   "remoteTools": [
@@ -521,12 +777,21 @@ infra/charts/controller/claude-templates/agents/
 {{else}}
   <!-- Rex/Blaze default config -->
 {{/if}}
+
+
+
+
+
+
 ```
 
 #### 3. Agent-Specific Container Scripts
 **Current:** `container.sh.hbs` handles implementation workflow
 
 **Needed:** Conditional logic for different agent behaviors:
+
+
+
 ```handlebars
 {{#if (eq github_app "5DLabs-Cleo")}}
   # Cleo-specific setup: focus on code quality
@@ -542,51 +807,106 @@ infra/charts/controller/claude-templates/agents/
 {{else}}
   # Rex/Blaze implementation setup
 {{/if}}
+
+
+
+
+
+
 ```
 
 #### 4. Agent-Specific CLAUDE.md Memory
 **Current:** Generic implementation-focused memory template
 
 **Needed:** Agent-specific memory initialization:
+
+
+
 ```handlebars
 # Agent: {{github_app}}
 {{#if (eq github_app "5DLabs-Cleo")}}
 ## Role: Code Quality & Formatting Specialist
+
+
 - Focus on Clippy pedantic compliance
+
+
 - Zero tolerance for formatting issues
+
+
 - Ensure 100% code quality standards
 - CRITICAL: Add "ready-for-qa" label when work complete and tests pass
 {{else if (eq github_app "5DLabs-Tess")}}
 ## Role: Quality Assurance & Testing Specialist
+
+
 - Comprehensive code review against acceptance criteria
+
+
 - Live Kubernetes deployment testing
+
+
 - Test coverage enhancement - add missing unit/integration tests
 - Goal: Near 100% test coverage before approval
+
+
 - 120% satisfaction requirement before approval
+
+
 - Only start work when PR has "ready-for-qa" label
 {{/if}}
+
+
+
+
+
+
 ```
 
 ### Infrastructure Requirements for Tess
 
 **Additional RBAC for Testing Agent:**
+
+
+
 ```yaml
 # Tess needs cluster-admin for deployment testing
 - apiGroups: ["*"]
   resources: ["*"]
   verbs: ["*"]
+
+
+
+
+
+
 ```
 
 **Additional Secret Mounts for Tess:**
+
+
+
 ```yaml
 # Database admin credentials
 - name: postgres-admin-secret
 - name: redis-admin-secret
 # Argo CD admin credentials
 - name: argocd-admin-secret
+
+
+
+
+
+
 ```
 
 ### Template Structure Changes
+
+
+
+
+
+
 
 ```
 infra/charts/controller/claude-templates/
@@ -599,6 +919,12 @@ infra/charts/controller/claude-templates/
 │   ├── client-config.json.hbs      # MODIFY: Agent-specific tools
 │   ├── container.sh.hbs            # MODIFY: Agent-specific setup
 │   └── settings.json.hbs           # MODIFY: Agent-specific settings
+
+
+
+
+
+
 ```
 
 ### Workspace Isolation Strategy
@@ -616,23 +942,43 @@ infra/charts/controller/claude-templates/
 - **Restart Efficiency**: Can restart individual agents without affecting others' accumulated knowledge
 
 **PVC Naming Convention:**
+
+
+
 ```yaml
 # Current naming: workspace-{service}
 # New naming: workspace-{service}-{agent}
+
+
 
 # Examples:
 workspace-cto-rex      # Rex's persistent workspace
 workspace-cto-cleo     # Cleo's persistent workspace
 workspace-cto-tess     # Tess's persistent workspace
+
+
+
+
+
+
 ```
 
 **Implementation in CRD Controller:**
+
+
+
 ```rust
 // In controller code - generate agent-specific PVC name
 let pvc_name = format!("workspace-{}-{}",
     code_run.spec.service,
     extract_agent_name(&code_run.spec.github_app)  // "rex", "cleo", "tess"
 );
+
+
+
+
+
+
 ```
 
 ### Session Continuity Clarification
@@ -667,19 +1013,46 @@ let pvc_name = format!("workspace-{}-{}",
 
 ### Completion Signaling Options Considered
 
+
+
 #### ✅ Selected: GitHub Label Approach
+
+
+
 ```yaml
 Process:
+
+
 1. Cleo completes code quality work
+
+
 2. Cleo pushes changes and waits for CI success
+
+
 3. Cleo adds "ready-for-qa" label to PR
+
+
 4. Webhook triggers Tess stage
 
 Benefits:
+
+
 - Clear, explicit handoff signal
+
+
 - Visible in GitHub UI
+
+
 - Programmatically detectable
+
+
 - Fits existing label-based correlation
+
+
+
+
+
+
 ```
 
 #### Alternative Options Evaluated
@@ -692,6 +1065,9 @@ Benefits:
 
 ### ✅ GitHub Webhook Payload Confirmation
 **Research Confirmed:** GitHub PR webhooks include full `labels` array in payload:
+
+
+
 ```json
 {
   "action": "opened",
@@ -710,11 +1086,20 @@ Benefits:
     }
   }
 }
+
+
+
+
+
+
 ```
 
 ### Workflow Correlation Strategy
 
 #### 1. Workflow Creation with Correlation Labels
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
@@ -730,9 +1115,18 @@ spec:
     parameters:
     - name: task-id
       value: "3"
+
+
+
+
+
+
 ```
 
 #### 2. Argo Events Sensor with Precise Targeting
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -749,9 +1143,18 @@ spec:
             dataTemplate: |
               play-task-{{ range $i, $l := .Input.body.pull_request.labels }}{{ if hasPrefix "task-" $l.name }}{{ $p := splitList "-" $l.name }}{{ if gt (len $p) 1 }}{{ index $p 1 }}{{ end }}{{ end }}{{ end }}-workflow
           dest: args.0
+
+
+
+
+
+
 ```
 
 #### 3. Multi-Stage Progression Logic
+
+
+
 ```yaml
 # After resuming, workflow updates its stage label for next correlation
 - name: update-stage-to-waiting-push
@@ -764,47 +1167,96 @@ spec:
         name: "{{workflow.name}}"
         labels:
           current-stage: waiting-push-event  # ← Update for next stage
+
+
+
+
+
+
 ```
 
 ### Event Correlation Patterns
 
 #### Task ID Extraction Logic
+
+
+
 ```bash
+
+
 # From webhook payload, extract task ID:
 .pull_request.labels[?(@.name | startswith("task-"))].name | split("-")[1]
 
+
+
 # Examples:
+
+
 # PR with label "task-3" → extracts "3"
+
+
 # PR with label "task-15" → extracts "15"
+
+
+
+
+
+
 ```
 
 #### Multi-Stage Workflow Targeting
+
+
+
 ```yaml
+
+
 # Stage 1: After Rex creates PR
 labelSelector: "task-id=3,current-stage=waiting-pr-created"
+
+
 
 # Stage 2: After Cleo adds ready-for-qa label
 labelSelector: "task-id=3,current-stage=waiting-ready-for-qa"
 
+
+
 # Stage 3: After Tess approves PR
 labelSelector: "task-id=3,current-stage=waiting-pr-approved"
+
+
+
+
+
+
 ```
 
 ### Event Discrimination by Type and Author
 
 #### Different Events Target Different Stages
+
+
+
 ```yaml
 # PR Created (any author) → Resume after Rex
 - eventName: pull-request-opened
   targetStage: waiting-pr-created
+
+
 
 # PR Labeled "ready-for-qa" → Resume after Cleo
 - eventName: pull-request-labeled
   targetStage: waiting-ready-for-qa
   conditions:
     - label.name: "ready-for-qa"
+
+
     - PR has task label
+
+
     - labeled by 5DLabs-Cleo
+
+
 
 # PR Review Approved (by Tess) → Resume after Tess
 - eventName: pull-request-review
@@ -812,6 +1264,12 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
   conditions:
     - state: approved
     - user: 5DLabs-Tess
+
+
+
+
+
+
 ```
 
 ## Final Review: Gaps, Questions, and Concerns
@@ -837,17 +1295,35 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 
 #### 4. Long-Running Workflow Management
 **Questions**:
+
+
 - How do we monitor workflow health over days/weeks?
+
+
 - What alerts fire if workflows get stuck?
+
+
 - How do we handle Kubernetes cluster restarts/upgrades?
+
+
 - What's our backup/recovery strategy for corrupted workflows?
 
 #### 5. Resource Management & Limits
 **Unknowns**:
+
+
 - How many suspended workflows can Kubernetes/etcd handle?
+
+
 - What's our cleanup strategy for completed workflows?
+
+
 - Are there memory leaks in long-running workflows?
+
+
 - Do we need resource quotas or limits?
+
+
 
 #### 6. Security Deep Dive
 **Concerns**:
@@ -858,81 +1334,169 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 
 ### 🔧 Technical Edge Cases
 
+
+
 #### 7. Webhook Reliability & Failure Modes
 **Scenarios not addressed**:
+
+
 - GitHub webhook fails/times out → workflow stuck suspended forever
+
+
 - Duplicate webhooks → multiple resume attempts
+
+
 - Webhooks arrive out of order → wrong stage resumed
+
+
 - GitHub API rate limiting → agent failures
+
+
 - Argo Events down when webhook arrives → lost events
 
 #### 8. Agent Failure Scenarios
 **What happens if**:
+
+
 - Agent crashes mid-execution → workflow state unclear
+
+
 - Agent violates labeling conventions → correlation breaks
+
+
 - Agent can't access required resources → deployment testing fails
+
+
 - Agent exceeds timeout → partial work lost
+
+
 - Multiple agents try to work on same PR simultaneously
 
 #### 9. Concurrency & Scaling Questions
 **Unclear scenarios**:
+
+
 - Multiple tasks running simultaneously → resource conflicts?
+
+
 - Multiple repositories → agent confusion?
+
+
 - High-frequency PR activity → agent overload?
+
+
 - Large codebase changes → long agent execution times?
 
 ### 🔍 Missing Operational Details
 
 #### 10. User Experience & Monitoring
 **Gaps**:
+
+
 - How does user track progress across multiple suspended workflows?
+
+
 - What's the interface for manual intervention/debugging?
+
+
 - How do we report overall project completion status?
+
+
 - What notifications/alerts go to the user?
 
 #### 11. Integration Dependencies
 **External failure points**:
+
+
 - MCP documentation server unavailable → agents can't research
+
+
 - GitHub App token refresh failures → authentication breaks
+
+
 - Kubernetes resource constraints → pod scheduling fails
+
+
 - Argo CD/Workflows version incompatibilities
 
 #### 12. Data Consistency & State Management
 **Potential issues**:
+
+
 - Task marker files conflicting between concurrent workflows
+
+
 - Agent workspace corruption → lost context
+
+
 - GitHub PR state changes outside workflow control
+
+
 - Task directory modifications during workflow execution
 
 ### 📊 Validation & Testing Strategy
 
 #### 13. Missing Testing Plan
 **Critical need**: How do we test/validate this complex system?
+
+
 - End-to-end workflow testing across days/weeks
+
+
 - Failure scenario testing (webhook failures, agent crashes, etc.)
+
+
 - Performance testing with multiple concurrent workflows
+
+
 - Security testing for Tess's broad permissions
 
 ### 🎯 Actual Implementation Requirements (Lab Environment)
 
 **Simplified Priority List:**
 
+
+
 1. **Argo Events Proof of Concept** - Build minimal sensor/eventsource to validate correlation works
+
+
 2. **Template Implementation** - Add actual Handlebars conditionals for agent-specific behavior
+
+
 3. **Controller PVC Naming** - Extract agent name from `github_app` for unique workspace PVCs
+
+
 4. **Agent System Prompts** - Create Cleo and Tess specific prompt templates
+
+
 5. **Rex Remediation Logic** - Event-based cancellation of running agents when Rex pushes fixes
 
 **Assumptions for Lab Environment:**
+
+
 - ✅ Webhook reliability - Assume GitHub webhooks work (handle failures later)
+
+
 - ✅ Security model - Cluster-admin fine for isolated lab testing
+
+
 - ✅ Operational concerns - Learn by doing, iterate as needed
+
+
 - ✅ Resource limits - Start small, scale as needed
 
 **Out of Scope for Now:**
+
+
 - ~~Comprehensive error handling~~ (Handle in production later)
+
+
 - ~~Advanced security~~ (Lab environment)
+
+
 - ~~Monitoring/alerting~~ (Your responsibility later)
+
+
 - ~~Resource optimization~~ (Learn by running)
 
 ## Discovery Phase Requirements
@@ -941,120 +1505,272 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 
 #### 1. Current CodeRun Controller Deep Dive
 **Understanding Required:**
+
+
 - How does the controller process CRD specs into running pods?
+
+
 - Template loading and Handlebars rendering pipeline
+
+
 - PVC creation and naming logic (`workspace-{service}`)
+
+
 - ConfigMap generation for agent files (CLAUDE.md, settings.json, etc.)
+
+
 - Secret mounting patterns for GitHub Apps
+
+
 - Pod lifecycle management and status reporting
+
+
 - Session continuity implementation (`continue_session` flag behavior)
 
 **Key Files to Study:**
+
+
 - `controller/src/tasks/code/controller.rs` - Main CRD processing logic
+
+
 - `controller/src/tasks/code/templates.rs` - Template generation system
+
+
 - `controller/src/tasks/code/resources.rs` - K8s resource creation
+
+
 - `controller/src/crds/coderun.rs` - CRD specification and validation
 
 #### 2. Existing Argo Events Integration
 **Understanding Required:**
+
+
 - Current GitHub webhook → Argo Workflows setup
+
+
 - EventSource and Sensor configurations already deployed
+
+
 - How GitHub App events are currently processed
+
+
 - Webhook payload parsing and parameter extraction
+
+
 - Correlation mechanisms (if any) currently in use
 
 **Key Areas to Investigate:**
+
+
 - `infra/resources/github-webhooks/` - Current webhook setup
+
+
 - Deployed EventSources and Sensors in cluster
+
+
 - Integration with existing `coderun-template.yaml`
+
+
 
 #### 3. Template System Architecture
 **Understanding Required:**
+
+
 - Template file organization and loading
+
+
 - Handlebars context data structure
+
+
 - How agent-specific data flows to templates
+
+
 - ConfigMap mounting and file structure in pods
+
+
 - Hook script system and execution
 
 **Template Files to Analyze:**
+
+
 - `infra/charts/controller/claude-templates/code/` - All template files
+
+
 - Template inheritance and override patterns
+
+
 - Variable substitution mechanisms
 
 #### 4. GitHub App Integration Patterns
 **Understanding Required:**
+
+
 - How GitHub App credentials flow from secrets to agents
+
+
 - App ID, Client ID, Private Key usage patterns
+
+
 - Authentication flow in agent containers
+
+
 - GitHub API interaction patterns
 
 **Secret Analysis Required:**
+
+
 - `github-app-5dlabs-rex`, `github-app-5dlabs-morgan` secret structures
+
+
 - External Secrets integration and sync patterns
 
 #### 5. Agent Container Environment
 **Understanding Required:**
+
+
 - Container startup sequence in `container.sh.hbs`
+
+
 - How CLAUDE.md persistence works with PVCs
+
+
 - MCP server integration and tool availability
+
+
 - Claude API authentication and model selection
+
+
 - Workspace directory structure and file management
 
 #### 6. Workflow Orchestration Patterns
 **Understanding Required:**
+
+
 - How `coderun-template.yaml` creates and monitors CRDs
+
+
 - Workflow timeout and cleanup mechanisms
+
+
 - Parameter passing between workflow steps
+
+
 - Status checking and completion detection
+
+
 
 ### 📋 Discovery Tasks Checklist
 
 #### Phase 1A: Controller Analysis
+
+
 - [ ] Trace CodeRun CRD processing from submission to pod creation
+
+
 - [ ] Map template system data flow and context building
+
+
 - [ ] Understand PVC naming and management logic
+
+
 - [ ] Document secret mounting and environment setup
+
+
 - [ ] Analyze session continuity implementation
 
 #### Phase 1B: Event System Analysis
+
+
 - [ ] Document current Argo Events setup and configurations
+
+
 - [ ] Test GitHub webhook delivery to existing sensors
+
+
 - [ ] Understand correlation mechanisms in use
+
+
 - [ ] Map event payload to workflow parameter flow
 
 #### Phase 1C: Template System Analysis
+
+
 - [ ] Catalog all existing template files and their purposes
+
+
 - [ ] Document Handlebars context structure and available variables
+
+
 - [ ] Understand ConfigMap generation and mounting
+
+
 - [ ] Test template modification and reload procedures
 
 #### Phase 1D: Integration Pattern Analysis
+
+
 - [ ] Document GitHub App authentication flow end-to-end
+
+
 - [ ] Test secret management and External Secrets sync
+
+
 - [ ] Understand agent container startup and environment setup
+
+
 - [ ] Map MCP tool availability and configuration
 
 #### Phase 1E: Gap Analysis
+
+
 - [ ] Identify exactly what needs modification vs. new implementation
+
+
 - [ ] Document breaking changes and compatibility requirements
+
+
 - [ ] Estimate complexity of each required change
+
+
 - [ ] Plan incremental implementation strategy
+
+
 
 ### 🎯 Discovery Deliverables
 
+
+
 1. **Architecture Documentation** - How existing system works
+
+
 2. **Modification Requirements** - Exact changes needed for multi-agent support
+
+
 3. **Compatibility Assessment** - Impact on existing Rex/Blaze workflows
+
+
 4. **Implementation Roadmap** - Detailed technical tasks with dependencies
+
+
 5. **Test Strategy** - How to validate changes without breaking existing functionality
 
 ### 📝 Implementation Notes
 
 **Lab Environment Approach:**
+
+
 - Complete discovery phase before any implementation
+
+
 - Start with basic implementation and iterate based on real-world learnings
+
+
 - Focus on proving core concepts work before optimizing for production
+
+
 - Security hardening and operational concerns addressed in later phases
+
+
 - Webhook reliability and error handling to be implemented as operational needs arise
 
 **Key Implementation Phases:**

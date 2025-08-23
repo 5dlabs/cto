@@ -6,6 +6,9 @@
 **Primary Purpose**: Gather system information and validate operational procedures
 
 #### kubernetes_listResources & kubernetes_describeResource
+
+
+
 ```bash
 # System component analysis for documentation
 kubernetes_listResources --api-version=argoproj.io/v1alpha1 --kind=Workflow --all-namespaces=true --output=yaml > current-workflows.yaml
@@ -22,15 +25,32 @@ kubernetes_listResources --api-version=apiextensions.k8s.io/v1 --kind=CustomReso
 # Document RBAC configurations
 kubernetes_listResources --api-version=rbac.authorization.k8s.io/v1 --kind=ClusterRole
 kubernetes_listResources --api-version=rbac.authorization.k8s.io/v1 --kind=ClusterRoleBinding
+
+
+
+
+
+
 ```
 
 **Documentation Focus**:
+
+
 - Capture current system state for baseline documentation
+
+
 - Identify all components and their configurations
+
+
 - Document resource allocation and capacity planning
+
+
 - Map dependencies and integration points
 
 #### kubernetes_createResource & kubernetes_updateResource
+
+
+
 ```bash
 # Test configuration changes in documentation
 kubernetes_createResource --file=./runbook-examples/test-workflow.yaml --dry-run=client
@@ -43,15 +63,32 @@ kubernetes_createResource --file=./test-configs/diagnostic-pod.yaml
 
 # Test backup and restore procedures
 kubernetes_createResource --file=./backup-configs/restore-test.yaml
+
+
+
+
+
+
 ```
 
 **Procedure Validation**:
+
+
 - Test all commands in runbook procedures for accuracy
+
+
 - Validate configuration changes before documenting
+
+
 - Test backup and restore procedures in staging
+
+
 - Verify resource creation procedures work correctly
 
 #### kubernetes_getPodLogs
+
+
+
 ```bash
 # Gather log patterns for troubleshooting documentation
 kubernetes_getPodLogs --pod-name=coderun-controller-* --namespace=agent-platform --tail=1000
@@ -64,15 +101,32 @@ kubernetes_getPodLogs --pod-name=coderun-rex-* --namespace=agent-platform --sinc
 
 # Collect startup sequences for troubleshooting guides
 kubernetes_getPodLogs --pod-name=new-pod-name --namespace=agent-platform --follow=true
+
+
+
+
+
+
 ```
 
 **Log Analysis for Documentation**:
+
+
 - Identify common error patterns and their solutions
+
+
 - Document normal vs. abnormal log patterns
+
+
 - Create log-based diagnostic procedures
+
+
 - Build troubleshooting decision trees from log analysis
 
 #### kubernetes_deleteResource
+
+
+
 ```bash
 # Clean up test resources created during documentation
 kubernetes_deleteResource --api-version=v1 --kind=Pod --label-selector="test-purpose=documentation"
@@ -82,17 +136,36 @@ kubernetes_deleteResource --api-version=argoproj.io/v1alpha1 --kind=Workflow --f
 
 # Validate resource cleanup in maintenance procedures
 kubernetes_deleteResource --api-version=v1 --kind=ConfigMap --name=test-config --namespace=test --dry-run=server
+
+
+
+
+
+
 ```
 
 **Cleanup and Testing**:
+
+
 - Test resource deletion procedures safely
+
+
 - Validate cleanup processes in documentation
+
+
 - Test emergency procedures with dry-run first
+
+
 - Document proper cleanup sequences
 
 ### Research and Best Practices Tools
 
+
+
 #### brave-search_brave_web_search
+
+
+
 ```bash
 # Research SRE and operations best practices
 brave-search_brave_web_search --query="SRE runbook best practices incident response procedures"
@@ -105,17 +178,34 @@ brave-search_brave_web_search --query="technical documentation standards operati
 
 # Find performance monitoring and alerting best practices
 brave-search_brave_web_search --query="Prometheus Grafana alerting thresholds operational monitoring"
+
+
+
+
+
+
 ```
 
 **Research Focus Areas**:
+
+
 - Industry best practices for operations documentation
+
+
 - Incident response frameworks and procedures
+
+
 - Troubleshooting methodologies and decision trees
+
+
 - Performance monitoring and alerting standards
 
 ### Memory and Knowledge Management
 
 #### memory_create_entities & memory_query_entities
+
+
+
 ```bash
 # Store system architecture information
 memory_create_entities --entities='[{"type":"system-component","name":"argo-workflows-controller","properties":{"purpose":"workflow orchestration","dependencies":["kubernetes-api","etcd"],"monitoring_endpoints":[":9090/metrics"]}}]'
@@ -134,18 +224,35 @@ memory_query_entities --query="system performance baselines and tuning recommend
 
 # Access incident response procedures and escalation paths
 memory_query_entities --query="incident response procedures for system outages"
+
+
+
+
+
+
 ```
 
 **Knowledge Organization**:
+
+
 - Catalog all system components with their purposes and dependencies
+
+
 - Store proven troubleshooting procedures with step-by-step solutions
+
+
 - Maintain performance baselines and optimization recommendations
+
+
 - Build repository of incident response procedures and lessons learned
 
 ## Local Server Integration
 
 ### Documentation Generator
 **Purpose**: Automated generation of system documentation from live system analysis
+
+
+
 
 ```python
 # Example documentation generation capabilities
@@ -175,16 +282,33 @@ monitoring_docs = doc_generator.generate_monitoring_documentation(
     include_dashboard_links=True,
     include_escalation_procedures=True
 )
+
+
+
+
+
+
 ```
 
 **Auto-Generated Documentation**:
+
+
 - System topology and component relationships from live cluster analysis
+
+
 - Resource utilization baselines from Prometheus metrics
+
+
 - Alert threshold documentation from monitoring configurations
+
+
 - Performance dashboard integration with operational procedures
 
 ### System Analyzer
 **Purpose**: Comprehensive analysis of system behavior for documentation accuracy
+
+
+
 
 ```python
 # System analysis for documentation validation
@@ -212,16 +336,33 @@ dependency_analysis = system_analyzer.analyze_system_dependencies(
     include_external_services=True,
     include_failure_impact_analysis=True
 )
+
+
+
+
+
+
 ```
 
 **Analysis Capabilities**:
+
+
 - Workflow execution pattern analysis for performance optimization documentation
+
+
 - Resource utilization analysis for capacity planning procedures
+
+
 - Failure pattern analysis for troubleshooting guide development
+
+
 - Dependency analysis for incident impact assessment procedures
 
 ### Runbook Validator
 **Purpose**: Validation of documented procedures against live system
+
+
+
 
 ```python
 # Runbook procedure validation
@@ -250,17 +391,34 @@ incident_validation = runbook_validator.validate_incident_procedures(
     test_communication_channels=True,
     validate_escalation_paths=True
 )
+
+
+
+
+
+
 ```
 
 **Validation Features**:
+
+
 - Command syntax and permission validation for all documented procedures
+
+
 - Test scenario creation for troubleshooting procedure validation
+
+
 - Incident response procedure testing with communication workflow validation
+
+
 - Documentation accuracy verification against live system state
 
 ## Tool Combination Strategies
 
 ### Comprehensive System Documentation
+
+
+
 ```bash
 # 1. Analyze current system state
 kubernetes_listResources --kind=Deployment --all-namespaces=true > system-deployments.yaml
@@ -278,9 +436,18 @@ memory_create_entities --type=architecture --data="[system_components_and_intera
 
 # 5. Validate documentation accuracy
 runbook_validator --validate-architecture-docs --dry-run=true
+
+
+
+
+
+
 ```
 
 ### Troubleshooting Guide Development
+
+
+
 ```bash
 # 1. Analyze historical failure patterns
 kubernetes_getPodLogs --all-namespaces=true --grep="ERROR\|FATAL\|Failed" --since=30d
@@ -297,11 +464,22 @@ documentation_generator --generate-troubleshooting-trees --based-on-failure-anal
 # 5. Validate troubleshooting procedures
 runbook_validator --test-troubleshooting-procedures --create-test-scenarios
 
+
+
 # 6. Store validated procedures
 memory_create_entities --type=troubleshooting-procedure --validated=true
+
+
+
+
+
+
 ```
 
 ### Operational Procedures Creation
+
+
+
 ```bash
 # 1. Document current operational practices
 kubernetes_listResources --all-namespaces=true > current-system-state.yaml
@@ -320,9 +498,18 @@ memory_query_entities --query="operational procedure gaps and missing documentat
 
 # 6. Generate final operational runbook
 documentation_generator --compile-runbook --include-all-procedures --validate-completeness
+
+
+
+
+
+
 ```
 
 ### Incident Response Preparation
+
+
+
 ```bash
 # 1. Research incident response best practices
 brave_search_brave_web_search --query="SRE incident response playbooks escalation procedures"
@@ -341,9 +528,18 @@ runbook_validator --test-communication-procedures --validate-escalation-paths
 
 # 6. Store validated incident response procedures
 memory_create_entities --type=incident-response --validated=true --tested=true
+
+
+
+
+
+
 ```
 
 ### Continuous Documentation Improvement
+
+
+
 ```bash
 # 1. Monitor documentation usage and effectiveness
 system_analyzer --track-documentation-usage --identify-gaps
@@ -357,37 +553,79 @@ runbook_validator --validate-against-current-system --identify-outdated-procedur
 # 4. Update documentation based on new learnings
 documentation_generator --update-procedures --based-on-feedback-and-analysis
 
+
+
 # 5. Test updated procedures
 runbook_validator --test-updated-procedures --comprehensive-validation
 
 # 6. Version control and distribute updated documentation
 memory_create_entities --type=documentation-version --version=new --validated=true
+
+
+
+
+
+
 ```
+
+
 
 ## Best Practices Summary
 
 ### Documentation Quality
+
+
 - Use live system analysis to ensure accuracy of documented procedures
+
+
 - Validate all commands and procedures in staging environment before publication
+
+
 - Include specific expected outputs and error handling for all procedures
+
+
 - Regular validation against current system state to prevent documentation drift
 
 ### Troubleshooting Effectiveness
+
+
 - Base troubleshooting guides on actual failure patterns from system logs
+
+
 - Create decision trees that lead to specific diagnostic and resolution steps
+
+
 - Include escalation criteria and contact information for complex issues
+
+
 - Test troubleshooting procedures in controlled environments
 
 ### Operational Excellence
+
+
 - Generate performance baselines from actual system metrics
+
+
 - Include monitoring integration for proactive issue detection
+
+
 - Create maintenance procedures that minimize system impact
+
+
 - Establish continuous improvement cycles for documentation updates
 
 ### Incident Management
+
+
 - Research industry best practices and adapt to specific system requirements
+
+
 - Test incident response procedures with realistic scenario simulations
+
+
 - Validate communication workflows and escalation paths
+
+
 - Create post-incident analysis procedures for continuous learning
 
 This comprehensive tool guide enables the creation of high-quality operational documentation that accurately reflects the system state, provides effective troubleshooting guidance, and supports reliable operational procedures for the multi-agent workflow orchestration system.

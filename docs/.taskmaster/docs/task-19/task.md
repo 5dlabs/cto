@@ -1,9 +1,13 @@
 # Task 19: Implement PR Approval Workflow
 
+
+
 ## Overview
 Build an automated PR approval workflow that triggers after Tess validation completion, integrating with GitHub's branch protection rules and human review checkpoints. This system provides automated quality gates while maintaining human oversight for critical decisions.
 
 ## Technical Implementation
+
+
 
 ### Architecture
 The PR approval workflow implements a multi-stage approval process:
@@ -17,15 +21,22 @@ The PR approval workflow implements a multi-stage approval process:
 
 ### Implementation Components
 
+
+
 #### 1. Tess PR Approval Logic
 
 **File**: `controller/src/github/tess_approval.rs`
+
+
+
 
 ```rust
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TessApprovalCriteria {
@@ -37,6 +48,8 @@ pub struct TessApprovalCriteria {
     pub breaking_changes: bool,
 }
 
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TessValidationResult {
     pub pr_number: u32,
@@ -47,6 +60,8 @@ pub struct TessValidationResult {
     pub detailed_results: HashMap<String, serde_json::Value>,
     pub recommendation: ApprovalRecommendation,
 }
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ApprovalRecommendation {
@@ -288,6 +303,8 @@ impl TessApprovalEngine {
     }
 }
 
+
+
 #[derive(Debug)]
 pub enum ApprovalDecision {
     AutoApprove {
@@ -304,11 +321,20 @@ pub enum ApprovalDecision {
         score: f64,
     },
 }
+
+
+
+
+
+
 ```
 
 #### 2. Argo Workflows PR Approval Sensor
 
 **File**: `workflows/pr-approval-sensor.yaml`
+
+
+
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -328,10 +354,14 @@ spec:
       - path: body.review.state
         type: string
         value:
+
+
         - approved
       - path: body.review.user.login
         type: string
         value:
+
+
         - "5DLabs-Tess[bot]"
     transform:
       jq: |
@@ -423,8 +453,14 @@ spec:
 
                     # Find workflow suspended at pr-approval checkpoint
                     WORKFLOW_NAME=$(kubectl get workflows -n taskmaster \
+
+
                       -l "taskmaster.io/pr-number=$PR_NUM" \
+
+
                       -l "taskmaster.io/repository=$REPO" \
+
+
                       -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | head -1)
 
                     if [ -z "$WORKFLOW_NAME" ]; then
@@ -487,11 +523,20 @@ spec:
         method: POST
         headers:
           Content-Type: application/json
+
+
+
+
+
+
 ```
 
 #### 3. Main Workflow with Approval Gates
 
 **File**: `workflows/pr-workflow-with-approval.yaml`
+
+
+
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -607,7 +652,11 @@ spec:
       image: alpine:3.18
       command: [sh]
       args:
+
+
       - -c
+
+
       - |
         echo "Waiting for Tess approval on PR #{{inputs.parameters.pr-number}}"
         echo "Validation result: {{inputs.parameters.validation-result}}"
@@ -666,6 +715,8 @@ spec:
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/$REPO/issues/$PR_NUM/comments" \
+
+
             -d '{
               "body": "🤖 **Tess Approval Complete - Human Review Required**\n\nTess has completed automated validation and approved this PR. A human reviewer must now approve before merging.\n\n**Next Steps:**\n- Review the Tess validation results\n- Verify the changes meet project standards\n- Approve the PR if everything looks good\n\n**Tess Approval:** ✅ Approved\n**Coverage:** See detailed report in PR review"
             }'
@@ -715,11 +766,20 @@ spec:
           echo "Tess approved: $TESS_APPROVED"
           echo "Human reviewed: $HUMAN_REVIEWED"
         fi
+
+
+
+
+
+
 ```
 
 #### 4. Branch Protection Configuration
 
 **File**: `scripts/setup-branch-protection.sh`
+
+
+
 
 ```bash
 #!/bin/bash
@@ -749,6 +809,8 @@ curl -X PUT \
   -H "Authorization: token $GITHUB_TOKEN" \
   -H "Accept: application/vnd.github.v3+json" \
   "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/branches/$BRANCH/protection" \
+
+
   -d '{
     "required_status_checks": {
       "strict": true,
@@ -781,12 +843,23 @@ curl -s \
   -H "Accept: application/vnd.github.v3+json" \
   "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/branches/$BRANCH/protection" | \
   jq '.required_pull_request_reviews.required_approving_review_count'
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
 
 ### Unit Tests
+
+
+
 ```rust
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -814,6 +887,8 @@ mod tests {
 
         let engine = TessApprovalEngine::new(
             mock_github_client(),
+
+
             120.0  // 120% threshold
         );
 
@@ -860,9 +935,18 @@ mod tests {
         }
     }
 }
+
+
+
+
+
+
 ```
 
 ### Integration Tests
+
+
+
 ```bash
 #!/bin/bash
 # Integration test for PR approval workflow
@@ -884,6 +968,8 @@ VALIDATION_RESULT=$(curl -X POST http://localhost:8080/api/tess/validate \
 
 echo "Validation result: $VALIDATION_RESULT"
 
+
+
 # 2. Check if Tess approved the PR
 echo "Step 2: Checking Tess approval..."
 APPROVAL_STATUS=$(echo "$VALIDATION_RESULT" | jq -r '.recommendation')
@@ -899,6 +985,8 @@ fi
 echo "Step 3: Triggering approval sensor..."
 curl -X POST http://localhost:12000/webhook \
   -H "Content-Type: application/json" \
+
+
   -d '{
     "action": "submitted",
     "review": {
@@ -909,6 +997,8 @@ curl -X POST http://localhost:12000/webhook \
     "pull_request": {"number": '$PR_NUMBER'},
     "repository": {"full_name": "'$REPO'"}
   }'
+
+
 
 # 4. Verify workflow resumed
 echo "Step 4: Checking workflow resumption..."
@@ -925,6 +1015,12 @@ else
 fi
 
 echo "=== Integration test completed successfully ==="
+
+
+
+
+
+
 ```
 
 ## Performance Considerations

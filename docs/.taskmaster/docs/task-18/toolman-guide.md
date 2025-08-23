@@ -1,12 +1,19 @@
 # Task 18: Test Coverage Requirements - Tool Usage Guide
 
+
+
 ## Overview
 This guide covers the comprehensive toolset required for implementing automated test coverage enforcement with the Tess agent. The implementation spans Rust coverage analysis, GitHub API integration, automated test generation, and comprehensive reporting systems.
+
+
 
 ## Required Tools
 
 ### 1. Rust Coverage Analysis Stack
 **Primary Tools**: `cargo llvm-cov`, `rustup`, `llvm-tools-preview`
+
+
+
 
 ```bash
 # Install LLVM coverage tools
@@ -17,15 +24,26 @@ cargo install cargo-llvm-cov --version 0.5.36
 rustup component list | grep llvm-tools
 cargo llvm-cov --version
 
+
+
 # Basic coverage workflow
 cargo llvm-cov clean
 cargo llvm-cov --html --open  # Interactive development
 cargo llvm-cov --lcov --output-path coverage.lcov
 cargo llvm-cov --cobertura --output-path coverage.xml
 cargo llvm-cov --json --output-path coverage.json
+
+
+
+
+
+
 ```
 
 **Advanced Coverage Usage**:
+
+
+
 ```bash
 # Workspace coverage analysis
 cargo llvm-cov --workspace --html --output-dir coverage-report
@@ -38,12 +56,23 @@ cargo llvm-cov --show-missing-lines
 
 # Coverage with specific test selection
 cargo llvm-cov --test integration_tests
+
+
+
+
+
+
 ```
 
 ### 2. GitHub API Integration Tools
 **Primary Tools**: `curl`, `gh`, `jq`, `python3`
 
+
+
+
 ```bash
+
+
 # GitHub CLI setup
 gh auth login
 gh config get -h github.com
@@ -59,11 +88,24 @@ gh pr review 123 --request-changes --body "Insufficient coverage"
 
 # Advanced GitHub operations
 gh api repos/owner/repo/pulls/123/reviews --method POST \
+
+
   --field event=APPROVE \
+
+
   --field body="Automated approval by Tess"
+
+
+
+
+
+
 ```
 
 **GitHub Integration Development**:
+
+
+
 ```bash
 # Test GitHub API connectivity
 curl -I https://api.github.com/user -H "Authorization: token $GITHUB_TOKEN"
@@ -74,10 +116,19 @@ gh api rate_limit
 # Test PR operations on development repo
 gh repo create test-coverage-repo --private
 gh pr create --title "Test Coverage PR" --body "Testing coverage workflow"
+
+
+
+
+
+
 ```
 
 ### 3. Test Generation and Analysis
 **Primary Tools**: `python3`, `ast-grep`, `tree-sitter`
+
+
+
 
 ```python
 # Coverage data processing
@@ -103,9 +154,18 @@ def find_uncovered_functions(source_file, coverage_data):
     # Parse Rust source and identify uncovered functions
     # Generate appropriate test templates
     pass
+
+
+
+
+
+
 ```
 
 **Test Generation Pipeline**:
+
+
+
 ```bash
 # Extract function signatures from Rust files
 grep -n "^pub fn\|^fn " src/**/*.rs
@@ -118,10 +178,19 @@ cargo check --tests
 
 # Run generated tests and measure coverage improvement
 cargo llvm-cov --include-tests test
+
+
+
+
+
+
 ```
 
 ### 4. Report Generation and Visualization
 **Primary Tools**: `cargo llvm-cov`, `python3`, `pandoc`
+
+
+
 
 ```bash
 # Generate multiple report formats
@@ -129,6 +198,8 @@ cargo llvm-cov --workspace --html --output-dir /tmp/coverage-html
 cargo llvm-cov --workspace --lcov --output-path /tmp/coverage.lcov
 cargo llvm-cov --workspace --cobertura --output-path /tmp/coverage.xml
 cargo llvm-cov --workspace --json --output-path /tmp/coverage.json
+
+
 
 # Serve coverage reports locally
 python3 -m http.server 8080 --directory /tmp/coverage-html
@@ -141,10 +212,21 @@ with open('/tmp/coverage.json', 'r') as f:
     coverage = data['data'][0]['totals']['lines']
     print(f'Coverage: {coverage[\"covered\"]}/{coverage[\"count\"]} ({coverage[\"percent\"]:.2f}%)')
 "
+
+
+
+
+
+
 ```
 
 **Report Processing Scripts**:
+
+
+
 ```python
+
+
 # coverage_processor.py
 import json
 from datetime import datetime
@@ -169,15 +251,26 @@ class CoverageReportProcessor:
     def find_uncovered_files(self):
         files = self.data['data'][0]['files']
         return [f for f in files if f['summary']['lines']['percent'] < 100.0]
+
+
+
+
+
+
 ```
 
 ### 5. Container Environment Management
 **Primary Tools**: `docker`, `bash`, `envsubst`
 
+
+
+
 ```bash
 # Test container environment locally
 docker run -it --rm \
   -v $(pwd):/workspace \
+
+
   -w /workspace \
   rust:1.70 \
   bash
@@ -189,16 +282,29 @@ cargo install cargo-llvm-cov
 # Test script execution in container
 docker run --rm \
   -v $(pwd)/templates:/templates \
+
+
   -e GITHUB_TOKEN="test-token" \
   -e REPO_URL="https://github.com/test/repo" \
+
+
   -e PR_NUMBER="123" \
   rust:1.70 \
   bash /templates/container-tess.sh.hbs
+
+
+
+
+
+
 ```
 
 ## Development Workflow
 
 ### Phase 1: Coverage Analysis Development
+
+
+
 ```bash
 # 1. Setup development environment
 mkdir -p test-project/src test-project/tests
@@ -224,9 +330,13 @@ pub fn uncovered_function() -> String {
 }
 EOF
 
+
+
 # 3. Create basic tests
 cat > tests/basic_test.rs << 'EOF'
 use test_project::covered_function;
+
+
 
 #[test]
 fn test_covered_function() {
@@ -236,9 +346,18 @@ EOF
 
 # 4. Analyze coverage iteratively
 cargo llvm-cov --html --open
+
+
+
+
+
+
 ```
 
 ### Phase 2: Test Generation System
+
+
+
 ```bash
 # 1. Analyze uncovered code
 cargo llvm-cov --show-missing-lines test > uncovered.txt
@@ -272,6 +391,8 @@ def generate_test_template(source_file, uncovered_lines):
 //! Generated tests for {source_file}
 
 use super::*;
+
+
 
 #[cfg(test)]
 mod generated_coverage_tests {{
@@ -307,9 +428,18 @@ EOF
 # 3. Test generated code
 cargo check --tests
 cargo test
+
+
+
+
+
+
 ```
 
 ### Phase 3: GitHub Integration Development
+
+
+
 ```bash
 # 1. Setup GitHub API testing
 export GITHUB_TOKEN="your-dev-token"
@@ -330,6 +460,8 @@ headers = {
     'Authorization': f'token {token}',
     'Accept': 'application/vnd.github.v3+json'
 }
+
+
 
 # Test API access
 response = requests.get('https://api.github.com/user', headers=headers)
@@ -379,6 +511,8 @@ class GitHubCoverageIntegration:
 
         return response.status_code == 200
 
+
+
 # Usage example
 if __name__ == '__main__':
     integration = GitHubCoverageIntegration(os.environ['GITHUB_TOKEN'])
@@ -398,9 +532,18 @@ if __name__ == '__main__':
 
     print(f"Review submission: {'✅ Success' if success else '❌ Failed'}")
 EOF
+
+
+
+
+
+
 ```
 
 ### Phase 4: Complete Workflow Integration
+
+
+
 ```bash
 # 1. Create comprehensive container script
 cat > container-tess-complete.sh << 'EOF'
@@ -412,6 +555,8 @@ COVERAGE_THRESHOLD_EXISTING=${COVERAGE_THRESHOLD_EXISTING:-95}
 COVERAGE_THRESHOLD_NEW=${COVERAGE_THRESHOLD_NEW:-100}
 
 echo "=== Tess Coverage Workflow ==="
+
+
 
 # Stage 1: Tool setup
 echo "Installing coverage tools..."
@@ -437,10 +582,20 @@ cargo llvm-cov --json --output-path /tmp/final-coverage.json test
 # Stage 5: GitHub integration
 echo "Processing GitHub integration..."
 python3 /scripts/github_integration.py \
+
+
   --coverage-file /tmp/final-coverage.json \
+
+
   --repo "$REPO_URL" \
+
+
   --pr "$PR_NUMBER" \
+
+
   --threshold-existing "$COVERAGE_THRESHOLD_EXISTING" \
+
+
   --threshold-new "$COVERAGE_THRESHOLD_NEW"
 
 echo "✅ Tess workflow completed"
@@ -448,8 +603,16 @@ EOF
 
 chmod +x container-tess-complete.sh
 
+
+
 # 2. Test complete workflow
 ./container-tess-complete.sh
+
+
+
+
+
+
 ```
 
 ## Common Issues and Solutions
@@ -458,6 +621,9 @@ chmod +x container-tess-complete.sh
 **Symptoms**: `cargo llvm-cov` command not found, installation errors
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check Rust toolchain
 rustup show
@@ -470,10 +636,20 @@ ls -la ~/.cargo/bin/
 # Check for conflicting installations
 which cargo-llvm-cov
 cargo --list | grep llvm-cov
+
+
+
+
+
+
 ```
 
 **Solutions**:
+
+
 - Ensure correct Rust toolchain version (stable channel)
+
+
 - Install llvm-tools-preview component first
 - Clear cargo cache and reinstall: `rm -rf ~/.cargo/registry/index`
 - Use specific version: `cargo install cargo-llvm-cov --version 0.5.36`
@@ -482,6 +658,9 @@ cargo --list | grep llvm-cov
 **Symptoms**: Coverage percentages vary between runs, missing coverage data
 
 **Diagnosis**:
+
+
+
 ```bash
 # Clean build artifacts thoroughly
 cargo llvm-cov clean
@@ -494,11 +673,21 @@ cargo test --test integration_tests
 
 # Check coverage instrumentation
 CARGO_LOG=cargo::util::rustc=debug cargo llvm-cov test
+
+
+
+
+
+
 ```
 
 **Solutions**:
+
+
 - Always run `cargo llvm-cov clean` before analysis
 - Ensure all tests are included: `cargo llvm-cov --workspace test`
+
+
 - Use consistent build flags across runs
 - Check for excluded files: `cargo llvm-cov --ignore-filename-regex "tests/.*"`
 
@@ -506,30 +695,56 @@ CARGO_LOG=cargo::util::rustc=debug cargo llvm-cov test
 **Symptoms**: API calls fail, authentication errors, rate limiting
 
 **Diagnosis**:
+
+
+
 ```bash
 # Test GitHub token validity
 curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user
 
+
+
 # Check API rate limits
 gh api rate_limit
+
+
 
 # Verify repository access
 gh repo view owner/repo
 
+
+
 # Test PR access
 gh pr view 123 --repo owner/repo
+
+
+
+
+
+
 ```
 
 **Solutions**:
+
+
 - Ensure token has correct scopes (repo, pull_request)
+
+
 - Implement retry logic with exponential backoff
+
+
 - Handle rate limiting with appropriate delays
+
+
 - Use GitHub App installation tokens for higher limits
 
 ### Issue 4: Test Generation Quality Issues
 **Symptoms**: Generated tests don't compile, don't improve coverage
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check generated test compilation
 cargo check --tests
@@ -537,22 +752,43 @@ cargo test generated_coverage_tests
 
 # Analyze coverage improvement
 cargo llvm-cov --html test
+
+
 # Compare before/after coverage reports
 
 # Validate test content
 grep -n "TODO" tests/generated_*
 grep -n "assert" tests/generated_*
+
+
+
+
+
+
 ```
 
 **Solutions**:
+
+
 - Improve test generation templates with actual assertions
+
+
 - Add semantic analysis to understand code context
+
+
 - Generate tests based on function signatures and types
+
+
 - Validate generated tests before integration
+
+
 
 ## Best Practices
 
 ### Coverage Analysis Workflow
+
+
+
 ```bash
 # Standard coverage analysis sequence
 cargo llvm-cov clean                          # Clean previous data
@@ -563,9 +799,18 @@ cargo llvm-cov --workspace --json report      # Generate JSON data
 # Comprehensive reporting
 cargo llvm-cov --workspace --lcov --output-path coverage.lcov report
 cargo llvm-cov --workspace --cobertura --output-path coverage.xml report
+
+
+
+
+
+
 ```
 
 ### Test Generation Strategy
+
+
+
 ```python
 # Quality test generation approach
 class TestGenerator:
@@ -587,9 +832,18 @@ class TestGenerator:
         # Generate error condition tests
         # Generate null/empty input tests
         pass
+
+
+
+
+
+
 ```
 
 ### GitHub Integration Patterns
+
+
+
 ```python
 # Robust GitHub API integration
 import time
@@ -616,11 +870,20 @@ class GitHubAPI:
     def submit_review(self, repo, pr_number, review_data):
         # Implementation with retry logic
         pass
+
+
+
+
+
+
 ```
 
 ## Performance Optimization
 
 ### Coverage Analysis Performance
+
+
+
 ```bash
 # Optimize coverage collection
 export CARGO_LLVM_COV_TARGET_DIR=/tmp/coverage  # Use fast storage
@@ -630,11 +893,22 @@ export CARGO_PROFILE_TEST_DEBUG=0               # Reduce debug info
 # Parallel test execution
 cargo llvm-cov --workspace test -- --test-threads=4
 
+
+
 # Selective coverage for large projects
 cargo llvm-cov --package core_lib test
+
+
+
+
+
+
 ```
 
 ### Memory Usage Optimization
+
+
+
 ```bash
 # Monitor memory usage during coverage
 /usr/bin/time -v cargo llvm-cov test
@@ -644,14 +918,25 @@ cargo llvm-cov test -- --test-threads=2
 
 # Use streaming for large reports
 cargo llvm-cov report | gzip > coverage-report.json.gz
+
+
+
+
+
+
 ```
 
 ## Monitoring and Debugging
 
 ### Coverage Analysis Debugging
+
+
+
 ```bash
 # Enable verbose coverage logging
 CARGO_LOG=cargo::util::rustc=debug cargo llvm-cov test
+
+
 
 # Check coverage data files
 ls -la target/llvm-cov-target/
@@ -659,9 +944,18 @@ llvm-profdata show --all-functions target/llvm-cov-target/default.profdata
 
 # Validate coverage instrumentation
 cargo llvm-cov --show-instantiations test
+
+
+
+
+
+
 ```
 
 ### GitHub Integration Monitoring
+
+
+
 ```python
 # Log all GitHub API interactions
 import logging
@@ -675,34 +969,80 @@ class GitHubAPI:
         response = requests.request(method, url, **kwargs)
         logger.debug(f"Response: {response.status_code} {response.reason}")
         return response
+
+
+
+
+
+
 ```
 
 ## Troubleshooting Checklist
 
 ### Pre-Development Setup
+
+
 - [ ] Rust toolchain installed with stable channel
+
+
 - [ ] LLVM tools component added to toolchain
+
+
 - [ ] cargo-llvm-cov installed and accessible
+
+
 - [ ] GitHub token configured with appropriate scopes
+
+
 - [ ] Test repository setup for development
 
 ### Development Phase
+
+
 - [ ] Coverage analysis produces consistent results
+
+
 - [ ] Generated tests compile without errors
+
+
 - [ ] GitHub API integration responds correctly
+
+
 - [ ] Report generation completes successfully
+
+
 - [ ] Container script executes without failures
 
 ### Integration Testing
+
+
 - [ ] Complete workflow executes end-to-end
+
+
 - [ ] Coverage thresholds enforced correctly
+
+
 - [ ] GitHub reviews submitted successfully
+
+
 - [ ] Reports accessible and properly formatted
+
+
 - [ ] Performance meets requirements under load
 
 ### Production Deployment
+
+
 - [ ] All tools available in production container
+
+
 - [ ] Environment variables configured correctly
+
+
 - [ ] GitHub API access working with production tokens
+
+
 - [ ] Monitoring and alerting functional
+
+
 - [ ] Rollback procedures tested and ready

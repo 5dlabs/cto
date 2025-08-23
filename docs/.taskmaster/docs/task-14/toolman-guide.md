@@ -1,5 +1,7 @@
 # Toolman Guide: Build Workflow Resume Operations
 
+
+
 ## Overview
 
 This guide provides comprehensive instructions for implementing robust workflow resume operations in the multi-agent orchestration system. The resume system ensures reliable workflow continuation after GitHub events, with comprehensive error handling, retry logic, and failure protection.
@@ -21,16 +23,30 @@ This guide provides comprehensive instructions for implementing robust workflow 
 
 #### Phase 1: Research and Architecture Design
 
+
+
+
 ```bash
+
+
 # Use brave-search_brave_web_search for research
 Search: "workflow resume operations retry patterns exponential backoff"
 Search: "circuit breaker pattern microservices reliability"
 Search: "event correlation patterns distributed systems"
 Search: "argo workflows suspend resume api best practices"
 Search: "kubernetes event-driven architecture reliability patterns"
+
+
+
+
+
+
 ```
 
 #### Phase 2: Implementation Knowledge Management
+
+
+
 
 ```bash
 # Use memory_create_entities to store patterns
@@ -45,22 +61,42 @@ Query: "workflow resume validation patterns"
 Query: "event correlation failure handling"
 Query: "circuit breaker implementation strategies"
 Query: "resume operation testing procedures"
+
+
+
+
+
+
 ```
 
 #### Phase 3: Testing and Validation
+
+
+
 
 ```bash
 # Use mcp-kubernetes for direct testing
 List workflows: kubectl get workflows -l workflow-type=play-orchestration
 Monitor workflow status: kubectl get workflow <name> -o yaml
 Test resume operations: kubectl patch workflow <name> --type='merge' -p='{"spec":{"suspend":null}}'
+
+
+
+
+
+
 ```
+
+
 
 ## Best Practices
 
 ### 1. Resume API Design Patterns
 
 **Comprehensive Validation Structure**:
+
+
+
 ```go
 type WorkflowResumeRequest struct {
     // Core correlation data
@@ -90,11 +126,20 @@ type ValidationRule struct {
     Value    string `json:"value"`
     Required bool   `json:"required"`
 }
+
+
+
+
+
+
 ```
 
 ### 2. Event Correlation Best Practices
 
 **Multi-Source Task ID Extraction**:
+
+
+
 ```go
 func extractTaskIdFromEvent(event *GitHubWebhookEvent) (string, error) {
     // Priority 1: Extract from PR labels
@@ -145,11 +190,20 @@ func isValidTaskId(taskId string) bool {
     taskNum, _ := strconv.Atoi(taskId)
     return taskNum > 0 && taskNum < 10000 // Reasonable bounds
 }
+
+
+
+
+
+
 ```
 
 ### 3. Retry Logic with Exponential Backoff
 
 **Advanced Retry Configuration**:
+
+
+
 ```go
 type RetryConfig struct {
     MaxAttempts       int           `json:"maxAttempts"`
@@ -213,11 +267,20 @@ func DefaultRetryConfig() *RetryConfig {
         },
     }
 }
+
+
+
+
+
+
 ```
 
 ### 4. Circuit Breaker Implementation
 
 **Production-Ready Circuit Breaker**:
+
+
+
 ```go
 type CircuitBreaker struct {
     name            string
@@ -303,11 +366,19 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
         cb.onSuccess(duration)
     }
 }
+
+
+
+
+
+
 ```
 
 ## Common Workflows
 
 ### Workflow 1: Complete Resume Service Implementation
+
+
 
 1. **Research and Design Phase**
    ```bash
@@ -332,7 +403,14 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
        "Monitor circuit breaker state transitions"
      ]
    })
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Core Service Development**
    ```go
@@ -374,7 +452,14 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
        w.Header().Set("Content-Type", "application/json")
        json.NewEncoder(w).Encode(result)
    }
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Testing and Validation**
    ```bash
@@ -395,6 +480,8 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
    # Test resume operation
    curl -X POST http://localhost:8080/resume \
      -H "Content-Type: application/json" \
+
+
      -d '{
        "taskId": "100",
        "eventType": "pr-created",
@@ -407,9 +494,16 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
 
    # Verify workflow resumed
    kubectl get workflow test-resume-workflow -o jsonpath='{.status.phase}'
-   ```
+
+
+
+
+
+```
 
 ### Workflow 2: Error Handling and Circuit Breaker Testing
+
+
 
 1. **Circuit Breaker Implementation**
    ```go
@@ -431,7 +525,14 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
        assert.Error(t, err)
        assert.Contains(t, err.Error(), "circuit breaker.*OPEN")
    }
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Retry Logic Testing**
    ```bash
@@ -453,7 +554,14 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
        "permanent": "Should fail immediately without retry"
      }
    })
-   ```
+
+
+
+
+
+```
+
+
 
 3. **End-to-End Integration Testing**
    ```bash
@@ -465,9 +573,16 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
 
    # Monitor test metrics
    curl http://workflow-resume-service/metrics | grep resume_
-   ```
+
+
+
+
+
+```
 
 ### Workflow 3: Production Deployment and Monitoring
+
+
 
 1. **Deployment Configuration**
    ```yaml
@@ -510,7 +625,14 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
              httpGet:
                path: /ready
                port: 8080
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Monitoring and Alerting Setup**
    ```yaml
@@ -534,7 +656,12 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
          for: 1m
          annotations:
            summary: "Circuit breaker is open - blocking resume operations"
-   ```
+
+
+
+
+
+```
 
 ## Troubleshooting Guide
 
@@ -542,6 +669,9 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
 **Symptoms**: Resume requests fail with "task ID mismatch" or "workflow not found"
 
 **Diagnosis**:
+
+
+
 ```bash
 # Use memory_query_entities to get troubleshooting procedures
 memory_query_entities("event correlation troubleshooting")
@@ -550,24 +680,49 @@ memory_query_entities("event correlation troubleshooting")
 curl -X POST http://workflow-resume-service/debug/event-correlation \
   -d '{"eventPayload": {...}}' | jq '.extractedTaskId'
 
+
+
 # Verify workflow labels
 kubectl get workflows -l task-id=<task-id> --show-labels
 
+
+
 # Check GitHub webhook payload
 kubectl logs -l app=argo-events-controller | grep "event correlation"
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Verify PR labeling follows convention (task-X format)
+
+
 2. Check branch naming includes task ID
+
+
 3. Validate workflow labels are set correctly
+
+
 4. Review event payload transformation in Argo Events
+
+
 
 ### Issue 2: High Resume Failure Rate
 **Symptoms**: Multiple resume operations failing consistently
 
 **Diagnosis**:
+
+
+
 ```bash
+
+
 # Check circuit breaker state
 curl http://workflow-resume-service/metrics | grep circuit_breaker_state
 
@@ -577,18 +732,35 @@ curl http://workflow-resume-service/metrics | grep resume_failed_total
 # Check Argo API server connectivity
 kubectl get pods -n argo | grep argo-server
 kubectl logs -n argo deployment/argo-server | grep -i error
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Verify Argo Workflows API server is healthy
+
+
 2. Check network connectivity between resume service and Argo
+
+
 3. Review circuit breaker configuration
+
+
 4. Analyze error patterns in logs
 
 ### Issue 3: Resume Operation Timeouts
 **Symptoms**: Resume requests taking too long or timing out
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check resume latency metrics
 curl http://workflow-resume-service/metrics | grep resume_latency_seconds
@@ -596,114 +768,251 @@ curl http://workflow-resume-service/metrics | grep resume_latency_seconds
 # Monitor retry attempts
 kubectl logs -l app=workflow-resume-service | grep "Resume attempt"
 
+
+
 # Check resource usage
 kubectl top pods -l app=workflow-resume-service
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Review retry configuration and reduce if needed
+
+
 2. Check Argo API server performance
+
+
 3. Scale resume service replicas if needed
+
+
 4. Optimize workflow query performance
 
 ### Issue 4: Duplicate Resume Operations
 **Symptoms**: Multiple resume requests for same workflow causing conflicts
 
 **Diagnosis**:
+
+
+
 ```bash
 # Check for duplicate events
 kubectl logs -l app=argo-events-sensor | grep "duplicate\|concurrent"
 
+
+
 # Review resume request IDs
 curl http://workflow-resume-service/debug/recent-requests | jq '.[] | {requestId, taskId, timestamp}'
 
+
+
 # Check workflow state
 kubectl get workflow <name> -o yaml | grep -A 10 status
+
+
+
+
+
+
 ```
 
 **Resolution**:
+
+
 1. Implement request deduplication using request IDs
+
+
 2. Add idempotency checks in resume logic
+
+
 3. Review event source configuration for duplicates
+
+
 4. Implement workflow state validation before resume
+
+
 
 ## Tool-Specific Tips
 
+
+
 ### brave-search_brave_web_search
+
+
 - Search for "golang circuit breaker pattern implementation"
+
+
 - Look for "microservices reliability patterns retry exponential backoff"
+
+
 - Research "event correlation distributed systems best practices"
+
+
 - Find "workflow orchestration error handling strategies"
 
 ### memory_create_entities / memory_query_entities
+
+
 - Store successful implementation patterns and configurations
+
+
 - Document error handling strategies and troubleshooting procedures
+
+
 - Keep track of testing scenarios and validation approaches
+
+
 - Record performance benchmarks and optimization techniques
 
 ### mcp-kubernetes
+
+
 - Use for direct workflow monitoring and testing
+
+
 - Implement workflow state validation
+
+
 - Test resume operations in real environments
+
+
 - Monitor resource usage and performance
+
+
 
 ## Quality Checks
 
 ### Pre-Implementation Checklist
+
+
 - [ ] Research completed on resume operation patterns
+
+
 - [ ] Circuit breaker and retry strategies designed
+
+
 - [ ] Event correlation requirements understood
+
+
 - [ ] Testing strategy planned with failure scenarios
 
 ### Implementation Checklist
+
+
 - [ ] Resume API with comprehensive validation implemented
+
+
 - [ ] Event correlation logic handles multiple sources
+
+
 - [ ] Retry logic with exponential backoff and jitter
+
+
 - [ ] Circuit breaker pattern with proper state transitions
+
+
 - [ ] Comprehensive error handling for all scenarios
 
 ### Post-Implementation Checklist
+
+
 - [ ] End-to-end testing demonstrates reliability
+
+
 - [ ] Performance acceptable under load
+
+
 - [ ] Circuit breaker protects against failures
+
+
 - [ ] Monitoring and alerting configured
+
+
 - [ ] Integration with Argo Events works correctly
 
 ## Success Indicators
 
 1. **Reliability Success**:
+
+
    - 99%+ resume success rate for valid requests
+
+
    - Event correlation accuracy >95%
+
+
    - Circuit breaker effectively protects against failures
 
 2. **Performance Success**:
+
+
    - Resume operations complete within 10 seconds
+
+
    - Service handles concurrent requests efficiently
+
+
    - Resource usage remains bounded under load
 
 3. **Integration Success**:
+
+
    - Seamless integration with Argo Events
+
+
    - Multi-agent workflow compatibility maintained
+
+
    - GitHub webhook processing works reliably
 
 ## Performance Optimization
 
 ### Resume Service Optimization
+
+
 - Implement connection pooling to Argo API
+
+
 - Cache workflow lookups for recent operations
+
+
 - Use efficient label selectors for workflow queries
+
+
 - Optimize event correlation algorithms
 
 ### Circuit Breaker Optimization
+
+
 - Tune failure thresholds based on actual patterns
+
+
 - Implement adaptive timeout periods
+
+
 - Use health checks for faster recovery detection
+
+
 - Monitor and adjust based on operational data
 
 ### Retry Logic Optimization
+
+
 - Analyze failure patterns to optimize retry conditions
+
+
 - Implement intelligent jitter based on load
+
+
 - Use context-aware timeouts
+
+
 - Add request prioritization for critical operations
 
 This guide provides the foundation for building robust workflow resume operations that ensure high reliability and availability in the multi-agent orchestration system.

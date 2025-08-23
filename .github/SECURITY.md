@@ -1,3 +1,5 @@
+
+
 # Security Policy
 
 ## Supported Versions
@@ -11,14 +13,26 @@
 
 If you discover a security vulnerability in the Agent Platform, please follow these steps:
 
+
+
 1. **DO NOT** create a public GitHub issue
 2. Email security@5dlabs.com with:
+
+
    - Description of the vulnerability
+
+
    - Steps to reproduce
+
+
    - Potential impact
+
+
    - Any suggested fixes
 
 We will acknowledge receipt within 48 hours and provide updates on the fix timeline.
+
+
 
 ## Security Features
 
@@ -30,22 +44,46 @@ This repository has the following security measures in place:
 - ✅ **Custom Patterns**: Configured for organization-specific secrets
 - 🔒 **Pre-commit Hooks**: Local secret scanning before commits
 
+
+
 ## Best Practices
 
+
+
 1. **Never commit secrets** - Use environment variables or secret management systems
+
+
 2. **Use `.gitignore`** - Ensure sensitive files are excluded
+
+
 3. **Regular rotation** - Rotate credentials regularly
+
+
 4. **Least privilege** - Grant minimal necessary permissions
+
+
 5. **Review warnings** - Take push protection warnings seriously
+
+
 
 ## If a Secret is Exposed
 
 If you accidentally expose a secret:
 
+
+
 1. **Immediately revoke** the exposed credential
+
+
 2. **Generate new credentials**
+
+
 3. **Update all systems** using the credential
+
+
 4. **Review logs** for any unauthorized access
+
+
 5. **Report the incident** to security@5dlabs.com
 
 ## Additional Resources

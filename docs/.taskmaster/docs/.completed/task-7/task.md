@@ -1,5 +1,7 @@
 # Task 7: Implement Workflow Stage Transitions
 
+
+
 ## Overview
 
 Create workflow template logic to update current-stage labels and handle transitions between agent phases. This enables event-driven coordination by maintaining workflow state through label updates that trigger subsequent agent stages.
@@ -14,19 +16,38 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
 
 ### Phase 1: Design Label Transition System
 
+
+
 1. **Define Stage Progression Flow**
    ```yaml
    # Workflow stage progression
    waiting-pr-created → waiting-ready-for-qa → waiting-pr-approved → completed
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Label Update Mechanism**
+
+
    - Use Kubernetes resource template for atomic label updates
+
+
    - Implement via kubectl patch commands with JSON merge strategy
+
+
    - Ensure idempotent operations to prevent duplicate updates
+
+
    - Add workflow correlation metadata for event targeting
 
 ### Phase 2: Implement Argo Workflows Label Updates
+
+
 
 1. **Create Label Update Template**
    ```yaml
@@ -44,7 +65,14 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
              task-id: "{{workflow.parameters.task-id}}"
              repository: "{{workflow.parameters.repository}}"
          spec: {}
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Implement Stage Transition Logic**
    ```yaml
@@ -56,9 +84,16 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
        parameters:
        - name: new-stage
          value: "waiting-pr-created"
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Create Atomic Label Update Operations
+
+
 
 1. **Kubernetes API Patch Operations**
    ```bash
@@ -71,6 +106,8 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
 
    # Perform atomic label update
    kubectl patch workflow "$WORKFLOW_NAME" \
+
+
      --type='merge' \
      --patch="{\"metadata\":{\"labels\":{\"current-stage\":\"$NEW_STAGE\"}}}"
 
@@ -83,7 +120,14 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
      echo "❌ Stage transition failed"
      exit 1
    fi
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Race Condition Prevention**
    ```yaml
@@ -107,9 +151,16 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
            }
          ]
        patchType: "application/json-patch+json"
-   ```
+
+
+
+
+
+```
 
 ### Phase 4: Integrate with Argo Events Sensors
+
+
 
 1. **Stage-Aware Event Correlation**
    ```yaml
@@ -136,7 +187,14 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
                  workflow-type=play-orchestration,
                  task-id={{extracted-task-id}},
                  current-stage=waiting-pr-created
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Multi-Stage Event Handling**
    ```yaml
@@ -152,9 +210,16 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
              labelSelector: |
                current-stage=waiting-ready-for-qa,
                task-id={{extracted-task-id}}
-   ```
+
+
+
+
+
+```
 
 ### Phase 5: Implement Workflow Stage Suspend/Resume Pattern
+
+
 
 1. **Suspend Points with Stage Updates**
    ```yaml
@@ -197,7 +262,14 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
            parameters:
            - name: new-stage
              value: "waiting-ready-for-qa"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Dynamic Label Management Template**
    ```yaml
@@ -221,7 +293,11 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
 
          # Atomic update with verification
          kubectl patch workflow "$WORKFLOW_NAME" \
+
+
            --type='merge' \
+
+
            --patch="{
              \"metadata\": {
                \"labels\": {
@@ -234,6 +310,8 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
 
          # Verify transition succeeded
          ACTUAL_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" \
+
+
            -o jsonpath='{.metadata.labels.current-stage}')
 
          if [ "$ACTUAL_STAGE" != "$NEW_STAGE" ]; then
@@ -242,11 +320,21 @@ Multi-agent orchestration requires atomic state management to coordinate agent h
          fi
 
          echo "✅ Successfully transitioned to: $NEW_STAGE"
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Complete Stage Transition Workflow
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -349,11 +437,22 @@ spec:
       source: |
         # Atomic label update implementation
         kubectl patch workflow "{{workflow.name}}" \
+
+
           --type='merge' \
           --patch='{"metadata":{"labels":{"current-stage":"{{inputs.parameters.new-stage}}"}}}'
+
+
+
+
+
+
 ```
 
 ### Event Sensor Integration
+
+
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -394,6 +493,12 @@ spec:
               workflow-type=play-orchestration,
               current-stage=waiting-ready-for-qa,
               task-id={{task-id-from-pr-labels}}
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
@@ -406,27 +511,51 @@ The workflow implements a finite state machine with these characteristics:
 - **Guards**: Label selectors ensure correct workflow targeting
 
 ### Event-Driven Coordination
+
+
+
+
+
+
 ```
 Rex Complete → update-stage → suspend → GitHub Event → resume → Cleo Start
 Cleo Complete → update-stage → suspend → GitHub Event → resume → Tess Start
 Tess Complete → update-stage → suspend → GitHub Event → resume → Task Complete
+
+
+
+
+
+
 ```
 
 ### Idempotent Operations
 All label updates are idempotent to handle:
+
+
 - Duplicate webhook events
+
+
 - Workflow restarts
+
+
 - Kubernetes API retries
+
+
 - Concurrent update attempts
 
 ## Testing Strategy
 
 ### Label Update Testing
+
+
 1. **Atomic Update Verification**
    ```bash
    # Test label updates don't create race conditions
    for i in {1..10}; do
      kubectl patch workflow test-workflow \
+
+
        --type='merge' \
        --patch='{"metadata":{"labels":{"current-stage":"test-'$i'"}}}' &
    done
@@ -434,7 +563,14 @@ All label updates are idempotent to handle:
 
    # Verify only one final state
    kubectl get workflow test-workflow -o jsonpath='{.metadata.labels.current-stage}'
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Stage Progression Testing**
    ```bash
@@ -449,17 +585,38 @@ All label updates are idempotent to handle:
      actual_stage=$(argo get workflow test-workflow -o jsonpath='{.metadata.labels.current-stage}')
      [ "$actual_stage" = "$stage" ] || echo "ERROR: Expected $stage, got $actual_stage"
    done
-   ```
+
+
+
+
+
+```
 
 ### Event Integration Testing
+
+
 1. **Webhook Correlation Testing**
+
+
    - Send test GitHub webhooks with task labels
+
+
    - Verify correct workflows are resumed at correct stages
+
+
    - Test multiple concurrent workflows don't interfere
 
+
+
 2. **Stage-Specific Resumption**
+
+
    - Workflows only resume when in correct stage
+
+
    - Wrong-stage workflows remain suspended
+
+
    - Multiple workflows with same task ID handled correctly
 
 ## Key Design Decisions
@@ -479,9 +636,17 @@ All label updates are idempotent to handle:
 4. **Orphaned Workflows**: Implement TTL and cleanup for stuck workflows
 
 ### Monitoring Points
+
+
 - Label update success/failure rates
+
+
 - Stage transition latency
+
+
 - Workflow suspension duration
+
+
 - Event correlation accuracy
 
 ## References
@@ -489,4 +654,6 @@ All label updates are idempotent to handle:
 - [Argo Workflows Resource Templates](https://argoproj.github.io/argo-workflows/workflow-templates/#resource-template)
 - [Kubernetes JSON Patch Operations](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/)
 - [Argo Events Sensor Configuration](https://argoproj.github.io/argo-events/sensors/triggers/argo-workflow/)
+
+
 - [Multi-Agent Architecture](/.taskmaster/docs/architecture.md)

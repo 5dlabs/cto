@@ -4,14 +4,30 @@
 
 The multi-agent orchestration system needs better visibility and human feedback loops. Rather than building complex integrations into TaskMaster, we can create a clean document-issue synchronization system where:
 
+
+
 1. **Text files remain source of truth** - All task definitions, acceptance criteria, and documentation in files
+
+
 2. **GitHub Issues provide human interface** - Natural place for discussions, scope changes, and feedback
+
+
 3. **Bidirectional sync keeps everything aligned** - Changes in either direction automatically update the other
+
+
 4. **GitHub Projects provides visibility** - Dashboard view of all work without being part of the core workflow
 
 ## Architecture Principles
 
+
+
 ### Source of Truth: Text Files
+
+
+
+
+
+
 ```
 docs/
 ├── task-1/
@@ -22,17 +38,37 @@ docs/
 ├── task-2/
 │   ├── task.md
 │   └── ...
+
+
+
+
+
+
 ```
 
 ### GitHub Issues: Human Interface
+
+
 - Each task directory maps to exactly one GitHub Issue
+
+
 - Issues provide discussion space and change requests
+
+
 - Issue body syncs with combined document content
+
+
 - Issue comments drive document updates
 
 ### Bidirectional Sync: Keep Everything Aligned
+
+
 - **File Change** → Update Issue body and project status
+
+
 - **Issue Change** → Update corresponding document files
+
+
 - **Issue Comments** → Trigger document review and updates
 
 ## Core Synchronization Components
@@ -40,6 +76,9 @@ docs/
 ### 1. **Document-Issue Mapping**
 
 #### File Structure with Issue Links
+
+
+
 ```bash
 docs/task-1/
 ├── task.md                    # Core task definition
@@ -47,9 +86,20 @@ docs/task-1/
 ├── implementation-notes.md    # Technical details
 ├── .github-issue-link        # Contains: "123"
 └── .sync-metadata.json       # Last sync timestamps, checksums
+
+
+
+
+
+
 ```
 
+
+
 #### Issue Body Structure
+
+
+
 ```markdown
 # Task 1: Implement user authentication service
 
@@ -62,14 +112,27 @@ docs/task-1/
 ## Implementation Notes
 [Content from implementation-notes.md]
 
+
+
 ---
+
+
 *This issue is automatically synchronized with task documents.
 Direct edits to this body will be overwritten.*
+
+
+
+
+
+
 ```
 
 ### 2. **Bidirectional Sync Flows**
 
 #### Files → Issue (Document Changes)
+
+
+
 ```mermaid
 graph LR
     A[File Modified] --> B[Detect Change]
@@ -77,9 +140,18 @@ graph LR
     C --> D[Generate Issue Body]
     D --> E[Update GitHub Issue]
     E --> F[Update Project Status]
+
+
+
+
+
+
 ```
 
 #### Issue → Files (Human Feedback)
+
+
+
 ```mermaid
 graph LR
     A[Issue Comment] --> B[Parse Intent]
@@ -87,11 +159,22 @@ graph LR
     C --> D[Update Documents]
     D --> E[Commit Changes]
     E --> F[Sync Back to Issue]
+
+
+
+
+
+
 ```
 
 ### 3. **Synchronization Mechanisms**
 
+
+
 #### File Watcher Service
+
+
+
 ```bash
 # Monitors document directories for changes
 inotifywait -m -r docs/ --format '%w%f %e' | while read file event; do
@@ -100,9 +183,18 @@ inotifywait -m -r docs/ --format '%w%f %e' | while read file event; do
     sync_task_to_issue "$task_dir"
   fi
 done
+
+
+
+
+
+
 ```
 
 #### GitHub Webhook Handler
+
+
+
 ```javascript
 // Processes issue comment webhooks
 app.post('/webhook/issue-comment', (req, res) => {
@@ -115,39 +207,91 @@ app.post('/webhook/issue-comment', (req, res) => {
     }
   }
 });
+
+
+
+
+
+
 ```
 
 ### 4. **Document Update Patterns**
 
 #### Scope Change Example
+
+
+
 ```markdown
 <!-- Issue Comment -->
 @morgan The authentication service needs to support SSO. Please add:
+
+
 - SAML 2.0 integration
+
+
 - OAuth with Google/Microsoft
+
+
 - Configurable session timeouts
 
 <!-- Morgan's Process -->
+
+
 1. Parse comment for actionable changes
+
+
 2. Update acceptance-criteria.md with new requirements
+
+
 3. Modify task.md to reflect expanded scope
 4. Commit changes: "Update auth service scope per issue #123"
+
+
 5. Sync updated content back to issue body
+
+
+
+
+
+
 ```
 
 #### Clarification Example
+
+
+
 ```markdown
 <!-- Issue Comment -->
 The "user profile management" requirement is unclear. Do we need:
+
+
 - Full CRUD operations?
+
+
 - Just read-only profile viewing?
+
+
 - Profile photo upload?
 
 <!-- Morgan's Process -->
+
+
 1. Identify ambiguous requirement in task.md
+
+
 2. Add clarification section to implementation-notes.md
+
+
 3. Update task.md with specific requirements
+
+
 4. Comment back on issue with clarification
+
+
+
+
+
+
 ```
 
 ## Technical Implementation
@@ -155,6 +299,9 @@ The "user profile management" requirement is unclear. Do we need:
 ### 1. **Document Synchronization Service**
 
 #### Core Sync Service
+
+
+
 ```bash
 #!/bin/bash
 # sync-service.sh - Main synchronization daemon
@@ -183,9 +330,18 @@ sync_task_to_issue() {
   # Update sync metadata
   echo "{\"last_sync\": \"$(date -Iseconds)\", \"direction\": \"files_to_issue\"}" > "$task_dir/.sync-metadata.json"
 }
+
+
+
+
+
+
 ```
 
 #### File Watcher Implementation
+
+
+
 ```bash
 #!/bin/bash
 # file-watcher.sh - Monitors document changes
@@ -203,30 +359,58 @@ inotifywait -m -r docs/ --format '%w%f %e' -e modify,create,delete | while read 
     sync_task_to_issue "$task_dir"
   fi
 done
+
+
+
+
+
+
 ```
 
 ### 2. **Issue-Driven Documentation Updates**
 
 #### Morgan Agent Enhancement
+
+
+
 ```yaml
 # Enhanced agent prompt for GitHub integration
 systemPrompt: |
   You are Morgan, enhanced with GitHub Projects integration capabilities.
 
   When processing GitHub issue comments:
+
+
   1. Parse human feedback for scope changes
+
+
   2. Update TaskMaster documentation files
+
+
   3. Validate changes against project constraints
+
+
   4. Commit updates with clear change descriptions
+
+
   5. Resume orchestration workflow if needed
 
   Monitor these issue patterns:
   - Scope changes: "add requirement", "update criteria"
   - Clarifications: "clarify", "explain", "define"
   - Guidance: "consider", "recommend", "suggest"
+
+
+
+
+
+
 ```
 
 #### Issue Comment Webhook
+
+
+
 ```yaml
 # Argo Events sensor for issue comments
 apiVersion: argoproj.io/v1alpha1
@@ -253,9 +437,17 @@ spec:
                         # Extract task ID from issue
                         # Trigger Morgan to process comment
                         # Update documentation if needed
+
+
+
+
+
+
 ```
 
 ### 3. **Project Board Configuration**
+
+
 
 #### Custom Fields
 - **Status**: Backlog → In Progress → Code Review → Testing → Done
@@ -266,10 +458,20 @@ spec:
 - **Task ID**: Direct link to TaskMaster task
 
 #### Automation Rules
+
+
 - Move to "In Progress" when Rex starts
+
+
 - Move to "Code Review" when Cleo begins
+
+
 - Move to "Testing" when Tess starts
+
+
 - Move to "Done" when PR merges
+
+
 - Add "Needs Human Input" label when agents request guidance
 
 ## Benefits and Use Cases
@@ -297,54 +499,114 @@ spec:
 ### Phase 1: Basic Sync (2-3 weeks)
 - **Goal**: Bi-directional sync between TaskMaster and GitHub Projects
 - **Deliverables**:
+
+
   - GitHub Projects API client
+
+
   - Task → Project Item mapping
+
+
   - Basic status updates (Created, In Progress, Done)
+
+
   - Project board template and configuration
+
+
 
 ### Phase 2: Real-time Updates (2-3 weeks)
 - **Goal**: Live status updates as workflows progress
 - **Deliverables**:
+
+
   - Argo Workflow integration points
+
+
   - Agent stage tracking
+
+
   - Custom project fields (Agent, Stage, Priority)
+
+
   - Automated status transitions
 
 ### Phase 3: Issue Integration (3-4 weeks)
 - **Goal**: Issue-driven documentation updates
 - **Deliverables**:
+
+
   - Issue comment webhooks
+
+
   - Morgan agent GitHub integration
+
+
   - Scope change processing
+
+
   - Documentation update workflows
 
 ### Phase 4: Advanced Features (4-6 weeks)
 - **Goal**: Full human-in-the-loop capabilities
 - **Deliverables**:
+
+
   - Priority-driven orchestration
+
+
   - Batch task management
+
+
   - Advanced project automation
+
+
   - Metrics and reporting dashboard
 
 ## Technical Considerations
 
 ### Security and Access
+
+
 - Use GitHub Apps for fine-grained permissions
+
+
 - Separate bot accounts for different automation levels
+
+
 - Audit trail for all project modifications
+
+
 - Rate limiting and error handling
 
 ### Performance and Scale
+
+
 - Async updates to avoid blocking workflows
+
+
 - Batch operations for multiple task updates
+
+
 - Caching for frequently accessed project data
+
+
 - Graceful degradation if GitHub API unavailable
 
 ### Integration Points
+
+
 - Argo Events for webhook processing
+
+
 - Enhanced agent templates for GitHub operations
+
+
 - TaskMaster file format extensions
+
+
 - Existing workflow template modifications
+
+
 
 ## Success Metrics
 
@@ -379,6 +641,8 @@ spec:
 1. **Learning Curve**: Training teams on new workflow integration
 2. **Customization**: Allowing teams to adapt board structure to their needs
 3. **Mobile Access**: Ensuring project boards work well on mobile devices
+
+
 
 ## Next Steps
 

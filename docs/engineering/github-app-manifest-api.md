@@ -1,5 +1,7 @@
 # GitHub App Manifest API Integration
 
+
+
 ## Overview
 
 This document details how to programmatically create GitHub Apps using the Manifest API, which is crucial for the Agent Persona Creator tool.
@@ -7,21 +9,42 @@ This document details how to programmatically create GitHub Apps using the Manif
 ## GitHub App Manifest Flow
 
 ### Standard Flow (Web-based)
+
+
 1. User clicks "Create GitHub App" button
+
+
 2. Redirected to GitHub with manifest in URL
+
+
 3. User reviews and approves
+
+
 4. GitHub creates app and redirects back with temporary code
+
+
 5. Exchange code for app credentials
+
+
 
 ### Programmatic Flow (Our Approach)
 Since we want full automation, we'll use a hybrid approach:
+
+
 1. Use GitHub REST API with PAT/OAuth for org app creation
+
+
 2. Or use pre-registered "App Factory" app to create child apps
+
+
 3. Store credentials securely in K8s secrets
 
 ## Manifest API Details
 
 ### Endpoint for Manifest Creation
+
+
+
 
 ```bash
 # Redirect URL format (requires user interaction)
@@ -29,9 +52,18 @@ https://github.com/organizations/{org}/settings/apps/new?state={state}&manifest=
 
 # For user-owned apps
 https://github.com/settings/apps/new?state={state}&manifest={manifest}
+
+
+
+
+
+
 ```
 
 ### Full Manifest Schema
+
+
+
 
 ```json
 {
@@ -91,11 +123,20 @@ https://github.com/settings/apps/new?state={state}&manifest={manifest}
     "workflow_run"
   ]
 }
+
+
+
+
+
+
 ```
 
 ## Programmatic App Creation Strategy
 
 ### Option 1: Using GitHub REST API (Recommended)
+
+
+
 
 ```rust
 // Rust implementation for MCP tool
@@ -120,19 +161,37 @@ async fn create_github_app(
     // Alternative: Use pre-existing app to manage others
     create_via_management_app(org, manifest).await
 }
+
+
+
+
+
+
 ```
 
 ### Option 2: Management App Pattern
 
 Create a single "Agent Factory" GitHub App with permissions to manage other apps:
 
+
+
+
 ```yaml
 # Agent Factory App Permissions
 administration: write  # Manage apps in org
 metadata: read         # Basic access
+
+
+
+
+
+
 ```
 
 Then use this app to create child apps:
+
+
+
 
 ```rust
 async fn create_via_management_app(
@@ -147,13 +206,24 @@ async fn create_via_management_app(
     // Use management endpoints (if available)
     // Or implement custom workflow
 }
+
+
+
+
+
+
 ```
 
 ### Option 3: Pre-Registration Pattern
 
 Pre-create a pool of GitHub Apps and assign them dynamically:
 
+
+
+
 ```yaml
+
+
 # Pool of pre-created apps
 app_pool:
   - name: agent-pool-001
@@ -161,14 +231,25 @@ app_pool:
   - name: agent-pool-002
     status: assigned
     assigned_to: Morgan
+
+
+
+
+
+
 ```
 
 ## Implementation Code Structure
 
 ### 1. Manifest Builder
 
+
+
+
 ```rust
 use serde::{Deserialize, Serialize};
+
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppManifest {
@@ -200,11 +281,22 @@ impl AppManifest {
         }
     }
 }
+
+
+
+
+
+
 ```
 
 ### 2. Permission Inference Engine
 
+
+
+
 ```rust
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Permissions {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -254,11 +346,22 @@ impl AgentPersona {
         perms
     }
 }
+
+
+
+
+
+
 ```
 
 ### 3. Webhook Configuration
 
+
+
+
 ```rust
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebhookConfig {
     pub url: String,
@@ -294,17 +397,35 @@ fn generate_webhook_secret() -> String {
         })
         .collect()
 }
+
+
+
+
+
+
 ```
 
 ## API Authentication & Creation Flow
 
 ### Step 1: Generate Manifest
+
+
+
 ```rust
 let manifest = AppManifest::for_agent(&agent_persona);
 let manifest_json = serde_json::to_string_pretty(&manifest)?;
+
+
+
+
+
+
 ```
 
 ### Step 2: Create App (Requires Manual Step)
+
+
+
 ```rust
 // Generate creation URL
 let creation_url = format!(
@@ -319,9 +440,18 @@ redis_client.set(&format!("app_creation:{}", state), &agent_persona)?;
 
 // Return URL for manual creation (or automate with browser)
 println!("Visit this URL to create the app: {}", creation_url);
+
+
+
+
+
+
 ```
 
 ### Step 3: Handle Callback
+
+
+
 ```rust
 // After app is created, GitHub redirects with code
 async fn handle_app_creation_callback(
@@ -344,11 +474,20 @@ async fn handle_app_creation_callback(
 
     Ok(app_info)
 }
+
+
+
+
+
+
 ```
 
 ## Alternative: GitHub CLI Extension
 
 Create a gh extension for semi-automated creation:
+
+
+
 
 ```bash
 #!/bin/bash
@@ -359,15 +498,28 @@ ORG="${2:-5dlabs}"
 
 # Create app using gh api
 gh api \
+
+
   --method POST \
   -H "Accept: application/vnd.github+json" \
   "/orgs/${ORG}/apps" \
+
+
   --input "${MANIFEST}"
+
+
+
+
+
+
 ```
 
 ## Kubernetes Secret Storage
 
 After app creation, store credentials:
+
+
+
 
 ```yaml
 apiVersion: v1
@@ -387,11 +539,19 @@ data:
   private-key: <base64 encoded>
   webhook-secret: <base64 encoded>
   installation-id: <base64 encoded>
+
+
+
+
+
+
 ```
 
 ## Error Handling
 
 ### Common Issues & Solutions
+
+
 
 1. **Rate Limiting**
    ```rust
@@ -405,13 +565,27 @@ data:
        tokio::time::sleep(Duration::from_secs(retry_after)).await;
        // Retry
    }
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Duplicate Names**
    ```rust
    // Append timestamp or increment
    let unique_name = format!("{}-{}", base_name, timestamp);
-   ```
+
+
+
+
+
+```
+
+
 
 3. **Invalid Permissions**
    ```rust
@@ -422,12 +596,22 @@ data:
        "pull_requests", "repository_hooks", "repository_projects",
        "security_events", "statuses", "vulnerability_alerts"
    ];
-   ```
+
+
+
+
+
+```
 
 ## Testing Approach
 
 ### 1. Mock Manifest Generation
+
+
+
 ```rust
+
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -443,10 +627,21 @@ mod tests {
         assert!(manifest.default_permissions.checks.is_some());
     }
 }
+
+
+
+
+
+
 ```
 
 ### 2. Integration Test with GitHub
+
+
+
 ```rust
+
+
 #[tokio::test]
 async fn test_github_app_creation() {
     // Use test org or sandbox
@@ -459,22 +654,52 @@ async fn test_github_app_creation() {
     assert!(result.is_ok());
     // Clean up test app
 }
+
+
+
+
+
+
 ```
+
+
 
 ## Security Best Practices
 
+
+
 1. **Never log private keys**
+
+
 2. **Rotate webhook secrets regularly**
+
+
 3. **Use least-privilege permissions**
+
+
 4. **Encrypt manifest in transit**
+
+
 5. **Validate webhook signatures**
+
+
 6. **Store credentials in external secrets**
+
+
 7. **Audit app usage regularly**
 
 ## Conclusion
 
 While GitHub doesn't provide a fully programmatic API for app creation (requires user consent), we can:
+
+
 1. Automate 95% of the process
+
+
 2. Use a management app pattern for org apps
+
+
 3. Pre-create app pools for instant assignment
+
+
 4. Provide excellent UX with minimal manual steps

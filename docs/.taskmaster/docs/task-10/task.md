@@ -1,5 +1,7 @@
 # Task 10: Implement Ready-for-QA Label Logic
 
+
+
 ## Overview
 
 Add logic for Cleo to add 'ready-for-qa' label to PRs through container-cleo.sh.hbs script as explicit handoff signal to Tess. This implements the critical handoff mechanism between code quality work and comprehensive testing phases in the multi-agent workflow.
@@ -12,14 +14,33 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
 
 ### Phase 1: Design Ready-for-QA Workflow Logic
 
+
+
 1. **Cleo Workflow Sequence**
    ```bash
+
+
    1. Run code quality checks (Clippy, rustfmt)
+
+
    2. Push quality fixes to same feature branch
+
+
    3. Wait for GitHub Actions CI tests to pass
+
+
    4. Add 'ready-for-qa' label via GitHub API
+
+
    5. Complete Cleo workflow successfully
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Label Management Strategy**
    ```bash
@@ -32,9 +53,16 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
    else
      echo "ℹ️  Ready-for-QA label already present"
    fi
-   ```
+
+
+
+
+
+```
 
 ### Phase 2: Implement CI Test Validation
+
+
 
 1. **GitHub Actions Status Checking**
    ```bash
@@ -51,6 +79,8 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
 
            # Get CI status for PR
            CI_STATUS=$(gh pr checks $pr_number --json state,conclusion \
+
+
                --jq '.[] | select(.name | test("CI|Test|Build")) | {state, conclusion}')
 
            # Check if all CI checks are successful
@@ -74,7 +104,14 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
        echo "⏰ Timeout waiting for CI checks to complete"
        return 1
    }
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Integration with Cleo Container Script**
    ```handlebars
@@ -108,9 +145,16 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
        exit 1
    fi
    {{/if}}
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Create GitHub API Integration Scripts
+
+
 
 1. **Label Addition Script**
    ```bash
@@ -148,7 +192,14 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
    fi
 
    echo "🚀 Ready for comprehensive testing by Tess"
-   ```
+
+
+
+
+
+```
+
+
 
 2. **PR Discovery and Context Setup**
    ```bash
@@ -193,9 +244,16 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
    EOF
 
    echo "✅ PR context established"
-   ```
+
+
+
+
+
+```
 
 ### Phase 4: Implement Argo Events Sensor Integration
+
+
 
 1. **Ready-for-QA Label Sensor**
    ```yaml
@@ -240,7 +298,14 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
                dataTemplate: |
                  {{.body.pull_request.labels | map(select(.name | startswith("task-"))) | .[0].name | split("-")[1]}}
              dest: spec.arguments.parameters.extracted-task-id
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Task ID Extraction from PR Labels**
    ```bash
@@ -254,9 +319,16 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
      echo "❌ Invalid or missing task ID in PR labels"
      exit 1
    fi
-   ```
+
+
+
+
+
+```
 
 ### Phase 5: Create Tess Integration Logic
+
+
 
 1. **Tess Prerequisites Check**
    ```handlebars
@@ -285,7 +357,14 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
    # Proceed with Tess testing workflow
    echo "🚀 Starting 120% satisfaction testing protocol"
    {{/if}}
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Label Validation and Workflow Coordination**
    ```bash
@@ -326,11 +405,21 @@ The ready-for-qa label serves as the explicit handoff signal from Cleo to Tess i
 
    # Save validated PR context for Tess workflow
    echo "$PR_INFO" > /tmp/validated-pr-context.json
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Complete Cleo Ready-for-QA Implementation
+
+
+
 ```handlebars
 #!/bin/bash
 # container-cleo.sh.hbs - Complete Cleo workflow with ready-for-qa handoff
@@ -351,6 +440,8 @@ source setup-pr-context.sh
 source /tmp/cleo-context.env
 
 echo "📋 Working on PR #$PR_NUMBER for task $TASK_ID"
+
+
 
 # Phase 1: Code Quality Checks
 echo "🔍 Phase 1: Running comprehensive code quality checks"
@@ -382,8 +473,14 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     git add .
     git commit -m "style(cleo): apply comprehensive code quality improvements
 
+
+
 - Fix all Clippy pedantic warnings
+
+
 - Apply consistent formatting
+
+
 - Update documentation as needed
 
 Quality assurance by Cleo agent."
@@ -396,6 +493,8 @@ else
     echo "ℹ️  Phase 2: No quality improvements needed"
 fi
 
+
+
 # Phase 3: Wait for CI Success
 echo "⏳ Phase 3: Waiting for CI tests to pass"
 
@@ -406,6 +505,8 @@ else
     echo "🛑 Cannot proceed to ready-for-qa until CI is green"
     exit 1
 fi
+
+
 
 # Phase 4: Add Ready-for-QA Label
 echo "🏷️  Phase 4: Adding ready-for-qa label for Tess handoff"
@@ -432,12 +533,29 @@ export CLEO_WORKFLOW_COMPLETE="true"
 export READY_FOR_QA_ADDED="true"
 
 exec /app/claude-desktop \
+
+
   --config /etc/claude/client-config.json \
+
+
   --memory /workspace/CLAUDE.md \
+
+
   --continue-session={{continue_session}}
+
+
+
+
+
+
 ```
 
+
+
 ### GitHub API Helper Scripts
+
+
+
 ```bash
 #!/bin/bash
 # wait-for-ci-success.sh - Robust CI status checking
@@ -502,32 +620,68 @@ while true; do
     echo "⏳ $PENDING_COUNT checks still running, waiting $CHECK_INTERVAL seconds..."
     sleep $CHECK_INTERVAL
 done
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
 
 ### Cleo → Tess Handoff Flow
+
+
+
+
+
+
 ```
 Cleo Quality Work → CI Success → Ready-for-QA Label → Webhook Event → Tess Resume
+
+
+
+
+
+
 ```
 
 ### Idempotent Label Management
 All label operations are idempotent to handle:
+
+
 - Multiple Cleo runs on same PR
+
+
 - Webhook delivery retries
+
+
 - Manual label additions
+
+
 - Race conditions between agents
 
 ### Event-Driven Coordination
 The ready-for-qa label serves as:
+
+
 - **Explicit handoff signal** from Cleo to Tess
+
+
 - **Event correlation key** for Argo Events sensors
+
+
 - **Prerequisite check** for Tess workflow initiation
+
+
 - **Audit trail** for workflow progression
 
 ## Testing Strategy
 
 ### Label Addition Testing
+
+
 1. **Successful Label Addition**
    ```bash
    # Test successful ready-for-qa label addition
@@ -546,7 +700,14 @@ The ready-for-qa label serves as:
    else
        echo "❌ Label addition test failed"
    fi
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Idempotent Operation Testing**
    ```bash
@@ -556,30 +717,69 @@ The ready-for-qa label serves as:
 
    # Verify only one ready-for-qa label exists
    LABEL_COUNT=$(gh pr view "$PR_NUMBER" --json labels \
+
+
        --jq '.labels[] | select(.name == "ready-for-qa") | .name' | wc -l)
    [ "$LABEL_COUNT" -eq 1 ] || echo "❌ Multiple ready-for-qa labels found"
-   ```
+
+
+
+
+
+```
 
 ### CI Integration Testing
+
+
 1. **CI Success Detection**
+
+
    - Create PR with passing CI checks
+
+
    - Test wait-for-ci-success.sh completes successfully
+
+
    - Test timeout behavior with slow CI
 
+
+
 2. **CI Failure Handling**
+
+
    - Create PR with failing CI checks
+
+
    - Test wait-for-ci-success.sh exits with error
+
+
    - Test no ready-for-qa label added when CI fails
 
 ### Event Integration Testing
+
+
 1. **Sensor Trigger Testing**
+
+
    - Add ready-for-qa label manually
+
+
    - Verify Argo Events sensor detects label addition
+
+
    - Test workflow resumption at correct stage
 
+
+
 2. **Task Correlation Testing**
+
+
    - Test task ID extraction from PR labels
+
+
    - Verify correct workflow targeted for resumption
+
+
    - Test multiple concurrent PRs don't interfere
 
 ## Key Design Decisions
@@ -595,4 +795,6 @@ The ready-for-qa label serves as:
 - [GitHub CLI Labels Documentation](https://cli.github.com/manual/gh_pr_edit)
 - [GitHub API Pull Request Labels](https://docs.github.com/en/rest/pulls/pulls#update-a-pull-request)
 - [Argo Events Pull Request Webhooks](https://argoproj.github.io/argo-events/eventsources/setup/github/)
+
+
 - [Multi-Agent Architecture](/.taskmaster/docs/architecture.md)

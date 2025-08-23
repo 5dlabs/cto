@@ -1,5 +1,7 @@
 # Task 4: Implement Agent-Specific PVC Naming (Updated)
 
+
+
 ## Overview
 
 Modify the Rust controller to extract agent names from the `github_app` field and implement conditional agent-specific PVC naming. **Implementation agents (Rex, Blaze) should continue using the shared `workspace-{service}` pattern**, while other agent types may require separate workspaces for proper isolation.
@@ -11,6 +13,8 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
 ## Implementation Guide
 
 ### Phase 1: Agent Name Extraction Logic
+
+
 
 1. **Create Agent Name Parser**
    ```rust
@@ -31,7 +35,14 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
 
        app_name.to_lowercase()
    }
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Implement Agent Type Classification**
    ```rust
@@ -44,9 +55,16 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
        // Non-implementation agents may need isolated workspaces
        !is_implementation_agent(agent_name)
    }
-   ```
+
+
+
+
+
+```
 
 ### Phase 2: Conditional PVC Naming Logic
+
+
 
 1. **Update PVC Name Generation**
    ```rust
@@ -70,15 +88,29 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
        self.ensure_pvc_exists(&pvc_name, service_name).await?;
        Ok(())
    }
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Maintain Backward Compatibility**
    ```rust
    // The existing workspace-{service} pattern remains the default
    // for implementation agents, ensuring no breaking changes
-   ```
+
+
+
+
+
+```
 
 ### Phase 3: Controller Integration
+
+
 
 1. **Update Reconciliation Logic**
    ```rust
@@ -93,7 +125,14 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
 
        // Continue with existing logic...
    }
-   ```
+
+
+
+
+
+```
+
+
 
 2. **Update Volume Mounting**
    ```rust
@@ -122,11 +161,21 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
 
        // ... rest of job spec ...
    }
-   ```
+
+
+
+
+
+```
+
+
 
 ## Code Examples
 
 ### Complete Agent Classification System
+
+
+
 ```rust
 use regex::Regex;
 use std::collections::HashSet;
@@ -176,9 +225,18 @@ impl AgentClassifier {
         }
     }
 }
+
+
+
+
+
+
 ```
 
 ### PVC Management with Conditional Logic
+
+
+
 ```rust
 use kube::api::{Api, PostParams};
 use k8s_openapi::api::core::v1::PersistentVolumeClaim;
@@ -212,6 +270,12 @@ pub async fn ensure_conditional_pvc(
         Err(e) => Err(e),
     }
 }
+
+
+
+
+
+
 ```
 
 ## Architecture Patterns
@@ -224,12 +288,21 @@ The new PVC naming strategy ensures:
 4. **Extensibility**: Easy to add new agent types with different workspace requirements
 
 ### Migration Strategy
+
+
+
 ```rust
 // No migration needed - implementation agents continue using existing pattern
 // New agent types automatically get isolated workspaces
 Workspace Naming Evolution:
 Phase 1: Legacy "workspace-{service}" (existing - continues for implementation agents)
 Phase 2: Conditional "workspace-{service}" or "workspace-{service}-{agent}" (new)
+
+
+
+
+
+
 ```
 
 ### Error Handling Patterns
@@ -241,6 +314,9 @@ Phase 2: Conditional "workspace-{service}" or "workspace-{service}-{agent}" (new
 ## Key Implementation Details
 
 ### Agent Name Validation
+
+
+
 ```rust
 fn validate_agent_name(agent_name: &str) -> Result<(), String> {
     // Kubernetes naming constraints
@@ -258,9 +334,18 @@ fn validate_agent_name(agent_name: &str) -> Result<(), String> {
 
     Ok(())
 }
+
+
+
+
+
+
 ```
 
 ### PVC Creation with Proper Labels
+
+
+
 ```rust
 fn create_pvc_spec(pvc_name: &str, service: &str, agent: Option<&str>) -> PersistentVolumeClaim {
     let mut labels = std::collections::BTreeMap::new();
@@ -295,6 +380,12 @@ fn create_pvc_spec(pvc_name: &str, service: &str, agent: Option<&str>) -> Persis
         ..Default::default()
     }
 }
+
+
+
+
+
+
 ```
 
 ## Testing Strategy
@@ -321,5 +412,9 @@ fn create_pvc_spec(pvc_name: &str, service: &str, agent: Option<&str>) -> Persis
 
 - [Kubernetes PVC API Documentation](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#persistentvolumeclaim-v1-core)
 - [kube-rs PVC Examples](https://docs.rs/kube/latest/kube/)
+
+
 - [Controller Architecture](.taskmaster/docs/architecture.md)
+
+
 - [Multi-Agent Workspace Design](.taskmaster/docs/prd.txt)
