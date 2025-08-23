@@ -239,7 +239,9 @@ jobs:
           merge-multiple: true
 
       # Build controller-core for the Docker image
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: controller -> target
