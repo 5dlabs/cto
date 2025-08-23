@@ -193,12 +193,7 @@ jobs:
             if command -v jq >/dev/null 2>&1; then
               VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json | jq -r .info.version)
             else
-              VERSION=$(python3 - <<'PY'
-import json, urllib.request
-with urllib.request.urlopen("https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json") as r:
-    print(json.load(r)["info"]["version"])
-PY
-)
+              VERSION=$(python3 -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json'))['info']['version'])")
             fi
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
@@ -207,12 +202,7 @@ PY
             if command -v jq >/dev/null 2>&1; then
               VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.version_pkg }}/json | jq -r .info.version)
             else
-              VERSION=$(python3 - <<'PY'
-import json, urllib.request
-with urllib.request.urlopen("https://pypi.org/pypi/${{ matrix.version_pkg }}/json") as r:
-    print(json.load(r)["info"]["version"])
-PY
-)
+              VERSION=$(python3 -c "import json, urllib.request; print(json.load(urllib.request.urlopen('https://pypi.org/pypi/${{ matrix.version_pkg }}/json'))['info']['version'])")
             fi
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
