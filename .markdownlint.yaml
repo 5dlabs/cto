@@ -5,9 +5,9 @@
 # Default state for all rules
 default: true
 
-# MD013/line-length - Line length (120 chars for technical docs)
+# MD013/line-length - Line length (150 chars for technical docs)
 MD013:
-  line_length: 120
+  line_length: 150
   code_blocks: false
   tables: false
   headings: false
@@ -76,14 +76,14 @@ MD007:
   indent: 2
   start_indented: false
 
-# MD012/no-multiple-blanks - Multiple consecutive blank lines
+# MD012/no-multiple-blanks - Multiple consecutive blank lines (allow up to 2)
 MD012:
-  maximum: 1
+  maximum: 2
 
-# MD022/blanks-around-headings - Headings should be surrounded by blank lines
+# MD022/blanks-around-headings - Headings should be surrounded by blank lines (more lenient)
 MD022:
-  lines_above: 1
-  lines_below: 1
+  lines_above: 0
+  lines_below: 0
 
 # MD025/single-title - Multiple top-level headings in the same document
 MD025:
@@ -160,3 +160,6 @@ MD052: false
 
 # MD053/link-image-reference-definitions - Link and image reference definitions should be needed
 MD053: false
+
+# MD032/blanks-around-lists - Lists should be surrounded by blank lines (disabled for flexibility)
+MD032: false

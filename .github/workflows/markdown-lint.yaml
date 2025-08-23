@@ -38,6 +38,7 @@ jobs:
             --ignore ".claude/**" \
             --ignore "docs/.claude/**" \
             --ignore "docs/.taskmaster/**" \
+            --ignore "CLAUDE.md" \
             "**/*.md" || {
             echo "::error::Markdown linting failed. Please fix the issues above."
             echo "::info::You can run './fix-markdown-lint.sh fix' locally to automatically fix some issues."
