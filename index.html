@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5D Labs - We Build AI That Builds Software</title>
+    <meta name="description" content="Deploy autonomous AI agents that build, test, and ship production code. Transform PRDs into PRs in hours, not weeks.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">🚀</span>
+                <span class="brand-text">5D Labs</span>
+            </div>
+            <div class="nav-links">
+                <a href="#demo" class="nav-link">Demo</a>
+                <a href="#features" class="nav-link">Features</a>
+                <a href="https://github.com/5dlabs/cto" class="nav-link" target="_blank">GitHub</a>
+                <a href="#pricing" class="nav-link">Pricing</a>
+                <button class="cta-button" onclick="scrollToDemo()">Try Demo</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-background">
+            <div class="particle" style="--delay: 0s; --x: 10%; --y: 20%;"></div>
+            <div class="particle" style="--delay: 1s; --x: 80%; --y: 30%;"></div>
+            <div class="particle" style="--delay: 2s; --x: 60%; --y: 70%;"></div>
+            <div class="particle" style="--delay: 3s; --x: 20%; --y: 80%;"></div>
+            <div class="particle" style="--delay: 4s; --x: 90%; --y: 10%;"></div>
+        </div>
+        
+        <div class="container hero-content">
+            <div class="hero-text">
+                <h1 class="hero-title">
+                    We Build AI That
+                    <span class="gradient-text">Builds Software</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Deploy autonomous AI agents that transform requirements into production-ready code. 
+                    Ship features in <strong>hours, not weeks</strong>.
+                </p>
+                
+                <div class="hero-stats">
+                    <div class="stat">
+                        <div class="stat-number">85%</div>
+                        <div class="stat-label">Faster Development</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">99.2%</div>
+                        <div class="stat-label">Test Coverage</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-number">$2M+</div>
+                        <div class="stat-label">Cost Savings</div>
+                    </div>
+                </div>
+
+                <div class="hero-actions">
+                    <button class="primary-button" onclick="scrollToDemo()">
+                        🚀 Try Live Demo
+                    </button>
+                    <a href="https://github.com/5dlabs/cto" class="secondary-button" target="_blank">
+                        ⭐ Star on GitHub
+                    </a>
+                </div>
+
+                <div class="hero-demo-command">
+                    <div class="command-box">
+                        <span class="command-prefix">$</span>
+                        <span class="command-text">curl -sSL https://demo.5dlabs.com | bash</span>
+                        <button class="copy-button" onclick="copyCommand()">📋</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div class="agent-showcase">
+                    <div class="agent-card active" data-agent="rex">
+                        <div class="agent-avatar">🔥</div>
+                        <div class="agent-name">Rex</div>
+                        <div class="agent-role">Implementation</div>
+                        <div class="agent-status">Building API endpoint...</div>
+                    </div>
+                    <div class="agent-card" data-agent="cleo">
+                        <div class="agent-avatar">👁️</div>
+                        <div class="agent-name">Cleo</div>
+                        <div class="agent-role">Quality</div>
+                        <div class="agent-status">Reviewing code...</div>
+                    </div>
+                    <div class="agent-card" data-agent="tess">
+                        <div class="agent-avatar">🧪</div>
+                        <div class="agent-name">Tess</div>
+                        <div class="agent-role">Testing</div>
+                        <div class="agent-status">Writing tests...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Demo Section -->
+    <section id="demo" class="demo-section">
+        <div class="container">
+            <h2 class="section-title">See CTO in Action</h2>
+            <p class="section-subtitle">Watch AI agents build a complete REST API in real-time</p>
+            
+            <div class="demo-container">
+                <div class="demo-terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">CTO Demo Terminal</span>
+                    </div>
+                    <div class="terminal-body">
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">user@demo:~$</span>
+                            <span class="terminal-command">cto code --task-id=1 --repository=demo/api-server</span>
+                        </div>
+                        <div class="terminal-output" id="demo-output">
+                            <div class="output-line">🚀 Starting CTO agent deployment...</div>
+                            <div class="output-line">📋 Loading task: "Build REST API for user management"</div>
+                            <div class="output-line">🤖 Rex agent initialized</div>
+                            <div class="output-line typing-animation">💻 Analyzing requirements and dependencies...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-controls">
+                    <button class="demo-button primary" onclick="startDemo()">▶️ Start Demo</button>
+                    <button class="demo-button secondary" onclick="resetDemo()">🔄 Reset</button>
+                    <button class="demo-button secondary" onclick="skipDemo()">⏩ Skip to End</button>
+                </div>
+            </div>
+
+            <div class="demo-stats">
+                <div class="demo-stat">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-info">
+                        <div class="stat-title">Development Time</div>
+                        <div class="stat-comparison">
+                            <span class="old-stat">7 days</span> → <span class="new-stat">4 hours</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-stat">
+                    <div class="stat-icon">🧪</div>
+                    <div class="stat-info">
+                        <div class="stat-title">Test Coverage</div>
+                        <div class="stat-comparison">
+                            <span class="old-stat">60%</span> → <span class="new-stat">99.2%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="demo-stat">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-info">
+                        <div class="stat-title">Cost Reduction</div>
+                        <div class="stat-comparison">
+                            <span class="old-stat">$50k</span> → <span class="new-stat">$7.5k</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">Autonomous AI Development Team</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>Specialized AI Agents</h3>
+                    <p>Rex & Blaze handle implementation, Cleo ensures quality, Tess covers testing, Morgan documents everything.</p>
+                    <ul class="feature-list">
+                        <li>✅ Language-specific expertise</li>
+                        <li>✅ Best practices enforcement</li>
+                        <li>✅ Continuous learning</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Ship features in hours instead of weeks. Our agents work 24/7 without breaks, meetings, or context switching.</p>
+                    <ul class="feature-list">
+                        <li>✅ 85% faster development</li>
+                        <li>✅ Parallel processing</li>
+                        <li>✅ No human bottlenecks</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🏭</div>
+                    <h3>Production Ready</h3>
+                    <p>Every line of code comes with comprehensive tests, documentation, and follows industry best practices.</p>
+                    <ul class="feature-list">
+                        <li>✅ 99.2% test coverage</li>
+                        <li>✅ Security scanning</li>
+                        <li>✅ Performance optimization</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>GitHub Native</h3>
+                    <p>Seamless integration with your existing workflow. Agents create PRs with detailed explanations.</p>
+                    <ul class="feature-list">
+                        <li>✅ Native PR creation</li>
+                        <li>✅ Branch protection</li>
+                        <li>✅ Code review automation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="pricing">
+        <div class="container">
+            <h2 class="section-title">Simple, Transparent Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>Open Source</h3>
+                        <div class="price">$0<span class="price-unit">/month</span></div>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>✅ Self-hosted deployment</li>
+                        <li>✅ All core features</li>
+                        <li>✅ Community support</li>
+                        <li>✅ Unlimited projects</li>
+                    </ul>
+                    <a href="https://github.com/5dlabs/cto" class="pricing-button secondary">Get Started</a>
+                </div>
+                
+                <div class="pricing-card featured">
+                    <div class="pricing-badge">Most Popular</div>
+                    <div class="pricing-header">
+                        <h3>Cloud</h3>
+                        <div class="price">$99<span class="price-unit">/seat/month</span></div>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>✅ Fully managed platform</li>
+                        <li>✅ 99.9% uptime SLA</li>
+                        <li>✅ Priority support</li>
+                        <li>✅ Advanced analytics</li>
+                        <li>✅ Team collaboration</li>
+                    </ul>
+                    <button class="pricing-button primary" onclick="openWaitlist()">Join Waitlist</button>
+                </div>
+                
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>Enterprise</h3>
+                        <div class="price">Custom</div>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>✅ On-premise deployment</li>
+                        <li>✅ Custom integrations</li>
+                        <li>✅ Dedicated support</li>
+                        <li>✅ SOC2 compliance</li>
+                        <li>✅ Custom agents</li>
+                    </ul>
+                    <a href="mailto:enterprise@5dlabs.com" class="pricing-button secondary">Contact Sales</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter Signup -->
+    <section class="newsletter">
+        <div class="container">
+            <div class="newsletter-content">
+                <h2>Stay Updated</h2>
+                <p>Get notified about new features, agent capabilities, and platform updates.</p>
+                <form class="newsletter-form" onsubmit="subscribeNewsletter(event)">
+                    <input type="email" placeholder="Enter your email" required class="newsletter-input">
+                    <button type="submit" class="newsletter-button">Subscribe</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <div class="brand-logo">
+                        <span class="logo">🚀</span>
+                        <span class="brand-text">5D Labs</span>
+                    </div>
+                    <p>Building the future of AI-powered software development</p>
+                </div>
+                
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Product</h4>
+                        <a href="https://github.com/5dlabs/cto">CTO Platform</a>
+                        <a href="https://github.com/5dlabs/tasks">Task Management</a>
+                        <a href="https://github.com/5dlabs/toolman">Tool Orchestration</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Resources</h4>
+                        <a href="https://docs.5dlabs.com">Documentation</a>
+                        <a href="https://blog.5dlabs.com">Blog</a>
+                        <a href="https://github.com/5dlabs">GitHub</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Community</h4>
+                        <a href="https://discord.gg/5dlabs">Discord</a>
+                        <a href="https://twitter.com/5dlabs">Twitter</a>
+                        <a href="https://youtube.com/5dlabs">YouTube</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2025 5D Labs. Licensed under AGPL-3.0. Made with ❤️ and 🤖</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Waitlist Modal -->
+    <div id="waitlist-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeWaitlist()">&times;</span>
+            <h2>Join the Cloud Beta</h2>
+            <p>Be among the first to experience fully-managed AI development agents.</p>
+            <form onsubmit="submitWaitlist(event)">
+                <input type="email" placeholder="Work email" required>
+                <input type="text" placeholder="Company name" required>
+                <select required>
+                    <option value="">Team size</option>
+                    <option value="1-5">1-5 developers</option>
+                    <option value="6-20">6-20 developers</option>
+                    <option value="21-100">21-100 developers</option>
+                    <option value="100+">100+ developers</option>
+                </select>
+                <button type="submit" class="primary-button">Join Waitlist</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

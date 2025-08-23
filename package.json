@@ -1,0 +1,33 @@
+{
+  "name": "5dlabs-landing-page",
+  "version": "1.0.0",
+  "description": "5D Labs - Landing page showcasing autonomous AI development agents",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "ngrok": "ngrok http 3000"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "autonomous-development",
+    "claude",
+    "kubernetes",
+    "github-automation",
+    "5dlabs"
+  ],
+  "author": "5D Labs",
+  "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5dlabs/cto.git"
+  },
+  "homepage": "https://5dlabs.com",
+  "bugs": {
+    "url": "https://github.com/5dlabs/cto/issues"
+  }
+}
