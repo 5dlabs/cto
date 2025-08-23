@@ -555,17 +555,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: \${SERVICE_NAME}-t\${NEXT_TASK_ID}-rex-
+                                    generateName: ${SERVICE_NAME}-t${NEXT_TASK_ID}-rex-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "\${NEXT_TASK_ID}"
+                                      task-id: "${NEXT_TASK_ID}"
                                       workflow-stage: "implementation"
                                       agent-type: "rex"
                                   spec:
-                                    taskId: \${NEXT_TASK_ID}
-                                    service: "\${SERVICE_NAME}"
-                                    repositoryUrl: "\${GITHUB_OWNER}/\${GITHUB_REPO}"
-                                    docsRepositoryUrl: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    taskId: ${NEXT_TASK_ID}
+                                    service: "${SERVICE_NAME}"
+                                    repositoryUrl: "${GITHUB_OWNER}/${GITHUB_REPO}"
+                                    docsRepositoryUrl: "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
                                     docsProjectDirectory: "docs"
                                     workingDirectory: "."
                                     githubApp: "5DLabs-Rex"
@@ -581,17 +581,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: \${SERVICE_NAME}-t\${NEXT_TASK_ID}-cleo-
+                                    generateName: ${SERVICE_NAME}-t${NEXT_TASK_ID}-cleo-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "\${NEXT_TASK_ID}"
+                                      task-id: "${NEXT_TASK_ID}"
                                       workflow-stage: "quality"
                                       agent-type: "cleo"
                                   spec:
-                                    taskId: \${NEXT_TASK_ID}
-                                    service: "\${SERVICE_NAME}"
-                                    repositoryUrl: "\${GITHUB_OWNER}/\${GITHUB_REPO}"
-                                    docsRepositoryUrl: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    taskId: ${NEXT_TASK_ID}
+                                    service: "${SERVICE_NAME}"
+                                    repositoryUrl: "${GITHUB_OWNER}/${GITHUB_REPO}"
+                                    docsRepositoryUrl: "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
                                     docsProjectDirectory: "docs"
                                     workingDirectory: "."
                                     githubApp: "5DLabs-Cleo"
@@ -608,17 +608,17 @@ spec:
                                   apiVersion: agents.platform/v1
                                   kind: CodeRun
                                   metadata:
-                                    generateName: \${SERVICE_NAME}-t\${NEXT_TASK_ID}-tess-
+                                    generateName: ${SERVICE_NAME}-t${NEXT_TASK_ID}-tess-
                                     namespace: agent-platform
                                     labels:
-                                      task-id: "\${NEXT_TASK_ID}"
+                                      task-id: "${NEXT_TASK_ID}"
                                       workflow-stage: "testing"
                                       agent-type: "tess"
                                   spec:
-                                    taskId: \${NEXT_TASK_ID}
-                                    service: "\${SERVICE_NAME}"
-                                    repositoryUrl: "\${GITHUB_OWNER}/\${GITHUB_REPO}"
-                                    docsRepositoryUrl: "https://github.com/\${GITHUB_OWNER}/\${GITHUB_REPO}"
+                                    taskId: ${NEXT_TASK_ID}
+                                    service: "${SERVICE_NAME}"
+                                    repositoryUrl: "${GITHUB_OWNER}/${GITHUB_REPO}"
+                                    docsRepositoryUrl: "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
                                     docsProjectDirectory: "docs"
                                     workingDirectory: "."
                                     githubApp: "5DLabs-Tess"
@@ -633,7 +633,7 @@ spec:
                                 image: alpine:3.18
                                 command: [sh]
                                 source: |
-                                  echo "✅ Task \${NEXT_TASK_ID} completed successfully!"
+                                  echo "✅ Task ${NEXT_TASK_ID} completed successfully!"
                                   echo "Merged to main and ready for production."
                         EOF
 

@@ -16,6 +16,7 @@ on:
     paths:
       - 'infra/images/**'
       - '.github/workflows/agents-build.yml'
+      - '.github/workflows/agents-build.yaml'
 
   workflow_dispatch:
     inputs:
@@ -189,12 +190,30 @@ jobs:
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} npm version: $VERSION"
           elif [ "${{ matrix.version_type }}" = "pypi" ]; then
-            VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json | jq -r .info.version)
+            if command -v jq >/dev/null 2>&1; then
+              VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json | jq -r .info.version)
+            else
+              VERSION=$(python3 - <<'PY'
+import json, urllib.request
+with urllib.request.urlopen("https://pypi.org/pypi/${{ matrix.pypi_pkg }}/json") as r:
+    print(json.load(r)["info"]["version"])
+PY
+)
+            fi
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} PyPI version: $VERSION"
           elif [ "${{ matrix.version_type }}" = "pip" ]; then
-            VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.version_pkg }}/json | jq -r .info.version)
+            if command -v jq >/dev/null 2>&1; then
+              VERSION=$(curl -fsSL https://pypi.org/pypi/${{ matrix.version_pkg }}/json | jq -r .info.version)
+            else
+              VERSION=$(python3 - <<'PY'
+import json, urllib.request
+with urllib.request.urlopen("https://pypi.org/pypi/${{ matrix.version_pkg }}/json") as r:
+    print(json.load(r)["info"]["version"])
+PY
+)
+            fi
             echo "version=$VERSION" >> $GITHUB_OUTPUT
             echo "arg_line=VERSION=$VERSION" >> $GITHUB_OUTPUT
             echo "📦 ${{ matrix.id }} PyPI version: $VERSION"
