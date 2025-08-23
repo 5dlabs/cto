@@ -47,6 +47,7 @@ The following environment variables can be configured:
 
 
 
+
 ```bash
 # Test OpenAI CLI
 openai --help
@@ -64,9 +65,12 @@ openai api completions.create -m gpt-4 -p "def fibonacci(n):"
 
 
 
+
+
 ```
 
 ### Python SDK
+
 
 
 
@@ -91,11 +95,14 @@ response = openai.Completion.create(
 
 
 
+
+
 ```
 
 
 
 ### Node.js SDK
+
 
 
 
@@ -113,6 +120,8 @@ const completion = await openai.completions.create({
   prompt: 'def fibonacci(n):',
   max_tokens: 100,
 });
+
+
 
 
 

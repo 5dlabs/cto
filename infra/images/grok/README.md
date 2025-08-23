@@ -32,6 +32,7 @@ A containerized version of the [Grok CLI](https://github.com/superagent-ai/grok-
 
 
 
+
 ```bash
 
 
@@ -46,9 +47,12 @@ REGISTRY=your-registry.com ./build.sh --push
 
 
 
+
+
 ```
 
 ### Running Locally
+
 
 
 
@@ -85,9 +89,12 @@ docker run -it \
 
 
 
+
+
 ```
 
 ### Kubernetes TaskRun Integration
+
 
 
 
@@ -119,6 +126,8 @@ spec:
 
 
 
+
+
 ```
 
 ## Integration with Orchestrator
@@ -139,11 +148,14 @@ Get your Grok API key from [X.AI](https://x.ai) and add it to your Kubernetes se
 
 
 
+
 ```bash
 kubectl create secret generic grok-secrets \
 
 
   --from-literal=api-key="your-grok-api-key"
+
+
 
 
 

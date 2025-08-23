@@ -35,6 +35,7 @@ Custom PostgreSQL image that combines:
 
 
 
+
 ```bash
 docker run --name postgres-vector \
 
@@ -48,9 +49,12 @@ docker run --name postgres-vector \
 
 
 
+
+
 ```
 
 ### Enable pgvector extension
+
 
 
 
@@ -79,6 +83,8 @@ SELECT content, embedding <-> '[0.1,0.2,0.3,...]' AS distance
 FROM embeddings
 ORDER BY embedding <-> '[0.1,0.2,0.3,...]'
 LIMIT 10;
+
+
 
 
 

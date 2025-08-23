@@ -8,6 +8,7 @@ We're implementing a multi-agent orchestration system using Argo Events + Argo W
 
 
 
+
 ```yaml
 
 
@@ -22,9 +23,12 @@ GitHub PR #123 approved (labeled: task-3)
 
 
 
+
+
 ```
 
 ### Discovered Limitations
+
 
 
 
@@ -42,9 +46,12 @@ GitHub PR #123 approved (labeled: task-3)
 
 
 
+
+
 ```
 
 ### Current Broken Behavior
+
 
 
 
@@ -53,6 +60,8 @@ GitHub PR #123 approved (labeled: task-3)
 GitHub PR #123 approved (task-3)
   ↓ Sensor: labelSelector: "workflow-type=play-orchestration,current-stage=waiting-pr-approved"
   ↓ Resumes: task-1, task-3, task-5, task-7 workflows (ALL OF THEM!) ❌
+
+
 
 
 

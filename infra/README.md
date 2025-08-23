@@ -10,8 +10,11 @@ This directory contains all infrastructure configurations for the platform, now 
 
 
 
+
 ```bash
 ./scripts/migrate-to-gitops.sh
+
+
 
 
 
@@ -24,6 +27,7 @@ This directory contains all infrastructure configurations for the platform, now 
 
 
 
+
 ```bash
 # Install Argo CD
 ./scripts/install-argocd.sh
@@ -33,6 +37,8 @@ This directory contains all infrastructure configurations for the platform, now 
 
 # Deploy GitOps applications
 kubectl apply -f gitops/app-of-apps.yaml
+
+
 
 
 
@@ -72,6 +78,7 @@ The main orchestrator service Helm chart:
 
 
 
+
 ```yaml
 # Managed by infra/gitops/applications/orchestrator.yaml
 source:
@@ -80,6 +87,8 @@ syncPolicy:
   automated:
     prune: true
     selfHeal: true
+
+
 
 
 
@@ -106,6 +115,7 @@ Argo CD installation and configuration:
 
 
 
+
 ```bash
 helm install argocd argo/argo-cd \
 
@@ -117,6 +127,8 @@ helm install argocd argo/argo-cd \
 
 
   --values charts/argocd/install-argocd.yaml
+
+
 
 
 
@@ -143,6 +155,7 @@ Argo Workflows installation and configuration:
 
 
 
+
 ```bash
 helm install argo-workflows argo/argo-workflows \
 
@@ -154,6 +167,8 @@ helm install argo-workflows argo/argo-workflows \
 
 
   --values charts/argo-workflows/install-argo-workflows.yaml
+
+
 
 
 
@@ -194,9 +209,12 @@ Root application that manages all other applications (App of Apps pattern)
 
 
 
+
 ```bash
 kubectl apply -f gitops/projects/platform-project.yaml
 kubectl apply -f gitops/app-of-apps.yaml
+
+
 
 
 
@@ -249,8 +267,11 @@ RBAC configuration for workflow execution
 
 
 
+
 ```bash
 kubectl apply -f workflow-templates/
+
+
 
 
 
@@ -451,6 +472,7 @@ Test manifests and simulators (not for production use):
 
 
 
+
 ```bash
 # Check application status
 kubectl get applications -n argocd
@@ -468,11 +490,14 @@ kubectl logs -n argocd deployment/argocd-application-controller
 
 
 
+
+
 ```
 
 
 
 ### Workflow Issues
+
 
 
 
@@ -497,11 +522,14 @@ kubectl logs -n argo -l workflows.argoproj.io/workflow=WORKFLOW_NAME
 
 
 
+
+
 ```
 
 
 
 ### Repository Access
+
 
 
 
@@ -513,6 +541,8 @@ kubectl get secrets -n argocd | grep repo
 
 # Update credentials
 kubectl apply -f charts/argocd/secrets.yaml
+
+
 
 
 
@@ -534,6 +564,7 @@ The traditional Helm-based deployment is still supported for environments not re
 
 
 
+
 ```bash
 # Traditional deployment
 helm install orchestrator ./charts/orchestrator \
@@ -546,6 +577,8 @@ helm install orchestrator ./charts/orchestrator \
 
 
   --set secrets.anthropicApiKey="your-key"
+
+
 
 
 

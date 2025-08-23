@@ -27,6 +27,7 @@ A containerized development environment with Open Code CLI for AI-powered coding
 
 
 
+
 ```bash
 
 
@@ -41,9 +42,12 @@ docker build --build-arg VERSION=0.5.5 -t opencode:latest .
 
 
 
+
+
 ```
 
 ### Running Locally
+
 
 
 
@@ -73,6 +77,8 @@ docker run -it \
 
 
 
+
+
 ```
 
 
@@ -80,6 +86,7 @@ docker run -it \
 ### Headless Server Mode
 
 Open Code can run in headless server mode for automated workflows:
+
 
 
 
@@ -100,9 +107,12 @@ docker run -d \
 
 
 
+
+
 ```
 
 ### Kubernetes TaskRun Integration
+
 
 
 
@@ -133,6 +143,8 @@ spec:
 
 
 
+
+
 ```
 
 ## Integration with Orchestrator
@@ -153,11 +165,14 @@ Get your Claude API key from [Anthropic](https://console.anthropic.com) and add 
 
 
 
+
 ```bash
 kubectl create secret generic opencode-secrets \
 
 
   --from-literal=api-key="your-claude-api-key"
+
+
 
 
 

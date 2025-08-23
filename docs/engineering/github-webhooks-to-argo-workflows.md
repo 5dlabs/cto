@@ -50,6 +50,7 @@
 
 
 
+
 ```yaml
 spec:
   github:
@@ -66,8 +67,11 @@ spec:
 
 
 
+
+
 ```
 - Sensor (only on opened/closed):
+
 
 
 
@@ -143,6 +147,8 @@ spec:
 
 
 
+
+
 ```
 
 #### PR created (opened)
@@ -183,6 +189,7 @@ spec:
 
 
 
+
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -209,6 +216,8 @@ subjects:
 - kind: ServiceAccount
   name: argo-events-sa
   namespace: argo
+
+
 
 
 

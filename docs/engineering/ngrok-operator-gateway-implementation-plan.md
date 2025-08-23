@@ -46,6 +46,7 @@ Reference docs (from local clone):
 
 
 
+
 ```bash
 helm repo add ngrok https://charts.ngrok.com
 helm repo update
@@ -61,9 +62,12 @@ export NGROK_API_KEY="..."
 
 
 
+
+
 ```
 
 2) Install Gateway API CRDs (standard) and the `GatewayClass`
+
 
 
 
@@ -85,9 +89,12 @@ EOF
 
 
 
+
+
 ```
 
 3) Install the ngrok Operator (secure method recommended)
+
 
 
 
@@ -126,9 +133,12 @@ helm install ngrok-operator ngrok/ngrok-operator \
 
 
 
+
+
 ```
 
 Validation:
+
 
 
 
@@ -142,10 +152,13 @@ kubectl get gatewayclasses
 
 
 
+
+
 ```
 
 ### Phase 2 — Establish the Gateway on public.5dlabs.ai
 Create a `Gateway` with HTTPS listener for `public.5dlabs.ai`. The operator reserves the domain with ngrok and exposes a CNAME target.
+
 
 
 
@@ -172,9 +185,12 @@ spec:
 
 
 
+
+
 ```
 
 Apply and fetch the ngrok CNAME target:
+
 
 
 
@@ -193,6 +209,8 @@ kubectl -n default get gateway public-gateway -o yaml | yq '.status.addresses'
 
 
 
+
+
 ```
 
 Create DNS:
@@ -204,9 +222,12 @@ Readiness check:
 
 
 
+
 ```bash
 kubectl get gateways.gateway.networking.k8s.io --all-namespaces
 # Wait for PROGRAMMED=True on public-gateway once DNS propagates.
+
+
 
 
 
@@ -228,6 +249,7 @@ Identify the GitHub EventSource Service:
 
 
 
+
 ```bash
 kubectl -n argo-events get svc
 # Choose the Service and port (often ~12000 for GitHub eventsource)
@@ -237,9 +259,12 @@ kubectl -n argo-events get svc
 
 
 
+
+
 ```
 
 Option A — Route only (no pre-verification at ngrok):
+
 
 
 
@@ -275,9 +300,12 @@ spec:
 
 
 
+
+
 ```
 
 Option B — Pre-verify with ngrok Traffic Policy, then route:
+
 
 
 
@@ -336,6 +364,8 @@ spec:
 
 
 
+
+
 ```
 
 Configure GitHub:
@@ -348,6 +378,7 @@ Configure GitHub:
 Add more `HTTPRoute`s under the same host (path-based), or additional listeners/hostnames (host-based):
 
 Path-based example (same host):
+
 
 
 
@@ -383,9 +414,12 @@ spec:
 
 
 
+
+
 ```
 
 Host-based example (new subdomain):
+
 
 
 
@@ -447,6 +481,8 @@ spec:
 
 
 
+
+
 ```
 
 Then create a CNAME: `app1.public.5dlabs.ai` → the CNAME target reported in the `Gateway` status for that listener.
@@ -457,9 +493,12 @@ Then create a CNAME: `app1.public.5dlabs.ai` → the CNAME target reported in th
 
 
 
+
 ```bash
 kubectl get gateways.gateway.networking.k8s.io --all-namespaces
 kubectl -n default get gateway public-gateway -o yaml | yq '.status'
+
+
 
 
 
@@ -477,8 +516,11 @@ kubectl -n default get gateway public-gateway -o yaml | yq '.status'
 
 
 
+
 ```bash
 kubectl -n ngrok-operator logs deploy/ngrok-operator | tail -n 200
+
+
 
 
 
@@ -502,6 +544,7 @@ kubectl -n ngrok-operator logs deploy/ngrok-operator | tail -n 200
 
 
 
+
 ```bash
 # Remove routes and gateway if needed
 kubectl delete httproute -n argo-events github-webhooks --ignore-not-found
@@ -514,6 +557,8 @@ kubectl -n ngrok-operator delete secret ngrok-operator-credentials --ignore-not-
 # (Optional) Remove GatewayClass and CRDs
 kubectl delete gatewayclass ngrok --ignore-not-found
 # CRDs are shared; remove only if you’re sure no other controllers use them
+
+
 
 
 

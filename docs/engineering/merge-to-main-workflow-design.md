@@ -25,6 +25,7 @@ Replace the current "wait for PR approval" pattern with "wait for merge to main"
 
 
 
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
@@ -166,10 +167,13 @@ spec:
 
 
 
+
+
 ```
 
 ### 2. Update Orchestration Workflow
 Change the final suspend stage from `wait-pr-approved` to `wait-merge-to-main`:
+
 
 
 
@@ -182,6 +186,8 @@ Change the final suspend stage from `wait-pr-approved` to `wait-merge-to-main`:
       parameters:
         - name: stage
           value: "waiting-merge-to-main"
+
+
 
 
 
@@ -206,6 +212,7 @@ Options for managing the task queue:
 
 
 
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -226,12 +233,15 @@ data:
 
 
 
+
+
 ```
 
 **Option C: CRD-Based Queue**
 Create a TaskQueue CRD to track state more robustly.
 
 ## Workflow Sequence
+
 
 
 
@@ -252,6 +262,8 @@ sequenceDiagram
     WF->>WF: Mark task complete
     WH->>Next: Start next task workflow
     Next->>Next: Begin Rex implementation
+
+
 
 
 

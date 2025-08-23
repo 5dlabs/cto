@@ -28,6 +28,8 @@ The multi-agent orchestration system needs better visibility and human feedback 
 
 
 
+
+
 ```
 docs/
 ├── task-1/
@@ -38,6 +40,8 @@ docs/
 ├── task-2/
 │   ├── task.md
 │   └── ...
+
+
 
 
 
@@ -79,6 +83,7 @@ docs/
 
 
 
+
 ```bash
 docs/task-1/
 ├── task.md                    # Core task definition
@@ -92,11 +97,14 @@ docs/task-1/
 
 
 
+
+
 ```
 
 
 
 #### Issue Body Structure
+
 
 
 
@@ -125,11 +133,14 @@ Direct edits to this body will be overwritten.*
 
 
 
+
+
 ```
 
 ### 2. **Bidirectional Sync Flows**
 
 #### Files → Issue (Document Changes)
+
 
 
 
@@ -146,9 +157,12 @@ graph LR
 
 
 
+
+
 ```
 
 #### Issue → Files (Human Feedback)
+
 
 
 
@@ -165,6 +179,8 @@ graph LR
 
 
 
+
+
 ```
 
 ### 3. **Synchronization Mechanisms**
@@ -172,6 +188,7 @@ graph LR
 
 
 #### File Watcher Service
+
 
 
 
@@ -189,9 +206,12 @@ done
 
 
 
+
+
 ```
 
 #### GitHub Webhook Handler
+
 
 
 
@@ -213,11 +233,14 @@ app.post('/webhook/issue-comment', (req, res) => {
 
 
 
+
+
 ```
 
 ### 4. **Document Update Patterns**
 
 #### Scope Change Example
+
 
 
 
@@ -254,9 +277,12 @@ app.post('/webhook/issue-comment', (req, res) => {
 
 
 
+
+
 ```
 
 #### Clarification Example
+
 
 
 
@@ -292,6 +318,8 @@ The "user profile management" requirement is unclear. Do we need:
 
 
 
+
+
 ```
 
 ## Technical Implementation
@@ -299,6 +327,7 @@ The "user profile management" requirement is unclear. Do we need:
 ### 1. **Document Synchronization Service**
 
 #### Core Sync Service
+
 
 
 
@@ -336,9 +365,12 @@ sync_task_to_issue() {
 
 
 
+
+
 ```
 
 #### File Watcher Implementation
+
 
 
 
@@ -365,11 +397,14 @@ done
 
 
 
+
+
 ```
 
 ### 2. **Issue-Driven Documentation Updates**
 
 #### Morgan Agent Enhancement
+
 
 
 
@@ -405,9 +440,12 @@ systemPrompt: |
 
 
 
+
+
 ```
 
 #### Issue Comment Webhook
+
 
 
 
@@ -437,6 +475,8 @@ spec:
                         # Extract task ID from issue
                         # Trigger Morgan to process comment
                         # Update documentation if needed
+
+
 
 
 

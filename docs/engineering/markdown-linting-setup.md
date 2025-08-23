@@ -57,6 +57,7 @@ The linting runs automatically via pre-commit hooks:
 
 
 
+
 ```bash
 # Install pre-commit hooks (if not already done)
 pre-commit install
@@ -72,11 +73,14 @@ pre-commit run markdownlint --all-files
 
 
 
+
+
 ```
 
 ### Manual Linting
 
 Use the provided script for manual linting and fixing:
+
 
 
 
@@ -104,6 +108,8 @@ Use the provided script for manual linting and fixing:
 
 
 
+
+
 ```
 
 
@@ -111,6 +117,7 @@ Use the provided script for manual linting and fixing:
 ### Direct CLI Usage
 
 You can also use markdownlint directly:
+
 
 
 
@@ -124,6 +131,8 @@ markdownlint --config .markdownlint.yaml "**/*.md"
 
 # Run on specific files
 markdownlint --config .markdownlint.yaml README.md docs/
+
+
 
 
 
@@ -193,6 +202,7 @@ Edit `.markdownlint.yaml` to adjust rules:
 
 
 
+
 ```yaml
 # Example: Increase line length limit
 MD013:
@@ -208,10 +218,13 @@ MD036: false
 
 
 
+
+
 ```
 
 ### Adding Exclusions
 Add files to exclude in `.markdownlint.yaml`:
+
 
 
 
@@ -225,6 +238,8 @@ exclude:
 
 
   - "*.template.md"
+
+
 
 
 
@@ -265,12 +280,15 @@ exclude:
 
 
 
+
 ```bash
 # Install markdownlint-cli
 npm install -g markdownlint-cli
 
 # Reinstall pre-commit hooks
 pre-commit install
+
+
 
 
 
@@ -298,8 +316,11 @@ pre-commit install
 
 
 
+
 ```bash
 chmod +x fix-markdown-lint.sh
+
+
 
 
 

@@ -40,6 +40,7 @@ Add a `format` parameter to relevant MCP tools:
 
 
 
+
 ```rust
 // In mcp/src/tools.rs
 Tool {
@@ -86,11 +87,14 @@ Tool {
 
 
 
+
+
 ```
 
 ### 2. Controller CRD Updates
 
 Update the CRDs to include format specification:
+
 
 
 
@@ -123,6 +127,8 @@ fn default_format() -> DocumentFormat {
 
 
 
+
+
 ```
 
 Similar updates for `DocsRunSpec` and `PlayRunSpec`.
@@ -130,6 +136,7 @@ Similar updates for `DocsRunSpec` and `PlayRunSpec`.
 ### 3. Container Script Adaptation
 
 Update container scripts to handle both formats:
+
 
 
 
@@ -201,11 +208,14 @@ EOF
 
 
 
+
+
 ```
 
 ### 4. Handlebars Template Updates
 
 Update handlebars templates to support format selection:
+
 
 
 
@@ -233,11 +243,14 @@ export RESPONSE_FORMAT="markdown"
 
 
 
+
+
 ```
 
 ### 5. Format-Specific Processing
 
 #### XML Processing Benefits
+
 
 
 
@@ -271,9 +284,12 @@ export RESPONSE_FORMAT="markdown"
 
 
 
+
+
 ```
 
 #### Markdown Processing (Default)
+
 
 
 
@@ -316,9 +332,12 @@ export RESPONSE_FORMAT="markdown"
 
 
 
+
+
 ```
 
 ### 6. Format Detection and Validation
+
 
 
 
@@ -361,6 +380,8 @@ impl DocumentFormatter for XmlFormatter {
         // Validate XML structure (DTD/XSD)
     }
 }
+
+
 
 
 
@@ -426,6 +447,7 @@ impl DocumentFormatter for XmlFormatter {
 
 
 
+
 ```typescript
 // No format specified - uses markdown by default
 await mcp.call("mcp_cto_code", {
@@ -438,11 +460,14 @@ await mcp.call("mcp_cto_code", {
 
 
 
+
+
 ```
 
 
 
 ### Example 2: Explicit XML Format
+
 
 
 
@@ -459,11 +484,14 @@ await mcp.call("mcp_cto_code", {
 
 
 
+
+
 ```
 
 
 
 ### Example 3: Play Workflow with XML
+
 
 
 
@@ -482,9 +510,12 @@ await mcp.call("mcp_cto_play", {
 
 
 
+
+
 ```
 
 ### Example 4: A/B Testing Formats
+
 
 
 
@@ -509,9 +540,12 @@ const xmlRun = await mcp.call("mcp_cto_code", {
 
 
 
+
+
 ```
 
 ## Environment Variables
+
 
 
 
@@ -528,11 +562,14 @@ VALIDATE_FORMAT=true|false       # Enable format validation
 
 
 
+
+
 ```
 
 ## Monitoring and Metrics
 
 Track format usage and performance:
+
 
 
 
@@ -562,6 +599,8 @@ static TOKEN_USAGE_BY_FORMAT: Lazy<IntCounterVec> = Lazy::new(|| {
         &["format", "agent"]
     ).unwrap()
 });
+
+
 
 
 
@@ -626,6 +665,7 @@ static TOKEN_USAGE_BY_FORMAT: Lazy<IntCounterVec> = Lazy::new(|| {
 
 
 
+
 ```rust
 
 
@@ -651,9 +691,12 @@ fn test_xml_format_selection() {
 
 
 
+
+
 ```
 
 ### Integration Tests
+
 
 
 
@@ -668,6 +711,8 @@ mcp_cto_code --task-id 42 --format xml
 
 # Verify outputs are equivalent
 diff -u output_markdown.txt output_xml.txt
+
+
 
 
 
@@ -696,6 +741,7 @@ diff -u output_markdown.txt output_xml.txt
 
 
 
+
 ```rust
 // Automatically choose format based on task complexity
 fn auto_select_format(task: &Task) -> DocumentFormat {
@@ -711,11 +757,14 @@ fn auto_select_format(task: &Task) -> DocumentFormat {
 
 
 
+
+
 ```
 
 
 
 ### 2. Custom Formats
+
 
 
 
@@ -733,9 +782,12 @@ enum DocumentFormat {
 
 
 
+
+
 ```
 
 ### 3. Format Conversion
+
 
 
 
@@ -752,11 +804,14 @@ impl From<MarkdownDocument> for XmlDocument {
 
 
 
+
+
 ```
 
 
 
 ### 4. Format Templates
+
 
 
 
@@ -769,6 +824,8 @@ format_templates:
   cleo:
     quality_checks: xml
     reports: markdown
+
+
 
 
 

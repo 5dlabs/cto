@@ -67,6 +67,7 @@ This is an integrated platform with a clear data flow:
 
 
 
+
 ```bash
 
 
@@ -84,6 +85,8 @@ helm install agent-platform 5dlabs/agent-platform --namespace agent-platform --c
 wget https://raw.githubusercontent.com/5dlabs/cto/main/infra/scripts/setup-agent-secrets.sh
 chmod +x setup-agent-secrets.sh
 ./setup-agent-secrets.sh --help
+
+
 
 
 
@@ -133,6 +136,7 @@ To access your Kubernetes cluster from anywhere (not just local network), instal
 
 
 
+
 ```bash
 # Add TwinGate Helm repository
 helm repo add twingate https://twingate.github.io/helm-charts
@@ -158,6 +162,8 @@ helm upgrade --install twingate-weightless-hummingbird twingate/connector \
 
 
 
+
+
 ```
 
 **Important**: After installation, add your Kubernetes service CIDR as resources in TwinGate admin panel. This enables the MCP tools to reach the agent-platform service using internal Kubernetes service URLs (e.g., `http://agent-platform.agent-platform.svc.cluster.local`) from anywhere.
@@ -169,12 +175,15 @@ For Cursor/Claude integration, install the MCP server:
 
 
 
+
 ```bash
 # One-liner installer (Linux/macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/5dlabs/cto/releases/download/v0.2.0/tools-installer.sh | sh
 
 # Verify installation
 cto-mcp --help   # MCP server for Cursor/Claude integration
+
+
 
 
 
@@ -197,6 +206,7 @@ cto-mcp --help   # MCP server for Cursor/Claude integration
 ### Configure Project Settings
 
 Create a `cto-config.json` file in your project root to configure agents, models, and defaults:
+
 
 
 
@@ -247,11 +257,14 @@ Create a `cto-config.json` file in your project root to configure agents, models
 
 
 
+
+
 ```
 
 ### Configure Cursor MCP Integration
 
 After creating your configuration file, configure Cursor to use the MCP server by creating a `.cursor/mcp.json` file in your project directory:
+
 
 
 
@@ -266,6 +279,8 @@ After creating your configuration file, configure Cursor to use the MCP server b
     }
   }
 }
+
+
 
 
 
@@ -299,6 +314,7 @@ After creating your configuration file, configure Cursor to use the MCP server b
 
 
 
+
 ```bash
 
 
@@ -324,6 +340,8 @@ cp target/release/cto-mcp /usr/local/bin/
 
 
 
+
+
 ```
 
 
@@ -334,6 +352,7 @@ The platform exposes three primary MCP tools:
 
 #### 1. `docs` - Generate Documentation
 Analyzes your Task Master project and creates comprehensive documentation.
+
 
 
 
@@ -356,6 +375,8 @@ docs({
 
 
 
+
+
 ```
 
 **What happens:**
@@ -365,6 +386,8 @@ docs({
 ✅ Submits a GitHub PR with the docs
 
 **Generated Documents:**
+
+
 
 
 
@@ -388,10 +411,13 @@ docs({
 
 
 
+
+
 ```
 
 #### 2. `code` - Implement Code
 Deploys an autonomous Claude agent to implement a specific task from your Task Master project.
+
 
 
 
@@ -424,6 +450,8 @@ code({
 
 
 
+
+
 ```
 
 **What happens:**
@@ -435,6 +463,7 @@ code({
 
 #### 3. `play` - Multi-Agent Orchestration
 Executes complex multi-agent workflows with event-driven coordination. Perfect for large features that require implementation, quality assurance, and testing phases.
+
 
 
 
@@ -459,6 +488,8 @@ play({
   model: "claude-opus-4-1-20250805",
   repository: "myorg/my-custom-repo"
 });
+
+
 
 
 
@@ -624,12 +655,15 @@ Edit the settings template files directly:
 
 
 
+
 ```bash
 # For docs generation agents
 vim infra/charts/agent-platform/claude-templates/docs/settings.json.hbs
 
 # For code implementation agents
 vim infra/charts/agent-platform/claude-templates/code/settings.json.hbs
+
+
 
 
 
@@ -662,6 +696,7 @@ See [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settin
 
 
 
+
 ```bash
 
 
@@ -673,9 +708,12 @@ vim infra/charts/agent-platform/claude-templates/docs/prompt.md.hbs
 
 
 
+
+
 ```
 
 **For code tasks** (affects specific task implementation):
+
 
 
 
@@ -691,6 +729,8 @@ vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
 
 
 
+
+
 ```
 
 #### 3. Customizing Play Workflows
@@ -700,11 +740,14 @@ vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
 
 
 
+
 ```bash
 
 
 # Edit the play workflow template
 vim infra/charts/agent-platform/templates/workflowtemplates/play-workflow-template.yaml
+
+
 
 
 
@@ -734,12 +777,15 @@ Hooks are shell scripts that run during agent execution. Add new hook files to t
 
 
 
+
 ```bash
 # Create new hook script (docs example)
 vim infra/charts/agent-platform/claude-templates/docs/hooks/my-custom-hook.sh.hbs
 
 # Create new hook script (code example)
 vim infra/charts/agent-platform/claude-templates/code/hooks/my-custom-hook.sh.hbs
+
+
 
 
 
@@ -759,12 +805,15 @@ After editing any template files, redeploy the agent-platform:
 
 
 
+
 ```bash
 # Deploy template changes
 helm upgrade agent-platform . -n agent-platform
 
 # Verify ConfigMap was updated
 kubectl get configmap claude-templates-configmap -n agent-platform -o yaml
+
+
 
 
 

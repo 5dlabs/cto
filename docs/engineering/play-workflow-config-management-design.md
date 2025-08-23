@@ -27,6 +27,8 @@ Use a Kubernetes ConfigMap to store project-specific configuration that persists
 
 
 
+
+
 ```
 ┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
 │   MCP Tool      │───▶│   ConfigMap         │◀───│ Task-Complete       │
@@ -45,12 +47,15 @@ Use a Kubernetes ConfigMap to store project-specific configuration that persists
 
 
 
+
+
 ```
 
 ### ConfigMap Structure
 
 **Name**: `{service}-play-project-config` (e.g., `cto-play-project-config`)
 **Namespace**: `agent-platform`
+
 
 
 
@@ -89,6 +94,8 @@ data:
 
 
 
+
+
 ```
 
 ## Implementation Plan
@@ -98,6 +105,7 @@ data:
 ### Phase 1: MCP Tool Updates
 
 **File**: `mcp/src/tools.rs` (or equivalent)
+
 
 
 
@@ -113,6 +121,8 @@ data:
 
 
 3. Start workflow with task_id as usual
+
+
 
 
 
@@ -136,6 +146,7 @@ Replace hardcoded values:
 
 
 
+
 ```bash
 
 
@@ -156,6 +167,8 @@ model: "$MODEL"
 
 
 
+
+
 ```
 
 ### Phase 3: Error Handling & Fallbacks
@@ -167,6 +180,7 @@ model: "$MODEL"
 ## User Experience
 
 ### Scenario 1: Fresh Project Start
+
 
 
 
@@ -192,9 +206,12 @@ mcp_cto_play task_id=1 implementation_agent=5DLabs-Blaze model=claude-opus-4-1-2
 
 
 
+
+
 ```
 
 ### Scenario 2: Mid-Project Agent Change
+
 
 
 
@@ -218,9 +235,12 @@ mcp_cto_play task_id=3 implementation_agent=5DLabs-Rex
 
 
 
+
+
 ```
 
 ### Scenario 3: Resume Without Changes
+
 
 
 
@@ -233,6 +253,8 @@ mcp_cto_play task_id=4
 # Result:
 # - ConfigMap unchanged
 # - Task 4 uses existing ConfigMap settings
+
+
 
 
 
@@ -333,11 +355,14 @@ Support multiple parallel projects:
 
 
 
+
 ```yaml
 # Multiple ConfigMaps:
 cto-play-project-config        # Default project
 cto-play-feature-xyz-config    # Feature branch project
 cto-play-experiment-config     # Experimental project
+
+
 
 
 

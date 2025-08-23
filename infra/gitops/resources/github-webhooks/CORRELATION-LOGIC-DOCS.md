@@ -16,6 +16,7 @@ The primary extraction method uses PR labels with the format `task-{id}`:
 
 
 
+
 ```go-template
 {{- range $i, $label := .Input.body.pull_request.labels -}}
   {{- if hasPrefix $label.name "task-" -}}
@@ -31,10 +32,13 @@ The primary extraction method uses PR labels with the format `task-{id}`:
 
 
 
+
+
 ```
 
 ### Fallback Method: Branch Name
 If no valid task label is found, the system falls back to extracting from the branch name:
+
 
 
 
@@ -60,6 +64,8 @@ If no valid task label is found, the system falls back to extracting from the br
 
 
 
+
+
 ```
 
 ## Workflow Targeting
@@ -75,6 +81,7 @@ Workflows are resumed by setting the workflow name in `args.0`:
 
 
 
+
 ```yaml
 argoWorkflow:
   operation: resume
@@ -85,6 +92,8 @@ argoWorkflow:
         dataTemplate: |
           play-task-{{ $taskId }}-workflow
       dest: args.0
+
+
 
 
 
@@ -125,6 +134,7 @@ When multiple task labels exist, the first valid one is used:
 
 
 
+
 ```go-template
 {{- range $i, $label := .Input.body.pull_request.labels -}}
   {{- if hasPrefix $label.name "task-" -}}
@@ -141,12 +151,15 @@ When multiple task labels exist, the first valid one is used:
 
 
 
+
+
 ```
 
 
 
 ### Malformed Task Labels
 Labels like `task-abc` (non-numeric) are ignored, triggering fallback to branch extraction:
+
 
 
 
@@ -158,6 +171,8 @@ Labels like `task-abc` (non-numeric) are ignored, triggering fallback to branch 
 {{- else -}}
   {{- /* Mark as malformed and continue */ -}}
 {{- end -}}
+
+
 
 
 
@@ -191,11 +206,14 @@ When an implementation agent (Rex, Blaze, Morgan) pushes to a task branch:
 
 
 
+
 ```yaml
 - path: body.pusher.name
   type: string
   comparator: "~"
   value: "5DLabs-(Rex|Blaze|Morgan)(\\[bot\\])?|5DLabs-(Rex|Blaze|Morgan)"
+
+
 
 
 
@@ -215,11 +233,15 @@ To add a new implementation agent (e.g., "Nova"):
 
 
 
+
+
 ```
 
 2. Add to exclusion list in cleanup operations:
    ```yaml
    kubectl delete coderun -l github-app!=5DLabs-Rex,github-app!=5DLabs-Blaze,github-app!=5DLabs-Morgan,github-app!=5DLabs-Nova
+
+
 
 
 
@@ -235,6 +257,7 @@ To add a new implementation agent (e.g., "Nova"):
 
 
 
+
 ```bash
 echo '{"pull_request":{"labels":[{"name":"task-5"}]}}' | \
   jq -r '.pull_request.labels[]?.name | select(startswith("task-")) | split("-")[1]'
@@ -247,9 +270,12 @@ echo '{"pull_request":{"labels":[{"name":"task-5"}]}}' | \
 
 
 
+
+
 ```
 
 #### Test Branch Extraction
+
 
 
 
@@ -267,9 +293,12 @@ fi
 
 
 
+
+
 ```
 
 #### Test Feature Branch Format
+
 
 
 
@@ -287,6 +316,8 @@ fi
 
 
 
+
+
 ```
 
 
@@ -297,8 +328,11 @@ Use `test-correlation-logic.sh` to validate all extraction patterns:
 
 
 
+
 ```bash
 ./test-correlation-logic.sh
+
+
 
 
 
@@ -337,8 +371,11 @@ Monitor sensor processing:
 
 
 
+
 ```bash
 kubectl logs -f $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow-correlation -o name | head -1) -n argo
+
+
 
 
 
@@ -352,9 +389,12 @@ Add debug output in dataTemplate:
 
 
 
+
 ```go-template
 {{- /* Debug: Print extracted values */ -}}
 {{- printf "TaskID: %s, Branch: %s" $taskId .Input.body.pull_request.head.ref -}}
+
+
 
 
 
@@ -393,12 +433,15 @@ All triggers include retry configuration:
 
 
 
+
 ```yaml
 retryStrategy:
   steps: 3
   duration: "10s"
   factor: 2
   jitter: 0.1
+
+
 
 
 
@@ -414,6 +457,7 @@ Sensor pods should have appropriate resource limits:
 
 
 
+
 ```yaml
 resources:
   limits:
@@ -422,6 +466,8 @@ resources:
   requests:
     memory: "128Mi"
     cpu: "100m"
+
+
 
 
 

@@ -28,6 +28,7 @@ A containerized development environment with Cursor CLI (`cursor-agent`) for AI-
 
 
 
+
 ```bash
 
 
@@ -39,9 +40,12 @@ docker build -t cursor-agent:latest .
 
 
 
+
+
 ```
 
 ### Running Locally
+
 
 
 
@@ -63,9 +67,12 @@ docker run -it \
 
 
 
+
+
 ```
 
 ### Kubernetes TaskRun Integration
+
 
 
 
@@ -84,6 +91,8 @@ spec:
         #!/bin/bash
         set -euo pipefail
         cursor-agent -p "review these changes for security issues" --output-format text
+
+
 
 
 

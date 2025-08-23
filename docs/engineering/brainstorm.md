@@ -136,6 +136,7 @@ Each agent is a different GitHub App with its own character/persona and speciali
 
 
 
+
 ```yaml
 # Triggered on pull_request event
 - name: pr-validation
@@ -155,9 +156,12 @@ Each agent is a different GitHub App with its own character/persona and speciali
 
 
 
+
+
 ```
 
 **Issue/Task Flow:**
+
 
 
 
@@ -179,6 +183,8 @@ Each agent is a different GitHub App with its own character/persona and speciali
         dependencies: [clippy-format]
         templateRef: { name: coderun-template }
         arguments: { parameters: [{ name: github-app, value: "qa-agent" }] }
+
+
 
 
 

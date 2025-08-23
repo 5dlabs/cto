@@ -45,6 +45,7 @@ Add metadata to tasks explicitly declaring dependencies and conflict zones:
 
 
 
+
 ```yaml
 task-5:
   depends_on: [task-1, task-3]  # Explicit dependencies
@@ -56,6 +57,8 @@ task-5:
 
 
     - database/migrations/*
+
+
 
 
 
@@ -123,11 +126,14 @@ Start with explicit grouping of tasks:
 
 
 
+
 ```yaml
 execution_groups:
   - sequential: [task-1, task-2]       # Must be sequential
   - parallel: [task-3, task-4, task-5]  # Can run together
   - sequential: [task-6]                # Depends on parallel group
+
+
 
 
 
@@ -162,6 +168,7 @@ Modify Argo Workflows to handle parallel execution:
 
 
 
+
 ```yaml
 - name: parallel-task-group
   parallel:
@@ -177,6 +184,8 @@ Modify Argo Workflows to handle parallel execution:
 - name: wait-for-group
   dependencies: [parallel-task-group]
   template: consolidate-results
+
+
 
 
 
@@ -225,12 +234,15 @@ Calculate risk score based on multiple factors:
 
 
 
+
 ```yaml
 task-3:
   parallel_safe: true
   modifies: ["src/auth/*"]
   depends_on_completion: [task-1]
   can_run_with: [task-4, task-5]
+
+
 
 
 

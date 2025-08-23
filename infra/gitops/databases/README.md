@@ -22,6 +22,7 @@ Example minimal cluster:
 
 
 
+
 ```yaml
 apiVersion: acid.zalan.do/v1
 kind: postgresql
@@ -50,9 +51,12 @@ spec:
 
 
 
+
+
 ```
 
 ### Useful Commands
+
 
 
 
@@ -82,6 +86,8 @@ kubectl get pods -l cluster-name=my-postgres-cluster
 
 
 
+
+
 ```
 
 
@@ -103,6 +109,7 @@ The Spotahome Redis operator manages Redis failover clusters with Sentinel for h
 ### Creating a Redis Failover Cluster
 
 Example minimal cluster:
+
 
 
 
@@ -148,9 +155,12 @@ spec:
 
 
 
+
+
 ```
 
 ### Useful Commands
+
 
 
 
@@ -172,6 +182,8 @@ kubectl exec -it rfr-my-redis-cluster-0 -- redis-cli
 
 # Check Sentinel status
 kubectl exec -it rfs-my-redis-cluster-0 -- redis-cli -p 26379 sentinel masters
+
+
 
 
 
@@ -203,6 +215,7 @@ Example minimal instance:
 
 
 
+
 ```yaml
 apiVersion: crd.questdb.io/v1beta1
 kind: QuestDB
@@ -231,9 +244,12 @@ spec:
 
 
 
+
+
 ```
 
 ### Useful Commands
+
 
 
 
@@ -264,11 +280,14 @@ psql -h localhost -p 8812 -U admin -d qdb
 
 
 
+
+
 ```
 
 ### Data Ingestion Methods
 
 1. **InfluxDB Line Protocol (ILP)** - Fastest for high-volume ingestion:
+
 
 
 
@@ -281,14 +300,19 @@ echo "sensors,location=lab1 temp=23.5,humidity=45.2 $(date +%s%N)" | \
 
 
 
+
+
 ```
 
 2. **PostgreSQL Wire Protocol** - Standard SQL interface:
 
 
 
+
 ```sql
 INSERT INTO metrics VALUES(now(), 'cpu', 45.2);
+
+
 
 
 
@@ -301,11 +325,14 @@ INSERT INTO metrics VALUES(now(), 'cpu', 45.2);
 
 
 
+
 ```bash
 curl -X POST http://questdb:9000/exec \
 
 
   -d "query=INSERT INTO metrics VALUES(now(), 'memory', 78.5)"
+
+
 
 
 
@@ -405,6 +432,7 @@ Configure ServiceMonitors or scrape configs to collect these metrics.
 
 
 
+
 ```bash
 
 
@@ -424,11 +452,14 @@ kubectl logs my-postgres-cluster-0 -c postgres
 
 
 
+
+
 ```
 
 
 
 ### Redis Issues
+
 
 
 
@@ -451,11 +482,14 @@ kubectl logs rfr-my-redis-cluster-0
 
 
 
+
+
 ```
 
 
 
 ### QuestDB Issues
+
 
 
 
@@ -481,6 +515,8 @@ curl -G http://localhost:9000/exec \
 
 
   --data-urlencode "query=SHOW TABLES"
+
+
 
 
 

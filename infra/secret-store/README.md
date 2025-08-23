@@ -11,6 +11,7 @@ After deploying the secret-store application, you need to manually create the Gi
 
 
 
+
 ```bash
 # Create the GitHub PAT secret with your actual token
 kubectl create secret generic github-pat \
@@ -25,6 +26,8 @@ kubectl create secret generic github-pat \
 
 # Verify the secret was created
 kubectl get secret github-pat -n secret-store -o yaml
+
+
 
 
 
@@ -82,6 +85,7 @@ Check that External Secrets are working:
 
 
 
+
 ```bash
 
 
@@ -104,6 +108,8 @@ kubectl get secret github-pat -n arc-runners
 
 
 
+
+
 ```
 
 ## ngrok Operator Credentials
@@ -111,6 +117,7 @@ kubectl get secret github-pat -n arc-runners
 Source secret lives in the `secret-store` namespace as a key/value bag named `ngrok-credentials`.
 
 Populate it locally from your `.env` file (do not commit the file):
+
 
 
 
@@ -129,6 +136,8 @@ kubectl -n secret-store create secret generic ngrok-credentials \
 
 # verify
 kubectl -n secret-store get secret ngrok-credentials -o yaml | grep -E 'NGROK_API_KEY|NGROK_AUTH_TOKEN'
+
+
 
 
 

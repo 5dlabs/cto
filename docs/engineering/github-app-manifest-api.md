@@ -46,6 +46,7 @@ Since we want full automation, we'll use a hybrid approach:
 
 
 
+
 ```bash
 # Redirect URL format (requires user interaction)
 https://github.com/organizations/{org}/settings/apps/new?state={state}&manifest={manifest}
@@ -58,9 +59,12 @@ https://github.com/settings/apps/new?state={state}&manifest={manifest}
 
 
 
+
+
 ```
 
 ### Full Manifest Schema
+
 
 
 
@@ -129,11 +133,14 @@ https://github.com/settings/apps/new?state={state}&manifest={manifest}
 
 
 
+
+
 ```
 
 ## Programmatic App Creation Strategy
 
 ### Option 1: Using GitHub REST API (Recommended)
+
 
 
 
@@ -167,11 +174,14 @@ async fn create_github_app(
 
 
 
+
+
 ```
 
 ### Option 2: Management App Pattern
 
 Create a single "Agent Factory" GitHub App with permissions to manage other apps:
+
 
 
 
@@ -186,9 +196,12 @@ metadata: read         # Basic access
 
 
 
+
+
 ```
 
 Then use this app to create child apps:
+
 
 
 
@@ -212,11 +225,14 @@ async fn create_via_management_app(
 
 
 
+
+
 ```
 
 ### Option 3: Pre-Registration Pattern
 
 Pre-create a pool of GitHub Apps and assign them dynamically:
+
 
 
 
@@ -237,11 +253,14 @@ app_pool:
 
 
 
+
+
 ```
 
 ## Implementation Code Structure
 
 ### 1. Manifest Builder
+
 
 
 
@@ -287,9 +306,12 @@ impl AppManifest {
 
 
 
+
+
 ```
 
 ### 2. Permission Inference Engine
+
 
 
 
@@ -352,9 +374,12 @@ impl AgentPersona {
 
 
 
+
+
 ```
 
 ### 3. Webhook Configuration
+
 
 
 
@@ -403,11 +428,14 @@ fn generate_webhook_secret() -> String {
 
 
 
+
+
 ```
 
 ## API Authentication & Creation Flow
 
 ### Step 1: Generate Manifest
+
 
 
 
@@ -420,9 +448,12 @@ let manifest_json = serde_json::to_string_pretty(&manifest)?;
 
 
 
+
+
 ```
 
 ### Step 2: Create App (Requires Manual Step)
+
 
 
 
@@ -446,9 +477,12 @@ println!("Visit this URL to create the app: {}", creation_url);
 
 
 
+
+
 ```
 
 ### Step 3: Handle Callback
+
 
 
 
@@ -480,11 +514,14 @@ async fn handle_app_creation_callback(
 
 
 
+
+
 ```
 
 ## Alternative: GitHub CLI Extension
 
 Create a gh extension for semi-automated creation:
+
 
 
 
@@ -512,11 +549,14 @@ gh api \
 
 
 
+
+
 ```
 
 ## Kubernetes Secret Storage
 
 After app creation, store credentials:
+
 
 
 
@@ -539,6 +579,8 @@ data:
   private-key: <base64 encoded>
   webhook-secret: <base64 encoded>
   installation-id: <base64 encoded>
+
+
 
 
 
@@ -570,6 +612,8 @@ data:
 
 
 
+
+
 ```
 
 
@@ -578,6 +622,8 @@ data:
    ```rust
    // Append timestamp or increment
    let unique_name = format!("{}-{}", base_name, timestamp);
+
+
 
 
 
@@ -601,11 +647,14 @@ data:
 
 
 
+
+
 ```
 
 ## Testing Approach
 
 ### 1. Mock Manifest Generation
+
 
 
 
@@ -633,9 +682,12 @@ mod tests {
 
 
 
+
+
 ```
 
 ### 2. Integration Test with GitHub
+
 
 
 
@@ -654,6 +706,8 @@ async fn test_github_app_creation() {
     assert!(result.is_ok());
     // Clean up test app
 }
+
+
 
 
 

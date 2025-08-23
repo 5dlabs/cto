@@ -42,6 +42,7 @@ A single MCP call `create_agent_persona` that takes a description of what the ag
 
 
 
+
 ```typescript
 interface CreateAgentPersonaParams {
   // Core agent definition
@@ -71,6 +72,8 @@ interface CreateAgentPersonaParams {
 
 
 
+
+
 ```
 
 ## Auto-Generation Strategy
@@ -78,6 +81,7 @@ interface CreateAgentPersonaParams {
 ### 1. Persona Generation
 
 Using a local LLM or the configured AI model to generate:
+
 
 
 
@@ -115,11 +119,14 @@ persona:
 
 
 
+
+
 ```
 
 ### 2. System Prompt Generation
 
 Transform the purpose and persona into structured prompts:
+
 
 
 
@@ -149,6 +156,8 @@ system_prompts:
 
 
 
+
+
 ```
 
 ## GitHub App Creation
@@ -168,6 +177,7 @@ GitHub supports creating apps via a manifest flow. The tool will:
 3. Complete the app setup flow programmatically
 
 ### Sample Manifest Structure
+
 
 
 
@@ -207,11 +217,14 @@ GitHub supports creating apps via a manifest flow. The tool will:
 
 
 
+
+
 ```
 
 ## Implementation Workflow
 
 ### Phase 1: Persona Generation
+
 
 
 
@@ -227,9 +240,12 @@ graph TD
 
 
 
+
+
 ```
 
 ### Phase 2: GitHub App Creation
+
 
 
 
@@ -245,9 +261,12 @@ graph TD
 
 
 
+
+
 ```
 
 ### Phase 3: Configuration
+
 
 
 
@@ -262,11 +281,14 @@ graph TD
 
 
 
+
+
 ```
 
 ## Generated Configuration Files
 
 ### 1. Agent Configuration (`agent-config.yaml`)
+
 
 
 
@@ -320,9 +342,12 @@ data:
 
 
 
+
+
 ```
 
 ### 2. Kubernetes Resources
+
 
 
 
@@ -339,6 +364,8 @@ data:
   app-id: <base64>
   private-key: <base64>
   webhook-secret: <base64>
+
+
 
 
 
@@ -375,9 +402,12 @@ Based on the agent's purpose, automatically determine GitHub permissions:
 
 
 
+
 ```bash
 mcp_cto_create_agent --purpose "Security vulnerability detection and code auditing" \
   --personality_hints '{"archetype": "detective", "tone": "analytical"}'
+
+
 
 
 
@@ -395,9 +425,12 @@ Generated:
 
 
 
+
 ```bash
 mcp_cto_create_agent --purpose "Technical documentation and API reference generation" \
   --personality_hints '{"archetype": "librarian", "quirks": ["loves organization", "explains clearly"]}'
+
+
 
 
 
@@ -415,8 +448,11 @@ Generated:
 
 
 
+
 ```bash
 mcp_cto_create_agent --purpose "Performance optimization and bottleneck detection"
+
+
 
 
 

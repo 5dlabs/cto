@@ -21,12 +21,15 @@ This document outlines a redesign of the toolman (MCP client) configuration syst
 
 
 
+
 ```mermaid
 graph TD
     A[Task Submission] --> B[Docs Agent Analyzes Task]
     B --> C[Generate client-config.json]
     C --> D[Mount to Code Agent Container]
     D --> E[Agent Executes with Tools]
+
+
 
 
 
@@ -48,12 +51,15 @@ Transform the tool configuration from a task-driven model to an agent-driven mod
 
 
 
+
 ```mermaid
 graph TD
     A[Agent Definition] --> B[Predefined Tool Set]
     B --> C[Static client-config.json]
     C --> D[Task Submission]
     D --> E[Agent Uses Existing Tools]
+
+
 
 
 
@@ -67,6 +73,7 @@ graph TD
 ### 1. Agent Tool Profiles
 
 Each agent will have a tool profile that defines their standard toolset:
+
 
 
 
@@ -218,11 +225,14 @@ agents:
 
 
 
+
+
 ```
 
 ### 2. Tool Inheritance and Composition
 
 Support tool inheritance for common patterns:
+
 
 
 
@@ -296,11 +306,14 @@ toolProfiles:
 
 
 
+
+
 ```
 
 ### 3. Client Config Generation
 
 Transform agent definitions into `client-config.json` at deployment time:
+
 
 
 
@@ -341,11 +354,14 @@ impl AgentConfig {
 
 
 
+
+
 ```
 
 ### 4. Dynamic Tool Augmentation
 
 Support task-specific tool additions when necessary:
+
 
 
 
@@ -370,6 +386,8 @@ task:
 
 
 
+
+
 ```
 
 
@@ -377,6 +395,7 @@ task:
 ### 5. Tool Capability Discovery
 
 Agents can query their available tools:
+
 
 
 
@@ -404,6 +423,8 @@ interface AgentCapabilities {
 
 
 
+
+
 ```
 
 ## Implementation Plan
@@ -424,6 +445,8 @@ interface AgentCapabilities {
        {{ .Values.agents.morgan.tools | toYaml }}
      rex-tools.yaml: |
        {{ .Values.agents.rex.tools | toYaml }}
+
+
 
 
 
@@ -473,6 +496,8 @@ interface AgentCapabilities {
 
 
 
+
+
 ```
 
 
@@ -501,6 +526,8 @@ interface AgentCapabilities {
 
 
 
+
+
 ```
 
 
@@ -513,6 +540,8 @@ interface AgentCapabilities {
    # Extract common tool patterns from existing configs
    # Generate recommended agent tool profiles
    # Update values.yaml with new structure
+
+
 
 
 
@@ -543,6 +572,8 @@ interface AgentCapabilities {
            }
        })
    }
+
+
 
 
 
@@ -587,6 +618,7 @@ interface AgentCapabilities {
 
 
 
+
 ```yaml
 agents:
   lexie:
@@ -614,9 +646,12 @@ agents:
 
 
 
+
+
 ```
 
 Generated `client-config.json`:
+
 
 
 
@@ -640,9 +675,12 @@ Generated `client-config.json`:
 
 
 
+
+
 ```
 
 ### Example 2: Full-Stack Developer Agent
+
 
 
 
@@ -716,9 +754,12 @@ agents:
 
 
 
+
+
 ```
 
 ### Example 3: Infrastructure Specialist
+
 
 
 
@@ -768,6 +809,8 @@ agents:
 
 
 
+
+
 ```
 
 ## Migration Strategy
@@ -776,10 +819,13 @@ agents:
 
 
 
+
 ```bash
 # Analyze all existing client-config.json files
 find . -name "client-config.json" -exec jq '.remoteTools' {} \; | \
   jq -s 'flatten | group_by(.) | map({tool: .[0], count: length}) | sort_by(.count) | reverse'
+
+
 
 
 
@@ -819,6 +865,7 @@ Integrate with existing tool catalog for validation:
 
 
 
+
 ```rust
 impl ToolValidator {
     fn validate_agent_tools(agent: &AgentConfig) -> Result<()> {
@@ -834,6 +881,8 @@ impl ToolValidator {
         Ok(())
     }
 }
+
+
 
 
 
@@ -865,6 +914,7 @@ impl ToolValidator {
 
 
 
+
 ```rust
 // Analyze task history to recommend tools
 async fn recommend_tools_for_agent(
@@ -879,11 +929,14 @@ async fn recommend_tools_for_agent(
 
 
 
+
+
 ```
 
 
 
 ### 2. Tool Usage Telemetry
+
 
 
 
@@ -910,9 +963,12 @@ telemetry:
 
 
 
+
+
 ```
 
 ### 3. Dynamic Tool Loading
+
 
 
 
@@ -930,6 +986,8 @@ impl DynamicToolLoader {
         Ok(())
     }
 }
+
+
 
 
 

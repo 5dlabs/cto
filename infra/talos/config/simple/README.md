@@ -43,11 +43,15 @@ This directory contains the working configuration for the Talos Kubernetes clust
 
 
 
+
+
 ```
 
 2. Apply worker config:
    ```bash
    talosctl apply-config --insecure --nodes 192.168.1.72 --file worker.yaml
+
+
 
 
 
@@ -63,11 +67,15 @@ This directory contains the working configuration for the Talos Kubernetes clust
 
 
 
+
+
 ```
 
 4. Get kubeconfig:
    ```bash
    talosctl --talosconfig talosconfig kubeconfig -n 192.168.1.77
+
+
 
 
 

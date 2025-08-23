@@ -13,6 +13,7 @@ This guide provides step-by-step instructions for deploying the enhanced GitHub 
 
 
 
+
 ```bash
 # Check EventSource
 kubectl get eventsource github -n argo
@@ -33,9 +34,12 @@ kubectl get secret github-webhook-secret -n argo
 
 
 
+
+
 ```
 
 ### 2. Verify Argo Events Version
+
 
 
 
@@ -48,11 +52,14 @@ kubectl get deploy -n argo-events -o jsonpath='{.items[*].spec.template.spec.con
 
 
 
+
+
 ```
 
 ## Deployment Steps
 
 ### Step 1: Apply the Enhanced Sensor
+
 
 
 
@@ -69,9 +76,12 @@ kubectl get sensor enhanced-play-workflow-correlation -n argo
 
 
 
+
+
 ```
 
 ### Step 2: Verify Sensor Status
+
 
 
 
@@ -93,9 +103,12 @@ kubectl get sensor enhanced-play-workflow-correlation -n argo -o jsonpath='{.sta
 
 
 
+
+
 ```
 
 ### Step 3: Monitor Sensor Pod
+
 
 
 
@@ -114,6 +127,8 @@ kubectl logs -f $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow
 
 
 
+
+
 ```
 
 ## Testing the Deployment
@@ -121,6 +136,7 @@ kubectl logs -f $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow
 ### Test 1: PR Creation Event
 
 Create a test workflow first:
+
 
 
 
@@ -148,9 +164,12 @@ EOF
 
 
 
+
+
 ```
 
 Simulate PR creation webhook:
+
 
 
 
@@ -169,9 +188,12 @@ curl -X POST http://github-eventsource-svc.argo:12000/github/webhook \
 
 
 
+
+
 ```
 
 ### Test 2: Ready-for-QA Label Event
+
 
 
 
@@ -189,9 +211,12 @@ curl -X POST http://github-eventsource-svc.argo:12000/github/webhook \
 
 
 
+
+
 ```
 
 ### Test 3: Branch Fallback
+
 
 
 
@@ -209,11 +234,14 @@ curl -X POST http://github-eventsource-svc.argo:12000/github/webhook \
 
 
 
+
+
 ```
 
 ## Validation Steps
 
 ### 1. Check Sensor Processing
+
 
 
 
@@ -235,11 +263,14 @@ kubectl logs -f $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow
 
 
 
+
+
 ```
 
 
 
 ### 2. Verify Workflow Resume
+
 
 
 
@@ -255,9 +286,12 @@ kubectl get workflow play-task-99-workflow -n argo -o jsonpath='{.status.phase}'
 
 
 
+
+
 ```
 
 ### 3. Check Remediation Logic
+
 
 
 
@@ -267,6 +301,8 @@ kubectl get workflows -n argo -l type=remediation
 
 # Check cleanup job execution
 kubectl get jobs -n argo -l job-name~="cancel-quality-agents-*"
+
+
 
 
 
@@ -283,8 +319,11 @@ kubectl get jobs -n argo -l job-name~="cancel-quality-agents-*"
 
 
 
+
 ```bash
 kubectl describe eventsource github -n argo
+
+
 
 
 
@@ -297,8 +336,11 @@ kubectl describe eventsource github -n argo
 
 
 
+
 ```bash
 kubectl get svc github-eventsource-svc -n argo
+
+
 
 
 
@@ -311,9 +353,12 @@ kubectl get svc github-eventsource-svc -n argo
 
 
 
+
 ```bash
 kubectl run test-curl --image=curlimages/curl --rm -it --restart=Never -- \
   curl -v http://github-eventsource-svc.argo:12000/github/webhook
+
+
 
 
 
@@ -328,8 +373,11 @@ kubectl run test-curl --image=curlimages/curl --rm -it --restart=Never -- \
 
 
 
+
 ```bash
 kubectl logs $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow-correlation -o name | head -1) -n argo --tail=100
+
+
 
 
 
@@ -342,9 +390,12 @@ kubectl logs $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow-co
 
 
 
+
 ```bash
 # Add debug output to sensor and redeploy
 # Look for template processing errors
+
+
 
 
 
@@ -357,8 +408,11 @@ kubectl logs $(kubectl get pods -n argo -l sensor-name=enhanced-play-workflow-co
 
 
 
+
 ```bash
 kubectl get workflows -n argo --show-labels | grep "play-task"
+
+
 
 
 
@@ -373,8 +427,11 @@ kubectl get workflows -n argo --show-labels | grep "play-task"
 
 
 
+
 ```bash
 kubectl get workflow play-task-X-workflow -n argo -o yaml | grep -A5 "suspend"
+
+
 
 
 
@@ -387,8 +444,11 @@ kubectl get workflow play-task-X-workflow -n argo -o yaml | grep -A5 "suspend"
 
 
 
+
 ```bash
 kubectl auth can-i update workflows --as=system:serviceaccount:argo:argo-events-sa -n argo
+
+
 
 
 
@@ -401,8 +461,11 @@ kubectl auth can-i update workflows --as=system:serviceaccount:argo:argo-events-
 
 
 
+
 ```bash
 kubectl get sensors -n argo | grep -E "(play-workflow|multi-agent)"
+
+
 
 
 
@@ -419,8 +482,11 @@ kubectl get sensors -n argo | grep -E "(play-workflow|multi-agent)"
 
 
 
+
 ```bash
 kubectl apply -f enhanced-correlation-sensor.yaml
+
+
 
 
 
@@ -433,9 +499,12 @@ kubectl apply -f enhanced-correlation-sensor.yaml
 
 
 
+
 ```bash
 # Create test workflows with high task numbers (900+)
 # These won't conflict with production tasks
+
+
 
 
 
@@ -448,9 +517,12 @@ kubectl apply -f enhanced-correlation-sensor.yaml
 
 
 
+
 ```bash
 # Watch both sensor logs
 kubectl logs -f -l sensor-name -n argo
+
+
 
 
 
@@ -524,6 +596,7 @@ kubectl logs -f -l sensor-name -n argo
 
 
 
+
 ```yaml
 # Edit sensor to add resource limits
 kubectl edit sensor enhanced-play-workflow-correlation -n argo
@@ -542,10 +615,13 @@ resources:
 
 
 
+
+
 ```
 
 ### Retry Configuration
 Adjust retry strategy based on webhook reliability:
+
 
 
 
@@ -561,6 +637,8 @@ retryStrategy:
 
 
 
+
+
 ```
 
 ### EventBus Scaling
@@ -568,9 +646,12 @@ For high webhook volume:
 
 
 
+
 ```bash
 kubectl edit eventbus default -n argo
 # Increase replicas under spec.nats.native.replicas
+
+
 
 
 
@@ -587,6 +668,7 @@ kubectl edit eventbus default -n argo
 
 
 
+
 ```yaml
 # Add to sensor for metrics exposure
 kubectl edit sensor enhanced-play-workflow-correlation -n argo
@@ -596,6 +678,8 @@ metrics:
   enabled: true
   port: 9090
   path: /metrics
+
+
 
 
 
@@ -623,6 +707,7 @@ Create dashboard with:
 
 
 
+
 ```yaml
 # Key alerts to configure:
 
@@ -643,6 +728,8 @@ Create dashboard with:
 
 
 
+
+
 ```
 
 ## Security Hardening
@@ -650,6 +737,7 @@ Create dashboard with:
 
 
 ### 1. Network Policies
+
 
 
 
@@ -686,10 +774,13 @@ spec:
 
 
 
+
+
 ```
 
 ### 2. Webhook Signature Validation
 Ensure webhook secret is strong:
+
 
 
 
@@ -708,10 +799,13 @@ kubectl create secret generic github-webhook-secret \
 
 
 
+
+
 ```
 
 ### 3. RBAC Restrictions
 Limit sensor permissions:
+
 
 
 
@@ -731,6 +825,8 @@ rules:
 
 
 
+
+
 ```
 
 
@@ -738,6 +834,7 @@ rules:
 ## Rollback Procedure
 
 If issues arise, rollback to previous sensors:
+
 
 
 
@@ -753,6 +850,8 @@ kubectl get sensors -n argo
 kubectl logs -f -l sensor-name -n argo
 
 # 4. Document issues for resolution
+
+
 
 
 

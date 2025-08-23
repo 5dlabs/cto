@@ -17,8 +17,11 @@ A containerized development environment with OpenHands for both headless and int
 
 
 
+
 ```bash
 docker build -t openhands-agent:latest .
+
+
 
 
 
@@ -28,6 +31,7 @@ docker build -t openhands-agent:latest .
 ```
 
 ## Run (Headless mode)
+
 
 
 
@@ -55,9 +59,12 @@ docker run -it \
 
 
 
+
+
 ```
 
 ## Run (Interactive CLI)
+
 
 
 
@@ -73,6 +80,8 @@ docker run -it \
   -v ~/.openhands:/.openhands \
   openhands-agent:latest \
   python -m openhands.cli.main --override-cli-mode true
+
+
 
 
 

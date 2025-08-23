@@ -12,6 +12,8 @@ This directory contains the Argo CD configuration for managing platform infrastr
 
 
 
+
+
 ```
 gitops/
 ├── app-of-apps.yaml          # Root application managing all others
@@ -27,6 +29,8 @@ gitops/
 
 
 
+
+
 ```
 
 ## Getting Started
@@ -35,8 +39,11 @@ gitops/
 
 
 
+
 ```bash
 ./infra/scripts/install-argocd.sh
+
+
 
 
 
@@ -54,8 +61,11 @@ Update secrets in `infra/charts/argocd/secrets.yaml` with your GitHub credential
 
 
 
+
 ```bash
 kubectl apply -f infra/gitops/projects/platform-project.yaml
+
+
 
 
 
@@ -70,8 +80,11 @@ kubectl apply -f infra/gitops/projects/platform-project.yaml
 
 
 
+
 ```bash
 kubectl apply -f infra/gitops/app-of-apps.yaml
+
+
 
 
 
@@ -157,6 +170,7 @@ Applications are automatically monitored by Argo CD:
 
 
 
+
 ```bash
 kubectl get applications -n argocd
 kubectl describe application controller -n argocd
@@ -166,9 +180,12 @@ kubectl describe application controller -n argocd
 
 
 
+
+
 ```
 
 ### Manual Sync
+
 
 
 
@@ -188,6 +205,8 @@ kubectl patch application controller -n argocd --type merge -p '{"operation":{"s
 
 
 
+
+
 ```
 
 
@@ -196,9 +215,12 @@ kubectl patch application controller -n argocd --type merge -p '{"operation":{"s
 
 
 
+
 ```bash
 kubectl logs -n argocd deployment/argocd-application-controller
 kubectl logs -n argocd deployment/argocd-server
+
+
 
 
 

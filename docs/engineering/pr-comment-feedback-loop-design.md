@@ -79,6 +79,7 @@ Design for implementing a recursive feedback loop where Rex responds to PR comme
 
 
 
+
 ```markdown
 ## 🔴 Required Changes
 
@@ -117,9 +118,12 @@ Design for implementing a recursive feedback loop where Rex responds to PR comme
 
 
 
+
+
 ```
 
 ### Non-Actionable Comments (Informational Only)
+
 
 
 
@@ -133,11 +137,14 @@ Design for implementing a recursive feedback loop where Rex responds to PR comme
 
 
 
+
+
 ```
 
 ## Proposed Implementation
 
 ### 1. New Sensor: PR Comment Handler
+
 
 
 
@@ -249,9 +256,12 @@ spec:
 
 
 
+
+
 ```
 
 ### 2. Rex Container Enhancement
+
 
 
 
@@ -303,11 +313,14 @@ fi
 
 
 
+
+
 ```
 
 ### 3. Workflow State Tracking
 
 Add labels to track iteration count:
+
 
 
 
@@ -317,6 +330,8 @@ metadata:
     task-id: "1"
     iteration: "3"  # Increments each time Rex responds to feedback
     max-iterations: "10"  # Safety limit
+
+
 
 
 
@@ -342,6 +357,7 @@ The loop ends when:
 4. **Timeout** - Overall workflow timeout (e.g., 48 hours)
 
 ## Sequence Diagram
+
 
 
 
@@ -374,6 +390,8 @@ sequenceDiagram
         Tess->>PR: Add approved label
         Note over PR: Ready for human review
     end
+
+
 
 
 

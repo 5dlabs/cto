@@ -20,9 +20,13 @@ Cleo cannot perform proper code quality review because it lacks awareness of whi
 
 
 
+
+
 ```
   fatal: not a git repository (or any parent up to mount point /)
   cp: cannot copy a directory, '/workspace/./.', into itself, '/workspace/cto-play-test/.'
+
+
 
 
 
@@ -56,6 +60,7 @@ The current workflow assumes:
 
 
 
+
 ```yaml
 # In play-workflow-template.yaml
 - name: cleo-quality-check
@@ -72,9 +77,12 @@ The current workflow assumes:
 
 
 
+
+
 ```
 
 ### **Option 2: GitHub API Discovery**
+
 
 
 
@@ -88,9 +96,12 @@ gh pr checkout $PR_NUMBER
 
 
 
+
+
 ```
 
 ### **Option 3: Environment Variable Injection**
+
 
 
 
@@ -107,9 +118,12 @@ env:
 
 
 
+
+
 ```
 
 ### **Option 4: Deterministic Branch Names**
+
 
 
 
@@ -124,9 +138,12 @@ git checkout "$BRANCH_NAME"
 
 
 
+
+
 ```
 
 ### **Option 5: Marker File Approach**
+
 
 
 
@@ -140,6 +157,8 @@ echo "$PR_URL" >> /workspace/.pr-context
 
 # Cleo reads marker file
 PR_NUMBER=$(head -1 /workspace/.pr-context)
+
+
 
 
 

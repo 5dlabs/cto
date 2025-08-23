@@ -18,22 +18,22 @@ show_help() {
 
 show_stats() {
     echo "Markdown linting statistics:"
-    echo "Total Markdown files: $(find . -name "*.md" -type f | wc -l)"
+    echo "Total Markdown files: $(find . -name "*.md" -type f -not -path "./.claude/*" -not -path "./docs/.claude/*" -not -path "./docs/.taskmaster/*" | wc -l)"
     echo ""
     echo "Current issues by type:"
-    markdownlint --config .markdownlint.yaml "**/*.md" 2>&1 | grep -o "MD[0-9]*" | sort | uniq -c | sort -nr
+    markdownlint --config .markdownlint.yaml --ignore ".claude/**" --ignore "docs/.claude/**" --ignore "docs/.taskmaster/**" "**/*.md" 2>&1 | grep -o "MD[0-9]*" | sort | uniq -c | sort -nr
 }
 
 run_lint() {
     echo "Running markdown linting..."
-    markdownlint --config .markdownlint.yaml "**/*.md"
+    markdownlint --config .markdownlint.yaml --ignore ".claude/**" --ignore "docs/.claude/**" --ignore "docs/.taskmaster/**" "**/*.md"
 }
 
 fix_issues() {
     echo "Fixing common markdown linting issues..."
     
-    # Find all markdown files
-    find . -name "*.md" -type f | while read -r file; do
+    # Find all markdown files (excluding .claude and .taskmaster directories)
+    find . -name "*.md" -type f -not -path "./.claude/*" -not -path "./docs/.claude/*" -not -path "./docs/.taskmaster/*" | while read -r file; do
         echo "Processing: $file"
         
         # Create a temporary file

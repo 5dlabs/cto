@@ -29,6 +29,7 @@ A containerized development environment with Claude Code CLI for AI-powered codi
 
 
 
+
 ```bash
 
 
@@ -43,9 +44,12 @@ docker build --build-arg CLAUDE_CODE_VERSION=1.2.3 -t claude-code:latest .
 
 
 
+
+
 ```
 
 ### Running Locally
+
 
 
 
@@ -75,9 +79,12 @@ docker run -it \
 
 
 
+
+
 ```
 
 ### Kubernetes TaskRun Integration
+
 
 
 
@@ -108,6 +115,8 @@ spec:
 
 
 
+
+
 ```
 
 ## Integration with Orchestrator
@@ -128,11 +137,14 @@ Get your Claude API key from [Anthropic](https://console.anthropic.com) and add 
 
 
 
+
 ```bash
 kubectl create secret generic claude-secrets \
 
 
   --from-literal=api-key="your-claude-api-key"
+
+
 
 
 

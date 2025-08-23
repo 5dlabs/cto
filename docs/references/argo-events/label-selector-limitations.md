@@ -13,8 +13,11 @@ Example (avoid this):
 
 
 
+
 ```yaml
 labelSelector: "task-id={{extracted-task-id}},stage=waiting"
+
+
 
 
 
@@ -27,10 +30,13 @@ Preferred (resume by name):
 
 
 
+
 ```yaml
 argoWorkflow:
   operation: resume
   args: ["play-task-{{taskId}}-workflow"]
+
+
 
 
 

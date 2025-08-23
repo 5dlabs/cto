@@ -7,6 +7,7 @@
 
 
 
+
 ```rust
 Tool {
     name: "create_agent_persona",
@@ -69,11 +70,14 @@ Tool {
 
 
 
+
+
 ```
 
 ## Implementation Flow
 
 ### 1. Character Generation Phase
+
 
 
 
@@ -128,9 +132,12 @@ async fn generate_agent_character(
 
 
 
+
+
 ```
 
 Example Generated Persona:
+
 
 
 
@@ -159,9 +166,12 @@ Example Generated Persona:
 
 
 
+
+
 ```
 
 ### 2. System Prompt Generation
+
 
 
 
@@ -241,9 +251,12 @@ Communication style:
 
 
 
+
+
 ```
 
 ### 3. GitHub App Creation
+
 
 
 
@@ -304,9 +317,12 @@ async fn create_github_app_for_agent(
 
 
 
+
+
 ```
 
 ### 4. Kubernetes Configuration
+
 
 
 
@@ -382,9 +398,12 @@ async fn create_k8s_resources(
 
 
 
+
+
 ```
 
 ### 5. Deployment (Optional)
+
 
 
 
@@ -423,9 +442,12 @@ async fn deploy_agent(
 
 
 
+
+
 ```
 
 ## Complete MCP Tool Handler
+
 
 
 
@@ -549,6 +571,8 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
 
 
 
+
+
 ```
 
 
@@ -556,6 +580,7 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
 ## Usage Examples
 
 ### Example 1: Create Security Analyst
+
 
 
 
@@ -577,9 +602,12 @@ await mcp.call("create_agent_persona", {
 
 
 
+
+
 ```
 
 Response:
+
 
 
 
@@ -617,9 +645,12 @@ Response:
 
 
 
+
+
 ```
 
 ### Example 2: Create Documentation Expert
+
 
 
 
@@ -638,6 +669,8 @@ await mcp.call("create_agent_persona", {
 
 
 
+
+
 ```
 
 Generated Agent:
@@ -646,6 +679,7 @@ Generated Agent:
 - Traits: ["Organized", "Clear communicator", "Detail-oriented"]
 
 ### Example 3: Performance Optimizer
+
 
 
 
@@ -663,6 +697,8 @@ await mcp.call("create_agent_persona", {
 
 
 
+
+
 ```
 
 Generated Agent:
@@ -673,6 +709,7 @@ Generated Agent:
 ## Testing the Implementation
 
 ### Unit Tests
+
 
 
 
@@ -737,9 +774,12 @@ mod tests {
 
 
 
+
+
 ```
 
 ## Error Handling
+
 
 
 
@@ -770,9 +810,12 @@ enum PersonaCreationError {
 
 
 
+
+
 ```
 
 ## Monitoring & Observability
+
 
 
 
@@ -792,6 +835,8 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
         "Time taken to create an agent persona"
     ).unwrap()
 });
+
+
 
 
 
@@ -818,6 +863,8 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
 
 
 
+
+
 ```
 
 
@@ -839,6 +886,8 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
 
 
 
+
+
 ```
 
 
@@ -854,6 +903,8 @@ static CREATION_DURATION: Lazy<Histogram> = Lazy::new(|| {
        let hints = generate_complementary_hints(gaps, need);
        Ok(hints)
    }
+
+
 
 
 

@@ -29,6 +29,8 @@ This repository contains the configuration for a minimal Talos Kubernetes cluste
 
 
 
+
+
 ```
 talos-home/
 ├── config/simple/           # Current working cluster configuration
@@ -38,6 +40,8 @@ talos-home/
 └── local-path-provisioner/  # Storage provisioner configuration
     ├── kustomization.yaml   # Kustomize deployment configuration
     └── local-path-storage.yaml  # User volume configuration
+
+
 
 
 
@@ -77,6 +81,8 @@ talos-home/
 
 
 
+
+
 ```
 
 2. **Create bootable USB** (on macOS):
@@ -92,6 +98,8 @@ talos-home/
 
    # Eject the USB
    diskutil eject /dev/diskX
+
+
 
 
 
@@ -119,6 +127,8 @@ talos-home/
 
 
 
+
+
 ```
 
 
@@ -127,6 +137,8 @@ talos-home/
 5. **Bootstrap Cluster** (first time only):
    ```bash
    talosctl --talosconfig=config/simple/talosconfig bootstrap -n 192.168.1.77
+
+
 
 
 
@@ -149,6 +161,8 @@ talos-home/
 
 
 
+
+
 ```
    - **IMPORTANT**: Remove USB after configuration is applied
 
@@ -164,12 +178,16 @@ talos-home/
 
 
 
+
+
 ```
 
 8. **Verify Cluster**:
    ```bash
    kubectl get nodes
    # Should show both nodes as Ready
+
+
 
 
 
@@ -187,6 +205,8 @@ talos-home/
 
    # Verify storage
    kubectl get storageclass
+
+
 
 
 
@@ -210,6 +230,7 @@ Example PVC:
 
 
 
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -223,6 +244,8 @@ spec:
   resources:
     requests:
       storage: 10Gi
+
+
 
 
 
@@ -273,8 +296,11 @@ Generate a kubeconfig for tools like Lens or k9s:
 
 
 
+
 ```bash
 talosctl --talosconfig=config/simple/talosconfig kubeconfig -n 192.168.1.77 > talos-kubeconfig.yaml
+
+
 
 
 

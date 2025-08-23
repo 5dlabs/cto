@@ -9,8 +9,11 @@ Build locally:
 
 
 
+
 ```bash
 docker build -t platform-qwen:latest .
+
+
 
 
 
@@ -24,8 +27,11 @@ Or use buildx for multi-platform:
 
 
 
+
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/5dlabs/platform-qwen:latest .
+
+
 
 
 
@@ -43,8 +49,11 @@ Run the container with:
 
 
 
+
 ```bash
 docker run -it --rm platform-qwen:latest
+
+
 
 
 
@@ -58,8 +67,11 @@ This will start the 'qwen' CLI. Mount volumes as needed for workspaces:
 
 
 
+
 ```bash
 docker run -it --rm -v $(pwd):/workspace platform-qwen:latest
+
+
 
 
 
