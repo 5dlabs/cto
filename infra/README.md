@@ -243,7 +243,7 @@ kubectl apply -f charts/argocd/secrets.yaml
 
 ## 📚 Migration Guide
 
-See [ARGO_MIGRATION_GUIDE.md](../ARGO_MIGRATION_GUIDE.md) for detailed migration instructions and troubleshooting.
+Migration instructions and troubleshooting are covered in the sections above. For detailed GitOps migration steps, see the deployment process section.
 
 ## 🔄 Legacy Support
 
