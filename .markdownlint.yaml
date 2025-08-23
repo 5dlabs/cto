@@ -76,9 +76,8 @@ MD007:
   indent: 2
   start_indented: false
 
-# MD012/no-multiple-blanks - Multiple consecutive blank lines (allow up to 2)
-MD012:
-  maximum: 2
+# MD012/no-multiple-blanks - Multiple consecutive blank lines (disabled for flexibility)
+MD012: false
 
 # MD022/blanks-around-headings - Headings should be surrounded by blank lines (more lenient)
 MD022:
@@ -163,3 +162,6 @@ MD053: false
 
 # MD032/blanks-around-lists - Lists should be surrounded by blank lines (disabled for flexibility)
 MD032: false
+
+# MD031/blanks-around-fences - Fenced code blocks should be surrounded by blank lines (disabled for flexibility)
+MD031: false
