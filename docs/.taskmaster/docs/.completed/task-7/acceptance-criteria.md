@@ -77,7 +77,7 @@ Note: Scope limited to enhancing the existing implementation. Baseline stage lab
 
 ### ✅ Recovery Mechanisms
 - [ ] **Workflow Restart**: Workflows can restart from correct stage after failures
-- [ ] **Manual Intervention**: Manual stage correction possible through label updates  
+- [ ] **Manual Intervention**: Manual stage correction possible through label updates
 - [ ] **State Repair**: Inconsistent workflow state can be detected and corrected
 - [ ] **Rollback Capability**: Failed stage transitions can be rolled back
 - [ ] **Health Checks**: Workflow stage health can be monitored and validated
@@ -177,7 +177,7 @@ Before marking this task complete, verify:
 2. **Event Integration**: Argo Events sensors correctly target and resume workflows
 3. **Concurrency Safety**: Multiple workflows and concurrent updates handled correctly
 4. **Error Handling**: All failure scenarios handled gracefully with proper recovery
-5. **Performance**: System meets all response time and resource usage requirements  
+5. **Performance**: System meets all response time and resource usage requirements
 6. **Testing**: All unit, integration, and load tests pass consistently
 7. **Documentation**: All technical and operational documentation complete
 8. **Security**: All security requirements met and validated

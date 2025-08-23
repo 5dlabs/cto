@@ -119,7 +119,7 @@ rules:
    ```yaml
    # Use kubernetes_createResource to apply each resource
    # 1. ServiceAccount
-   # 2. ClusterRole  
+   # 2. ClusterRole
    # 3. ClusterRoleBinding
    ```
 

@@ -126,7 +126,7 @@ spec:
             duration: "30s"
             factor: 2
             maxDuration: "5m"
-        
+
   - name: step-with-retry
     script:
       image: taskmaster/resilient-executor:latest
@@ -140,15 +140,15 @@ spec:
       source: |
         #!/bin/bash
         set -euo pipefail
-        
+
         # Failure handling logic
         execute_with_failure_handling() {
           local attempt=1
           local max_attempts=3
-          
+
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts"
-            
+
             if your_operation; then
               echo "Operation succeeded on attempt $attempt"
               return 0
@@ -158,7 +158,7 @@ spec:
                 echo "All attempts exhausted"
                 return 1
               fi
-              
+
               # Exponential backoff
               sleep_duration=$((30 * (2 ** (attempt - 1))))
               echo "Waiting ${sleep_duration}s before retry"
@@ -167,7 +167,7 @@ spec:
             fi
           done
         }
-        
+
         execute_with_failure_handling
 ```
 
@@ -279,23 +279,23 @@ lazy_static! {
         "retry_attempts_total",
         "Total number of retry attempts"
     ).unwrap();
-    
+
     static ref RETRY_SUCCESS_TOTAL: Counter = register_counter!(
-        "retry_success_total", 
+        "retry_success_total",
         "Total number of successful retries"
     ).unwrap();
-    
+
     // Failure metrics
     static ref FAILURE_ANALYSIS_DURATION: Histogram = register_histogram!(
         "failure_analysis_duration_seconds",
         "Time taken to analyze failures"
     ).unwrap();
-    
+
     static ref CIRCUIT_BREAKER_STATE: Gauge = register_gauge!(
         "circuit_breaker_state",
         "Circuit breaker state (0=closed, 1=open, 2=half-open)"
     ).unwrap();
-    
+
     // Recovery metrics
     static ref RECOVERY_SUCCESS_TOTAL: Counter = register_counter!(
         "recovery_success_total",
@@ -332,7 +332,7 @@ curl -X POST https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK \
         "value": "test-workflow-123",
         "short": true
       }, {
-        "title": "Stage", 
+        "title": "Stage",
         "value": "TestExecution",
         "short": true
       }]
@@ -350,19 +350,19 @@ def test_email_notification():
     msg['From'] = "taskmaster@example.com"
     msg['To'] = "admin@example.com"
     msg['Subject'] = "Test Failure Notification"
-    
+
     body = """
     Workflow Failure Detected
-    
+
     Workflow ID: test-workflow-123
     Stage: TestExecution
     Error: Test suite failed with exit code 1
-    
+
     Please investigate and take appropriate action.
     """
-    
+
     msg.attach(MimeText(body, 'plain'))
-    
+
     try:
         server = smtplib.SMTP('localhost', 587)
         server.starttls()
@@ -425,7 +425,7 @@ async fn test_exponential_backoff() {
         },
         5,  // max attempts
     ).await;
-    
+
     assert!(result.is_ok());
     assert_eq!(attempts, 3);
 }
@@ -460,7 +460,7 @@ cargo test failure::analysis::test_pattern_matching
 python3 << 'EOF'
 def analyze_failure_pattern(error_message, context):
     patterns = load_failure_patterns()
-    
+
     for pattern in patterns:
         if any(sig in error_message.lower() for sig in pattern['signatures']):
             return {
@@ -469,7 +469,7 @@ def analyze_failure_pattern(error_message, context):
                 'confidence': pattern['confidence'],
                 'recommendations': pattern['recommendations']
             }
-    
+
     return None
 
 # Test pattern matching
@@ -497,16 +497,16 @@ impl NotificationService {
         failure: &FailureAnalysis,
     ) -> Result<()> {
         let message = self.format_failure_message(failure);
-        
+
         // Send to all configured channels
         if let Some(webhook) = &self.slack_webhook {
             self.send_slack_notification(webhook, &message).await?;
         }
-        
+
         if let Some(config) = &self.email_config {
             self.send_email_notification(config, &message).await?;
         }
-        
+
         Ok(())
     }
 }
@@ -661,7 +661,7 @@ where
     Fut: std::future::Future<Output = Result<T>>,
 {
     let mut backoff = ExponentialBackoff::new(strategy.base_delay);
-    
+
     for attempt in 1..=strategy.max_attempts {
         match operation().await {
             Ok(result) => return Ok(result),
@@ -674,7 +674,7 @@ where
             Err(e) => return Err(e),
         }
     }
-    
+
     unreachable!()
 }
 
@@ -691,7 +691,7 @@ impl CircuitBreaker {
     pub fn record_failure(&self) {
         self.failure_count.fetch_add(1, Ordering::Relaxed);
         self.last_failure.store(current_timestamp(), Ordering::Relaxed);
-        
+
         if self.failure_count.load(Ordering::Relaxed) >= self.threshold {
             self.is_open.store(true, Ordering::Relaxed);
         }
@@ -708,9 +708,9 @@ pub async fn send_batch_notifications(
 ) -> Result<BatchResult> {
     let futures = notifications.into_iter()
         .map(|notif| self.send_single_notification(notif));
-    
+
     let results = futures::future::join_all(futures).await;
-    
+
     BatchResult::from_individual_results(results)
 }
 
@@ -750,13 +750,13 @@ dashboard:
     targets:
     - expr: "rate(retry_success_total[5m]) / rate(retry_attempts_total[5m]) * 100"
       legendFormat: "Success Rate %"
-  
+
   - title: "Circuit Breaker States"
     type: "graph"
     targets:
     - expr: "circuit_breaker_state"
       legendFormat: "{{instance}} - {{stage}}"
-  
+
   - title: "Failure Analysis Duration"
     type: "histogram"
     targets:
@@ -777,7 +777,7 @@ groups:
       severity: warning
     annotations:
       summary: "High failure rate detected"
-      
+
   - alert: CircuitBreakerOpen
     expr: circuit_breaker_state == 1
     for: 1m
@@ -785,7 +785,7 @@ groups:
       severity: critical
     annotations:
       summary: "Circuit breaker is open for {{$labels.stage}}"
-      
+
   - alert: NotificationDeliveryFailure
     expr: rate(notification_delivery_failed_total[5m]) > 0.1
     for: 5m

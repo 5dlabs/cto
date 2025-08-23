@@ -10,7 +10,7 @@ This task implements basic monitoring for the multi-agent workflow system to tra
 
 1. **Workflow Status Tracking**
    - Monitor workflow creation and progression
-   - Track which stage each workflow is in  
+   - Track which stage each workflow is in
    - Simple workflow age tracking (creation time vs. current time)
 
 2. **Basic Alert Conditions**
@@ -32,7 +32,7 @@ Create a simple Python script that queries Argo Workflows and displays status. T
 - Calculate workflow age and detect stuck/long-running workflows
 - Generate simple status reports with counts and alerts
 
-### Basic Resource Monitoring  
+### Basic Resource Monitoring
 
 Create a simple bash script that checks:
 - Pod resource usage via kubectl top
@@ -64,7 +64,7 @@ Implement simple alerting via:
 ## Success Criteria
 
 1. **Basic visibility** - Can see current workflow status and age
-2. **Stuck workflow detection** - Alerts when workflows are stuck >12 hours  
+2. **Stuck workflow detection** - Alerts when workflows are stuck >12 hours
 3. **Long-running workflow alerts** - Notifications for workflows >7 days
 4. **Resource awareness** - Basic visibility into resource usage
 5. **Simple alerting** - Notifications via Slack or console logs

@@ -196,15 +196,15 @@ The workflow template must support configurable agent selection while maintainin
        source: |
          #!/bin/sh
          echo "Completing task {{inputs.parameters.task-id}}"
-         
+
          # Move task directory to completed
          mv docs/.taskmaster/docs/task-{{inputs.parameters.task-id}} \
             docs/.taskmaster/docs/.completed/task-{{inputs.parameters.task-id}}
-         
+
          # Update task status
          echo "Task {{inputs.parameters.task-id}} completed at $(date)" >> \
               docs/.taskmaster/completion.log
-         
+
          # Trigger next task workflow if available
          NEXT_TASK=$(({{inputs.parameters.task-id}} + 1))
          if [ -d "docs/.taskmaster/docs/task-$NEXT_TASK" ]; then
@@ -227,7 +227,7 @@ templates:
         parameters:
         - name: github-app
           value: "{{workflow.parameters.implementation-agent}}"
-    
+
     - name: wait-pr-created
       dependencies: [implementation-work]
       template: suspend-for-event
@@ -235,7 +235,7 @@ templates:
         parameters:
         - name: event-type
           value: "pr-created"
-    
+
     - name: quality-work
       dependencies: [wait-pr-created]
       template: agent-coderun
@@ -243,7 +243,7 @@ templates:
         parameters:
         - name: github-app
           value: "{{workflow.parameters.quality-agent}}"
-    
+
     - name: wait-ready-for-qa
       dependencies: [quality-work]
       template: suspend-for-event
@@ -251,7 +251,7 @@ templates:
         parameters:
         - name: event-type
           value: "ready-for-qa"
-    
+
     - name: testing-work
       dependencies: [wait-ready-for-qa]
       template: agent-coderun
@@ -259,7 +259,7 @@ templates:
         parameters:
         - name: github-app
           value: "{{workflow.parameters.testing-agent}}"
-    
+
     - name: wait-pr-approved
       dependencies: [testing-work]
       template: suspend-for-event
@@ -267,7 +267,7 @@ templates:
         parameters:
         - name: event-type
           value: "pr-approved"
-    
+
     - name: complete-task
       dependencies: [wait-pr-approved]
       template: task-completion

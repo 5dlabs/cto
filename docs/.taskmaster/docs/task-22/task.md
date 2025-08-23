@@ -22,7 +22,7 @@ agent_resource_specs:
       limits:
         cpu: "4000m"      # 4 CPU cores max for peak processing
         memory: "16Gi"    # 16GB memory limit for large codebases
-        
+
   quality_agents:  # Cleo
     claude-3-5-sonnet:
       requests:
@@ -31,8 +31,8 @@ agent_resource_specs:
       limits:
         cpu: "2000m"      # 2 CPU cores max
         memory: "8Gi"     # 8GB memory limit
-        
-  testing_agents:  # Tess  
+
+  testing_agents:  # Tess
     claude-3-5-sonnet:
       requests:
         cpu: "2000m"      # 2 CPU cores for deployment testing
@@ -50,15 +50,15 @@ pvc_specifications:
     size: "10Gi"
     storage_class: "fast-ssd"
     access_mode: "ReadWriteOnce"
-    
+
   large_workspace:  # For complex codebases
-    size: "25Gi" 
+    size: "25Gi"
     storage_class: "fast-ssd"
     access_mode: "ReadWriteOnce"
-    
+
   testing_workspace:  # Tess with deployment artifacts
     size: "50Gi"
-    storage_class: "fast-ssd" 
+    storage_class: "fast-ssd"
     access_mode: "ReadWriteOnce"
 ```
 
@@ -78,11 +78,11 @@ spec:
     requests.memory: "80Gi"   # 80GB memory total requests
     limits.cpu: "40"          # 40 CPU cores total limits
     limits.memory: "160Gi"    # 160GB memory total limits
-    
+
     # Storage resource limits
     requests.storage: "500Gi" # 500GB total storage requests
     persistentvolumeclaims: "20"  # Max 20 PVCs simultaneously
-    
+
     # Object count limits
     pods: "30"                # Max 30 pods (safety buffer)
     services: "10"
@@ -103,7 +103,7 @@ description: "High priority for critical agent workflows"
 
 ---
 # Standard priority for normal operations
-apiVersion: scheduling.k8s.io/v1  
+apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
   name: agent-standard-priority
@@ -116,7 +116,7 @@ description: "Standard priority for normal agent operations"
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: agent-low-priority  
+  name: agent-low-priority
 value: 100
 globalDefault: false
 description: "Low priority for testing and development workflows"
@@ -145,7 +145,7 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
-  - type: Resource  
+  - type: Resource
     resource:
       name: memory
       target:
@@ -162,7 +162,7 @@ spec:
       stabilizationWindowSeconds: 900  # 15 minutes
       policies:
       - type: Percent
-        value: 50 
+        value: 50
         periodSeconds: 60
 ```
 
@@ -221,7 +221,7 @@ spec:
       minAllowed:
         cpu: 100m
         memory: 128Mi
-      maxAllowed:  
+      maxAllowed:
         cpu: 8000m
         memory: 32Gi
       controlledResources: ["cpu", "memory"]
@@ -249,8 +249,8 @@ spec:
       annotations:
         summary: "Agent pod CPU usage is high"
         description: "Agent {{ $labels.pod }} CPU usage is {{ $value | humanizePercentage }}"
-        
-    # High memory utilization alert  
+
+    # High memory utilization alert
     - alert: AgentHighMemoryUsage
       expr: container_memory_working_set_bytes{namespace="agent-platform",container="agent"} / container_spec_memory_limit_bytes > 0.85
       for: 5m
@@ -259,9 +259,9 @@ spec:
       annotations:
         summary: "Agent pod memory usage is high"
         description: "Agent {{ $labels.pod }} memory usage is {{ $value | humanizePercentage }}"
-        
+
     # Out of memory kill alert
-    - alert: AgentOOMKilled  
+    - alert: AgentOOMKilled
       expr: increase(kube_pod_container_status_restarts_total{namespace="agent-platform"}[5m]) > 0 and on(pod) kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
       for: 0m
       labels:
@@ -269,7 +269,7 @@ spec:
       annotations:
         summary: "Agent pod killed due to OOM"
         description: "Agent {{ $labels.pod }} was killed due to out of memory condition"
-        
+
     # Resource quota approaching limit
     - alert: NamespaceResourceQuotaHigh
       expr: kube_resourcequota{namespace="agent-platform",type="used"} / kube_resourcequota{namespace="agent-platform",type="hard"} > 0.8
@@ -277,7 +277,7 @@ spec:
       labels:
         severity: warning
       annotations:
-        summary: "Namespace resource quota usage is high"  
+        summary: "Namespace resource quota usage is high"
         description: "{{ $labels.resource }} quota usage is {{ $value | humanizePercentage }} in namespace {{ $labels.namespace }}"
 ```
 
@@ -298,7 +298,7 @@ spec:
         ]
       },
       {
-        "title": "Memory Usage by Agent", 
+        "title": "Memory Usage by Agent",
         "type": "stat",
         "targets": [
           {
@@ -309,7 +309,7 @@ spec:
       },
       {
         "title": "PVC Usage",
-        "type": "bargauge", 
+        "type": "bargauge",
         "targets": [
           {
             "expr": "kubelet_volume_stats_used_bytes{namespace='agent-platform'} / kubelet_volume_stats_capacity_bytes * 100",
@@ -338,7 +338,7 @@ spec:
   minAvailable: 1  # Always keep at least 1 controller running
 ```
 
-#### Argo Components Protection  
+#### Argo Components Protection
 ```yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -368,10 +368,10 @@ spec:
       cpu: "2000m"
       memory: "8Gi"
     defaultRequest:
-      cpu: "1000m" 
+      cpu: "1000m"
       memory: "4Gi"
     type: Container
-    
+
   # Limits for PVC sizes
   - max:
       storage: "100Gi"
@@ -388,12 +388,12 @@ spec:
    - Establish performance benchmarks with different resource configurations
    - Document resource requirements by model type and workload complexity
 
-2. **Resource Request/Limit Definition**  
+2. **Resource Request/Limit Definition**
    - Implement tiered resource specifications for different agent roles
    - Configure PVC sizing based on workspace requirements
    - Establish priority class hierarchy
 
-### Phase 2: Quota and Autoscaling (Week 2)  
+### Phase 2: Quota and Autoscaling (Week 2)
 3. **Namespace Resource Quotas**
    - Deploy resource quotas for agent-platform namespace
    - Implement monitoring for quota utilization
@@ -430,14 +430,14 @@ spec:
 
 ### Resource Efficiency
 - **CPU Utilization**: 60-80% average utilization across agent pods
-- **Memory Efficiency**: < 10% of pods experiencing memory pressure  
+- **Memory Efficiency**: < 10% of pods experiencing memory pressure
 - **Storage Optimization**: < 20% unused storage across PVCs
 - **Scaling Responsiveness**: HPA scaling decisions within 5 minutes of load changes
 
 ### System Reliability
 - **OOM Prevention**: Zero OOM kills during normal operations
 - **Resource Availability**: 99.9% uptime for controller components
-- **Quota Compliance**: No resource quota violations causing pod failures  
+- **Quota Compliance**: No resource quota violations causing pod failures
 - **Performance Consistency**: < 10% variance in agent execution times due to resource constraints
 
 ### Operational Metrics
@@ -471,7 +471,7 @@ spec:
 - Implement gradual rollout of resource changes with monitoring
 - Maintain rollback procedures for resource configuration changes
 
-### Availability Protection  
+### Availability Protection
 - Use Pod Disruption Budgets to protect critical components during maintenance
 - Implement multi-replica deployments for all controller components
 - Configure proper health checks and readiness probes for reliable scaling

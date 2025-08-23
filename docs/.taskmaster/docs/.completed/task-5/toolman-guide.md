@@ -131,8 +131,8 @@ labelSelector: |
   inline:
     script: |
       echo '{{inputs.body}}' | jq -r '
-        .pull_request.labels[] | 
-        select(.name | startswith("task-")) | 
+        .pull_request.labels[] |
+        select(.name | startswith("task-")) |
         .name | split("-")[1]
       ' | head -1
 ```

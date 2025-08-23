@@ -56,14 +56,14 @@ docs/task-1/
 ## Task Definition
 [Content from task.md]
 
-## Acceptance Criteria  
+## Acceptance Criteria
 [Content from acceptance-criteria.md]
 
 ## Implementation Notes
 [Content from implementation-notes.md]
 
 ---
-*This issue is automatically synchronized with task documents. 
+*This issue is automatically synchronized with task documents.
 Direct edits to this body will be overwritten.*
 ```
 
@@ -107,7 +107,7 @@ done
 // Processes issue comment webhooks
 app.post('/webhook/issue-comment', (req, res) => {
   const { action, issue, comment } = req.body;
-  
+
   if (action === 'created') {
     const taskDir = findTaskByIssue(issue.number);
     if (taskDir) {
@@ -124,7 +124,7 @@ app.post('/webhook/issue-comment', (req, res) => {
 <!-- Issue Comment -->
 @morgan The authentication service needs to support SSO. Please add:
 - SAML 2.0 integration
-- OAuth with Google/Microsoft  
+- OAuth with Google/Microsoft
 - Configurable session timeouts
 
 <!-- Morgan's Process -->
@@ -135,7 +135,7 @@ app.post('/webhook/issue-comment', (req, res) => {
 5. Sync updated content back to issue body
 ```
 
-#### Clarification Example  
+#### Clarification Example
 ```markdown
 <!-- Issue Comment -->
 The "user profile management" requirement is unclear. Do we need:
@@ -162,24 +162,24 @@ The "user profile management" requirement is unclear. Do we need:
 sync_task_to_issue() {
   local task_dir="$1"
   local issue_num=$(cat "$task_dir/.github-issue-link")
-  
+
   # Combine all markdown files into issue body
   local issue_body=""
   issue_body+="# $(basename "$task_dir" | tr '-' ' ' | title)\n\n"
-  
+
   if [[ -f "$task_dir/task.md" ]]; then
     issue_body+="## Task Definition\n"
     issue_body+="$(cat "$task_dir/task.md")\n\n"
   fi
-  
+
   if [[ -f "$task_dir/acceptance-criteria.md" ]]; then
     issue_body+="## Acceptance Criteria\n"
     issue_body+="$(cat "$task_dir/acceptance-criteria.md")\n\n"
   fi
-  
+
   # Update GitHub issue
   gh issue edit "$issue_num" --body "$issue_body"
-  
+
   # Update sync metadata
   echo "{\"last_sync\": \"$(date -Iseconds)\", \"direction\": \"files_to_issue\"}" > "$task_dir/.sync-metadata.json"
 }
@@ -195,10 +195,10 @@ inotifywait -m -r docs/ --format '%w%f %e' -e modify,create,delete | while read 
   # Only process markdown files
   if [[ "$file" =~ \.md$ ]] && [[ "$event" =~ (MODIFY|CREATE) ]]; then
     task_dir=$(dirname "$file")
-    
+
     # Debounce: wait 2 seconds for multiple rapid changes
     sleep 2
-    
+
     echo "Syncing $(basename "$task_dir") to GitHub after file change"
     sync_task_to_issue "$task_dir"
   fi
@@ -212,14 +212,14 @@ done
 # Enhanced agent prompt for GitHub integration
 systemPrompt: |
   You are Morgan, enhanced with GitHub Projects integration capabilities.
-  
+
   When processing GitHub issue comments:
   1. Parse human feedback for scope changes
   2. Update TaskMaster documentation files
   3. Validate changes against project constraints
   4. Commit updates with clear change descriptions
   5. Resume orchestration workflow if needed
-  
+
   Monitor these issue patterns:
   - Scope changes: "add requirement", "update criteria"
   - Clarifications: "clarify", "explain", "define"

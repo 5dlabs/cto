@@ -12,7 +12,7 @@
   - Priority class: agent-high-priority
   - No OOM kills during normal code generation operations
 
-- [ ] **Quality Agents (Cleo)**  
+- [ ] **Quality Agents (Cleo)**
   - Resource requests: CPU 1000m, Memory 4Gi, Storage 10Gi
   - Resource limits: CPU 2000m, Memory 8Gi
   - Priority class: agent-standard-priority
@@ -20,7 +20,7 @@
 
 - [ ] **Testing Agents (Tess)**
   - Resource requests: CPU 2000m, Memory 8Gi, Storage 50Gi
-  - Resource limits: CPU 4000m, Memory 16Gi  
+  - Resource limits: CPU 4000m, Memory 16Gi
   - Priority class: agent-high-priority
   - Sufficient resources for live deployment testing and comprehensive validation
 
@@ -32,7 +32,7 @@
 **Acceptance Tests**:
 - [ ] **Compute Resource Quotas**
   - Total CPU requests limited to 20 cores
-  - Total CPU limits limited to 40 cores  
+  - Total CPU limits limited to 40 cores
   - Total memory requests limited to 80Gi
   - Total memory limits limited to 160Gi
   - Proper enforcement prevents pod creation when quota exceeded
@@ -46,7 +46,7 @@
 - [ ] **Object Count Quotas**
   - Maximum 30 pods in namespace
   - Maximum 50 ConfigMaps and 30 Secrets
-  - Maximum 10 Services  
+  - Maximum 10 Services
   - Quota violations prevent resource creation with clear error messages
 
 **Verification Method**: Attempt to exceed each quota limit and verify proper enforcement with meaningful error messages. Run sustained load test to confirm quotas prevent resource exhaustion.
@@ -61,7 +61,7 @@
   - Scale down when utilization < 50% for 15 minutes with 50% max decrease
   - Scaling decisions complete within 5 minutes of threshold breach
 
-- [ ] **Argo Workflows Controller Scaling**  
+- [ ] **Argo Workflows Controller Scaling**
   - Minimum 2 replicas, maximum 8 replicas
   - Scale based on both resource utilization and workflow count
   - Custom metric: Scale up when running workflows > 20
@@ -69,7 +69,7 @@
 
 - [ ] **Scaling Behavior Validation**
   - No thrashing or rapid scale-up/scale-down cycles
-  - Stabilization windows prevent premature scaling decisions  
+  - Stabilization windows prevent premature scaling decisions
   - Scaling events properly logged and auditable
   - Performance maintains during scaling operations
 
@@ -87,7 +87,7 @@
 
 - [ ] **VPA Update Policies**
   - Auto mode updates pods when recommendations significantly differ
-  - Minimum allowed: CPU 100m, Memory 128Mi  
+  - Minimum allowed: CPU 100m, Memory 128Mi
   - Maximum allowed: CPU 8000m, Memory 32Gi
   - Update decisions respect pod disruption budgets
 
@@ -99,7 +99,7 @@
 
 **Verification Method**: Deploy VPA in recommendation mode, collect data for 48 hours, then enable auto mode and verify appropriate resource adjustments occur without service disruption.
 
-### 5. Pod Disruption Budget Protection ✅  
+### 5. Pod Disruption Budget Protection ✅
 **Requirement**: Maintain availability during maintenance and failures
 
 **Acceptance Tests**:
@@ -135,7 +135,7 @@
   - No CPU throttling during normal operations
   - Idle periods maintain minimal CPU consumption (< 10%)
 
-- [ ] **Memory Management Excellence**  
+- [ ] **Memory Management Excellence**
   - Memory utilization 70-85% of allocated memory during active processing
   - Zero OOM kills during normal operations
   - Memory pressure alerts triggered before critical thresholds
@@ -162,7 +162,7 @@
 - [ ] **Alert Configuration and Accuracy**
   - False positive rate < 5% for resource pressure alerts
   - Critical alerts (OOM, quota violations) trigger within 2 minutes
-  - Warning alerts provide 15-minute advance notice of resource issues  
+  - Warning alerts provide 15-minute advance notice of resource issues
   - Alert escalation and acknowledgment workflows function correctly
 
 - [ ] **Dashboard Functionality**
@@ -199,7 +199,7 @@
 
 ## Integration Testing
 
-### 9. End-to-End Resource Management ✅  
+### 9. End-to-End Resource Management ✅
 **System Integration**: Resource management across complete workflow execution
 
 **Acceptance Tests**:
@@ -215,7 +215,7 @@
   - Autoscaling responds appropriately to sustained high load
   - Performance degrades gracefully when approaching resource limits
 
-- [ ] **Failure Recovery Resource Behavior**  
+- [ ] **Failure Recovery Resource Behavior**
   - OOM-killed pods restart with appropriate resource allocations
   - Resource constraints during failures don't cascade to other components
   - Recovery from resource exhaustion completes within 5 minutes
@@ -269,7 +269,7 @@
 - [ ] HPA configured for all controller deployments with load testing validation
 - [ ] VPA deployed and optimizing agent resource allocations
 - [ ] PDB protection ensuring availability during maintenance operations
-- [ ] Comprehensive monitoring and alerting deployed with accuracy verification  
+- [ ] Comprehensive monitoring and alerting deployed with accuracy verification
 - [ ] Performance testing completed across all resource management scenarios
 - [ ] Operational runbooks created and validated with SRE team
 - [ ] Cost optimization metrics demonstrate measurable improvement

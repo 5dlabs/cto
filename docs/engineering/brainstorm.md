@@ -77,7 +77,7 @@ Each agent is a different GitHub App with its own character/persona and speciali
       - name: clippy-format
         templateRef: { name: coderun-template }
         arguments: { parameters: [{ name: github-app, value: "clippy-agent" }] }
-        
+
       - name: qa-testing
         dependencies: [clippy-format]
         templateRef: { name: coderun-template }
@@ -93,12 +93,12 @@ Each agent is a different GitHub App with its own character/persona and speciali
       - name: implement
         templateRef: { name: coderun-template }
         arguments: { parameters: [{ name: github-app, value: "rex" }] }
-        
+
       - name: clippy-format
         dependencies: [implement]
         templateRef: { name: coderun-template }
         arguments: { parameters: [{ name: github-app, value: "clippy-agent" }] }
-        
+
       - name: qa-testing
         dependencies: [clippy-format]
         templateRef: { name: coderun-template }
@@ -163,5 +163,3 @@ Each agent is a different GitHub App with its own character/persona and speciali
 - Security scanning integration points and report formats?
 - Morgan (PM agent) coordination patterns with other agents?
 - Auto-merge policies after all agents approve?
-
-

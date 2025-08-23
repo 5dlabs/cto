@@ -366,7 +366,7 @@ memory_create_entities --type=audit-trail --all-archival-operations
 
 ### Security and Compliance
 - Encryption at rest and in transit for all archived data
-- Access control and audit logging for all archival operations  
+- Access control and audit logging for all archival operations
 - Regular compliance audits and regulatory reporting
 - Secure deletion verification for permanently removed data
 

@@ -15,7 +15,7 @@
 ## Git Workflow
 
 ### Your Current Context
-- **Repository**: 
+- **Repository**:
 - **Feature Branch**: feature/task--implementation
 - **Target Branch**: main (never push directly to this)
 - **Authentication**: GitHub App (5DLabs-Rex - pre-configured)

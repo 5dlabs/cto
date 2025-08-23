@@ -75,29 +75,29 @@ async fn generate_agent_character(
     let prompt = format!(
         r#"Create a unique AI agent persona for the following purpose:
         Purpose: {}
-        
+
         Personality hints:
         - Archetype: {}
         - Tone: {}
         - Quirks: {:?}
-        
+
         Generate:
         1. A human-like name (single first name)
         2. A detailed personality profile
         3. Communication style guidelines
         4. Three key personality traits
         5. A visual description for an avatar
-        
+
         Format as JSON with fields: name, archetype, traits, communication_style, avatar_description"#,
         purpose,
         hints.archetype.unwrap_or("auto-generate"),
         hints.tone.unwrap_or("professional"),
         hints.quirks.unwrap_or_default()
     );
-    
+
     let response = ai_client.generate(prompt).await?;
     let persona: AgentPersona = serde_json::from_str(&response)?;
-    
+
     Ok(persona)
 }
 ```
@@ -150,14 +150,14 @@ Communication style:
         persona.work_approach(),
         persona.communication_style.describe()
     );
-    
+
     // Generate task-specific prompts
     let mut task_prompts = HashMap::new();
-    
+
     if capabilities.contains(&"code_review".to_string()) {
         task_prompts.insert("code_review", format!(
             r#"When reviewing code, you:
-- {} 
+- {}
 - Focus on {}
 - Communicate findings by {}"#,
             persona.review_approach(),
@@ -165,7 +165,7 @@ Communication style:
             persona.communication_pattern()
         ));
     }
-    
+
     if capabilities.contains(&"problem_solving".to_string()) {
         task_prompts.insert("problem_solving", format!(
             r#"When solving problems, you:
@@ -177,7 +177,7 @@ Communication style:
             persona.solution_presentation()
         ));
     }
-    
+
     Ok(SystemPrompts {
         base: base_prompt,
         task_specific: task_prompts,
@@ -200,37 +200,37 @@ async fn create_github_app_for_agent(
         url: format!("https://github.com/{}/cto", org),
         description: format!("{}: {}", persona.archetype, purpose),
         hook_attributes: WebhookConfig {
-            url: format!("https://webhooks.{}.com/agents/{}", 
+            url: format!("https://webhooks.{}.com/agents/{}",
                 org, persona.name.to_lowercase()),
             active: true,
             events: infer_events_from_purpose(purpose),
         },
-        redirect_url: format!("https://platform.{}.com/agents/{}/callback", 
+        redirect_url: format!("https://platform.{}.com/agents/{}/callback",
             org, persona.name.to_lowercase()),
         public: false,
         default_permissions: custom_permissions
             .unwrap_or_else(|| infer_permissions_from_purpose(purpose)),
         default_events: infer_events_from_purpose(purpose),
     };
-    
+
     // Option 1: Use management app to create
     if let Some(mgmt_app) = get_management_app() {
         return mgmt_app.create_child_app(manifest).await;
     }
-    
+
     // Option 2: Generate creation URL for manual step
     let manifest_json = serde_json::to_string(&manifest)?;
     let encoded = urlencoding::encode(&manifest_json);
     let state = uuid::Uuid::new_v4().to_string();
-    
+
     // Store state for callback
     store_creation_state(&state, persona, &manifest).await?;
-    
+
     let creation_url = format!(
         "https://github.com/organizations/{}/settings/apps/new?state={}&manifest={}",
         org, state, encoded
     );
-    
+
     // Return URL and wait for callback
     Ok(GitHubAppInfo::Pending {
         creation_url,
@@ -249,7 +249,7 @@ async fn create_k8s_resources(
     namespace: &str
 ) -> Result<()> {
     let k8s_client = kube::Client::try_default().await?;
-    
+
     // Create ConfigMap with agent configuration
     let config_map = ConfigMap {
         metadata: ObjectMeta {
@@ -275,10 +275,10 @@ async fn create_k8s_resources(
         }),
         ..Default::default()
     };
-    
+
     let api: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), namespace);
     api.create(&PostParams::default(), &config_map).await?;
-    
+
     // Create Secret for GitHub App credentials
     let secret = Secret {
         metadata: ObjectMeta {
@@ -300,10 +300,10 @@ async fn create_k8s_resources(
         }),
         ..Default::default()
     };
-    
+
     let secret_api: Api<Secret> = Api::namespaced(k8s_client, namespace);
     secret_api.create(&PostParams::default(), &secret).await?;
-    
+
     Ok(())
 }
 ```
@@ -331,11 +331,11 @@ async fn deploy_agent(
         },
         ..Default::default()
     };
-    
+
     // Submit to controller
     let api: Api<CodeRun> = Api::namespaced(k8s_client, namespace);
     api.create(&PostParams::default(), &code_run).await?;
-    
+
     Ok(())
 }
 ```
@@ -347,49 +347,49 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
     // Parse parameters
     let purpose = params["purpose"].as_str()
         .ok_or("Purpose is required")?;
-    
+
     let hints = params.get("personality_hints")
         .map(|h| serde_json::from_value::<PersonalityHints>(h.clone()))
         .transpose()?;
-    
+
     let capabilities = params.get("capabilities")
         .and_then(|c| c.as_array())
         .map(|arr| arr.iter()
             .filter_map(|v| v.as_str().map(String::from))
             .collect::<Vec<_>>())
         .unwrap_or_else(|| infer_capabilities_from_purpose(purpose));
-    
+
     let github_org = params.get("github_org")
         .and_then(|o| o.as_str())
         .unwrap_or("5dlabs");
-    
+
     let should_deploy = params.get("deploy")
         .and_then(|d| d.as_bool())
         .unwrap_or(false);
-    
+
     let namespace = params.get("namespace")
         .and_then(|n| n.as_str())
         .unwrap_or("agent-platform");
-    
+
     // Step 1: Generate character
     println!("🎭 Generating agent persona...");
     let persona = generate_agent_character(purpose, hints).await?;
     println!("✅ Created persona: {} the {}", persona.name, persona.archetype);
-    
+
     // Step 2: Generate prompts
     println!("📝 Generating system prompts...");
     let prompts = generate_system_prompts(&persona, purpose, &capabilities).await?;
     println!("✅ Generated {} task-specific prompts", prompts.task_specific.len());
-    
+
     // Step 3: Create GitHub App
     println!("🐙 Creating GitHub App...");
     let app_info = create_github_app_for_agent(
-        &persona, 
-        purpose, 
+        &persona,
+        purpose,
         github_org,
         params.get("permissions").map(|p| serde_json::from_value(p.clone())).transpose()?
     ).await?;
-    
+
     match &app_info {
         GitHubAppInfo::Created { app_id, .. } => {
             println!("✅ Created GitHub App with ID: {}", app_id);
@@ -400,19 +400,19 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
             let app_info = wait_for_app_creation(&app_info).await?;
         }
     }
-    
+
     // Step 4: Create K8s resources
     println!("☸️ Creating Kubernetes resources...");
     create_k8s_resources(&persona, &app_info, &prompts, namespace).await?;
     println!("✅ Created ConfigMap and Secrets");
-    
+
     // Step 5: Deploy (optional)
     if should_deploy {
         println!("🚀 Deploying agent...");
         deploy_agent(&persona, namespace).await?;
         println!("✅ Agent deployed successfully");
     }
-    
+
     // Return complete information
     Ok(json!({
         "success": true,
@@ -425,7 +425,7 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
         "github_app": {
             "id": app_info.app_id,
             "name": format!("{}-AI-Agent", persona.name),
-            "installation_url": format!("https://github.com/apps/{}-ai-agent/installations/new", 
+            "installation_url": format!("https://github.com/apps/{}-ai-agent/installations/new",
                 persona.name.to_lowercase()),
         },
         "kubernetes": {
@@ -439,17 +439,17 @@ async fn handle_create_agent_persona(params: Value) -> Result<Value> {
         },
         "next_steps": if !should_deploy {
             vec![
-                format!("Install the GitHub App: https://github.com/apps/{}-ai-agent/installations/new", 
+                format!("Install the GitHub App: https://github.com/apps/{}-ai-agent/installations/new",
                     persona.name.to_lowercase()),
                 format!("Deploy the agent: mcp_cto_deploy_agent --name={}", persona.name),
-                format!("View agent config: kubectl get cm {}-config -n {} -o yaml", 
+                format!("View agent config: kubectl get cm {}-config -n {} -o yaml",
                     persona.name.to_lowercase(), namespace),
             ]
         } else {
             vec![
-                format!("View agent logs: kubectl logs -l app={} -n {}", 
+                format!("View agent logs: kubectl logs -l app={} -n {}",
                     persona.name.to_lowercase(), namespace),
-                format!("Check agent status: kubectl get coderun -n {} | grep {}", 
+                format!("Check agent status: kubectl get coderun -n {} | grep {}",
                     namespace, persona.name.to_lowercase()),
             ]
         }
@@ -546,7 +546,7 @@ Generated Agent:
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_persona_generation() {
         let persona = generate_agent_character(
@@ -557,23 +557,23 @@ mod tests {
                 quirks: Some(vec!["thorough".to_string()]),
             })
         ).await.unwrap();
-        
+
         assert!(!persona.name.is_empty());
-        assert!(persona.archetype.contains("engineer") || 
+        assert!(persona.archetype.contains("engineer") ||
                 persona.archetype.contains("Engineer"));
         assert!(!persona.traits.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_permission_inference() {
         let perms = infer_permissions_from_purpose(
             "security vulnerability detection"
         );
-        
+
         assert_eq!(perms.security_events, Some("write".to_string()));
         assert_eq!(perms.contents, Some("read".to_string()));
     }
-    
+
     #[tokio::test]
     async fn test_prompt_generation() {
         let persona = AgentPersona {
@@ -583,13 +583,13 @@ mod tests {
             communication_style: CommunicationStyle::default(),
             avatar_description: "A robot".to_string(),
         };
-        
+
         let prompts = generate_system_prompts(
             &persona,
             "testing",
             &vec!["code_review".to_string()]
         ).await.unwrap();
-        
+
         assert!(prompts.base.contains("TestBot"));
         assert!(prompts.task_specific.contains_key("code_review"));
     }
@@ -603,16 +603,16 @@ mod tests {
 enum PersonaCreationError {
     #[error("Failed to generate persona: {0}")]
     GenerationFailed(String),
-    
+
     #[error("GitHub App creation failed: {0}")]
     GitHubAppFailed(String),
-    
+
     #[error("Kubernetes resource creation failed: {0}")]
     K8sResourceFailed(String),
-    
+
     #[error("Deployment failed: {0}")]
     DeploymentFailed(String),
-    
+
     #[error("Timeout waiting for app creation")]
     CreationTimeout,
 }

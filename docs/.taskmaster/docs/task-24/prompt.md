@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -23,7 +23,6 @@
 - `dest: metadata.name` (dynamic targeting)
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
-
 
 ## Mission Statement
 You are a senior Site Reliability Engineer (SRE) tasked with creating comprehensive operational documentation for a complex multi-agent AI workflow orchestration system. Your goal is to build definitive runbooks, troubleshooting guides, and incident response procedures that enable any operations team member to effectively manage, monitor, and troubleshoot the system.
@@ -120,28 +119,28 @@ Establish comprehensive monitoring and optimization practices:
 runbook_structure:
   system_overview:
     - architecture_diagrams
-    - component_responsibilities  
+    - component_responsibilities
     - data_flow_documentation
     - external_dependencies
-    
+
   operational_procedures:
     - daily_operations_checklist
     - monitoring_and_alerting
     - maintenance_schedules
     - backup_and_recovery
-    
+
   troubleshooting_guides:
     - common_issues_and_solutions
     - diagnostic_procedures
     - escalation_guidelines
     - root_cause_analysis_templates
-    
+
   incident_response:
     - severity_classification
     - response_procedures
     - communication_protocols
     - post_incident_analysis
-    
+
   performance_optimization:
     - monitoring_guidelines
     - tuning_recommendations
@@ -157,18 +156,18 @@ procedure_template:
   purpose: "Why this procedure exists"
   prerequisites: "What must be in place before starting"
   estimated_time: "Expected duration for completion"
-  
+
   steps:
     - step_number: 1
       action: "Specific action to take"
       command: "kubectl get pods -n agent-platform"
       expected_result: "All pods in Running state"
       troubleshooting: "What to do if result differs"
-      
+
   validation:
     - description: "How to verify successful completion"
     - acceptance_criteria: "Specific metrics or states to confirm"
-    
+
   rollback:
     - conditions: "When rollback is necessary"
     - procedure: "Steps to undo changes safely"
@@ -181,12 +180,12 @@ monitoring_integration:
     - map_alerts_to_runbook_sections
     - provide_direct_links_to_relevant_procedures
     - include_context_specific_troubleshooting_steps
-    
+
   metric_thresholds:
     - document_threshold_rationale
     - provide_adjustment_procedures
     - include_seasonal_and_growth_considerations
-    
+
   dashboard_integration:
     - link_runbook_sections_to_relevant_dashboards
     - provide_drill_down_guidance
@@ -220,7 +219,7 @@ monitoring_integration:
 2. **Basic Operations**: Document fundamental monitoring, management, and maintenance procedures
 3. **Common Issues**: Catalog known issues with tested resolution procedures
 
-### Phase 2: Advanced Operations  
+### Phase 2: Advanced Operations
 4. **Troubleshooting Framework**: Build systematic diagnostic procedures and decision trees
 5. **Performance Optimization**: Document tuning procedures and monitoring guidelines
 6. **Capacity Planning**: Create growth analysis and scaling procedures

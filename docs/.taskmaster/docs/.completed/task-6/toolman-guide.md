@@ -71,7 +71,7 @@ Tools: filesystem, memory_create_entities
    ```bash
    # Focus areas for container-rex.sh.hbs
    - Documentation-first workflow setup
-   - MCP server integration preparation  
+   - MCP server integration preparation
    - Task file access patterns
    - Implementation-focused environment
    ```
@@ -137,7 +137,7 @@ Tools: filesystem, git, memory_create_entities
 - **Documentation**: Include comments in templates explaining agent-specific logic
 - **Testing**: Test templates render without Handlebars errors
 
-### Controller Integration  
+### Controller Integration
 - **Type Safety**: Ensure proper error handling for template operations
 - **Performance**: Minimize template loading overhead
 - **Maintainability**: Keep template selection logic simple and clear
@@ -197,7 +197,7 @@ git.log()     # Review change history
 - [ ] Required tools and credentials are available to each agent
 - [ ] Template selection logic correctly maps GitHub Apps to templates
 
-### Integration Quality Checks  
+### Integration Quality Checks
 - [ ] Controller compiles and runs without errors
 - [ ] Template loading performance is acceptable
 - [ ] ConfigMaps contain correct container scripts

@@ -363,17 +363,17 @@ impl StateManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_multi_task_workflow_execution() {
         let tasks = vec!["task-1", "task-2", "task-3"];
         let workflow = MultiTaskWorkflow::new(tasks);
         let result = workflow.execute().await.unwrap();
-        
+
         assert_eq!(result.completed_tasks, 3);
         assert_eq!(result.failed_tasks, 0);
     }
-    
+
     #[tokio::test]
     async fn test_checkpoint_recovery() {
         // Test recovery from various failure scenarios
@@ -392,7 +392,7 @@ lazy_static! {
         "Workflow execution duration",
         &["workflow_type", "status"]
     ).unwrap();
-    
+
     static ref CHECKPOINT_OPERATIONS: CounterVec = register_counter_vec!(
         "checkpoint_operations_total",
         "Checkpoint operations",
@@ -409,12 +409,12 @@ use tracing::{info, warn, error, instrument};
 #[instrument(skip(self))]
 pub async fn process_task_sequence(&self, tasks: &[String]) -> Result<WorkflowResult> {
     info!("Starting multi-task workflow with {} tasks", tasks.len());
-    
+
     for (index, task_id) in tasks.iter().enumerate() {
         info!("Processing task {} ({}/{})", task_id, index + 1, tasks.len());
         // Process task...
     }
-    
+
     info!("Completed multi-task workflow successfully");
     Ok(result)
 }

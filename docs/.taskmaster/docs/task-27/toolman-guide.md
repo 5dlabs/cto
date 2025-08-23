@@ -73,7 +73,7 @@ spec:
       property: host
   - secretKey: username
     remoteRef:
-      key: /infrastructure/tess-admin/postgres  
+      key: /infrastructure/tess-admin/postgres
       property: username
   - secretKey: password
     remoteRef:
@@ -229,8 +229,8 @@ SELECT pg_size_pretty(pg_database_size('taskmaster'));
 \l
 
 -- Show active connections
-SELECT datname, usename, client_addr, state 
-FROM pg_stat_activity 
+SELECT datname, usename, client_addr, state
+FROM pg_stat_activity
 WHERE state = 'active';
 
 -- Vacuum and analyze
@@ -243,13 +243,13 @@ EOF
 #!/bin/bash
 test_postgres_connection() {
   local host="$1"
-  local port="$2" 
+  local port="$2"
   local user="$3"
   local password="$4"
   local database="$5"
-  
+
   export PGPASSWORD="$password"
-  
+
   echo "Testing PostgreSQL connection..."
   if psql -h "$host" -p "$port" -U "$user" -d "$database" -c "SELECT version();" > /dev/null 2>&1; then
     echo "✓ PostgreSQL connection successful"
@@ -316,11 +316,11 @@ test_redis_connection() {
   local host="$1"
   local port="$2"
   local password="$3"
-  
+
   echo "Testing Redis connection..."
   if redis-cli -h "$host" -p "$port" -a "$password" ping | grep -q PONG; then
     echo "✓ Redis connection successful"
-    
+
     # Test admin operations
     if redis-cli -h "$host" -p "$port" -a "$password" INFO server > /dev/null 2>&1; then
       echo "✓ Redis admin operations available"
@@ -421,11 +421,11 @@ test_argocd_connection() {
   local server="$1"
   local username="$2"
   local password="$3"
-  
+
   echo "Testing Argo CD connection..."
   if argocd login "$server" --username "$username" --password "$password" --insecure > /dev/null 2>&1; then
     echo "✓ Argo CD authentication successful"
-    
+
     # Test administrative operations
     if argocd cluster list > /dev/null 2>&1; then
       echo "✓ Argo CD admin operations available"
@@ -665,7 +665,7 @@ retry_command() {
   local max_retries=3
   local delay=2
   local command="$1"
-  
+
   for ((i=1; i<=max_retries; i++)); do
     if eval "$command"; then
       return 0
@@ -675,7 +675,7 @@ retry_command() {
       delay=$((delay * 2))
     fi
   done
-  
+
   echo "Command failed after $max_retries attempts"
   return 1
 }
@@ -691,7 +691,7 @@ retry_command "psql -h postgres-primary.taskmaster.local -c 'SELECT 1'"
 perform_health_check() {
   local service="$1"
   local start_time=$(date +%s)
-  
+
   case "$service" in
     "postgres")
       test_postgres_connection && status="success" || status="failure"
@@ -703,9 +703,9 @@ perform_health_check() {
       test_argocd_connection && status="success" || status="failure"
       ;;
   esac
-  
+
   local duration=$(($(date +%s) - start_time))
-  
+
   # Push metrics to Prometheus
   cat <<EOF | curl -X POST --data-binary @- http://pushgateway:9091/metrics/job/tess-admin-health
 tess_admin_health_check_duration_seconds{service="$service",status="$status"} $duration
@@ -720,7 +720,7 @@ EOF
 # Complete admin access validation
 validate_tess_admin_access() {
   echo "=== Validating Tess Admin Access ==="
-  
+
   # Check Kubernetes access
   echo "1. Testing Kubernetes access..."
   if kubectl auth can-i create secrets --as=system:serviceaccount:taskmaster:tess-admin-service-account; then
@@ -729,23 +729,23 @@ validate_tess_admin_access() {
     echo "✗ Kubernetes access failed"
     return 1
   fi
-  
+
   # Check database access
   echo "2. Testing database access..."
   test_postgres_connection || return 1
   test_redis_connection || return 1
-  
+
   # Check Argo CD access
   echo "3. Testing Argo CD access..."
   test_argocd_connection || return 1
-  
+
   # Check secret rotation
   echo "4. Testing secret rotation..."
   kubectl get externalsecret -n taskmaster | grep -q "True.*24h" || {
     echo "✗ Secret rotation not configured properly"
     return 1
   }
-  
+
   echo "✓ All admin access validated successfully"
   return 0
 }
@@ -754,7 +754,7 @@ validate_tess_admin_access() {
 enable_break_glass_access() {
   echo "=== EMERGENCY: Enabling Break-Glass Access ==="
   echo "This action is logged and monitored"
-  
+
   # Create emergency role binding
   kubectl apply -f - <<EOF
 apiVersion: rbac.authorization.k8s.io/v1
@@ -773,10 +773,10 @@ roleRef:
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
 EOF
-  
+
   # Set expiration timer
   (sleep 14400 && kubectl delete clusterrolebinding tess-emergency-access) &
-  
+
   echo "Break-glass access enabled for 4 hours"
 }
 ```

@@ -210,7 +210,7 @@
    ```bash
    # Test complete approval workflow
    ./test-pr-approval-integration.sh
-   
+
    # Test sensor functionality
    ./test-approval-sensor.sh
    ```

@@ -391,7 +391,7 @@ EOF
   curl -X POST http://workflow-resume-service/resume \
     -d '{"taskId": "'$((200+i))'", "eventType": "pr-created"}' \
     -H "Content-Type: application/json" &
-    
+
   if [ $((i % 10)) -eq 0 ]; then
     wait
     echo "Completed $i requests"
@@ -520,7 +520,7 @@ spec:
       - name: testing-work
         dependencies: [quality-work]
         template: suspend-for-webhook
-        
+
   - name: suspend-for-webhook
     suspend: {}
 EOF

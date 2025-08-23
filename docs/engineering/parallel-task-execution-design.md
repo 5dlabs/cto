@@ -44,7 +44,7 @@ task-5:
 ### Approach 2: Automatic Dependency Detection
 Analyze task acceptance criteria programmatically to detect:
 1. File overlap analysis
-2. API endpoint conflicts  
+2. API endpoint conflicts
 3. Database table dependencies
 4. Import/export relationships
 5. Test coverage overlap
@@ -94,11 +94,11 @@ Modify Argo Workflows to handle parallel execution:
       template: run-rex
       arguments:
         task-id: 3
-    - name: start-task-4  
+    - name: start-task-4
       template: run-rex
       arguments:
         task-id: 4
-  
+
 - name: wait-for-group
   dependencies: [parallel-task-group]
   template: consolidate-results

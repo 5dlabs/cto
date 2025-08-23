@@ -96,21 +96,21 @@ test_mcp_connectivity() {
     local server_url="$1"
     local max_retries=3
     local retry_delay=2
-    
+
     for attempt in $(seq 1 $max_retries); do
         echo "🔍 Attempt $attempt/$max_retries: Testing MCP server at $server_url"
-        
+
         if curl -f -s --connect-timeout 5 "$server_url/health" >/dev/null 2>&1; then
             echo "✅ MCP documentation server accessible"
             return 0
         fi
-        
+
         if [ $attempt -lt $max_retries ]; then
             echo "⏳ Retrying in ${retry_delay}s..."
             sleep $retry_delay
         fi
     done
-    
+
     echo "⚠️ MCP server not accessible after $max_retries attempts"
     echo "📝 Proceeding with implementation without documentation queries"
     export DOCS_FIRST_MODE="false"
@@ -189,7 +189,7 @@ rustdocs_get_crate_info("sqlx")
    kubectl get deployment rustdocs-mcp-server -n agent-platform
    kubectl get service rustdocs-mcp-service -n agent-platform
    kubectl get pods -l app=rustdocs-mcp-server -n agent-platform
-   
+
    # Use brave-search_brave_web_search for research
    Search: "MCP Model Context Protocol rust documentation server"
    Search: "kubernetes service discovery documentation integration"
@@ -200,7 +200,7 @@ rustdocs_get_crate_info("sqlx")
    # Test MCP server health endpoint
    kubectl run health-check --rm -i --tty --image=alpine/curl --restart=Never -- \
      curl -v "http://rustdocs-mcp-service.agent-platform.svc.cluster.local:8080/health"
-   
+
    # Test documentation search functionality
    kubectl run docs-test --rm -i --tty --image=alpine/curl --restart=Never -- \
      curl "http://rustdocs-mcp-service.agent-platform.svc.cluster.local:8080/api/v1/docs/search?q=tokio"
@@ -211,10 +211,10 @@ rustdocs_get_crate_info("sqlx")
    # Update container script templates
    # Modify: infra/charts/controller/claude-templates/code/container-rex.sh.hbs
    # Modify: infra/charts/controller/claude-templates/code/container-blaze.sh.hbs
-   
+
    # Update client configuration templates
    # Modify: infra/charts/controller/claude-templates/code/client-config.json.hbs
-   
+
    # Update system prompt templates
    # Modify: infra/charts/controller/claude-templates/agents/rex-system-prompt.md.hbs
    # Modify: infra/charts/controller/claude-templates/agents/blaze-system-prompt.md.hbs
@@ -244,7 +244,7 @@ rustdocs_get_crate_info("sqlx")
      service: "test-service"
      continue_session: false
    EOF
-   
+
    # Verify MCP configuration
    kubectl exec -it test-rex-mcp-config -- env | grep MCP
    kubectl exec -it test-rex-mcp-config -- cat ~/.config/claude/client-config.json | jq '.remoteTools[] | select(. | startswith("rustdocs"))'
@@ -264,7 +264,7 @@ rustdocs_get_crate_info("sqlx")
      service: "test-service"
      continue_session: false
    EOF
-   
+
    # Verify NO MCP configuration
    kubectl exec -it test-cleo-isolation -- env | grep MCP || echo "No MCP config (expected)"
    kubectl exec -it test-cleo-isolation -- cat ~/.config/claude/client-config.json | jq '.remoteTools[] | select(. | startswith("rustdocs"))' | wc -l # Should be 0
@@ -276,7 +276,7 @@ rustdocs_get_crate_info("sqlx")
    ```bash
    # Scale down MCP server to simulate unavailability
    kubectl scale deployment rustdocs-mcp-server --replicas=0 -n agent-platform
-   
+
    # Create Rex CodeRun during server downtime
    kubectl apply -f - <<EOF
    apiVersion: agents.platform/v1
@@ -289,10 +289,10 @@ rustdocs_get_crate_info("sqlx")
      service: "test-service"
      continue_session: false
    EOF
-   
+
    # Verify graceful degradation
    kubectl logs test-rex-server-down -n agent-platform | grep -E '(not accessible|Proceeding without|DOCS_FIRST_MODE=false)'
-   
+
    # Restore server
    kubectl scale deployment rustdocs-mcp-server --replicas=2 -n agent-platform
    ```
@@ -301,10 +301,10 @@ rustdocs_get_crate_info("sqlx")
    ```bash
    # Monitor connectivity testing during server restarts
    kubectl rollout restart deployment rustdocs-mcp-server -n agent-platform
-   
+
    # Create CodeRun during rollout
    kubectl apply -f test-coderun-during-restart.yaml
-   
+
    # Check for timeout handling and retry logic
    kubectl logs <pod-name> -n agent-platform | grep -E '(timeout|retry|attempt)'
    ```

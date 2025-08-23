@@ -194,10 +194,10 @@
    git clone https://github.com/test/sample-rust-project
    export GITHUB_TOKEN="test-token"
    export PR_NUMBER="123"
-   
+
    # Execute Tess workflow
    bash container-tess.sh.hbs
-   
+
    # Verify all stages complete successfully
    ls /tmp/artifacts/
    ```
@@ -207,10 +207,10 @@
    # Test with low coverage project
    export COVERAGE_THRESHOLD_EXISTING=95
    export COVERAGE_THRESHOLD_NEW=100
-   
+
    # Should request changes for insufficient coverage
    bash container-tess.sh.hbs
-   
+
    # Verify GitHub review requests changes
    ```
 
@@ -232,7 +232,7 @@
    ```bash
    # Test complete workflow with sample projects
    ./test-coverage-workflow.sh
-   
+
    # Test GitHub API integration
    ./test-github-integration.sh
    ```
@@ -241,7 +241,7 @@
    ```bash
    # Test with large codebase
    ./performance-test-coverage.sh 10000-line-project
-   
+
    # Memory usage validation
    valgrind ./test-coverage-analysis
    ```

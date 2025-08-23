@@ -33,13 +33,13 @@ CREATE TABLE embeddings (
 );
 
 -- Insert vectors
-INSERT INTO embeddings (content, embedding) 
+INSERT INTO embeddings (content, embedding)
 VALUES ('sample text', '[0.1,0.2,0.3,...]');
 
 -- Vector similarity search
-SELECT content, embedding <-> '[0.1,0.2,0.3,...]' AS distance 
-FROM embeddings 
-ORDER BY embedding <-> '[0.1,0.2,0.3,...]' 
+SELECT content, embedding <-> '[0.1,0.2,0.3,...]' AS distance
+FROM embeddings
+ORDER BY embedding <-> '[0.1,0.2,0.3,...]'
 LIMIT 10;
 ```
 

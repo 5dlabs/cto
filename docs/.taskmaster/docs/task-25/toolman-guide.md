@@ -143,7 +143,7 @@ memory_query_entities --query="deployment rollback procedures and incident respo
 
 **Knowledge Organization**:
 - Catalog proven deployment patterns and configurations
-- Store production hardening measures and security policies  
+- Store production hardening measures and security policies
 - Track deployment metrics and continuous improvement opportunities
 - Maintain repository of troubleshooting procedures and solutions
 

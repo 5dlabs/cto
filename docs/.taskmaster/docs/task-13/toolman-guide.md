@@ -69,22 +69,22 @@ templates:
     command: [sh]
     source: |
       set -e  # Exit on any error
-      
+
       TASK_ID="{{inputs.parameters.task-id}}"
       SOURCE_DIR="docs/.taskmaster/docs/task-$TASK_ID"
       TARGET_DIR="docs/.taskmaster/docs/.completed/task-$TASK_ID"
-      
+
       # Validation before move
       if [ ! -d "$SOURCE_DIR" ]; then
         echo "ERROR: Source directory $SOURCE_DIR not found"
         exit 1
       fi
-      
+
       # Atomic directory operation
       echo "Moving task $TASK_ID to completed directory"
       mkdir -p "docs/.taskmaster/docs/.completed"
       mv "$SOURCE_DIR" "$TARGET_DIR"
-      
+
       # Git commit with error handling
       if git add -A && git commit -m "Task $TASK_ID completed - moved to .completed directory"; then
         echo "Task $TASK_ID successfully committed"
@@ -104,9 +104,9 @@ templates:
     command: [sh]
     source: |
       set -e
-      
+
       echo "Discovering next pending task..."
-      
+
       # Find next task with natural version sort
       NEXT_TASK_PATH=$(find docs/.taskmaster/docs/ \
         -maxdepth 1 \
@@ -115,36 +115,36 @@ templates:
         | grep -v ".completed" \
         | sort -V \
         | head -1)
-      
+
       if [ -n "$NEXT_TASK_PATH" ]; then
         NEXT_TASK_ID=$(echo "$NEXT_TASK_PATH" | grep -o 'task-[0-9]*' | cut -d'-' -f2)
-        
+
         # Comprehensive task validation
         validate_task() {
           local task_path="$1"
           local task_id="$2"
-          
+
           # Check task.txt exists
           if [ ! -f "$task_path/task.txt" ]; then
             echo "Task $task_id missing task.txt file"
             return 1
           fi
-          
+
           # Check task.txt format
           if ! grep -q "^# Task ID: $task_id$" "$task_path/task.txt"; then
             echo "Task $task_id has invalid task.txt format"
             return 1
           fi
-          
+
           # Check task status
           if grep -q "^# Status: completed$" "$task_path/task.txt"; then
             echo "Task $task_id already marked as completed"
             return 1
           fi
-          
+
           return 0
         }
-        
+
         if validate_task "$NEXT_TASK_PATH" "$NEXT_TASK_ID"; then
           echo "Next task found: $NEXT_TASK_ID"
           echo "$NEXT_TASK_ID" > /tmp/next-task-id
@@ -153,7 +153,7 @@ templates:
           mkdir -p "docs/.taskmaster/docs/.corrupted"
           mv "$NEXT_TASK_PATH" "docs/.taskmaster/docs/.corrupted/task-$NEXT_TASK_ID"
           echo "$(date -u +%Y-%m-%dT%H:%M:%SZ): Task $NEXT_TASK_ID quarantined" >> docs/.taskmaster/task-errors.log
-          
+
           # Recursively find next valid task
           find_next_task  # This would need to be implemented as a loop
         fi
@@ -184,10 +184,10 @@ templates:
         parameters:
         - name: task-id
           value: "{{inputs.parameters.current-task-id}}"
-          
+
   - - name: discover-next-task
       template: find-next-task
-      
+
   - - name: start-next-workflow
       when: "{{steps.discover-next-task.outputs.parameters.next-task-id}} != ''"
       template: trigger-next-task-workflow
@@ -195,11 +195,11 @@ templates:
         parameters:
         - name: task-id
           value: "{{steps.discover-next-task.outputs.parameters.next-task-id}}"
-          
+
   - - name: finalize-queue-processing
       when: "{{steps.discover-next-task.outputs.parameters.next-task-id}} == ''"
       template: handle-queue-complete
-      
+
 # Safe workflow creation with resource limits
 - name: trigger-next-task-workflow
   inputs:
@@ -224,11 +224,11 @@ templates:
         # Resource limits to prevent runaway workflows
         activeDeadlineSeconds: 86400  # 24 hours max
         parallelism: 1
-        
+
         # Cleanup policy
         ttlStrategy:
           secondsAfterCompletion: 3600  # Clean up after 1 hour
-          
+
         arguments:
           parameters:
           - name: task-id
@@ -253,17 +253,17 @@ templates:
     source: |
       TASK_ID="{{inputs.parameters.task-id}}"
       ERROR_REASON="{{inputs.parameters.error-reason}}"
-      
+
       echo "Handling corrupted task: $TASK_ID (Reason: $ERROR_REASON)"
-      
+
       # Create quarantine structure
       QUARANTINE_DIR="docs/.taskmaster/docs/.corrupted/task-$TASK_ID"
       mkdir -p "docs/.taskmaster/docs/.corrupted"
-      
+
       # Move corrupted task
       if [ -d "docs/.taskmaster/docs/task-$TASK_ID" ]; then
         mv "docs/.taskmaster/docs/task-$TASK_ID" "$QUARANTINE_DIR"
-        
+
         # Add metadata about corruption
         cat > "$QUARANTINE_DIR/.corruption-info" <<EOF
       {
@@ -274,14 +274,14 @@ templates:
       }
       EOF
       fi
-      
+
       # Log corruption event
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ): Task $TASK_ID quarantined - $ERROR_REASON" >> docs/.taskmaster/task-errors.log
-      
+
       # Commit quarantine
       git add -A
       git commit -m "Quarantine corrupted task $TASK_ID: $ERROR_REASON"
-      
+
       echo "Task $TASK_ID successfully quarantined"
 ```
 
@@ -295,7 +295,7 @@ templates:
    Search: "argo workflows recursive template best practices"
    Search: "kubernetes workflow automation patterns"
    Search: "workflow resource limits prevention infinite loops"
-   
+
    # Store research findings
    memory_create_entities("Research", {
      "topic": "task-progression-patterns",
@@ -308,7 +308,7 @@ templates:
    ```yaml
    # Create comprehensive workflow template
    # infra/argo-workflows/templates/task-progression.yaml
-   
+
    apiVersion: argoproj.io/v1alpha1
    kind: WorkflowTemplate
    metadata:
@@ -324,7 +324,7 @@ templates:
    ```yaml
    # Modify existing play-workflow-template.yaml
    # Add progression step after multi-agent completion
-   
+
    templates:
    - name: main
      dag:
@@ -346,10 +346,10 @@ templates:
    echo "# Task ID: 101" > docs/.taskmaster/docs/task-101/task.txt
    echo "# Task ID: 102" > docs/.taskmaster/docs/task-102/task.txt
    echo "# Task ID: 103" > docs/.taskmaster/docs/task-103/task.txt
-   
+
    # Submit test workflow
    argo submit play-workflow-template.yaml -p task-id=101
-   
+
    # Monitor progression
    watch argo list -l workflow-type=play-orchestration
    ```
@@ -379,7 +379,7 @@ templates:
      - name: test
        template: find-next-task
    EOF
-   
+
    # Verify results
    argo logs $(argo list -o name | head -1)
    ```
@@ -389,7 +389,7 @@ templates:
    # Check quarantine functionality
    ls docs/.taskmaster/docs/.corrupted/
    cat docs/.taskmaster/task-errors.log
-   
+
    # Verify error recovery continues with valid tasks
    argo logs <workflow> | grep "Next task found: 201"
    ```
@@ -403,10 +403,10 @@ templates:
      mkdir -p docs/.taskmaster/docs/task-$i
      echo "# Task ID: $i" > docs/.taskmaster/docs/task-$i/task.txt
    done
-   
+
    # Submit and monitor performance
    argo submit play-workflow-template.yaml -p task-id=301
-   
+
    # Monitor resource usage
    kubectl top nodes
    kubectl top pods -n argo
@@ -417,7 +417,7 @@ templates:
    # Test workflow cleanup and limits
    # Monitor workflow count over time
    watch 'argo list | wc -l'
-   
+
    # Verify TTL cleanup working
    argo list --completed | grep "seconds ago"
    ```

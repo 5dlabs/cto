@@ -50,7 +50,7 @@
 ### ✅ Prometheus Alert Rules
 - [ ] `WorkflowStuckAtSameStage` alert fires for workflows stuck >6 hours
 - [ ] `WorkflowExcessiveAge` alert fires for workflows running >7 days
-- [ ] `WorkflowCriticalAge` alert fires for workflows running >10 days  
+- [ ] `WorkflowCriticalAge` alert fires for workflows running >10 days
 - [ ] `MultipleWorkflowsStuck` alert fires when ≥3 workflows stuck in same namespace
 - [ ] Alert labels include workflow name, namespace, phase, and severity
 - [ ] Alert annotations provide clear descriptions and recommended actions
@@ -91,7 +91,7 @@
 ### ✅ Resource Usage Tests
 - [ ] High CPU usage (>90%) triggers resource exhaustion alerts
 - [ ] Memory usage approaching limits (>95%) generates warnings
-- [ ] Disk I/O saturation (>90% utilization) creates alerts  
+- [ ] Disk I/O saturation (>90% utilization) creates alerts
 - [ ] Network egress costs tracked and alerted on budget thresholds
 - [ ] Resource forecasting predicts capacity needs based on trends
 - [ ] Cost allocation tags properly assigned to multi-tenant scenarios
@@ -264,7 +264,7 @@
 - [ ] Existing workflow monitoring continues to function
 - [ ] Legacy alert rules remain active during transition
 - [ ] Historical metrics data preserved during upgrade
-- [ ] Existing dashboard configurations remain functional  
+- [ ] Existing dashboard configurations remain functional
 - [ ] Current notification channels continue to work
 - [ ] Gradual migration path available for existing workflows
 

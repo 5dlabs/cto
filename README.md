@@ -124,7 +124,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
       "sourceBranch": "main"
     },
     "code": {
-      "model": "claude-opus-4-20250514", 
+      "model": "claude-opus-4-20250514",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -146,7 +146,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
   },
   "agents": {
     "morgan": "5DLabs-Morgan",
-    "rex": "5DLabs-Rex", 
+    "rex": "5DLabs-Rex",
     "blaze": "5DLabs-Blaze",
     "cipher": "5DLabs-Cipher",
     "cleo": "5DLabs-Cleo",
@@ -288,7 +288,7 @@ play({
 play({
   task_id: 1,
   implementation_agent: "blaze",
-  quality_agent: "cleo", 
+  quality_agent: "cleo",
   testing_agent: "tess"
 });
 
@@ -489,7 +489,7 @@ Common variables available in templates:
 ## Best Practices
 
 1. **Configure `cto-config.json` first** to set up your agents, models, and repository defaults
-2. **Always generate docs first** to establish baseline documentation  
+2. **Always generate docs first** to establish baseline documentation
 3. **Choose the right tool for the job**:
    - Use `docs()` for documentation generation
    - Use `code()` for single-agent implementation tasks

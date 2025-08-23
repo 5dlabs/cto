@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -24,7 +24,6 @@
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 
-
 ## Mission
 
 You are tasked with implementing robust workflow resume operations for the multi-agent orchestration system. This system must reliably resume suspended workflows at the correct points based on GitHub events, with comprehensive error handling, retry logic, and failure protection.
@@ -33,7 +32,7 @@ You are tasked with implementing robust workflow resume operations for the multi
 
 **System Architecture**: Multi-agent Play Workflow with event-driven suspend/resume patterns
 - **Rex/Blaze Implementation** → Suspend → **GitHub PR Created** → Resume → **Cleo Quality**
-- **Cleo Quality** → Suspend → **GitHub PR Labeled "ready-for-qa"** → Resume → **Tess Testing** 
+- **Cleo Quality** → Suspend → **GitHub PR Labeled "ready-for-qa"** → Resume → **Tess Testing**
 - **Tess Testing** → Suspend → **GitHub PR Approved** → Resume → **Task Completion**
 
 **Your Role**: Reliability engineer building bullet-proof workflow resume infrastructure
@@ -70,18 +69,18 @@ func ResumeWorkflow(ctx context.Context, resumeRequest *WorkflowResumeRequest) (
     if err := validateResumeRequest(resumeRequest); err != nil {
         return nil, fmt.Errorf("resume validation failed: %w", err)
     }
-    
+
     // Step 2: Find the target workflow using correlation
     workflow, err := findTargetWorkflowWithCorrelation(ctx, resumeRequest)
     if err != nil {
         return nil, fmt.Errorf("workflow correlation failed: %w", err)
     }
-    
+
     // Step 3: Validate workflow state for resume
     if err := validateWorkflowStateForResume(workflow, resumeRequest); err != nil {
         return nil, fmt.Errorf("workflow state validation failed: %w", err)
     }
-    
+
     // Step 4: Execute resume with retry logic and circuit breaker
     return executeResumeWithProtection(ctx, workflow, resumeRequest)
 }
@@ -92,14 +91,14 @@ type WorkflowResumeRequest struct {
     EventType    string            `json:"eventType"`
     PRNumber     int               `json:"prNumber"`
     EventPayload map[string]interface{} `json:"eventPayload"`
-    
+
     // Workflow targeting
     LabelSelector string            `json:"labelSelector,omitempty"`
     WorkflowName  string            `json:"workflowName,omitempty"`
-    
+
     // Resume parameters
     ResumeParameters map[string]string `json:"resumeParameters"`
-    
+
     // Validation rules
     ValidationRules []ValidationRule  `json:"validationRules"`
 }
@@ -120,10 +119,10 @@ type ResumeResult struct {
 ```go
 func findTargetWorkflowWithCorrelation(ctx context.Context, request *WorkflowResumeRequest) (*v1alpha1.Workflow, error) {
     argoClient := getArgoWorkflowsClient()
-    
+
     // Build label selector for workflow targeting
     labelSelector := buildWorkflowLabelSelector(request)
-    
+
     // Query workflows matching the criteria
     workflowList, err := argoClient.List(ctx, metav1.ListOptions{
         LabelSelector: labelSelector,
@@ -131,7 +130,7 @@ func findTargetWorkflowWithCorrelation(ctx context.Context, request *WorkflowRes
     if err != nil {
         return nil, fmt.Errorf("workflow query failed: %w", err)
     }
-    
+
     // Handle different scenarios
     switch len(workflowList.Items) {
     case 0:
@@ -148,7 +147,7 @@ func buildWorkflowLabelSelector(request *WorkflowResumeRequest) string {
         "workflow-type=play-orchestration",
         fmt.Sprintf("task-id=%s", request.TaskId),
     }
-    
+
     // Add event-specific stage selector
     switch request.EventType {
     case "pr-created":
@@ -158,32 +157,32 @@ func buildWorkflowLabelSelector(request *WorkflowResumeRequest) string {
     case "pr-approved":
         selectors = append(selectors, "current-stage=waiting-pr-approved")
     }
-    
+
     return strings.Join(selectors, ",")
 }
 
 func validateWorkflowStateForResume(workflow *v1alpha1.Workflow, request *WorkflowResumeRequest) error {
     // Check if workflow is actually suspended
     if !isWorkflowSuspended(workflow) {
-        return fmt.Errorf("workflow %s is not suspended (current phase: %s)", 
+        return fmt.Errorf("workflow %s is not suspended (current phase: %s)",
             workflow.Name, workflow.Status.Phase)
     }
-    
+
     // Validate task ID correlation
     workflowTaskId := workflow.Labels["task-id"]
     if workflowTaskId != request.TaskId {
-        return fmt.Errorf("task ID mismatch: workflow=%s, event=%s", 
+        return fmt.Errorf("task ID mismatch: workflow=%s, event=%s",
             workflowTaskId, request.TaskId)
     }
-    
+
     // Validate workflow stage matches event expectation
     currentStage := workflow.Labels["current-stage"]
     expectedStage := getExpectedStageForEvent(request.EventType)
     if currentStage != expectedStage {
-        return fmt.Errorf("stage mismatch: current=%s, expected=%s", 
+        return fmt.Errorf("stage mismatch: current=%s, expected=%s",
             currentStage, expectedStage)
     }
-    
+
     // Run custom validation rules
     return runValidationRules(workflow, request)
 }
@@ -210,63 +209,63 @@ func executeResumeWithProtection(ctx context.Context, workflow *v1alpha1.Workflo
         BackoffMultiplier: 2.0,
         JitterFactor:     0.1,
     }
-    
+
     // Use circuit breaker to protect against cascading failures
     circuitBreaker := getCircuitBreakerForWorkflow(workflow.Name)
-    
+
     result := &ResumeResult{
         WorkflowName: workflow.Name,
         ResumeTime:   time.Now(),
     }
-    
+
     var lastError error
     delay := retryConfig.InitialDelay
-    
+
     for attempt := 1; attempt <= retryConfig.MaxAttempts; attempt++ {
         result.AttemptCount = attempt
-        
-        log.Printf("Resume attempt %d/%d for workflow %s (task %s)", 
+
+        log.Printf("Resume attempt %d/%d for workflow %s (task %s)",
             attempt, retryConfig.MaxAttempts, workflow.Name, request.TaskId)
-        
+
         // Execute resume through circuit breaker
         err := circuitBreaker.Execute(func() error {
             return performActualResume(ctx, workflow, request)
         })
-        
+
         if err == nil {
             result.Success = true
-            log.Printf("Resume successful on attempt %d for workflow %s", 
+            log.Printf("Resume successful on attempt %d for workflow %s",
                 attempt, workflow.Name)
             return result, nil
         }
-        
+
         lastError = err
-        
+
         // Check if error is retryable
         if !isRetryableError(err) {
             result.ValidationErrors = []string{err.Error()}
-            log.Printf("Non-retryable error for workflow %s: %v", 
+            log.Printf("Non-retryable error for workflow %s: %v",
                 workflow.Name, err)
             break
         }
-        
+
         // Circuit breaker may block retries
         if isCircuitBreakerOpen(err) {
             result.ValidationErrors = []string{"circuit breaker open - retry blocked"}
-            log.Printf("Circuit breaker blocked retry for workflow %s", 
+            log.Printf("Circuit breaker blocked retry for workflow %s",
                 workflow.Name)
             break
         }
-        
+
         if attempt < retryConfig.MaxAttempts {
             // Add jitter to prevent thundering herd
             jitter := time.Duration(rand.Float64() * float64(delay) * retryConfig.JitterFactor)
             actualDelay := delay + jitter
             result.RetryDelays = append(result.RetryDelays, actualDelay)
-            
-            log.Printf("Resume failed on attempt %d, retrying in %v: %v", 
+
+            log.Printf("Resume failed on attempt %d, retrying in %v: %v",
                 attempt, actualDelay, err)
-            
+
             select {
             case <-ctx.Done():
                 return result, ctx.Err()
@@ -279,11 +278,11 @@ func executeResumeWithProtection(ctx context.Context, workflow *v1alpha1.Workflo
             }
         }
     }
-    
+
     result.Success = false
-    result.ValidationErrors = append(result.ValidationErrors, 
+    result.ValidationErrors = append(result.ValidationErrors,
         fmt.Sprintf("resume failed after %d attempts: %v", retryConfig.MaxAttempts, lastError))
-    
+
     return result, lastError
 }
 
@@ -297,14 +296,14 @@ func isRetryableError(err error) bool {
         "too many requests",
         "network is unreachable",
     }
-    
+
     errMsg := strings.ToLower(err.Error())
     for _, pattern := range retryablePatterns {
         if strings.Contains(errMsg, pattern) {
             return true
         }
     }
-    
+
     return false
 }
 ```
@@ -317,7 +316,7 @@ type CircuitBreaker struct {
     name            string
     maxFailures     int
     resetTimeout    time.Duration
-    
+
     mutex           sync.RWMutex
     failures        int
     lastFailureTime time.Time
@@ -340,7 +339,7 @@ func NewCircuitBreaker(name string, maxFailures int, resetTimeout time.Duration)
         resetTimeout: resetTimeout,
         state:       CircuitClosed,
         onStateChange: func(from, to CircuitBreakerState) {
-            log.Printf("Circuit breaker %s: %s -> %s", name, 
+            log.Printf("Circuit breaker %s: %s -> %s", name,
                 stateToString(from), stateToString(to))
         },
     }
@@ -349,22 +348,22 @@ func NewCircuitBreaker(name string, maxFailures int, resetTimeout time.Duration)
 func (cb *CircuitBreaker) Execute(operation func() error) error {
     cb.mutex.Lock()
     defer cb.mutex.Unlock()
-    
+
     // Update circuit breaker state based on time and failures
     cb.updateState()
-    
+
     if cb.state == CircuitOpen {
         return fmt.Errorf("circuit breaker %s is OPEN - operation blocked", cb.name)
     }
-    
+
     // Execute the operation
     err := operation()
-    
+
     if err != nil {
         cb.recordFailure()
         return err
     }
-    
+
     cb.recordSuccess()
     return nil
 }
@@ -372,7 +371,7 @@ func (cb *CircuitBreaker) Execute(operation func() error) error {
 func (cb *CircuitBreaker) updateState() {
     now := time.Now()
     oldState := cb.state
-    
+
     switch cb.state {
     case CircuitClosed:
         if cb.failures >= cb.maxFailures {
@@ -386,7 +385,7 @@ func (cb *CircuitBreaker) updateState() {
     case CircuitHalfOpen:
         // State managed by recordSuccess/recordFailure
     }
-    
+
     if oldState != cb.state && cb.onStateChange != nil {
         cb.onStateChange(oldState, cb.state)
     }
@@ -395,11 +394,11 @@ func (cb *CircuitBreaker) updateState() {
 func (cb *CircuitBreaker) recordSuccess() {
     oldState := cb.state
     cb.failures = 0
-    
+
     if cb.state == CircuitHalfOpen {
         cb.state = CircuitClosed
     }
-    
+
     if oldState != cb.state && cb.onStateChange != nil {
         cb.onStateChange(oldState, cb.state)
     }
@@ -409,11 +408,11 @@ func (cb *CircuitBreaker) recordFailure() {
     oldState := cb.state
     cb.failures++
     cb.lastFailureTime = time.Now()
-    
+
     if cb.state == CircuitHalfOpen {
         cb.state = CircuitOpen
     }
-    
+
     if oldState != cb.state && cb.onStateChange != nil {
         cb.onStateChange(oldState, cb.state)
     }
@@ -494,7 +493,7 @@ spec:
         type: string
         comparator: "regex"
         value: "^task-[0-9]+$"
-        
+
   triggers:
   - template:
       name: resume-workflow
@@ -530,13 +529,13 @@ type ResumeMetrics struct {
 func (svc *WorkflowResumeService) recordMetrics(result *ResumeResult, duration time.Duration) {
     svc.metrics.TotalResumeAttempts.Inc()
     svc.metrics.ResumeLatency.Observe(duration.Seconds())
-    
+
     if result.Success {
         svc.metrics.SuccessfulResumes.Inc()
     } else {
         svc.metrics.FailedResumes.Inc()
     }
-    
+
     svc.metrics.RetryAttempts.Observe(float64(result.AttemptCount))
 }
 ```
@@ -593,7 +592,7 @@ argo get test-workflow-123
 ```go
 func handleNetworkTimeout(ctx context.Context, workflow *v1alpha1.Workflow, request *WorkflowResumeRequest) error {
     log.Printf("Network timeout during resume for workflow %s - will retry", workflow.Name)
-    
+
     // This is retryable - let retry logic handle it
     return fmt.Errorf("network timeout - retryable error")
 }
@@ -602,9 +601,9 @@ func handleNetworkTimeout(ctx context.Context, workflow *v1alpha1.Workflow, requ
 ### Scenario 2: Multiple Workflows Match Event
 ```go
 func handleMultipleWorkflows(workflows []v1alpha1.Workflow, request *WorkflowResumeRequest) (*v1alpha1.Workflow, error) {
-    log.Printf("Found %d workflows matching task %s - determining correct target", 
+    log.Printf("Found %d workflows matching task %s - determining correct target",
         len(workflows), request.TaskId)
-    
+
     // Find most recent suspended workflow
     var target *v1alpha1.Workflow
     for _, wf := range workflows {
@@ -612,11 +611,11 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, request *WorkflowRes
             target = &wf
         }
     }
-    
+
     if target == nil {
         return nil, fmt.Errorf("no suspended workflows found among %d candidates", len(workflows))
     }
-    
+
     // Cancel older/duplicate workflows
     for _, wf := range workflows {
         if wf.Name != target.Name {
@@ -624,7 +623,7 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, request *WorkflowRes
             cancelWorkflow(wf.Name)
         }
     }
-    
+
     return target, nil
 }
 ```
@@ -632,23 +631,23 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, request *WorkflowRes
 ### Scenario 3: Event for Non-existent Workflow
 ```go
 func handleMissingWorkflow(request *WorkflowResumeRequest) error {
-    log.Printf("No workflow found for task %s, event type %s", 
+    log.Printf("No workflow found for task %s, event type %s",
         request.TaskId, request.EventType)
-    
+
     // Check if event arrived too late (workflow already completed)
     if isWorkflowAlreadyCompleted(request.TaskId) {
-        log.Printf("Event for task %s arrived after workflow completion - ignoring", 
+        log.Printf("Event for task %s arrived after workflow completion - ignoring",
             request.TaskId)
         return nil // Don't retry late events
     }
-    
+
     // Check if workflow creation is still pending
     if isWorkflowCreationPending(request.TaskId) {
-        log.Printf("Workflow creation for task %s still pending - will retry", 
+        log.Printf("Workflow creation for task %s still pending - will retry",
             request.TaskId)
         return fmt.Errorf("workflow creation pending - retryable")
     }
-    
+
     // Unknown state - requires manual investigation
     return fmt.Errorf("workflow not found for unknown reason - manual investigation required")
 }

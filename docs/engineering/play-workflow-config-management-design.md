@@ -49,16 +49,16 @@ metadata:
 data:
   # Agent assignments
   implementationAgent: "5DLabs-Rex"
-  qualityAgent: "5DLabs-Cleo" 
+  qualityAgent: "5DLabs-Cleo"
   testingAgent: "5DLabs-Tess"
-  
+
   # Runtime settings
   model: "claude-sonnet-4-20250514"
   repository: "5dlabs/cto-play-test"
   service: "cto"
-  docsRepository: "5dlabs/cto-play-test" 
+  docsRepository: "5dlabs/cto-play-test"
   docsProjectDirectory: "docs"
-  
+
   # Optional overrides
   workingDirectory: "."
   continueSession: "true"
@@ -99,7 +99,7 @@ IMPL_AGENT=$(kubectl get configmap ${SERVICE}-play-project-config -o jsonpath='{
 MODEL=$(kubectl get configmap ${SERVICE}-play-project-config -o jsonpath='{.data.model}')
 
 # Use in YAML generation:
-githubApp: "$IMPL_AGENT"  
+githubApp: "$IMPL_AGENT"
 model: "$MODEL"
 ```
 
@@ -116,19 +116,19 @@ model: "$MODEL"
 # User starts with Blaze
 mcp_cto_play task_id=1 implementation_agent=5DLabs-Blaze model=claude-opus-4-1-20250805
 
-# Result: 
+# Result:
 # - ConfigMap created with Blaze + Opus settings
 # - Task 1 uses Blaze + Opus
 # - Future tasks (2,3,4...) will use Blaze + Opus
 ```
 
-### Scenario 2: Mid-Project Agent Change  
+### Scenario 2: Mid-Project Agent Change
 ```bash
 # After Task 2 completes, user wants to switch to Rex
 mcp_cto_play task_id=3 implementation_agent=5DLabs-Rex
 
 # Result:
-# - ConfigMap updated to use Rex (keeping other settings)  
+# - ConfigMap updated to use Rex (keeping other settings)
 # - Task 3 starts with Rex
 # - Future tasks (4,5,6...) will use Rex
 ```
@@ -146,7 +146,7 @@ mcp_cto_play task_id=4
 ## Benefits
 
 1. **Consistency**: All tasks in a project use same agent/model settings
-2. **Flexibility**: Can change settings between tasks  
+2. **Flexibility**: Can change settings between tasks
 3. **Persistence**: Settings survive task completions
 4. **Single Source**: ConfigMap is the authoritative config for the project
 5. **Debuggability**: Easy to inspect current project settings via kubectl
@@ -158,7 +158,7 @@ mcp_cto_play task_id=4
 - Gradually migrate existing projects on next MCP call
 
 ### Rollout Plan
-1. **Deploy MCP changes** (create ConfigMaps)  
+1. **Deploy MCP changes** (create ConfigMaps)
 2. **Deploy sensor changes** (read from ConfigMaps)
 3. **Test with new projects** first
 4. **Migrate existing projects** as they're used
@@ -170,13 +170,13 @@ mcp_cto_play task_id=4
 - Fallback behavior when ConfigMap missing
 - Value validation and sanitization
 
-### Integration Tests  
+### Integration Tests
 - Full task sequence with consistent settings
 - Mid-project agent changes
 - Error conditions and fallbacks
 
 ### Manual Testing
-- Start fresh project → verify consistency  
+- Start fresh project → verify consistency
 - Change agents mid-project → verify new settings propagate
 - Edge cases: missing ConfigMap, invalid agents, etc.
 
@@ -184,12 +184,12 @@ mcp_cto_play task_id=4
 
 **Estimated Effort**: 4-6 hours
 - **MCP Tool Changes**: 2 hours
-- **Sensor Template Changes**: 2 hours  
+- **Sensor Template Changes**: 2 hours
 - **Testing & Validation**: 2 hours
 
 **Risk Level**: Low-Medium
 - Non-breaking change (fallbacks maintained)
-- Isolated to play workflow functionality  
+- Isolated to play workflow functionality
 - Well-defined scope and interfaces
 
 ## Future Enhancements
@@ -199,7 +199,7 @@ Support multiple parallel projects:
 ```yaml
 # Multiple ConfigMaps:
 cto-play-project-config        # Default project
-cto-play-feature-xyz-config    # Feature branch project  
+cto-play-feature-xyz-config    # Feature branch project
 cto-play-experiment-config     # Experimental project
 ```
 
@@ -209,5 +209,5 @@ Provide web interface to view/modify project configurations without kubectl.
 ### Configuration Templates
 Pre-defined templates for common workflows:
 - "Fast Development" (Rex/Sonnet)
-- "High Quality" (Blaze/Opus) 
+- "High Quality" (Blaze/Opus)
 - "Cost Optimized" (Rex/Haiku)

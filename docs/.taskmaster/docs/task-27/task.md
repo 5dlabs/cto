@@ -212,16 +212,16 @@ spec:
           # Validate PostgreSQL connection
           echo "Testing PostgreSQL connection..."
           PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USERNAME" -d "$POSTGRES_DATABASE" -c "SELECT version();"
-          
+
           # Validate Redis connection
           echo "Testing Redis connection..."
           redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" ping
-          
+
           # Validate Argo CD access
           echo "Testing Argo CD access..."
           argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_TOKEN" --insecure
           argocd cluster list
-          
+
           echo "All connections validated successfully"
         env:
         - name: POSTGRES_HOST
@@ -593,7 +593,7 @@ spec:
 
 - **External Secrets Operator**: Dynamic secret management
 - **Cert Manager**: TLS certificate lifecycle
-- **Argo CD**: Administrative operations and deployments  
+- **Argo CD**: Administrative operations and deployments
 - **Kubernetes RBAC**: Cluster-level permissions
 - **Database Systems**: Admin-level database operations
 - **Monitoring Stack**: Audit logging and alerting

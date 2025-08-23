@@ -152,7 +152,7 @@
 **Reliability Requirements**: Production system reliability supporting business-critical operations
 
 **Acceptance Tests**:
-- [ ] **High Availability During Deployments**  
+- [ ] **High Availability During Deployments**
   - System availability > 99.95% maintained during deployment activities with comprehensive monitoring
   - Multi-zone deployment strategies preventing single point of failure during deployments
   - Pod disruption budgets ensuring minimum service levels during planned maintenance activities

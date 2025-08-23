@@ -51,19 +51,19 @@ spec:
     dag:
       tasks:
       # ... existing workflow steps ...
-      
+
       - name: complete-task
         dependencies: [wait-pr-approved]
         template: mark-task-complete
-        
+
       - name: discover-next-task
         dependencies: [complete-task]
         template: find-next-task
-        
+
       - name: continue-or-finish
         dependencies: [discover-next-task]
         template: conditional-continue
-        
+
   - name: mark-task-complete
     script:
       image: alpine/git
@@ -71,17 +71,17 @@ spec:
       source: |
         # Move completed task to .completed directory
         TASK_ID="{{workflow.parameters.task-id}}"
-        
+
         echo "Moving task-$TASK_ID to completed directory"
         mkdir -p docs/.taskmaster/docs/.completed
         mv "docs/.taskmaster/docs/task-$TASK_ID" "docs/.taskmaster/docs/.completed/task-$TASK_ID"
-        
+
         # Commit the task completion
         git add -A
         git commit -m "Complete task $TASK_ID - moved to .completed directory"
-        
+
         echo "Task $TASK_ID marked as complete"
-        
+
   - name: find-next-task
     script:
       image: alpine
@@ -94,7 +94,7 @@ spec:
                    head -1 | \
                    grep -o 'task-[0-9]*' | \
                    cut -d'-' -f2)
-                   
+
         if [ -n "$NEXT_TASK" ]; then
           echo "Next task found: $NEXT_TASK"
           echo "$NEXT_TASK" > /tmp/next-task-id
@@ -107,7 +107,7 @@ spec:
         - name: next-task-id
           valueFrom:
             path: /tmp/next-task-id
-            
+
   - name: conditional-continue
     inputs:
       parameters:
@@ -123,7 +123,7 @@ spec:
     - - name: all-tasks-complete
         when: "{{inputs.parameters.next-task-id}} == ''"
         template: finalize-processing
-        
+
   - name: start-new-workflow
     inputs:
       parameters:
@@ -206,7 +206,7 @@ NEXT_TASK=$(find_next_task)
 
 if [ -n "$NEXT_TASK" ]; then
     echo "Next pending task: $NEXT_TASK"
-    
+
     # Validate task has required files
     if [ -f "docs/.taskmaster/docs/task-$NEXT_TASK/task.txt" ]; then
         echo "Task $NEXT_TASK validated and ready for processing"
@@ -246,7 +246,7 @@ spec:
           parameters:
           - name: task-id
             value: "{{inputs.parameters.task-id}}"
-            
+
       - name: implementation-work
         dependencies: [create-task-marker]
         template: agent-coderun
@@ -256,9 +256,9 @@ spec:
             value: "5DLabs-Rex"  # Or workflow parameter for agent selection
           - name: task-id
             value: "{{inputs.parameters.task-id}}"
-            
+
       # ... rest of multi-agent pipeline ...
-      
+
       - name: complete-and-continue
         dependencies: [wait-pr-approved]
         template: task-completion-loop
@@ -266,7 +266,7 @@ spec:
           parameters:
           - name: current-task-id
             value: "{{inputs.parameters.task-id}}"
-            
+
   - name: task-completion-loop
     inputs:
       parameters:
@@ -300,25 +300,25 @@ spec:
 validate_task_structure() {
     local task_id="$1"
     local task_dir="docs/.taskmaster/docs/task-$task_id"
-    
+
     # Check task directory exists
     if [ ! -d "$task_dir" ]; then
         echo "Error: Task directory not found: $task_dir"
         return 1
     fi
-    
+
     # Check required task.txt file
     if [ ! -f "$task_dir/task.txt" ]; then
         echo "Error: Missing task.txt file in $task_dir"
         return 1
     fi
-    
+
     # Validate task.txt format
     if ! grep -q "^# Task ID: $task_id$" "$task_dir/task.txt"; then
         echo "Error: Invalid task.txt format in $task_dir"
         return 1
     fi
-    
+
     echo "Task $task_id structure validated"
     return 0
 }
@@ -326,30 +326,30 @@ validate_task_structure() {
 handle_corrupted_task() {
     local task_id="$1"
     local task_dir="docs/.taskmaster/docs/task-$task_id"
-    
+
     echo "Handling corrupted task: $task_id"
-    
+
     # Move corrupted task to quarantine
     mkdir -p "docs/.taskmaster/docs/.corrupted"
     mv "$task_dir" "docs/.taskmaster/docs/.corrupted/task-$task_id"
-    
+
     # Log the issue
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ): Task $task_id moved to quarantine due to corruption" >> docs/.taskmaster/task-errors.log
-    
+
     # Continue with next task
     find_next_task
 }
 
 handle_no_more_tasks() {
     echo "All tasks in queue have been processed"
-    
+
     # Create completion marker
     echo '{"status":"complete","completedAt":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","totalTasks":"'$(ls docs/.taskmaster/docs/.completed/ | grep task- | wc -l)'"}' > docs/.taskmaster/queue-complete.json
-    
+
     # Commit final state
     git add docs/.taskmaster/queue-complete.json
     git commit -m "All tasks completed - queue processing finished"
-    
+
     echo "Task queue processing complete"
 }
 ```
@@ -434,10 +434,10 @@ find docs/.taskmaster/docs/ \
 validate_next_task() {
     local task_path="$1"
     local task_id=$(echo "$task_path" | grep -o 'task-[0-9]*' | cut -d'-' -f2)
-    
+
     # Check task.txt exists and is valid
-    if [ -f "$task_path/task.txt" ] && 
-       grep -q "^# Task ID: $task_id$" "$task_path/task.txt" && 
+    if [ -f "$task_path/task.txt" ] &&
+       grep -q "^# Task ID: $task_id$" "$task_path/task.txt" &&
        grep -q "^# Status: pending$" "$task_path/task.txt"; then
         return 0
     else
@@ -510,7 +510,7 @@ log_task_event() {
     local task_id="$2"
     local timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     local workflow_name="$3"
-    
+
     echo "[TASK_PROGRESSION] $timestamp event=$event task_id=$task_id workflow=$workflow_name" >> docs/.taskmaster/progression.log
 }
 
@@ -533,20 +533,20 @@ spec:
       duration: "30s"
       factor: 2
       maxDuration: "5m"
-  
+
   # Failure handling
   onExit:
     template: handle-progression-failure
-    
+
 templates:
 - name: handle-progression-failure
   script:
     source: |
       echo "Task progression failed - investigating"
-      
+
       # Log failure details
       echo "$(date): Workflow {{workflow.name}} failed during task progression" >> docs/.taskmaster/failures.log
-      
+
       # Check for partial completion
       if [ -f "/tmp/next-task-id" ]; then
         NEXT_TASK=$(cat /tmp/next-task-id)
@@ -561,7 +561,7 @@ templates:
 spec:
   activeDeadlineSeconds: 86400  # 24 hours max for any single workflow chain
   parallelism: 1  # Ensure sequential task processing
-  
+
   # Resource limits for task progression workflows
   podGC:
     strategy: OnWorkflowCompletion

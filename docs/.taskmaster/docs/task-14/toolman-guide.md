@@ -66,19 +66,19 @@ type WorkflowResumeRequest struct {
     // Core correlation data
     TaskId       string            `json:"taskId" validate:"required,min=1"`
     EventType    string            `json:"eventType" validate:"required,oneof=pr-created pr-labeled-ready pr-approved"`
-    
+
     // GitHub event context
     PRNumber     int               `json:"prNumber,omitempty"`
     EventPayload map[string]interface{} `json:"eventPayload" validate:"required"`
-    
+
     // Resume targeting
     LabelSelector string            `json:"labelSelector,omitempty"`
     WorkflowName  string            `json:"workflowName,omitempty"`
-    
+
     // Operation parameters
     ResumeParameters map[string]string `json:"resumeParameters,omitempty"`
     ValidationRules  []ValidationRule  `json:"validationRules,omitempty"`
-    
+
     // Request metadata
     RequestId    string            `json:"requestId"`
     Timestamp    time.Time         `json:"timestamp"`
@@ -109,7 +109,7 @@ func extractTaskIdFromEvent(event *GitHubWebhookEvent) (string, error) {
             }
         }
     }
-    
+
     // Priority 2: Extract from branch name
     branchName := event.PullRequest.Head.Ref
     if strings.HasPrefix(branchName, "task-") {
@@ -121,13 +121,13 @@ func extractTaskIdFromEvent(event *GitHubWebhookEvent) (string, error) {
             }
         }
     }
-    
+
     // Priority 3: Extract from PR title or body
     taskIdPattern := regexp.MustCompile(`task[- ]?([0-9]+)`)
     if matches := taskIdPattern.FindStringSubmatch(event.PullRequest.Title); len(matches) > 1 {
         return matches[1], nil
     }
-    
+
     return "", fmt.Errorf("no task ID found in event")
 }
 
@@ -135,12 +135,12 @@ func isValidTaskId(taskId string) bool {
     if taskId == "" {
         return false
     }
-    
+
     // Validate numeric format
     if _, err := strconv.Atoi(taskId); err != nil {
         return false
     }
-    
+
     // Additional validation rules
     taskNum, _ := strconv.Atoi(taskId)
     return taskNum > 0 && taskNum < 10000 // Reasonable bounds
@@ -164,18 +164,18 @@ func (rc *RetryConfig) CalculateDelay(attempt int) time.Duration {
     if attempt <= 1 {
         return rc.InitialDelay
     }
-    
+
     // Exponential backoff
     delay := time.Duration(float64(rc.InitialDelay) * math.Pow(rc.BackoffMultiplier, float64(attempt-1)))
-    
+
     // Apply maximum delay cap
     if delay > rc.MaxDelay {
         delay = rc.MaxDelay
     }
-    
+
     // Add jitter to prevent thundering herd
     jitter := time.Duration(rand.Float64() * float64(delay) * rc.JitterFactor)
-    
+
     return delay + jitter
 }
 
@@ -183,14 +183,14 @@ func (rc *RetryConfig) IsRetryable(err error) bool {
     if err == nil {
         return false
     }
-    
+
     errMsg := strings.ToLower(err.Error())
     for _, retryablePattern := range rc.RetryableErrors {
         if strings.Contains(errMsg, strings.ToLower(retryablePattern)) {
             return true
         }
     }
-    
+
     return false
 }
 
@@ -224,13 +224,13 @@ type CircuitBreaker struct {
     maxFailures     int
     resetTimeout    time.Duration
     halfOpenMaxCalls int
-    
+
     mutex           sync.RWMutex
     failures        int
     successes       int
     lastFailureTime time.Time
     state          CircuitBreakerState
-    
+
     // Callbacks
     onStateChange   func(from, to CircuitBreakerState)
     onFailure       func(err error)
@@ -239,33 +239,33 @@ type CircuitBreaker struct {
 
 func (cb *CircuitBreaker) Execute(operation func() error) error {
     cb.mutex.Lock()
-    
+
     // Check if we can execute
     if !cb.canExecute() {
         cb.mutex.Unlock()
         return fmt.Errorf("circuit breaker %s is OPEN - operation blocked", cb.name)
     }
-    
+
     cb.mutex.Unlock()
-    
+
     // Execute operation with timing
     start := time.Now()
     err := operation()
     duration := time.Since(start)
-    
+
     // Record result
     if err != nil {
         cb.recordFailure(err)
         return err
     }
-    
+
     cb.recordSuccess(duration)
     return nil
 }
 
 func (cb *CircuitBreaker) canExecute() bool {
     cb.updateState()
-    
+
     switch cb.state {
     case CircuitClosed:
         return true
@@ -281,9 +281,9 @@ func (cb *CircuitBreaker) canExecute() bool {
 func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
     cb.mutex.Lock()
     defer cb.mutex.Unlock()
-    
+
     oldState := cb.state
-    
+
     if cb.state == CircuitHalfOpen {
         cb.successes++
         if cb.successes >= cb.halfOpenMaxCalls {
@@ -294,11 +294,11 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
     } else {
         cb.failures = 0
     }
-    
+
     if oldState != cb.state && cb.onStateChange != nil {
         cb.onStateChange(oldState, cb.state)
     }
-    
+
     if cb.onSuccess != nil {
         cb.onSuccess(duration)
     }
@@ -315,7 +315,7 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
    Search: "workflow resume patterns microservices reliability"
    Search: "event correlation distributed systems best practices"
    Search: "circuit breaker pattern golang implementation"
-   
+
    # Store research findings
    memory_create_entities("Resume Patterns", {
      "topic": "workflow-resume-reliability-patterns",
@@ -338,7 +338,7 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
    ```go
    // services/workflow-resume/main.go
    package main
-   
+
    import (
        "context"
        "encoding/json"
@@ -346,31 +346,31 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
        "log"
        "net/http"
        "time"
-       
+
        "github.com/gorilla/mux"
        "github.com/prometheus/client_golang/prometheus/promhttp"
    )
-   
+
    type ResumeService struct {
        argoClient      ArgoWorkflowsClient
        circuitBreakers map[string]*CircuitBreaker
        retryConfig     *RetryConfig
        metrics         *ResumeMetrics
    }
-   
+
    func (svc *ResumeService) HandleResumeRequest(w http.ResponseWriter, r *http.Request) {
        var request WorkflowResumeRequest
        if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
            http.Error(w, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
            return
        }
-       
+
        result, err := svc.ResumeWorkflow(r.Context(), &request)
        if err != nil {
            http.Error(w, err.Error(), http.StatusInternalServerError)
            return
        }
-       
+
        w.Header().Set("Content-Type", "application/json")
        json.NewEncoder(w).Encode(result)
    }
@@ -391,7 +391,7 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
    spec:
      suspend: {}
    EOF
-   
+
    # Test resume operation
    curl -X POST http://localhost:8080/resume \
      -H "Content-Type: application/json" \
@@ -404,7 +404,7 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
          }
        }
      }'
-   
+
    # Verify workflow resumed
    kubectl get workflow test-resume-workflow -o jsonpath='{.status.phase}'
    ```
@@ -416,16 +416,16 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
    // Test circuit breaker functionality
    func TestCircuitBreakerFlow(t *testing.T) {
        cb := NewCircuitBreaker("test", 3, 30*time.Second)
-       
+
        // Test closed state - operations should succeed
        err := cb.Execute(func() error { return nil })
        assert.NoError(t, err)
-       
+
        // Force failures to open circuit
        for i := 0; i < 3; i++ {
            cb.Execute(func() error { return fmt.Errorf("test error") })
        }
-       
+
        // Test open state - operations should be blocked
        err = cb.Execute(func() error { return nil })
        assert.Error(t, err)
@@ -459,10 +459,10 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
    ```bash
    # Deploy complete test environment
    kubectl apply -f test/resume-operations/test-environment.yaml
-   
+
    # Run comprehensive test suite
    go test ./test/resume-operations/... -v -timeout 10m
-   
+
    # Monitor test metrics
    curl http://workflow-resume-service/metrics | grep resume_
    ```
@@ -528,7 +528,7 @@ func (cb *CircuitBreaker) recordSuccess(duration time.Duration) {
          for: 2m
          annotations:
            summary: "High failure rate for resume operations"
-           
+
        - alert: CircuitBreakerOpen
          expr: circuit_breaker_state{state="open"} == 1
          for: 1m

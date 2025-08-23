@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -24,14 +24,13 @@
 
 **💡 Rule:** When in doubt, grep the reference examples for your pattern instead of guessing!
 
-
 ## Mission Statement
 You are an expert testing engineer tasked with creating a comprehensive end-to-end testing suite for a multi-agent workflow orchestration system. Your goal is to build robust testing infrastructure that validates the entire pipeline from GitHub webhooks through Rex implementation, Cleo code quality, and Tess validation phases.
 
 ## System Context
 You are working with a sophisticated event-driven system where:
 - **Rex/Blaze agents** perform implementation work and create GitHub PRs with task labels
-- **Cleo agents** handle code quality and add "ready-for-qa" labels when complete  
+- **Cleo agents** handle code quality and add "ready-for-qa" labels when complete
 - **Tess agents** perform comprehensive testing and validation before approval
 - **Argo Workflows** orchestrate the pipeline with suspend/resume based on GitHub webhook events
 - **Task correlation** happens via PR labels (task-X) and branch naming conventions
@@ -114,7 +113,7 @@ Develop property-based tests that validate:
 ```yaml
 Testing Layers:
   - Unit Tests: Individual component validation
-  - Integration Tests: Agent-to-agent handoff verification  
+  - Integration Tests: Agent-to-agent handoff verification
   - System Tests: Complete workflow execution validation
   - Chaos Tests: Failure scenario and recovery validation
   - Performance Tests: Latency and throughput measurement
@@ -126,7 +125,7 @@ Testing Layers:
 - Implement proper test data cleanup and isolation
 - Generate synthetic but realistic GitHub repository structures
 
-### Automation and CI Integration  
+### Automation and CI Integration
 - Configure tests to run on schedule (every 4 hours) and on PR changes
 - Execute test scenarios in parallel where possible to reduce total runtime
 - Collect and aggregate test results with proper reporting
@@ -159,7 +158,7 @@ Testing Layers:
 2. **Basic Framework**: Implement core assertion libraries and simple PR generation
 3. **Happy Path Testing**: Validate basic end-to-end workflow execution
 
-### Phase 2: Comprehensive Coverage  
+### Phase 2: Comprehensive Coverage
 4. **Advanced Scenarios**: Add complex multi-iteration feedback loops and concurrent processing
 5. **Failure Testing**: Implement chaos engineering scenarios and recovery validation
 6. **Performance Suite**: Add comprehensive latency measurement and bottleneck identification

@@ -85,7 +85,7 @@
   "task_id": "string (required)",
   "started_at": "ISO-8601 timestamp (required)",
   "agent": "string (required)",
-  "workflow_id": "string (required)", 
+  "workflow_id": "string (required)",
   "commit_sha": "string (required)",
   "pr_number": "string (optional)"
 }

@@ -27,7 +27,7 @@ metadata:
   namespace: taskmaster
 spec:
   entrypoint: process-task-sequence
-  
+
   arguments:
     parameters:
     - name: task-list
@@ -50,16 +50,16 @@ spec:
           parameters:
           - name: task-list
             value: "{{workflow.parameters.task-list}}"
-          - name: task-range  
+          - name: task-range
             value: "{{workflow.parameters.task-range}}"
-            
+
     - - name: initialize-workflow-state
         template: init-state
         arguments:
           parameters:
           - name: total-tasks
             value: "{{steps.parse-task-list.outputs.parameters.task-count}}"
-            
+
     - - name: process-tasks-loop
         template: task-processing-loop
         arguments:
@@ -88,12 +88,12 @@ spec:
       source: |
         import json
         import sys
-        
+
         def parse_task_range(range_str):
             """Parse range specification like '1-5' or '10,12,14'"""
             if not range_str:
                 return []
-                
+
             tasks = []
             for part in range_str.split(','):
                 if '-' in part:
@@ -102,17 +102,17 @@ spec:
                 else:
                     tasks.append(int(part))
             return tasks
-        
+
         def parse_task_list(list_str):
             """Parse JSON array of task IDs"""
             if not list_str:
                 return []
             return json.loads(list_str)
-        
+
         # Parse inputs
         task_list = "{{inputs.parameters.task-list}}"
         task_range = "{{inputs.parameters.task-range}}"
-        
+
         # Determine task IDs
         if task_list:
             task_ids = parse_task_list(task_list)
@@ -120,14 +120,14 @@ spec:
             task_ids = parse_task_range(task_range)
         else:
             task_ids = []
-        
+
         # Output results
         with open('/tmp/task-ids.json', 'w') as f:
             json.dump(task_ids, f)
-            
+
         with open('/tmp/task-count.txt', 'w') as f:
             f.write(str(len(task_ids)))
-        
+
         print(f"Parsed {len(task_ids)} tasks: {task_ids}")
 
   - name: init-state
@@ -145,7 +145,7 @@ spec:
       source: |
         import json
         from datetime import datetime, timezone
-        
+
         state = {
             "workflow_id": "{{workflow.uid}}",
             "start_time": datetime.now(timezone.utc).isoformat(),
@@ -158,7 +158,7 @@ spec:
             "last_checkpoint": None,
             "status": "initialized"
         }
-        
+
         with open('/tmp/workflow-state.json', 'w') as f:
             json.dump(state, f, indent=2)
 
@@ -180,7 +180,7 @@ spec:
           - name: task-index
             value: "{{item-index}}"
         withParam: "{{inputs.parameters.task-ids}}"
-        
+
       - name: create-checkpoint
         dependencies: [execute-task-sequence]
         template: checkpoint-workflow
@@ -216,16 +216,16 @@ spec:
       command: [bash]
       source: |
         set -euo pipefail
-        
+
         TASK_ID="{{inputs.parameters.task-id}}"
         TASK_INDEX="{{inputs.parameters.task-index}}"
         WORKFLOW_STATE='{{inputs.parameters.workflow-state}}'
-        
+
         echo "Processing task $TASK_ID (index: $TASK_INDEX)"
-        
+
         # Load current workflow state
         echo "$WORKFLOW_STATE" > /tmp/current-state.json
-        
+
         # Check if task was already completed (memoization)
         if jq -e ".task_results[\"$TASK_ID\"]" /tmp/current-state.json > /dev/null; then
             echo "Task $TASK_ID already completed, using cached result"
@@ -234,23 +234,23 @@ spec:
             cp /tmp/current-state.json /tmp/updated-state.json
             exit 0
         fi
-        
+
         # Execute the actual task
         start_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        
+
         # Call task execution service
         TASK_RESULT=$(curl -s -X POST http://taskmaster-controller/api/tasks \
             -H "Content-Type: application/json" \
             -d "{\"task_id\": \"$TASK_ID\"}")
-        
+
         end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        
+
         # Process task result
         TASK_STATUS=$(echo "$TASK_RESULT" | jq -r '.status')
-        
+
         if [ "$TASK_STATUS" = "completed" ]; then
             echo "Task $TASK_ID completed successfully"
-            
+
             # Update workflow state
             jq --arg task_id "$TASK_ID" \
                --arg result "$TASK_RESULT" \
@@ -264,10 +264,10 @@ spec:
                .task_results[$task_id].end_time = $end_time |
                .last_updated = now | todate
                ' /tmp/current-state.json > /tmp/updated-state.json
-               
+
         else
             echo "Task $TASK_ID failed: $TASK_STATUS"
-            
+
             # Update workflow state with failure
             jq --arg task_id "$TASK_ID" \
                --arg error "$TASK_RESULT" \
@@ -277,14 +277,14 @@ spec:
                .task_results[$task_id] = {"status": "failed", "error": $error} |
                .last_updated = now | todate
                ' /tmp/current-state.json > /tmp/updated-state.json
-               
+
             # Check continue-on-error policy
             if [ "{{workflow.parameters.continue-on-error}}" != "true" ]; then
                 echo "Failing workflow due to task failure and continue-on-error=false"
                 exit 1
             fi
         fi
-        
+
         # Output task result
         echo "$TASK_RESULT" > /tmp/task-result.json
 
@@ -298,30 +298,30 @@ spec:
       source: |
         import json
         from datetime import datetime, timezone
-        
+
         # Load current state
         state = json.loads('{{inputs.parameters.workflow-state}}')
-        
+
         # Create checkpoint
         checkpoint = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "completed_tasks": state["completed_tasks"],
-            "failed_tasks": state["failed_tasks"], 
+            "failed_tasks": state["failed_tasks"],
             "current_task_index": state["current_task_index"],
             "progress_percentage": (state["completed_tasks"] / state["total_tasks"]) * 100
         }
-        
+
         # Add checkpoint to state
         state["checkpoints"].append(checkpoint)
         state["last_checkpoint"] = checkpoint["timestamp"]
-        
+
         # Store checkpoint in persistent storage
         checkpoint_data = {
             "workflow_id": state["workflow_id"],
             "checkpoint": checkpoint,
             "state_snapshot": state
         }
-        
+
         # Save to checkpoint storage (Redis/database)
         print(f"Created checkpoint at {checkpoint['timestamp']}")
         print(f"Progress: {checkpoint['progress_percentage']:.1f}%")
@@ -393,18 +393,18 @@ impl WorkflowState {
             status: WorkflowStatus::Initialized,
         }
     }
-    
+
     pub fn update_task_result(&mut self, task_id: &str, result: TaskResult) {
         self.task_results.insert(task_id.to_string(), result);
-        
+
         match result.status.as_str() {
             "completed" => self.completed_tasks += 1,
             "failed" => self.failed_tasks += 1,
             _ => {}
         }
-        
+
         self.current_task_index += 1;
-        
+
         // Update overall status
         if self.completed_tasks + self.failed_tasks >= self.total_tasks {
             self.status = if self.failed_tasks > 0 {
@@ -414,7 +414,7 @@ impl WorkflowState {
             };
         }
     }
-    
+
     pub fn create_checkpoint(&mut self) -> Checkpoint {
         let checkpoint = Checkpoint {
             timestamp: Utc::now(),
@@ -423,17 +423,17 @@ impl WorkflowState {
             current_task_index: self.current_task_index,
             progress_percentage: (self.completed_tasks as f64 / self.total_tasks as f64) * 100.0,
         };
-        
+
         self.checkpoints.push(checkpoint.clone());
         self.last_checkpoint = Some(checkpoint.timestamp);
-        
+
         checkpoint
     }
-    
+
     pub fn get_progress(&self) -> f64 {
         (self.completed_tasks as f64 / self.total_tasks as f64) * 100.0
     }
-    
+
     pub fn is_task_completed(&self, task_id: &str) -> bool {
         self.task_results
             .get(task_id)
@@ -514,10 +514,10 @@ impl ProgressTracker {
             reports: Arc::new(RwLock::new(std::collections::HashMap::new())),
         }
     }
-    
+
     pub async fn update_progress(&self, workflow_id: Uuid, state: &WorkflowState) {
         let mut reports = self.reports.write().await;
-        
+
         let report = ProgressReport {
             workflow_id,
             current_task: self.get_current_task(state),
@@ -529,24 +529,24 @@ impl ProgressTracker {
             current_stage: self.determine_stage(state),
             task_breakdown: self.create_task_breakdown(state),
         };
-        
+
         reports.insert(workflow_id, report);
     }
-    
+
     pub async fn get_progress(&self, workflow_id: &Uuid) -> Option<ProgressReport> {
         let reports = self.reports.read().await;
         reports.get(workflow_id).cloned()
     }
-    
+
     fn estimate_completion(&self, state: &WorkflowState) -> Option<chrono::DateTime<chrono::Utc>> {
         if state.completed_tasks == 0 {
             return None;
         }
-        
+
         let elapsed = chrono::Utc::now() - state.start_time;
         let avg_task_time = elapsed / state.completed_tasks as i32;
         let remaining_tasks = state.total_tasks - state.completed_tasks;
-        
+
         Some(chrono::Utc::now() + avg_task_time * remaining_tasks as i32)
     }
 }
@@ -576,7 +576,7 @@ spec:
 # Comprehensive retry strategy
 retryStrategy:
   limit: 3
-  retryPolicy: "OnFailure" 
+  retryPolicy: "OnFailure"
   backoff:
     duration: "30s"
     factor: 2
@@ -594,32 +594,32 @@ onExit: workflow-cleanup
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_workflow_state_initialization() {
         let workflow_id = Uuid::new_v4();
         let state = WorkflowState::new(workflow_id, 5);
-        
+
         assert_eq!(state.total_tasks, 5);
         assert_eq!(state.completed_tasks, 0);
         assert_eq!(state.status, WorkflowStatus::Initialized);
     }
-    
+
     #[test]
     fn test_progress_calculation() {
         let mut state = WorkflowState::new(Uuid::new_v4(), 10);
         state.completed_tasks = 3;
-        
+
         assert_eq!(state.get_progress(), 30.0);
     }
-    
+
     #[tokio::test]
     async fn test_checkpoint_creation() {
         let mut state = WorkflowState::new(Uuid::new_v4(), 5);
         state.completed_tasks = 2;
-        
+
         let checkpoint = state.create_checkpoint();
-        
+
         assert_eq!(checkpoint.completed_tasks, 2);
         assert_eq!(checkpoint.progress_percentage, 40.0);
         assert_eq!(state.checkpoints.len(), 1);
@@ -633,7 +633,7 @@ mod tests {
 async fn test_multi_task_workflow_execution() {
     let workflow_def = MultiTaskWorkflow::new(vec!["task-1", "task-2", "task-3"]);
     let result = workflow_def.execute().await.unwrap();
-    
+
     assert_eq!(result.completed_tasks, 3);
     assert_eq!(result.failed_tasks, 0);
     assert!(result.task_results.contains_key("task-1"));
@@ -658,10 +658,10 @@ lazy_static! {
         "Workflow execution duration",
         &["workflow_type", "status"]
     ).unwrap();
-    
+
     static ref TASK_COUNTER: CounterVec = register_counter_vec!(
         "tasks_total",
-        "Total number of tasks processed", 
+        "Total number of tasks processed",
         &["status"]
     ).unwrap();
 }

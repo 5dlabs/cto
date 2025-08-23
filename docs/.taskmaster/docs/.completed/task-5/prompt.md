@@ -6,13 +6,13 @@
 - **Location:** [docs/references/argo-events/](../../../references/argo-events/)
 - **Key Files:**
   - `github.yaml` - GitHub webhook sensor patterns
-  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction  
+  - `complete-trigger-parameterization.yaml` - Dynamic parameter extraction
   - `special-workflow-trigger.yaml` - ArgoWorkflow operations (submit/resume)
   - `trigger-standard-k8s-resource.yaml` - K8s resource creation patterns
 
 **❌ UNSUPPORTED Operations (will cause deployment failures):**
 - `operation: delete` ❌
-- `operation: patch` ❌  
+- `operation: patch` ❌
 - `operation: update` ❌
 - Template variables in `labelSelector` ❌
 
@@ -164,8 +164,8 @@ spec:
   inline:
     script: |
       echo '{{inputs.body}}' | \
-      jq -r '.pull_request.labels[] | 
-             select(.name | startswith("task-")) | 
+      jq -r '.pull_request.labels[] |
+             select(.name | startswith("task-")) |
              .name | split("-")[1]' | \
       head -1
 ```

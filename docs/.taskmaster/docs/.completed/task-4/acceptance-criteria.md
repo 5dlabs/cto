@@ -5,7 +5,7 @@
 ### 1. Agent Name Extraction Logic
 - [ ] `extract_agent_name()` function implemented in `controller/src/tasks/code/resources.rs`
 - [ ] Correctly parses `5DLabs-Rex` to `rex`
-- [ ] Correctly parses `5DLabs-Cleo[bot]` to `cleo` 
+- [ ] Correctly parses `5DLabs-Cleo[bot]` to `cleo`
 - [ ] Correctly parses `5DLabs-Tess` to `tess`
 - [ ] Correctly parses `5DLabs-Blaze` to `blaze`
 - [ ] Handles case-insensitive input
@@ -56,7 +56,7 @@
 - [ ] Proper error handling with descriptive error messages
 - [ ] Comprehensive logging for troubleshooting
 
-### Resource Management  
+### Resource Management
 - [ ] PVC creation follows Kubernetes best practices
 - [ ] Proper labels applied to PVCs (shared vs isolated)
 - [ ] Resource limits and requests configured appropriately
@@ -127,7 +127,7 @@
 
 **Steps**:
 1. Submit CodeRun and monitor reconciliation logs
-2. Verify agent name extraction logged correctly  
+2. Verify agent name extraction logged correctly
 3. Check agent classification logged correctly
 4. Confirm PVC creation/retrieval process
 5. Validate status updates reflect PVC operations
@@ -231,7 +231,7 @@
 ## Notes
 
 - **CRITICAL**: Implementation agents (Rex, Blaze) must continue using shared workspace
-- Backward compatibility ensures smooth operation for existing deployments  
+- Backward compatibility ensures smooth operation for existing deployments
 - Performance monitoring important due to controller-wide impact
 - Clear error messages essential for operational troubleshooting
 - Agent classification system designed for future extensibility

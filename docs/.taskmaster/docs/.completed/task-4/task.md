@@ -20,7 +20,7 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
        // '5DLabs-Rex' -> 'rex'
        // '5DLabs-Cleo[bot]' -> 'cleo'
        // '5DLabs-Tess' -> 'tess'
-       
+
        let app_name = github_app
            .split('-')
            .last()
@@ -28,7 +28,7 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
            .split('[')
            .next()
            .unwrap_or(github_app);
-           
+
        app_name.to_lowercase()
    }
    ```
@@ -39,7 +39,7 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
        // Implementation agents work on the same workspace
        matches!(agent_name, "rex" | "blaze")
    }
-   
+
    fn requires_isolated_workspace(agent_name: &str) -> bool {
        // Non-implementation agents may need isolated workspaces
        !is_implementation_agent(agent_name)
@@ -55,9 +55,9 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
        let service_name = &code_run.spec.service;
        let github_app = code_run.spec.github_app.as_ref()
            .ok_or_else(|| Error::ConfigError("GitHub App is required".to_string()))?;
-       
+
        let agent_name = extract_agent_name(github_app);
-       
+
        // Implementation agents use shared workspace
        let pvc_name = if is_implementation_agent(&agent_name) {
            format!("workspace-{service_name}")
@@ -65,7 +65,7 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
            // Non-implementation agents get isolated workspaces
            format!("workspace-{service_name}-{agent_name}")
        };
-       
+
        info!("📦 Ensuring PVC exists: {} (agent: {})", pvc_name, agent_name);
        self.ensure_pvc_exists(&pvc_name, service_name).await?;
        Ok(())
@@ -100,26 +100,26 @@ The current controller uses a generic `workspace-{service}` naming pattern for P
    // In build_job_spec function
    fn build_job_spec(&self, code_run: &CodeRun, job_name: &str, cm_name: &str) -> Result<Job> {
        // ... existing volume setup ...
-       
+
        // PVC workspace volume with conditional naming
        let service_name = &code_run.spec.service;
        let github_app = code_run.spec.github_app.as_ref()
            .ok_or_else(|| Error::ConfigError("GitHub App is required".to_string()))?;
-       
+
        let agent_name = extract_agent_name(github_app);
        let pvc_name = if is_implementation_agent(&agent_name) {
            format!("workspace-{service_name}")
        } else {
            format!("workspace-{service_name}-{agent_name}")
        };
-       
+
        volumes.push(json!({
            "name": "workspace",
            "persistentVolumeClaim": {
                "claimName": pvc_name
            }
        }));
-       
+
        // ... rest of job spec ...
    }
    ```
@@ -141,15 +141,15 @@ impl AgentClassifier {
         let mut implementation_agents = HashSet::new();
         implementation_agents.insert("rex".to_string());
         implementation_agents.insert("blaze".to_string());
-        
+
         let fallback_regex = Regex::new(r"(?i)5dlabs[_-]?(\w+)(?:\[bot\])?").unwrap();
-        
+
         Self {
             implementation_agents,
             fallback_regex,
         }
     }
-    
+
     pub fn extract_agent_name(&self, github_app: &str) -> Result<String, String> {
         if let Some(caps) = self.fallback_regex.captures(github_app) {
             Ok(caps.get(1).unwrap().as_str().to_lowercase())
@@ -157,18 +157,18 @@ impl AgentClassifier {
             Err(format!("Cannot extract agent name from: {}", github_app))
         }
     }
-    
+
     pub fn is_implementation_agent(&self, agent_name: &str) -> bool {
         self.implementation_agents.contains(agent_name)
     }
-    
+
     pub fn requires_isolated_workspace(&self, agent_name: &str) -> bool {
         !self.is_implementation_agent(agent_name)
     }
-    
+
     pub fn get_pvc_name(&self, service: &str, github_app: &str) -> Result<String, String> {
         let agent_name = self.extract_agent_name(github_app)?;
-        
+
         if self.is_implementation_agent(&agent_name) {
             Ok(format!("workspace-{}", service))
         } else {
@@ -190,12 +190,12 @@ pub async fn ensure_conditional_pvc(
     let classifier = AgentClassifier::new();
     let pvc_name = classifier.get_pvc_name(&code_run.spec.service, &code_run.spec.github_app)
         .map_err(|e| kube::Error::Api(ErrorResponse::default()))?;
-        
+
     let namespace = code_run.metadata.namespace.as_ref()
         .ok_or_else(|| kube::Error::Api(ErrorResponse::default()))?;
-        
+
     let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
-    
+
     // Check if PVC exists, create if missing
     match pvc_api.get(&pvc_name).await {
         Ok(_) => {
@@ -247,15 +247,15 @@ fn validate_agent_name(agent_name: &str) -> Result<(), String> {
     if agent_name.len() > 63 {
         return Err("Agent name too long for Kubernetes naming".to_string());
     }
-    
+
     if !agent_name.chars().all(|c| c.is_alphanumeric() || c == '-') {
         return Err("Agent name contains invalid characters".to_string());
     }
-    
+
     if agent_name.starts_with('-') || agent_name.ends_with('-') {
         return Err("Agent name cannot start or end with hyphen".to_string());
     }
-    
+
     Ok(())
 }
 ```
@@ -266,14 +266,14 @@ fn create_pvc_spec(pvc_name: &str, service: &str, agent: Option<&str>) -> Persis
     let mut labels = std::collections::BTreeMap::new();
     labels.insert("service".to_string(), service.to_string());
     labels.insert("component".to_string(), "agent-workspace".to_string());
-    
+
     if let Some(agent_name) = agent {
         labels.insert("agent".to_string(), agent_name.to_string());
         labels.insert("workspace-type".to_string(), "isolated".to_string());
     } else {
         labels.insert("workspace-type".to_string(), "shared".to_string());
     }
-    
+
     PersistentVolumeClaim {
         metadata: ObjectMeta {
             name: Some(pvc_name.to_string()),

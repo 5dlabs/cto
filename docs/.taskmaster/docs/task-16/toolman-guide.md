@@ -45,7 +45,7 @@ find templates/ -name "*.hbs" -exec bash -n {} \;
 ```
 templates/
 ├── container-rex.sh.hbs      # Implementation workflow (Rex/Blaze)
-├── container-cleo.sh.hbs     # Code quality workflow  
+├── container-cleo.sh.hbs     # Code quality workflow
 ├── container-tess.sh.hbs     # Testing workflow
 └── shared/
     ├── common-setup.hbs      # Shared setup logic
@@ -59,7 +59,7 @@ templates/
 # Unit testing
 cargo test --lib tasks::code::templates
 
-# Integration testing  
+# Integration testing
 cargo test --test template_integration
 
 # Performance benchmarking
@@ -247,7 +247,7 @@ git diff HEAD~1 --name-only | xargs cargo check
 ```rust
 // templates.rs structure
 mod agent_mapper;      // Core mapping logic
-mod template_loader;   // File loading utilities  
+mod template_loader;   // File loading utilities
 mod cache;            // Performance optimizations
 mod error_types;      // Custom error definitions
 
@@ -262,7 +262,7 @@ pub use template_loader::load_agent_template;
 pub enum TemplateError {
     #[error("Agent '{agent}' not found")]
     AgentNotFound { agent: String },
-    
+
     #[error("Template '{template}' failed to load: {source}")]
     LoadError { template: String, source: std::io::Error },
 }
@@ -279,7 +279,7 @@ mod tests {
         mod name_extraction;
         mod error_handling;
     }
-    
+
     mod integration {
         // End-to-end workflow tests
         mod template_loading;

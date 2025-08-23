@@ -139,9 +139,9 @@ jq --version
 ```bash
 # Extract from PR labels
 echo '$PR_PAYLOAD' | jq -r '
-  .pull_request.labels[] | 
-  select(.name | startswith("task-")) | 
-  .name | 
+  .pull_request.labels[] |
+  select(.name | startswith("task-")) |
+  .name |
   split("-")[1]
 ' | head -1
 
@@ -161,17 +161,17 @@ echo '$JSON' | jq -e 'has("task_id") and has("started_at") and has("agent")'
 jq '.pull_request.labels | map(select(.name | test("^task-\\d+$")))'
 
 # Extract all task IDs
-jq -r '.pull_request.labels[] | 
-       select(.name | startswith("task-")) | 
-       .name | 
-       capture("task-(?<id>\\d+)") | 
+jq -r '.pull_request.labels[] |
+       select(.name | startswith("task-")) |
+       .name |
+       capture("task-(?<id>\\d+)") |
        .id'
 
 # Conditional extraction
-jq -r 'if .pull_request.labels then 
+jq -r 'if .pull_request.labels then
          (.pull_request.labels[] | select(.name | startswith("task-")).name)
-       else 
-         empty 
+       else
+         empty
        end'
 ```
 
@@ -199,7 +199,7 @@ echo "$BRANCH_NAME" | grep -P "$branch_regex"
 branches=(
   "task-26"
   "task-26-fix-bug"
-  "feature/task-26" 
+  "feature/task-26"
   "hotfix/task-15-urgent"
   "invalid-branch"
 )
@@ -324,7 +324,7 @@ EOF
 # Get workflow status
 kubectl get workflow validation-26-abc123 -o jsonpath='{.status.phase}'
 
-# Watch workflow progress  
+# Watch workflow progress
 kubectl get workflow validation-26-abc123 -w
 
 # Delete completed workflows
@@ -362,7 +362,7 @@ api_call_with_retry() {
   local url="$1"
   local max_retries=3
   local retry=0
-  
+
   while [[ $retry -lt $max_retries ]]; do
     if curl -f -s "$url"; then
       return 0
@@ -370,7 +370,7 @@ api_call_with_retry() {
     ((retry++))
     sleep $((2**retry))
   done
-  
+
   echo "API call failed after $max_retries retries" >&2
   return 1
 }
@@ -486,20 +486,20 @@ check_validation_system() {
     echo "ERROR: Argo Workflows unavailable"
     return 1
   fi
-  
+
   # Check GitHub API
   if ! curl -f -s -H "Authorization: token $GITHUB_TOKEN" \
        https://api.github.com/rate_limit >/dev/null; then
     echo "ERROR: GitHub API unavailable"
     return 1
   fi
-  
+
   # Check Prometheus
   if ! curl -f -s "$PROMETHEUS_URL/api/v1/query?query=up" >/dev/null; then
-    echo "ERROR: Prometheus unavailable" 
+    echo "ERROR: Prometheus unavailable"
     return 1
   fi
-  
+
   echo "All systems operational"
   return 0
 }

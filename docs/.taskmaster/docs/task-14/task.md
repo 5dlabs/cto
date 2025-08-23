@@ -65,7 +65,7 @@ spec:
         type: string
         comparator: "regex"
         value: "^task-[0-9]+$"
-        
+
   - name: github-pr-labeled
     eventSourceName: github-webhook
     eventName: pull-request-labeled
@@ -74,7 +74,7 @@ spec:
       - path: body.label.name
         type: string
         value: "ready-for-qa"
-        
+
   - name: github-pr-approved
     eventSourceName: github-webhook
     eventName: pull-request-review
@@ -83,7 +83,7 @@ spec:
       - path: body.review.state
         type: string
         value: "approved"
-        
+
   triggers:
   - template:
       name: resume-workflow-trigger
@@ -120,18 +120,18 @@ func ResumeWorkflow(ctx context.Context, resumeSpec *WorkflowResumeSpec) error {
     if err := validateResumeRequest(resumeSpec); err != nil {
         return fmt.Errorf("resume validation failed: %w", err)
     }
-    
+
     // Step 2: Find target workflow
     workflow, err := findTargetWorkflow(ctx, resumeSpec)
     if err != nil {
         return fmt.Errorf("workflow lookup failed: %w", err)
     }
-    
+
     // Step 3: Validate workflow state
     if err := validateWorkflowState(workflow, resumeSpec); err != nil {
         return fmt.Errorf("workflow state validation failed: %w", err)
     }
-    
+
     // Step 4: Perform resume with retry logic
     return performResumeWithRetry(ctx, workflow, resumeSpec)
 }
@@ -141,48 +141,48 @@ func validateResumeRequest(spec *WorkflowResumeSpec) error {
     if spec.WorkflowName == "" && spec.LabelSelector == "" {
         return errors.New("either workflowName or labelSelector required")
     }
-    
+
     if spec.CorrelationData.TaskId == "" {
         return errors.New("task ID required for correlation")
     }
-    
+
     if spec.CorrelationData.EventType == "" {
         return errors.New("event type required for validation")
     }
-    
+
     return nil
 }
 
 func findTargetWorkflow(ctx context.Context, spec *WorkflowResumeSpec) (*v1alpha1.Workflow, error) {
     client := argo.NewArgoWorkflowsClient()
-    
+
     if spec.WorkflowName != "" {
         // Direct workflow name lookup
         return client.Get(ctx, spec.WorkflowName, metav1.GetOptions{})
     }
-    
+
     // Label-based workflow discovery
     labelSelector := fmt.Sprintf(
         "workflow-type=play-orchestration,task-id=%s,current-stage=%s",
         spec.CorrelationData.TaskId,
         spec.TargetStage,
     )
-    
+
     workflows, err := client.List(ctx, metav1.ListOptions{
         LabelSelector: labelSelector,
     })
     if err != nil {
         return nil, err
     }
-    
+
     if len(workflows.Items) == 0 {
         return nil, fmt.Errorf("no workflows found matching criteria: %s", labelSelector)
     }
-    
+
     if len(workflows.Items) > 1 {
         return nil, fmt.Errorf("multiple workflows found matching criteria: %s", labelSelector)
     }
-    
+
     return &workflows.Items[0], nil
 }
 ```
@@ -205,30 +205,30 @@ func performResumeWithRetry(ctx context.Context, workflow *v1alpha1.Workflow, sp
         MaxDelay:      time.Second * 30,
         BackoffFactor: 2.0,
     }
-    
+
     var lastError error
     delay := retryConfig.InitialDelay
-    
+
     for attempt := 1; attempt <= retryConfig.MaxAttempts; attempt++ {
         log.Printf("Resume attempt %d/%d for workflow %s", attempt, retryConfig.MaxAttempts, workflow.Name)
-        
+
         err := performResume(ctx, workflow, spec)
         if err == nil {
             log.Printf("Resume successful on attempt %d for workflow %s", attempt, workflow.Name)
             return nil
         }
-        
+
         lastError = err
-        
+
         // Check if error is retryable
         if !isRetryableError(err) {
             log.Printf("Non-retryable error for workflow %s: %v", workflow.Name, err)
             return err
         }
-        
+
         if attempt < retryConfig.MaxAttempts {
             log.Printf("Resume failed on attempt %d, retrying in %v: %v", attempt, delay, err)
-            
+
             select {
             case <-ctx.Done():
                 return ctx.Err()
@@ -241,7 +241,7 @@ func performResumeWithRetry(ctx context.Context, workflow *v1alpha1.Workflow, sp
             }
         }
     }
-    
+
     return fmt.Errorf("resume failed after %d attempts, last error: %w", retryConfig.MaxAttempts, lastError)
 }
 
@@ -254,14 +254,14 @@ func isRetryableError(err error) bool {
         "service unavailable",
         "internal server error",
     }
-    
+
     errMsg := strings.ToLower(err.Error())
     for _, retryableErr := range retryableErrors {
         if strings.Contains(errMsg, retryableErr) {
             return true
         }
     }
-    
+
     return false
 }
 ```
@@ -283,7 +283,7 @@ func validateEventCorrelation(event *GitHubWebhookEvent, workflow *v1alpha1.Work
         Valid: true,
         ValidationErrors: []string{},
     }
-    
+
     // Extract task ID from event
     taskIdFromEvent := extractTaskIdFromEvent(event)
     if taskIdFromEvent == "" {
@@ -292,7 +292,7 @@ func validateEventCorrelation(event *GitHubWebhookEvent, workflow *v1alpha1.Work
         return result, nil
     }
     result.TaskId = taskIdFromEvent
-    
+
     // Extract task ID from workflow labels
     taskIdFromWorkflow := workflow.Labels["task-id"]
     if taskIdFromWorkflow == "" {
@@ -300,34 +300,34 @@ func validateEventCorrelation(event *GitHubWebhookEvent, workflow *v1alpha1.Work
         result.ValidationErrors = append(result.ValidationErrors, "no task ID found in workflow labels")
         return result, nil
     }
-    
+
     // Validate task ID correlation
     if taskIdFromEvent != taskIdFromWorkflow {
         result.Valid = false
-        result.ValidationErrors = append(result.ValidationErrors, 
+        result.ValidationErrors = append(result.ValidationErrors,
             fmt.Sprintf("task ID mismatch: event=%s, workflow=%s", taskIdFromEvent, taskIdFromWorkflow))
         return result, nil
     }
-    
+
     // Determine event type and target stage
     result.EventType, result.TargetStage = determineEventTypeAndStage(event)
-    
+
     // Validate workflow is in correct stage for this event
     currentStage := workflow.Labels["current-stage"]
     if currentStage != result.TargetStage {
         result.Valid = false
-        result.ValidationErrors = append(result.ValidationErrors, 
+        result.ValidationErrors = append(result.ValidationErrors,
             fmt.Sprintf("workflow stage mismatch: current=%s, expected=%s", currentStage, result.TargetStage))
         return result, nil
     }
-    
+
     // Validate workflow is suspended
     if !isWorkflowSuspended(workflow) {
         result.Valid = false
         result.ValidationErrors = append(result.ValidationErrors, "workflow is not in suspended state")
         return result, nil
     }
-    
+
     return result, nil
 }
 
@@ -341,7 +341,7 @@ func extractTaskIdFromEvent(event *GitHubWebhookEvent) string {
             }
         }
     }
-    
+
     // Extract from branch name as fallback
     branchName := event.PullRequest.Head.Ref
     if strings.HasPrefix(branchName, "task-") {
@@ -350,7 +350,7 @@ func extractTaskIdFromEvent(event *GitHubWebhookEvent) string {
             return parts[1]
         }
     }
-    
+
     return ""
 }
 
@@ -381,7 +381,7 @@ func determineEventTypeAndStage(event *GitHubWebhookEvent) (eventType, targetSta
 type CircuitBreaker struct {
     MaxFailures     int           `json:"maxFailures"`
     ResetTimeout    time.Duration `json:"resetTimeout"`
-    
+
     mutex           sync.RWMutex
     failures        int
     lastFailureTime time.Time
@@ -407,28 +407,28 @@ func NewCircuitBreaker(maxFailures int, resetTimeout time.Duration) *CircuitBrea
 func (cb *CircuitBreaker) Call(ctx context.Context, operation func() error) error {
     cb.mutex.Lock()
     defer cb.mutex.Unlock()
-    
+
     // Check if circuit breaker should transition states
     cb.updateState()
-    
+
     if cb.state == StateOpen {
         return fmt.Errorf("circuit breaker is OPEN - operation blocked")
     }
-    
+
     err := operation()
-    
+
     if err != nil {
         cb.recordFailure()
         return err
     }
-    
+
     cb.recordSuccess()
     return nil
 }
 
 func (cb *CircuitBreaker) updateState() {
     now := time.Now()
-    
+
     switch cb.state {
     case StateClosed:
         if cb.failures >= cb.MaxFailures {
@@ -457,7 +457,7 @@ func (cb *CircuitBreaker) recordSuccess() {
 func (cb *CircuitBreaker) recordFailure() {
     cb.failures++
     cb.lastFailureTime = time.Now()
-    
+
     if cb.state == StateHalfOpen {
         cb.state = StateOpen
         log.Printf("Circuit breaker transitioned back to OPEN state")
@@ -625,19 +625,19 @@ spec:
 ```go
 func handleWorkflowNotFound(taskId, eventType string) error {
     log.Printf("No workflow found for task %s, event %s", taskId, eventType)
-    
+
     // Check if this is a late-arriving event
     if isEventTooLate(taskId, eventType) {
         log.Printf("Event arrived too late for task %s - workflow already completed", taskId)
         return nil // Don't retry late events
     }
-    
+
     // Check if workflow creation is still in progress
     if isWorkflowCreationPending(taskId) {
         log.Printf("Workflow creation pending for task %s - will retry", taskId)
         return fmt.Errorf("workflow creation pending - retryable")
     }
-    
+
     // Unknown scenario - requires investigation
     log.Printf("Unknown workflow state for task %s - manual investigation required", taskId)
     return fmt.Errorf("workflow not found and reason unknown")
@@ -648,7 +648,7 @@ func handleWorkflowNotFound(taskId, eventType string) error {
 ```go
 func handleMultipleWorkflows(workflows []v1alpha1.Workflow, taskId string) error {
     log.Printf("Multiple workflows found for task %s: %d instances", taskId, len(workflows))
-    
+
     // Find the most recent workflow
     var mostRecent *v1alpha1.Workflow
     for _, wf := range workflows {
@@ -656,7 +656,7 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, taskId string) error
             mostRecent = &wf
         }
     }
-    
+
     // Cancel older workflows
     for _, wf := range workflows {
         if wf.Name != mostRecent.Name {
@@ -666,7 +666,7 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, taskId string) error
             }
         }
     }
-    
+
     // Resume the most recent workflow
     return resumeWorkflow(mostRecent)
 }
@@ -676,7 +676,7 @@ func handleMultipleWorkflows(workflows []v1alpha1.Workflow, taskId string) error
 ```go
 func handleCorrelationFailure(event *GitHubWebhookEvent, workflow *v1alpha1.Workflow, validationResult *EventValidationResult) error {
     log.Printf("Event correlation failed for workflow %s: %v", workflow.Name, validationResult.ValidationErrors)
-    
+
     // Log detailed correlation data for debugging
     correlationData := map[string]interface{}{
         "workflow_name": workflow.Name,
@@ -686,10 +686,10 @@ func handleCorrelationFailure(event *GitHubWebhookEvent, workflow *v1alpha1.Work
         "event_type": validationResult.EventType,
         "validation_errors": validationResult.ValidationErrors,
     }
-    
+
     correlationJson, _ := json.MarshalIndent(correlationData, "", "  ")
     log.Printf("Correlation data: %s", string(correlationJson))
-    
+
     // Don't retry correlation failures - they indicate data issues
     return fmt.Errorf("event correlation failed - manual investigation required")
 }
@@ -727,7 +727,7 @@ func TestResumeWorkflowValidation(t *testing.T) {
             expectError: true,
         },
     }
-    
+
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             err := validateResumeRequest(tt.resumeSpec)
@@ -752,10 +752,10 @@ func TestResumeWorkflowIntegration(t *testing.T) {
         "current-stage": "waiting-pr-created",
         "workflow-type": "play-orchestration",
     }
-    
+
     // Submit workflow and wait for suspension
     client := fake.NewSimpleClientset(workflow)
-    
+
     // Create resume specification
     resumeSpec := &WorkflowResumeSpec{
         LabelSelector: "task-id=5,current-stage=waiting-pr-created",
@@ -764,15 +764,15 @@ func TestResumeWorkflowIntegration(t *testing.T) {
             EventType: "pr-created",
         },
     }
-    
+
     // Test resume operation
     ctx := context.Background()
     err := ResumeWorkflow(ctx, resumeSpec)
-    
+
     if err != nil {
         t.Errorf("resume operation failed: %v", err)
     }
-    
+
     // Verify workflow resumed
     updatedWorkflow, _ := client.Get(ctx, workflow.Name, metav1.GetOptions{})
     if updatedWorkflow.Spec.Suspend == nil || *updatedWorkflow.Spec.Suspend {

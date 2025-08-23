@@ -63,54 +63,54 @@ spec:
                       source: |
                         #!/bin/bash
                         set -e
-                        
+
                         echo "=== Task Completion Handler ==="
-                        
+
                         # Extract task ID from PR title or labels
                         PR_TITLE="{{ .Input.body.pull_request.title }}"
                         PR_LABELS="{{ .Input.body.pull_request.labels }}"
-                        
+
                         # Parse task ID (e.g., "Task 1: Initialize..." -> "1")
                         TASK_ID=$(echo "$PR_TITLE" | grep -oE 'Task ([0-9]+)' | sed 's/Task //')
-                        
+
                         if [ -z "$TASK_ID" ]; then
                           echo "No task ID found in PR title"
                           exit 0
                         fi
-                        
+
                         echo "Task $TASK_ID completed via merge to main"
-                        
+
                         # 1. Mark current orchestration workflow as complete
                         CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration \
                           --field-selector status.phase=Running \
                           -o jsonpath='{.items[0].metadata.name}')
-                        
+
                         if [ -n "$CURRENT_WORKFLOW" ]; then
                           # Resume the waiting-for-merge suspend node
                           NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
                             jq -r '.status.nodes | to_entries | .[] |
                             select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
                             .key')
-                          
+
                           if [ -n "$NODE_ID" ]; then
                             kubectl patch workflow $CURRENT_WORKFLOW -n agent-platform \
                               --type='merge' -p "{\"status\":{\"nodes\":{\"$NODE_ID\":{\"phase\":\"Succeeded\"}}}}"
                             echo "✅ Task $TASK_ID workflow completed"
                           fi
                         fi
-                        
+
                         # 2. Start next task in queue
                         NEXT_TASK_ID=$((TASK_ID + 1))
                         echo "Checking if task $NEXT_TASK_ID should be started..."
-                        
+
                         # Check if next task exists in documentation
                         # This would need to query the docs repo or a ConfigMap
                         # For now, we'll assume tasks 1-29 exist
-                        
+
                         if [ $NEXT_TASK_ID -le 29 ]; then
                           echo "Starting Task $NEXT_TASK_ID..."
-                          
+
                           # Create new orchestration workflow for next task
                           cat <<EOF | kubectl create -f -
                           apiVersion: argoproj.io/v1alpha1
@@ -136,7 +136,7 @@ spec:
                             workflowTemplateRef:
                               name: play-orchestration-template
                         EOF
-                          
+
                           echo "✅ Task $NEXT_TASK_ID workflow started"
                         else
                           echo "No more tasks in queue. All tasks completed!"
@@ -193,7 +193,7 @@ sequenceDiagram
     participant WH as Webhook Sensor
     participant WF as Current Workflow
     participant Next as Next Task
-    
+
     Note over PR: Rex→Cleo→Tess complete
     Tess->>PR: Approve PR
     Human->>PR: Review & Merge to main

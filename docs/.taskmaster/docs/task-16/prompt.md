@@ -25,7 +25,7 @@ Implement a struct that:
 ### 2. Core Functions to Implement
 ```rust
 pub fn get_template_for_agent(&self, github_app: &str) -> Result<String>
-pub fn extract_agent_name(&self, github_app: &str) -> Result<String>  
+pub fn extract_agent_name(&self, github_app: &str) -> Result<String>
 pub fn get_template_for_agent_with_fallback(&self, github_app: &str) -> String
 pub fn load_agent_template(github_app: &str) -> Result<String>
 ```
@@ -67,7 +67,7 @@ Each template should be self-contained:
 
 ## Files to Modify/Create
 - `controller/src/tasks/code/templates.rs` - Main implementation
-- `templates/container-cleo.sh.hbs` - Code quality workflow template  
+- `templates/container-cleo.sh.hbs` - Code quality workflow template
 - `templates/container-tess.sh.hbs` - Testing workflow template
 - Update existing integration points in task processing
 
@@ -80,6 +80,6 @@ Each template should be self-contained:
 ## Implementation Notes
 - Avoid complex Handlebars conditionals; use separate template files
 - Each container script should contain complete workflow logic for its agent
-- Consider configuration-driven mapping for future extensibility  
+- Consider configuration-driven mapping for future extensibility
 - Implement comprehensive logging for troubleshooting
 - Plan for graceful degradation when templates are missing

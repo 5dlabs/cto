@@ -94,7 +94,7 @@ kubernetes_deleteResource --api-version=v1 --kind=Pod --label-selector="test-run
 # Research Kubernetes resource management best practices
 brave-search_brave_web_search --query="Kubernetes VPA HPA integration best practices 2024"
 
-# Find solutions for specific resource management challenges  
+# Find solutions for specific resource management challenges
 brave-search_brave_web_search --query="Kubernetes resource quota troubleshooting OOMKilled prevention"
 
 # Research autoscaling patterns for AI workloads
@@ -226,7 +226,7 @@ vpa_config = {
     'update_mode': 'Auto',
     'resource_policy': {
         'cpu_min': '100m',
-        'cpu_max': '8000m', 
+        'cpu_max': '8000m',
         'memory_min': '128Mi',
         'memory_max': '32Gi'
     }

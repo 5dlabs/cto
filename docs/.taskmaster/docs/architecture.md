@@ -25,7 +25,7 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 ---
 
-### Stage 2: Code Quality (Cleo)  
+### Stage 2: Code Quality (Cleo)
 
 **Trigger:** GitHub webhook detects PR creation (via Argo Events)
 
@@ -61,9 +61,9 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 #### 3B: Live Deployment Testing Phase
 
-**Prerequisites:** 
+**Prerequisites:**
 - Helm charts available
-- Container image builds successfully  
+- Container image builds successfully
 - All required infrastructure components available
 
 **Process:**
@@ -75,7 +75,7 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
    - Integration testing across services
 3. Tess has full admin access to verify functionality:
    - Postgres Admin access
-   - Redis Admin access  
+   - Redis Admin access
    - Kubernetes Admin access
    - Argo CD Admin access
    - GitHub Actions access
@@ -109,7 +109,7 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 **Process:**
 1. CTO (human) reviews and merges the PR
-2. Task is marked as completed  
+2. Task is marked as completed
 3. Task directory moved to `.completed/`
 4. Workflow proceeds to next task (if available)
 
@@ -119,7 +119,7 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 ### GitHub Events Integration
 - **PR Created:** Triggers Cleo stage
-- **Push to Feature Branch:** Triggers Tess stage  
+- **Push to Feature Branch:** Triggers Tess stage
 - **PR Comments:** Triggers Rex restart (separate from main workflow)
 - **PR Merged:** Triggers task completion and next task start
 
@@ -137,7 +137,7 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
 
 **Process:**
 1. Implementation agent (Rex, Blaze, or Morgan) detects new PR comments
-2. Agent starts with session resume  
+2. Agent starts with session resume
 3. Agent pulls down **only unresolved/relevant comments**
 4. Agent addresses issues and pushes fixes
 5. **Implementation agent push triggers QA pipeline restart** (see below)
@@ -156,7 +156,7 @@ The play workflow is an event-driven, multi-agent orchestration that processes t
    kubectl delete coderun -l github-app=5DLabs-Tess
    ```
 3. **Remove "ready-for-qa" label** (if present) to reset state
-4. **Update workflow stage** back to waiting-pr-created  
+4. **Update workflow stage** back to waiting-pr-created
 5. **Resume workflow from Cleo stage** with fresh code
 
 ### Event-Based Coordination
@@ -186,7 +186,7 @@ spec:
           type: string
           comparator: "~"
           value: "refs/heads/task-.*"
-        
+
   triggers:
   - template:
       name: cancel-running-quality-agents
@@ -230,7 +230,7 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 ## Quality Gates Summary
 
 1. **Implementation Gate:** Rex completes feature development
-2. **Quality Gate:** Cleo ensures code quality and formatting  
+2. **Quality Gate:** Cleo ensures code quality and formatting
 3. **Review Gate:** Tess performs code review against acceptance criteria
 4. **Deployment Gate:** Tess verifies functionality in live Kubernetes environment
 5. **Approval Gate:** Human (CTO) merges PR after full validation
@@ -242,7 +242,7 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 **Why This Takes Days/Weeks (Not Hours):**
 - **Complex Implementation:** Rex may need 1-3 days for sophisticated features
 - **Documentation Research:** MCP server queries and best practice verification takes time
-- **Multiple Review Cycles:** Tess may find issues requiring multiple Rex iterations  
+- **Multiple Review Cycles:** Tess may find issues requiring multiple Rex iterations
 - **Real Deployment Testing:** Actual Kubernetes deployment, database testing, integration validation
 - **Human Intervention:** CTO review and approval happens on business schedule
 - **Infrastructure Issues:** Deployment failures, resource constraints, environment problems
@@ -257,7 +257,7 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 
 - **Event-Driven:** Each stage triggered by GitHub events, not sequential timing
 - **Real-World Testing:** Actual Kubernetes deployment and validation required
-- **Quality-Focused:** Multiple agents ensure different aspects of quality  
+- **Quality-Focused:** Multiple agents ensure different aspects of quality
 - **Human Oversight:** CTO maintains control over final PR merges
 - **Feedback Loops:** Rex can be recalled based on review feedback
 - **Single Workflow Visibility:** Entire process visible in Argo Workflows UI
@@ -271,7 +271,7 @@ The sensor will automatically detect pushes from the new agent and trigger QA pi
 - Integration with existing Argo Events setup
 - Ability to pause/wait for external events (GitHub webhooks)
 
-### Agent Capabilities  
+### Agent Capabilities
 - **Rex:** Implementation, comment resolution, session resume
 - **Blaze:** Implementation, coding tasks (similar to Rex)
 - **Cleo:** Pedantic code quality, formatting, zero-tolerance standards
@@ -360,11 +360,11 @@ spec:
           parameters:
           - name: github-app
             value: "5DLabs-Rex"
-      
+
       - name: wait-pr-created
-        dependencies: [rex-implementation]  
+        dependencies: [rex-implementation]
         template: suspend-for-webhook
-        
+
       - name: cleo-quality
         dependencies: [wait-pr-created]
         template: agent-coderun
@@ -372,27 +372,27 @@ spec:
           parameters:
           - name: github-app
             value: "5DLabs-Cleo"
-            
+
       - name: wait-ready-for-qa
         dependencies: [cleo-quality]
         template: suspend-for-webhook
-        
+
       - name: tess-testing
-        dependencies: [wait-ready-for-qa] 
+        dependencies: [wait-ready-for-qa]
         template: agent-coderun
         arguments:
           parameters:
           - name: github-app
             value: "5DLabs-Tess"
-            
+
       - name: wait-pr-approved
         dependencies: [tess-testing]
         template: suspend-for-webhook
-        
+
       - name: complete-task
         dependencies: [wait-pr-approved]
         template: mark-task-complete
-        
+
   - name: suspend-for-webhook
     suspend: {}  # Indefinite suspend until external resume
 ```
@@ -408,13 +408,13 @@ spec:
   - name: github-pr-created
     eventSourceName: github-webhook
     eventName: pull-request-opened
-  - name: github-push-event  
+  - name: github-push-event
     eventSourceName: github-webhook
     eventName: push-to-branch
   - name: github-pr-approved
-    eventSourceName: github-webhook  
+    eventSourceName: github-webhook
     eventName: pull-request-approved
-    
+
   triggers:
   - template:
       name: resume-workflow-on-event
@@ -441,12 +441,12 @@ spec:
 - **Event Payload Processing:** Extract task ID from GitHub webhook payload labels
 - **Selective Resume:** Only resume workflows waiting for the specific event type + task ID combination
 
-### Resource & Timeout Management  
+### Resource & Timeout Management
 - **Extended Timeout:** `activeDeadlineSeconds: 604800` (7 days) or longer - legitimately long-running process
-- **Timeout Considerations:** 
+- **Timeout Considerations:**
   - Rex implementation: Could take 1-2 days for complex features
   - Code review iterations: Multiple back-and-forth cycles with Tess
-  - Real-world testing: Deployment and comprehensive testing takes time  
+  - Real-world testing: Deployment and comprehensive testing takes time
   - Human review: CTO approval may not be immediate
   - **Realistic Duration:** Weeks, not hours
 - **Resource Efficiency:** Suspended workflows consume no pod resources (only etcd space)
@@ -457,7 +457,7 @@ spec:
 # Option 1: Extended but bounded (recommended)
 activeDeadlineSeconds: 1209600  # 14 days
 
-# Option 2: Very long timeout  
+# Option 2: Very long timeout
 activeDeadlineSeconds: 2592000  # 30 days
 
 # Option 3: Configurable per workflow
@@ -482,7 +482,7 @@ activeDeadlineSeconds: {{workflow.parameters.timeout-days | default(14) | multip
 
 **Existing CRD Capabilities (Good for all agents):**
 - ✅ `continue_session`: Each agent continues their OWN previous sessions (not shared)
-- ✅ `github_app`: Agent-specific authentication (5DLabs-Cleo, 5DLabs-Tess) 
+- ✅ `github_app`: Agent-specific authentication (5DLabs-Cleo, 5DLabs-Tess)
 - ✅ `model`: Agent-specific Claude models
 - ✅ Template system: Agent-specific prompts and configurations
 - ✅ Live input: MCP input tool for real-time agent interaction
@@ -500,7 +500,7 @@ infra/charts/controller/claude-templates/agents/
 └── tess-system-prompt.md.hbs
 ```
 
-#### 2. Agent-Specific Client Configuration  
+#### 2. Agent-Specific Client Configuration
 **Current:** `client-config.json.hbs` optimized for implementation work
 
 **Needed:** Agent-specific MCP tool configurations:
@@ -508,13 +508,13 @@ infra/charts/controller/claude-templates/agents/
 {{#if (eq github_app "5DLabs-Cleo")}}
   "remoteTools": [
     "rustdocs_query_rust_docs",
-    "brave-search_brave_web_search", 
+    "brave-search_brave_web_search",
     "memory_create_entities"
   ]
 {{else if (eq github_app "5DLabs-Tess")}}
   "remoteTools": [
     "kubernetes_listResources",
-    "kubernetes_describeResource", 
+    "kubernetes_describeResource",
     "memory_create_entities",
     "brave-search_brave_web_search"
   ]
@@ -532,11 +532,11 @@ infra/charts/controller/claude-templates/agents/
   # Cleo-specific setup: focus on code quality
   echo "🎯 Cleo: Code Quality & Formatting Agent"
   echo "Mission: Relentless pursuit of 100% code quality"
-{{else if (eq github_app "5DLabs-Tess")}}  
+{{else if (eq github_app "5DLabs-Tess")}}
   # Tess-specific setup: testing and deployment
   echo "🧪 Tess: Quality Assurance & Testing Agent"
   echo "Mission: 120% satisfaction through comprehensive testing"
-  
+
   # Additional K8s admin setup for Tess
   export KUBECONFIG=/etc/kube/config
 {{else}}
@@ -553,11 +553,11 @@ infra/charts/controller/claude-templates/agents/
 {{#if (eq github_app "5DLabs-Cleo")}}
 ## Role: Code Quality & Formatting Specialist
 - Focus on Clippy pedantic compliance
-- Zero tolerance for formatting issues  
+- Zero tolerance for formatting issues
 - Ensure 100% code quality standards
 - CRITICAL: Add "ready-for-qa" label when work complete and tests pass
 {{else if (eq github_app "5DLabs-Tess")}}
-## Role: Quality Assurance & Testing Specialist  
+## Role: Quality Assurance & Testing Specialist
 - Comprehensive code review against acceptance criteria
 - Live Kubernetes deployment testing
 - Test coverage enhancement - add missing unit/integration tests
@@ -573,7 +573,7 @@ infra/charts/controller/claude-templates/agents/
 ```yaml
 # Tess needs cluster-admin for deployment testing
 - apiGroups: ["*"]
-  resources: ["*"] 
+  resources: ["*"]
   verbs: ["*"]
 ```
 
@@ -582,7 +582,7 @@ infra/charts/controller/claude-templates/agents/
 # Database admin credentials
 - name: postgres-admin-secret
 - name: redis-admin-secret
-# Argo CD admin credentials  
+# Argo CD admin credentials
 - name: argocd-admin-secret
 ```
 
@@ -605,7 +605,7 @@ infra/charts/controller/claude-templates/
 
 **Agent-Specific PVC Workspaces (Critical Requirement):**
 - **Rex PVC**: `workspace-{service}-rex` - Implementation agent workspace
-- **Cleo PVC**: `workspace-{service}-cleo` - Code quality agent workspace  
+- **Cleo PVC**: `workspace-{service}-cleo` - Code quality agent workspace
 - **Tess PVC**: `workspace-{service}-tess` - Testing agent workspace
 
 **Benefits of Separate Workspaces:**
@@ -622,14 +622,14 @@ infra/charts/controller/claude-templates/
 
 # Examples:
 workspace-cto-rex      # Rex's persistent workspace
-workspace-cto-cleo     # Cleo's persistent workspace  
+workspace-cto-cleo     # Cleo's persistent workspace
 workspace-cto-tess     # Tess's persistent workspace
 ```
 
 **Implementation in CRD Controller:**
 ```rust
 // In controller code - generate agent-specific PVC name
-let pvc_name = format!("workspace-{}-{}", 
+let pvc_name = format!("workspace-{}-{}",
     code_run.spec.service,
     extract_agent_name(&code_run.spec.github_app)  // "rex", "cleo", "tess"
 );
@@ -639,7 +639,7 @@ let pvc_name = format!("workspace-{}-{}",
 
 **How `continue_session: true` Works:**
 - **NOT shared context**: Cleo doesn't continue from Rex's workspace
-- **Agent-specific continuity**: Cleo continues from Cleo's previous session  
+- **Agent-specific continuity**: Cleo continues from Cleo's previous session
 - **Independent histories**: Each agent maintains their own CLAUDE.md and context
 - **Concurrent safety**: Rex can restart without affecting other agents' state
 
@@ -648,7 +648,7 @@ let pvc_name = format!("workspace-{}-{}",
 **Required Changes:**
 1. **PVC Name Generation**: Extract agent name from `github_app` field for unique PVC naming
 2. **Template Resolution**: Modify template loading to check for agent-specific templates first
-3. **RBAC Assignment**: Conditional RBAC based on `github_app` field  
+3. **RBAC Assignment**: Conditional RBAC based on `github_app` field
 4. **Secret Mounting**: Additional secrets for Tess testing capabilities
 
 **No CRD Schema Changes:** Existing `CodeRun` fields support all requirements
@@ -661,7 +661,7 @@ let pvc_name = format!("workspace-{}-{}",
 
 ## Cleo Completion Signaling
 
-### Explicit Handoff Requirement  
+### Explicit Handoff Requirement
 **Problem**: Need clear signal when Cleo's work is complete and Tess can begin
 **Solution**: Cleo adds "ready-for-qa" label to PR when fully satisfied
 
@@ -671,7 +671,7 @@ let pvc_name = format!("workspace-{}-{}",
 ```yaml
 Process:
 1. Cleo completes code quality work
-2. Cleo pushes changes and waits for CI success  
+2. Cleo pushes changes and waits for CI success
 3. Cleo adds "ready-for-qa" label to PR
 4. Webhook triggers Tess stage
 
@@ -684,7 +684,7 @@ Benefits:
 
 #### Alternative Options Evaluated
 - **PR Comment**: Requires parsing comment text, more complex
-- **Custom Status Check**: More complex implementation, less visible  
+- **Custom Status Check**: More complex implementation, less visible
 - **File Marker**: Creates file clutter in PR
 - **PR Review**: Could conflict with human reviews
 
@@ -701,7 +701,7 @@ Benefits:
       {
         "id": 12345,
         "name": "task-3",        # ← Our correlation key!
-        "color": "ff0000", 
+        "color": "ff0000",
         "description": "Task 3 implementation"
       }
     ],
@@ -717,7 +717,7 @@ Benefits:
 #### 1. Workflow Creation with Correlation Labels
 ```yaml
 apiVersion: argoproj.io/v1alpha1
-kind: Workflow  
+kind: Workflow
 metadata:
   name: play-task-{{workflow.parameters.task-id}}-workflow
   labels:
@@ -754,7 +754,7 @@ spec:
 #### 3. Multi-Stage Progression Logic
 ```yaml
 # After resuming, workflow updates its stage label for next correlation
-- name: update-stage-to-waiting-push  
+- name: update-stage-to-waiting-push
   resource:
     action: patch
     manifest: |
@@ -774,7 +774,7 @@ spec:
 .pull_request.labels[?(@.name | startswith("task-"))].name | split("-")[1]
 
 # Examples:
-# PR with label "task-3" → extracts "3"  
+# PR with label "task-3" → extracts "3"
 # PR with label "task-15" → extracts "15"
 ```
 
@@ -783,7 +783,7 @@ spec:
 # Stage 1: After Rex creates PR
 labelSelector: "task-id=3,current-stage=waiting-pr-created"
 
-# Stage 2: After Cleo adds ready-for-qa label  
+# Stage 2: After Cleo adds ready-for-qa label
 labelSelector: "task-id=3,current-stage=waiting-ready-for-qa"
 
 # Stage 3: After Tess approves PR
@@ -798,7 +798,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 - eventName: pull-request-opened
   targetStage: waiting-pr-created
 
-# PR Labeled "ready-for-qa" → Resume after Cleo  
+# PR Labeled "ready-for-qa" → Resume after Cleo
 - eventName: pull-request-labeled
   targetStage: waiting-ready-for-qa
   conditions:
@@ -808,7 +808,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 
 # PR Review Approved (by Tess) → Resume after Tess
 - eventName: pull-request-review
-  targetStage: waiting-pr-approved  
+  targetStage: waiting-pr-approved
   conditions:
     - state: approved
     - user: 5DLabs-Tess
@@ -823,7 +823,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 **Need**: Complete Argo Events configuration for GitHub webhook → workflow resume
 **Risk**: Theory might not work in practice without proper configuration
 
-#### 2. Template Implementation Specifics  
+#### 2. Template Implementation Specifics
 **Gap**: We know what templates need but not the actual code changes
 **Need**: Specific Handlebars template modifications with exact conditionals
 **Risk**: Template complexity could introduce bugs or maintenance overhead
@@ -862,7 +862,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 **Scenarios not addressed**:
 - GitHub webhook fails/times out → workflow stuck suspended forever
 - Duplicate webhooks → multiple resume attempts
-- Webhooks arrive out of order → wrong stage resumed  
+- Webhooks arrive out of order → wrong stage resumed
 - GitHub API rate limiting → agent failures
 - Argo Events down when webhook arrives → lost events
 
@@ -918,20 +918,20 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 **Simplified Priority List:**
 
 1. **Argo Events Proof of Concept** - Build minimal sensor/eventsource to validate correlation works
-2. **Template Implementation** - Add actual Handlebars conditionals for agent-specific behavior  
+2. **Template Implementation** - Add actual Handlebars conditionals for agent-specific behavior
 3. **Controller PVC Naming** - Extract agent name from `github_app` for unique workspace PVCs
 4. **Agent System Prompts** - Create Cleo and Tess specific prompt templates
 5. **Rex Remediation Logic** - Event-based cancellation of running agents when Rex pushes fixes
 
 **Assumptions for Lab Environment:**
 - ✅ Webhook reliability - Assume GitHub webhooks work (handle failures later)
-- ✅ Security model - Cluster-admin fine for isolated lab testing  
+- ✅ Security model - Cluster-admin fine for isolated lab testing
 - ✅ Operational concerns - Learn by doing, iterate as needed
 - ✅ Resource limits - Start small, scale as needed
 
 **Out of Scope for Now:**
 - ~~Comprehensive error handling~~ (Handle in production later)
-- ~~Advanced security~~ (Lab environment)  
+- ~~Advanced security~~ (Lab environment)
 - ~~Monitoring/alerting~~ (Your responsibility later)
 - ~~Resource optimization~~ (Learn by running)
 
@@ -981,7 +981,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 - Template inheritance and override patterns
 - Variable substitution mechanisms
 
-#### 4. GitHub App Integration Patterns  
+#### 4. GitHub App Integration Patterns
 **Understanding Required:**
 - How GitHub App credentials flow from secrets to agents
 - App ID, Client ID, Private Key usage patterns
@@ -1016,7 +1016,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 - [ ] Document secret mounting and environment setup
 - [ ] Analyze session continuity implementation
 
-#### Phase 1B: Event System Analysis  
+#### Phase 1B: Event System Analysis
 - [ ] Document current Argo Events setup and configurations
 - [ ] Test GitHub webhook delivery to existing sensors
 - [ ] Understand correlation mechanisms in use
@@ -1029,7 +1029,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 - [ ] Test template modification and reload procedures
 
 #### Phase 1D: Integration Pattern Analysis
-- [ ] Document GitHub App authentication flow end-to-end  
+- [ ] Document GitHub App authentication flow end-to-end
 - [ ] Test secret management and External Secrets sync
 - [ ] Understand agent container startup and environment setup
 - [ ] Map MCP tool availability and configuration
@@ -1044,7 +1044,7 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 
 1. **Architecture Documentation** - How existing system works
 2. **Modification Requirements** - Exact changes needed for multi-agent support
-3. **Compatibility Assessment** - Impact on existing Rex/Blaze workflows  
+3. **Compatibility Assessment** - Impact on existing Rex/Blaze workflows
 4. **Implementation Roadmap** - Detailed technical tasks with dependencies
 5. **Test Strategy** - How to validate changes without breaking existing functionality
 
@@ -1060,6 +1060,6 @@ labelSelector: "task-id=3,current-stage=waiting-pr-approved"
 **Key Implementation Phases:**
 1. **Discovery Phase**: Deep dive into existing infrastructure and dependencies
 2. **Proof of Concept**: Validate Argo Events correlation with minimal test
-3. **Template System**: Add agent-specific conditionals and prompts  
+3. **Template System**: Add agent-specific conditionals and prompts
 4. **Controller Updates**: Agent-specific PVC naming and permissions
 5. **End-to-End Testing**: Full Rex → Cleo → Tess workflow validation

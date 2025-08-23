@@ -19,7 +19,7 @@ kubernetes_listResources --api-version=agents.platform/v1 --kind=CodeRun --label
 - Always include namespace when working across multiple environments
 - Combine with grep for specific field filtering
 
-#### kubernetes_describeResource  
+#### kubernetes_describeResource
 ```bash
 # Get detailed workflow status and events
 kubernetes_describeResource --api-version=argoproj.io/v1alpha1 --kind=Workflow --name=play-workflow-abc123 --namespace=argo
@@ -48,7 +48,7 @@ kubernetes_createResource --file=./test-workflows/e2e-test-workflow.yaml
 - Use generateName for test resources to avoid conflicts
 
 #### kubernetes_deleteResource
-```bash  
+```bash
 # Clean up test workflows after completion
 kubernetes_deleteResource --api-version=argoproj.io/v1alpha1 --kind=Workflow --label-selector="test-run-id=abc123"
 
@@ -143,7 +143,7 @@ const testPR = await github.createSyntheticPR({
 # Example chaos scenario execution
 chaos_config = {
     "pod_kill": {
-        "namespace": "agent-platform", 
+        "namespace": "agent-platform",
         "label_selector": "github-app=5DLabs-Rex",
         "duration": "60s"
     },
@@ -158,7 +158,7 @@ await chaos_mesh.execute_scenario(chaos_config)
 
 **Safety Protocols**:
 - Only target test namespaces and resources
-- Set appropriate duration limits for chaos scenarios  
+- Set appropriate duration limits for chaos scenarios
 - Implement automatic cleanup and recovery verification
 - Monitor system health throughout chaos testing
 
@@ -193,7 +193,7 @@ baseline = performance_monitor.get_baseline_metrics(
 kubernetes_createResource --file=test-namespace.yaml
 kubernetes_createResource --file=test-rbac.yaml
 
-# 2. Deploy test workflows  
+# 2. Deploy test workflows
 kubernetes_createResource --file=e2e-test-workflow.yaml
 
 # 3. Monitor execution
@@ -208,14 +208,14 @@ kubernetes_deleteResource --label-selector="test-run-id=e2e-21"
 ```
 
 ### Chaos Testing Workflow
-```bash  
+```bash
 # 1. Establish baseline
 performance-monitor --baseline --duration=300s
 
 # 2. Inject failures
 chaos-mesh --scenario=pod-kill --target-agent=rex
 
-# 3. Monitor recovery  
+# 3. Monitor recovery
 kubernetes_listPods --watch=true --label-selector="github-app=5DLabs-Rex"
 kubernetes_getPodLogs --pod-name=new-rex-pod --follow=true
 
@@ -264,7 +264,7 @@ memory_create_entities --update-baseline --metrics="[current_results]"
 - Implement safeguards against accidental production impact
 - Regular rotation of test credentials and cleanup of test data
 
-### Operational Excellence  
+### Operational Excellence
 - Document all test scenarios and expected outcomes
 - Maintain runbooks for common test failure modes
 - Implement automated result reporting and alerting

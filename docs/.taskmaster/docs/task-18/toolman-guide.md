@@ -87,11 +87,11 @@ import subprocess
 def analyze_coverage_json(coverage_file):
     with open(coverage_file, 'r') as f:
         data = json.load(f)
-    
+
     total_lines = data['data'][0]['totals']['lines']['count']
     covered_lines = data['data'][0]['totals']['lines']['covered']
     coverage_pct = (covered_lines / total_lines) * 100
-    
+
     return {
         'total': total_lines,
         'covered': covered_lines,
@@ -126,7 +126,7 @@ cargo llvm-cov --include-tests test
 ```bash
 # Generate multiple report formats
 cargo llvm-cov --workspace --html --output-dir /tmp/coverage-html
-cargo llvm-cov --workspace --lcov --output-path /tmp/coverage.lcov  
+cargo llvm-cov --workspace --lcov --output-path /tmp/coverage.lcov
 cargo llvm-cov --workspace --cobertura --output-path /tmp/coverage.xml
 cargo llvm-cov --workspace --json --output-path /tmp/coverage.json
 
@@ -152,11 +152,11 @@ from datetime import datetime
 class CoverageReportProcessor:
     def __init__(self, coverage_file):
         self.data = self.load_coverage_data(coverage_file)
-    
+
     def load_coverage_data(self, file_path):
         with open(file_path, 'r') as f:
             return json.load(f)
-    
+
     def generate_summary(self):
         totals = self.data['data'][0]['totals']
         return {
@@ -165,7 +165,7 @@ class CoverageReportProcessor:
             'functions': totals['functions'],
             'regions': totals['regions']
         }
-    
+
     def find_uncovered_files(self):
         files = self.data['data'][0]['files']
         return [f for f in files if f['summary']['lines']['percent'] < 100.0]
@@ -251,11 +251,11 @@ import ast
 def parse_uncovered_lines(uncovered_file):
     with open(uncovered_file, 'r') as f:
         content = f.read()
-    
+
     # Extract uncovered line information
     files_lines = {}
     current_file = None
-    
+
     for line in content.split('\n'):
         if line.endswith('.rs'):
             current_file = line.strip()
@@ -264,7 +264,7 @@ def parse_uncovered_lines(uncovered_file):
             # Extract line numbers
             numbers = re.findall(r'\d+(?:-\d+)?', line)
             files_lines[current_file].extend(numbers)
-    
+
     return files_lines
 
 def generate_test_template(source_file, uncovered_lines):
@@ -278,23 +278,23 @@ mod generated_coverage_tests {{
     use super::*;
 
     // Tests for uncovered lines: {uncovered_lines}
-    
+
     #[test]
     fn test_uncovered_branches() {{
         // TODO: Add specific tests for uncovered code paths
     }}
-    
+
     #[test]
     fn test_error_conditions() {{
         // TODO: Add tests for error handling paths
     }}
 }}
 '''
-    
+
     test_file = source_file.replace('src/', 'tests/generated_').replace('.rs', '_test.rs')
     with open(test_file, 'w') as f:
         f.write(template)
-    
+
     print(f"Generated test template: {test_file}")
 
 # Process uncovered code
@@ -361,41 +361,41 @@ class GitHubCoverageIntegration:
             'Authorization': f'token {token}',
             'Accept': 'application/vnd.github.v3+json'
         }
-    
+
     def submit_coverage_review(self, repo, pr_number, coverage_report):
         meets_threshold = coverage_report['meets_threshold']
-        
+
         if meets_threshold:
             event = 'APPROVE'
             body = f"✅ Coverage requirements met ({coverage_report['percentage']:.2f}%)"
         else:
-            event = 'REQUEST_CHANGES'  
+            event = 'REQUEST_CHANGES'
             body = f"❌ Coverage below threshold ({coverage_report['percentage']:.2f}%)"
-        
+
         review_data = {'event': event, 'body': body}
-        
+
         url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews'
         response = requests.post(url, headers=self.headers, json=review_data)
-        
+
         return response.status_code == 200
 
 # Usage example
 if __name__ == '__main__':
     integration = GitHubCoverageIntegration(os.environ['GITHUB_TOKEN'])
-    
+
     # Mock coverage report
     report = {
         'percentage': 97.5,
         'meets_threshold': True,
         'improvement': 5.2
     }
-    
+
     success = integration.submit_coverage_review(
         os.environ['TEST_REPO'],
         int(os.environ['TEST_PR']),
         report
     )
-    
+
     print(f"Review submission: {'✅ Success' if success else '❌ Failed'}")
 EOF
 ```
@@ -502,7 +502,7 @@ CARGO_LOG=cargo::util::rustc=debug cargo llvm-cov test
 - Use consistent build flags across runs
 - Check for excluded files: `cargo llvm-cov --ignore-filename-regex "tests/.*"`
 
-### Issue 3: GitHub API Integration Failures  
+### Issue 3: GitHub API Integration Failures
 **Symptoms**: API calls fail, authentication errors, rate limiting
 
 **Diagnosis**:
@@ -576,12 +576,12 @@ class TestGenerator:
         // Test normal operation
         let result = {function_name}({self.generate_valid_params(parameters)});
         assert!(result.is_ok() || result.is_some());
-        
+
         // Test edge cases
         {self.generate_edge_case_tests(function_name, parameters)}
     }}
 '''
-    
+
     def generate_edge_case_tests(self, function_name, parameters):
         # Generate boundary condition tests
         # Generate error condition tests

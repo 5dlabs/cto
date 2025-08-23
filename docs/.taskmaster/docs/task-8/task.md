@@ -49,7 +49,7 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
        {{ .body.ref | regexReplaceAll "refs/heads/task-([0-9]+)-.*" "${1}" }}
    - path: "body.repository.name"
      type: string
-   - path: "body.sender.login"  
+   - path: "body.sender.login"
      type: string
    ```
 
@@ -77,18 +77,18 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
    ```bash
    #!/bin/bash
    # Script for selective agent cancellation
-   
+
    TASK_ID="{{inputs.parameters.task-id}}"
-   
+
    # Cancel Cleo agents for this task
    kubectl delete coderun -l "task-id=${TASK_ID},github-app=5DLabs-Cleo" --wait=true
-   
-   # Cancel Tess agents for this task  
+
+   # Cancel Tess agents for this task
    kubectl delete coderun -l "task-id=${TASK_ID},github-app=5DLabs-Tess" --wait=true
-   
+
    # Verify cancellation completed
    REMAINING=$(kubectl get coderun -l "task-id=${TASK_ID},github-app in (5DLabs-Cleo,5DLabs-Tess)" --no-headers | wc -l)
-   
+
    if [ "$REMAINING" -eq 0 ]; then
      echo "✅ All downstream agents cancelled successfully"
    else
@@ -114,13 +114,13 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
          dataFilters:
          - path: "body.sender.login"
            type: string
-           value: 
+           value:
            - "5DLabs-Rex[bot]"
          - path: "body.ref"
            type: string
            comparator: "=~"
            value: "refs/heads/task-[0-9]+-.*"
-           
+
      triggers:
      - template:
          name: restart-qa-pipeline
@@ -161,7 +161,7 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
            parameters:
            - name: task-id
              value: "{{workflow.parameters.task-id}}"
-             
+
        - name: remove-qa-label
          dependencies: [cancel-downstream-agents]
          template: remove-ready-for-qa-label
@@ -169,7 +169,7 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
            parameters:
            - name: task-id
              value: "{{workflow.parameters.task-id}}"
-             
+
        - name: reset-workflow-stage
          dependencies: [remove-qa-label]
          template: update-workflow-stage
@@ -179,9 +179,9 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
              value: "waiting-pr-created"
            - name: task-id
              value: "{{workflow.parameters.task-id}}"
-             
+
        - name: resume-from-cleo
-         dependencies: [reset-workflow-stage]  
+         dependencies: [reset-workflow-stage]
          template: resume-qa-workflow
          arguments:
            parameters:
@@ -195,19 +195,19 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
    ```bash
    #!/bin/bash
    # Script to remove ready-for-qa label from PR
-   
+
    TASK_ID="{{inputs.parameters.task-id}}"
    GITHUB_TOKEN=$(cat /etc/github-app/token)
-   
+
    # Find PR number for this task
    PR_NUMBER=$(gh pr list --repo 5dlabs/cto --label "task-${TASK_ID}" --json number --jq '.[0].number')
-   
+
    if [ -n "$PR_NUMBER" ]; then
      echo "Removing ready-for-qa label from PR #${PR_NUMBER}"
-     
+
      # Remove ready-for-qa label
      gh pr edit "$PR_NUMBER" --remove-label "ready-for-qa"
-     
+
      echo "✅ Ready-for-QA label removed, resetting QA pipeline state"
    else
      echo "⚠️  No PR found for task ${TASK_ID}"
@@ -227,12 +227,12 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
        source: |
          TASK_ID="{{inputs.parameters.task-id}}"
          NEW_STAGE="{{inputs.parameters.new-stage}}"
-         
+
          # Find and update main workflow for this task
          WORKFLOW_NAME=$(kubectl get workflow \
            -l "workflow-type=play-orchestration,task-id=${TASK_ID}" \
            -o jsonpath='{.items[0].metadata.name}')
-           
+
          if [ -n "$WORKFLOW_NAME" ]; then
            kubectl patch workflow "$WORKFLOW_NAME" \
              --type='merge' \
@@ -262,25 +262,25 @@ When Rex pushes fixes in response to PR feedback, any ongoing Cleo or Tess work 
    ```bash
    #!/bin/bash
    # Safety validation before agent cancellation
-   
+
    TASK_ID="{{inputs.parameters.task-id}}"
-   
+
    # Verify this is actually a Rex push event
    SENDER="{{inputs.parameters.sender}}"
    if [[ "$SENDER" != "5DLabs-Rex[bot]" ]]; then
      echo "❌ Invalid sender: $SENDER (expected 5DLabs-Rex[bot])"
      exit 1
    fi
-   
+
    # Verify task ID is valid
    if ! [[ "$TASK_ID" =~ ^[0-9]+$ ]]; then
      echo "❌ Invalid task ID: $TASK_ID"
      exit 1
    fi
-   
+
    # Check if there are actually agents to cancel
    AGENTS_TO_CANCEL=$(kubectl get coderun -l "task-id=${TASK_ID},github-app in (5DLabs-Cleo,5DLabs-Tess)" --no-headers | wc -l)
-   
+
    if [ "$AGENTS_TO_CANCEL" -eq 0 ]; then
      echo "ℹ️  No downstream agents found for task $TASK_ID, nothing to cancel"
    else
@@ -300,7 +300,7 @@ metadata:
 spec:
   template:
     serviceAccountName: argo-events-sa
-    
+
   dependencies:
   - name: rex-push-event
     eventSourceName: rex-remediation-events
@@ -310,14 +310,14 @@ spec:
       - path: "body.sender.login"
         type: string
         value: ["5DLabs-Rex[bot]"]
-      - path: "body.ref" 
+      - path: "body.ref"
         type: string
         comparator: "=~"
         value: "refs/heads/task-[0-9]+-.*"
       - path: "body.repository.name"
         type: string
         value: ["cto"]
-        
+
   triggers:
   - template:
       name: restart-qa-pipeline
@@ -346,26 +346,26 @@ spec:
                   value: "{{rex-push-event.body.after}}"
                 - name: sender
                   value: "{{rex-push-event.body.sender.login}}"
-                  
+
               templates:
               - name: remediation-flow
                 dag:
                   tasks:
                   - name: validate-event
                     template: validate-rex-push
-                    
+
                   - name: cancel-agents
                     dependencies: [validate-event]
                     template: cancel-downstream-agents
-                    
+
                   - name: remove-qa-label
                     dependencies: [cancel-agents]
                     template: remove-ready-for-qa-label
-                    
+
                   - name: reset-workflow
                     dependencies: [remove-qa-label]
                     template: reset-workflow-stage
-                    
+
                   - name: resume-qa-pipeline
                     dependencies: [reset-workflow]
                     template: resume-main-workflow
@@ -379,13 +379,13 @@ spec:
                     echo "Task ID: {{workflow.parameters.task-id}}"
                     echo "Sender: {{workflow.parameters.sender}}"
                     echo "Commit: {{workflow.parameters.commit-sha}}"
-                    
+
                     # Validate sender is Rex
                     if [ "{{workflow.parameters.sender}}" != "5DLabs-Rex[bot]" ]; then
                       echo "❌ Invalid sender"
                       exit 1
                     fi
-                    
+
                     echo "✅ Event validation passed"
 
               - name: cancel-downstream-agents
@@ -394,15 +394,15 @@ spec:
                   command: [bash]
                   source: |
                     TASK_ID="{{workflow.parameters.task-id}}"
-                    
+
                     echo "🛑 Cancelling downstream agents for task $TASK_ID"
-                    
+
                     # Cancel Cleo agents
                     kubectl delete coderun -l "task-id=${TASK_ID},github-app=5DLabs-Cleo" --ignore-not-found
-                    
+
                     # Cancel Tess agents
                     kubectl delete coderun -l "task-id=${TASK_ID},github-app=5DLabs-Tess" --ignore-not-found
-                    
+
                     echo "✅ Agent cancellation completed"
 
               - name: remove-ready-for-qa-label
@@ -411,15 +411,15 @@ spec:
                   command: [bash]
                   source: |
                     TASK_ID="{{workflow.parameters.task-id}}"
-                    
+
                     # Authenticate with GitHub
                     echo "$GITHUB_TOKEN" | gh auth login --with-token
-                    
+
                     # Find PR for this task
                     PR_NUMBER=$(gh pr list --repo 5dlabs/cto \
                       --label "task-${TASK_ID}" \
                       --json number --jq '.[0].number')
-                    
+
                     if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
                       echo "📋 Removing ready-for-qa label from PR #${PR_NUMBER}"
                       gh pr edit "$PR_NUMBER" --remove-label "ready-for-qa" --repo 5dlabs/cto
@@ -434,18 +434,18 @@ spec:
                         name: github-app-5dlabs-rex
                         key: token
 
-              - name: reset-workflow-stage  
+              - name: reset-workflow-stage
                 script:
                   image: bitnami/kubectl:latest
                   command: [bash]
                   source: |
                     TASK_ID="{{workflow.parameters.task-id}}"
-                    
+
                     # Find main workflow for this task
                     WORKFLOW_NAME=$(kubectl get workflow \
                       -l "workflow-type=play-orchestration,task-id=${TASK_ID}" \
                       -o jsonpath='{.items[0].metadata.name}')
-                      
+
                     if [ -n "$WORKFLOW_NAME" ]; then
                       echo "🔄 Resetting workflow $WORKFLOW_NAME to waiting-pr-created"
                       kubectl patch workflow "$WORKFLOW_NAME" \
@@ -458,16 +458,16 @@ spec:
 
               - name: resume-main-workflow
                 script:
-                  image: bitnami/kubectl:latest  
+                  image: bitnami/kubectl:latest
                   command: [bash]
                   source: |
                     TASK_ID="{{workflow.parameters.task-id}}"
-                    
+
                     # Resume main workflow at quality stage
                     WORKFLOW_NAME=$(kubectl get workflow \
                       -l "workflow-type=play-orchestration,task-id=${TASK_ID}" \
                       -o jsonpath='{.items[0].metadata.name}')
-                      
+
                     if [ -n "$WORKFLOW_NAME" ]; then
                       echo "▶️  Resuming workflow $WORKFLOW_NAME"
                       argo resume "$WORKFLOW_NAME"
@@ -527,7 +527,7 @@ All remediation operations are designed to be idempotent:
    spec:
      github_app: "5DLabs-Cleo"
    EOF
-   
+
    # Trigger remediation
    # Verify CodeRuns are deleted
    kubectl get coderun -l "task-id=3,github-app=5DLabs-Cleo"

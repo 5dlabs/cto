@@ -280,7 +280,7 @@ memory_create_entities --type=architecture --data="[system_components_and_intera
 runbook_validator --validate-architecture-docs --dry-run=true
 ```
 
-### Troubleshooting Guide Development  
+### Troubleshooting Guide Development
 ```bash
 # 1. Analyze historical failure patterns
 kubernetes_getPodLogs --all-namespaces=true --grep="ERROR\|FATAL\|Failed" --since=30d
@@ -372,7 +372,7 @@ memory_create_entities --type=documentation-version --version=new --validated=tr
 - Include specific expected outputs and error handling for all procedures
 - Regular validation against current system state to prevent documentation drift
 
-### Troubleshooting Effectiveness  
+### Troubleshooting Effectiveness
 - Base troubleshooting guides on actual failure patterns from system logs
 - Create decision trees that lead to specific diagnostic and resolution steps
 - Include escalation criteria and contact information for complex issues

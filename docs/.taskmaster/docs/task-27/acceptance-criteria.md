@@ -16,7 +16,7 @@
 - [ ] Secret refresh occurs automatically every 24 hours
 - [ ] Failed secret retrieval triggers appropriate alerts
 
-### ✅ Redis Admin Secrets  
+### ✅ Redis Admin Secrets
 - [ ] ExternalSecret creates `tess-redis-admin` secret successfully
 - [ ] Secret includes: host, port, password, cluster-endpoints, url
 - [ ] Supports both single-instance and cluster Redis configurations
@@ -59,7 +59,7 @@
 
 ### ✅ Application Management
 - [ ] Can create new applications via Argo CD API
-- [ ] Can modify existing application configurations  
+- [ ] Can modify existing application configurations
 - [ ] Can delete test applications without restrictions
 - [ ] Can trigger application sync and refresh operations
 - [ ] Can access application logs and events
@@ -153,7 +153,7 @@
 ### ✅ Privilege Separation
 - [ ] Tess admin secrets inaccessible to other agents (Rex, Cleo)
 - [ ] Service account permissions limited to required operations only
-- [ ] Database privileges follow principle of least privilege where possible  
+- [ ] Database privileges follow principle of least privilege where possible
 - [ ] Redis ACL prevents access to dangerous operations in production
 - [ ] Argo CD project restrictions limit scope appropriately
 
@@ -175,7 +175,7 @@
 
 ### ✅ Failure Recovery Testing
 - [ ] PostgreSQL connection failure detected and recovered
-- [ ] Redis cluster failover handled transparently  
+- [ ] Redis cluster failover handled transparently
 - [ ] Argo CD API unavailability triggers appropriate fallback
 - [ ] Secret rotation failure doesn't break existing connections
 - [ ] Init container prevents startup with invalid credentials
