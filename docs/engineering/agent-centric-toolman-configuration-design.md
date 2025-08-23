@@ -1,7 +1,5 @@
 # Agent-Centric Toolman Configuration Design
 
-
-
 ## Overview
 
 This document outlines a redesign of the toolman (MCP client) configuration system, moving from task-based dynamic generation to agent-centric static configuration. This approach treats tools as inherent capabilities of agents, similar to how employees have their standard toolsets.
@@ -18,24 +16,12 @@ This document outlines a redesign of the toolman (MCP client) configuration syst
 
 ### Current Flow
 
-
-
-
-
 ```mermaid
 graph TD
     A[Task Submission] --> B[Docs Agent Analyzes Task]
     B --> C[Generate client-config.json]
     C --> D[Mount to Code Agent Container]
     D --> E[Agent Executes with Tools]
-
-
-
-
-
-
-
-
 ```
 
 ## Proposed Solution
@@ -44,13 +30,7 @@ graph TD
 
 Transform the tool configuration from a task-driven model to an agent-driven model where each agent has a predefined set of tools based on their role and expertise.
 
-
-
 ### New Flow
-
-
-
-
 
 ```mermaid
 graph TD
@@ -58,14 +38,6 @@ graph TD
     B --> C[Static client-config.json]
     C --> D[Task Submission]
     D --> E[Agent Uses Existing Tools]
-
-
-
-
-
-
-
-
 ```
 
 ## Design Details
@@ -73,10 +45,6 @@ graph TD
 ### 1. Agent Tool Profiles
 
 Each agent will have a tool profile that defines their standard toolset:
-
-
-
-
 
 ```yaml
 # In values.yaml or agent-config.yaml
@@ -87,47 +55,21 @@ agents:
     expertise: ["documentation", "requirements", "planning"]
     tools:
       remote:
-
-
         - "brave-search_brave_web_search"
-
-
         - "memory_create_entities"
-
-
         - "memory_query_entities"
-
-
         - "github_create_issue"
-
-
         - "github_list_issues"
       local:
         filesystem:
-
-
           - "read_file"
-
-
           - "write_file"
-
-
           - "list_directory"
-
-
           - "create_directory"
-
-
           - "edit_file"
         git:
-
-
           - "git_status"
-
-
           - "git_diff"
-
-
           - "git_commit"
       custom:
         - name: "task-manager"
@@ -140,47 +82,21 @@ agents:
     expertise: ["backend", "architecture", "apis"]
     tools:
       remote:
-
-
         - "rustdocs_query_rust_docs"
-
-
         - "kubernetes_listResources"
-
-
         - "kubernetes_describeResource"
-
-
         - "kubernetes_createResource"
-
-
         - "terraform_plan"
-
-
         - "terraform_apply"
       local:
         filesystem:
-
-
           - "read_file"
-
-
           - "write_file"
-
-
           - "list_directory"
-
-
           - "edit_file"
-
-
           - "search_files"
         database:
-
-
           - "postgres_query"
-
-
           - "postgres_schema"
 
   cleo:
@@ -189,53 +105,23 @@ agents:
     expertise: ["testing", "quality", "ci/cd"]
     tools:
       remote:
-
-
         - "github_create_check"
-
-
         - "github_update_check"
-
-
         - "sonarqube_analyze"
       local:
         filesystem:
-
-
           - "read_file"
-
-
           - "write_file"
-
-
           - "run_tests"
         linting:
-
-
           - "eslint_check"
-
-
           - "prettier_format"
-
-
           - "clippy_check"
-
-
-
-
-
-
-
-
 ```
 
 ### 2. Tool Inheritance and Composition
 
 Support tool inheritance for common patterns:
-
-
-
-
 
 ```yaml
 # Tool templates/base configurations
@@ -243,80 +129,40 @@ toolProfiles:
   base:
     # All agents get these by default
     remote:
-
-
       - "memory_create_entities"
-
-
       - "memory_query_entities"
     local:
       filesystem:
-
-
         - "read_file"
-
-
         - "write_file"
-
-
         - "list_directory"
 
   developer:
     # Extends base
     extends: base
     remote:
-
-
       - "rustdocs_query_rust_docs"
-
-
       - "github_create_pr"
     local:
       filesystem:
-
-
         - "edit_file"
-
-
         - "search_files"
       git:
-
-
         - "git_status"
-
-
         - "git_diff"
 
   infrastructure:
     # Extends developer
     extends: developer
     remote:
-
-
       - "kubernetes_listResources"
-
-
       - "kubernetes_describeResource"
-
-
       - "terraform_plan"
-
-
-
-
-
-
-
-
 ```
 
 ### 3. Client Config Generation
 
 Transform agent definitions into `client-config.json` at deployment time:
-
-
-
-
 
 ```rust
 // In controller or MCP server
@@ -348,23 +194,11 @@ impl AgentConfig {
         config
     }
 }
-
-
-
-
-
-
-
-
 ```
 
 ### 4. Dynamic Tool Augmentation
 
 Support task-specific tool additions when necessary:
-
-
-
-
 
 ```yaml
 # Task definition can request additional tools
@@ -373,32 +207,16 @@ task:
   agent: "rex"
   additionalTools:
     remote:
-
-
       - "aws_s3_upload"  # Special tool needed for this task
     local:
       custom:
         - name: "migration-tool"
           command: "./scripts/migrate.sh"
-
-
-
-
-
-
-
-
 ```
-
-
 
 ### 5. Tool Capability Discovery
 
 Agents can query their available tools:
-
-
-
-
 
 ```typescript
 // MCP endpoint for tool discovery
@@ -417,21 +235,11 @@ interface AgentCapabilities {
   };
   canAugment: boolean;  // Whether task-specific tools can be added
 }
-
-
-
-
-
-
-
-
 ```
 
 ## Implementation Plan
 
 ### Phase 1: Agent Tool Profiles (Week 1)
-
-
 
 1. **Update Agent ConfigMap Structure**
    ```yaml
@@ -446,30 +254,14 @@ interface AgentCapabilities {
      rex-tools.yaml: |
        {{ .Values.agents.rex.tools | toYaml }}
 
-
-
-
-
-
-
 ```
 
-
-
 2. **Create Tool Profile Templates**
-
-
    - Define base profiles in `values.yaml`
-
-
    - Create inheritance resolver
-
-
    - Validate tool names against catalog
 
 ### Phase 2: Client Config Generation (Week 1-2)
-
-
 
 1. **Controller Updates**
    ```rust
@@ -492,27 +284,13 @@ interface AgentCapabilities {
        }
    }
 
-
-
-
-
-
-
 ```
 
-
-
 2. **Remove Dynamic Generation from Docs Agent**
-
-
    - Remove handlebars templates for client-config generation
-
-
    - Update docs agent to focus on documentation tasks only
 
 ### Phase 3: Migration Support (Week 2)
-
-
 
 1. **Backward Compatibility**
    ```rust
@@ -522,15 +300,7 @@ interface AgentCapabilities {
        Static(AgentTools),  // New: from agent config
    }
 
-
-
-
-
-
-
 ```
-
-
 
 2. **Migration Script**
    ```bash
@@ -541,17 +311,9 @@ interface AgentCapabilities {
    # Generate recommended agent tool profiles
    # Update values.yaml with new structure
 
-
-
-
-
-
-
 ```
 
 ### Phase 4: Tool Discovery & Management (Week 3)
-
-
 
 1. **MCP Tool for Tool Management**
    ```rust
@@ -573,25 +335,11 @@ interface AgentCapabilities {
        })
    }
 
-
-
-
-
-
-
 ```
 
-
-
 2. **Web UI for Tool Configuration** (Future)
-
-
    - Visual tool selector
-
-
    - Drag-and-drop tool assignment
-
-
    - Tool usage analytics
 
 ## Benefits
@@ -615,10 +363,6 @@ interface AgentCapabilities {
 
 ### Example 1: Minimal Documentation Agent
 
-
-
-
-
 ```yaml
 agents:
   lexie:
@@ -626,35 +370,15 @@ agents:
     role: "Documentation Writer"
     tools:
       remote:
-
-
         - "brave-search_brave_web_search"
       local:
         filesystem:
-
-
           - "read_file"
-
-
           - "write_file"
-
-
           - "list_directory"
-
-
-
-
-
-
-
-
 ```
 
 Generated `client-config.json`:
-
-
-
-
 ```json
 {
   "remoteTools": [
@@ -669,21 +393,9 @@ Generated `client-config.json`:
     }
   }
 }
-
-
-
-
-
-
-
-
 ```
 
 ### Example 2: Full-Stack Developer Agent
-
-
-
-
 
 ```yaml
 agents:
@@ -693,76 +405,30 @@ agents:
     extends: developer  # Inherit from developer profile
     tools:
       remote:
-
-
         - "rustdocs_query_rust_docs"
-
-
         - "mdn_web_docs_search"
-
-
         - "npm_package_search"
-
-
         - "github_create_pr"
-
-
         - "github_review_pr"
       local:
         filesystem:
-
-
           - "read_file"
-
-
           - "write_file"
-
-
           - "edit_file"
-
-
           - "search_files"
-
-
           - "create_directory"
         git:
-
-
           - "git_status"
-
-
           - "git_diff"
-
-
           - "git_commit"
-
-
           - "git_push"
         npm:
-
-
           - "npm_install"
-
-
           - "npm_run"
-
-
           - "npm_test"
-
-
-
-
-
-
-
-
 ```
 
 ### Example 3: Infrastructure Specialist
-
-
-
-
 
 ```yaml
 agents:
@@ -771,31 +437,15 @@ agents:
     role: "Infrastructure Engineer"
     tools:
       remote:
-
-
         - "kubernetes_*"  # All Kubernetes tools
-
-
         - "terraform_*"   # All Terraform tools
-
-
         - "aws_*"        # All AWS tools
-
-
         - "prometheus_query"
-
-
         - "grafana_dashboard"
       local:
         filesystem:
-
-
           - "read_file"
-
-
           - "write_file"
-
-
           - "edit_file"
         kubectl:
           command: "kubectl"
@@ -803,56 +453,24 @@ agents:
         helm:
           command: "helm"
           workingDirectory: "/workspace"
-
-
-
-
-
-
-
-
 ```
 
 ## Migration Strategy
 
 ### Step 1: Analyze Existing Patterns
-
-
-
-
 ```bash
 # Analyze all existing client-config.json files
 find . -name "client-config.json" -exec jq '.remoteTools' {} \; | \
   jq -s 'flatten | group_by(.) | map({tool: .[0], count: length}) | sort_by(.count) | reverse'
-
-
-
-
-
-
-
-
 ```
-
-
 
 ### Step 2: Create Default Profiles
 Based on analysis, create sensible defaults for each agent role
 
-
-
 ### Step 3: Gradual Rollout
-
-
 1. Start with new agents using static configs
-
-
 2. Migrate existing agents one at a time
-
-
 3. Keep dynamic generation as fallback
-
-
 4. Remove dynamic generation after full migration
 
 ### Step 4: Optimization
@@ -861,10 +479,6 @@ After migration, analyze actual tool usage and optimize profiles
 ## Tool Catalog Integration
 
 Integrate with existing tool catalog for validation:
-
-
-
-
 
 ```rust
 impl ToolValidator {
@@ -881,14 +495,6 @@ impl ToolValidator {
         Ok(())
     }
 }
-
-
-
-
-
-
-
-
 ```
 
 ## Security Considerations
@@ -897,8 +503,6 @@ impl ToolValidator {
 2. **Sensitive Tools**: Mark tools that access secrets or production systems
 3. **Audit Logging**: Track tool usage for security auditing
 4. **Tool Sandboxing**: Isolate risky tools in separate processes
-
-
 
 ## Success Metrics
 
@@ -911,10 +515,6 @@ impl ToolValidator {
 ## Future Enhancements
 
 ### 1. Smart Tool Recommendation
-
-
-
-
 ```rust
 // Analyze task history to recommend tools
 async fn recommend_tools_for_agent(
@@ -923,26 +523,10 @@ async fn recommend_tools_for_agent(
 ) -> Vec<String> {
     // ML model or heuristics to suggest tools
 }
-
-
-
-
-
-
-
-
 ```
 
-
-
 ### 2. Tool Usage Telemetry
-
-
-
-
 ```yaml
-
-
 # Track actual tool usage
 telemetry:
   morgan:
@@ -951,27 +535,11 @@ telemetry:
       memory_create_entities: 89
       read_file: 1247
     tools_never_used:
-
-
       - terraform_plan
-
-
       - kubernetes_delete
-
-
-
-
-
-
-
-
 ```
 
 ### 3. Dynamic Tool Loading
-
-
-
-
 ```rust
 // Load tools on-demand based on task requirements
 impl DynamicToolLoader {
@@ -986,30 +554,12 @@ impl DynamicToolLoader {
         Ok(())
     }
 }
-
-
-
-
-
-
-
-
 ```
 
-
-
 ### 4. Tool Marketplace
-
-
 - Central repository of MCP tools
-
-
 - Agents can "shop" for new capabilities
-
-
 - Community-contributed tools
-
-
 - Tool ratings and reviews
 
 ## Conclusion
