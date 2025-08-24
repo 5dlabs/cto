@@ -35,6 +35,7 @@ spec:
         postgresql:
           enabled: false
         externalDatabase:
+          enabled: true
           type: postgresql
           host: mailu-postgres.databases.svc.cluster.local
           port: 5432
@@ -47,10 +48,11 @@ spec:
         subnet: 10.42.0.0/16
 
         # Mail settings
-        messageSizeLimitMb: 50
-        authRatelimit:
-          ip: "60/hour"
-          user: "100/hour"
+        limits:
+          messageSizeLimitInMegabytes: 50
+          authRatelimit:
+            ip: "60/hour"
+            user: "100/day"
 
         # TLS configuration
         tls:
@@ -141,9 +143,9 @@ spec:
 
         # Storage configuration
         persistence:
-          enabled: true
-          storageClass: local-path
+          single_pvc: true
           size: 20Gi
+          storageClass: local-path
 
         # Ingress for webmail
         ingress:
