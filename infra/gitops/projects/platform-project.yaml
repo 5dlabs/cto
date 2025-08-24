@@ -161,6 +161,10 @@ spec:
       kind: '*'
     - group: 'external-secrets.io'
       kind: '*'
+    - group: 'policy'
+      kind: '*'
+    - group: 'storage.k8s.io'
+      kind: '*'
     # Database operator CRDs
     - group: 'acid.zalan.do'
       kind: '*'
