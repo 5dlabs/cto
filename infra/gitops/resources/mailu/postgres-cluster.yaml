@@ -50,13 +50,11 @@ spec:
 
   # Database users and permissions
   users:
-    # Mailu application user - needs more permissions for schema creation
+    # Mailu application user - needs superuser for schema operations with Zalando operator
     mailu:
-      - NOSUPERUSER
-      - INHERIT
+      - SUPERUSER
       - CREATEDB
       - CREATEROLE
-      - NOREPLICATION
     # Admin user for maintenance
     admin:
       - SUPERUSER
