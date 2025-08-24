@@ -1,10 +1,12 @@
-# CoreDNS DNSSEC Configuration
+# CoreDNS DNSSEC Configuration for Talos Linux
 
-This directory contains the CoreDNS configuration with DNSSEC validation enabled to address RFC6840 compliance issues.
+This directory contains the CoreDNS configuration with DNSSEC validation enabled to address RFC6840 compliance issues in Talos-managed CoreDNS deployments.
 
 ## Overview
 
 The CoreDNS configuration has been updated to enable DNSSEC validation, which addresses the issue mentioned in [CoreDNS issue #5189](https://github.com/coredns/coredns/issues/5189) where CoreDNS cache was violating RFC6840.
+
+**Note**: This configuration is designed for Talos Linux-managed CoreDNS deployments, not standalone Helm chart deployments.
 
 ## Configuration Changes
 
@@ -14,7 +16,7 @@ The CoreDNS configuration has been updated to enable DNSSEC validation, which ad
 - **Sequential policy** for upstream resolution to ensure consistent DNSSEC validation
 
 ### Upstream Resolvers
-The configuration uses multiple DNSSEC-capable upstream resolvers:
+The configuration uses multiple DNSSEC-capable upstream resolvers instead of relying on `/etc/resolv.conf`:
 - `8.8.8.8:53` (Google DNS)
 - `8.8.4.4:53` (Google DNS secondary)
 - `1.1.1.1:53` (Cloudflare DNS)
@@ -34,7 +36,24 @@ The configuration uses multiple DNSSEC-capable upstream resolvers:
 
 ## Deployment
 
-The configuration is deployed via ArgoCD as the `coredns-config` application. After deployment, CoreDNS pods will be automatically restarted to pick up the new configuration.
+### Option 1: Direct Application (Recommended)
+Use the provided script to apply the configuration directly:
+
+```bash
+./infra/scripts/apply-coredns-dnssec.sh
+```
+
+### Option 2: Manual Application
+```bash
+# Apply the ConfigMap
+kubectl apply -f infra/gitops/resources/coredns/coredns-configmap.yaml
+
+# Restart CoreDNS pods
+kubectl rollout restart deployment/coredns -n kube-system
+
+# Wait for rollout
+kubectl rollout status deployment/coredns -n kube-system
+```
 
 ## Verification
 
@@ -69,6 +88,14 @@ kubectl logs -n kube-system deployment/coredns
 kubectl port-forward -n kube-system service/coredns 9153:9153
 curl http://localhost:9153/metrics | grep dns
 ```
+
+## Talos Integration
+
+This configuration is compatible with Talos Linux's CoreDNS deployment:
+- **Version**: CoreDNS v1.12.1 (as deployed by Talos)
+- **Namespace**: kube-system
+- **Labels**: k8s-app=kube-dns, kubernetes.io/name=CoreDNS
+- **ConfigMap**: coredns
 
 ## Related Issues
 
