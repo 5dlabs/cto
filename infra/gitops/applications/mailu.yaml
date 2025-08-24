@@ -32,12 +32,15 @@ spec:
           password: "ChangeMe123!"
 
         # Database configuration (using our PostgreSQL cluster)
-        database:
+        postgresql:
+          enabled: false
+        externalDatabase:
+          enabled: true
           type: postgresql
           host: mailu-postgres.databases.svc.cluster.local
           port: 5432
-          name: mailu
-          user: mailu
+          database: mailu
+          username: mailu
           existingSecret: mailu.mailu-postgres.credentials.postgresql.acid.zalan.do
           existingSecretPasswordKey: password
 
@@ -45,10 +48,11 @@ spec:
         subnet: 10.42.0.0/16
 
         # Mail settings
-        messageSizeLimitMb: 50
-        authRatelimit:
-          ip: "60/hour"
-          user: "100/hour"
+        limits:
+          messageSizeLimitInMegabytes: 50
+          authRatelimit:
+            ip: "60/hour"
+            user: "100/day"
 
         # TLS configuration
         tls:
@@ -139,11 +143,9 @@ spec:
 
         # Storage configuration
         persistence:
-          enabled: true
+          single_pvc: true
+          size: 20Gi
           storageClass: local-path
-          size:
-            data: 10Gi
-            mail: 20Gi
 
         # Ingress for webmail
         ingress:
