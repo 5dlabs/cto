@@ -4,4 +4,6 @@ kind: Kustomization
 resources:
   - gatewayclass.yaml
   - gateway.yaml
+  - traffic-policy.yaml
+  - domain.yaml
 

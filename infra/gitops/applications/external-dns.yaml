@@ -20,11 +20,11 @@ spec:
       values: |
         # External DNS configuration for Cloudflare
         provider: cloudflare
-        
+
         # Domain filter - only manage DNS for 5dlabs.ai
         domainFilters:
           - 5dlabs.ai
-        
+
         # Cloudflare configuration
         env:
           - name: CF_API_TOKEN
@@ -32,33 +32,33 @@ spec:
               secretKeyRef:
                 name: cloudflare-api-credentials
                 key: api-token
-        
+
         cloudflare:
           # Proxy traffic through Cloudflare (orange cloud)
           proxied: true
-        
+
         # Sources to watch for DNS records
         sources:
           - gateway-httproute
           - gateway-grpcroute
           - service
           - ingress
-        
+
         # Policy for record ownership
         policy: sync  # sync = manage all records, upsert-only = only create/update
-        
+
         # Registry for tracking managed records
         registry: txt
         txtOwnerId: external-dns-5dlabs
         txtPrefix: external-dns-
-        
+
         # Logging
         logLevel: info
         logFormat: text
-        
+
         # Deployment configuration
         replicaCount: 1
-        
+
         # Resource limits
         resources:
           limits:
@@ -67,7 +67,7 @@ spec:
           requests:
             cpu: 50m
             memory: 64Mi
-        
+
         # Security context
         securityContext:
           runAsNonRoot: true
@@ -76,23 +76,23 @@ spec:
           capabilities:
             drop:
               - ALL
-        
+
         # Service account
         serviceAccount:
           create: true
           name: external-dns
           annotations: {}
-        
+
         # RBAC
         rbac:
           create: true
-        
+
         # Interval for DNS updates
         interval: 1m
-        
+
         # Annotations to watch for
         annotationFilter: external-dns.alpha.kubernetes.io/hostname
-        
+
         # Extra arguments
         extraArgs:
           - --cloudflare-dns-records-per-page=100
