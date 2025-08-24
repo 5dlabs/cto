@@ -14,7 +14,7 @@ spec:
   source:
     repoURL: https://mailu.github.io/helm-charts/
     chart: mailu
-    targetRevision: master
+    targetRevision: 2.2.2
     helm:
       values: |
         # Mailu Configuration for 5dlabs.ai
