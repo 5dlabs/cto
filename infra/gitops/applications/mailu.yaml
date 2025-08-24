@@ -97,11 +97,11 @@ spec:
           logLevel: DEBUG
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           # DNS configuration to fix DNSSEC validation issue in Kubernetes
           extraEnvVars:
             - name: RESOLVER_ADDRESS
@@ -113,6 +113,11 @@ spec:
             # Override hardcoded SQLite URI with PostgreSQL connection string
             - name: SQLALCHEMY_DATABASE_URI
               value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu"
+            # Enable Flask debug mode for detailed error messages
+            - name: DEBUG
+              value: "true"
+            - name: DEBUG_PROFILER
+              value: "true"
 
         postfix:
           enabled: true
