@@ -4,91 +4,111 @@
 
 The 5D Labs Platform is evolving to become the premier AI-driven development platform. This roadmap outlines our planned features and enhancements to deliver more powerful, intelligent, and cost-effective development workflows.
 
+## ✅ Recently Implemented
+
+### GitHub Webhooks to Argo Workflows
+- **Completed**: Public webhook entry via ngrok Gateway API
+- **Completed**: Argo Events EventSource for GitHub integration  
+- **Completed**: Event filtering and workflow triggering
+- **Completed**: Support for issues, PRs, comments, and workflow events
 
 
-## 🚀 Immediate Priorities
 
-### Documentation Auto-Ingestion
+## 🚀 In Progress - Q1 2025
 
-
-**Automatic architecture and PRD documentation integration**
+### Agent-Centric Tool Configuration
 
 
-- Auto-detect and ingest architecture documents from repositories
+**Transform tool configuration from task-driven to agent-driven model**
 
 
-- Parse PRD (Product Requirements Document) files into agent context
+- Predefined tool sets per agent role (no more dynamic generation per task)
 
 
-- Dynamic documentation discovery and indexing
-
-### MCP Tools Integration
+- Tool inheritance and composition for common patterns
 
 
-**Curated tool selection and management**
+- ~500-1000 token savings per task by eliminating generation overhead
 
 
-- Template-driven tool documentation generation
+- Tool usage analytics and optimization
 
 
-- Selective tool enablement per agent configuration
+- Dynamic tool augmentation for special cases
+
+### Agent Persona Creator
 
 
-- Tool usage guidelines
+**Automated AI agent creation with full GitHub App integration**
 
 
-- Dynamic tool capability detection and documentation
-
-## 🔧 Core Platform Enhancements
-
-### QA Agent System
+- Generate unique personas with personality traits and communication styles
 
 
-**Autonomous quality assurance and testing**
+- Automatic GitHub App creation via manifest API
 
 
-- Pull request monitoring and automated testing
+- System prompt generation based on purpose and capabilities
 
 
-- Functionality validation before code quality checks
+- Kubernetes resource generation (ConfigMaps, Secrets)
 
 
-- Integration with Tasks system for acceptance criteria
+- Avatar generation support (future enhancement)
+
+## 🔧 Core Platform Enhancements - Q1-Q2 2025
+
+### PR Comment Feedback Loop
 
 
-- Live testing in sandboxed Kubernetes environments
+**Recursive feedback system for continuous improvement**
 
 
-- PR commenting system with detailed test results and acceptance criteria validation
+- Rex responds to PR comments from Tess for remediation
 
 
-- Self-healing deployment capabilities
+- Structured comment format for actionable feedback
 
 
-- Automated PR approval workflow (human-gated merging)
-
-### Sequential Task Dependencies
+- Automatic workflow restart on required changes
 
 
-**Dependency-aware task execution and orchestration**
+- Iteration tracking with safety limits
 
 
-- Task dependency management with configurable prerequisites
+- Human override capabilities via labels
 
 
-- Automatic task triggering when dependencies are merged to main
+- Silent fixes from Cleo (no comment-based feedback)
 
 
-- Integration with GitHub monitoring service for PR merge events
+- Loop continues until Tess approves (120% satisfaction)
+
+### Parallel Task Execution
 
 
-- Dependency graph visualization and management
+**Intelligent parallel execution for independent tasks**
 
 
-- Failure propagation and recovery strategies for dependent tasks
+- Automatic detection of tasks without dependencies
 
 
-- Support for complex dependency chains across multiple services
+- Safe parallelization rules based on bounded contexts
+
+
+- Conflict detection for file/API/database overlaps
+
+
+- Speculative execution with rollback capabilities
+
+
+- Progressive parallelization based on conflict history
+
+
+- Risk scoring system for parallelization decisions
+
+
+- Support for explicit parallel/sequential task groups
 
 ### Multi-CLI Integration
 
@@ -110,45 +130,85 @@ The 5D Labs Platform is evolving to become the premier AI-driven development pla
 
 - Consistent workflow regardless of underlying CLI
 
-### GitHub Projects Synchronization
+### GitHub Projects & Document Synchronization
 
 
-**Visual project management integration**
-- Integration with [5D Labs Tasks](https://github.com/5dlabs/tasks) system
+**Bidirectional sync between text files and GitHub Issues**
 
 
-- Automatic task synchronization with GitHub Projects
+- Text files remain source of truth for all task definitions
 
 
-- Visual progress tracking and team collaboration
+- GitHub Issues provide human interface for discussions and feedback
 
 
-- Agent assignment based on service ownership
+- Automatic issue body updates when documents change
 
 
-- Real-time status updates and milestone tracking
-
-### Configuration Management
+- Morgan processes issue comments for document updates
 
 
-**Environment-specific deployment configuration**
+- Custom fields for agent tracking and workflow stages
 
 
-- Environment variable overrides for all service URLs
+- Project board automation rules for status transitions
 
 
-- Configurable telemetry endpoints (OTLP, logging)
+- Human-in-the-loop capabilities via issue comments
+
+### Play Workflow Configuration Management
 
 
-- Flexible MCP server URL configuration
+**Project-scoped configuration persistence**
 
 
-- Support for different deployment environments (local, cloud, on-premises)
+- ConfigMap-based storage for project settings
 
 
-- Configuration validation and documentation
+- Consistent agent/model settings across all tasks
 
-## 🎭 Agent Specialization
+
+- Mid-project agent switching capabilities
+
+
+- Configuration inheritance from previous tasks
+
+
+- Fallback to defaults when ConfigMap is missing
+
+
+- Support for multiple parallel projects
+
+
+- Web UI for configuration management (future)
+
+### XML/Markdown Format Selection
+
+
+**Flexible documentation format support**
+
+
+- Runtime format selection via MCP parameters
+
+
+- Support for both XML and Markdown formats
+
+
+- Backward compatibility with Markdown as default
+
+
+- Format-specific processing and validation
+
+
+- Structured data advantages with XML
+
+
+- A/B testing capabilities for format comparison
+
+
+- Auto-format selection based on task complexity (future)
+
+## 🎭 Agent Specialization - Q2 2025
 
 ### Agent Profiles
 
@@ -170,7 +230,7 @@ The 5D Labs Platform is evolving to become the premier AI-driven development pla
 
 - **Data Agent** - Database design, ETL, analytics workflows
 
-## 📊 Intelligence & Optimization
+## 📊 Intelligence & Optimization - Q2-Q3 2025
 
 ### Telemetry-Driven Context Optimization
 
@@ -236,7 +296,7 @@ Comprehensive observability and alerting:
 
 ---
 
-## 🔗 Integration Ecosystem
+## 🔗 Integration Ecosystem - Q3 2025
 
 ### Enhanced Tool Management
 
@@ -259,7 +319,7 @@ Sophisticated toolchain orchestration:
 
 ---
 
-## 🌟 Advanced Capabilities
+## 🌟 Future Vision - Q4 2025 and Beyond
 
 ### Predictive Development
 
@@ -278,29 +338,49 @@ AI-powered development insights:
 
 - Performance bottleneck identification
 
+### Multi-Agent Orchestration
+
+Advanced agent coordination capabilities:
+
+
+
+- Agent team composition optimization
+
+
+- Cross-agent knowledge sharing
+
+
+- Specialized agent marketplace
+
+
+- Custom agent training pipelines
+
 
 
 ---
 
 ## 📝 How to Contribute
 
-We welcome contributions to help build the future of AI-driven development! Areas where you can help:
+We welcome contributions to help build the future of AI-driven development! Priority areas for contribution:
 
 
 
-- **Tool Integrations** - Add support for new development tools and CLIs
+- **Agent Persona Creator** - Help implement GitHub App automation and persona generation
 
 
-- **Agent Profiles** - Develop specialized agents for different domains
+- **Parallel Task Execution** - Develop conflict detection and safe parallelization algorithms
 
 
-- **Documentation** - Improve auto-ingestion and context management
+- **Format Support** - Extend XML/Markdown format capabilities and validation
 
 
-- **Telemetry** - Enhance monitoring and optimization capabilities
+- **Tool Configuration** - Migrate from task-based to agent-centric tool management
 
 
-- **Testing** - Expand QA automation and validation workflows
+- **PR Feedback Loop** - Enhance comment parsing and remediation workflows
+
+
+- **GitHub Projects Sync** - Build bidirectional document-issue synchronization
 
 
 
