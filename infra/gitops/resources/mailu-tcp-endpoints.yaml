@@ -1,0 +1,98 @@
+---
+# SMTP (Port 25) - Mail Transfer Agent
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: AgentEndpoint
+metadata:
+  name: mailu-smtp
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: mail-tcp
+    app.kubernetes.io/part-of: mailu
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "smtp.5dlabs.ai"
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+spec:
+  description: "Mailu SMTP port for mail transfer"
+  upstream:
+    url: tcp://mailu-front.mailu:25
+
+---
+# SMTPS (Port 465) - Secure SMTP
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: AgentEndpoint
+metadata:
+  name: mailu-smtps
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: mail-tcp
+    app.kubernetes.io/part-of: mailu
+spec:
+  description: "Mailu SMTPS port for secure mail submission"
+  upstream:
+    url: tcp://mailu-front.mailu:465
+
+---
+# Submission (Port 587) - Mail Submission Agent
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: AgentEndpoint
+metadata:
+  name: mailu-submission
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: mail-tcp
+    app.kubernetes.io/part-of: mailu
+spec:
+  description: "Mailu submission port for authenticated mail sending"
+  upstream:
+    url: tcp://mailu-front.mailu:587
+
+---
+# IMAPS (Port 993) - Secure IMAP
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: AgentEndpoint
+metadata:
+  name: mailu-imaps
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: mail-tcp
+    app.kubernetes.io/part-of: mailu
+spec:
+  description: "Mailu IMAPS port for secure mail retrieval"
+  upstream:
+    url: tcp://mailu-front.mailu:993
+
+---
+# POP3S (Port 995) - Secure POP3
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: AgentEndpoint
+metadata:
+  name: mailu-pop3s
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: mail-tcp
+    app.kubernetes.io/part-of: mailu
+spec:
+  description: "Mailu POP3S port for secure mail retrieval"
+  upstream:
+    url: tcp://mailu-front.mailu:995
+
+---
+# ManageSieve (Port 4190) - Mail filtering
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: AgentEndpoint
+metadata:
+  name: mailu-sieve
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: mail-tcp
+    app.kubernetes.io/part-of: mailu
+spec:
+  description: "Mailu ManageSieve port for mail filtering rules"
+  upstream:
+    url: tcp://mailu-front.mailu:4190
