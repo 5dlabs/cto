@@ -12,9 +12,9 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://mailu.github.io/helm-charts/
-    chart: mailu
-    targetRevision: master
+    repoURL: https://github.com/Mailu/helm-charts.git
+    path: charts/mailu
+    targetRevision: HEAD
     helm:
       values: |
         # Mailu Configuration for 5dlabs.ai
@@ -122,15 +122,19 @@ spec:
               value: "true"
             - name: SKIP_DNSSEC_VALIDATION
               value: "true"
+            - name: DB_PW
+              valueFrom:
+                secretKeyRef:
+                  name: mailu.mailu-postgres.credentials.postgresql.acid.zalan.do
+                  key: password
             # Override hardcoded SQLite URI with PostgreSQL connection string (with SSL)
             - name: SQLALCHEMY_DATABASE_URI
               value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu?sslmode=require"
             # Enable Flask debug mode for detailed error messages
             - name: DEBUG
-              value: "true"
+              value: "false"
             - name: DEBUG_PROFILER
               value: "true"
-
         postfix:
           enabled: true
           resources:
