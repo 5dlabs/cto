@@ -89,10 +89,17 @@ spec:
           externalService:
             enabled: false
 
+        # Use latest image tags for all components
+        image:
+          tag: "latest"
+
         # Admin configuration with DNS fixes and database override
         admin:
           enabled: true
           replicaCount: 1
+          # Use latest image tag
+          image:
+            tag: "latest"
           # Enable debug logging for admin service
           logLevel: DEBUG
           resources:
@@ -107,7 +114,7 @@ spec:
             enabled: false
           readinessProbe:
             enabled: false
-          # DNS configuration to fix DNSSEC validation issue in Kubernetes
+          # DNS configuration to use Google DNS directly
           extraEnvVars:
             - name: RESOLVER_ADDRESS
               value: "8.8.8.8"
@@ -115,9 +122,9 @@ spec:
               value: "true"
             - name: SKIP_DNSSEC_VALIDATION
               value: "true"
-                       # Override hardcoded SQLite URI with PostgreSQL connection string (with SSL)
-           - name: SQLALCHEMY_DATABASE_URI
-             value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu?sslmode=require"
+            # Override hardcoded SQLite URI with PostgreSQL connection string (with SSL)
+            - name: SQLALCHEMY_DATABASE_URI
+              value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu?sslmode=require"
             # Enable Flask debug mode for detailed error messages
             - name: DEBUG
               value: "true"
