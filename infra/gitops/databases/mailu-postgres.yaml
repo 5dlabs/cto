@@ -55,6 +55,9 @@ spec:
       - SUPERUSER
       - CREATEDB
       - CREATEROLE
+    # Roundcube webmail user
+    roundcube:
+      - CREATEDB
     # Admin user for maintenance
     admin:
       - SUPERUSER
@@ -63,6 +66,7 @@ spec:
   # Databases
   databases:
     mailu: mailu
+    roundcube: roundcube
 
   # Connection pooler for better performance
   enableConnectionPooler: true
