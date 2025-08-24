@@ -16,7 +16,7 @@ spec:
     targetRevision: HEAD
     path: infra/gitops/resources
     directory:
-      include: mailu-tcp-endpoints.yaml
+      include: "mailu-tcp-endpoints.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: mailu
