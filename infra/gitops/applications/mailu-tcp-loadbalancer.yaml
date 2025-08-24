@@ -2,10 +2,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mailu-tcp-endpoints
+  name: mailu-tcp-loadbalancer
   namespace: argocd
   labels:
-    app.kubernetes.io/name: mailu-tcp-endpoints
+    app.kubernetes.io/name: mailu-tcp-loadbalancer
     app.kubernetes.io/part-of: platform
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -16,7 +16,7 @@ spec:
     targetRevision: HEAD
     path: infra/gitops/resources
     directory:
-      include: "mailu-tcp-*.yaml"
+      include: "mailu-tcp-loadbalancer.yaml"
   destination:
     server: https://kubernetes.default.svc
     namespace: mailu
