@@ -662,60 +662,26 @@ vim infra/charts/agent-platform/claude-templates/docs/prompt.md.hbs
 vim {docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md
 vim {docs_project_directory}/.taskmaster/docs/task-{id}/task.md
 vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
-
-
-
-
-
-
-
-
 ```
 
 #### 3. Customizing Play Workflows
 
 **For play workflows** (affects multi-agent orchestration):
 
-
-
-
-
 ```bash
-
-
 # Edit the play workflow template
 vim infra/charts/agent-platform/templates/workflowtemplates/play-workflow-template.yaml
-
-
-
-
-
-
-
-
 ```
 
 The play workflow template controls:
-
-
 - Phase sequencing and dependencies
-
-
 - Agent assignments for each phase
-
-
 - Event triggers between phases
-
-
 - Parameter passing between phases
 
 #### 4. Adding Custom Hooks
 
 Hooks are shell scripts that run during agent execution. Add new hook files to the `claude-templates` directory:
-
-
-
-
 
 ```bash
 # Create new hook script (docs example)
