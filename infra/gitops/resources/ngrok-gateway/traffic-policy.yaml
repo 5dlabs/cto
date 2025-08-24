@@ -18,8 +18,10 @@ spec:
             config:
               name: "webhook-rate-limit"
               algorithm: "sliding_window"
-              capacity: 100
-              rate: "10r/s"
+              capacity: 600
+              rate: "60s"
+              bucket_key:
+                - "conn.client_ip"
     on_http_response:
       - actions:
           - type: add-headers
