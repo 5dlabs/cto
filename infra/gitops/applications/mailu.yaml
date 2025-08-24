@@ -109,11 +109,11 @@ spec:
             limits:
               memory: "2Gi"
               cpu: "2000m"
-          # Temporarily disable probes while troubleshooting migration issues
+          # Re-enable probes now that database connection is working
           livenessProbe:
-            enabled: false
+            enabled: true
           readinessProbe:
-            enabled: false
+            enabled: true
           # DNS configuration to use Google DNS directly
           extraEnvVars:
             - name: RESOLVER_ADDRESS
