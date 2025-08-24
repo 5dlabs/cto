@@ -83,11 +83,25 @@ spec:
             limits:
               memory: "200Mi"
               cpu: "200m"
-          service:
+          # Enable external service for mail ports via NGrok LoadBalancer
+          externalService:
+            enabled: true
             type: LoadBalancer
+            loadBalancerClass: ngrok
+            externalTrafficPolicy: Local
             annotations:
               external-dns.alpha.kubernetes.io/hostname: "mail.5dlabs.ai"
               external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+            ports:
+              # Enable all mail ports
+              pop3: false      # 110/tcp - disable plain POP3
+              pop3s: true      # 995/tcp - secure POP3
+              imap: false      # 143/tcp - disable plain IMAP  
+              imaps: true      # 993/tcp - secure IMAP
+              smtp: true       # 25/tcp - SMTP
+              smtps: true      # 465/tcp - secure SMTP
+              submission: true # 587/tcp - submission
+              manageSieve: true # 4190/tcp - ManageSieve
 
         admin:
           enabled: true
@@ -157,13 +171,12 @@ spec:
           size: 20Gi
           storageClass: local-path
 
-        # Ingress for webmail
+        # Ingress for webmail (using NGrok)
         ingress:
           enabled: true
-          className: nginx
+          ingressClassName: ngrok
           annotations:
             cert-manager.io/cluster-issuer: letsencrypt-prod
-            nginx.ingress.kubernetes.io/proxy-body-size: "50m"
             external-dns.alpha.kubernetes.io/hostname: "webmail.5dlabs.ai"
             external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
           hosts:
