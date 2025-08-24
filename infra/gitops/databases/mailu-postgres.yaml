@@ -68,9 +68,6 @@ spec:
   preparedDatabases:
     mailu:
       defaultUsers: true
-      schemas:
-        public: {}
-        mailu: {}
       extensions:
         pg_stat_statements: "public"
         uuid-ossp: "public"
