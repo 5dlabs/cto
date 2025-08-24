@@ -48,8 +48,8 @@ spec:
           port: 5432
           database: mailu
           username: mailu
-          existingSecret: mailu.mailu-postgres.credentials.postgresql.acid.zalan.do
-          existingSecretPasswordKey: password
+          existingSecret: mailu-secret
+          existingSecretPasswordKey: DB_PW
 
         # Subnet configuration for Kubernetes
         subnet: 10.42.0.0/16
