@@ -64,17 +64,6 @@ spec:
   databases:
     mailu: mailu
 
-  # Prepared databases with extensions
-  preparedDatabases:
-    mailu:
-      defaultUsers: true
-      extensions:
-        pg_stat_statements: "public"
-        uuid-ossp: "public"
-        hstore: "public"
-        pg_trgm: "public"
-        pgcrypto: "public"
-
   # Connection pooler for better performance
   enableConnectionPooler: true
   connectionPooler:
