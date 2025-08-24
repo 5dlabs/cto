@@ -106,26 +106,10 @@ helm repo update
 
 # Install TwinGate connector (replace tokens with your actual values)
 helm upgrade --install twingate-weightless-hummingbird twingate/connector \
-
-
   -n default \
-
-
   --set connector.network="maroonsnake" \
-
-
   --set connector.accessToken="your-access-token" \
-
-
   --set connector.refreshToken="your-refresh-token"
-
-
-
-
-
-
-
-
 ```
 
 **Important**: After installation, add your Kubernetes service CIDR as resources in TwinGate admin panel. This enables the MCP tools to reach the agent-platform service using internal Kubernetes service URLs (e.g., `http://agent-platform.agent-platform.svc.cluster.local`) from anywhere.
@@ -134,35 +118,17 @@ helm upgrade --install twingate-weightless-hummingbird twingate/connector \
 
 For Cursor/Claude integration, install the MCP server:
 
-
-
-
-
 ```bash
 # One-liner installer (Linux/macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/5dlabs/cto/releases/download/v0.2.0/tools-installer.sh | sh
 
 # Verify installation
 cto-mcp --help   # MCP server for Cursor/Claude integration
-
-
-
-
-
-
-
-
 ```
 
 **What you get:**
-
-
 - `cto-mcp` - MCP server that integrates with Cursor/Claude
-
-
 - Multi-platform support (Linux x64/ARM64, macOS Intel/Apple Silicon, Windows x64)
-
-
 - Automatic installation to system PATH
 
 ### Configure Project Settings
@@ -252,17 +218,9 @@ After creating your configuration file, configure Cursor to use the MCP server b
 ```
 
 **Usage:**
-
-
 1. Create the `cto-config.json` file in your project root with your specific settings
-
-
 2. Create the `.cursor/mcp.json` file to enable MCP integration
-
-
 3. Restart Cursor to load the MCP server
-
-
 4. The `docs()`, `code()`, and `play()` functions will be available with your configured defaults
 
 **Benefits of Configuration-Driven Approach:**
@@ -317,14 +275,6 @@ docs({
   agent: "morgan",
   model: "claude-3-5-sonnet-20241022"
 });
-
-
-
-
-
-
-
-
 ```
 
 **What happens:**
@@ -353,22 +303,10 @@ docs({
 │   ├── acceptance-criteria.md
 │   └── prompt.md
 └── ...
-
-
-
-
-
-
-
-
 ```
 
 #### 2. `code` - Implement Code
 Deploys an autonomous Claude agent to implement a specific task from your Task Master project.
-
-
-
-
 
 ```javascript
 // Minimal call using config defaults
@@ -392,14 +330,6 @@ code({
   repository: "https://github.com/myorg/my-project",
   continue_session: true
 });
-
-
-
-
-
-
-
-
 ```
 
 **What happens:**
@@ -436,14 +366,6 @@ play({
   model: "claude-opus-4-1-20250805",
   repository: "myorg/my-custom-repo"
 });
-
-
-
-
-
-
-
-
 ```
 
 **What happens:**
@@ -637,25 +559,11 @@ See [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settin
 
 
 ```bash
-
-
 # Edit the docs prompt template
 vim infra/charts/agent-platform/claude-templates/docs/prompt.md.hbs
-
-
-
-
-
-
-
-
 ```
 
 **For code tasks** (affects specific task implementation):
-
-
-
-
 
 ```bash
 # Edit task-specific files in your docs repository
@@ -714,27 +622,12 @@ kubectl get configmap claude-templates-configmap -n agent-platform -o yaml
 ### Template Variables
 
 Common variables available in templates:
-
-
-
 - `{{task_id}}` - Task ID for code tasks
-
-
 - `{{service_name}}` - Target service name
-
-
 - `{{github_user}}` - GitHub username
-
-
 - `{{repository_url}}` - Target repository URL
-
-
 - `{{working_directory}}` - Working directory path
-
-
 - `{{model}}` - Claude model name
-
-
 - `{{docs_repository_url}}` - Documentation repository URL
 
 
