@@ -12,6 +12,19 @@ metadata:
 spec:
   project: platform
 
+  # Ignore common Deployment drift fields
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/securityContext/fsGroup
+        - /spec/template/spec/securityContext/runAsUser
+        - /spec/template/spec/securityContext/runAsGroup
+        - /spec/template/spec/containers/0/securityContext
+        - /metadata/generation
+        - /spec/revisionHistoryLimit
+        - /status
+
   source:
     repoURL: https://kubernetes-sigs.github.io/external-dns/
     chart: external-dns
