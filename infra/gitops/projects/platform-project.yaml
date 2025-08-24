@@ -35,6 +35,7 @@ spec:
     - 'https://github.com/actions/actions-runner-controller'
     - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
+    - 'https://kubernetes-sigs.github.io/external-dns/'
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
