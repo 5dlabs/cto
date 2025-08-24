@@ -113,6 +113,11 @@ spec:
             # Override hardcoded SQLite URI with PostgreSQL connection string
             - name: SQLALCHEMY_DATABASE_URI
               value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu"
+            # Enable Flask debug mode for detailed error messages
+            - name: DEBUG
+              value: "true"
+            - name: DEBUG_PROFILER
+              value: "true"
 
         postfix:
           enabled: true
