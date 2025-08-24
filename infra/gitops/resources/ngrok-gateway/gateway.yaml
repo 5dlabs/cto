@@ -6,6 +6,7 @@ metadata:
   namespace: default
   annotations:
     external-dns.alpha.kubernetes.io/hostname: "public.5dlabs.ai,github.public.5dlabs.ai"
+    k8s.ngrok.com/traffic-policy: security-policy
 spec:
   gatewayClassName: ngrok
   listeners:
@@ -13,6 +14,8 @@ spec:
       protocol: HTTPS
       port: 443
       hostname: "public.5dlabs.ai"
+      tls:
+        mode: Terminate
       allowedRoutes:
         namespaces:
           from: All
@@ -20,6 +23,8 @@ spec:
       protocol: HTTPS
       port: 443
       hostname: "github.public.5dlabs.ai"
+      tls:
+        mode: Terminate
       allowedRoutes:
         namespaces:
           from: All
