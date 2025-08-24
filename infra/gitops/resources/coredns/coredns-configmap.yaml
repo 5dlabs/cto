@@ -5,8 +5,8 @@ metadata:
   name: coredns
   namespace: kube-system
   labels:
-    app: coredns
     k8s-app: kube-dns
+    kubernetes.io/name: CoreDNS
 data:
   Corefile: |-
     .:53 {

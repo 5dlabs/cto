@@ -1,14 +1,18 @@
 #!/bin/bash
 
-# Script to apply CoreDNS DNSSEC configuration
+# Script to apply CoreDNS DNSSEC configuration to Talos-managed CoreDNS
 # This addresses the RFC6840 compliance issue mentioned in CoreDNS issue #5189
 
 set -e
 
-echo "🔧 Applying CoreDNS DNSSEC configuration..."
+echo "🔧 Applying CoreDNS DNSSEC configuration to Talos-managed CoreDNS..."
+
+# Check if CoreDNS is running
+echo "🔍 Checking CoreDNS deployment status..."
+kubectl get deployment coredns -n kube-system
 
 # Apply the CoreDNS ConfigMap
-echo "📝 Applying CoreDNS ConfigMap..."
+echo "📝 Applying CoreDNS ConfigMap with DNSSEC validation..."
 kubectl apply -f infra/gitops/resources/coredns/coredns-configmap.yaml
 
 # Wait a moment for the ConfigMap to be updated
@@ -24,7 +28,7 @@ kubectl rollout status deployment/coredns -n kube-system --timeout=120s
 
 # Verify the configuration
 echo "✅ Verifying CoreDNS configuration..."
-kubectl get configmap coredns -n kube-system -o yaml | grep -A 20 "Corefile:"
+kubectl get configmap coredns -n kube-system -o yaml | grep -A 25 "Corefile:"
 
 echo "🔍 Checking CoreDNS pod status..."
 kubectl get pods -n kube-system -l k8s-app=kube-dns
