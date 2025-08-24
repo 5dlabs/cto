@@ -1,19 +1,19 @@
-# CoreDNS DNSSEC Configuration for Talos Linux
+# CoreDNS Configuration for Talos Linux
 
-This directory contains the CoreDNS configuration with DNSSEC validation enabled to address RFC6840 compliance issues in Talos-managed CoreDNS deployments.
+This directory contains the CoreDNS configuration optimized for Talos-managed CoreDNS deployments.
 
 ## Overview
 
-The CoreDNS configuration has been updated to enable DNSSEC validation, which addresses the issue mentioned in [CoreDNS issue #5189](https://github.com/coredns/coredns/issues/5189) where CoreDNS cache was violating RFC6840.
+The CoreDNS configuration has been updated to use reliable upstream resolvers while avoiding DNSSEC validation issues that can cause CoreDNS to fail. This addresses the issue mentioned in [CoreDNS issue #5189](https://github.com/coredns/coredns/issues/5189) where DNSSEC validation can cause parsing errors.
 
 **Note**: This configuration is designed for Talos Linux-managed CoreDNS deployments, not standalone Helm chart deployments.
 
 ## Configuration Changes
 
-### DNSSEC Validation
-- **Enabled DNSSEC validation** in the cache plugin
-- **Multiple upstream resolvers** with health checks for reliability
-- **Sequential policy** for upstream resolution to ensure consistent DNSSEC validation
+### DNS Resolution
+- **Reliable upstream resolvers** with health checks for reliability
+- **Sequential policy** for upstream resolution to ensure consistent DNS resolution
+- **DNSSEC validation disabled** to avoid CoreDNS parsing errors
 
 ### Upstream Resolvers
 The configuration uses multiple DNSSEC-capable upstream resolvers instead of relying on `/etc/resolv.conf`:
@@ -23,16 +23,16 @@ The configuration uses multiple DNSSEC-capable upstream resolvers instead of rel
 - `1.0.0.1:53` (Cloudflare DNS secondary)
 
 ### Cache Configuration
-- **DNSSEC-aware caching** with `dnssec` option enabled
+- **Basic caching** without DNSSEC validation to avoid parsing errors
 - **30-second TTL** for cached responses
 - **Disabled caching** for cluster.local to avoid conflicts
 
 ## Benefits
 
-1. **RFC6840 Compliance**: Proper DNSSEC validation prevents cache poisoning attacks
-2. **Security**: Validates DNS responses against DNSSEC signatures
-3. **Reliability**: Multiple upstream resolvers with health checks
-4. **Performance**: Maintains caching while ensuring security
+1. **Stability**: Avoids CoreDNS parsing errors that can cause DNS failures
+2. **Reliability**: Multiple upstream resolvers with health checks
+3. **Performance**: Maintains caching while ensuring stability
+4. **Compatibility**: Works with Mailu and other applications that expect reliable DNS
 
 ## Deployment
 
@@ -40,7 +40,7 @@ The configuration uses multiple DNSSEC-capable upstream resolvers instead of rel
 Use the provided script to apply the configuration directly:
 
 ```bash
-./infra/scripts/apply-coredns-dnssec.sh
+./infra/scripts/apply-coredns-config.sh
 ```
 
 ### Option 2: Manual Application
@@ -57,17 +57,17 @@ kubectl rollout status deployment/coredns -n kube-system
 
 ## Verification
 
-To verify DNSSEC validation is working:
+To verify DNS resolution is working:
 
 ```bash
-# Check CoreDNS logs for DNSSEC validation
+# Check CoreDNS logs for any errors
 kubectl logs -n kube-system deployment/coredns
 
-# Test DNSSEC validation from a pod
-kubectl run test-dns --image=busybox --rm -it --restart=Never -- nslookup -type=ANY google.com
+# Test DNS resolution from a pod
+kubectl run test-dns --image=busybox --rm -it --restart=Never -- nslookup google.com
 
-# Check if DNSSEC records are being validated
-kubectl run test-dnssec --image=busybox --rm -it --restart=Never -- nslookup -type=DNSKEY google.com
+# Test Mailu DNS resolution
+kubectl run test-mailu-dns --image=busybox --rm -it --restart=Never -- nslookup mail.5dlabs.ai
 ```
 
 ## Troubleshooting

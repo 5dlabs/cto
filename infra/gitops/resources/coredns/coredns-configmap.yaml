@@ -34,12 +34,10 @@ data:
            health_check 5s
         }
         
-        # Enable DNSSEC-aware caching with proper validation
+        # Basic caching without DNSSEC validation (DNSSEC validation disabled due to CoreDNS compatibility issues)
         cache 30 {
            disable success cluster.local
            disable denial cluster.local
-           # Enable DNSSEC validation in cache
-           dnssec
         }
         
         loop
