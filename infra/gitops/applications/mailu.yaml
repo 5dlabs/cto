@@ -95,13 +95,13 @@ spec:
           replicaCount: 1
           # Enable debug logging for admin service
           logLevel: DEBUG
-                 resources:
-         requests:
-           memory: "1Gi"
-           cpu: "500m"
-         limits:
-           memory: "2Gi"
-           cpu: "2000m"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
           # DNS configuration to fix DNSSEC validation issue in Kubernetes
           extraEnvVars:
             - name: RESOLVER_ADDRESS
