@@ -81,25 +81,10 @@ spec:
             limits:
               memory: "200Mi"
               cpu: "200m"
-          # Enable external LoadBalancer service with NGrok
+          # Disable Helm chart's LoadBalancer - using separate NGrok LoadBalancer instead
+          # (Helm chart doesn't support loadBalancerClass field needed for NGrok)
           externalService:
-            enabled: true
-            type: LoadBalancer
-            loadBalancerClass: ngrok
-            externalTrafficPolicy: Local
-            annotations:
-              external-dns.alpha.kubernetes.io/hostname: "mail.5dlabs.ai"
-              external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
-            ports:
-              # Enable secure mail ports only
-              pop3: false      # 110/tcp - disable plain POP3
-              pop3s: true      # 995/tcp - secure POP3
-              imap: false      # 143/tcp - disable plain IMAP  
-              imaps: true      # 993/tcp - secure IMAP
-              smtp: true       # 25/tcp - SMTP
-              smtps: true      # 465/tcp - secure SMTP
-              submission: true # 587/tcp - submission
-              manageSieve: true # 4190/tcp - ManageSieve
+            enabled: false
 
         admin:
           enabled: true
