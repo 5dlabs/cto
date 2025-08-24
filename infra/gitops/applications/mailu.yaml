@@ -47,6 +47,14 @@ spec:
         # Subnet configuration for Kubernetes
         subnet: 10.42.0.0/16
 
+        # DNS configuration to fix DNSSEC validation issue in Kubernetes
+        admin:
+          extraEnvVars:
+            - name: RESOLVER_ADDRESS
+              value: "8.8.8.8"
+            - name: DISABLE_DNSSEC_VALIDATION
+              value: "true"
+
         # Mail settings
         limits:
           messageSizeLimitInMegabytes: 50
