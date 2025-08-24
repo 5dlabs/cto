@@ -22,6 +22,15 @@ spec:
         hostnames:
           - mail.5dlabs.ai
 
+        # Global database configuration for Roundcube
+        global:
+          database:
+            roundcube:
+              database: roundcube
+              username: roundcube
+              existingSecret: roundcube.mailu-postgres.credentials.postgresql.acid.zalan.do
+              existingSecretPasswordKey: password
+
         # Initial admin configuration
         initialAccount:
           enabled: true
