@@ -18,11 +18,9 @@ spec:
     helm:
       values: |
         # Mailu Configuration for 5dlabs.ai
-        domain: mail.5dlabs.ai
+        domain: 5dlabs.ai
         hostnames:
           - mail.5dlabs.ai
-          - smtp.5dlabs.ai
-          - imap.5dlabs.ai
 
         # Initial admin configuration
         initialAccount:
