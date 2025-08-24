@@ -50,12 +50,12 @@ spec:
 
   # Database users and permissions
   users:
-    # Mailu application user
+    # Mailu application user - needs more permissions for schema creation
     mailu:
       - NOSUPERUSER
       - INHERIT
       - CREATEDB
-      - NOCREATEROLE
+      - CREATEROLE
       - NOREPLICATION
     # Admin user for maintenance
     admin:
@@ -70,6 +70,9 @@ spec:
   preparedDatabases:
     mailu:
       defaultUsers: true
+      schemas:
+        public: {}
+        mailu: {}
       extensions:
         pg_stat_statements: "public"
         uuid-ossp: "public"

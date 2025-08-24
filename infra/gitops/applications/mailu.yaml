@@ -2,10 +2,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mailu-namespace
+  name: mailu
   namespace: argocd
   labels:
-    app.kubernetes.io/name: mailu-namespace
+    app.kubernetes.io/name: mailu
     app.kubernetes.io/part-of: platform
 spec:
   project: platform
@@ -23,3 +23,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
