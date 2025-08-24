@@ -26,12 +26,8 @@ All operations run as Kubernetes jobs with enhanced reliability through TTL-safe
 ## Getting Started
 
 ### Prerequisites
-
-
 - Access to a Cursor/Claude environment with MCP support
-
 - A project with Task Master initialized (`.taskmaster/` directory)
-
 - GitHub repository for your project
 
 ## Installation
@@ -47,29 +43,13 @@ This is an integrated platform with a clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-
-
 1. Cursor calls `docs()`, `code()`, or `play()` via MCP protocol
-
-
 2. MCP server loads configuration from `cto-config.json` and applies defaults
-
-
 3. MCP server submits workflow to Argo with all required parameters
-
-
 4. Argo Workflows creates CodeRun/DocsRun custom resources
-
-
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
-
-
 6. Controllers deploy Claude agents as Jobs with workspace isolation
-
-
 7. Agents authenticate via GitHub Apps and complete work
-
-
 8. Agents submit GitHub PRs with automatic cleanup
 
 
@@ -81,8 +61,6 @@ This is an integrated platform with a clear data flow:
 
 
 ```bash
-
-
 # Add the 5dlabs Helm repository
 helm repo add 5dlabs https://5dlabs.github.io/cto
 helm repo update
@@ -97,48 +75,20 @@ helm install agent-platform 5dlabs/agent-platform --namespace agent-platform --c
 wget https://raw.githubusercontent.com/5dlabs/cto/main/infra/scripts/setup-agent-secrets.sh
 chmod +x setup-agent-secrets.sh
 ./setup-agent-secrets.sh --help
-
-
-
-
-
-
-
-
 ```
 
 **Requirements:**
-
-
 - Kubernetes 1.19+
-
-
 - Helm 3.2.0+
-
-
 - GitHub Personal Access Token
-
-
 - Anthropic API Key
 
 **What you get:**
-
-
 - Complete agent-platform platform deployed to Kubernetes
-
-
 - REST API for task management
-
-
 - Separate Kubernetes controllers for CodeRun/DocsRun resources with TTL-safe reconciliation
-
-
 - Agent workspace management and isolation with persistent volumes
-
-
 - Automatic resource cleanup and job lifecycle management
-
-
 - MCP tools that connect to your deployment
 
 ### Optional: Remote Cluster Access with TwinGate
@@ -328,32 +278,18 @@ After creating your configuration file, configure Cursor to use the MCP server b
 
 
 ```bash
-
-
 # Build from source
 git clone https://github.com/5dlabs/cto.git
 cd cto/controller
 
-
-
 # Build MCP server
 cargo build --release --bin cto-mcp
-
-
 
 # Verify the build
 ./target/release/cto-mcp --help   # MCP server
 
 # Install to your system (optional)
 cp target/release/cto-mcp /usr/local/bin/
-
-
-
-
-
-
-
-
 ```
 
 
@@ -685,15 +621,8 @@ vim infra/charts/agent-platform/claude-templates/code/settings.json.hbs
 ```
 
 Settings control:
-
-
-
 - Model selection (`claude-opus-4`, `claude-sonnet-4`, etc.)
-
-
 - Tool permissions and access
-
-
 - MCP tool configuration
 
 
