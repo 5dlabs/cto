@@ -74,13 +74,11 @@ spec:
             ip: "60/hour"
             user: "100/day"
 
-        # TLS configuration
+        # TLS configuration - using NGrok for external TLS termination
         tls:
           enabled: true
           certmanager:
-            enabled: true
-            issuerName: letsencrypt-prod
-            issuerKind: ClusterIssuer
+            enabled: false
 
         # Component configuration
         front:
@@ -169,12 +167,12 @@ spec:
           size: 20Gi
           storageClass: local-path
 
-        # Ingress for webmail (using NGrok)
+        # Ingress for webmail (using NGrok) - NGrok handles TLS termination
         ingress:
           enabled: true
           ingressClassName: ngrok
+          tls: false  # NGrok handles TLS termination
           annotations:
-            cert-manager.io/cluster-issuer: letsencrypt-prod
             external-dns.alpha.kubernetes.io/hostname: "webmail.5dlabs.ai"
             external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
           hosts:
@@ -182,10 +180,6 @@ spec:
               paths:
                 - path: /
                   pathType: Prefix
-          tls:
-            - secretName: webmail-tls
-              hosts:
-                - webmail.5dlabs.ai
 
         # Security settings
         securityContext:
