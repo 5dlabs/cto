@@ -1,0 +1,234 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mailu
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://mailu.github.io/helm-charts/
+    chart: mailu
+    targetRevision: 2.2.2
+    helm:
+      values: |
+        # Mailu Configuration for 5dlabs.ai
+        domain: 5dlabs.ai
+        hostnames:
+          - mail.5dlabs.ai
+
+        # Global database configuration for Roundcube
+        global:
+          database:
+            roundcube:
+              database: roundcube
+              username: roundcube
+              existingSecret: roundcube.mailu-postgres.credentials.postgresql.acid.zalan.do
+              existingSecretPasswordKey: password
+
+        # Initial admin configuration
+        initialAccount:
+          enabled: true
+          domain: 5dlabs.ai
+          username: admin
+          password: "ChangeMe123!"
+
+        # Database configuration (using our PostgreSQL cluster)
+        postgresql:
+          enabled: false
+        externalDatabase:
+          enabled: true
+          type: postgresql
+          host: mailu-postgres.databases.svc.cluster.local
+          port: 5432
+          database: mailu
+          username: mailu
+          existingSecret: mailu.mailu-postgres.credentials.postgresql.acid.zalan.do
+          existingSecretPasswordKey: password
+
+        # Subnet configuration for Kubernetes
+        subnet: 10.42.0.0/16
+
+        # Enable debug logging for troubleshooting
+        logLevel: DEBUG
+
+        # Mail settings
+        limits:
+          messageSizeLimitInMegabytes: 50
+          authRatelimit:
+            ip: "60/hour"
+            user: "100/day"
+
+        # TLS configuration - disabled since NGrok handles external TLS termination
+        tls:
+          enabled: false
+          certmanager:
+            enabled: false
+
+        # Component configuration
+        front:
+          enabled: true
+          replicaCount: 1
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "100m"
+            limits:
+              memory: "200Mi"
+              cpu: "200m"
+          # Disable hostPort bindings to avoid PodSecurity baseline violations
+          hostPort:
+            enabled: false
+          # Disable Helm chart's LoadBalancer - using separate NGrok LoadBalancer instead
+          # (Helm chart doesn't support loadBalancerClass field needed for NGrok)
+          externalService:
+            enabled: false
+
+        # Use latest image tags for all components
+        image:
+          tag: "latest"
+
+        # Admin configuration with DNS fixes and database override
+        admin:
+          enabled: true
+          replicaCount: 1
+          # Use latest image tag
+          image:
+            tag: "latest"
+          # Enable debug logging for admin service
+          logLevel: DEBUG
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          # Re-enable probes now that database migration is complete
+          livenessProbe:
+            enabled: true
+          readinessProbe:
+            enabled: true
+          # DNS configuration to use Google DNS directly
+          extraEnvVars:
+            - name: RESOLVER_ADDRESS
+              value: "8.8.8.8"
+            - name: DISABLE_DNSSEC_VALIDATION
+              value: "true"
+            - name: SKIP_DNSSEC_VALIDATION
+              value: "true"
+            # Override hardcoded SQLite URI with PostgreSQL connection string (with SSL)
+            - name: SQLALCHEMY_DATABASE_URI
+              value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu?sslmode=require"
+            # Enable Flask debug mode for detailed error messages
+            - name: DEBUG
+              value: "true"
+            - name: DEBUG_PROFILER
+              value: "true"
+
+        postfix:
+          enabled: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+        dovecot:
+          enabled: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+        rspamd:
+          enabled: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+        # Disable ClamAV initially to save resources
+        clamav:
+          enabled: false
+
+        roundcube:
+          enabled: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+        redis:
+          enabled: true
+          persistence:
+            enabled: true
+            size: 1Gi
+            storageClass: local-path
+
+        # Storage configuration
+        persistence:
+          single_pvc: true
+          size: 20Gi
+          storageClass: local-path
+
+        # Ingress for webmail (using NGrok) - NGrok handles TLS termination
+        ingress:
+          enabled: true
+          ingressClassName: ngrok
+          tls: false  # NGrok handles TLS termination
+          annotations:
+            external-dns.alpha.kubernetes.io/hostname: "webmail.5dlabs.ai"
+            external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+          hosts:
+            - host: webmail.5dlabs.ai
+              paths:
+                - path: /
+                  pathType: Prefix
+
+        # Security settings
+        securityContext:
+          runAsNonRoot: false
+          fsGroup: 1000
+
+        # Network policies
+        networkPolicy:
+          enabled: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mailu
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 5
