@@ -125,8 +125,8 @@ spec:
             - name: DB_PW
               valueFrom:
                 secretKeyRef:
-                  name: mailu.mailu-postgres.credentials.postgresql.acid.zalan.do
-                  key: password
+                  name: mailu-secret
+                  key: DB_PW
             # Override hardcoded SQLite URI with PostgreSQL connection string (with SSL)
             - name: SQLALCHEMY_DATABASE_URI
               value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu?sslmode=require"
