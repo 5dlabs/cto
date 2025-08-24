@@ -54,6 +54,9 @@ spec:
         # Subnet configuration for Kubernetes
         subnet: 10.42.0.0/16
 
+        # Enable debug logging for troubleshooting
+        logLevel: DEBUG
+
         # Mail settings
         limits:
           messageSizeLimitInMegabytes: 50
@@ -90,6 +93,8 @@ spec:
         admin:
           enabled: true
           replicaCount: 1
+          # Enable debug logging for admin service
+          logLevel: DEBUG
           resources:
             requests:
               memory: "256Mi"
