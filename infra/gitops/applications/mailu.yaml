@@ -12,9 +12,9 @@ metadata:
 spec:
   project: platform
   source:
-    repoURL: https://mailu.github.io/helm-charts/
-    chart: mailu
-    targetRevision: 2.2.2
+    repoURL: https://github.com/Mailu/helm-charts.git
+    path: charts/mailu
+    targetRevision: HEAD
     helm:
       values: |
         # Mailu Configuration for 5dlabs.ai
@@ -134,8 +134,7 @@ spec:
             - name: DEBUG
               value: "false"
             - name: DEBUG_PROFILER
-              value: "false"
-
+              value: "true"
         postfix:
           enabled: true
           resources:

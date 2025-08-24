@@ -1,0 +1,16 @@
+---
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+kind: Domain
+metadata:
+  name: public-5dlabs-ai
+  namespace: default
+spec:
+  domain: "public.5dlabs.ai"
+---
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+kind: Domain
+metadata:
+  name: github-public-5dlabs-ai
+  namespace: default
+spec:
+  domain: "github.public.5dlabs.ai"

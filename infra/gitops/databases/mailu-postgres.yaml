@@ -1,0 +1,88 @@
+---
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: mailu-postgres
+  namespace: databases
+  labels:
+    team: platform
+    app.kubernetes.io/name: mailu-postgres
+    app.kubernetes.io/part-of: mailu
+spec:
+  teamId: platform
+  postgresql:
+    version: "16"
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      work_mem: "16MB"
+      maintenance_work_mem: "128MB"
+
+      # Logging for mail server debugging
+      log_statement: "mod"
+      log_duration: "off"
+      log_min_duration_statement: "1000ms"
+      log_connections: "on"
+      log_disconnections: "on"
+
+      # Statement timeouts
+      statement_timeout: "30s"
+      lock_timeout: "10s"
+      idle_in_transaction_session_timeout: "60s"
+
+  # 2 instances for HA
+  numberOfInstances: 2
+
+  # Storage configuration
+  volume:
+    size: 10Gi
+    storageClass: local-path
+
+  # Resource allocation
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 200m
+    limits:
+      memory: 2Gi
+      cpu: 1000m
+
+  # Database users and permissions
+  users:
+    # Mailu application user - needs superuser for schema operations with Zalando operator
+    mailu:
+      - SUPERUSER
+      - CREATEDB
+      - CREATEROLE
+    # Roundcube webmail user
+    roundcube:
+      - CREATEDB
+    # Admin user for maintenance
+    admin:
+      - SUPERUSER
+      - CREATEDB
+
+  # Databases
+  databases:
+    mailu: mailu
+    roundcube: roundcube
+
+  # Connection pooler for better performance
+  enableConnectionPooler: true
+  connectionPooler:
+    numberOfInstances: 1
+    mode: "transaction"
+    schema: "pooler"
+    user: "pooler"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 50Mi
+      limits:
+        cpu: 200m
+        memory: 200Mi
+
+  # Maintenance windows
+  maintenanceWindows:
+    - "03:00-04:00"

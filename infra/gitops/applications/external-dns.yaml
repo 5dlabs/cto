@@ -1,0 +1,140 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/part-of: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+
+  # Ignore common Deployment drift fields
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/securityContext/fsGroup
+        - /spec/template/spec/securityContext/runAsUser
+        - /spec/template/spec/securityContext/runAsGroup
+        - /spec/template/spec/containers/0/securityContext
+        - /metadata/generation
+        - /spec/revisionHistoryLimit
+        - /status
+
+  source:
+    repoURL: https://kubernetes-sigs.github.io/external-dns/
+    chart: external-dns
+    targetRevision: 1.15.0
+    helm:
+      values: |
+        # External DNS configuration for Cloudflare
+        provider: cloudflare
+
+        # Domain filter - only manage DNS for 5dlabs.ai
+        domainFilters:
+          - 5dlabs.ai
+
+        # Cloudflare configuration
+        env:
+          - name: CF_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: cloudflare-api-credentials
+                key: api-token
+
+        cloudflare:
+          # Proxy traffic through Cloudflare (orange cloud)
+          proxied: true
+
+        # Sources to watch for DNS records
+        sources:
+          - gateway-httproute
+          - gateway-grpcroute
+          - service
+          - ingress
+
+        # Policy for record ownership
+        policy: upsert-only  # upsert-only = only create/update, don't delete
+
+        # Registry for tracking managed records
+        registry: txt
+        txtOwnerId: external-dns-5dlabs
+        txtPrefix: external-dns-
+
+        # Logging
+        logLevel: info
+        logFormat: text
+
+        # Deployment configuration
+        replicaCount: 1
+
+        # Resource limits
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          fsGroup: 65534
+          capabilities:
+            drop:
+              - ALL
+
+        # Service account
+        serviceAccount:
+          create: true
+          name: external-dns
+          annotations: {}
+
+        # RBAC
+        rbac:
+          create: true
+
+        # Interval for DNS updates
+        interval: 1m
+
+        # Additional resilience settings
+        logLevel: info
+        dryRun: false
+        once: false
+
+        # Annotations to watch for
+        annotationFilter: external-dns.alpha.kubernetes.io/hostname
+
+        # Extra arguments
+        extraArgs:
+          - --cloudflare-dns-records-per-page=100
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-dns
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+
+  revisionHistoryLimit: 5
