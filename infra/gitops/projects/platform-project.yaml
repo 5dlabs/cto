@@ -36,6 +36,7 @@ spec:
     - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://kubernetes-sigs.github.io/external-dns/'
+    - 'https://mailu.github.io/helm-charts/'
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
@@ -90,6 +91,8 @@ spec:
     - namespace: redis-operator-staging
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
+      server: https://kubernetes.default.svc
+    - namespace: mailu
       server: https://kubernetes.default.svc
 
   # Cluster resource whitelist
