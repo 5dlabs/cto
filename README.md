@@ -689,14 +689,6 @@ vim infra/charts/agent-platform/claude-templates/docs/hooks/my-custom-hook.sh.hb
 
 # Create new hook script (code example)
 vim infra/charts/agent-platform/claude-templates/code/hooks/my-custom-hook.sh.hbs
-
-
-
-
-
-
-
-
 ```
 
 Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
@@ -707,24 +699,12 @@ See [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hoo
 
 After editing any template files, redeploy the agent-platform:
 
-
-
-
-
 ```bash
 # Deploy template changes
 helm upgrade agent-platform . -n agent-platform
 
 # Verify ConfigMap was updated
 kubectl get configmap claude-templates-configmap -n agent-platform -o yaml
-
-
-
-
-
-
-
-
 ```
 
 **Important**: Template changes only affect new agent jobs. Running jobs continue with their original templates.
