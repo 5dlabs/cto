@@ -54,19 +54,6 @@ spec:
         # Subnet configuration for Kubernetes
         subnet: 10.42.0.0/16
 
-        # DNS configuration to fix DNSSEC validation issue in Kubernetes
-        admin:
-          extraEnvVars:
-            - name: RESOLVER_ADDRESS
-              value: "8.8.8.8"
-            - name: DISABLE_DNSSEC_VALIDATION
-              value: "true"
-            - name: SKIP_DNSSEC_VALIDATION
-              value: "true"
-            # Override hardcoded SQLite URI with PostgreSQL connection string
-            - name: SQLALCHEMY_DATABASE_URI
-              value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu"
-
         # Mail settings
         limits:
           messageSizeLimitInMegabytes: 50
@@ -99,6 +86,7 @@ spec:
           externalService:
             enabled: false
 
+        # Admin configuration with DNS fixes and database override
         admin:
           enabled: true
           replicaCount: 1
@@ -109,6 +97,17 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          # DNS configuration to fix DNSSEC validation issue in Kubernetes
+          extraEnvVars:
+            - name: RESOLVER_ADDRESS
+              value: "8.8.8.8"
+            - name: DISABLE_DNSSEC_VALIDATION
+              value: "true"
+            - name: SKIP_DNSSEC_VALIDATION
+              value: "true"
+            # Override hardcoded SQLite URI with PostgreSQL connection string
+            - name: SQLALCHEMY_DATABASE_URI
+              value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu"
 
         postfix:
           enabled: true
