@@ -55,17 +55,17 @@ spec:
         subnet: 10.42.0.0/16
 
         # DNS configuration to fix DNSSEC validation issue in Kubernetes
-admin:
-  extraEnvVars:
-    - name: RESOLVER_ADDRESS
-      value: "8.8.8.8"
-    - name: DISABLE_DNSSEC_VALIDATION
-      value: "true"
-    - name: SKIP_DNSSEC_VALIDATION
-      value: "true"
-    # Override hardcoded SQLite URI with PostgreSQL connection string
-    - name: SQLALCHEMY_DATABASE_URI
-      value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu"
+        admin:
+          extraEnvVars:
+            - name: RESOLVER_ADDRESS
+              value: "8.8.8.8"
+            - name: DISABLE_DNSSEC_VALIDATION
+              value: "true"
+            - name: SKIP_DNSSEC_VALIDATION
+              value: "true"
+            # Override hardcoded SQLite URI with PostgreSQL connection string
+            - name: SQLALCHEMY_DATABASE_URI
+              value: "postgresql://mailu:$(DB_PW)@mailu-postgres.databases.svc.cluster.local:5432/mailu"
 
         # Mail settings
         limits:
@@ -93,6 +93,9 @@ admin:
             limits:
               memory: "200Mi"
               cpu: "200m"
+          # Disable hostPort bindings to avoid PodSecurity baseline violations
+          hostPort:
+            enabled: false
           # Disable Helm chart's LoadBalancer - using separate NGrok LoadBalancer instead
           # (Helm chart doesn't support loadBalancerClass field needed for NGrok)
           externalService:
