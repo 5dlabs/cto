@@ -1,0 +1,25 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mailu-namespace
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mailu-namespace
+    app.kubernetes.io/part-of: platform
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/5dlabs/cto.git
+    targetRevision: HEAD
+    path: infra/gitops/resources/mailu
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mailu
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
