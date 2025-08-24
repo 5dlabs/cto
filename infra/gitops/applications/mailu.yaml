@@ -54,6 +54,8 @@ spec:
               value: "8.8.8.8"
             - name: DISABLE_DNSSEC_VALIDATION
               value: "true"
+            - name: SKIP_DNSSEC_VALIDATION
+              value: "true"
 
         # Mail settings
         limits:
