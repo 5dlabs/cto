@@ -4,6 +4,8 @@ kind: Gateway
 metadata:
   name: public-gateway
   namespace: default
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "public.5dlabs.ai,github.public.5dlabs.ai"
 spec:
   gatewayClassName: ngrok
   listeners:

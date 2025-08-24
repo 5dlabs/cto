@@ -88,6 +88,9 @@ agent_*.md
 # Solana credentials
 sol.env
 
+# Cloudflare credentials
+cloudflare.env
+
 # Charts repository (for local development)
 charts-repo/
 
