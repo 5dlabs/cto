@@ -64,9 +64,9 @@ spec:
             ip: "60/hour"
             user: "100/day"
 
-        # TLS configuration - using NGrok for external TLS termination
+        # TLS configuration - disabled since NGrok handles external TLS termination
         tls:
-          enabled: true
+          enabled: false
           certmanager:
             enabled: false
 
