@@ -26,11 +26,14 @@ spec:
           - 5dlabs.ai
         
         # Cloudflare configuration
+        env:
+          - name: CF_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: cloudflare-api-credentials
+                key: api-token
+        
         cloudflare:
-          # Use API token (more secure than global API key)
-          apiToken:
-            secretName: cloudflare-api-credentials
-            secretKey: api-token
           # Proxy traffic through Cloudflare (orange cloud)
           proxied: true
         
