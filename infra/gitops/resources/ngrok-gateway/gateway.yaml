@@ -14,7 +14,6 @@ spec:
       protocol: HTTPS
       port: 443
       hostname: "public.5dlabs.ai"
-      tls: {}
       allowedRoutes:
         namespaces:
           from: All
@@ -22,7 +21,6 @@ spec:
       protocol: HTTPS
       port: 443
       hostname: "github.public.5dlabs.ai"
-      tls: {}
       allowedRoutes:
         namespaces:
           from: All
