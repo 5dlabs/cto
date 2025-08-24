@@ -624,8 +624,6 @@ Settings control:
 - Model selection (`claude-opus-4`, `claude-sonnet-4`, etc.)
 - Tool permissions and access
 - MCP tool configuration
-
-
 - Enterprise managed settings
 
 See [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settings) for complete configuration options.
