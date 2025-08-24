@@ -45,7 +45,7 @@ spec:
           - ingress
 
         # Policy for record ownership
-        policy: sync  # sync = manage all records, upsert-only = only create/update
+        policy: upsert-only  # upsert-only = only create/update, don't delete
 
         # Registry for tracking managed records
         registry: txt
@@ -89,6 +89,11 @@ spec:
 
         # Interval for DNS updates
         interval: 1m
+
+        # Additional resilience settings
+        logLevel: info
+        dryRun: false
+        once: false
 
         # Annotations to watch for
         annotationFilter: external-dns.alpha.kubernetes.io/hostname
