@@ -115,17 +115,21 @@ spec:
                         echo "🔐 Authenticating with Morgan GitHub App..."
 
                         if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
-                            # Create temporary private key file (support escaped newlines)
+                            # Create temporary private key file
                             TEMP_KEY_FILE="/tmp/github-app-key.pem"
                             printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
                             chmod 600 "$TEMP_KEY_FILE"
 
                             # Generate JWT token for GitHub App
-                            JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | \
+                              base64 -w 0 | tr '+/' '-_' | tr -d '=')
                             NOW=$(date +%s)
                             EXP=$((NOW + 600))
-                            JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-                            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | \
+                              base64 -w 0 | tr '+/' '-_' | tr -d '=')
+                            JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | \
+                              openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | \
+                              base64 -w 0 | tr '+/' '-_' | tr -d '=')
                             JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
 
                             # Get installation access token for organization
@@ -189,13 +193,13 @@ spec:
 
                         # IDEMPOTENCY CHECK: Prevent duplicate processing
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
-                        
-                        # Check if this PR has already been processed by checking for recent completed workflows
+
+                        # Check if this PR has already been processed
                         EXISTING_COMPLETION=$(kubectl get workflows -n agent-platform \
                           -l type=task-completion,pr-number=$PR_NUMBER \
                           --field-selector status.phase=Succeeded \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                        
+
                         if [ -n "$EXISTING_COMPLETION" ]; then
                           echo "⚠️ PR #$PR_NUMBER already processed by workflow: $EXISTING_COMPLETION"
                           echo "Skipping duplicate processing"
@@ -282,7 +286,8 @@ spec:
                                 git config user.name "Task Orchestrator (Morgan)"
                                 git config user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
                                 git add -A
-                                git commit -m "chore: move task-${TASK_ID} to .completed/ (PR #{{workflow.parameters.pr-number}})" || echo "No changes to commit"
+                                git commit -m "chore: move task-${TASK_ID} to .completed/" || \
+                                  echo "No changes to commit"
 
                                 if ! git push origin main 2>/dev/null; then
                                   echo "⚠️ Failed to push task move, continuing anyway..."
@@ -460,12 +465,12 @@ spec:
                         EXISTING_NEXT=$(kubectl get workflows -n agent-platform \
                           -l task-id=$NEXT_TASK_ID,workflow-type=play-orchestration \
                           -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' 2>/dev/null)
-                        
+
                         if [ -n "$EXISTING_NEXT" ]; then
                           echo "Existing workflows for Task $NEXT_TASK_ID:"
                           echo "$EXISTING_NEXT"
-                          
-                          # Check if any are still running or succeeded recently (within last hour)
+
+                          # Check if any are still running or succeeded recently
                           SKIP_CREATION=false
                           while IFS=' ' read -r workflow_name phase; do
                             if [ -n "$workflow_name" ]; then
@@ -490,7 +495,7 @@ spec:
                               fi
                             fi
                           done <<< "$EXISTING_NEXT"
-                          
+
                           if [ "$SKIP_CREATION" = true ]; then
                             exit 0
                           fi
