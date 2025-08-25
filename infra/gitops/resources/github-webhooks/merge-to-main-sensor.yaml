@@ -46,7 +46,9 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: task-complete-
+                # Use deterministic name based on PR number to prevent duplicates
+                # Kubernetes will reject duplicate creation attempts with AlreadyExists error
+                name: task-complete-pr-will-be-replaced
                 namespace: agent-platform
                 labels:
                   type: task-completion
@@ -191,28 +193,14 @@ spec:
                         echo "👤 Merged by: {{workflow.parameters.merged-by}}"
                         echo "════════════════════════════════════════════════════════════════"
 
-                        # IDEMPOTENCY CHECK: Prevent duplicate processing
+                        # With deterministic workflow names (task-complete-pr-NUMBER),
+                        # Kubernetes will prevent duplicate workflows from being created.
+                        # This check is now mainly for logging purposes.
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
                         CURRENT_WORKFLOW_NAME="{{workflow.name}}"
 
-                        # Check if ANY workflow exists for this PR (not just Succeeded)
-                        # This prevents race conditions where duplicate workflows are created
-                        # before the first one reaches Succeeded status
-                        # We need to exclude the current workflow from this check
-                        EXISTING_WORKFLOWS=$(kubectl get workflows -n agent-platform \
-                          -l type=task-completion,pr-number=$PR_NUMBER \
-                          -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-
-                        for workflow in $EXISTING_WORKFLOWS; do
-                          if [ "$workflow" != "$CURRENT_WORKFLOW_NAME" ]; then
-                            echo "⚠️ PR #$PR_NUMBER already being processed by workflow: $workflow"
-                            echo "Current workflow: $CURRENT_WORKFLOW_NAME"
-                            echo "Skipping duplicate processing"
-                            exit 0
-                          fi
-                        done
-
-                        echo "✅ No other workflows processing PR #$PR_NUMBER, continuing..."
+                        echo "✅ Processing PR #$PR_NUMBER as workflow: $CURRENT_WORKFLOW_NAME"
+                        echo "Note: Duplicate attempts will be rejected by Kubernetes with AlreadyExists error"
 
                         # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
                         PR_TITLE="{{workflow.parameters.pr-title}}"
@@ -743,7 +731,12 @@ spec:
                           exit 1
                         fi
           parameters:
-            # Add PR number to workflow labels for idempotency tracking
+            # Use PR number in workflow name for deduplication
+            - dest: metadata.name
+              src:
+                dependencyName: github-pr-merged
+                dataTemplate: task-complete-pr-{{ .pull_request.number }}
+            # Add PR number to workflow labels for tracking
             - dest: metadata.labels.pr-number
               src:
                 dependencyName: github-pr-merged
