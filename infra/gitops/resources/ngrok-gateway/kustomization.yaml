@@ -6,4 +6,5 @@ resources:
   - gateway.yaml
   - traffic-policy.yaml
   - domain.yaml
+  - redirect-route.yaml
 

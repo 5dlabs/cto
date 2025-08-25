@@ -14,3 +14,19 @@ metadata:
   namespace: default
 spec:
   domain: "github.public.5dlabs.ai"
+---
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+kind: Domain
+metadata:
+  name: root-5dlabs-ai
+  namespace: default
+spec:
+  domain: "5dlabs.ai"
+---
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+kind: Domain
+metadata:
+  name: www-5dlabs-ai
+  namespace: default
+spec:
+  domain: "www.5dlabs.ai"
