@@ -51,6 +51,10 @@ spec:
           existingSecret: mailu-secret
           existingSecretPasswordKey: DB_PW
 
+        # Don't create mailu-secret - it's managed by external-secrets
+        secret:
+          create: false
+
         # Subnet configuration for Kubernetes
         subnet: 10.42.0.0/16
 
