@@ -67,24 +67,49 @@ data:
     EOF
     )
 
+    # Execute the API call and capture result  
     if [ -n "$EXISTING_RULE" ]; then
       echo "Redirect rule already exists with ID: $EXISTING_RULE"
       echo "Updating existing rule..."
-
-      # Update existing ruleset
-      curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_redirect/entrypoint" \
-        -H "Authorization: Bearer $CF_API_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "$RULE_CONFIG" | jq '.'
     else
       echo "Creating new redirect rule..."
-
-      # Create new ruleset or add to existing
-      curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_redirect/entrypoint" \
-        -H "Authorization: Bearer $CF_API_TOKEN" \
-        -H "Content-Type: application/json" \
-        -d "$RULE_CONFIG" | jq '.'
     fi
 
-    echo "Redirect rule configuration completed successfully!"
-    echo "Domains $ZONE_NAME and www.$ZONE_NAME will now redirect to $REDIRECT_URL"
+    RESULT=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_redirect/entrypoint" \
+      -H "Authorization: Bearer $CF_API_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$RULE_CONFIG")
+    
+    echo "$RESULT" | jq '.'
+    
+    # Check for permission errors
+    SUCCESS=$(echo "$RESULT" | jq -r '.success')
+    if [ "$SUCCESS" != "true" ]; then
+      ERROR_CODE=$(echo "$RESULT" | jq -r '.errors[0].code // empty')
+      ERROR_MSG=$(echo "$RESULT" | jq -r '.errors[0].message // empty')
+      
+      if [ "$ERROR_CODE" = "10000" ]; then
+        echo ""
+        echo "❌ CLOUDFLARE API PERMISSION ERROR DETECTED"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Your API token lacks permissions for redirect rules."
+        echo ""
+        echo "🔧 QUICK FIX:"
+        echo "1. Go to: https://dash.cloudflare.com/profile/api-tokens"
+        echo "2. Edit your existing token"  
+        echo "3. Add permission: Zone:Zone Settings:Edit"
+        echo "4. Save the token"
+        echo ""
+        echo "💡 Current token works for DNS (external-dns) but needs"
+        echo "   Zone Settings permission for redirect rules."
+        echo ""
+        echo "🔄 After updating token, ArgoCD will retry automatically."
+        exit 1
+      else
+        echo "❌ Unexpected error: $ERROR_MSG (code: $ERROR_CODE)"
+        exit 1
+      fi
+    fi
+  
+  echo "✅ Redirect rule configuration completed successfully!"
+  echo "Domains $ZONE_NAME and www.$ZONE_NAME will now redirect to $REDIRECT_URL"
