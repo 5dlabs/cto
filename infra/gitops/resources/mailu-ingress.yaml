@@ -1,0 +1,28 @@
+---
+# Custom NGrok Ingress for Mailu with correct backend port configuration
+# This replaces the Helm chart ingress which doesn't properly support custom backend ports
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mailu-ingress
+  namespace: mailu
+  labels:
+    app.kubernetes.io/name: mailu
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: mailu
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "webmail.5dlabs.ai"
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+spec:
+  ingressClassName: ngrok
+  rules:
+    - host: mail.5dlabs.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mailu-front
+                port:
+                  number: 80  # Use HTTP port 80, NGrok handles HTTPS termination
