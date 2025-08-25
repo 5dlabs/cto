@@ -735,7 +735,7 @@ spec:
             - dest: metadata.name
               src:
                 dependencyName: github-pr-merged
-                dataTemplate: task-complete-pr-{{ .pull_request.number }}
+                dataTemplate: task-complete-pr-{{ .body.pull_request.number }}
             # Add PR number to workflow labels for tracking
             - dest: metadata.labels.pr-number
               src:
