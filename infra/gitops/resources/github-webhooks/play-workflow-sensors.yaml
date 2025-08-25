@@ -131,7 +131,11 @@ spec:
                         done
 
                         echo "Finished processing waiting workflows"
-      # Removed retry strategy to prevent duplicate workflow creation
+      retryStrategy:
+        steps: 2  # Minimal retries for reliability
+        duration: "5s"
+        factor: 2
+        jitter: 0.1
 
 ---
 # Sensor for Ready-for-QA Label Added - Resume after quality work
@@ -264,7 +268,11 @@ spec:
                         echo "❌ ERROR: No workflow found after $MAX_ATTEMPTS attempts"
                         echo "This suggests the workflow stage transition failed"
                         exit 1
-      # Removed retry strategy to prevent duplicate workflow creation
+      retryStrategy:
+        steps: 2  # Minimal retries for reliability
+        duration: "5s"
+        factor: 2
+        jitter: 0.1
 
 # ---
 # # DEPRECATED: Replaced by merge-to-main-sensor.yaml
@@ -457,4 +465,8 @@ spec:
                         done
 
                         echo "✅ Remediation completed"
-      # Removed retry strategy to prevent duplicate workflow creation
+      retryStrategy:
+        steps: 2  # Minimal retries for reliability
+        duration: "5s"
+        factor: 2
+        jitter: 0.1

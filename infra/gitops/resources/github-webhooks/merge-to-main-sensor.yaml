@@ -477,17 +477,23 @@ spec:
                                 SKIP_CREATION=true
                                 break
                               elif [ "$phase" = "Succeeded" ]; then
-                                # Check if completed within last hour
+                                # Check if completed within last 5 minutes
                                 COMPLETION_TIME=$(kubectl get workflow $workflow_name -n agent-platform \
                                   -o jsonpath='{.status.finishedAt}' 2>/dev/null || echo "")
                                 if [ -n "$COMPLETION_TIME" ]; then
                                   COMPLETION_EPOCH=$(date -d "$COMPLETION_TIME" +%s 2>/dev/null || echo "0")
                                   CURRENT_EPOCH=$(date +%s)
                                   AGE_SECONDS=$((CURRENT_EPOCH - COMPLETION_EPOCH))
-                                  if [ $AGE_SECONDS -lt 3600 ]; then
+                                  # Only skip if completed within 5 minutes (300 seconds)
+                                  # This prevents duplicate creation from webhook retries
+                                  # but allows legitimate restarts after a reasonable time
+                                  if [ $AGE_SECONDS -lt 300 ]; then
                                     echo "⚠️ Task $NEXT_TASK_ID was recently completed: $workflow_name (${AGE_SECONDS}s ago)"
+                                    echo "Skipping to prevent duplicate from webhook retry"
                                     SKIP_CREATION=true
                                     break
+                                  else
+                                    echo "Task $NEXT_TASK_ID completed ${AGE_SECONDS}s ago, allowing restart"
                                   fi
                                 fi
                               fi
@@ -732,5 +738,9 @@ spec:
               src:
                 dependencyName: github-pr-merged
                 dataKey: body.pull_request.merged_by.login
-      # Removed retry strategy to prevent duplicate workflow creation
-      # Idempotency is now handled within the workflow script itself
+      retryStrategy:
+        steps: 2  # Reduced from 3 to minimize duplicates
+        duration: "5s"  # Reduced from 10s for faster retries
+        factor: 2
+        jitter: 0.1
+        # Retries are safe now due to idempotency checks in the workflow script
