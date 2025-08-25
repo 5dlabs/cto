@@ -12,11 +12,9 @@ data:
     #!/bin/sh
     set -euo pipefail
 
-    # Install jq if not available
-    if ! command -v jq >/dev/null 2>&1; then
-      echo "Installing jq..."
-      apk add --no-cache jq
-    fi
+    # Install required packages
+    echo "Installing curl and jq..."
+    apk update && apk add --no-cache curl jq
 
     # Configuration
     ZONE_NAME="5dlabs.ai"

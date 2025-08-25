@@ -19,7 +19,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: configure-redirects
-          image: alpine/curl:8.5.0
+          image: alpine:3.19
           command: ["/bin/sh"]
           args: ["/scripts/configure-redirects.sh"]
           env:
@@ -40,11 +40,10 @@ spec:
               cpu: 50m
               memory: 64Mi
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
+            runAsUser: 0
+            runAsGroup: 0
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL
@@ -54,7 +53,7 @@ spec:
             name: cloudflare-redirect-script
             defaultMode: 0755
       securityContext:
-        fsGroup: 65534
+        fsGroup: 0
         seccompProfile:
           type: RuntimeDefault
   backoffLimit: 3
