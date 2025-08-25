@@ -132,8 +132,8 @@ spec:
 
                         echo "Finished processing waiting workflows"
       retryStrategy:
-        steps: 3
-        duration: "10s"
+        steps: 2  # Minimal retries for reliability
+        duration: "5s"
         factor: 2
         jitter: 0.1
 
@@ -269,8 +269,8 @@ spec:
                         echo "This suggests the workflow stage transition failed"
                         exit 1
       retryStrategy:
-        steps: 3
-        duration: "10s"
+        steps: 2  # Minimal retries for reliability
+        duration: "5s"
         factor: 2
         jitter: 0.1
 
@@ -466,7 +466,7 @@ spec:
 
                         echo "✅ Remediation completed"
       retryStrategy:
-        steps: 3
-        duration: "10s"
+        steps: 2  # Minimal retries for reliability
+        duration: "5s"
         factor: 2
         jitter: 0.1
