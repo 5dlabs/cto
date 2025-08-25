@@ -2,11 +2,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cloudflare-redirects  
+  name: sendgrid-dns
   namespace: argocd
   labels:
-    app.kubernetes.io/name: cloudflare-redirects
-    app.kubernetes.io/component: redirect-rules
+    app.kubernetes.io/name: sendgrid-dns
     app.kubernetes.io/part-of: platform
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -16,7 +15,7 @@ spec:
   source:
     repoURL: https://github.com/5dlabs/cto
     targetRevision: HEAD
-    path: infra/gitops/resources/cloudflare-redirects
+    path: infra/gitops/resources/sendgrid-dns
 
   destination:
     server: https://kubernetes.default.svc
@@ -40,13 +39,12 @@ spec:
         factor: 2
         maxDuration: 2m
 
-  # Ignore job status changes
+  # Ignore service status changes
   ignoreDifferences:
-    - group: batch
-      kind: Job
+    - group: ""
+      kind: Service
       jsonPointers:
         - /status
         - /metadata/generation
-        - /spec/activeDeadlineSeconds
 
   revisionHistoryLimit: 5
