@@ -49,6 +49,8 @@ spec:
                 labels:
                   type: task-completion
                   trigger: merge-to-main
+                  # Add PR number to prevent duplicate task completion for same PR
+                  pr-number: "{{`{{workflow.parameters.pr-number}}`}}"
               spec:
                 entrypoint: handle-task-completion
                 serviceAccountName: argo-workflow
@@ -184,6 +186,21 @@ spec:
                         echo "📦 Merge SHA: {{workflow.parameters.merge-sha}}"
                         echo "👤 Merged by: {{workflow.parameters.merged-by}}"
                         echo "════════════════════════════════════════════════════════════════"
+
+                        # IDEMPOTENCY CHECK: Prevent duplicate processing
+                        PR_NUMBER="{{workflow.parameters.pr-number}}"
+                        
+                        # Check if this PR has already been processed by checking for recent completed workflows
+                        EXISTING_COMPLETION=$(kubectl get workflows -n agent-platform \
+                          -l type=task-completion,pr-number=$PR_NUMBER \
+                          --field-selector status.phase=Succeeded \
+                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                        
+                        if [ -n "$EXISTING_COMPLETION" ]; then
+                          echo "⚠️ PR #$PR_NUMBER already processed by workflow: $EXISTING_COMPLETION"
+                          echo "Skipping duplicate processing"
+                          exit 0
+                        fi
 
                         # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
                         PR_TITLE="{{workflow.parameters.pr-title}}"
@@ -439,15 +456,44 @@ spec:
                           exit 0
                         fi
 
-                        # Check if next task is already running (avoid duplicates)
+                        # Check if next task is already running or recently completed (avoid duplicates)
                         EXISTING_NEXT=$(kubectl get workflows -n agent-platform \
                           -l task-id=$NEXT_TASK_ID,workflow-type=play-orchestration \
-                          --field-selector status.phase=Running \
-                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
+                          -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' 2>/dev/null)
+                        
                         if [ -n "$EXISTING_NEXT" ]; then
-                          echo "⚠️ Task $NEXT_TASK_ID is already running: $EXISTING_NEXT"
-                          exit 0
+                          echo "Existing workflows for Task $NEXT_TASK_ID:"
+                          echo "$EXISTING_NEXT"
+                          
+                          # Check if any are still running or succeeded recently (within last hour)
+                          SKIP_CREATION=false
+                          while IFS=' ' read -r workflow_name phase; do
+                            if [ -n "$workflow_name" ]; then
+                              if [ "$phase" = "Running" ] || [ "$phase" = "Pending" ]; then
+                                echo "⚠️ Task $NEXT_TASK_ID is already active: $workflow_name ($phase)"
+                                SKIP_CREATION=true
+                                break
+                              elif [ "$phase" = "Succeeded" ]; then
+                                # Check if completed within last hour
+                                COMPLETION_TIME=$(kubectl get workflow $workflow_name -n agent-platform \
+                                  -o jsonpath='{.status.finishedAt}' 2>/dev/null || echo "")
+                                if [ -n "$COMPLETION_TIME" ]; then
+                                  COMPLETION_EPOCH=$(date -d "$COMPLETION_TIME" +%s 2>/dev/null || echo "0")
+                                  CURRENT_EPOCH=$(date +%s)
+                                  AGE_SECONDS=$((CURRENT_EPOCH - COMPLETION_EPOCH))
+                                  if [ $AGE_SECONDS -lt 3600 ]; then
+                                    echo "⚠️ Task $NEXT_TASK_ID was recently completed: $workflow_name (${AGE_SECONDS}s ago)"
+                                    SKIP_CREATION=true
+                                    break
+                                  fi
+                                fi
+                              fi
+                            fi
+                          done <<< "$EXISTING_NEXT"
+                          
+                          if [ "$SKIP_CREATION" = true ]; then
+                            exit 0
+                          fi
                         fi
 
                         echo "Creating orchestration workflow for Task $NEXT_TASK_ID..."
@@ -677,8 +723,5 @@ spec:
               src:
                 dependencyName: github-pr-merged
                 dataKey: body.pull_request.merged_by.login
-      retryStrategy:
-        steps: 3
-        duration: "10s"
-        factor: 2
-        jitter: 0.1
+      # Removed retry strategy to prevent duplicate workflow creation
+      # Idempotency is now handled within the workflow script itself
