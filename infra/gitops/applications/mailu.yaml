@@ -201,6 +201,10 @@ spec:
           enabled: false
           tlsFlavorOverride: "notls"  # Override TLS_FLAVOR to prevent redirect loop
 
+        # Disable Helm secret creation - managed by external-secrets instead
+        secret:
+          create: false
+
         # Security settings
         securityContext:
           runAsNonRoot: false
