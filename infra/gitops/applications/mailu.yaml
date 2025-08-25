@@ -148,6 +148,23 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          # Configure SMTP relay through SendGrid
+          extraEnvVars:
+            - name: RELAYHOST
+              valueFrom:
+                secretKeyRef:
+                  name: mailu-secret
+                  key: RELAYHOST
+            - name: RELAYUSER
+              valueFrom:
+                secretKeyRef:
+                  name: mailu-secret
+                  key: RELAYUSER
+            - name: RELAYPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mailu-secret
+                  key: RELAYPASSWORD
 
         dovecot:
           enabled: true

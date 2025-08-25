@@ -28,6 +28,12 @@ spec:
                 secretKeyRef:
                   name: cloudflare-api-credentials
                   key: api-token
+            - name: CF_REDIRECT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-redirect-credentials
+                  key: api-token
+                  optional: true
           volumeMounts:
             - name: scripts
               mountPath: /scripts
