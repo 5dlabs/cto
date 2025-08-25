@@ -68,8 +68,9 @@ spec:
             ip: "60/hour"
             user: "100/day"
 
-        # TLS configuration - disabled since NGrok handles external TLS termination
+        # TLS configuration - use 'notls' flavor since NGrok handles external TLS termination
         tls:
+          flavor: notls
           enabled: false
           certmanager:
             enabled: false
