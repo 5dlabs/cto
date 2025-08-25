@@ -33,6 +33,8 @@ spec:
           - path: body.pull_request.base.ref
             type: string
             value: ["main"]
+      # NOTE: Argo Events has built-in deduplication that caches event IDs
+      # for 5 minutes to prevent duplicate processing automatically
   triggers:
     - template:
         name: task-completion-handler
@@ -192,14 +194,15 @@ spec:
                         # IDEMPOTENCY CHECK: Prevent duplicate processing
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
 
-                        # Check if this PR has already been processed
+                        # Check if ANY workflow exists for this PR (not just Succeeded)
+                        # This prevents race conditions where duplicate workflows are created
+                        # before the first one reaches Succeeded status
                         EXISTING_COMPLETION=$(kubectl get workflows -n agent-platform \
                           -l type=task-completion,pr-number=$PR_NUMBER \
-                          --field-selector status.phase=Succeeded \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -n "$EXISTING_COMPLETION" ]; then
-                          echo "⚠️ PR #$PR_NUMBER already processed by workflow: $EXISTING_COMPLETION"
+                          echo "⚠️ PR #$PR_NUMBER already being processed by workflow: $EXISTING_COMPLETION"
                           echo "Skipping duplicate processing"
                           exit 0
                         fi
@@ -738,9 +741,6 @@ spec:
               src:
                 dependencyName: github-pr-merged
                 dataKey: body.pull_request.merged_by.login
-      retryStrategy:
-        steps: 2  # Reduced from 3 to minimize duplicates
-        duration: "5s"  # Reduced from 10s for faster retries
-        factor: 2
-        jitter: 0.1
-        # Retries are safe now due to idempotency checks in the workflow script
+      # Retry strategy removed to prevent duplicate workflow creation
+      # GitHub already provides webhook retry on failure
+      # Deduplication and idempotency checks handle any edge cases
