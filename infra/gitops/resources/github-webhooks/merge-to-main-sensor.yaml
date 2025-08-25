@@ -346,15 +346,35 @@ spec:
                             -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
                           echo "Workflow phase: $WORKFLOW_PHASE"
 
-                          # LESSON LEARNED: Find the specific suspend node by display name
-                          # Must check both node type and displayName
-                          NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
-                            jq -r '.status.nodes | to_entries | .[] |
-                            select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
-                            .key')
+                          # LESSON LEARNED: Webhook might arrive before suspend node is created
+                          # Wait up to 60 seconds for the suspend node to appear (Tess might still be running)
+                          MAX_WAIT=60
+                          WAIT_TIME=0
+                          NODE_ID=""
+
+                          echo "Looking for wait-merge-to-main suspend node..."
+                          while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+                            NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
+                              jq -r '.status.nodes | to_entries | .[] |
+                              select(.value.displayName == "wait-merge-to-main" and .value.type == "Suspend") |
+                              .key')
+
+                            if [ -n "$NODE_ID" ]; then
+                              echo "Found suspend node after ${WAIT_TIME}s: $NODE_ID"
+                              break
+                            fi
+
+                            if [ $WAIT_TIME -eq 0 ]; then
+                              echo "Suspend node not found yet, waiting for Tess to complete..."
+                            else
+                              echo "Still waiting... (${WAIT_TIME}s / ${MAX_WAIT}s)"
+                            fi
+
+                            sleep 5
+                            WAIT_TIME=$((WAIT_TIME + 5))
+                          done
 
                           if [ -n "$NODE_ID" ]; then
-                            echo "Found suspend node: $NODE_ID"
 
                             # LESSON LEARNED: Check node phase before trying to resume
                             NODE_PHASE=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
@@ -370,7 +390,8 @@ spec:
                               echo "⚠️ Node already in phase: $NODE_PHASE"
                             fi
                           else
-                            echo "⚠️ No wait-merge-to-main suspend node found"
+                            echo "⚠️ No wait-merge-to-main suspend node found after waiting ${MAX_WAIT}s"
+                            echo "Tess might still be running or workflow might be in unexpected state"
                             # Try legacy wait-pr-approved node
                             NODE_ID=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform -o json | \
                               jq -r '.status.nodes | to_entries | .[] |
