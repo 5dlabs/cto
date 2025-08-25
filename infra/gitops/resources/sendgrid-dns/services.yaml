@@ -42,7 +42,7 @@ spec:
     name: http
 
 ---
-# DKIM key 2 CNAME  
+# DKIM key 2 CNAME
 apiVersion: v1
 kind: Service
 metadata:

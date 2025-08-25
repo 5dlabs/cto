@@ -11,35 +11,34 @@ data:
   configure-redirects.sh: |
     #!/bin/bash
     set -euo pipefail
-    
+
     # Configuration
     ZONE_NAME="5dlabs.ai"
     REDIRECT_URL="https://github.com/5dlabs"
     RULE_NAME="5dlabs-to-github"
-    
     echo "Starting Cloudflare redirect rule configuration..."
-    
+
     # Get Zone ID
     echo "Getting zone ID for $ZONE_NAME..."
     ZONE_ID=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones?name=$ZONE_NAME" \
       -H "Authorization: Bearer $CF_API_TOKEN" \
       -H "Content-Type: application/json" | \
       jq -r '.result[0].id')
-    
+
     if [ "$ZONE_ID" = "null" ] || [ -z "$ZONE_ID" ]; then
       echo "Error: Could not find zone ID for $ZONE_NAME"
       exit 1
     fi
-    
+
     echo "Found zone ID: $ZONE_ID"
-    
+
     # Check if redirect rule already exists
     echo "Checking for existing redirect rules..."
     EXISTING_RULE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_redirect/entrypoint" \
       -H "Authorization: Bearer $CF_API_TOKEN" \
       -H "Content-Type: application/json" | \
       jq -r ".result.rules[]? | select(.description == \"$RULE_NAME\") | .id")
-    
+
     # Create the redirect rule configuration
     RULE_CONFIG=$(cat <<EOF
     {
@@ -63,11 +62,11 @@ data:
     }
     EOF
     )
-    
+
     if [ -n "$EXISTING_RULE" ]; then
       echo "Redirect rule already exists with ID: $EXISTING_RULE"
       echo "Updating existing rule..."
-      
+
       # Update existing ruleset
       curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_redirect/entrypoint" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
@@ -75,13 +74,13 @@ data:
         -d "$RULE_CONFIG" | jq '.'
     else
       echo "Creating new redirect rule..."
-      
+
       # Create new ruleset or add to existing
       curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/http_request_redirect/entrypoint" \
         -H "Authorization: Bearer $CF_API_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$RULE_CONFIG" | jq '.'
     fi
-    
+
     echo "Redirect rule configuration completed successfully!"
     echo "Domains $ZONE_NAME and www.$ZONE_NAME will now redirect to $REDIRECT_URL"

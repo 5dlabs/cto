@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cloudflare-redirects  
+  name: cloudflare-redirects
   namespace: argocd
   labels:
     app.kubernetes.io/name: cloudflare-redirects
@@ -12,7 +12,7 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform
-  
+
   source:
     repoURL: https://github.com/5dlabs/cto
     targetRevision: HEAD

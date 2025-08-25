@@ -11,7 +11,7 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform
-  
+
   source:
     repoURL: https://github.com/5dlabs/cto
     targetRevision: HEAD
