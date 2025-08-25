@@ -93,6 +93,10 @@ spec:
           # (Helm chart doesn't support loadBalancerClass field needed for NGrok)
           externalService:
             enabled: false
+          # Override TLS_FLAVOR to prevent redirect loop with NGrok TLS termination
+          extraEnvVars:
+            - name: TLS_FLAVOR
+              value: "notls"
 
         # Use latest image tags for all components
         image:
