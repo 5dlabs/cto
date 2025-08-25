@@ -49,8 +49,6 @@ spec:
                 labels:
                   type: task-completion
                   trigger: merge-to-main
-                  # Add PR number to prevent duplicate task completion for same PR
-                  pr-number: "{{`{{workflow.parameters.pr-number}}`}}"
               spec:
                 entrypoint: handle-task-completion
                 serviceAccountName: argo-workflow
@@ -708,6 +706,12 @@ spec:
                           exit 1
                         fi
           parameters:
+            # Add PR number to workflow labels for idempotency tracking
+            - dest: metadata.labels.pr-number
+              src:
+                dependencyName: github-pr-merged
+                dataKey: body.pull_request.number
+            # Workflow parameters
             - dest: spec.arguments.parameters.0.value
               src:
                 dependencyName: github-pr-merged
