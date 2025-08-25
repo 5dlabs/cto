@@ -54,7 +54,7 @@ spec:
               spec:
                 entrypoint: handle-task-completion
                 serviceAccountName: argo-workflow
-                activeDeadlineSeconds: 600  # 10 minute timeout
+                activeDeadlineSeconds: 7200  # 2 hour timeout for finding suspend node
                 arguments:
                   parameters:
                     - name: pr-title
