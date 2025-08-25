@@ -1,0 +1,62 @@
+---
+# Email DNS records managed by external-dns
+# These services don't have endpoints, they just create DNS records
+
+# SendGrid mail server CNAME
+apiVersion: v1
+kind: Service
+metadata:
+  name: sendgrid-mail
+  namespace: external-dns
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "em7161.5dlabs.ai"
+    external-dns.alpha.kubernetes.io/target: "u55480967.wl218.sendgrid.net"
+  labels:
+    app.kubernetes.io/name: sendgrid-dns
+    app.kubernetes.io/part-of: platform
+spec:
+  type: ExternalName
+  externalName: u55480967.wl218.sendgrid.net
+  ports:
+  - port: 25
+    name: smtp
+
+---
+# DKIM key 1 CNAME
+apiVersion: v1
+kind: Service
+metadata:
+  name: sendgrid-dkim1
+  namespace: external-dns
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "s1._domainkey.5dlabs.ai"
+    external-dns.alpha.kubernetes.io/target: "s1.domainkey.u55480967.wl218.sendgrid.net"
+  labels:
+    app.kubernetes.io/name: sendgrid-dns
+    app.kubernetes.io/part-of: platform
+spec:
+  type: ExternalName
+  externalName: s1.domainkey.u55480967.wl218.sendgrid.net
+  ports:
+  - port: 80
+    name: http
+
+---
+# DKIM key 2 CNAME  
+apiVersion: v1
+kind: Service
+metadata:
+  name: sendgrid-dkim2
+  namespace: external-dns
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "s2._domainkey.5dlabs.ai"
+    external-dns.alpha.kubernetes.io/target: "s2.domainkey.u55480967.wl218.sendgrid.net"
+  labels:
+    app.kubernetes.io/name: sendgrid-dns
+    app.kubernetes.io/part-of: platform
+spec:
+  type: ExternalName
+  externalName: s2.domainkey.u55480967.wl218.sendgrid.net
+  ports:
+  - port: 80
+    name: http
