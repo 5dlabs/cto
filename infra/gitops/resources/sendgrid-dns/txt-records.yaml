@@ -1,6 +1,6 @@
 ---
 # DMARC TXT record managed by external-dns
-# Using LoadBalancer service with TXT annotation
+# Using regular ClusterIP service with TXT annotation
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,12 +8,12 @@ metadata:
   namespace: external-dns
   annotations:
     external-dns.alpha.kubernetes.io/hostname: "_dmarc.5dlabs.ai"
-    external-dns.alpha.kubernetes.io/txt-records: "\"v=DMARC1; p=none;\""
+    external-dns.alpha.kubernetes.io/txt-records: "v=DMARC1; p=none;"
   labels:
     app.kubernetes.io/name: sendgrid-dns
     app.kubernetes.io/part-of: platform
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   ports:
   - port: 80
     name: http
