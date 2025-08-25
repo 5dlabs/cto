@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: cloudflare-config-setup
+  name: cloudflare-redirect-setup
   namespace: external-dns
   labels:
     app.kubernetes.io/name: cloudflare-redirects
@@ -21,7 +21,7 @@ spec:
         - name: configure-redirects
           image: alpine/curl:8.5.0
           command: ["/bin/sh"]
-          args: ["/scripts/configure-cloudflare.sh"]
+          args: ["/scripts/configure-redirects.sh"]
           env:
             - name: CF_API_TOKEN
               valueFrom:
@@ -51,7 +51,7 @@ spec:
       volumes:
         - name: scripts
           configMap:
-            name: cloudflare-config-script
+            name: cloudflare-redirect-script
             defaultMode: 0755
       securityContext:
         fsGroup: 65534
