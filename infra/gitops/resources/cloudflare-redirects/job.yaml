@@ -19,8 +19,8 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: configure-redirects
-          image: dwdraju/alpine-curl-jq:3.18
-          command: ["/bin/bash"]
+          image: alpine/curl:8.5.0
+          command: ["/bin/sh"]
           args: ["/scripts/configure-redirects.sh"]
           env:
             - name: CF_API_TOKEN
