@@ -1,53 +1,67 @@
 ---
 # NGrok LoadBalancer service for Mailu mail ports
 # This creates TCP addresses automatically via NGrok operator
+# TEMPORARILY DISABLED: This service creates 6 separate NGrok TCP endpoints which significantly impacts costs
+# Mail functionality will be available via webmail interface only during cost optimization period
 apiVersion: v1
 kind: Service
 metadata:
-  name: mailu-tcp-loadbalancer
+  name: mailu-tcp-loadbalancer-disabled
   namespace: mailu
   labels:
     app.kubernetes.io/name: mailu
     app.kubernetes.io/component: mail-tcp
     app.kubernetes.io/part-of: mailu
+    # TEMPORARILY DISABLED: Removing selector to prevent service from binding to pods
+    disabled.for.cost.optimization: "true"
   annotations:
     # Removed custom domain due to NGrok ACL restrictions
     # external-dns.alpha.kubernetes.io/hostname: "mail.5dlabs.ai"
     # external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
     # NOTE: ArgoCD shows "Progressing" status because NGrok LoadBalancers don't get traditional external IPs
     # This is expected behavior - NGrok manages TCP endpoints via AgentEndpoints instead
+    # COST OPTIMIZATION: This service is temporarily disabled to reduce NGrok endpoint costs
+    disabled.reason: "cost-optimization"
 spec:
-  type: LoadBalancer
-  loadBalancerClass: ngrok
-  allocateLoadBalancerNodePorts: false
-  externalTrafficPolicy: Local
-  selector:
-    app.kubernetes.io/component: front
-    app.kubernetes.io/instance: mailu
-    app.kubernetes.io/name: mailu
+  # TEMPORARILY DISABLED: Changing type to ClusterIP to prevent NGrok endpoint creation
+  type: ClusterIP
+  # loadBalancerClass: ngrok  # DISABLED for cost optimization
+  # allocateLoadBalancerNodePorts: false  # Not applicable for ClusterIP
+  # externalTrafficPolicy: Local  # Not applicable for ClusterIP
+  # DISABLED: Commenting out selector to prevent pod binding
+  # selector:
+  #   app.kubernetes.io/component: front
+  #   app.kubernetes.io/instance: mailu
+  #   app.kubernetes.io/name: mailu
   ports:
-    # Secure mail ports only
-    - name: smtp
-      port: 25
+    # DISABLED: All mail ports commented out to prevent NGrok TCP endpoint creation
+    # These 6 ports each create separate NGrok endpoints - significant cost impact
+    # - name: smtp
+    #   port: 25
+    #   protocol: TCP
+    #   targetPort: 25
+    # - name: smtps
+    #   port: 465
+    #   protocol: TCP
+    #   targetPort: 465
+    # - name: submission
+    #   port: 587
+    #   protocol: TCP
+    #   targetPort: 587
+    # - name: imaps
+    #   port: 993
+    #   protocol: TCP
+    #   targetPort: 993
+    # - name: pop3s
+    #   port: 995
+    #   protocol: TCP
+    #   targetPort: 995
+    # - name: sieve
+    #   port: 4190
+    #   protocol: TCP
+    #   targetPort: 4190
+    # Placeholder port to keep service valid (will be unused without selector)
+    - name: placeholder
+      port: 80
       protocol: TCP
-      targetPort: 25
-    - name: smtps
-      port: 465
-      protocol: TCP
-      targetPort: 465
-    - name: submission
-      port: 587
-      protocol: TCP
-      targetPort: 587
-    - name: imaps
-      port: 993
-      protocol: TCP
-      targetPort: 993
-    - name: pop3s
-      port: 995
-      protocol: TCP
-      targetPort: 995
-    - name: sieve
-      port: 4190
-      protocol: TCP
-      targetPort: 4190
+      targetPort: 80
