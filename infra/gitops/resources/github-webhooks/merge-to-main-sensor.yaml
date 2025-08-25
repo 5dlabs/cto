@@ -193,19 +193,26 @@ spec:
 
                         # IDEMPOTENCY CHECK: Prevent duplicate processing
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
+                        CURRENT_WORKFLOW_NAME="{{workflow.name}}"
 
                         # Check if ANY workflow exists for this PR (not just Succeeded)
                         # This prevents race conditions where duplicate workflows are created
                         # before the first one reaches Succeeded status
-                        EXISTING_COMPLETION=$(kubectl get workflows -n agent-platform \
+                        # We need to exclude the current workflow from this check
+                        EXISTING_WORKFLOWS=$(kubectl get workflows -n agent-platform \
                           -l type=task-completion,pr-number=$PR_NUMBER \
-                          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                          -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 
-                        if [ -n "$EXISTING_COMPLETION" ]; then
-                          echo "⚠️ PR #$PR_NUMBER already being processed by workflow: $EXISTING_COMPLETION"
-                          echo "Skipping duplicate processing"
-                          exit 0
-                        fi
+                        for workflow in $EXISTING_WORKFLOWS; do
+                          if [ "$workflow" != "$CURRENT_WORKFLOW_NAME" ]; then
+                            echo "⚠️ PR #$PR_NUMBER already being processed by workflow: $workflow"
+                            echo "Current workflow: $CURRENT_WORKFLOW_NAME"
+                            echo "Skipping duplicate processing"
+                            exit 0
+                          fi
+                        done
+
+                        echo "✅ No other workflows processing PR #$PR_NUMBER, continuing..."
 
                         # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
                         PR_TITLE="{{workflow.parameters.pr-title}}"
