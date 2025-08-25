@@ -201,10 +201,15 @@ spec:
             external-dns.alpha.kubernetes.io/hostname: "webmail.5dlabs.ai"
             external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
           hosts:
-            - host: webmail.5dlabs.ai
+            - host: mail.5dlabs.ai
               paths:
                 - path: /
                   pathType: Prefix
+                  backend:
+                    service:
+                      name: mailu-front
+                      port:
+                        number: 80  # Use HTTP port 80, NGrok handles HTTPS termination
 
         # Security settings
         securityContext:
