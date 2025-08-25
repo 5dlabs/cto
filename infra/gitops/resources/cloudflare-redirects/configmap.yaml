@@ -9,8 +9,14 @@ metadata:
     app.kubernetes.io/part-of: platform
 data:
   configure-redirects.sh: |
-    #!/bin/bash
+    #!/bin/sh
     set -euo pipefail
+
+    # Install jq if not available
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "Installing jq..."
+      apk add --no-cache jq
+    fi
 
     # Configuration
     ZONE_NAME="5dlabs.ai"
