@@ -14,6 +14,19 @@ metadata:
     # Removed custom domain due to NGrok ACL restrictions
     # external-dns.alpha.kubernetes.io/hostname: "mail.5dlabs.ai"
     # external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+    # Tell ArgoCD this LoadBalancer is healthy even without external IP (NGrok manages TCP endpoints via AgentEndpoints)
+    argocd.argoproj.io/health-check: |
+      hs = {}
+      if obj.status ~= nil then
+        if obj.status.loadBalancer ~= nil then
+          hs.status = "Healthy"
+          hs.message = "NGrok LoadBalancer - endpoints managed by NGrok operator"
+          return hs
+        end
+      end
+      hs.status = "Progressing"
+      hs.message = "Waiting for NGrok operator"
+      return hs
 spec:
   type: LoadBalancer
   loadBalancerClass: ngrok
