@@ -192,24 +192,9 @@ spec:
           size: 20Gi
           storageClass: local-path
 
-        # Ingress for webmail (using NGrok) - NGrok handles TLS termination
+        # Disable Helm chart ingress - we'll create our own with correct port configuration
         ingress:
-          enabled: true
-          ingressClassName: ngrok
-          tls: false  # NGrok handles TLS termination
-          annotations:
-            external-dns.alpha.kubernetes.io/hostname: "webmail.5dlabs.ai"
-            external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
-          hosts:
-            - host: mail.5dlabs.ai
-              paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service:
-                      name: mailu-front
-                      port:
-                        number: 80  # Use HTTP port 80, NGrok handles HTTPS termination
+          enabled: false
 
         # Security settings
         securityContext:
