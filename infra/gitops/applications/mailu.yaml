@@ -68,9 +68,8 @@ spec:
             ip: "60/hour"
             user: "100/day"
 
-        # TLS configuration - use 'notls' flavor since NGrok handles external TLS termination
+        # TLS configuration - disabled since NGrok handles external TLS termination
         tls:
-          flavor: notls
           enabled: false
           certmanager:
             enabled: false
@@ -200,6 +199,7 @@ spec:
         # Disable Helm chart ingress - we'll create our own with correct port configuration
         ingress:
           enabled: false
+          tlsFlavorOverride: "notls"  # Override TLS_FLAVOR to prevent redirect loop
 
         # Security settings
         securityContext:
