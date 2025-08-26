@@ -31,7 +31,9 @@ spec:
           "quality-agent": "{{`{{workflow.parameters.quality-agent}}`}}",
           "testing-agent": "{{`{{workflow.parameters.testing-agent}}`}}",
           "repository": "{{`{{workflow.parameters.repository}}`}}",
-          "service": "{{`{{workflow.parameters.service}}`}}"
+          "service": "{{`{{workflow.parameters.service}}`}}",
+          "docs-repository": "{{`{{workflow.parameters.docs-repository}}`}}",
+          "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}"
         }
 
   # Main entry point
@@ -61,6 +63,12 @@ spec:
       - name: service
         description: "Service identifier for persistent workspace"
         value: "play-test"
+      - name: docs-repository
+        description: "GitHub repository containing documentation"
+        value: "5dlabs/cto-play-test"
+      - name: docs-project-directory
+        description: "Directory within docs repository containing project documentation"
+        value: "docs"
 
       # Model configuration
       - name: model

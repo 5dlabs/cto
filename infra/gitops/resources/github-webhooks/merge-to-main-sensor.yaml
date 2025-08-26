@@ -604,6 +604,8 @@ spec:
                           IMPL_AGENT="5DLabs-Rex"
                           QUALITY_AGENT="5DLabs-Cleo"
                           TESTING_AGENT="5DLabs-Tess"
+                          DOCS_REPO="$REPO_PATH"  # Default to same as main repository
+                          DOCS_DIR="docs"
                         else
                           echo "✅ Found workflow: $CURRENT_WORKFLOW"
 
@@ -617,6 +619,8 @@ spec:
                             IMPL_AGENT="5DLabs-Rex"
                             QUALITY_AGENT="5DLabs-Cleo"
                             TESTING_AGENT="5DLabs-Tess"
+                            DOCS_REPO="$REPO_PATH"  # Default to same as main repository
+                            DOCS_DIR="docs"
                           else
                             echo "📦 Retrieved parameters from workflow annotation"
                             # Parse individual parameters with fallbacks
@@ -628,12 +632,25 @@ spec:
                             # Update repository and service if they were stored
                             STORED_REPO=$(echo "$INITIAL_PARAMS" | jq -r '.repository // ""')
                             STORED_SERVICE=$(echo "$INITIAL_PARAMS" | jq -r '.service // ""')
+                            STORED_DOCS_REPO=$(echo "$INITIAL_PARAMS" | jq -r '."docs-repository" // ""')
+                            STORED_DOCS_DIR=$(echo "$INITIAL_PARAMS" | jq -r '."docs-project-directory" // "docs"')
 
                             if [ -n "$STORED_REPO" ] && [ "$STORED_REPO" != "null" ]; then
                               REPO_PATH="$STORED_REPO"
                             fi
                             if [ -n "$STORED_SERVICE" ] && [ "$STORED_SERVICE" != "null" ]; then
                               SERVICE_NAME="$STORED_SERVICE"
+                            fi
+                            if [ -n "$STORED_DOCS_REPO" ] && [ "$STORED_DOCS_REPO" != "null" ]; then
+                              DOCS_REPO="$STORED_DOCS_REPO"
+                            else
+                              # Default to same as main repository if not specified
+                              DOCS_REPO="$REPO_PATH"
+                            fi
+                            if [ -n "$STORED_DOCS_DIR" ] && [ "$STORED_DOCS_DIR" != "null" ]; then
+                              DOCS_DIR="$STORED_DOCS_DIR"
+                            else
+                              DOCS_DIR="docs"
                             fi
                           fi
                         fi
@@ -645,6 +662,8 @@ spec:
                         echo "  Testing Agent: $TESTING_AGENT"
                         echo "  Repository: $REPO_PATH"
                         echo "  Service: $SERVICE_NAME"
+                        echo "  Docs Repository: $DOCS_REPO"
+                        echo "  Docs Project Directory: $DOCS_DIR"
 
                         # Create the next task workflow using the WorkflowTemplate
                         cat <<EOF | kubectl create -f -
@@ -667,7 +686,9 @@ spec:
                                 "quality-agent": "$QUALITY_AGENT",
                                 "testing-agent": "$TESTING_AGENT",
                                 "repository": "$REPO_PATH",
-                                "service": "$SERVICE_NAME"
+                                "service": "$SERVICE_NAME",
+                                "docs-repository": "$DOCS_REPO",
+                                "docs-project-directory": "$DOCS_DIR"
                               }
                         spec:
                           workflowTemplateRef:
@@ -689,9 +710,9 @@ spec:
                               - name: testing-agent
                                 value: "$TESTING_AGENT"
                               - name: docs-repository
-                                value: "$REPO_PATH"
+                                value: "$DOCS_REPO"
                               - name: docs-project-directory
-                                value: "docs"
+                                value: "$DOCS_DIR"
                         EOF
 
                         if [ $? -eq 0 ]; then
