@@ -195,15 +195,15 @@ spec:
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
                         CURRENT_WORKFLOW_NAME="{{workflow.name}}"
                         LOCK_NAME="pr-merge-lock-${PR_NUMBER}"
-                        
+
                         echo "🔒 Attempting to acquire lock for PR #$PR_NUMBER..."
-                        
+
                         # Try to create lock ConfigMap (atomic operation)
                         if kubectl create configmap "$LOCK_NAME" \
                           --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
                           --from-literal=timestamp="$(date -u +%s)" \
                           -n agent-platform 2>/dev/null; then
-                          
+
                           echo "✅ Lock acquired for PR #$PR_NUMBER by $CURRENT_WORKFLOW_NAME"
                           # Set up cleanup on exit
                           trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true" EXIT
@@ -215,7 +215,7 @@ spec:
                             -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "0")
                           CURRENT_TIME=$(date -u +%s)
                           LOCK_AGE=$((CURRENT_TIME - LOCK_TIME))
-                          
+
                           if [ $LOCK_AGE -gt 3600 ]; then
                             echo "⚠️ Stale lock detected (${LOCK_AGE}s old), attempting to claim..."
                             kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true
