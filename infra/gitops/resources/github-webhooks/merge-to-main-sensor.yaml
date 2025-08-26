@@ -766,10 +766,10 @@ spec:
                         fi
           parameters:
             # Append PR number to generateName for easier identification
-            - dest: metadata.generateName
-              src:
+            - src:
                 dependencyName: github-pr-merged
                 dataTemplate: "pr{{ .Input.body.pull_request.number }}-"
+              dest: metadata.generateName
               operation: append
             # Add PR number to workflow labels for tracking
             - dest: metadata.labels.pr-number
