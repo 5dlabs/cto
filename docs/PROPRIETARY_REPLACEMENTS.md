@@ -1,156 +1,56 @@
-# Proprietary Component Replacement Strategy
+# Component Integration Strategy
 
 ## Overview
 
-This document outlines open-source and self-hosted alternatives to the proprietary components currently used in the 5D Labs infrastructure, enabling the platform to be fully distributable without external dependencies.
+This document outlines our approach to integrating best-in-class tools for the multi-agent platform, keeping production-tested solutions like NGrok and Cloudflare for tunneling while replacing proprietary VPN and task management systems with open-source alternatives.
 
-## Component Analysis & Replacements
+## Final Technology Stack
 
-### 1. NGrok (Webhook Tunnel Service)
+### 1. Webhook Tunneling: NGrok & Cloudflare (KEEPING)
 
-#### Current Usage
-- **Purpose**: Expose local webhook endpoints to GitHub for development
-- **Cost**: $8-39/month for persistent domains
-- **Files**: `ngrok-operator.yaml`, `ngrok-gateway.yaml`
+#### Rationale
+- **Industry Standards**: Both are battle-tested, reliable solutions
+- **Free Tiers**: Generous limits perfect for development
+- **Developer Experience**: Excellent documentation and tooling
+- **Production Ready**: Seamless path from development to production
 
-#### Open-Source Alternatives
-
-##### Option A: Cloudflare Tunnel (Recommended for Production)
+#### Integration Strategy
 ```yaml
-# cloudflare-tunnel.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cloudflared
-spec:
-  replicas: 1
-  template:
-    spec:
-      containers:
-      - name: cloudflared
-        image: cloudflare/cloudflared:latest
-        args:
-        - tunnel
-        - --no-autoupdate
-        - run
-        - --token=$(TUNNEL_TOKEN)
-```
-
-**Pros**: 
-- Free tier available
-- Production-grade reliability
-- Built-in DDoS protection
-
-**Cons**:
-- Requires Cloudflare account
-- Some configuration complexity
-
-##### Option B: LocalTunnel (Fully Open Source)
-```javascript
-// localtunnel-server.js
-const localtunnel = require('localtunnel');
-
-async function createTunnel(port, subdomain) {
-    const tunnel = await localtunnel({
-        port: port,
-        subdomain: subdomain, // optional
-        host: 'https://localtunnel.me'
-    });
+# Platform will support both providers
+tunneling:
+  provider: auto  # auto-select based on environment
+  
+  ngrok:
+    enabled: true
+    # Free tier for development
+    # $8/month for persistent domains
     
-    console.log(`Tunnel URL: ${tunnel.url}`);
-    return tunnel;
-}
+  cloudflare:
+    enabled: true  
+    # Free tier with named tunnels
+    # Zero Trust security built-in
 ```
 
-**Pros**:
-- Completely free
-- No account required
-- Simple to use
+See `TUNNELING_STRATEGY.md` for complete implementation details.
 
-**Cons**:
-- Less reliable than NGrok
-- Random URLs unless self-hosted
+### 2. VPN/Remote Access: WireGuard (REPLACING Twingate)
 
-##### Option C: Bore (Rust-based, Self-Hosted)
-```bash
-# Server side (public VPS)
-bore server --domain bore.example.com
-
-# Client side (local cluster)
-bore local 8080 --to bore.example.com
-```
-
-**Pros**:
-- Self-hosted control
-- Minimal resource usage
-- Written in Rust (fast)
-
-**Cons**:
-- Requires public server
-- Manual DNS configuration
-
-##### Option D: FRP (Fast Reverse Proxy)
-```ini
-# frpc.ini (client config)
-[common]
-server_addr = your-server.com
-server_port = 7000
-
-[webhook]
-type = http
-local_port = 8080
-subdomain = webhook
-```
-
-**Pros**:
-- Highly configurable
-- Supports multiple protocols
-- Good performance
-
-**Cons**:
-- Requires public server
-- More complex setup
-
-#### Implementation Strategy
-```go
-// pkg/tunnel/provider.go
-package tunnel
-
-type TunnelProvider interface {
-    CreateTunnel(port int, subdomain string) (string, error)
-    CloseTunnel() error
-}
-
-type TunnelFactory struct {
-    providerType string
-}
-
-func (f *TunnelFactory) GetProvider() TunnelProvider {
-    switch f.providerType {
-    case "cloudflare":
-        return &CloudflareTunnelProvider{}
-    case "localtunnel":
-        return &LocalTunnelProvider{}
-    case "bore":
-        return &BoreProvider{}
-    case "none":
-        return &NoOpProvider{} // For production with real domains
-    default:
-        return &LocalTunnelProvider{} // Default fallback
-    }
-}
-```
-
-### 2. Twingate (Zero-Trust VPN)
-
-#### Current Usage
+#### Current Twingate Usage
 - **Purpose**: Secure remote access to cluster services
-- **Cost**: $5-10/user/month
+- **Cost**: $5-10/user/month  
 - **Files**: `twingate-pastoral.yaml`, `twingate-therapeutic.yaml`
 
-#### Open-Source Alternatives
+#### WireGuard Replacement Strategy
 
-##### Option A: WireGuard (Recommended)
+##### Why WireGuard?
+- **Fully Open Source**: No vendor lock-in, complete control
+- **Kernel-Level Performance**: Built into Linux kernel 5.6+
+- **Modern Cryptography**: ChaCha20, Poly1305, Curve25519
+- **Minimal Attack Surface**: ~4,000 lines of code vs OpenVPN's 100,000+
+- **Cross-Platform**: Works on Linux, Windows, macOS, iOS, Android
+- **Simple Configuration**: Much easier than IPSec or OpenVPN
+
+##### WireGuard Implementation
 ```yaml
 # wireguard-server.yaml
 apiVersion: v1
@@ -183,111 +83,184 @@ spec:
         - SYS_MODULE
 ```
 
-**Pros**:
-- Modern, fast protocol
-- Minimal overhead
-- Built into Linux kernel
-
-**Cons**:
-- Manual user management
-- No built-in web UI
-
-##### Option B: Tailscale (Freemium)
-```bash
-# Install Tailscale in cluster
-kubectl apply -f https://raw.githubusercontent.com/tailscale/tailscale/main/cmd/k8s-operator/deploy/manifests/operator.yaml
-
-# Expose service via Tailscale
-kubectl annotate service my-service tailscale.com/expose="true"
+##### WireGuard Configuration for Platform
+```yaml
+# wireguard-server-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wireguard-config
+  namespace: agent-platform
+data:
+  wg0.conf: |
+    [Interface]
+    Address = 10.200.0.1/24
+    ListenPort = 51820
+    PrivateKey = ${SERVER_PRIVATE_KEY}
+    PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+    
+    # Agent platform admin
+    [Peer]
+    PublicKey = ${ADMIN_PUBLIC_KEY}
+    AllowedIPs = 10.200.0.2/32
+    
+    # Developer access
+    [Peer]
+    PublicKey = ${DEV_PUBLIC_KEY}
+    AllowedIPs = 10.200.0.3/32
 ```
 
-**Pros**:
-- Zero-config mesh VPN
-- Free for personal use
-- Excellent UX
+##### Automated User Management
+```go
+// pkg/vpn/wireguard.go
+package vpn
 
-**Cons**:
-- Requires account
-- Limited free tier
+import (
+    "golang.zx2c4.com/wireguard/wgctrl"
+    "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
 
-##### Option C: Headscale (Open-Source Tailscale)
+type WireGuardManager struct {
+    client     *wgctrl.Client
+    configPath string
+    subnet     string
+}
+
+func (w *WireGuardManager) AddUser(username string) (*UserConfig, error) {
+    // Generate key pair
+    privateKey, _ := wgtypes.GeneratePrivateKey()
+    publicKey := privateKey.PublicKey()
+    
+    // Assign IP from pool
+    ip := w.getNextAvailableIP()
+    
+    // Update server config
+    peer := wgtypes.PeerConfig{
+        PublicKey:  publicKey,
+        AllowedIPs: []net.IPNet{{IP: ip, Mask: net.CIDRMask(32, 32)}},
+    }
+    
+    // Generate client config
+    clientConfig := fmt.Sprintf(`
+[Interface]
+Address = %s/24
+PrivateKey = %s
+DNS = 10.200.0.1
+
+[Peer]
+PublicKey = %s
+Endpoint = %s:51820
+AllowedIPs = 10.200.0.0/24, 10.96.0.0/12
+PersistentKeepalive = 25
+`,
+        ip, privateKey.String(), w.serverPublicKey, w.endpoint)
+    
+    return &UserConfig{
+        Username: username,
+        Config:   clientConfig,
+        QRCode:   generateQRCode(clientConfig),
+    }, nil
+}
+```
+
+##### Web UI for WireGuard Management
 ```yaml
-# headscale-deployment.yaml
+# wg-easy-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: headscale
+  name: wg-easy
+  namespace: agent-platform
 spec:
   template:
     spec:
       containers:
-      - name: headscale
-        image: headscale/headscale:latest
-        args:
-        - serve
+      - name: wg-easy
+        image: weejewel/wg-easy
+        ports:
+        - containerPort: 51820/udp  # WireGuard
+        - containerPort: 51821/tcp  # Web UI
+        env:
+        - name: WG_HOST
+          value: vpn.agent-platform.local
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wg-easy-password
+              key: password
         volumeMounts:
-        - name: config
-          mountPath: /etc/headscale
-        - name: data
-          mountPath: /var/lib/headscale
+        - name: wireguard-data
+          mountPath: /etc/wireguard
 ```
 
-**Pros**:
-- Self-hosted Tailscale
-- No account required
-- Full control
-
-**Cons**:
-- More complex setup
-- Requires maintenance
-
-##### Option D: OpenVPN (Traditional)
+##### Integration with Platform Installer
 ```bash
-# Generate OpenVPN server config
-docker run -v $PWD:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u udp://vpn.example.com
-docker run -v $PWD:/etc/openvpn --rm -it kylemanna/openvpn ovpn_initpki
+$ agent-platform install
+
+[5/10] Remote Access Configuration:
+  How will team members access the cluster?
+  
+  > [1] WireGuard VPN (Recommended, open source)
+    [2] kubectl port-forward only (simple but limited)
+    [3] Direct access (I have public IPs)
+    
+  Selection: 1
+  
+  WireGuard Setup:
+  ✓ Generating server keys...
+  ✓ Creating network 10.200.0.0/24
+  ✓ Deploying WireGuard server...
+  
+  Admin user configuration:
+  Username: admin
+  
+  Your WireGuard configuration has been saved to:
+  ~/.agent-platform/wireguard-admin.conf
+  
+  To connect:
+  1. Install WireGuard client: https://www.wireguard.com/install/
+  2. Import the configuration file
+  3. Connect to 'agent-platform' VPN
+  
+  Web UI available at: http://10.200.0.1:51821
+  Password: <auto-generated>
 ```
 
-**Pros**:
-- Battle-tested
-- Wide client support
-- Many management tools
-
-**Cons**:
-- Older protocol
-- More overhead
-- Complex configuration
-
-#### Implementation Strategy
+##### Alternative: Simple Port Forwarding (for Solo Developers)
 ```go
-// pkg/access/vpn.go
+// pkg/access/portforward.go
 package access
 
-type VPNProvider interface {
-    CreateUser(username string) (*UserCredentials, error)
-    RevokeUser(username string) error
-    GetConnectionConfig(username string) ([]byte, error)
+// For users who don't need full VPN
+type PortForwardManager struct {
+    kubeconfig string
 }
 
-type AccessManager struct {
-    provider VPNProvider
-}
+func (p *PortForwardManager) CreateAccessScript() string {
+    return `#!/bin/bash
+# agent-platform-access.sh
 
-func NewAccessManager(providerType string) *AccessManager {
-    var provider VPNProvider
-    
-    switch providerType {
-    case "wireguard":
-        provider = &WireGuardProvider{}
-    case "headscale":
-        provider = &HeadscaleProvider{}
-    case "none":
-        provider = &KubectlPortForwardProvider{} // Fallback to port-forward
-    default:
-        provider = &KubectlPortForwardProvider{}
-    }
-    
-    return &AccessManager{provider: provider}
+echo "Starting port forwards for agent platform..."
+
+# ArgoCD UI
+kubectl port-forward -n argocd svc/argocd-server 8080:80 &
+
+# Argo Workflows UI  
+kubectl port-forward -n argo svc/argo-server 2746:2746 &
+
+# Grafana
+kubectl port-forward -n monitoring svc/grafana 3000:3000 &
+
+echo "Access URLs:"
+echo "  ArgoCD:         http://localhost:8080"
+echo "  Argo Workflows: http://localhost:2746"
+echo "  Grafana:        http://localhost:3000"
+echo ""
+echo "Press Ctrl+C to stop all port forwards"
+
+wait
+`
 }
 ```
 
