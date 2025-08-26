@@ -841,25 +841,42 @@ if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
 
   # 7. Port-forward with retry logic and better timing
   if [ -n "$SVC_NAME" ]; then
-  for i in 1 2 3; do
-    kubectl port-forward -n test-{{task_id}} "$SVC_NAME" 8080:8080 &
-    PF_PID=$!
-    sleep 5  # Give port-forward more time to establish
+    PF_SUCCESS=false
+    for i in 1 2 3; do
+      # Kill any existing port-forward process before retry
+      if [ -n "$PF_PID" ]; then
+        kill $PF_PID 2>/dev/null || true
+        wait $PF_PID 2>/dev/null || true
+      fi
+      
+      kubectl port-forward -n test-{{task_id}} "$SVC_NAME" 8080:8080 &
+      PF_PID=$!
+      sleep 5  # Give port-forward time to establish
+      
+      # Test if port-forward is actually working, not just if process exists
+      if curl -f -s --connect-timeout 2 http://localhost:8080/ >/dev/null 2>&1; then
+        echo "✓ Port-forward established and responding"
+        PF_SUCCESS=true
+        break
+      elif kill -0 $PF_PID 2>/dev/null; then
+        echo "Port-forward process running but not responding yet"
+      else
+        echo "Retry $i: Port-forward failed, retrying..."
+      fi
+    done
     
-    if kill -0 $PF_PID 2>/dev/null; then
-      echo "✓ Port-forward established"
-      break
+    # Test endpoints if port-forward succeeded
+    if [ "$PF_SUCCESS" = "true" ] && [ -n "$PF_PID" ]; then
+      curl -f http://localhost:8080/health || echo "⚠️ Health check failed or not implemented"
+      curl -f http://localhost:8080/ready || echo "⚠️ Ready check failed or not implemented"
+      kill $PF_PID 2>/dev/null || true
+      wait $PF_PID 2>/dev/null || true
+    else
+      echo "⚠️ Port-forward could not be established after 3 attempts"
+      # Clean up any remaining process
+      [ -n "$PF_PID" ] && kill $PF_PID 2>/dev/null || true
     fi
-    echo "Retry $i: Port-forward failed, retrying..."
-  done
-  
-  # Test endpoints if port-forward succeeded
-  if kill -0 $PF_PID 2>/dev/null; then
-    curl -f http://localhost:8080/health || echo "⚠️ Health check failed or not implemented"
-    curl -f http://localhost:8080/ready || echo "⚠️ Ready check failed or not implemented"
-    kill $PF_PID 2>/dev/null || true
   fi
-fi
 
   # 8. Check logs for errors
   kubectl logs -n test-{{task_id}} -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
