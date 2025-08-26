@@ -494,8 +494,8 @@ spec:
             taskId: {{`{{inputs.parameters.task-id}}`}}
             service: "{{`{{workflow.parameters.service}}`}}"
             repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
-            docsRepositoryUrl: "https://github.com/5dlabs/cto-play-test"
-            docsProjectDirectory: "docs"
+            docsRepositoryUrl: "https://github.com/{{`{{workflow.parameters.docs-repository}}`}}"
+            docsProjectDirectory: "{{`{{workflow.parameters.docs-project-directory}}`}}"
             workingDirectory: "."
             githubApp: "{{`{{inputs.parameters.github-app}}`}}"
             model: "{{`{{workflow.parameters.model}}`}}"

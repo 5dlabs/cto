@@ -688,6 +688,10 @@ spec:
                                 value: "$QUALITY_AGENT"
                               - name: testing-agent
                                 value: "$TESTING_AGENT"
+                              - name: docs-repository
+                                value: "$REPO_PATH"
+                              - name: docs-project-directory
+                                value: "docs"
                         EOF
 
                         if [ $? -eq 0 ]; then
