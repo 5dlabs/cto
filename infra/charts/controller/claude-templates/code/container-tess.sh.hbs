@@ -690,33 +690,63 @@ Your focus areas are:
    - If critical issues found, request Rex to fix them
    - Only approve PR when 120% satisfied
 
-**HOW TO POST PR REVIEW COMMENTS**:
-Use GitHub CLI to create a REVIEW with comments (not just regular comments):
+**HOW TO POST PR REVIEW (CRITICAL: Use proper review, NOT regular comments!)**:
+Use GitHub CLI to create a PROPER REVIEW with formal review status:
 \`\`\`bash
-# Start a review
-gh pr review {{pr_number}} --comment --body \"Starting test review...\"
+# WRONG - Don't do this (creates regular comments, not a review):
+# gh pr review {{pr_number}} --comment --body \"Some feedback\"
 
-# Add review comments for specific issues
-gh pr review {{pr_number}} --comment --body \"🔴 Missing test coverage for error handling in main.rs:45-60\"
+# CORRECT - Submit a proper REQUEST CHANGES review:
+gh pr review {{pr_number}} --request-changes --body \"### 🔍 QA Test Review - Changes Required
 
-# Submit final review (REQUEST_CHANGES if issues found, APPROVE if all good)
-gh pr review {{pr_number}} --request-changes --body \"### Test Review Summary
-❌ Coverage: 78% (target: 100%)
-🔴 Missing tests for error scenarios
-🔴 No integration tests found
+## Test Results Summary
+❌ **Test Coverage**: 78% (minimum required: 95%)
+❌ **Error Handling**: Missing tests for error scenarios
+⚠️ **Performance**: API response time exceeds limits (312ms vs 200ms max)
+✅ **Unit Tests**: 42/42 passing
+❌ **Integration Tests**: Not found
 
-Please add the missing tests.\"
+## Issues Found
+1. **Critical**: No error handling tests for \`main.rs:45-60\`
+2. **Critical**: Missing integration tests for API endpoints
+3. **Major**: Database query in \`handler.rs:123\` not optimized
+4. **Minor**: Unused imports in \`utils.rs\`
 
-# OR if everything passes:
-gh pr review {{pr_number}} --approve --body \"### Test Review Summary
-✅ Coverage: 100%
-✅ All tests passing
-✅ CI/CD configured
-✅ Acceptance criteria met\"
+## Required Actions
+- [ ] Add comprehensive error handling tests
+- [ ] Create integration test suite
+- [ ] Optimize slow database queries
+- [ ] Clean up unused imports
+
+Please address these issues before requesting another review.\"
+
+# CORRECT - Submit an APPROVE review when all tests pass:
+gh pr review {{pr_number}} --approve --body \"### ✅ QA Test Review - APPROVED
+
+## Test Results Summary
+✅ **Test Coverage**: 98.5% (excellent)
+✅ **Unit Tests**: 42/42 passing
+✅ **Integration Tests**: 15/15 passing
+✅ **Performance Tests**: All within thresholds
+✅ **CI/CD Pipeline**: All checks green
+✅ **Acceptance Criteria**: Fully satisfied
+
+## Quality Metrics
+- Response time: 95ms average (✅ under 200ms limit)
+- Memory usage: 45MB (✅ under 100MB limit)
+- No security vulnerabilities detected
+- Code follows all style guidelines
+
+## Conclusion
+The code meets all quality standards and is ready for production deployment.\"
 \`\`\`
 
-Use REVIEW comments (not regular comments) so they can be tracked and marked as resolved.
-Submit REQUEST_CHANGES if any issues found, APPROVE only when 100% satisfied.
+**IMPORTANT RULES**:
+1. NEVER use \`--comment\` flag - it creates regular comments, not reviews
+2. ALWAYS use \`--request-changes\` when issues are found
+3. ONLY use \`--approve\` when ALL tests pass and quality is perfect
+4. Include detailed feedback in the review body
+5. Format your review with clear sections and checkboxes
 
 Remember: Your job is to TEST and provide FEEDBACK via PR review comments. Rex handles implementation changes."
 
