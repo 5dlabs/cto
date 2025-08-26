@@ -591,10 +591,11 @@ spec:
 
                         # Retrieve parameters from the current task's workflow
                         echo "🔍 Looking for current task workflow to retrieve parameters..."
+                        # Get the most recent workflow for this task (sorted by creation time, take last one)
                         CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration \
                           --sort-by='.metadata.creationTimestamp' \
-                          -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || echo "")
+                          -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | tail -n1)
 
                         if [ -z "$CURRENT_WORKFLOW" ]; then
                           echo "⚠️ Could not find workflow for task $TASK_ID, using defaults"
