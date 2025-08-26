@@ -22,6 +22,17 @@ spec:
   workflowMetadata:
     labels:
       workflow-type: play-orchestration
+    annotations:
+      # Store initial parameters for forwarding to subsequent tasks
+      platform.agents/initial-params: |
+        {
+          "model": "{{`{{workflow.parameters.model}}`}}",
+          "implementation-agent": "{{`{{workflow.parameters.implementation-agent}}`}}",
+          "quality-agent": "{{`{{workflow.parameters.quality-agent}}`}}",
+          "testing-agent": "{{`{{workflow.parameters.testing-agent}}`}}",
+          "repository": "{{`{{workflow.parameters.repository}}`}}",
+          "service": "{{`{{workflow.parameters.service}}`}}"
+        }
 
   # Main entry point
   entrypoint: main

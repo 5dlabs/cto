@@ -589,173 +589,104 @@ spec:
                           SERVICE_NAME="service"
                         fi
 
-                        # Create the next task workflow
+                        # Retrieve parameters from the current task's workflow
+                        echo "🔍 Looking for current task workflow to retrieve parameters..."
+                        CURRENT_WORKFLOW=$(kubectl get workflows -n agent-platform \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          --sort-by='.metadata.creationTimestamp' \
+                          -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || echo "")
+
+                        if [ -z "$CURRENT_WORKFLOW" ]; then
+                          echo "⚠️ Could not find workflow for task $TASK_ID, using defaults"
+                          # Default values if no workflow found
+                          MODEL="claude-3-5-sonnet-20241022"
+                          IMPL_AGENT="5DLabs-Rex"
+                          QUALITY_AGENT="5DLabs-Cleo"
+                          TESTING_AGENT="5DLabs-Tess"
+                        else
+                          echo "✅ Found workflow: $CURRENT_WORKFLOW"
+
+                          # Retrieve stored parameters from annotation
+                          INITIAL_PARAMS=$(kubectl get workflow $CURRENT_WORKFLOW -n agent-platform \
+                            -o jsonpath='{.metadata.annotations.platform\.agents/initial-params}' 2>/dev/null || echo "{}")
+
+                          if [ "$INITIAL_PARAMS" = "{}" ] || [ -z "$INITIAL_PARAMS" ]; then
+                            echo "⚠️ No parameters found in annotation, using defaults"
+                            MODEL="claude-3-5-sonnet-20241022"
+                            IMPL_AGENT="5DLabs-Rex"
+                            QUALITY_AGENT="5DLabs-Cleo"
+                            TESTING_AGENT="5DLabs-Tess"
+                          else
+                            echo "📦 Retrieved parameters from workflow annotation"
+                            # Parse individual parameters with fallbacks
+                            MODEL=$(echo "$INITIAL_PARAMS" | jq -r '.model // "claude-3-5-sonnet-20241022"')
+                            IMPL_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-agent" // "5DLabs-Rex"')
+                            QUALITY_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."quality-agent" // "5DLabs-Cleo"')
+                            TESTING_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."testing-agent" // "5DLabs-Tess"')
+
+                            # Update repository and service if they were stored
+                            STORED_REPO=$(echo "$INITIAL_PARAMS" | jq -r '.repository // ""')
+                            STORED_SERVICE=$(echo "$INITIAL_PARAMS" | jq -r '.service // ""')
+
+                            if [ -n "$STORED_REPO" ] && [ "$STORED_REPO" != "null" ]; then
+                              REPO_PATH="$STORED_REPO"
+                            fi
+                            if [ -n "$STORED_SERVICE" ] && [ "$STORED_SERVICE" != "null" ]; then
+                              SERVICE_NAME="$STORED_SERVICE"
+                            fi
+                          fi
+                        fi
+
+                        echo "📝 Using parameters:"
+                        echo "  Model: $MODEL"
+                        echo "  Implementation Agent: $IMPL_AGENT"
+                        echo "  Quality Agent: $QUALITY_AGENT"
+                        echo "  Testing Agent: $TESTING_AGENT"
+                        echo "  Repository: $REPO_PATH"
+                        echo "  Service: $SERVICE_NAME"
+
+                        # Create the next task workflow using the WorkflowTemplate
                         cat <<EOF | kubectl create -f -
                         apiVersion: argoproj.io/v1alpha1
                         kind: Workflow
                         metadata:
-                          generateName: ${SERVICE_NAME}-task-${NEXT_TASK_ID}-play-
+                          generateName: play-workflow-template-
                           namespace: agent-platform
                           labels:
                             task-id: "$NEXT_TASK_ID"
                             workflow-type: play-orchestration
                             triggered-by: task-completion
                             previous-task: "$TASK_ID"
+                          annotations:
+                            # Forward parameters to next task
+                            platform.agents/initial-params: |
+                              {
+                                "model": "$MODEL",
+                                "implementation-agent": "$IMPL_AGENT",
+                                "quality-agent": "$QUALITY_AGENT",
+                                "testing-agent": "$TESTING_AGENT",
+                                "repository": "$REPO_PATH",
+                                "service": "$SERVICE_NAME"
+                              }
                         spec:
-                          entrypoint: orchestrate
-                          serviceAccountName: argo-workflow
-                          activeDeadlineSeconds: 172800  # 48 hours
+                          workflowTemplateRef:
+                            name: play-workflow-template
                           arguments:
                             parameters:
                               - name: task-id
                                 value: "$NEXT_TASK_ID"
+                              - name: repository
+                                value: "$REPO_PATH"
                               - name: service
                                 value: "$SERVICE_NAME"
-                              - name: github-owner
-                                value: "$GITHUB_OWNER"
-                              - name: github-repo
-                                value: "$GITHUB_REPO"
-                              - name: docs-repo
-                                value: "$GITHUB_REPO"
-                          templates:
-                            - name: orchestrate
-                              steps:
-                                # Stage 1: Rex Implementation
-                                - - name: implementation
-                                    template: run-rex
-
-                                # Stage 2: Wait for PR creation
-                                - - name: wait-pr-created
-                                    template: suspend-for-stage
-                                    arguments:
-                                      parameters:
-                                        - name: stage
-                                          value: "waiting-pr-created"
-
-                                # Stage 3: Cleo Code Quality
-                                - - name: quality
-                                    template: run-cleo
-
-                                # Stage 4: Wait for ready-for-qa label
-                                - - name: wait-ready-for-qa
-                                    template: suspend-for-stage
-                                    arguments:
-                                      parameters:
-                                        - name: stage
-                                          value: "waiting-ready-for-qa"
-
-                                # Stage 5: Tess QA Testing
-                                - - name: testing
-                                    template: run-tess
-
-                                # Stage 6: Wait for merge to main
-                                - - name: wait-merge-to-main
-                                    template: suspend-for-stage
-                                    arguments:
-                                      parameters:
-                                        - name: stage
-                                          value: "waiting-merge-to-main"
-
-                                # Stage 7: Task complete
-                                - - name: task-complete
-                                    template: log-completion
-
-                            - name: suspend-for-stage
-                              inputs:
-                                parameters:
-                                  - name: stage
-                              suspend: {}
-                              metadata:
-                                labels:
-                                  current-stage: "{{`{{inputs.parameters.stage}}`}}"
-
-                            - name: run-rex
-                              resource:
-                                action: create
-                                manifest: |
-                                  apiVersion: agents.platform/v1
-                                  kind: CodeRun
-                                  metadata:
-                                    generateName: ${SERVICE_NAME}-t${NEXT_TASK_ID}-rex-
-                                    namespace: agent-platform
-                                    labels:
-                                      task-id: "${NEXT_TASK_ID}"
-                                      workflow-stage: "implementation"
-                                      agent-type: "rex"
-                                  spec:
-                                    taskId: ${NEXT_TASK_ID}
-                                    service: "${SERVICE_NAME}"
-                                    repositoryUrl: "${GITHUB_OWNER}/${GITHUB_REPO}"
-                                    docsRepositoryUrl: "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
-                                    docsProjectDirectory: "docs"
-                                    workingDirectory: "."
-                                    githubApp: "5DLabs-Rex"
-                                    model: "claude-sonnet-4-20250514"
-                                    continueSession: true
-                                    overwriteMemory: false
-                                    contextVersion: 1
-
-                            - name: run-cleo
-                              resource:
-                                action: create
-                                manifest: |
-                                  apiVersion: agents.platform/v1
-                                  kind: CodeRun
-                                  metadata:
-                                    generateName: ${SERVICE_NAME}-t${NEXT_TASK_ID}-cleo-
-                                    namespace: agent-platform
-                                    labels:
-                                      task-id: "${NEXT_TASK_ID}"
-                                      workflow-stage: "quality"
-                                      agent-type: "cleo"
-                                  spec:
-                                    taskId: ${NEXT_TASK_ID}
-                                    service: "${SERVICE_NAME}"
-                                    repositoryUrl: "${GITHUB_OWNER}/${GITHUB_REPO}"
-                                    docsRepositoryUrl: "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
-                                    docsProjectDirectory: "docs"
-                                    workingDirectory: "."
-                                    githubApp: "5DLabs-Cleo"
-                                    model: "claude-sonnet-4-20250514"
-                                    continueSession: true
-                                    overwriteMemory: false
-                                    contextVersion: 1
-                                    # Cleo will find the PR created by Rex
-
-                            - name: run-tess
-                              resource:
-                                action: create
-                                manifest: |
-                                  apiVersion: agents.platform/v1
-                                  kind: CodeRun
-                                  metadata:
-                                    generateName: ${SERVICE_NAME}-t${NEXT_TASK_ID}-tess-
-                                    namespace: agent-platform
-                                    labels:
-                                      task-id: "${NEXT_TASK_ID}"
-                                      workflow-stage: "testing"
-                                      agent-type: "tess"
-                                  spec:
-                                    taskId: ${NEXT_TASK_ID}
-                                    service: "${SERVICE_NAME}"
-                                    repositoryUrl: "${GITHUB_OWNER}/${GITHUB_REPO}"
-                                    docsRepositoryUrl: "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}"
-                                    docsProjectDirectory: "docs"
-                                    workingDirectory: "."
-                                    githubApp: "5DLabs-Tess"
-                                    model: "claude-sonnet-4-20250514"
-                                    continueSession: true
-                                    overwriteMemory: false
-                                    contextVersion: 1
-                                    # Tess will find the PR with ready-for-qa label
-
-                            - name: log-completion
-                              script:
-                                image: alpine:3.18
-                                command: [sh]
-                                source: |
-                                  echo "✅ Task ${NEXT_TASK_ID} completed successfully!"
-                                  echo "Merged to main and ready for production."
+                              - name: model
+                                value: "$MODEL"
+                              - name: implementation-agent
+                                value: "$IMPL_AGENT"
+                              - name: quality-agent
+                                value: "$QUALITY_AGENT"
+                              - name: testing-agent
+                                value: "$TESTING_AGENT"
                         EOF
 
                         if [ $? -eq 0 ]; then
