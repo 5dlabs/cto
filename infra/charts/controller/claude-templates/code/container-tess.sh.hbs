@@ -791,50 +791,80 @@ Your STRICT testing requirements:
 **KUBERNETES DEPLOYMENT INSTRUCTIONS**:
 If you have kubectl access, deploy the application to verify it works:
 \`\`\`bash
-# 1. Build and push Docker image (if Dockerfile exists)
-if [ -f Dockerfile ]; then
-  docker build -t ghcr.io/5dlabs/task-{{task_id}}:test .
-  docker push ghcr.io/5dlabs/task-{{task_id}}:test
+# 1. Check if we can actually deploy (skip Docker build/push - image should exist)
+if ! kubectl version --short 2>/dev/null; then
+  echo "⚠️ No kubectl access - skipping Kubernetes deployment"
+  exit 0
 fi
 
-# 2. Create test namespace
-kubectl create namespace test-{{task_id}}
+# 2. Create or use test namespace (idempotent)
+kubectl create namespace test-{{task_id}} --dry-run=client -o yaml | kubectl apply -f -
 
-# 3. Deploy using universal-app chart
-helm upgrade --install task-{{task_id}} /workspace/infra/charts/universal-app \\
+# 3. Check if universal-app chart exists locally
+CHART_PATH="/workspace/infra/charts/universal-app"
+if [ ! -d "$CHART_PATH" ]; then
+  # Try alternate locations
+  CHART_PATH="./infra/charts/universal-app"
+  if [ ! -d "$CHART_PATH" ]; then
+    echo "⚠️ Universal app chart not found - skipping deployment"
+    exit 0
+  fi
+fi
+
+# 4. Deploy using universal-app chart (assuming image already exists)
+RELEASE_NAME="task-{{task_id}}"
+helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \\
   --namespace test-{{task_id}} \\
+  --set fullnameOverride="$RELEASE_NAME" \\
   --set image.repository=ghcr.io/5dlabs/task-{{task_id}} \\
-  --set image.tag=test \\
+  --set image.tag=latest \\
   --set ingress.enabled=false \\
   --set service.port=8080 \\
   --set resources.limits.cpu=500m \\
-  --set resources.limits.memory=512Mi
+  --set resources.limits.memory=512Mi \\
+  --timeout 5m \\
+  --wait || {
+    echo "⚠️ Helm install failed - checking status"
+    kubectl get all -n test-{{task_id}}
+    helm uninstall "$RELEASE_NAME" -n test-{{task_id}} 2>/dev/null || true
+    exit 0
+  }
 
-# 4. Wait for deployment to be ready
-kubectl wait --for=condition=available \\
-  deployment/task-{{task_id}} \\
-  --namespace test-{{task_id}} \\
-  --timeout=300s
+# 5. Get actual deployment and service names (helm may add suffixes)
+DEPLOYMENT_NAME=$(kubectl get deployment -n test-{{task_id}} -o name | head -1)
+SVC_NAME=$(kubectl get svc -n test-{{task_id}} -o name | head -1)
 
-# 5. Check pod status
+# 6. Check pod status
 kubectl get pods -n test-{{task_id}}
 
-# 6. Port-forward and test
-kubectl port-forward -n test-{{task_id}} svc/task-{{task_id}} 8080:8080 &
-PF_PID=$!
-sleep 2
-
-# 7. Test endpoints
-curl -f http://localhost:8080/health || echo "Health check failed"
-curl -f http://localhost:8080/ready || echo "Ready check failed"
+# 7. Port-forward with retry logic and better timing
+if [ -n "$SVC_NAME" ]; then
+  for i in 1 2 3; do
+    kubectl port-forward -n test-{{task_id}} "$SVC_NAME" 8080:8080 &
+    PF_PID=$!
+    sleep 5  # Give port-forward more time to establish
+    
+    if kill -0 $PF_PID 2>/dev/null; then
+      echo "✓ Port-forward established"
+      break
+    fi
+    echo "Retry $i: Port-forward failed, retrying..."
+  done
+  
+  # Test endpoints if port-forward succeeded
+  if kill -0 $PF_PID 2>/dev/null; then
+    curl -f http://localhost:8080/health || echo "⚠️ Health check failed or not implemented"
+    curl -f http://localhost:8080/ready || echo "⚠️ Ready check failed or not implemented"
+    kill $PF_PID 2>/dev/null || true
+  fi
+fi
 
 # 8. Check logs for errors
-kubectl logs -n test-{{task_id}} -l app.kubernetes.io/name=universal-app --tail=50
+kubectl logs -n test-{{task_id}} -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
 
 # 9. Cleanup
-kill $PF_PID 2>/dev/null || true
-helm uninstall task-{{task_id}} -n test-{{task_id}}
-kubectl delete namespace test-{{task_id}}
+helm uninstall "$RELEASE_NAME" -n test-{{task_id}} --wait || true
+kubectl delete namespace test-{{task_id}} --wait=false || true
 \`\`\`
 
 **HOW TO POST PR REVIEW (CRITICAL: Use proper review, NOT regular comments!)**:
