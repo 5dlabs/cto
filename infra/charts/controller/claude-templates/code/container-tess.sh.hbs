@@ -794,7 +794,7 @@ If you have kubectl access, deploy the application to verify it works:
 # 1. Check if we can actually deploy (skip Docker build/push - image should exist)
 if ! kubectl version --short 2>/dev/null; then
   echo "⚠️ No kubectl access - skipping Kubernetes deployment"
-  exit 0
+  # Don't exit - continue with other tests
 fi
 
 # 2. Create or use test namespace (idempotent)
@@ -807,13 +807,15 @@ if [ ! -d "$CHART_PATH" ]; then
   CHART_PATH="./infra/charts/universal-app"
   if [ ! -d "$CHART_PATH" ]; then
     echo "⚠️ Universal app chart not found - skipping deployment"
-    exit 0
+    # Don't exit - continue with other tests
+    SKIP_K8S_DEPLOY=true
   fi
 fi
 
 # 4. Deploy using universal-app chart (assuming image already exists)
-RELEASE_NAME="task-{{task_id}}"
-helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \\
+if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
+  RELEASE_NAME="task-{{task_id}}"
+  helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \\
   --namespace test-{{task_id}} \\
   --set fullnameOverride="$RELEASE_NAME" \\
   --set image.repository=ghcr.io/5dlabs/task-{{task_id}} \\
@@ -827,18 +829,18 @@ helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \\
     echo "⚠️ Helm install failed - checking status"
     kubectl get all -n test-{{task_id}}
     helm uninstall "$RELEASE_NAME" -n test-{{task_id}} 2>/dev/null || true
-    exit 0
+    # Don't exit - continue with other tests
   }
 
-# 5. Get actual deployment and service names (helm may add suffixes)
-DEPLOYMENT_NAME=$(kubectl get deployment -n test-{{task_id}} -o name | head -1)
-SVC_NAME=$(kubectl get svc -n test-{{task_id}} -o name | head -1)
+  # 5. Get actual deployment and service names (helm may add suffixes)
+  DEPLOYMENT_NAME=$(kubectl get deployment -n test-{{task_id}} -o name | head -1)
+  SVC_NAME=$(kubectl get svc -n test-{{task_id}} -o name | head -1)
 
-# 6. Check pod status
-kubectl get pods -n test-{{task_id}}
+  # 6. Check pod status
+  kubectl get pods -n test-{{task_id}}
 
-# 7. Port-forward with retry logic and better timing
-if [ -n "$SVC_NAME" ]; then
+  # 7. Port-forward with retry logic and better timing
+  if [ -n "$SVC_NAME" ]; then
   for i in 1 2 3; do
     kubectl port-forward -n test-{{task_id}} "$SVC_NAME" 8080:8080 &
     PF_PID=$!
@@ -859,12 +861,15 @@ if [ -n "$SVC_NAME" ]; then
   fi
 fi
 
-# 8. Check logs for errors
-kubectl logs -n test-{{task_id}} -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
+  # 8. Check logs for errors
+  kubectl logs -n test-{{task_id}} -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
 
-# 9. Cleanup
-helm uninstall "$RELEASE_NAME" -n test-{{task_id}} --wait || true
-kubectl delete namespace test-{{task_id}} --wait=false || true
+  # 9. Cleanup
+  helm uninstall "$RELEASE_NAME" -n test-{{task_id}} --wait || true
+  kubectl delete namespace test-{{task_id}} --wait=false || true
+else
+  echo "ℹ️ Kubernetes deployment skipped - no access or chart missing"
+fi
 \`\`\`
 
 **HOW TO POST PR REVIEW (CRITICAL: Use proper review, NOT regular comments!)**:

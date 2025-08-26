@@ -416,7 +416,9 @@ Monitor CI status and fix any failures OR stuck jobs:
 ```bash
 # Check CI status - look for BOTH failures AND stuck jobs
 gh pr checks {{pr_number}}
-gh run list --branch={{pr_branch}} --limit 5
+# Get PR branch dynamically
+PR_BRANCH=$(gh pr view {{pr_number}} --json headRefName -q .headRefName)
+gh run list --branch="$PR_BRANCH" --limit 5
 
 # If jobs are stuck/not starting:
 # 1. Check workflow syntax:
@@ -723,7 +725,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    - Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
    - **CRITICAL: Check for stuck/pending jobs**:
      * Look for jobs showing "Waiting" or "Pending" for > 2 minutes
-     * Check 'gh run list --branch={{pr_branch}}' for workflow status
+     * Check 'gh run list --branch=$(gh pr view {{pr_number}} --json headRefName -q .headRefName)' for workflow status
      * If jobs aren't starting, investigate:
        - Missing runner labels? Check 'runs-on:' in workflow
        - Workflow syntax errors? Validate with 'actionlint' or GitHub UI
