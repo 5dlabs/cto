@@ -589,33 +589,49 @@ CLEO_PROMPT="$CLEO_PROMPT
    - For YAML: YAML linting and validation
    - IMPORTANT: Commit and push ALL fixes immediately (don't wait until the end)
 4. **Set up CI/CD Pipeline (CRITICAL)**:
-   - Check if .github/workflows/build.yml exists
-   - If not, create GitHub Actions workflow to build Docker image
+   - Check if .github/workflows/ci.yml exists (or similar CI workflow)
+   - If not, create GitHub Actions workflow that MUST include:
+     * cargo clippy -- -D warnings -W clippy::pedantic
+     * cargo fmt --check
+     * cargo test
+     * Docker image building
    - Ensure Dockerfile exists (create minimal one if needed)
    - The workflow should:
      * Trigger on PR and push to main
+     * Run ALL quality checks (clippy pedantic, fmt, tests)
      * Build Docker image with proper tagging
      * Push to ghcr.io (GitHub Container Registry)
    - Commit and push the CI configuration
-   - Use 'gh workflow run' to trigger the build
-   - Use 'gh run list' and 'gh run view' to monitor build status
-   - KEEP WORKING until the Docker image builds successfully in GitHub Actions
-5. **Verify CI Success**:
-   - Use 'gh pr checks' to confirm all checks are passing
-   - Use 'gh run list --workflow=build.yml' to verify successful Docker build
-   - Do NOT proceed until you have a green build
+   - Push any code fixes you made locally
+   - Use 'gh workflow run' to trigger the build if needed
+   - Use 'gh run list' and 'gh run view' to monitor status
+   - KEEP ITERATING: Fix issues, push, check CI, repeat until GREEN
+5. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
+   - Use 'gh pr checks' to confirm ALL checks are passing
+   - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI
+   - Use 'gh run list --workflow=ci.yml' to verify successful runs
+   - SUCCESS = Clippy pedantic passing IN GITHUB ACTIONS (not just locally!)
+   - You MUST push changes and verify they pass in CI
+   - Do NOT proceed until GitHub shows green checks for clippy pedantic
 6. **Review against task requirements**: Verify implementation matches acceptance criteria
 7. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
 8. **Success criteria**: Quality checks AND Docker build must pass for approval
 
-## Quality Standards
-- **Zero tolerance** for clippy warnings (even at pedantic level)
-- **Perfect formatting** required (cargo fmt --check must pass)
-- **All tests pass** (cargo test must succeed)
+## Quality Standards (MUST PASS IN GITHUB ACTIONS, NOT JUST LOCALLY!)
+- **Zero tolerance** for clippy warnings at pedantic level IN GITHUB ACTIONS
+- **Perfect formatting** required (cargo fmt --check must pass IN CI)
+- **All tests pass** (cargo test must succeed IN CI)
 - **Clean YAML** syntax and structure
 - **CI/CD Pipeline** MUST be working with successful Docker image build
-- **GitHub Actions** must show green checks for the PR
+- **GitHub Actions** must show green checks for ALL quality gates
 - **Task compliance** (implementation should meet acceptance criteria)
+
+## CRITICAL REMINDER
+Your success is measured by GitHub Actions CI status, NOT local checks!
+- You MUST push your changes to see them tested in CI
+- You MUST iterate: fix locally → push → check CI → repeat until green
+- Clippy pedantic MUST pass in GitHub Actions before you can add 'ready-for-qa' label
+- The PR checks page on GitHub is your source of truth
 
 Begin your code quality review now."
 
