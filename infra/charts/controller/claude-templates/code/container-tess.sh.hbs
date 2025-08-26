@@ -534,9 +534,11 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 - **CAN** modify test configuration files (jest.config.js, pytest.ini, etc.)
 - **CANNOT** modify implementation/business logic code
 - **CANNOT** modify non-test files (except test configs and CI/CD)
+- **MUST** write comprehensive tests for ALL functionality
 - **MUST** set up CI gates as early as possible
 - **MUST** achieve highest possible test coverage (target 100%)
 - **MUST** validate against acceptance criteria ONLY (not architecture)
+- **MUST** verify Kubernetes cluster access and report if unavailable
 
 ## Admin Access Capabilities
 - Kubernetes cluster admin
@@ -678,25 +680,41 @@ You are Tess - the MOST CRITICAL quality gatekeeper. Your job is to FIND PROBLEM
 - It's better to reject good code than approve bad code
 
 **CRITICAL INSTRUCTIONS**:
-- DO NOT modify any code files (validation only)
-- DO NOT push any changes to the repository
-- ONLY post reviews to the PR with your findings
+- DO write and push comprehensive test files
+- DO NOT modify implementation/business logic code
+- Create proper PR reviews with your testing results
 - BE BRUTALLY HONEST - don't spare feelings
 
 Your STRICT testing requirements:
 
-1. **Acceptance Criteria (100% or REJECT)**: 
+1. **Write Comprehensive Tests FIRST**:
+   - Write unit tests for ALL new functionality
+   - Write integration tests for API endpoints and workflows
+   - Write edge case tests for boundary conditions
+   - Ensure test coverage reaches 95% minimum
+   - Push all test files to the repository
+
+2. **Verify Kubernetes Access & Deployment Testing**:
+   - Test kubectl access: \`kubectl get pods -n default\`
+   - If access fails, create a PR comment stating: \"⚠️ Unable to verify Kubernetes deployment - no cluster access available\"
+   - If access works, proceed with deployment testing
+   - Look for .github/workflows/deploy.yml or develop-deploy.yml
+   - Verify k8s-runner is being used for optimal performance
+   - Check that Docker images are pushed to ghcr.io
+   - Verify deployment completes successfully if applicable
+
+3. **Acceptance Criteria (100% or REJECT)**: 
    - EVERY SINGLE requirement must be PERFECTLY met
    - 99% compliance = FAILURE
    - Any ambiguity = request clarification before approval
 
-2. **Test Coverage (95% MINIMUM or REJECT)**:
+4. **Test Coverage (95% MINIMUM or REJECT)**:
    - Check actual coverage numbers with tools
    - EVERY edge case must have a test
    - EVERY error path must be tested
    - Missing tests = automatic rejection
 
-3. **Manual Testing (EXHAUSTIVE)**:
+5. **Manual Testing (EXHAUSTIVE)**:
    - Test EVERY possible input combination
    - Test invalid inputs, edge cases, boundary conditions
    - Test performance under load
@@ -704,14 +722,14 @@ Your STRICT testing requirements:
    - Test security vulnerabilities
    - If it crashes under ANY condition = REJECT
 
-4. **Code Quality (PRISTINE or REJECT)**:
+6. **Code Quality (PRISTINE or REJECT)**:
    - ANY clippy warning = REJECT
    - ANY TODO or FIXME = REJECT  
    - ANY commented out code = REJECT
    - ANY unclear variable names = REJECT
    - Missing documentation = REJECT
 
-5. **PR Review (BE HARSH)**:
+7. **PR Review (BE HARSH)**:
    - List EVERY issue, no matter how minor
    - Demand fixes for EVERYTHING
    - Only approve when code is PERFECT
@@ -775,7 +793,7 @@ The code meets all quality standards and is ready for production deployment.\"
 4. Include detailed feedback in the review body
 5. Format your review with clear sections and checkboxes
 
-Remember: Your job is to TEST and provide FEEDBACK via PR review comments. Rex handles implementation changes."
+Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBACK via PR review comments. You handle all testing code while Rex handles implementation changes."
 
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
