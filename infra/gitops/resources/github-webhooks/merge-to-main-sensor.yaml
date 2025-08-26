@@ -46,9 +46,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                # Use deterministic name based on PR number to prevent duplicates
-                # Kubernetes will reject duplicate creation attempts with AlreadyExists error
-                name: task-complete-pr-will-be-replaced
+                generateName: task-complete-
                 namespace: agent-platform
                 labels:
                   type: task-completion
@@ -193,14 +191,50 @@ spec:
                         echo "👤 Merged by: {{workflow.parameters.merged-by}}"
                         echo "════════════════════════════════════════════════════════════════"
 
-                        # With deterministic workflow names (task-complete-pr-NUMBER),
-                        # Kubernetes will prevent duplicate workflows from being created.
-                        # This check is now mainly for logging purposes.
+                        # DISTRIBUTED LOCK: Prevent duplicate processing using ConfigMap
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
                         CURRENT_WORKFLOW_NAME="{{workflow.name}}"
+                        LOCK_NAME="pr-merge-lock-${PR_NUMBER}"
 
-                        echo "✅ Processing PR #$PR_NUMBER as workflow: $CURRENT_WORKFLOW_NAME"
-                        echo "Note: Duplicate attempts will be rejected by Kubernetes with AlreadyExists error"
+                        echo "🔒 Attempting to acquire lock for PR #$PR_NUMBER..."
+
+                        # Try to create lock ConfigMap (atomic operation)
+                        if kubectl create configmap "$LOCK_NAME" \
+                          --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
+                          --from-literal=timestamp="$(date -u +%s)" \
+                          -n agent-platform 2>/dev/null; then
+
+                          echo "✅ Lock acquired for PR #$PR_NUMBER by $CURRENT_WORKFLOW_NAME"
+                          # Set up cleanup on exit
+                          trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true" EXIT
+                        else
+                          # Lock already exists, check if it's stale (older than 1 hour)
+                          EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n agent-platform \
+                            -o jsonpath='{.data.owner}' 2>/dev/null || echo "unknown")
+                          LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n agent-platform \
+                            -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "0")
+                          CURRENT_TIME=$(date -u +%s)
+                          LOCK_AGE=$((CURRENT_TIME - LOCK_TIME))
+
+                          if [ $LOCK_AGE -gt 3600 ]; then
+                            echo "⚠️ Stale lock detected (${LOCK_AGE}s old), attempting to claim..."
+                            kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true
+                            if kubectl create configmap "$LOCK_NAME" \
+                              --from-literal=owner="$CURRENT_WORKFLOW_NAME" \
+                              --from-literal=timestamp="$(date -u +%s)" \
+                              -n agent-platform 2>/dev/null; then
+                              echo "✅ Stale lock replaced, continuing..."
+                              trap "echo 'Releasing lock...'; kubectl delete configmap $LOCK_NAME -n agent-platform 2>/dev/null || true" EXIT
+                            else
+                              echo "❌ Failed to claim stale lock, another workflow got it first"
+                              exit 0
+                            fi
+                          else
+                            echo "⚠️ PR #$PR_NUMBER is already being processed by: $EXISTING_OWNER"
+                            echo "Lock age: ${LOCK_AGE}s (will expire after 3600s)"
+                            exit 0
+                          fi
+                        fi
 
                         # Extract task ID from PR title (e.g., "Task 1: Initialize..." -> "1")
                         PR_TITLE="{{workflow.parameters.pr-title}}"
@@ -731,11 +765,12 @@ spec:
                           exit 1
                         fi
           parameters:
-            # Use PR number in workflow name for deduplication
-            - dest: metadata.name
+            # Append PR number to generateName for easier identification
+            - dest: metadata.generateName
               src:
                 dependencyName: github-pr-merged
-                dataTemplate: task-complete-pr-{{ .body.pull_request.number }}
+                dataTemplate: "pr{{ .Input.body.pull_request.number }}-"
+              operation: append
             # Add PR number to workflow labels for tracking
             - dest: metadata.labels.pr-number
               src:
