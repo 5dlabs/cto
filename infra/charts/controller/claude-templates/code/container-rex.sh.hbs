@@ -37,10 +37,12 @@ fi
 echo '════════════════════════════════════════════════════════════════'
 echo '║           REX/BLAZE DOCUMENTATION WORKFLOW STARTING          ║'
 echo '║                  Implementation Agent Active                  ║'
+echo '║            ⚠️  TASK {{task_id}} ONLY - NO OTHER TASKS ⚠️             ║'
 echo '════════════════════════════════════════════════════════════════'
 echo "🎯 Agent: {{github_app}}"
 echo "📚 Focus: Documentation-first implementation approach"
 echo "📋 Task ID: {{task_id}}"
+echo "⛔ CRITICAL: You must ONLY work on Task {{task_id}} - ignore ALL other tasks"
 
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
@@ -1064,10 +1066,28 @@ else
         fi
         echo ""
 
-        # Prepare prompt prefix for toolman guidance
-        PROMPT_PREFIX=""
+        # Prepare prompt prefix with CRITICAL task isolation instruction
+        PROMPT_PREFIX="⛔ **CRITICAL TASK ISOLATION REQUIREMENT** ⛔
+
+You are assigned to work on **TASK {{task_id}} ONLY**. 
+
+**STRICT RULES:**
+1. You MUST ONLY implement Task {{task_id}} - ignore ALL other tasks
+2. DO NOT skip ahead to other tasks, even if you see evidence of previous work
+3. DO NOT implement task-2, task-3, task-4, etc. - ONLY Task {{task_id}}
+4. If you see existing code from other tasks, IGNORE IT
+5. If your memory (CLAUDE.md) mentions other tasks, IGNORE those parts
+6. Focus SOLELY on the requirements in task/prompt.md for Task {{task_id}}
+
+**TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
+
+---
+
+"
+        
+        # Add toolman guidance if available
         if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
-            PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**
+            PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **Tool Usage Reference**
 
 Before starting implementation, you MUST read and follow the task-specific tool guidance in the file \`task/toolman-guide.md\`. This file contains:
 - Selected tools for this specific task
@@ -1081,9 +1101,9 @@ Before starting implementation, you MUST read and follow the task-specific tool 
 ---
 
 "
-            echo "✓ Including toolman guidance prefix"
+            echo "✓ Including task isolation instructions and toolman guidance"
         else
-            echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
+            echo "✓ Including task isolation instructions (no toolman guide found)"
         fi
 
         # Seed initial user turn via a FIFO (system prompts are set via CLI flags, not streamed)
