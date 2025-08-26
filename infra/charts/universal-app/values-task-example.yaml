@@ -1,3 +1,4 @@
+---
 # Example values for deploying a task application
 # This would be used by Tess when deploying completed tasks
 
@@ -12,7 +13,7 @@ image:
   pullPolicy: IfNotPresent
   tag: "latest"
 
-# Service configuration  
+# Service configuration
 service:
   type: ClusterIP
   port: 8080
