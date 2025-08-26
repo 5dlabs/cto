@@ -412,12 +412,25 @@ git push
 ```
 
 ### 2. CI/CD Failure Fixes (HIGH PRIORITY)
-Monitor CI status and fix any failures:
+Monitor CI status and fix any failures OR stuck jobs:
 ```bash
-# Check CI status
+# Check CI status - look for BOTH failures AND stuck jobs
 gh pr checks {{pr_number}}
+gh run list --branch={{pr_branch}} --limit 5
 
-# Common fixes:
+# If jobs are stuck/not starting:
+# 1. Check workflow syntax:
+cat .github/workflows/*.yml | head -50
+# 2. Verify runner labels exist
+# 3. Check for workflow errors in GitHub UI
+
+# Common fixes for stuck jobs:
+# - Fix 'runs-on:' to use valid runner (ubuntu-latest, ubuntu-22.04, etc.)
+# - Fix action versions (e.g., actions/checkout@v4)
+# - Ensure workflow triggers match (push, pull_request)
+# - Remove or fix invalid workflow syntax
+
+# Common fixes for failed jobs:
 # - Fix linting errors (cargo fmt, black, eslint --fix)
 # - Fix type errors
 # - Update dependencies if needed
@@ -701,14 +714,29 @@ CLEO_PROMPT="$CLEO_PROMPT
    - Push any code fixes you made locally
    - Use 'gh workflow run' to trigger the build if needed
    - Use 'gh run list' and 'gh run view' to monitor status
-   - KEEP ITERATING: Fix issues, push, check CI, repeat until GREEN
+   - **WATCH FOR STUCK JOBS**: If jobs show "Waiting" > 2 min:
+     * Check runner availability and labels
+     * Verify workflow syntax is correct
+     * Fix any workflow configuration issues
+   - KEEP ITERATING: Fix issues, push, check CI, repeat until ALL JOBS RUN AND PASS
 5. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
-   - Use 'gh pr checks' to confirm ALL checks are passing
+   - Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
+   - **CRITICAL: Check for stuck/pending jobs**:
+     * Look for jobs showing "Waiting" or "Pending" for > 2 minutes
+     * Check 'gh run list --branch={{pr_branch}}' for workflow status
+     * If jobs aren't starting, investigate:
+       - Missing runner labels? Check 'runs-on:' in workflow
+       - Workflow syntax errors? Validate with 'actionlint' or GitHub UI
+       - Missing workflow triggers? Check 'on:' section
+       - Concurrency limits? Check workflow 'concurrency:' settings
+   - **Common fixes for stuck jobs**:
+     * Add/fix 'runs-on: ubuntu-latest' (or appropriate runner)
+     * Remove invalid actions or fix version tags
+     * Ensure workflow file is in .github/workflows/
+     * Check if workflow needs to be enabled in Actions settings
    - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI
-   - Use 'gh run list --workflow=ci.yml' to verify successful runs
-   - SUCCESS = Clippy pedantic passing IN GITHUB ACTIONS (not just locally!)
-   - You MUST push changes and verify they pass in CI
-   - Do NOT proceed until GitHub shows green checks for clippy pedantic
+   - SUCCESS = ALL jobs completed successfully (not just "not failed")
+   - Do NOT proceed until GitHub shows ALL green checks
 6. **Review against task requirements**: Verify implementation matches acceptance criteria
 7. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
 8. **Success criteria**: Quality checks AND Docker build must pass for approval
@@ -727,6 +755,20 @@ Your success is measured by GitHub Actions CI status, NOT local checks!
 - You MUST push your changes to see them tested in CI
 - You MUST iterate: fix locally → push → check CI → repeat until green
 - Clippy pedantic MUST pass in GitHub Actions before you can add 'ready-for-qa' label
+- **ALL CI JOBS MUST ACTUALLY RUN** - stuck/pending jobs = FAILURE
+
+## TROUBLESHOOTING STUCK CI JOBS
+If CI jobs won't start (showing \"Waiting\" or \"Pending\" indefinitely):
+1. **Check runner labels**: Ensure 'runs-on:' uses valid runners
+   - Common: ubuntu-latest, ubuntu-22.04, ubuntu-20.04
+   - Self-hosted: [self-hosted], [k8s-runner]
+2. **Validate workflow syntax**: Run locally or check GitHub UI for errors
+3. **Check workflow triggers**: Ensure 'on:' section includes your event
+4. **Fix common issues**:
+   - Missing or misspelled action names
+   - Invalid YAML syntax (use yamllint)
+   - Workflow file not in .github/workflows/
+   - Workflow disabled in repo settings
 - The PR checks page on GitHub is your source of truth
 
 Begin your code quality review now."
