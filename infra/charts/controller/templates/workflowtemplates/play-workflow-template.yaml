@@ -45,35 +45,35 @@ spec:
       # Agent selection parameters (no hardcoded names)
       - name: implementation-agent
         description: "Agent to use for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)"
-        value: "5DLabs-Rex"
+        value: ""  # Must be provided by MCP client
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
-        value: "5DLabs-Cleo"
+        value: ""  # Must be provided by MCP client
       - name: testing-agent
         description: "Agent to use for testing and validation (e.g., 5DLabs-Tess)"
-        value: "5DLabs-Tess"
+        value: ""  # Must be provided by MCP client
 
       # Task and repository configuration
       - name: task-id
         description: "Unique task identifier for correlation (required)"
-        value: ""
+        value: ""  # Must be provided by MCP client
       - name: repository
         description: "GitHub repository for the work"
-        value: "5dlabs/cto-play-test"
+        value: ""  # Must be provided by MCP client
       - name: service
         description: "Service identifier for persistent workspace"
-        value: "play-test"
+        value: ""  # Must be provided by MCP client
       - name: docs-repository
         description: "GitHub repository containing documentation"
-        value: "5dlabs/cto-play-test"
+        value: ""  # Must be provided by MCP client
       - name: docs-project-directory
         description: "Directory within docs repository containing project documentation"
-        value: "docs"
+        value: ""  # Must be provided by MCP client
 
       # Model configuration
       - name: model
         description: "Claude model to use for all agents"
-        value: "claude-3-5-sonnet-20241022"
+        value: ""  # Must be provided by MCP client
 
       # PR context (populated by suspend/resume)
       - name: pr-url
