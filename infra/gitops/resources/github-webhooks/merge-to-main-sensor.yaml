@@ -212,8 +212,16 @@ spec:
                           EXISTING_OWNER=$(kubectl get configmap $LOCK_NAME -n agent-platform \
                             -o jsonpath='{.data.owner}' 2>/dev/null || echo "unknown")
                           LOCK_TIME=$(kubectl get configmap $LOCK_NAME -n agent-platform \
-                            -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "0")
+                            -o jsonpath='{.data.timestamp}' 2>/dev/null || echo "")
                           CURRENT_TIME=$(date -u +%s)
+
+                          # If lock time is invalid or missing, assume it's recent (don't delete it)
+                          if [ -z "$LOCK_TIME" ] || ! [[ "$LOCK_TIME" =~ ^[0-9]+$ ]]; then
+                            echo "⚠️ PR #$PR_NUMBER is already being processed by: $EXISTING_OWNER"
+                            echo "Lock exists but timestamp is invalid, treating as valid lock"
+                            exit 0
+                          fi
+
                           LOCK_AGE=$((CURRENT_TIME - LOCK_TIME))
 
                           if [ $LOCK_AGE -gt 3600 ]; then
