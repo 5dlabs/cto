@@ -1157,29 +1157,122 @@ EOF
       echo "⚠️ kubectl not available, cannot update CodeRun status"
     fi
     
-    # Apply correlation labels
+    # Apply correlation labels with comprehensive debugging
     echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
-    TASK_LABEL="task-${TASK_ID}"
-    RUN_LABEL="run-${WORKFLOW_NAME:-unknown}"
-    SERVICE_LABEL="service-${SERVICE_NAME:-unknown}"
     
-    # Use gh CLI to add labels (simpler than curl)
-    if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
-      echo "✅ Added correlation labels: $TASK_LABEL, $RUN_LABEL, $SERVICE_LABEL"
+    # Debug: Check environment variables
+    echo "🔍 DEBUG: Environment check for label creation:"
+    echo "   TASK_ID: '${TASK_ID}'"
+    echo "   WORKFLOW_NAME: '${WORKFLOW_NAME}'"
+    echo "   SERVICE_NAME: '${SERVICE_NAME}'"
+    echo "   CODERUN_NAME: '${CODERUN_NAME}'"
+    echo "   GitHub Token: $([ -n "$GITHUB_TOKEN" ] && echo 'Present' || echo 'Missing')"
+    
+    # Validate required variables
+    if [ -z "$WORKFLOW_NAME" ]; then
+      echo "❌ ERROR: WORKFLOW_NAME is not set!"
+      echo "🔍 DEBUG: Attempting to extract from CODERUN_NAME..."
+      # Try to extract workflow name from CodeRun name pattern
+      if [ -n "$CODERUN_NAME" ]; then
+        # Pattern: service-t{task}-stage-{hash} created by workflow
+        echo "   CODERUN_NAME format: $CODERUN_NAME"
+      fi
+      
+      # Check if we can get it from Kubernetes labels
+      if command -v kubectl >/dev/null 2>&1 && [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+        echo "🔍 DEBUG: Trying to get workflow name from CodeRun labels..."
+        WORKFLOW_FROM_LABELS=$(kubectl get coderun "$CODERUN_NAME" -n "$NAMESPACE" -o jsonpath='{.metadata.labels.workflow-name}' 2>/dev/null || echo "")
+        if [ -n "$WORKFLOW_FROM_LABELS" ]; then
+          echo "✅ Found workflow name from CodeRun labels: $WORKFLOW_FROM_LABELS"
+          WORKFLOW_NAME="$WORKFLOW_FROM_LABELS"
+        else
+          echo "❌ Could not retrieve workflow name from CodeRun labels"
+        fi
+      fi
+      
+      # Final check - if still no workflow name, fail loudly
+      if [ -z "$WORKFLOW_NAME" ]; then
+        echo "❌ CRITICAL: Cannot determine WORKFLOW_NAME - this will cause correlation issues!"
+        echo "🔍 DEBUG: Available environment variables:"
+        env | grep -E "WORKFLOW|CODERUN|TASK|SERVICE" | sort
+        # DO NOT use 'unknown' - exit with error instead
+        echo "❌ Refusing to use 'unknown' label - failing task"
+        exit 1
+      fi
+    fi
+    
+    TASK_LABEL="task-${TASK_ID}"
+    RUN_LABEL="run-${WORKFLOW_NAME}"
+    SERVICE_LABEL="service-${SERVICE_NAME}"
+    
+    echo "📋 Labels to apply:"
+    echo "   Task: $TASK_LABEL"
+    echo "   Run: $RUN_LABEL"
+    echo "   Service: $SERVICE_LABEL"
+    
+    # Try to add labels with detailed error capture
+    echo "🔍 DEBUG: Attempting to add labels to PR..."
+    LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
+    LABEL_EXIT_CODE=$?
+    
+    if [ $LABEL_EXIT_CODE -eq 0 ]; then
+      echo "✅ Added correlation labels successfully"
     else
-      echo "⚠️ Failed to add correlation labels (they may not exist)"
+      echo "⚠️ Failed to add labels (exit code: $LABEL_EXIT_CODE)"
+      echo "🔍 DEBUG: Error output: $LABEL_ERROR"
       
-      # Try to create the labels if they don't exist
-      echo "🏷️ Creating missing labels..."
-      gh label create "$TASK_LABEL" -R "{{docs_repository_url}}" --color "f29513" --description "Task correlation" 2>/dev/null || true
-      gh label create "$RUN_LABEL" -R "{{docs_repository_url}}" --color "0366d6" --description "Workflow run correlation" 2>/dev/null || true
-      gh label create "$SERVICE_LABEL" -R "{{docs_repository_url}}" --color "0e8a16" --description "Service correlation" 2>/dev/null || true
+      # Check if labels exist
+      echo "🔍 DEBUG: Checking which labels exist..."
+      for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+        if gh label list -R "{{docs_repository_url}}" --search "$label" | grep -q "^$label"; then
+          echo "   ✓ Label '$label' exists"
+        else
+          echo "   ✗ Label '$label' does not exist"
+          # Create the missing label
+          echo "   📝 Creating label '$label'..."
+          case "$label" in
+            task-*) COLOR="f29513"; DESC="Task correlation" ;;
+            run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
+            service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+            *) COLOR="ededed"; DESC="Unknown label type" ;;
+          esac
+          
+          CREATE_ERROR=$(gh label create "$label" -R "{{docs_repository_url}}" --color "$COLOR" --description "$DESC" 2>&1)
+          CREATE_EXIT=$?
+          if [ $CREATE_EXIT -eq 0 ]; then
+            echo "   ✅ Created label '$label'"
+          else
+            echo "   ❌ Failed to create label '$label': $CREATE_ERROR"
+          fi
+        fi
+      done
       
-      # Try again to add the labels
-      if gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>/dev/null; then
-        echo "✅ Labels created and added successfully"
+      # Retry adding labels with individual attempts
+      echo "🔍 DEBUG: Retrying label addition individually..."
+      LABELS_ADDED=0
+      for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+        RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "$label" 2>&1)
+        RETRY_EXIT=$?
+        if [ $RETRY_EXIT -eq 0 ]; then
+          echo "   ✅ Added label '$label'"
+          LABELS_ADDED=$((LABELS_ADDED + 1))
+        else
+          echo "   ❌ Failed to add label '$label': $RETRY_ERROR"
+        fi
+      done
+      
+      if [ $LABELS_ADDED -eq 3 ]; then
+        echo "✅ All labels added successfully after retry"
+      elif [ $LABELS_ADDED -gt 0 ]; then
+        echo "⚠️ Partial success: $LABELS_ADDED/3 labels added"
       else
-        echo "⚠️ Could not add labels even after creating them"
+        echo "❌ CRITICAL: Could not add any labels to PR"
+        echo "🔍 DEBUG: Checking PR state..."
+        PR_STATE=$(gh pr view "$PR_NUMBER" -R "{{docs_repository_url}}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+        echo "   PR State: $PR_STATE"
+        if [ "$PR_STATE" = "CLOSED" ] || [ "$PR_STATE" = "MERGED" ]; then
+          echo "❌ PR is $PR_STATE - cannot add labels to closed/merged PRs"
+        fi
       fi
     fi
   else
