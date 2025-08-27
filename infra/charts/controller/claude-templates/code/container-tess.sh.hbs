@@ -788,6 +788,37 @@ Your STRICT testing requirements:
    - REPEAT until you can post APPROVE
    - You are NOT ALLOWED to finish without APPROVE status
 
+10. **MANDATORY PRE-APPROVAL CHECKLIST**:
+    Before you can APPROVE, ALL of these MUST be true:
+    □ CI Status: Run \`gh pr checks {{pr_number}} --json name,status\` - ALL must show "completed" with "success"
+    □ Test Coverage: Must be >= 95% (verify with coverage tools)
+    □ All Tests Pass: 100% of tests must pass, no skipped tests
+    □ Acceptance Criteria: 100% of Task {{task_id}} criteria met
+    □ No TODO/FIXME: Zero TODOs or FIXMEs in code
+    □ No Warnings: Zero clippy warnings, zero compiler warnings
+    □ K8s Deployment: If you have access, deployment must succeed
+    
+    **VERIFICATION COMMANDS TO RUN BEFORE APPROVING**:
+    \`\`\`bash
+    # 1. Verify CI is completely green
+    CI_STATUS=$(gh pr checks {{pr_number}} --json status -q '.[].status' | sort -u)
+    if [ "$CI_STATUS" != "completed" ]; then
+      echo "❌ CI NOT DONE - CANNOT APPROVE"
+      # YOU MUST WAIT AND KEEP CHECKING
+    fi
+    
+    # 2. Check for any failures
+    FAILED=$(gh pr checks {{pr_number}} --json conclusion -q '.[] | select(.conclusion != "success") | .conclusion' | wc -l)
+    if [ "$FAILED" -gt 0 ]; then
+      echo "❌ CI HAS FAILURES - CANNOT APPROVE"
+      # YOU MUST FIX THE FAILURES
+    fi
+    
+    # 3. Only if ALL checks pass can you approve
+    \`\`\`
+    
+    IF ANY ITEM IS UNCHECKED, YOU CANNOT APPROVE!
+
 **KUBERNETES DEPLOYMENT INSTRUCTIONS**:
 If you have kubectl access, deploy the application to verify it works:
 \`\`\`bash
@@ -929,11 +960,23 @@ gh pr review {{pr_number}} --request-changes --body \"### 🔍 QA Review for Tas
 
 Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 
-# CORRECT - Submit an APPROVE review when all tests pass:
+# CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
+# FIRST: Verify you can approve
+CI_FAILED=\$(gh pr checks {{pr_number}} --json conclusion -q '.[] | select(.conclusion != "success")' | wc -l)
+if [ "\$CI_FAILED" -gt 0 ]; then
+  echo "❌ CANNOT APPROVE - CI HAS FAILURES"
+  exit 1
+fi
+
+# ONLY IF ALL CHECKS PASS:
 gh pr review {{pr_number}} --approve --body \"### ✅ QA Review for Task {{task_id}} - APPROVED
 
+## Pre-Approval Verification
+✅ **ALL CI checks verified**: Ran 'gh pr checks' - all showing success
+✅ **No failures found**: Zero failing checks confirmed
+
 ## CI Status
-✅ **GitHub Actions CI**: All checks passing
+✅ **GitHub Actions CI**: All checks passing (verified with gh CLI)
 ✅ **All workflows**: Green across the board
 
 ## Task {{task_id}} Acceptance Criteria
@@ -976,7 +1019,7 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 
 **CRITICAL ITERATION REQUIREMENT**:
 - DO NOT EXIT until ALL of the following are true:
-  1. CI is GREEN (all checks passing)
+  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks {{pr_number}}
   2. Test coverage is >= 95%
   3. All acceptance criteria for Task {{task_id}} are met
   4. Kubernetes deployment succeeds (if you have access)
@@ -985,13 +1028,21 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 - If ANY of these are not met:
   1. Write/fix tests as needed
   2. Push your changes
-  3. Wait for CI to run
+  3. Wait for CI to run (use: sleep 120 && gh pr checks {{pr_number}})
   4. Check status again
   5. KEEP ITERATING until everything passes
 
+- **APPROVAL GATES** (You CANNOT approve if ANY of these are true):
+  * Any CI check is failing or pending
+  * Test coverage < 95%
+  * Any acceptance criteria unmet
+  * Any TODOs or FIXMEs in code
+  * Any compiler/linter warnings
+
 - You are NOT DONE until you can post an APPROVE review
 - NEVER exit with a REQUEST CHANGES review - keep working until it's fixed
-- Your success is measured by getting to APPROVED status"
+- Your success is measured by getting to APPROVED status
+- **IF YOU APPROVE WITH FAILING CI, YOU HAVE FAILED YOUR MISSION**"
 
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
