@@ -279,6 +279,8 @@ spec:
                   value: "{{`{{workflow.parameters.repository}}`}}"
                 - name: task-id
                   value: "{{`{{inputs.parameters.task-id}}`}}"
+                - name: stage
+                  value: "{{`{{inputs.parameters.stage}}`}}"
 
     # Template to check/poll GitHub for PR existence for task label
     - name: check-or-wait-for-pr
@@ -286,6 +288,7 @@ spec:
         parameters:
           - name: repository
           - name: task-id
+          - name: stage
       outputs:
         parameters:
           - name: pr-url
@@ -320,8 +323,8 @@ spec:
           SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
           
           # For single-repo setups, we need to find PRs from previous workflow runs
-          # Check if we're in a subsequent stage (quality/testing) by checking workflow parameters
-          STAGE="{{`{{workflow.parameters.current-stage}}`}}"
+          # Check if we're in a subsequent stage (quality/testing) by checking input parameters
+          STAGE="{{`{{inputs.parameters.stage}}`}}"
           
           if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
             echo "🔎 Stage $STAGE: Looking for existing PR with label ${LABEL} in ${REPO}"
