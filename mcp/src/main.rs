@@ -1012,22 +1012,40 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Testing agent: {testing_agent}");
 
     // Check for requirements.yaml file
-    // Use WORKSPACE_FOLDER_PATHS first (Cursor), then fall back to current_dir
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
+    // Try to determine workspace directory, but don't fail if we can't
+    let workspace_dir_result = std::env::var("WORKSPACE_FOLDER_PATHS")
         .map(|paths| {
             let first_path = paths.split(',').next().unwrap_or(&paths).trim();
             std::path::PathBuf::from(first_path)
         })
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-    let docs_dir = workspace_dir.join(&docs_project_directory);
-    let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
-    let project_requirements_path = docs_dir.join("requirements.yaml");
+        .or_else(|_| std::env::current_dir());
     
-    eprintln!(
-        "🔍 Checking for requirements.yaml in: {} (docs_project_directory='{}')",
-        docs_dir.display(),
-        docs_project_directory
-    );
+    // Only check for requirements if we have a valid workspace directory
+    let requirements_path = if let Ok(workspace_dir) = workspace_dir_result {
+        let docs_dir = workspace_dir.join(&docs_project_directory);
+        let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
+        let project_requirements_path = docs_dir.join("requirements.yaml");
+        
+        eprintln!(
+            "🔍 Checking for requirements.yaml in: {} (docs_project_directory='{}')",
+            docs_dir.display(),
+            docs_project_directory
+        );
+        
+        if task_requirements_path.exists() {
+            eprintln!("📋 Found task-specific requirements.yaml for task {task_id}");
+            Some(task_requirements_path)
+        } else if project_requirements_path.exists() {
+            eprintln!("📋 Found project-level requirements.yaml");
+            Some(project_requirements_path)
+        } else {
+            eprintln!("ℹ️ No requirements.yaml found");
+            None
+        }
+    } else {
+        eprintln!("⚠️ Could not determine workspace directory, skipping requirements check");
+        None
+    };
     
     let mut params = vec![
         format!("task-id={task_id}"),
@@ -1042,17 +1060,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     ];
 
     // Load and encode requirements.yaml if it exists
-    let requirements_path = if task_requirements_path.exists() {
-        eprintln!("📋 Found task-specific requirements.yaml for task {task_id}");
-        Some(task_requirements_path)
-    } else if project_requirements_path.exists() {
-        eprintln!("📋 Found project-level requirements.yaml");
-        Some(project_requirements_path)
-    } else {
-        eprintln!("ℹ️ No requirements.yaml found");
-        None
-    };
-
     if let Some(path) = requirements_path {
         let requirements_content = std::fs::read_to_string(&path)
             .context(format!("Failed to read requirements file: {}", path.display()))?;
