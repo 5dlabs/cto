@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document provides an overview of the seven mini-projects that comprise the CTO Platform Enhancements initiative. Each project is designed to be implemented within a focused timeframe while contributing to the platform's evolution into a comprehensive, vendor-agnostic AI development orchestration system.
+This document provides an overview of the eight mini-projects that comprise the CTO Platform Enhancements initiative. Each project is designed to be implemented within a focused timeframe while contributing to the platform's evolution into a comprehensive, vendor-agnostic AI development orchestration system.
 
 ## Project Structure
 
@@ -26,7 +26,10 @@ docs/
 ├── platform-packaging/
 │   ├── prd.txt                 # Product Requirements Document
 │   └── architecture.md          # Technical Architecture
-└── telemetry-monitoring-enhancement/
+├── telemetry-monitoring-enhancement/
+│   ├── prd.txt                 # Product Requirements Document
+│   └── architecture.md          # Technical Architecture
+└── mcp-tool-selection-enhancement/
     ├── prd.txt                 # Product Requirements Document
     └── architecture.md          # Technical Architecture
 ```
@@ -169,6 +172,26 @@ Validate and enhance existing telemetry infrastructure (Victoria Logs, Victoria 
 3. Alerting Implementation (Days 5-6)
 4. Health Monitoring (Days 7-8)
 
+### 8. MCP Tool Selection Enhancement (Medium Priority)
+**Timeline:** Days 1-8
+**Status:** Documentation Complete
+
+#### Objective
+Transform MCP tool selection from dynamic, task-based generation to static, Helm-defined configurations, eliminating expensive tool-man configuration copying and providing declarative tool management.
+
+#### Key Components
+- Static tool configurations defined in Helm charts
+- ConfigMap-based tool storage for each agent
+- Role-based tool profiles (Rex, Cleo, Tess)
+- Tool registry with centralized definitions
+- Simplified documentation generation without tool-man
+
+#### Critical Path
+1. Static Configuration (Days 1-2)
+2. Helm Integration (Days 3-4)
+3. Documentation Optimization (Days 5-6)
+4. Testing and Validation (Days 7-8)
+
 ## Implementation Strategy
 
 ### Parallel Tracks
@@ -185,8 +208,9 @@ Given the one-week timeline, projects can be implemented in parallel tracks:
 **Track C: Integration**
 - GitHub Integration Enhancements
 
-**Track D: Monitoring**
+**Track D: Monitoring & Tools**
 - Telemetry Monitoring Enhancement
+- MCP Tool Selection Enhancement
 
 **Track E: Packaging (Post-MVP)**
 - Platform Packaging (deferred until after core features)
@@ -220,6 +244,10 @@ graph LR
 7. ✅ Agent health monitoring dashboards
 8. ✅ Discord alerting system
 9. ✅ OpenTelemetry data correlation
+10. ✅ Static MCP tool configurations
+11. ✅ Helm-based tool management
+12. ✅ ConfigMap tool storage
+13. ✅ Simplified documentation generation
 
 ### Post-MVP Deliverables (Week 2-3)
 10. ✅ Automated installation system
@@ -270,6 +298,6 @@ After successful implementation:
 
 ## Conclusion
 
-These seven mini-projects represent a focused, achievable enhancement of the CTO platform within a one-week timeline for the core features, with packaging deferred to post-MVP. By prioritizing CLI agnosticism, automated remediation, and comprehensive monitoring, we address the most critical needs while laying groundwork for future expansion.
+These eight mini-projects represent a focused, achievable enhancement of the CTO platform within a one-week timeline for the core features, with packaging deferred to post-MVP. By prioritizing CLI agnosticism, automated remediation, comprehensive monitoring, and optimized tool management, we address the most critical needs while laying groundwork for future expansion.
 
-The modular design ensures each project can deliver value independently while contributing to the platform's overall evolution into a comprehensive AI development orchestration system. The telemetry monitoring enhancement provides essential visibility into system health, while the packaging system will enable the platform to be distributed as a standalone product once the core functionality is stable.
+The modular design ensures each project can deliver value independently while contributing to the platform's overall evolution into a comprehensive AI development orchestration system. The telemetry monitoring enhancement provides essential visibility into system health, the MCP tool selection enhancement eliminates complexity and improves performance, while the packaging system will enable the platform to be distributed as a standalone product once the core functionality is stable.
