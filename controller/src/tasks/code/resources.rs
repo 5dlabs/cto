@@ -877,6 +877,14 @@ impl<'a> CodeResourceManager<'a> {
     ) -> Result<(Vec<serde_json::Value>, Vec<serde_json::Value>)> {
         let mut env_from = Vec::new();
 
+        // ALWAYS process spec.env first (workflow-provided env vars like PR_URL, PR_NUMBER)
+        for (key, value) in &code_run.spec.env {
+            env_vars.push(json!({
+                "name": key,
+                "value": value
+            }));
+        }
+
         // Check if we have task requirements
         if let Some(requirements_b64) = &code_run.spec.task_requirements {
             use base64::{engine::general_purpose, Engine as _};
@@ -950,18 +958,10 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }
-        } else {
-            // Fall back to legacy env and env_from_secrets fields
-            // Process direct env vars
-            for (key, value) in &code_run.spec.env {
-                env_vars.push(json!({
-                    "name": key,
-                    "value": value
-                }));
-            }
+        }
 
-            // Process env_from_secrets
-            for secret_env in &code_run.spec.env_from_secrets {
+        // Process legacy env_from_secrets if present (regardless of task requirements)
+        for secret_env in &code_run.spec.env_from_secrets {
                 env_vars.push(json!({
                     "name": &secret_env.name,
                     "valueFrom": {
