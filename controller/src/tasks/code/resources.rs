@@ -685,7 +685,7 @@ impl<'a> CodeResourceManager<'a> {
         // This ensures that later additions (like critical system vars) take precedence
         let mut seen_names = std::collections::HashSet::new();
         let mut deduplicated_env_vars = Vec::new();
-        
+
         // Process in reverse order to keep the last occurrence of each variable
         for env_var in final_env_vars.into_iter().rev() {
             if let Some(name) = env_var.get("name").and_then(|n| n.as_str()) {
@@ -698,11 +698,11 @@ impl<'a> CodeResourceManager<'a> {
                 deduplicated_env_vars.push(env_var);
             }
         }
-        
+
         // Reverse back to original order
         deduplicated_env_vars.reverse();
         final_env_vars = deduplicated_env_vars;
-        
+
         // Add critical system vars (these will override any duplicates due to deduplication logic)
         final_env_vars.extend(critical_env_vars);
 
@@ -717,7 +717,7 @@ impl<'a> CodeResourceManager<'a> {
         // Final deduplication pass to handle any remaining duplicates from critical vars and Docker
         let mut final_seen_names = std::collections::HashSet::new();
         let mut final_deduplicated_env_vars = Vec::new();
-        
+
         // Process in reverse order to keep the last occurrence (critical vars take precedence)
         for env_var in final_env_vars.into_iter().rev() {
             if let Some(name) = env_var.get("name").and_then(|n| n.as_str()) {
@@ -729,7 +729,7 @@ impl<'a> CodeResourceManager<'a> {
                 final_deduplicated_env_vars.push(env_var);
             }
         }
-        
+
         // Reverse back to original order
         final_deduplicated_env_vars.reverse();
         final_env_vars = final_deduplicated_env_vars;
