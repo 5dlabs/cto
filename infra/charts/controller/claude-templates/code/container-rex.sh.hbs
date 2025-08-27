@@ -302,14 +302,13 @@ echo "Target repository: {{repository_url}} ($REPO_HTTP_URL)"
 echo "Docs branch: $DOCS_BRANCH"
 echo "GitHub App: $GITHUB_APP"
 
-# Always use multi-repo workflow for consistency
+# Always use consistent workflow approach
 # Even if docs and target are the same repo, we clone them separately
 # This avoids complex branch switching and file preservation issues
 echo "=== UNIFIED WORKFLOW APPROACH ==="
 echo "  docs_repository_url: '{{docs_repository_url}}'"
 echo "  repository_url: '{{repository_url}}'"
 echo "  └─ TaskMaster files will be copied from docs repo at: {{docs_project_directory}}"
-WORKFLOW_TYPE="multi-repo"
 
 # Repository Setup - Always use consistent approach
 echo "=== REPOSITORY SETUP ==="
@@ -613,7 +612,6 @@ fi
 
 # Copy Current Task Documentation to Working Directory
 echo "=== TASK DOCUMENTATION SETUP ==="
-echo "🔍 DEBUG: WORKFLOW_TYPE is: $WORKFLOW_TYPE"
 echo "🔍 DEBUG: REPO_NAME is: $REPO_NAME" 
 echo "🔍 DEBUG: CLAUDE_WORK_DIR is: $CLAUDE_WORK_DIR"
 echo "🔍 DEBUG: Task ID is: {{task_id}}"
