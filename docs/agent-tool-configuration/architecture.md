@@ -616,3 +616,468 @@ Cache hit rate: 100% (pre-configured)
 ```
 
 This architecture provides a robust, performant system for managing agent tools statically, significantly reducing operational overhead while improving consistency and reliability.
+
+## Additional Components
+
+### 7. Avatar Generation Service
+
+Automated avatar generation using the [Imagine.art API](https://www.imagine.art/dashboard) with consistent branding.
+
+```rust
+// src/avatar/avatar_generator.rs
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AvatarRequest {
+    pub agent_name: String,
+    pub role: String,
+    pub style: String,
+    pub size: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AvatarResponse {
+    pub image_url: String,
+    pub metadata: HashMap<String, String>,
+}
+
+pub struct AvatarGenerator {
+    client: Client,
+    api_key: String,
+    base_url: String,
+}
+
+impl AvatarGenerator {
+    pub fn new(api_key: String) -> Self {
+        Self {
+            client: Client::new(),
+            api_key,
+            base_url: "https://api.imagine.art".to_string(),
+        }
+    }
+
+    pub async fn generate_avatar(&self, agent: &AgentConfig) -> Result<AvatarResponse> {
+        let prompt = self.build_avatar_prompt(agent);
+        
+        let request = AvatarRequest {
+            agent_name: agent.name.clone(),
+            role: agent.role.clone(),
+            style: "professional_tech_avatar".to_string(),
+            size: 512,
+        };
+
+        let response = self.client
+            .post(&format!("{}/v1/images/generations", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+
+        let avatar_response: AvatarResponse = response.json().await?;
+        Ok(avatar_response)
+    }
+
+    fn build_avatar_prompt(&self, agent: &AgentConfig) -> String {
+        let base_style = "professional tech avatar, clean design, consistent branding";
+        let role_style = match agent.role.as_str() {
+            "developer" => "focused, analytical, code-oriented",
+            "quality" => "meticulous, detail-oriented, testing-focused",
+            "testing" => "thorough, systematic, validation-focused",
+            "frontend" => "creative, design-aware, user-focused",
+            _ => "professional, competent, tech-savvy",
+        };
+
+        format!(
+            "Create a professional avatar for {}: a {} agent. Style: {} {}. Clean, modern, tech aesthetic.",
+            agent.name, agent.role, base_style, role_style
+        )
+    }
+
+    pub async fn store_avatar(&self, agent_name: &str, avatar_data: &[u8]) -> Result<String> {
+        // Store avatar in persistent storage (e.g., S3, local filesystem)
+        let filename = format!("avatars/{}.png", agent_name);
+        // Implementation for storing avatar data
+        Ok(filename)
+    }
+}
+```
+
+### 8. Blaze Agent Configuration
+
+Specialized configuration for the front-end focused Blaze agent.
+
+```yaml
+# config/agents/blaze.yaml
+agent:
+  name: "Blaze"
+  role: "frontend_engineer"
+  expertise:
+    - "Svelte/SvelteKit"
+    - "TypeScript"
+    - "CSS/SCSS"
+    - "Frontend Architecture"
+    - "UI/UX Design"
+    - "Performance Optimization"
+
+tools:
+  extends: "developer"
+  remote:
+    - "mdn_web_docs_search"
+    - "npm_package_search"
+    - "svelte_docs_search"
+    - "css_tricks_search"
+    - "web_components_search"
+  
+  local:
+    filesystem:
+      - "read_file"
+      - "write_file"
+      - "edit_file"
+      - "search_files"
+      - "create_component"
+      - "create_page"
+    
+    git:
+      - "git_status"
+      - "git_diff"
+      - "git_commit"
+      - "git_push"
+    
+    svelte:
+      - "svelte_create_component"
+      - "svelte_create_page"
+      - "svelte_build"
+      - "svelte_dev"
+      - "svelte_check"
+    
+    styling:
+      - "css_validate"
+      - "scss_compile"
+      - "tailwind_generate"
+      - "responsive_test"
+    
+    testing:
+      - "vitest_run"
+      - "playwright_test"
+      - "accessibility_test"
+      - "performance_test"
+
+resources:
+  cpu: "1.0"
+  memory: "2Gi"
+  storage: "10Gi"
+  gpu: "0.5"  # For image processing tasks
+
+startup:
+  ascii_art: true
+  avatar_display: true
+  role_announcement: true
+```
+
+### 9. ASCII Art Generator
+
+Creates engaging startup banners for agent containers.
+
+```rust
+// src/display/ascii_art.rs
+use std::collections::HashMap;
+
+pub struct AsciiArtGenerator {
+    templates: HashMap<String, String>,
+    avatar_converter: AvatarToAscii,
+}
+
+impl AsciiArtGenerator {
+    pub fn new() -> Self {
+        let mut templates = HashMap::new();
+        
+        // Rex template
+        templates.insert("rex".to_string(), r#"
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║    ██████╗ ███████╗██╗  ██╗                                ║
+║    ██╔══██╗██╔════╝╚██╗██╔╝                                ║
+║    ██████╔╝█████╗   ╚███╔╝                                 ║
+║    ██╔══██╗██╔══╝   ██╔██╗                                 ║
+║    ██║  ██║███████╗██╔╝ ██╗                                ║
+║    ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝                                ║
+║                                                              ║
+║                    REX - Development Agent                  ║
+║                    Ready for coding tasks!                  ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+"#.to_string());
+
+        // Blaze template
+        templates.insert("blaze".to_string(), r#"
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║    ██████╗ ██╗      █████╗ ███████╗███████╗                ║
+║    ██╔══██╗██║     ██╔══██╗╚══███╔╝██╔════╝                ║
+║    ██████╔╝██║     ███████║  ███╔╝ █████╗                  ║
+║    ██╔══██╗██║     ██╔══██║ ███╔╝  ██╔══╝                  ║
+║    ██████╔╝███████╗██║  ██║███████╗███████╗                ║
+║    ╚═════╝ ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝                ║
+║                                                              ║
+║                   BLAZE - Frontend Engineer                 ║
+║                   Svelte specialist ready!                  ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+"#.to_string());
+
+        Self {
+            templates,
+            avatar_converter: AvatarToAscii::new(),
+        }
+    }
+
+    pub fn generate_startup_banner(&self, agent: &AgentConfig) -> String {
+        let template = self.templates.get(&agent.name.to_lowercase())
+            .unwrap_or(&self.get_default_template());
+        
+        let mut banner = template.clone();
+        
+        // Replace placeholders with agent-specific information
+        banner = banner.replace("{{AGENT_NAME}}", &agent.name);
+        banner = banner.replace("{{AGENT_ROLE}}", &agent.role);
+        banner = banner.replace("{{AGENT_EXPERTISE}}", &agent.expertise.join(", "));
+        
+        // Add avatar if available
+        if let Some(avatar_ascii) = self.avatar_converter.convert(&agent.avatar_url) {
+            banner = format!("{}\n\n{}\n", avatar_ascii, banner);
+        }
+        
+        banner
+    }
+
+    fn get_default_template(&self) -> String {
+        r#"
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║                    {{AGENT_NAME}}                            ║
+║                    {{AGENT_ROLE}}                            ║
+║                    {{AGENT_EXPERTISE}}                       ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+"#.to_string()
+    }
+}
+
+pub struct AvatarToAscii {
+    converter: ImageToAscii,
+}
+
+impl AvatarToAscii {
+    pub fn new() -> Self {
+        Self {
+            converter: ImageToAscii::new(),
+        }
+    }
+
+    pub fn convert(&self, avatar_url: &str) -> Option<String> {
+        // Convert avatar image to ASCII art
+        // This would use a library like image-to-ascii or similar
+        self.converter.convert_url(avatar_url).ok()
+    }
+}
+```
+
+### 10. Agent Startup Manager
+
+Manages the startup sequence including ASCII art display and avatar loading.
+
+```rust
+// src/agent/startup_manager.rs
+use tokio::time::{sleep, Duration};
+use std::sync::Arc;
+
+pub struct StartupManager {
+    ascii_generator: Arc<AsciiArtGenerator>,
+    avatar_generator: Arc<AvatarGenerator>,
+    agent_config: AgentConfig,
+}
+
+impl StartupManager {
+    pub fn new(
+        ascii_generator: Arc<AsciiArtGenerator>,
+        avatar_generator: Arc<AvatarGenerator>,
+        agent_config: AgentConfig,
+    ) -> Self {
+        Self {
+            ascii_generator,
+            avatar_generator,
+            agent_config,
+        }
+    }
+
+    pub async fn run_startup_sequence(&self) -> Result<()> {
+        // Display ASCII art banner
+        let banner = self.ascii_generator.generate_startup_banner(&self.agent_config);
+        self.display_banner(&banner).await?;
+        
+        // Load or generate avatar
+        let avatar_url = self.ensure_avatar().await?;
+        
+        // Initialize agent tools
+        self.initialize_tools().await?;
+        
+        // Display ready message
+        self.display_ready_message().await?;
+        
+        Ok(())
+    }
+
+    async fn display_banner(&self, banner: &str) -> Result<()> {
+        // Clear screen and display banner with animation
+        print!("\x1B[2J\x1B[1;1H"); // Clear screen
+        
+        for line in banner.lines() {
+            println!("{}", line);
+            sleep(Duration::from_millis(50)).await; // Animated display
+        }
+        
+        Ok(())
+    }
+
+    async fn ensure_avatar(&self) -> Result<String> {
+        // Check if avatar exists, generate if not
+        let avatar_path = format!("avatars/{}.png", self.agent_config.name);
+        
+        if !std::path::Path::new(&avatar_path).exists() {
+            let avatar_response = self.avatar_generator
+                .generate_avatar(&self.agent_config)
+                .await?;
+            
+            // Store the avatar
+            self.avatar_generator
+                .store_avatar(&self.agent_config.name, &avatar_response.image_data)
+                .await?;
+        }
+        
+        Ok(avatar_path)
+    }
+
+    async fn initialize_tools(&self) -> Result<()> {
+        // Initialize MCP tools based on agent configuration
+        let tool_loader = ToolLoader::new(&self.agent_config);
+        tool_loader.load_tools().await?;
+        
+        Ok(())
+    }
+
+    async fn display_ready_message(&self) -> Result<()> {
+        println!("\n🚀 {} is ready for action!", self.agent_config.name);
+        println!("   Role: {}", self.agent_config.role);
+        println!("   Tools loaded: {}", self.agent_config.tools.total_count());
+        println!("   Status: Online\n");
+        
+        Ok(())
+    }
+}
+```
+
+### 11. Blaze-Specific MCP Tools
+
+Custom tools for front-end development tasks.
+
+```rust
+// src/tools/blaze_tools.rs
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SvelteComponentRequest {
+    pub name: String,
+    pub props: Vec<String>,
+    pub template: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SvelteComponentResponse {
+    pub component_code: String,
+    pub typescript_types: String,
+    pub css_styles: String,
+}
+
+pub struct SvelteTool;
+
+#[async_trait]
+impl McpTool for SvelteTool {
+    fn name(&self) -> &'static str {
+        "svelte_create_component"
+    }
+
+    fn description(&self) -> &'static str {
+        "Create a new Svelte component with TypeScript and styling"
+    }
+
+    async fn execute(&self, request: SvelteComponentRequest) -> Result<SvelteComponentResponse> {
+        let component_code = self.generate_component_code(&request)?;
+        let typescript_types = self.generate_typescript_types(&request.props)?;
+        let css_styles = self.generate_css_styles(&request.name)?;
+        
+        Ok(SvelteComponentResponse {
+            component_code,
+            typescript_types,
+            css_styles,
+        })
+    }
+}
+
+impl SvelteTool {
+    fn generate_component_code(&self, request: &SvelteComponentRequest) -> Result<String> {
+        let props_code = request.props.iter()
+            .map(|prop| format!("export let {}: string;", prop))
+            .collect::<Vec<_>>()
+            .join("\n  ");
+        
+        let component = format!(
+            r#"<script lang="ts">
+  {}
+</script>
+
+<div class="{}">
+  {}
+</div>
+
+<style>
+  .{} {{
+    /* Component styles */
+  }}
+</style>"#,
+            props_code,
+            request.name.to_lowercase(),
+            request.template,
+            request.name.to_lowercase()
+        );
+        
+        Ok(component)
+    }
+
+    fn generate_typescript_types(&self, props: &[String]) -> Result<String> {
+        let types = props.iter()
+            .map(|prop| format!("  {}: string;", prop))
+            .collect::<Vec<_>>()
+            .join("\n");
+        
+        Ok(format!(
+            "export interface {}Props {{\n{}\n}}",
+            props.join("").to_pascal_case(),
+            types
+        ))
+    }
+
+    fn generate_css_styles(&self, component_name: &str) -> Result<String> {
+        Ok(format!(
+            ".{} {{\n  /* Auto-generated styles for {} */\n}}",
+            component_name.to_lowercase(),
+            component_name
+        ))
+    }
+}
+```
+
+This enhanced architecture now includes avatar generation using the [Imagine.art API](https://www.imagine.art/dashboard), Blaze agent specialization for Svelte development, and engaging ASCII art startup displays, making the agent system more professional and visually appealing while maintaining the core functionality improvements.
