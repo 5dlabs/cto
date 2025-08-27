@@ -870,24 +870,61 @@ if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
   # Add the ready-for-qa label using PR number if available; fallback to PR URL
   if [ -n "$PR_NUMBER" ]; then
     echo "🏷️ Adding 'ready-for-qa' label to PR #$PR_NUMBER..."
-    if gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-qa" 2>/dev/null; then
+    echo "🔍 DEBUG: PR_NUMBER='$PR_NUMBER', REPO_SLUG='$REPO_SLUG'"
+    
+    # Capture error output for debugging
+    LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-qa" 2>&1)
+    LABEL_EXIT=$?
+    
+    if [ $LABEL_EXIT -eq 0 ]; then
       echo "✅ Successfully added 'ready-for-qa' label"
     else
-      echo "⚠️ Failed to add label using PR number - attempting with PR URL..."
-      if [ -n "$PR_URL" ]; then
-        if gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>/dev/null; then
+      echo "⚠️ Failed to add label using PR number (exit code: $LABEL_EXIT)"
+      echo "🔍 DEBUG: Error: $LABEL_ERROR"
+      
+      # Check if the label exists
+      echo "🔍 DEBUG: Checking if 'ready-for-qa' label exists..."
+      if gh label list -R "$REPO_SLUG" --search "ready-for-qa" | grep -q "ready-for-qa"; then
+        echo "   ✓ Label 'ready-for-qa' exists in repository"
+      else
+        echo "   ✗ Label 'ready-for-qa' does not exist - attempting to create it..."
+        CREATE_ERROR=$(gh label create "ready-for-qa" -R "$REPO_SLUG" --color "0e8a16" --description "Ready for QA testing" 2>&1)
+        CREATE_EXIT=$?
+        if [ $CREATE_EXIT -eq 0 ]; then
+          echo "   ✅ Created 'ready-for-qa' label"
+          # Retry adding the label
+          RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-qa" 2>&1)
+          RETRY_EXIT=$?
+          if [ $RETRY_EXIT -eq 0 ]; then
+            echo "   ✅ Successfully added label after creating it"
+          else
+            echo "   ❌ Still failed to add label: $RETRY_ERROR"
+          fi
+        else
+          echo "   ❌ Failed to create label: $CREATE_ERROR"
+        fi
+      fi
+      
+      # Try with PR URL as fallback
+      if [ -n "$PR_URL" ] && [ $LABEL_EXIT -ne 0 ]; then
+        echo "⚠️ Attempting with PR URL as fallback..."
+        URL_ERROR=$(gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>&1)
+        URL_EXIT=$?
+        if [ $URL_EXIT -eq 0 ]; then
           echo "✅ Successfully added 'ready-for-qa' label using PR URL"
         else
-          echo "❌ Failed to add 'ready-for-qa' label"
+          echo "❌ Failed to add 'ready-for-qa' label using PR URL: $URL_ERROR"
         fi
       fi
     fi
   elif [ -n "$PR_URL" ]; then
     echo "🏷️ Adding 'ready-for-qa' label using PR URL..."
-    if gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>/dev/null; then
+    URL_ERROR=$(gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>&1)
+    URL_EXIT=$?
+    if [ $URL_EXIT -eq 0 ]; then
       echo "✅ Successfully added 'ready-for-qa' label"
     else
-      echo "❌ Failed to add 'ready-for-qa' label"
+      echo "❌ Failed to add 'ready-for-qa' label: $URL_ERROR"
     fi
   else
     echo "⚠️ No PR_NUMBER or PR_URL available, cannot add label"
