@@ -805,12 +805,24 @@ Your STRICT testing requirements:
     # EVERY check must show "pass" or ✓ 
     # If you see ANY "fail", "pending", or "skipping" - CANNOT APPROVE
     
-    # 2. Count the checks status
-    TOTAL_CHECKS=\$(gh pr checks {{pr_number}} | grep -c "^")
-    PASSING_CHECKS=\$(gh pr checks {{pr_number}} | grep -c "pass\\|✓")
+    # 2. Verify all checks are passing using tab-separated status field
+    # gh pr checks output format: NAME<TAB>STATUS<TAB>CONCLUSION<TAB>URL
+    CI_OUTPUT=\$(gh pr checks {{pr_number}})
+    if [ -z "\$CI_OUTPUT" ]; then
+        echo "❌ No CI checks found - cannot verify"
+        exit 1
+    fi
+    
+    # Count checks by looking at the status field (2nd column)
+    TOTAL_CHECKS=\$(echo "\$CI_OUTPUT" | wc -l)
+    # Look for pass/✓ only in the status column (tab-delimited field 2)
+    PASSING_CHECKS=\$(echo "\$CI_OUTPUT" | awk -F'\t' '\$2 ~ /pass|✓/' | wc -l)
+    
     if [ "\$TOTAL_CHECKS" != "\$PASSING_CHECKS" ]; then
         echo "❌ NOT ALL CHECKS PASSING - CANNOT APPROVE"
         echo "Total: \$TOTAL_CHECKS, Passing: \$PASSING_CHECKS"
+        echo "Failed/pending checks:"
+        echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/ {print \$1 " - " \$2}'
         exit 1
     fi
     
@@ -963,10 +975,17 @@ Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
 # FIRST: Verify you can approve
 CI_OUTPUT=\$(gh pr checks {{pr_number}})
-CI_FAILED=\$(echo "\$CI_OUTPUT" | grep -c "fail\\|pending\\|skipping" || true)
+if [ -z "\$CI_OUTPUT" ]; then
+  echo "❌ No CI checks found - cannot approve"
+  exit 1
+fi
+
+# Check for non-passing statuses in the status column (2nd field)
+CI_FAILED=\$(echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/' | wc -l)
 if [ "\$CI_FAILED" -gt 0 ]; then
   echo "❌ CANNOT APPROVE - CI HAS FAILURES OR IS INCOMPLETE"
-  echo "\$CI_OUTPUT"
+  echo "Failed/pending checks:"
+  echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/ {print \$1 " - " \$2}'
   exit 1
 fi
 
