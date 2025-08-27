@@ -681,28 +681,30 @@ impl<'a> CodeResourceManager<'a> {
             }),
         ];
 
-        // Remove any duplicates and re-add critical vars to ensure they're not overridden
-        // Also preserve PR_URL and PR_NUMBER from being overridden since they're critical for coordination
-        final_env_vars.retain(|v| {
-            if let Some(name) = v.get("name").and_then(|n| n.as_str()) {
-                !["CODERUN_NAME", "WORKFLOW_NAME", "NAMESPACE", "PR_URL", "PR_NUMBER"].contains(&name)
+        // Comprehensive deduplication: remove all duplicates by name, keeping the last occurrence
+        // This ensures that later additions (like critical system vars) take precedence
+        let mut seen_names = std::collections::HashSet::new();
+        let mut deduplicated_env_vars = Vec::new();
+        
+        // Process in reverse order to keep the last occurrence of each variable
+        for env_var in final_env_vars.into_iter().rev() {
+            if let Some(name) = env_var.get("name").and_then(|n| n.as_str()) {
+                if !seen_names.contains(name) {
+                    seen_names.insert(name.to_string());
+                    deduplicated_env_vars.push(env_var);
+                }
             } else {
-                true
-            }
-        });
-        
-        // Re-add critical system vars
-        final_env_vars.extend(critical_env_vars);
-        
-        // Re-add PR context vars if they exist in spec.env (workflow-provided)
-        for (key, value) in &code_run.spec.env {
-            if key == "PR_URL" || key == "PR_NUMBER" {
-                final_env_vars.push(json!({
-                    "name": key,
-                    "value": value
-                }));
+                // Keep env vars without names (shouldn't happen, but be safe)
+                deduplicated_env_vars.push(env_var);
             }
         }
+        
+        // Reverse back to original order
+        deduplicated_env_vars.reverse();
+        final_env_vars = deduplicated_env_vars;
+        
+        // Add critical system vars (these will override any duplicates due to deduplication logic)
+        final_env_vars.extend(critical_env_vars);
 
         // Add Docker environment variable if Docker is enabled
         if enable_docker {
@@ -711,6 +713,26 @@ impl<'a> CodeResourceManager<'a> {
                 "value": "unix:///var/run/docker.sock"
             }));
         }
+
+        // Final deduplication pass to handle any remaining duplicates from critical vars and Docker
+        let mut final_seen_names = std::collections::HashSet::new();
+        let mut final_deduplicated_env_vars = Vec::new();
+        
+        // Process in reverse order to keep the last occurrence (critical vars take precedence)
+        for env_var in final_env_vars.into_iter().rev() {
+            if let Some(name) = env_var.get("name").and_then(|n| n.as_str()) {
+                if !final_seen_names.contains(name) {
+                    final_seen_names.insert(name.to_string());
+                    final_deduplicated_env_vars.push(env_var);
+                }
+            } else {
+                final_deduplicated_env_vars.push(env_var);
+            }
+        }
+        
+        // Reverse back to original order
+        final_deduplicated_env_vars.reverse();
+        final_env_vars = final_deduplicated_env_vars;
 
         // Build the job spec with environment configuration
         let mut container_spec = json!({
@@ -971,19 +993,22 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }
-        }
 
-        // Process legacy env_from_secrets if present (regardless of task requirements)
-        for secret_env in &code_run.spec.env_from_secrets {
-            env_vars.push(json!({
-                "name": &secret_env.name,
-                "valueFrom": {
-                    "secretKeyRef": {
-                        "name": &secret_env.secret_name,
-                        "key": &secret_env.secret_key
+            // Only process legacy env_from_secrets if task requirements don't exist
+            // This prevents conflicts between task_requirements and legacy env_from_secrets
+        } else {
+            // Process legacy env_from_secrets only when no task requirements are present
+            for secret_env in &code_run.spec.env_from_secrets {
+                env_vars.push(json!({
+                    "name": &secret_env.name,
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": &secret_env.secret_name,
+                            "key": &secret_env.secret_key
+                        }
                     }
-                }
-            }));
+                }));
+            }
         }
 
         Ok((env_vars, env_from))
