@@ -354,89 +354,88 @@ fi
 # Step 3: Copy task files from docs repo to target repo
 echo "📋 TASK FILES: COPYING from docs to target repository"
 mkdir -p "/workspace/$TARGET_REPO_DIR/task"
-    
-    # Determine docs project directory path
-    {{#if docs_project_directory}}
-    if [ "{{docs_project_directory}}" = "." ]; then
-        DOCS_PATH="/tmp/docs-repo/.taskmaster"
-    else
-        DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
-    fi
-    {{else}}
+
+# Determine docs project directory path
+{{#if docs_project_directory}}
+if [ "{{docs_project_directory}}" = "." ]; then
     DOCS_PATH="/tmp/docs-repo/.taskmaster"
-    {{/if}}
+else
+    DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
+fi
+{{else}}
+DOCS_PATH="/tmp/docs-repo/.taskmaster"
+{{/if}}
+
+# Copy specific task files
+TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
+echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
+echo "🔍 DEBUG: Contents of docs temp directory:"
+ls -la /tmp/docs-repo/.taskmaster/ || echo "No .taskmaster found"
+echo "🔍 DEBUG: Contents of docs directory:"
+ls -la /tmp/docs-repo/.taskmaster/docs/ || echo "No docs directory found"
+
+if [ -d "$TASK_DIR" ]; then
+    echo "🔍 DEBUG: Task directory found, contents:"
+    ls -la "$TASK_DIR"
     
-    # Copy specific task files
-    TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
-    echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
-    echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
-    echo "🔍 DEBUG: Contents of docs temp directory:"
-    ls -la /tmp/docs-repo/.taskmaster/ || echo "No .taskmaster found"
-    echo "🔍 DEBUG: Contents of docs directory:"
-    ls -la /tmp/docs-repo/.taskmaster/docs/ || echo "No docs directory found"
+    echo "✅ Copying task.md..."
+    cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
     
-    if [ -d "$TASK_DIR" ]; then
-        echo "🔍 DEBUG: Task directory found, contents:"
-        ls -la "$TASK_DIR"
-        
-        echo "✅ Copying task.md..."
-        cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
-        
-        echo "✅ Copying acceptance-criteria.md..."
-        cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
-        
-        echo "✅ Copying prompt.md..."
-        cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
-        
-        echo "✅ Copying client-config.json..."
-        if [ -f "$TASK_DIR/client-config.json" ]; then
-            cp "$TASK_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
-        else
-            echo "⚠️ client-config.json not found - MCP client may not be configured"
-        fi
-        
-        echo "✅ Copying toolman-guide.md..."
-        if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-            cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
-        else
-            echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
-        fi
-        
-        echo "✓ Task {{task_id}} files copied from $TASK_DIR"
+    echo "✅ Copying acceptance-criteria.md..."
+    cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
+    
+    echo "✅ Copying prompt.md..."
+    cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
+    
+    echo "✅ Copying client-config.json..."
+    if [ -f "$TASK_DIR/client-config.json" ]; then
+        cp "$TASK_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
     else
-        echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
-        echo "🔍 DEBUG: Available directories in docs:"
-        find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+        echo "⚠️ client-config.json not found - MCP client may not be configured"
     fi
     
-    # Copy architecture.md from docs root
-    ARCH_FILE="$DOCS_PATH/docs/architecture.md"
-    if [ -f "$ARCH_FILE" ]; then
-        cp "$ARCH_FILE" "/workspace/$TARGET_REPO_DIR/task/"
-        echo "✓ Architecture documentation copied"
+    echo "✅ Copying toolman-guide.md..."
+    if [ -f "$TASK_DIR/toolman-guide.md" ]; then
+        cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
     else
-        echo "⚠️ architecture.md not found at: $ARCH_FILE"
+        echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
     
-    # Copy tasks.json if it exists
-    if [ -f "$DOCS_PATH/tasks.json" ]; then
-        cp "$DOCS_PATH/tasks.json" "/workspace/$TARGET_REPO_DIR/task/"
-        echo "✓ tasks.json copied"
-    fi
-    
-    echo "✓ Task files copied to target repository"
-    
-    # DEBUG: Verify files were copied successfully
-    echo "🔍 DEBUG: Contents of target task directory after copy:"
-    ls -la "/workspace/$TARGET_REPO_DIR/task/" || echo "Task directory not found"
-    echo "🔍 DEBUG: Checking if prompt.md exists:"
-    [ -f "/workspace/$TARGET_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
-    
-    # Step 4: Clean up docs repository
-    echo "🧹 CLEANUP: Removing temporary docs repository"
-    rm -rf /tmp/docs-repo
-    echo "✓ Docs repository cleaned up"
-    
+    echo "✓ Task {{task_id}} files copied from $TASK_DIR"
+else
+    echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
+    echo "🔍 DEBUG: Available directories in docs:"
+    find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+fi
+
+# Copy architecture.md from docs root
+ARCH_FILE="$DOCS_PATH/docs/architecture.md"
+if [ -f "$ARCH_FILE" ]; then
+    cp "$ARCH_FILE" "/workspace/$TARGET_REPO_DIR/task/"
+    echo "✓ Architecture documentation copied"
+else
+    echo "⚠️ architecture.md not found at: $ARCH_FILE"
+fi
+
+# Copy tasks.json if it exists
+if [ -f "$DOCS_PATH/tasks.json" ]; then
+    cp "$DOCS_PATH/tasks.json" "/workspace/$TARGET_REPO_DIR/task/"
+    echo "✓ tasks.json copied"
+fi
+
+echo "✓ Task files copied to target repository"
+
+# DEBUG: Verify files were copied successfully
+echo "🔍 DEBUG: Contents of target task directory after copy:"
+ls -la "/workspace/$TARGET_REPO_DIR/task/" || echo "Task directory not found"
+echo "🔍 DEBUG: Checking if prompt.md exists:"
+[ -f "/workspace/$TARGET_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
+
+# Step 4: Clean up docs repository
+echo "🧹 CLEANUP: Removing temporary docs repository"
+rm -rf /tmp/docs-repo
+echo "✓ Docs repository cleaned up"
 # Set working directory to the target repository root
 REPO_NAME="$TARGET_REPO_DIR"
 echo "✓ Working directory: /workspace/$REPO_NAME"
