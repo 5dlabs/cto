@@ -962,7 +962,7 @@ impl<'a> CodeResourceManager<'a> {
 
         // Process legacy env_from_secrets if present (regardless of task requirements)
         for secret_env in &code_run.spec.env_from_secrets {
-                env_vars.push(json!({
+            env_vars.push(json!({
                     "name": &secret_env.name,
                     "valueFrom": {
                         "secretKeyRef": {
