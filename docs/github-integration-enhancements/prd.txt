@@ -1,0 +1,764 @@
+<context>
+# Overview
+The GitHub Integration Enhancements project extends the CTO platform's GitHub capabilities with automated PR comment feedback loops, GitHub Projects integration for task tracking, and GitHub App manifest API integration for automatic bot creation. These features transform the platform from a simple code generation tool into a comprehensive development workflow system that integrates deeply with GitHub's collaboration features.
+
+# Core Features
+## PR Comment Feedback Loop
+- **Automated Comment Monitoring**: Watch for specific comment patterns from QA agents
+- **Structured Feedback Parsing**: Extract actionable items from PR comments
+- **Automated Remediation**: Trigger implementation agents based on feedback
+- **Status Synchronization**: Update PR labels and checks based on agent progress
+
+## GitHub Projects Integration
+- **Task Synchronization**: Sync Taskmaster tasks with GitHub Project items
+- **Status Tracking**: Update project board columns based on task status
+- **Milestone Management**: Link tasks to GitHub milestones
+- **Sprint Planning**: Support for iteration fields and capacity planning
+
+## GitHub App Manifest API
+- **Automated App Creation**: Create GitHub Apps programmatically for each agent
+- **Dynamic Permission Management**: Request only needed permissions per agent
+- **Webhook Configuration**: Auto-configure webhooks for agent events
+- **Installation Flow**: Streamlined app installation to repositories
+
+# User Experience
+## User Personas
+- **DevOps Teams**: Need automated bot management and deployment
+- **QA Engineers**: Require feedback loops for issue remediation
+- **Project Managers**: Want visibility into task progress via GitHub Projects
+- **Security Teams**: Need controlled, auditable bot permissions
+
+## Key User Flows
+1. **QA Feedback Loop**: QA posts comment → System parses → Agent fixes → Auto-commits
+2. **Task Tracking**: Create task → Sync to GitHub Project → Track progress → Update status
+3. **Bot Creation**: Define agent → Generate manifest → Create app → Install to repo
+4. **Sprint Management**: Plan sprint in Projects → Sync to tasks → Track completion
+</context>
+
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### Core Infrastructure
+- **Comment Webhook Processor**: Receives and processes PR comment events
+- **Projects API Client**: Manages GitHub Projects V2 GraphQL interactions
+- **App Manifest Generator**: Creates GitHub App manifests from agent definitions
+- **Event Orchestrator**: Coordinates between GitHub events and agent workflows
+
+### PR Comment Feedback Architecture
+```yaml
+Comment Processing Pipeline:
+  Webhook Ingestion:
+    - GitHub webhook events
+    - Comment filtering (bot vs human)
+    - Pattern matching for commands
+    
+  Feedback Parser:
+    - Structured format detection (XML/Markdown)
+    - Issue extraction
+    - Priority assessment
+    - Action determination
+    
+  Remediation Orchestration:
+    - Agent selection
+    - Task creation
+    - Workflow triggering
+    - Progress tracking
+    
+  Response Management:
+    - PR comment updates
+    - Check status updates
+    - Label management
+    - Notification dispatch
+```
+
+### GitHub Projects Integration Architecture
+```yaml
+Projects Synchronization:
+  Task to Project Item:
+    - Create project items from tasks
+    - Map task fields to project fields
+    - Handle custom fields
+    - Maintain bidirectional links
+    
+  Status Synchronization:
+    - Task status → Project column
+    - Project column → Task status
+    - Handle status conflicts
+    - Audit trail maintenance
+    
+  Milestone Integration:
+    - Link tasks to milestones
+    - Track milestone progress
+    - Update completion percentages
+    - Handle milestone changes
+```
+
+## Data Models
+
+### PR Comment Feedback Schema
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PRFeedback {
+    pub pr_number: u64,
+    pub comment_id: u64,
+    pub author: String,
+    pub timestamp: DateTime<Utc>,
+    pub feedback_type: FeedbackType,
+    pub issues: Vec<Issue>,
+    pub requested_action: RequestedAction,
+    pub priority: Priority,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum FeedbackType {
+    QAResult,
+    CodeReview,
+    SecurityAudit,
+    PerformanceReport,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Issue {
+    pub id: String,
+    pub severity: Severity,
+    pub category: IssueCategory,
+    pub description: String,
+    pub file_path: Option<String>,
+    pub line_range: Option<(u32, u32)>,
+    pub suggested_fix: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum RequestedAction {
+    FixIssues(Vec<String>),
+    AddTests(Vec<String>),
+    UpdateDocumentation,
+    RefactorCode(Vec<String>),
+    RestartPipeline,
+}
+```
+
+### GitHub Projects Schema
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectItem {
+    pub id: String,
+    pub project_id: String,
+    pub content_id: Option<String>, // Task ID
+    pub content_type: ContentType,
+    pub field_values: HashMap<String, FieldValue>,
+    pub status: ProjectStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectField {
+    pub id: String,
+    pub name: String,
+    pub field_type: FieldType,
+    pub options: Vec<FieldOption>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum FieldType {
+    SingleSelect,
+    Iteration,
+    Number,
+    Text,
+    Date,
+    Milestone,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TaskProjectMapping {
+    pub task_id: u32,
+    pub project_item_id: String,
+    pub project_id: String,
+    pub last_synced: DateTime<Utc>,
+    pub sync_direction: SyncDirection,
+}
+```
+
+### GitHub App Manifest Schema
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppManifest {
+    pub name: String,
+    pub url: String,
+    pub hook_attributes: HookAttributes,
+    pub redirect_url: String,
+    pub callback_urls: Vec<String>,
+    pub public: bool,
+    pub default_permissions: Permissions,
+    pub default_events: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentAppConfig {
+    pub agent_name: String,
+    pub app_name: String,
+    pub description: String,
+    pub permissions: Permissions,
+    pub events: Vec<WebhookEvent>,
+    pub webhook_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Permissions {
+    pub actions: Option<String>,
+    pub contents: Option<String>,
+    pub issues: Option<String>,
+    pub pull_requests: Option<String>,
+    pub project: Option<String>,
+    pub checks: Option<String>,
+}
+```
+
+## APIs and Integrations
+
+### PR Comment Webhook Handler
+```rust
+pub struct CommentWebhookHandler {
+    parser: FeedbackParser,
+    orchestrator: RemediationOrchestrator,
+    github_client: GitHubClient,
+}
+
+impl CommentWebhookHandler {
+    pub async fn handle_comment(&self, event: IssueCommentEvent) -> Result<()> {
+        // Filter for relevant comments
+        if !self.is_relevant_comment(&event) {
+            return Ok(());
+        }
+        
+        // Parse feedback from comment
+        let feedback = self.parser.parse_comment(&event.comment)?;
+        
+        // Determine required action
+        let action = self.determine_action(&feedback)?;
+        
+        // Create remediation task
+        let task = self.create_remediation_task(&feedback, &action)?;
+        
+        // Trigger appropriate agent
+        self.orchestrator.trigger_remediation(task).await?;
+        
+        // Update PR with acknowledgment
+        self.acknowledge_feedback(&event.issue, &feedback).await?;
+        
+        Ok(())
+    }
+    
+    fn is_relevant_comment(&self, event: &IssueCommentEvent) -> bool {
+        // Check if comment is from QA bot
+        if event.comment.user.login.ends_with("[bot]") {
+            return true;
+        }
+        
+        // Check for command patterns
+        if event.comment.body.contains("@cto-fix") ||
+           event.comment.body.contains("@cto-review") {
+            return true;
+        }
+        
+        false
+    }
+    
+    async fn acknowledge_feedback(&self, issue: &Issue, feedback: &PRFeedback) -> Result<()> {
+        let message = format!(
+            "🔄 **Remediation Started**\n\n\
+             Identified {} issues to address:\n{}\n\n\
+             Tracking: rex-remediation-{}",
+            feedback.issues.len(),
+            self.format_issue_list(&feedback.issues),
+            feedback.pr_number
+        );
+        
+        self.github_client.create_issue_comment(
+            issue.number,
+            &message
+        ).await?;
+        
+        // Add label
+        self.github_client.add_label(
+            issue.number,
+            "remediation-in-progress"
+        ).await?;
+        
+        Ok(())
+    }
+}
+```
+
+### GitHub Projects V2 Integration
+```rust
+pub struct ProjectsV2Client {
+    github_client: GitHubClient,
+    graphql_client: GraphQLClient,
+}
+
+impl ProjectsV2Client {
+    pub async fn sync_task_to_project(
+        &self,
+        task: &Task,
+        project_id: &str,
+    ) -> Result<ProjectItem> {
+        // Check if item already exists
+        if let Some(item) = self.find_existing_item(task.id, project_id).await? {
+            return self.update_project_item(item, task).await;
+        }
+        
+        // Create new project item
+        let mutation = r#"
+            mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {
+                    projectId: $projectId,
+                    contentId: $contentId
+                }) {
+                    item {
+                        id
+                        content {
+                            ... on Issue {
+                                id
+                                title
+                            }
+                        }
+                    }
+                }
+            }
+        "#;
+        
+        let variables = json!({
+            "projectId": project_id,
+            "contentId": task.github_issue_id,
+        });
+        
+        let response = self.graphql_client.execute(mutation, variables).await?;
+        
+        // Update field values
+        self.update_field_values(&response.item.id, task).await?;
+        
+        Ok(response.item)
+    }
+    
+    async fn update_field_values(
+        &self,
+        item_id: &str,
+        task: &Task,
+    ) -> Result<()> {
+        let fields = self.get_project_fields(item_id).await?;
+        
+        // Map task fields to project fields
+        for field in fields {
+            let value = match field.name.as_str() {
+                "Status" => self.map_task_status_to_column(&task.status),
+                "Priority" => Some(task.priority.clone()),
+                "Agent" => Some(task.assigned_agent.clone()),
+                "Points" => task.story_points.map(|p| p.to_string()),
+                _ => None,
+            };
+            
+            if let Some(val) = value {
+                self.update_field_value(item_id, &field.id, &val).await?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn map_task_status_to_column(&self, status: &str) -> Option<String> {
+        match status {
+            "pending" => Some("📋 Backlog".to_string()),
+            "in_progress" => Some("🏃 In Progress".to_string()),
+            "in_review" => Some("👀 In Review".to_string()),
+            "completed" => Some("✅ Done".to_string()),
+            _ => None,
+        }
+    }
+}
+```
+
+### GitHub App Manifest Generator
+```rust
+pub struct AppManifestGenerator {
+    base_url: String,
+    webhook_secret: String,
+}
+
+impl AppManifestGenerator {
+    pub fn generate_manifest(&self, agent: &AgentConfig) -> AppManifest {
+        AppManifest {
+            name: format!("cto-agent-{}", agent.name.to_lowercase()),
+            url: format!("{}/agents/{}", self.base_url, agent.name),
+            hook_attributes: HookAttributes {
+                url: format!("{}/webhooks/github", self.base_url),
+                active: true,
+                content_type: "json".to_string(),
+                secret: self.webhook_secret.clone(),
+            },
+            redirect_url: format!("{}/auth/callback", self.base_url),
+            callback_urls: vec![
+                format!("{}/auth/callback", self.base_url),
+            ],
+            public: false,
+            default_permissions: self.get_agent_permissions(agent),
+            default_events: self.get_agent_events(agent),
+        }
+    }
+    
+    fn get_agent_permissions(&self, agent: &AgentConfig) -> Permissions {
+        match agent.role {
+            AgentRole::Implementation => Permissions {
+                contents: Some("write".to_string()),
+                pull_requests: Some("write".to_string()),
+                issues: Some("write".to_string()),
+                actions: Some("write".to_string()),
+                checks: Some("write".to_string()),
+                ..Default::default()
+            },
+            AgentRole::QA => Permissions {
+                contents: Some("read".to_string()),
+                pull_requests: Some("write".to_string()),
+                issues: Some("write".to_string()),
+                checks: Some("write".to_string()),
+                ..Default::default()
+            },
+            AgentRole::Documentation => Permissions {
+                contents: Some("write".to_string()),
+                issues: Some("read".to_string()),
+                ..Default::default()
+            },
+        }
+    }
+    
+    fn get_agent_events(&self, agent: &AgentConfig) -> Vec<String> {
+        match agent.role {
+            AgentRole::Implementation => vec![
+                "pull_request".to_string(),
+                "issue_comment".to_string(),
+                "push".to_string(),
+            ],
+            AgentRole::QA => vec![
+                "pull_request".to_string(),
+                "issue_comment".to_string(),
+                "check_suite".to_string(),
+            ],
+            AgentRole::Documentation => vec![
+                "push".to_string(),
+                "release".to_string(),
+            ],
+        }
+    }
+}
+
+pub struct AppManifestClient {
+    github_client: GitHubClient,
+    generator: AppManifestGenerator,
+}
+
+impl AppManifestClient {
+    pub async fn create_app_from_manifest(
+        &self,
+        agent: &AgentConfig,
+    ) -> Result<GitHubApp> {
+        let manifest = self.generator.generate_manifest(agent);
+        
+        // POST to GitHub's app manifest endpoint
+        let response = self.github_client.create_app_from_manifest(
+            &serde_json::to_string(&manifest)?
+        ).await?;
+        
+        // Store app credentials
+        self.store_app_credentials(&response).await?;
+        
+        Ok(response)
+    }
+    
+    async fn store_app_credentials(&self, app: &GitHubApp) -> Result<()> {
+        // Store in Kubernetes secret
+        let secret = Secret {
+            metadata: ObjectMeta {
+                name: Some(format!("github-app-{}", app.slug)),
+                namespace: Some("agent-platform".to_string()),
+                ..Default::default()
+            },
+            data: Some(BTreeMap::from([
+                ("app_id".to_string(), ByteString(app.id.to_string().into_bytes())),
+                ("private_key".to_string(), ByteString(app.pem.clone().into_bytes())),
+                ("webhook_secret".to_string(), ByteString(app.webhook_secret.clone().into_bytes())),
+            ])),
+            ..Default::default()
+        };
+        
+        // Create secret in cluster
+        kube::Api::namespaced(client, "agent-platform")
+            .create(&PostParams::default(), &secret)
+            .await?;
+        
+        Ok(())
+    }
+}
+```
+
+## Infrastructure Requirements
+
+### Webhook Event Processing
+```yaml
+# Argo Events sensor for PR comments
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pr-comment-sensor
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+  dependencies:
+    - name: pr-comment
+      eventSourceName: github-webhook
+      eventName: issue_comment
+  triggers:
+    - template:
+        name: process-feedback
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: process-feedback-{{.Input.comment.id}}
+              spec:
+                template:
+                  spec:
+                    containers:
+                    - name: processor
+                      image: ghcr.io/5dlabs/comment-processor:latest
+                      env:
+                      - name: COMMENT_ID
+                        value: "{{.Input.comment.id}}"
+                      - name: PR_NUMBER
+                        value: "{{.Input.issue.number}}"
+                      - name: COMMENT_BODY
+                        value: "{{.Input.comment.body}}"
+```
+
+### GitHub Projects GraphQL Queries
+```graphql
+# Get project fields
+query GetProjectFields($projectId: ID!) {
+  node(id: $projectId) {
+    ... on ProjectV2 {
+      fields(first: 20) {
+        nodes {
+          ... on ProjectV2Field {
+            id
+            name
+            dataType
+          }
+          ... on ProjectV2SingleSelectField {
+            id
+            name
+            options {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# Update project item field
+mutation UpdateProjectItemField($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+  updateProjectV2ItemFieldValue(input: {
+    projectId: $projectId
+    itemId: $itemId
+    fieldId: $fieldId
+    value: $value
+  }) {
+    projectV2Item {
+      id
+    }
+  }
+}
+```
+
+# Development Roadmap
+
+## Phase 1: PR Comment Feedback Loop (Days 1-2)
+### Webhook Infrastructure
+- Set up GitHub webhook receiver
+- Implement comment parsing logic
+- Create feedback extraction patterns
+- Build remediation task creator
+
+### Integration Points
+- Connect to existing agent workflows
+- Add PR comment responses
+- Implement status tracking
+- Create progress notifications
+
+### Deliverables
+- Working webhook handler
+- Comment parser
+- Remediation orchestrator
+- Integration tests
+
+## Phase 2: GitHub Projects Integration (Days 3-4)
+### GraphQL Client
+- Implement Projects V2 GraphQL client
+- Create task-to-item mapper
+- Build field synchronization
+- Handle bidirectional updates
+
+### Synchronization Logic
+- Task creation → Project item
+- Status changes → Column moves
+- Field updates → Task updates
+- Conflict resolution
+
+### Deliverables
+- Projects V2 client
+- Sync engine
+- Field mapping
+- Status tracking
+
+## Phase 3: GitHub App Manifest (Day 5)
+### Manifest Generation
+- Create manifest templates
+- Build permission calculator
+- Generate per-agent manifests
+- Handle installation flow
+
+### App Management
+- Store app credentials
+- Manage app lifecycle
+- Handle updates
+- Track installations
+
+### Deliverables
+- Manifest generator
+- App creation flow
+- Credential storage
+- Installation guide
+
+## Phase 4: Testing & Polish (Days 6-7)
+### End-to-End Testing
+- Test complete feedback loop
+- Verify Projects sync
+- Validate app creation
+- Check permission scopes
+
+### Documentation
+- API documentation
+- Setup guides
+- Troubleshooting docs
+- Best practices
+
+### Deliverables
+- Test suite
+- Documentation
+- Bug fixes
+- Performance tuning
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+### GitHub API Rate Limits
+**Risk**: Hitting API rate limits during heavy usage
+**Mitigation**: Implement caching, batch operations, use GraphQL for efficiency
+
+### Webhook Reliability
+**Risk**: Missing webhook events
+**Mitigation**: Implement event replay, idempotent processing, audit logs
+
+### Permission Scope Creep
+**Risk**: Apps requesting too many permissions
+**Mitigation**: Principle of least privilege, regular audits, granular scopes
+
+## Resource Constraints
+
+### GraphQL Complexity
+**Challenge**: Complex GraphQL queries for Projects V2
+**Approach**: Query optimization, caching, pagination
+
+### State Synchronization
+**Challenge**: Keeping tasks and projects in sync
+**Approach**: Event sourcing, conflict resolution, audit trail
+
+## Minimum Viable Product Definition
+
+### MVP Scope
+- Basic PR comment parsing and response
+- Simple Projects column sync (status only)
+- Manual GitHub App creation with manifest
+- Core webhook processing
+
+### MVP Success Criteria
+- Successfully process QA feedback comments
+- Sync task status to Project columns
+- Generate valid app manifests
+- Handle basic webhook events
+
+# Appendix
+
+## Sample PR Comment Formats
+
+### Structured QA Feedback
+```xml
+<qa-feedback>
+  <summary>3 issues found, 2 critical</summary>
+  <issues>
+    <issue severity="critical">
+      <file>src/auth.rs</file>
+      <line>42</line>
+      <description>SQL injection vulnerability</description>
+      <suggested-fix>Use parameterized queries</suggested-fix>
+    </issue>
+    <issue severity="warning">
+      <file>tests/auth_test.rs</file>
+      <description>Missing test coverage for error cases</description>
+    </issue>
+  </issues>
+  <action>fix-critical</action>
+</qa-feedback>
+```
+
+### Command-Based Feedback
+```markdown
+@cto-fix priority:high
+
+## Issues Found
+- [ ] Authentication bypass in login endpoint
+- [ ] Missing rate limiting
+- [ ] Sensitive data in logs
+
+## Suggested Actions
+1. Fix security vulnerabilities
+2. Add rate limiting middleware
+3. Sanitize log output
+
+/assign @rex
+/label security
+```
+
+## GitHub Projects Field Mappings
+| Task Field | Project Field | Type | Values |
+|------------|---------------|------|---------|
+| status | Status | Single Select | Backlog, In Progress, Review, Done |
+| priority | Priority | Single Select | Low, Medium, High, Critical |
+| assigned_agent | Agent | Single Select | Rex, Cleo, Tess |
+| story_points | Points | Number | 1-13 |
+| sprint | Iteration | Iteration | Current, Next |
+| due_date | Due Date | Date | ISO 8601 |
+
+## Success Metrics
+- Comment to remediation time: <5 minutes
+- Projects sync accuracy: >99%
+- App creation success rate: >95%
+- Webhook processing latency: <1 second
+- Feedback loop completion: <30 minutes
+</PRD>

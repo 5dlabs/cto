@@ -622,6 +622,8 @@ impl<'a> CodeResourceManager<'a> {
         );
 
         // Build environment variables for code tasks
+        // Note: Critical system vars (CODERUN_NAME, WORKFLOW_NAME, NAMESPACE) are added
+        // AFTER requirements processing to prevent overrides
         let env_vars = vec![
             json!({
                 "name": "GITHUB_APP_ID",
@@ -650,10 +652,24 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }),
-            // Add CodeRun metadata for status updates
+        ];
+
+        // Process task requirements if present
+        let (mut final_env_vars, env_from) = self.process_task_requirements(code_run, env_vars)?;
+
+        // Critical system variables that must not be overridden
+        // Add these AFTER requirements processing to ensure they take precedence
+        let critical_env_vars = vec![
             json!({
                 "name": "CODERUN_NAME",
                 "value": code_run.name_any()
+            }),
+            json!({
+                "name": "WORKFLOW_NAME",
+                "value": code_run.metadata.labels.as_ref()
+                    .and_then(|labels| labels.get("workflow-name"))
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string())
             }),
             json!({
                 "name": "NAMESPACE",
@@ -663,18 +679,17 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }),
-            // Add workflow name from CodeRun labels for PR correlation
-            json!({
-                "name": "WORKFLOW_NAME",
-                "value": code_run.metadata.labels.as_ref()
-                    .and_then(|labels| labels.get("workflow-name"))
-                    .unwrap_or(&"unknown".to_string())
-                    .clone()
-            }),
         ];
 
-        // Process task requirements if present
-        let (mut final_env_vars, env_from) = self.process_task_requirements(code_run, env_vars)?;
+        // Remove any duplicates and re-add critical vars to ensure they're not overridden
+        final_env_vars.retain(|v| {
+            if let Some(name) = v.get("name").and_then(|n| n.as_str()) {
+                !["CODERUN_NAME", "WORKFLOW_NAME", "NAMESPACE"].contains(&name)
+            } else {
+                true
+            }
+        });
+        final_env_vars.extend(critical_env_vars);
 
         // Add Docker environment variable if Docker is enabled
         if enable_docker {
