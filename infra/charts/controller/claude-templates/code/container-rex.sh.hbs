@@ -435,9 +435,20 @@ echo "🔍 DEBUG: Checking if prompt.md exists:"
 echo "🧹 CLEANUP: Removing temporary docs repository"
 rm -rf /tmp/docs-repo
 echo "✓ Docs repository cleaned up"
+
 # Set working directory to the target repository root
 REPO_NAME="$TARGET_REPO_DIR"
 echo "✓ Working directory: /workspace/$REPO_NAME"
+
+# Set Claude working directory early (needed for client-config.json copy)
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
+else
+  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
+fi
+mkdir -p "$CLAUDE_WORK_DIR"
+echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
@@ -477,15 +488,9 @@ else
     echo "✓ Created feature branch: $FEATURE_BRANCH"
 fi
 
-# 5. Set Working Directory (Critical for Claude Execution)
-WORK_DIR="{{working_directory}}"
-if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
-else
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
-fi
-mkdir -p "$CLAUDE_WORK_DIR" && cd "$CLAUDE_WORK_DIR"
-echo "✓ Set working directory: $CLAUDE_WORK_DIR"
+# 5. Change to Claude Working Directory (already set up earlier)
+cd "$CLAUDE_WORK_DIR"
+echo "✓ Changed to Claude working directory: $CLAUDE_WORK_DIR"
 echo "🔑 CRITICAL: Claude will be launched from this directory"
 
 # Working directory setup completed above
