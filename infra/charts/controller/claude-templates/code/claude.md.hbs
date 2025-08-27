@@ -118,9 +118,11 @@ This file enables automatic pull request creation.
 
 **IMPORTANT PR HANDLING**:
 - Always check if a PR already exists for this task before creating PR_DESCRIPTION.md
-- If a PR exists and is OPEN, do NOT create PR_DESCRIPTION.md (continue working on the existing PR)
-- If a PR exists but is CLOSED or MERGED, you MUST create a new PR with PR_DESCRIPTION.md
-- Use `gh pr list` to check for existing PRs with your task label
+- Use `gh pr list --state all --label "task-{{task_id}}"` to find existing PRs for your task
+- If a PR exists and is OPEN: do NOT create PR_DESCRIPTION.md (continue working on the existing PR)
+- If a PR exists and is MERGED: the task is complete - do NOT create a new PR
+- If a PR exists and is CLOSED (not merged): create a new PR with PR_DESCRIPTION.md
+- Only create PR_DESCRIPTION.md when there's no open PR or when reopening after a closed (unmerged) PR
 
 Additional PR gating rules:
 - Do NOT open a PR unless: `cargo fmt --all -- --check` passes, `cargo clippy ... -D warnings -W clippy::pedantic` passes, and all tests pass
