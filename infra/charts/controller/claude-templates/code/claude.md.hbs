@@ -116,6 +116,12 @@ git commit -m "feat: implement [brief description]"
 
 This file enables automatic pull request creation.
 
+**IMPORTANT PR HANDLING**:
+- Always check if a PR already exists for this task before creating PR_DESCRIPTION.md
+- If a PR exists and is OPEN, do NOT create PR_DESCRIPTION.md (continue working on the existing PR)
+- If a PR exists but is CLOSED or MERGED, you MUST create a new PR with PR_DESCRIPTION.md
+- Use `gh pr list` to check for existing PRs with your task label
+
 Additional PR gating rules:
 - Do NOT open a PR unless: `cargo fmt --all -- --check` passes, `cargo clippy ... -D warnings -W clippy::pedantic` passes, and all tests pass
 - Aim for ≥95% coverage; target ~100% on critical code paths before PR

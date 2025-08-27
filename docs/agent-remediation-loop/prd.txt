@@ -1,0 +1,469 @@
+<context>
+# Overview
+The Agent Remediation Loop creates an automated feedback system where QA findings from Tess trigger Rex to implement fixes without human intervention. This eliminates manual back-and-forth between agents, significantly reducing the time from issue detection to resolution. The system supports recursive remediation cycles until all acceptance criteria are met, with built-in safety limits to prevent infinite loops.
+
+# Core Features
+## Automated Feedback Processing
+- **PR Comment Detection**: Monitor and parse structured feedback from Tess
+- **Issue Classification**: Categorize feedback as bugs, missing features, or regressions
+- **Context Preservation**: Maintain original task requirements during remediation
+- **Priority Handling**: Address critical issues before minor ones
+
+## Intelligent Remediation
+- **Rex Auto-Restart**: Automatically trigger Rex when issues are found
+- **Cleo/Tess Cancellation**: Cancel outdated quality checks when fixes are pushed
+- **Fresh QA Pipeline**: Restart quality assurance from clean state after fixes
+- **Session Resume**: Rex continues from previous context, not starting fresh
+
+## Loop Control Mechanisms
+- **Iteration Limits**: Maximum 5-10 remediation cycles before escalation
+- **Termination Conditions**: Clear success criteria (Tess approval) or failure states
+- **Human Override**: CTO can intervene at any point with "skip-automation" label
+- **Timeout Protection**: Overall workflow timeout prevents runaway processes
+
+# User Experience
+## User Personas
+- **QA Agent (Tess)**: Provides structured feedback that triggers remediation
+- **Implementation Agent (Rex)**: Receives and acts on feedback automatically
+- **Platform Engineers**: Monitor remediation cycles and intervene if needed
+- **CTO/Reviewers**: Have visibility but minimal required interaction
+
+## Key User Flows
+1. **Happy Path**: Rex → Cleo → Tess → Approval (no remediation needed)
+2. **Single Remediation**: Tess finds issues → Rex fixes → Cleo → Tess → Approval
+3. **Multiple Cycles**: Repeated Tess feedback → Rex fixes until satisfied
+4. **Manual Override**: Human adds "skip-automation" label to stop loop
+</context>
+
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### Core Infrastructure
+- **GitHub Webhook Sensors**: Detect PR comments and trigger remediation
+- **Argo Events**: Process webhooks and coordinate agent restarts
+- **CodeRun Controller**: Manage agent lifecycle and cancellations
+- **Label Management**: Track iteration count and workflow state via PR labels
+
+### Remediation Architecture
+```yaml
+Feedback Detection:
+- Monitor PR comments from Tess (and potentially humans)
+- Parse structured feedback format
+- Extract actionable issues and severity
+
+Remediation Trigger:
+- Create new Rex CodeRun with feedback context
+- Cancel running Cleo/Tess CodeRuns
+- Remove "ready-for-qa" label to reset state
+- Update iteration counter
+
+Quality Reset:
+- Wait for Rex to push fixes
+- Trigger fresh Cleo review
+- Proceed to Tess validation
+- Repeat until approval or limit
+```
+
+### Comment Classification System
+```markdown
+## Actionable Comments (Trigger Rex)
+🔴 Required Changes
+**Issue Type**: [Bug|Missing Feature|Regression|Performance]
+**Severity**: [Critical|High|Medium|Low]
+
+### Description
+[Clear description of the issue]
+
+### Acceptance Criteria Not Met
+- [ ] Specific criterion not satisfied
+- [ ] Another missing requirement
+
+### Steps to Reproduce (if bug)
+1. Step one
+2. Step two
+
+### Expected vs Actual
+- **Expected**: [what should happen]
+- **Actual**: [what actually happens]
+```
+
+## Data Models
+
+### Remediation State Tracking
+```yaml
+PR Labels for State:
+- task-{id}: Task association
+- iteration-{n}: Current remediation cycle
+- needs-remediation: Tess found issues
+- remediation-in-progress: Rex is fixing
+- ready-for-qa: Cleo complete, ready for Tess
+- approved: Tess satisfied
+- skip-automation: Human override
+```
+
+### Feedback Context Structure
+```rust
+pub struct RemediationContext {
+    pub pr_number: u32,
+    pub task_id: String,
+    pub iteration: u8,
+    pub feedback: Vec<IssueFeedback>,
+    pub original_requirements: String,
+    pub previous_attempts: Vec<RemediationAttempt>,
+}
+
+pub struct IssueFeedback {
+    pub issue_type: IssueType,
+    pub severity: Severity,
+    pub description: String,
+    pub acceptance_criteria: Vec<String>,
+    pub reproduction_steps: Option<Vec<String>>,
+    pub comment_id: String,
+    pub author: String,
+}
+```
+
+## APIs and Integrations
+
+### PR Comment Webhook Sensor
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pr-comment-feedback
+  namespace: argo
+spec:
+  dependencies:
+    - name: github-pr-comment
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["issue_comment", "pull_request_review_comment"]
+          - path: body.action
+            type: string
+            value: ["created"]
+            
+  triggers:
+    - template:
+        name: process-pr-feedback
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: platform.5dlabs.com/v1
+              kind: CodeRun
+              metadata:
+                generateName: rex-remediation-
+                namespace: agent-platform
+                labels:
+                  task-id: "{{.Input.body.issue.labels[?name=~'task-'].name}}"
+                  workflow-stage: "remediation"
+                  agent-type: "rex"
+                  trigger: "pr-comment"
+                  iteration: "{{.IncrementedIteration}}"
+              spec:
+                service: "task{{.TaskId}}"
+                github_app: "5DLabs-Rex"
+                pr_number: "{{.Input.body.issue.number}}"
+                pr_comment_id: "{{.Input.body.comment.id}}"
+                continue_session: true
+```
+
+### Rex Remediation Enhancement
+```bash
+# In container-rex.sh.hbs
+if [ -n "$PR_COMMENT_ID" ]; then
+  echo "📝 PROCESSING FEEDBACK FROM QA"
+  
+  # Fetch the specific comment
+  COMMENT_JSON=$(gh api /repos/$REPO_OWNER/$REPO_NAME/issues/comments/$PR_COMMENT_ID)
+  COMMENT_BODY=$(echo "$COMMENT_JSON" | jq -r '.body')
+  
+  # Parse structured feedback
+  echo "$COMMENT_BODY" > /tmp/qa-feedback.md
+  
+  # Extract issue metadata
+  ISSUE_TYPE=$(grep "Issue Type" /tmp/qa-feedback.md | sed 's/.*\[\(.*\)\].*/\1/')
+  SEVERITY=$(grep "Severity" /tmp/qa-feedback.md | sed 's/.*\[\(.*\)\].*/\1/')
+  ITERATION=$(kubectl get cm task-$TASK_ID-state -o jsonpath='{.data.iteration}' || echo "1")
+  
+  echo "Remediation Iteration: $ITERATION"
+  echo "Issue Type: $ISSUE_TYPE"
+  echo "Severity: $SEVERITY"
+  
+  # Check iteration limit
+  if [ "$ITERATION" -ge "10" ]; then
+    echo "⚠️ Maximum remediation iterations reached. Escalating to human review."
+    gh pr comment $PR_NUMBER --body "Maximum automated remediation attempts reached. Human intervention required."
+    exit 1
+  fi
+  
+  # Prepare context for Claude
+  cat > /tmp/remediation-context.md << EOF
+You have received QA feedback requiring remediation (Iteration $ITERATION/10).
+
+The feedback is in /tmp/qa-feedback.md. Please:
+1. Read and understand the issues raised
+2. Implement the necessary fixes
+3. Ensure all acceptance criteria mentioned are met
+4. Commit and push your changes
+
+This is a $SEVERITY priority $ISSUE_TYPE that must be resolved.
+
+Previous remediation attempts: $((ITERATION - 1))
+EOF
+fi
+```
+
+### Cleanup and Cancellation Logic
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: rex-push-cleanup
+spec:
+  dependencies:
+    - name: rex-push-event
+      eventSourceName: github
+      filters:
+        data:
+          - path: body.pusher.name
+            type: string
+            value: ["5DLabs-Rex[bot]", "5DLabs-Rex"]
+            
+  triggers:
+    - template:
+        name: cancel-quality-agents
+        k8s:
+          operation: delete
+          source:
+            resource:
+              apiVersion: platform.5dlabs.com/v1
+              kind: CodeRun
+            labelSelector:
+              matchExpressions:
+                - key: agent-type
+                  operator: In
+                  values: ["cleo", "tess"]
+                - key: task-id
+                  operator: Exists
+                  
+    - template:
+        name: remove-qa-label
+        http:
+          url: "https://api.github.com/repos/{{.Org}}/{{.Repo}}/issues/{{.PR}}/labels/ready-for-qa"
+          method: DELETE
+          headers:
+            Authorization: "Bearer {{.GitHubToken}}"
+            
+    - template:
+        name: increment-iteration
+        k8s:
+          operation: patch
+          source:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: "task-{{.TaskId}}-state"
+              data:
+                iteration: "{{.IncrementedIteration}}"
+```
+
+## Infrastructure Requirements
+
+### State Management ConfigMap
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: task-{{task-id}}-state
+  namespace: agent-platform
+data:
+  iteration: "1"
+  max_iterations: "10"
+  last_feedback: ""
+  start_time: "{{timestamp}}"
+  feedback_history: |
+    []
+```
+
+### Enhanced RBAC for Label Management
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-label-manager
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["platform.5dlabs.com"]
+    resources: ["coderuns"]
+    verbs: ["get", "list", "delete"]
+```
+
+# Development Roadmap
+
+## Phase 1: Comment Detection (Day 1)
+### Webhook Integration
+- Configure GitHub webhook for issue_comment events
+- Create Argo Events sensor for comment processing
+- Parse comment structure for actionable feedback
+- Extract task association from PR labels
+
+### Deliverables
+- Working webhook → sensor integration
+- Comment parsing logic
+- Task ID extraction
+- Basic remediation trigger
+
+## Phase 2: Rex Enhancement (Day 2)
+### Remediation Logic
+- Add PR comment context to Rex container
+- Implement feedback parsing in container script
+- Add iteration tracking and limits
+- Create remediation prompt template
+
+### Session Management
+- Ensure continue_session works properly
+- Preserve original task context
+- Append feedback to existing context
+- Handle multiple feedback rounds
+
+### Deliverables
+- Rex container with remediation support
+- Iteration limit enforcement
+- Context preservation logic
+- Feedback integration
+
+## Phase 3: Pipeline Control (Day 3)
+### Agent Coordination
+- Implement Cleo/Tess cancellation on Rex push
+- Remove ready-for-qa label logic
+- Reset workflow state properly
+- Handle concurrent agent scenarios
+
+### State Tracking
+- Create iteration counter management
+- Track feedback history
+- Monitor remediation cycles
+- Generate metrics
+
+### Deliverables
+- Agent cancellation working
+- Label management functional
+- State tracking operational
+- Metrics collection
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+### Infinite Loop Prevention
+**Risk**: Rex and Tess disagree, causing endless cycles
+**Mitigation**: Hard iteration limit (10 cycles), human escalation, timeout protection
+
+### State Synchronization
+**Risk**: Labels, ConfigMaps, and workflow state get out of sync
+**Mitigation**: Single source of truth (PR labels), atomic updates, validation checks
+
+### Comment Parsing Failures
+**Risk**: Unstructured or malformed feedback breaks parsing
+**Mitigation**: Fallback to human review, flexible parsing, error notifications
+
+## Resource Constraints
+
+### Agent Resource Usage
+**Challenge**: Multiple remediation cycles consume significant compute
+**Approach**: Resource limits per iteration, cleanup old runs, efficient cancellation
+
+### GitHub API Limits
+**Challenge**: High comment/label activity may hit rate limits
+**Approach**: Batch operations, caching, exponential backoff
+
+## Minimum Viable Product Definition
+
+### MVP Scope
+- Detect Tess comments with "Required Changes"
+- Trigger Rex remediation once
+- Cancel running Cleo/Tess
+- Single iteration (no loops yet)
+
+### MVP Success Criteria
+- Rex successfully receives feedback
+- Implements fix based on feedback
+- Cleo/Tess restart with fresh code
+- Complete one remediation cycle
+
+# Appendix
+
+## Feedback Format Examples
+
+### Bug Report
+```markdown
+## 🔴 Required Changes
+
+**Issue Type**: Bug
+**Severity**: High
+
+### Description
+The authentication endpoint returns 500 error when token is expired.
+
+### Steps to Reproduce
+1. Login with valid credentials
+2. Wait for token expiry (1 hour)
+3. Make API call with expired token
+
+### Expected vs Actual
+- **Expected**: 401 Unauthorized with token refresh instructions
+- **Actual**: 500 Internal Server Error
+
+### Acceptance Criteria Not Met
+- [ ] Proper error handling for expired tokens
+- [ ] Clear error messages for authentication failures
+```
+
+### Missing Feature
+```markdown
+## 🔴 Required Changes
+
+**Issue Type**: Missing Feature
+**Severity**: Critical
+
+### Description
+The user profile endpoint is missing pagination support as specified in requirements.
+
+### Acceptance Criteria Not Met
+- [ ] Support page and limit query parameters
+- [ ] Return total count in response headers
+- [ ] Default to 20 items per page
+```
+
+## State Transition Diagram
+```mermaid
+stateDiagram-v2
+    [*] --> Implementation: Rex starts
+    Implementation --> QualityReview: Push code
+    QualityReview --> Testing: Add ready-for-qa
+    Testing --> RequiresChanges: Issues found
+    Testing --> Approved: All criteria met
+    RequiresChanges --> Remediation: Trigger Rex
+    Remediation --> QualityReview: Push fixes
+    Approved --> [*]: Human merge
+    Remediation --> Escalation: Max iterations
+    Escalation --> [*]: Human intervention
+```
+
+## Success Metrics
+- Average remediation cycles: < 3
+- Successful auto-remediation rate: > 80%
+- Time to resolution: < 4 hours
+- Human intervention rate: < 20%
+- Resource efficiency: < 2x base usage
+</PRD>
