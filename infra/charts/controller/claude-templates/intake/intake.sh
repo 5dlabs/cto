@@ -416,13 +416,10 @@ if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
     cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
 fi
 
-# Configure models with fallback
-echo "🤖 Configuring AI models..."
+# Configure models (Anthropic API provider)
+echo "🤖 Configuring AI models (Anthropic API)..."
 
-# Configure TaskMaster to use CLAUDE code with Opus for main and research, Sonnet for fallback
-echo "✅ Using CLAUDE code; setting main=opus, research=opus, fallback=sonnet"
-
-# Create CLAUDE code configuration
+# Create Anthropic provider configuration using MODEL from config.json
 cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -432,27 +429,23 @@ cat > .taskmaster/config.json << EOF
   },
   "models": {
     "main": {
-      "provider": "claude-code",
-      "modelId": "opus",
-      "maxTokens": 64000,
-      "temperature": 0.2
+      "provider": "anthropic",
+      "modelId": "$MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
     },
     "research": {
-      "provider": "claude-code",
-      "modelId": "opus",
-      "maxTokens": 32000,
-      "temperature": 0.1
+      "provider": "anthropic",
+      "modelId": "$MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
     },
     "fallback": {
-      "provider": "claude-code",
-      "modelId": "sonnet",
-      "maxTokens": 64000,
-      "temperature": 0.2
+      "provider": "anthropic",
+      "modelId": "claude-3-5-sonnet-20241022",
+      "maxTokens": 8000,
+      "temperature": 0.7
     }
-  },
-  "parameters": {
-    "maxTokens": 8000,
-    "temperature": 0.7
   },
   "global": {
     "defaultTag": "master"
@@ -460,7 +453,7 @@ cat > .taskmaster/config.json << EOF
 }
 EOF
 
-echo "✅ CLAUDE code configuration created"
+echo "✅ Anthropic provider configuration written"
 
 # Parse PRD
 echo "📄 Parsing PRD to generate tasks..."
