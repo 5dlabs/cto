@@ -486,8 +486,8 @@ if [ "$OPENAI_VALID" = true ]; then
 }
 EOF
 else
-  # Use Claude Code for all roles
-  echo "✅ Using Claude Code for all roles"
+  # Use Claude Code for main/research, but no fallback if OpenAI unavailable
+  echo "✅ Using Claude Code (no GPT fallback available)"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -510,7 +510,7 @@ else
     },
     "fallback": {
       "provider": "claude-code",
-      "modelId": "sonnet",
+      "modelId": "opus",
       "maxTokens": 64000,
       "temperature": 0.2
     }
