@@ -1012,7 +1012,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Testing agent: {testing_agent}");
 
     // Check for requirements.yaml file
-    let workspace_dir = std::env::current_dir().context("Failed to get current directory")?;
+    // Use WORKSPACE_FOLDER_PATHS first (Cursor), then fall back to current_dir
+    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
+        .map(|paths| {
+            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
+            std::path::PathBuf::from(first_path)
+        })
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
     let docs_dir = workspace_dir.join(&docs_project_directory);
     let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
     let project_requirements_path = docs_dir.join("requirements.yaml");
