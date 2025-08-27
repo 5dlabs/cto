@@ -318,7 +318,16 @@ spec:
           LABEL="task-${TASK_ID}"
           RUN_LABEL="run-{{`{{workflow.name}}`}}"
           SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
-          echo "🔎 Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
+          
+          # For single-repo setups, we need to find PRs from previous workflow runs
+          # Check if we're in a subsequent stage (quality/testing) by checking workflow parameters
+          STAGE="{{`{{workflow.parameters.current-stage}}`}}"
+          
+          if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
+            echo "🔎 Stage $STAGE: Looking for existing PR with label ${LABEL} in ${REPO}"
+          else
+            echo "🔎 Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
+          fi
 
           # Ensure tools
           apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
@@ -381,11 +390,21 @@ spec:
             else
               resp=$(curl -sL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
             fi
-            pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .html_url' | head -n1)
-            pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .number' | head -n1)
-            if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+            
+            # Different search logic based on stage
+            if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
+              # For quality/testing stages, just look for the task label (PR already exists)
               pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
               pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+            else
+              # For implementation stage, look for both task and run labels first
+              pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .html_url' | head -n1)
+              pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .number' | head -n1)
+              # Fall back to just task label if not found
+              if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+                pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
+                pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+              fi
             fi
 
             if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
@@ -410,11 +429,19 @@ spec:
             sleep 5
           done
 
-          echo "❌ No PR found for ${LABEL} after waiting."
-          # Leave outputs empty; upstream can decide to re-run implementation
-          > /tmp/pr-url.txt
-          > /tmp/pr-number.txt
-          exit 0
+          if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
+            echo "❌ No PR found for ${LABEL}. This indicates the implementation stage hasn't created a PR yet."
+            # For quality/testing, this is an error condition
+            > /tmp/pr-url.txt
+            > /tmp/pr-number.txt
+            exit 1
+          else
+            echo "❌ No PR found for ${LABEL} after waiting."
+            # Leave outputs empty; upstream can decide to re-run implementation
+            > /tmp/pr-url.txt
+            > /tmp/pr-number.txt
+            exit 0
+          fi
     - name: agent-coderun
       inputs:
         parameters:
