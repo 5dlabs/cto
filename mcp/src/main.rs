@@ -1011,7 +1011,25 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Quality agent: {quality_agent}");
     eprintln!("🐛 DEBUG: Testing agent: {testing_agent}");
 
-    let params = vec![
+    // Check for requirements.yaml file
+    // Use WORKSPACE_FOLDER_PATHS first (Cursor), then fall back to current_dir
+    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
+        .map(|paths| {
+            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
+            std::path::PathBuf::from(first_path)
+        })
+        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+    let docs_dir = workspace_dir.join(&docs_project_directory);
+    let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
+    let project_requirements_path = docs_dir.join("requirements.yaml");
+    
+    eprintln!(
+        "🔍 Checking for requirements.yaml in: {} (docs_project_directory='{}')",
+        docs_dir.display(),
+        docs_project_directory
+    );
+    
+    let mut params = vec![
         format!("task-id={task_id}"),
         format!("repository={repository}"),
         format!("service={service}"),
@@ -1022,6 +1040,32 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("testing-agent={testing_agent}"),
         format!("model={model}"),
     ];
+
+    // Load and encode requirements.yaml if it exists
+    let requirements_path = if task_requirements_path.exists() {
+        eprintln!("📋 Found task-specific requirements.yaml for task {task_id}");
+        Some(task_requirements_path)
+    } else if project_requirements_path.exists() {
+        eprintln!("📋 Found project-level requirements.yaml");
+        Some(project_requirements_path)
+    } else {
+        eprintln!("ℹ️ No requirements.yaml found");
+        None
+    };
+
+    if let Some(path) = requirements_path {
+        let requirements_content = std::fs::read_to_string(&path)
+            .context(format!("Failed to read requirements file: {}", path.display()))?;
+        
+        // Base64 encode the requirements
+        use base64::{engine::general_purpose, Engine as _};
+        let encoded = general_purpose::STANDARD.encode(requirements_content);
+        params.push(format!("task-requirements={encoded}"));
+        eprintln!("✅ Encoded requirements.yaml for workflow");
+    } else {
+        // Always provide task-requirements parameter, even if empty (Argo requires it)
+        params.push("task-requirements=".to_string());
+    }
 
     let mut args = vec![
         "submit",

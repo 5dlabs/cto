@@ -93,6 +93,11 @@ spec:
       - name: merge-sha
         description: "Merge commit SHA (populated after PR merge)"
         value: ""
+      
+      # Task requirements (secrets and environment variables)
+      - name: task-requirements
+        description: "Base64-encoded requirements.yaml content for all agents"
+        value: ""
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
@@ -511,6 +516,8 @@ spec:
             overwriteMemory: false
             docsBranch: "main"
             contextVersion: 1
+            # Pass task requirements if available
+            taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             # Pass PR context as environment if available
             env:
               PR_URL: "{{`{{inputs.parameters.pr-url}}`}}"
