@@ -622,62 +622,19 @@ echo "🔍 DEBUG: Task ID is: {{task_id}}"
 mkdir -p "$CLAUDE_WORK_DIR/task"
 echo "✓ Created task directory at: $CLAUDE_WORK_DIR/task"
 
-# Task documentation should already be available in the task/ directory
-if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
-    echo "✓ Restoring task documentation from preserved temporary location"
-    
-    # Use the preserved Task Master files from temporary location
-    TEMP_TASK_DIR="/tmp/taskmaster-preserve"
-    echo "🔍 DEBUG: Restoring task files from: $TEMP_TASK_DIR"
-    
-    if [ -d "$TEMP_TASK_DIR" ] && [ "$(ls -A $TEMP_TASK_DIR 2>/dev/null)" ]; then
-        echo "✓ Preserved Task Master files found"
-        echo "🔍 DEBUG: Preserved task files:"
-        ls -la "$TEMP_TASK_DIR/"
-        
-        echo "✅ Copying all preserved files to task directory..."
-        
-        # Copy all files from preserved directory to task directory
-        if cp -r "$TEMP_TASK_DIR"/* "$CLAUDE_WORK_DIR/task/" 2>/dev/null; then
-            echo "✓ All task files copied from preserved temporary location"
-        else
-            echo "❌ Failed to copy task files from preserved location"
-            exit 1
-        fi
-        
-        # Copy task.txt as task.md if it exists (specific rename needed)
-        if [ -f "$CLAUDE_WORK_DIR/task/task.txt" ]; then
-            cp "$CLAUDE_WORK_DIR/task/task.txt" "$CLAUDE_WORK_DIR/task/task.md" && echo "✓ task.txt copied as task.md" || echo "❌ task.txt copy failed"
-        fi
-        
-        # Move client-config.json to Claude working directory (not in task/ subdirectory)
-        if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
-            mv "$CLAUDE_WORK_DIR/task/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Claude working directory" || echo "❌ client-config.json move failed"
-        else
-            echo "⚠️ client-config.json not found - MCP client may not be configured"
-        fi
-        
-        echo "✓ Task {{task_id}} files copied from preserved temporary location"
-        
-        # Clean up temporary directory
-        rm -rf "$TEMP_TASK_DIR"
-        echo "✓ Cleaned up temporary preservation directory"
-    else
-        echo "❌ CRITICAL: No preserved Task Master files found at: $TEMP_TASK_DIR"
-        echo "🔍 DEBUG: This indicates the Task Master preservation step failed earlier"
-        echo "❌ Task {{task_id}} files are not available for this job"
-        exit 1
-    fi
-    
-    # DEBUG: Verify files were copied successfully
-    echo "🔍 DEBUG: Contents of target task directory after copy:"
-    ls -la "$CLAUDE_WORK_DIR/task/" || echo "Task directory not found"
-    echo "🔍 DEBUG: Checking if prompt.md exists:"
-    [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
-    
-else
-    echo "✓ Task documentation copied from docs repository during multi-repo setup"
+# Task documentation was copied from docs repository during repository setup
+echo "✓ Task documentation available in task/ directory"
+
+# Move client-config.json if it's in the task directory
+if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
+    mv "$CLAUDE_WORK_DIR/task/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Claude working directory" || echo "❌ client-config.json move failed"
 fi
+
+# DEBUG: Verify files were copied successfully
+echo "🔍 DEBUG: Contents of target task directory:"
+ls -la "$CLAUDE_WORK_DIR/task/" || echo "Task directory not found"
+echo "🔍 DEBUG: Checking if prompt.md exists:"
+[ -f "$CLAUDE_WORK_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
 
 # Verify client-config.json is available in Claude's working directory
 echo "=== TOOLMAN CONFIG SETUP ==="
