@@ -1,0 +1,885 @@
+<context>
+# Overview
+The Platform Packaging project transforms the CTO platform from an organization-specific deployment into a generic, distributable product that can be installed on any developer's workstation or team infrastructure. This involves creating an automated installer, abstracting all hardcoded values, and providing multiple installation profiles for different use cases.
+
+# Core Features
+## Automated Installation System
+- **Interactive CLI Wizard**: Step-by-step setup with progress indicators
+- **Profile-Based Installation**: Minimal, Standard, and Production profiles
+- **Dependency Management**: Automatic detection and installation of prerequisites
+- **Validation System**: Comprehensive health checks and troubleshooting
+
+## Configuration Abstraction
+- **Template System**: Replace all hardcoded 5D Labs references
+- **Dynamic Configuration**: Runtime configuration based on user input
+- **Multi-Environment Support**: Development, staging, and production configurations
+- **Secret Management**: Secure handling of API keys and credentials
+
+## Distribution Channels
+- **Homebrew Integration**: One-command installation on macOS/Linux
+- **Direct Downloads**: Platform-specific binaries with assets
+- **Docker Images**: Containerized installation option
+- **GitHub Releases**: Automated release management
+
+# User Experience
+## User Personas
+- **Individual Developers**: Need quick setup for local development
+- **DevOps Teams**: Require production-ready deployment automation
+- **Platform Engineers**: Want customization and integration capabilities
+- **Enterprise Teams**: Need security, compliance, and scalability features
+
+## Key User Flows
+1. **Quick Start**: Download → Run installer → Start developing in 5 minutes
+2. **Team Setup**: Configure GitHub integration → Deploy to shared infrastructure → Invite team members
+3. **Production Deployment**: Customize configuration → Deploy with monitoring → Scale as needed
+4. **Upgrade Path**: Seamless migration from development to production profiles
+</context>
+
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### Core Infrastructure
+- **CLI Framework**: Interactive installer with progress tracking
+- **Template Engine**: Dynamic configuration generation
+- **Cluster Provisioner**: Kubernetes cluster setup and management
+- **Component Installer**: ArgoCD, Argo Workflows, and platform components
+- **Validation Engine**: Health checks and troubleshooting
+
+### Installation Profiles
+```yaml
+Installation Profiles:
+  Minimal:
+    - Single-node k3s cluster
+    - Core platform components only
+    - Local development focus
+    - 8GB RAM requirement
+    
+  Standard:
+    - Multi-node cluster support
+    - Full monitoring stack
+    - Database operators
+    - 16GB RAM requirement
+    
+  Production:
+    - High availability setup
+    - Enterprise security features
+    - Backup and disaster recovery
+    - 32GB+ RAM requirement
+```
+
+## Data Models
+
+### Platform Configuration Schema
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlatformConfig {
+    pub version: String,
+    pub profile: InstallationProfile,
+    pub platform: PlatformSettings,
+    pub github: GitHubIntegration,
+    pub registry: RegistryConfig,
+    pub agents: HashMap<String, AgentConfig>,
+    pub features: FeatureFlags,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlatformSettings {
+    pub name: String,
+    pub domain: Option<String>,
+    pub namespace: String,
+    pub ingress_type: IngressType,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GitHubIntegration {
+    pub organization: String,
+    pub repository: String,
+    pub apps: HashMap<String, GitHubAppConfig>,
+    pub webhook_secret: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegistryConfig {
+    pub r#type: RegistryType,
+    pub url: String,
+    pub namespace: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentConfig {
+    pub enabled: bool,
+    pub github_app_id: Option<String>,
+    pub resources: ResourceRequirements,
+    pub features: HashMap<String, bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FeatureFlags {
+    pub monitoring: bool,
+    pub databases: bool,
+    pub mail_notifications: bool,
+    pub backup: bool,
+    pub high_availability: bool,
+}
+```
+
+### Installation Profile Schema
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InstallationProfile {
+    pub name: String,
+    pub description: String,
+    pub components: Vec<Component>,
+    pub features: FeatureFlags,
+    pub resource_requirements: ResourceRequirements,
+    pub estimated_install_time: Duration,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Component {
+    pub name: String,
+    pub category: ComponentCategory,
+    pub required: bool,
+    pub dependencies: Vec<String>,
+    pub install_order: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ComponentCategory {
+    Core,
+    Orchestration,
+    Monitoring,
+    Database,
+    Security,
+    Optional,
+}
+```
+
+## APIs and Integrations
+
+### CLI Installer Implementation
+```rust
+// cmd/agent-platform/main.go
+use clap::{App, Arg, SubCommand};
+use indicatif::{ProgressBar, ProgressStyle};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let matches = App::new("agent-platform")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("Multi-Agent Development Platform")
+        .subcommand(SubCommand::with_name("install")
+            .about("Install the platform")
+            .arg(Arg::with_name("profile")
+                .short("p")
+                .long("profile")
+                .value_name("PROFILE")
+                .help("Installation profile (minimal, standard, production)")
+                .takes_value(true))
+            .arg(Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILE")
+                .help("Configuration file path")
+                .takes_value(true)))
+        .subcommand(SubCommand::with_name("status")
+            .about("Show platform status"))
+        .subcommand(SubCommand::with_name("upgrade")
+            .about("Upgrade platform components"))
+        .get_matches();
+
+    match matches.subcommand() {
+        ("install", Some(args)) => {
+            let installer = Installer::new()?;
+            installer.run(args).await?;
+        }
+        ("status", _) => {
+            let status = StatusChecker::new()?;
+            status.show()?;
+        }
+        ("upgrade", _) => {
+            let upgrader = Upgrader::new()?;
+            upgrader.upgrade().await?;
+        }
+        _ => {
+            println!("{}", matches.usage());
+        }
+    }
+
+    Ok(())
+}
+
+// pkg/installer/installer.go
+pub struct Installer {
+    config: PlatformConfig,
+    progress: ProgressBar,
+    validator: PrerequisitesValidator,
+    cluster_provisioner: ClusterProvisioner,
+    component_installer: ComponentInstaller,
+}
+
+impl Installer {
+    pub async fn run(&self, args: &ArgMatches) -> Result<()> {
+        // Step 1: Validate prerequisites
+        self.progress.set_message("Checking prerequisites...");
+        self.validator.validate()?;
+
+        // Step 2: Load or create configuration
+        self.progress.set_message("Loading configuration...");
+        let config = self.load_config(args)?;
+
+        // Step 3: Provision Kubernetes cluster
+        self.progress.set_message("Setting up Kubernetes cluster...");
+        self.cluster_provisioner.provision(&config).await?;
+
+        // Step 4: Install core components
+        self.progress.set_message("Installing core components...");
+        self.component_installer.install_core(&config).await?;
+
+        // Step 5: Configure GitHub integration
+        self.progress.set_message("Setting up GitHub integration...");
+        self.setup_github_integration(&config).await?;
+
+        // Step 6: Install optional features
+        if config.features.monitoring || config.features.databases {
+            self.progress.set_message("Installing optional features...");
+            self.component_installer.install_optional(&config).await?;
+        }
+
+        // Step 7: Run validation tests
+        self.progress.set_message("Running validation tests...");
+        self.run_validation_tests(&config).await?;
+
+        // Step 8: Display access information
+        self.show_access_info(&config)?;
+
+        Ok(())
+    }
+
+    async fn setup_github_integration(&self, config: &PlatformConfig) -> Result<()> {
+        let github_manager = GitHubManager::new(&config.github)?;
+
+        // Create GitHub Apps for each agent
+        for (agent_name, agent_config) in &config.agents {
+            if agent_config.enabled {
+                let app = github_manager.create_app(agent_name).await?;
+                println!("✓ Created GitHub App for {} (ID: {})", agent_name, app.id);
+            }
+        }
+
+        // Configure webhooks
+        github_manager.setup_webhooks(&config).await?;
+
+        Ok(())
+    }
+}
+```
+
+### Template Engine Implementation
+```rust
+// pkg/templates/engine.rs
+use handlebars::{Handlebars, Context, Template};
+use serde_json::Value;
+
+pub struct TemplateEngine {
+    handlebars: Handlebars,
+    templates: HashMap<String, String>,
+}
+
+impl TemplateEngine {
+    pub fn new() -> Result<Self> {
+        let mut handlebars = Handlebars::new();
+        
+        // Register custom helpers
+        handlebars.register_helper("env", Box::new(env_helper));
+        handlebars.register_helper("secret", Box::new(secret_helper));
+        handlebars.register_helper("random", Box::new(random_helper));
+        
+        Ok(Self {
+            handlebars,
+            templates: HashMap::new(),
+        })
+    }
+
+    pub fn render_template(&self, template_name: &str, data: &Value) -> Result<String> {
+        let template = self.templates.get(template_name)
+            .ok_or_else(|| anyhow!("Template not found: {}", template_name))?;
+        
+        self.handlebars.render_template(template, data)
+            .map_err(|e| anyhow!("Template render error: {}", e))
+    }
+
+    pub fn render_kubernetes_manifest(&self, manifest: &str, config: &PlatformConfig) -> Result<String> {
+        let data = serde_json::to_value(config)?;
+        self.render_template(manifest, &data)
+    }
+}
+
+// Custom helpers
+fn env_helper(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &mut dyn Output) -> Result<(), RenderError> {
+    let var_name = h.param(0)
+        .and_then(|v| v.value().as_str())
+        .ok_or_else(|| RenderError::new("Environment variable name required"))?;
+    
+    let value = std::env::var(var_name)
+        .unwrap_or_else(|_| format!("${{{}}}", var_name));
+    
+    out.write(&value)?;
+    Ok(())
+}
+```
+
+### Cluster Provisioner Implementation
+```rust
+// pkg/cluster/provisioner.rs
+pub trait ClusterProvisioner {
+    async fn provision(&self, config: &PlatformConfig) -> Result<()>;
+    async fn validate(&self) -> Result<()>;
+    async fn destroy(&self) -> Result<()>;
+}
+
+pub struct K3sProvisioner {
+    config: K3sConfig,
+}
+
+impl ClusterProvisioner for K3sProvisioner {
+    async fn provision(&self, config: &PlatformConfig) -> Result<()> {
+        let install_script = format!(r#"
+#!/bin/bash
+set -e
+
+# Install k3s
+curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION={} sh -s - \
+    --disable traefik \
+    --write-kubeconfig-mode 644 \
+    --node-label agent-platform=true
+
+# Wait for cluster to be ready
+kubectl wait --for=condition=Ready nodes --all --timeout=300s
+
+# Install local path provisioner
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+kubectl patch storageclass local-path -p '{{"metadata": {{"annotations":{{"storageclass.kubernetes.io/is-default-class": "true"}}}}}}'
+"#, self.config.k3s_version);
+
+        // Execute installation script
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg(&install_script)
+            .output()
+            .await?;
+
+        if !output.status.success() {
+            return Err(anyhow!("K3s installation failed: {}", 
+                String::from_utf8_lossy(&output.stderr)));
+        }
+
+        Ok(())
+    }
+}
+
+pub struct KindProvisioner {
+    config: KindConfig,
+}
+
+impl ClusterProvisioner for KindProvisioner {
+    async fn provision(&self, config: &PlatformConfig) -> Result<()> {
+        let kind_config = format!(r#"
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: agent-platform
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+  - containerPort: 443
+    hostPort: 443
+  - containerPort: 8080
+    hostPort: 8080
+  - containerPort: 2746
+    hostPort: 2746
+  - containerPort: 3000
+    hostPort: 3000
+"#);
+
+        // Create kind cluster
+        let output = Command::new("kind")
+            .arg("create")
+            .arg("cluster")
+            .arg("--config")
+            .arg("-")
+            .arg("--name")
+            .arg("agent-platform")
+            .stdin(Stdio::piped())
+            .output()
+            .await?;
+
+        if !output.status.success() {
+            return Err(anyhow!("Kind cluster creation failed: {}", 
+                String::from_utf8_lossy(&output.stderr)));
+        }
+
+        Ok(())
+    }
+}
+```
+
+## Infrastructure Requirements
+
+### Prerequisites Validation
+```rust
+// pkg/validator/prerequisites.rs
+pub struct PrerequisitesValidator {
+    requirements: Vec<Requirement>,
+}
+
+#[derive(Debug)]
+pub struct Requirement {
+    pub name: String,
+    pub check: Box<dyn Fn() -> Result<bool>>,
+    pub install_instructions: String,
+    pub critical: bool,
+}
+
+impl PrerequisitesValidator {
+    pub fn new() -> Self {
+        let mut validator = Self {
+            requirements: Vec::new(),
+        };
+
+        // Add standard requirements
+        validator.add_requirement(Requirement {
+            name: "Docker".to_string(),
+            check: Box::new(|| {
+                Command::new("docker")
+                    .arg("--version")
+                    .output()
+                    .map(|_| true)
+                    .map_err(|_| anyhow!("Docker not found"))
+            }),
+            install_instructions: "Install Docker from https://docker.com".to_string(),
+            critical: true,
+        });
+
+        validator.add_requirement(Requirement {
+            name: "kubectl".to_string(),
+            check: Box::new(|| {
+                Command::new("kubectl")
+                    .arg("version")
+                    .arg("--client")
+                    .output()
+                    .map(|_| true)
+                    .map_err(|_| anyhow!("kubectl not found"))
+            }),
+            install_instructions: "Install kubectl from https://kubernetes.io/docs/tasks/tools/".to_string(),
+            critical: true,
+        });
+
+        validator.add_requirement(Requirement {
+            name: "System Resources".to_string(),
+            check: Box::new(|| {
+                let mem_info = sysinfo::System::new_all();
+                let total_memory = mem_info.total_memory();
+                
+                if total_memory < 8 * 1024 * 1024 * 1024 { // 8GB
+                    return Err(anyhow!("Insufficient memory: {}MB (need 8GB)", total_memory / 1024 / 1024));
+                }
+                
+                Ok(true)
+            }),
+            install_instructions: "Upgrade system memory to at least 8GB".to_string(),
+            critical: true,
+        });
+
+        validator
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        let mut failures = Vec::new();
+
+        for requirement in &self.requirements {
+            match (requirement.check)() {
+                Ok(true) => {
+                    println!("✓ {}", requirement.name);
+                }
+                Ok(false) | Err(_) => {
+                    println!("✗ {}", requirement.name);
+                    failures.push(requirement);
+                }
+            }
+        }
+
+        if !failures.is_empty() {
+            println!("\nPrerequisites not met:");
+            for failure in &failures {
+                println!("  - {}: {}", failure.name, failure.install_instructions);
+            }
+            
+            if failures.iter().any(|f| f.critical) {
+                return Err(anyhow!("Critical prerequisites not met"));
+            }
+        }
+
+        Ok(())
+    }
+}
+```
+
+### Component Installation System
+```rust
+// pkg/components/installer.rs
+pub struct ComponentInstaller {
+    kube_client: kubernetes::Client,
+    helm_client: helm::Client,
+    template_engine: TemplateEngine,
+}
+
+impl ComponentInstaller {
+    pub async fn install_core(&self, config: &PlatformConfig) -> Result<()> {
+        let components = vec![
+            Component::new("argocd", "ArgoCD", ComponentCategory::Core),
+            Component::new("argo-workflows", "Argo Workflows", ComponentCategory::Core),
+            Component::new("argo-events", "Argo Events", ComponentCategory::Core),
+            Component::new("controller", "Multi-Agent Controller", ComponentCategory::Core),
+        ];
+
+        for component in components {
+            self.install_component(&component, config).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn install_optional(&self, config: &PlatformConfig) -> Result<()> {
+        if config.features.monitoring {
+            self.install_monitoring_stack(config).await?;
+        }
+
+        if config.features.databases {
+            self.install_database_operators(config).await?;
+        }
+
+        if config.features.backup {
+            self.install_backup_system(config).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn install_component(&self, component: &Component, config: &PlatformConfig) -> Result<()> {
+        println!("Installing {}...", component.display_name);
+
+        // Render component manifests
+        let manifests = self.template_engine.render_component_manifests(component, config)?;
+
+        // Apply to cluster
+        for manifest in manifests {
+            self.kube_client.apply(&manifest).await?;
+        }
+
+        // Wait for component to be ready
+        self.wait_for_component_ready(component).await?;
+
+        println!("✓ {} installed successfully", component.display_name);
+        Ok(())
+    }
+}
+```
+
+## Distribution Strategy
+
+### Build System
+```bash
+#!/bin/bash
+# build-release.sh
+
+VERSION=${1:-"0.1.0"}
+PLATFORMS=("darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64" "windows/amd64")
+
+# Build binaries
+for PLATFORM in "${PLATFORMS[@]}"; do
+    GOOS=${PLATFORM%/*}
+    GOARCH=${PLATFORM#*/}
+    
+    echo "Building for $GOOS/$GOARCH..."
+    
+    env GOOS=$GOOS GOARCH=$GOARCH go build \
+        -ldflags "-X main.Version=$VERSION" \
+        -o "dist/agent-platform-${GOOS}-${GOARCH}" \
+        ./cmd/agent-platform
+done
+
+# Package with assets
+for PLATFORM in "${PLATFORMS[@]}"; do
+    GOOS=${PLATFORM%/*}
+    GOARCH=${PLATFORM#*/}
+    
+    tar -czf "dist/agent-platform-${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
+        -C dist "agent-platform-${GOOS}-${GOARCH}" \
+        -C .. templates/ scripts/ config/
+done
+
+# Create checksums
+cd dist
+sha256sum agent-platform-${VERSION}-*.tar.gz > SHA256SUMS
+```
+
+### Homebrew Integration
+```ruby
+# Formula/agent-platform.rb
+class AgentPlatform < Formula
+  desc "Multi-Agent Software Development Orchestration Platform"
+  homepage "https://github.com/yourusername/agent-platform"
+  version "0.1.0"
+  
+  if OS.mac? && Hardware::CPU.arm?
+    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-darwin-arm64.tar.gz"
+    sha256 "xxx"
+  elsif OS.mac?
+    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-darwin-amd64.tar.gz"
+    sha256 "xxx"
+  elsif OS.linux?
+    url "https://github.com/yourusername/agent-platform/releases/download/v#{version}/agent-platform-#{version}-linux-amd64.tar.gz"
+    sha256 "xxx"
+  end
+  
+  depends_on "kubectl"
+  depends_on "helm"
+  
+  def install
+    bin.install "agent-platform"
+    (share/"agent-platform").install "templates", "scripts", "config"
+  end
+  
+  def post_install
+    (var/"agent-platform").mkpath
+    (etc/"agent-platform").mkpath
+  end
+  
+  test do
+    assert_match version.to_s, shell_output("#{bin}/agent-platform version")
+  end
+end
+```
+
+# Development Roadmap
+
+## Phase 1: Core Abstraction (Days 1-3)
+### Template System Development
+- Create Handlebars templates for all Kubernetes manifests
+- Abstract all hardcoded values (5D Labs, GitHub Apps, etc.)
+- Build configuration schema and validation
+- Implement template rendering engine
+
+### CLI Framework
+- Set up Cobra CLI framework
+- Implement interactive wizard with Bubble Tea
+- Add progress indicators and logging
+- Create configuration management commands
+
+### Deliverables
+- Working template system
+- Basic CLI with install command
+- Configuration validation
+- Template test suite
+
+## Phase 2: Installation Engine (Days 4-6)
+### Cluster Provisioning
+- Implement k3s, kind, and minikube provisioners
+- Add prerequisite validation system
+- Create cluster health checks
+- Build cleanup and rollback mechanisms
+
+### Component Installation
+- Develop component installer framework
+- Implement ArgoCD, Argo Workflows installation
+- Add monitoring stack installation
+- Create database operator installation
+
+### Deliverables
+- Working cluster provisioners
+- Component installation system
+- Health check framework
+- Installation validation tests
+
+## Phase 3: GitHub Integration (Days 7-8)
+### GitHub App Automation
+- Implement GitHub App creation via API
+- Add webhook configuration automation
+- Create credential management system
+- Build GitHub integration validation
+
+### Webhook Management
+- Implement tunnel provider integration
+- Add webhook URL management
+- Create webhook delivery testing
+- Build webhook troubleshooting tools
+
+### Deliverables
+- Automated GitHub App creation
+- Webhook configuration system
+- Credential storage and management
+- GitHub integration tests
+
+## Phase 4: Distribution (Days 9-10)
+### Build and Package
+- Create cross-platform build system
+- Implement asset packaging
+- Add version management
+- Create release automation
+
+### Distribution Channels
+- Set up Homebrew formula
+- Create direct download system
+- Implement Docker image builds
+- Add GitHub release automation
+
+### Deliverables
+- Cross-platform binaries
+- Homebrew integration
+- Docker images
+- Release automation
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+### Template Complexity
+**Risk**: Complex templates may be difficult to maintain and debug
+**Mitigation**: Comprehensive testing, clear documentation, template validation
+
+### Cluster Provisioning
+**Risk**: Different Kubernetes distributions may have compatibility issues
+**Mitigation**: Extensive testing on multiple platforms, fallback mechanisms
+
+### GitHub API Limits
+**Risk**: Rate limiting during automated GitHub App creation
+**Mitigation**: Implement retry logic, batch operations, user guidance
+
+## Resource Constraints
+
+### Testing Coverage
+**Challenge**: Testing on multiple platforms and configurations
+**Approach**: Automated CI/CD, cloud-based testing, community testing
+
+### Documentation
+**Challenge**: Comprehensive documentation for all installation paths
+**Approach**: Interactive help, video tutorials, troubleshooting guides
+
+## Minimum Viable Product Definition
+
+### MVP Scope
+- Basic CLI installer with minimal profile
+- k3s cluster provisioning
+- Core component installation
+- Simple GitHub integration
+- Basic validation system
+
+### MVP Success Criteria
+- Successfully install platform on fresh system
+- All core components functional
+- GitHub webhooks working
+- Clear upgrade path to full features
+
+# Appendix
+
+## Configuration Examples
+
+### Minimal Profile
+```yaml
+# config.yaml
+version: "0.1.0"
+profile: minimal
+
+platform:
+  name: my-dev-platform
+  namespace: agent-platform
+
+github:
+  organization: myusername
+  repository: test-repo
+
+registry:
+  type: local
+  
+agents:
+  rex:
+    enabled: true
+    
+features:
+  monitoring: false
+  databases: false
+```
+
+### Production Profile
+```yaml
+# config.yaml
+version: "0.1.0"
+profile: production
+
+platform:
+  name: enterprise-platform
+  domain: agents.company.com
+  namespace: agent-platform
+
+github:
+  organization: company-org
+  repository: platform-test
+  apps:
+    rex:
+      id: "${REX_APP_ID}"
+      client_id: "${REX_CLIENT_ID}"
+      private_key_path: "/secrets/rex.pem"
+    cleo:
+      id: "${CLEO_APP_ID}"
+      client_id: "${CLEO_CLIENT_ID}"
+      private_key_path: "/secrets/cleo.pem"
+    tess:
+      id: "${TESS_APP_ID}"
+      client_id: "${TESS_CLIENT_ID}"
+      private_key_path: "/secrets/tess.pem"
+
+registry:
+  type: ecr
+  url: xxx.dkr.ecr.us-west-2.amazonaws.com
+  namespace: company
+
+agents:
+  rex:
+    enabled: true
+    resources:
+      cpu: 4
+      memory: 8Gi
+  cleo:
+    enabled: true
+    resources:
+      cpu: 2
+      memory: 4Gi
+  tess:
+    enabled: true
+    resources:
+      cpu: 2
+      memory: 4Gi
+    features:
+      kubernetes_testing: true
+
+features:
+  monitoring: true
+  databases: true
+  mail_notifications: true
+  backup: true
+  high_availability: true
+```
+
+## Success Metrics
+- Installation success rate: >95%
+- Time to first task: <5 minutes
+- Configuration complexity: <10 interactive prompts
+- Upgrade success rate: >99%
+- Community adoption: 100+ installations
+</PRD>
