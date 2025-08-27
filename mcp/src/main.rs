@@ -942,25 +942,46 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .ok_or(anyhow!("Missing required parameter: docs_project_directory. Please provide it or set defaults.play.docsProjectDirectory in config"))?;
 
     // Handle implementation agent - use provided value or config default
-    let implementation_agent = arguments
+    let implementation_agent_input = arguments
         .get("implementation_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.implementation_agent.clone());
+    
+    // Resolve agent name if it's a short alias
+    let implementation_agent = if config.agents.contains_key(&implementation_agent_input) {
+        config.agents[&implementation_agent_input].clone()
+    } else {
+        implementation_agent_input
+    };
 
     // Handle quality agent - use provided value or config default
-    let quality_agent = arguments
+    let quality_agent_input = arguments
         .get("quality_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
+    
+    // Resolve agent name if it's a short alias
+    let quality_agent = if config.agents.contains_key(&quality_agent_input) {
+        config.agents[&quality_agent_input].clone()
+    } else {
+        quality_agent_input
+    };
 
     // Handle testing agent - use provided value or config default
-    let testing_agent = arguments
+    let testing_agent_input = arguments
         .get("testing_agent")
         .and_then(|v| v.as_str())
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
+    
+    // Resolve agent name if it's a short alias
+    let testing_agent = if config.agents.contains_key(&testing_agent_input) {
+        config.agents[&testing_agent_input].clone()
+    } else {
+        testing_agent_input
+    };
 
     // Handle model - use provided value or config default
     let model = arguments
@@ -986,6 +1007,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Play workflow submitting with task_id: {task_id}");
     eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
     eprintln!("🐛 DEBUG: Play workflow service: {service}");
+    eprintln!("🐛 DEBUG: Implementation agent: {implementation_agent}");
+    eprintln!("🐛 DEBUG: Quality agent: {quality_agent}");
+    eprintln!("🐛 DEBUG: Testing agent: {testing_agent}");
 
     let params = vec![
         format!("task-id={task_id}"),
