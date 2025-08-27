@@ -126,7 +126,7 @@ spec:
         parameters:
         - name: configmap-name
       container:
-        image: ghcr.io/5dlabs/claude-code:{{ .Values.agent.image.tag | default "latest" }}
+        image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
         imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
         command: ["/bin/bash"]
         args: ["/claude-templates/intake_intake.sh"]
