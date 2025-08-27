@@ -126,7 +126,10 @@ fn load_cto_config() -> Result<CtoConfig> {
     }
     eprintln!(
         "🐛 DEBUG: Current working directory: {:?}",
-        std::env::current_dir()
+        std::env::current_dir().unwrap_or_else(|e| {
+            eprintln!("⚠️ Failed to get current directory: {e}");
+            std::path::PathBuf::from(".")
+        })
     );
 
     // Add workspace folder paths if available (Cursor provides this)
@@ -439,7 +442,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🔍 Checking for uncommitted changes...");
     eprintln!(
         "🐛 DEBUG: Current directory for git: {:?}",
-        std::env::current_dir()
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
     );
     let status_output = Command::new("git")
         .args(["status", "--porcelain"])
