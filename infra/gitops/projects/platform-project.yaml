@@ -36,7 +36,7 @@ spec:
     - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://kubernetes-sigs.github.io/external-dns/'
-    - 'https://mailu.github.io/helm-charts/'
+    # Removed Mailu Helm chart repository
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
     - 'https://github.com/spotahome/redis-operator'
@@ -68,8 +68,7 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
       server: https://kubernetes.default.svc
-    - namespace: jupiter
-      server: https://kubernetes.default.svc
+    # Removed Jupiter namespace
     - namespace: kube-system
       server: https://kubernetes.default.svc
     - namespace: default
@@ -92,8 +91,7 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: questdb-operator-staging
       server: https://kubernetes.default.svc
-    - namespace: mailu
-      server: https://kubernetes.default.svc
+    # Removed Mailu namespace
 
   # Cluster resource whitelist
   clusterResourceWhitelist:
