@@ -583,11 +583,11 @@ EOF
         cat /task-files/CLAUDE.md >> "/workspace/CLAUDE.md"
         echo "✓ Appended base CLAUDE.md content from ConfigMap"
     fi
-    
+
     # Copy to working directory for consistency with Rex pattern
     cp "/workspace/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
     echo "✓ Created Tess-specific CLAUDE.md memory"
-fi
+fi  # End of CLAUDE.md creation if block
 
 # Copy guidelines files to working directory (match Rex pattern)
 if [ -f "/task-files/coding-guidelines.md" ]; then
@@ -800,21 +800,33 @@ Your STRICT testing requirements:
     
     **VERIFICATION COMMANDS TO RUN BEFORE APPROVING**:
     \`\`\`bash
-    # 1. Verify CI is completely green
-    CI_STATUS=$(gh pr checks {{pr_number}} --json status -q '.[].status' | sort -u)
-    if [ "$CI_STATUS" != "completed" ]; then
-      echo "❌ CI NOT DONE - CANNOT APPROVE"
-      # YOU MUST WAIT AND KEEP CHECKING
+    # 1. Verify CI is completely green - NO FAILURES ALLOWED
+    gh pr checks {{pr_number}}
+    # EVERY check must show "pass" or ✓ 
+    # If you see ANY "fail", "pending", or "skipping" - CANNOT APPROVE
+    
+    # 2. Verify all checks are passing using tab-separated status field
+    # gh pr checks output format: NAME<TAB>STATUS<TAB>CONCLUSION<TAB>URL
+    CI_OUTPUT=\$(gh pr checks {{pr_number}})
+    if [ -z "\$CI_OUTPUT" ]; then
+        echo "❌ No CI checks found - cannot verify"
+        exit 1
     fi
     
-    # 2. Check for any failures
-    FAILED=$(gh pr checks {{pr_number}} --json conclusion -q '.[] | select(.conclusion != "success") | .conclusion' | wc -l)
-    if [ "$FAILED" -gt 0 ]; then
-      echo "❌ CI HAS FAILURES - CANNOT APPROVE"
-      # YOU MUST FIX THE FAILURES
+    # Count checks by looking at the status field (2nd column)
+    TOTAL_CHECKS=\$(echo "\$CI_OUTPUT" | wc -l)
+    # Look for pass/✓ only in the status column (tab-delimited field 2)
+    PASSING_CHECKS=\$(echo "\$CI_OUTPUT" | awk -F'\t' '\$2 ~ /pass|✓/' | wc -l)
+    
+    if [ "\$TOTAL_CHECKS" != "\$PASSING_CHECKS" ]; then
+        echo "❌ NOT ALL CHECKS PASSING - CANNOT APPROVE"
+        echo "Total: \$TOTAL_CHECKS, Passing: \$PASSING_CHECKS"
+        echo "Failed/pending checks:"
+        echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/ {print \$1 " - " \$2}'
+        exit 1
     fi
     
-    # 3. Only if ALL checks pass can you approve
+    # 3. Only if ALL checks show "pass" can you approve
     \`\`\`
     
     IF ANY ITEM IS UNCHECKED, YOU CANNOT APPROVE!
@@ -962,9 +974,18 @@ Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 
 # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
 # FIRST: Verify you can approve
-CI_FAILED=\$(gh pr checks {{pr_number}} --json conclusion -q '.[] | select(.conclusion != "success")' | wc -l)
+CI_OUTPUT=\$(gh pr checks {{pr_number}})
+if [ -z "\$CI_OUTPUT" ]; then
+  echo "❌ No CI checks found - cannot approve"
+  exit 1
+fi
+
+# Check for non-passing statuses in the status column (2nd field)
+CI_FAILED=\$(echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/' | wc -l)
 if [ "\$CI_FAILED" -gt 0 ]; then
-  echo "❌ CANNOT APPROVE - CI HAS FAILURES"
+  echo "❌ CANNOT APPROVE - CI HAS FAILURES OR IS INCOMPLETE"
+  echo "Failed/pending checks:"
+  echo "\$CI_OUTPUT" | awk -F'\t' '\$2 !~ /pass|✓/ {print \$1 " - " \$2}'
   exit 1
 fi
 
