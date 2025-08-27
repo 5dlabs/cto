@@ -682,14 +682,27 @@ impl<'a> CodeResourceManager<'a> {
         ];
 
         // Remove any duplicates and re-add critical vars to ensure they're not overridden
+        // Also preserve PR_URL and PR_NUMBER from being overridden since they're critical for coordination
         final_env_vars.retain(|v| {
             if let Some(name) = v.get("name").and_then(|n| n.as_str()) {
-                !["CODERUN_NAME", "WORKFLOW_NAME", "NAMESPACE"].contains(&name)
+                !["CODERUN_NAME", "WORKFLOW_NAME", "NAMESPACE", "PR_URL", "PR_NUMBER"].contains(&name)
             } else {
                 true
             }
         });
+        
+        // Re-add critical system vars
         final_env_vars.extend(critical_env_vars);
+        
+        // Re-add PR context vars if they exist in spec.env (workflow-provided)
+        for (key, value) in &code_run.spec.env {
+            if key == "PR_URL" || key == "PR_NUMBER" {
+                final_env_vars.push(json!({
+                    "name": key,
+                    "value": value
+                }));
+            }
+        }
 
         // Add Docker environment variable if Docker is enabled
         if enable_docker {
@@ -963,15 +976,14 @@ impl<'a> CodeResourceManager<'a> {
         // Process legacy env_from_secrets if present (regardless of task requirements)
         for secret_env in &code_run.spec.env_from_secrets {
             env_vars.push(json!({
-                    "name": &secret_env.name,
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": &secret_env.secret_name,
-                            "key": &secret_env.secret_key
-                        }
+                "name": &secret_env.name,
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": &secret_env.secret_name,
+                        "key": &secret_env.secret_key
                     }
-                }));
-            }
+                }
+            }));
         }
 
         Ok((env_vars, env_from))
