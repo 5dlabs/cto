@@ -777,7 +777,88 @@ startup:
   role_announcement: true
 ```
 
-### 9. ASCII Art Generator
+### 9. Cypher Agent Configuration
+
+Specialized configuration for the security-focused Cypher agent.
+
+```yaml
+# config/agents/cypher.yaml
+agent:
+  name: "Cypher"
+  role: "security_engineer"
+  expertise:
+    - "Security Scanning"
+    - "Vulnerability Assessment"
+    - "Automated Remediation"
+    - "Security Reporting"
+    - "GitHub Security Advisories"
+    - "Dependency Analysis"
+
+tools:
+  extends: "base"
+  remote:
+    - "github_security_advisories"
+    - "npm_audit"
+    - "cargo_audit"
+    - "snyk_security_scan"
+    - "oss_index_vulnerability_search"
+    - "cve_database_search"
+  
+  local:
+    filesystem:
+      - "read_file"
+      - "write_file"
+      - "edit_file"
+      - "search_files"
+      - "create_security_report"
+      - "update_dependencies"
+    
+    git:
+      - "git_status"
+      - "git_diff"
+      - "git_commit"
+      - "git_push"
+      - "git_create_branch"
+      - "git_merge"
+    
+    security:
+      - "github_cli_advisory_download"
+      - "vulnerability_prioritization"
+      - "automated_remediation"
+      - "security_report_generation"
+      - "dependency_update"
+      - "security_check"
+    
+    ci_cd:
+      - "trigger_security_scan"
+      - "post_test_integration"
+      - "workflow_status_check"
+      - "security_gate_validation"
+
+workflow:
+  trigger: "post_test_completion"
+  sequence:
+    - "download_security_advisories"
+    - "scan_dependencies"
+    - "prioritize_vulnerabilities"
+    - "remediate_issues"
+    - "generate_report"
+    - "publish_to_github"
+
+resources:
+  cpu: "1.5"
+  memory: "3Gi"
+  storage: "15Gi"
+  network: "high_bandwidth"  # For advisory downloads
+
+startup:
+  ascii_art: true
+  avatar_display: true
+  role_announcement: true
+  security_mode: true
+```
+
+### 10. ASCII Art Generator
 
 Creates engaging startup banners for agent containers.
 
@@ -824,6 +905,23 @@ impl AsciiArtGenerator {
 ║                                                              ║
 ║                   BLAZE - Frontend Engineer                 ║
 ║                   Svelte specialist ready!                  ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+"#.to_string());
+
+        // Cypher template
+        templates.insert("cypher".to_string(), r#"
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║     ██████╗██╗   ██╗██████╗ ██╗  ██╗███████╗██████╗        ║
+║    ██╔════╝╚██╗ ██╔╝██╔══██╗██║  ██║██╔════╝██╔══██╗       ║
+║    ██║      ╚████╔╝ ██████╔╝███████║█████╗  ██████╔╝       ║
+║    ██║       ╚██╔╝  ██╔═══╝ ██╔══██║██╔══╝  ██╔══██╗       ║
+║    ╚██████╗   ██║   ██║     ██║  ██║███████╗██║  ██║       ║
+║     ╚═════╝   ╚═╝   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝       ║
+║                                                              ║
+║                   CYPHER - Security Engineer                ║
+║                   Security scanning active!                 ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 "#.to_string());
@@ -1080,4 +1178,422 @@ impl SvelteTool {
 }
 ```
 
-This enhanced architecture now includes avatar generation using the [Imagine.art API](https://www.imagine.art/dashboard), Blaze agent specialization for Svelte development, and engaging ASCII art startup displays, making the agent system more professional and visually appealing while maintaining the core functionality improvements.
+### 12. Cypher-Specific MCP Tools
+
+Custom tools for security scanning and automated remediation.
+
+```rust
+// src/tools/cypher_tools.rs
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SecurityAdvisory {
+    pub id: String,
+    pub severity: String,
+    pub title: String,
+    pub description: String,
+    pub affected_packages: Vec<String>,
+    pub remediation: String,
+    pub published_date: String,
+    pub priority_score: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SecurityScanRequest {
+    pub repository: String,
+    pub branch: String,
+    pub scan_types: Vec<String>, // "dependencies", "code", "secrets"
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SecurityScanResponse {
+    pub vulnerabilities: Vec<SecurityAdvisory>,
+    pub scan_summary: ScanSummary,
+    pub remediation_plan: RemediationPlan,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScanSummary {
+    pub total_vulnerabilities: u32,
+    pub critical_count: u32,
+    pub high_count: u32,
+    pub medium_count: u32,
+    pub low_count: u32,
+    pub scan_duration: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RemediationPlan {
+    pub priority_order: Vec<String>,
+    pub automated_fixes: Vec<AutomatedFix>,
+    pub manual_reviews: Vec<String>,
+    pub estimated_time: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AutomatedFix {
+    pub advisory_id: String,
+    pub package_name: String,
+    pub current_version: String,
+    pub target_version: String,
+    pub fix_type: String, // "update", "replace", "remove"
+}
+
+pub struct GitHubAdvisoryTool;
+
+#[async_trait]
+impl McpTool for GitHubAdvisoryTool {
+    fn name(&self) -> &'static str {
+        "github_cli_advisory_download"
+    }
+
+    fn description(&self) -> &'static str {
+        "Download security advisories using GitHub CLI and analyze for current project"
+    }
+
+    async fn execute(&self, request: SecurityScanRequest) -> Result<SecurityScanResponse> {
+        // Download advisories using GitHub CLI
+        let advisories = self.download_advisories(&request.repository).await?;
+        
+        // Analyze project dependencies
+        let project_deps = self.analyze_project_dependencies().await?;
+        
+        // Match advisories to project dependencies
+        let relevant_advisories = self.match_advisories_to_deps(&advisories, &project_deps).await?;
+        
+        // Prioritize vulnerabilities
+        let prioritized_advisories = self.prioritize_vulnerabilities(&relevant_advisories).await?;
+        
+        // Generate remediation plan
+        let remediation_plan = self.generate_remediation_plan(&prioritized_advisories).await?;
+        
+        // Create scan summary
+        let scan_summary = self.create_scan_summary(&prioritized_advisories).await?;
+        
+        Ok(SecurityScanResponse {
+            vulnerabilities: prioritized_advisories,
+            scan_summary,
+            remediation_plan,
+        })
+    }
+}
+
+impl GitHubAdvisoryTool {
+    async fn download_advisories(&self, repository: &str) -> Result<Vec<SecurityAdvisory>> {
+        // Use GitHub CLI to download security advisories
+        let output = tokio::process::Command::new("gh")
+            .args(&[
+                "security", "advisory", "list",
+                "--repo", repository,
+                "--json", "id,severity,title,description,affected_packages,published_at"
+            ])
+            .output()
+            .await?;
+
+        let advisories_json = String::from_utf8(output.stdout)?;
+        let advisories: Vec<SecurityAdvisory> = serde_json::from_str(&advisories_json)?;
+        
+        Ok(advisories)
+    }
+
+    async fn analyze_project_dependencies(&self) -> Result<HashMap<String, String>> {
+        let mut dependencies = HashMap::new();
+        
+        // Analyze Cargo.toml for Rust dependencies
+        if let Ok(cargo_content) = tokio::fs::read_to_string("Cargo.toml").await {
+            dependencies.extend(self.parse_cargo_dependencies(&cargo_content));
+        }
+        
+        // Analyze package.json for Node.js dependencies
+        if let Ok(package_content) = tokio::fs::read_to_string("package.json").await {
+            dependencies.extend(self.parse_package_dependencies(&package_content));
+        }
+        
+        Ok(dependencies)
+    }
+
+    async fn match_advisories_to_deps(
+        &self,
+        advisories: &[SecurityAdvisory],
+        dependencies: &HashMap<String, String>,
+    ) -> Result<Vec<SecurityAdvisory>> {
+        let mut relevant_advisories = Vec::new();
+        
+        for advisory in advisories {
+            for affected_package in &advisory.affected_packages {
+                if dependencies.contains_key(affected_package) {
+                    relevant_advisories.push(advisory.clone());
+                    break;
+                }
+            }
+        }
+        
+        Ok(relevant_advisories)
+    }
+
+    async fn prioritize_vulnerabilities(
+        &self,
+        advisories: &[SecurityAdvisory],
+    ) -> Result<Vec<SecurityAdvisory>> {
+        let mut prioritized = advisories.to_vec();
+        
+        // Calculate priority scores based on severity and other factors
+        for advisory in &mut prioritized {
+            advisory.priority_score = self.calculate_priority_score(advisory).await?;
+        }
+        
+        // Sort by priority score (highest first)
+        prioritized.sort_by(|a, b| b.priority_score.partial_cmp(&a.priority_score).unwrap());
+        
+        Ok(prioritized)
+    }
+
+    async fn calculate_priority_score(&self, advisory: &SecurityAdvisory) -> Result<f64> {
+        let mut score = 0.0;
+        
+        // Base score from severity
+        match advisory.severity.as_str() {
+            "critical" => score += 10.0,
+            "high" => score += 7.0,
+            "medium" => score += 4.0,
+            "low" => score += 1.0,
+            _ => score += 2.0,
+        }
+        
+        // Additional factors
+        // - Recent advisories get higher priority
+        // - Widely used packages get higher priority
+        // - Exploit availability increases priority
+        
+        Ok(score)
+    }
+
+    async fn generate_remediation_plan(
+        &self,
+        advisories: &[SecurityAdvisory],
+    ) -> Result<RemediationPlan> {
+        let mut automated_fixes = Vec::new();
+        let mut manual_reviews = Vec::new();
+        
+        for advisory in advisories {
+            if self.can_automate_fix(advisory).await? {
+                automated_fixes.push(self.create_automated_fix(advisory).await?);
+            } else {
+                manual_reviews.push(advisory.id.clone());
+            }
+        }
+        
+        let priority_order: Vec<String> = advisories
+            .iter()
+            .map(|a| a.id.clone())
+            .collect();
+        
+        Ok(RemediationPlan {
+            priority_order,
+            automated_fixes,
+            manual_reviews,
+            estimated_time: self.estimate_remediation_time(&automated_fixes, &manual_reviews).await?,
+        })
+    }
+
+    async fn can_automate_fix(&self, advisory: &SecurityAdvisory) -> Result<bool> {
+        // Check if this vulnerability can be automatically fixed
+        // - Version updates for dependencies
+        // - Simple configuration changes
+        // - Known safe replacements
+        Ok(advisory.remediation.contains("update") || advisory.remediation.contains("replace"))
+    }
+
+    async fn create_automated_fix(&self, advisory: &SecurityAdvisory) -> Result<AutomatedFix> {
+        // Parse remediation instructions to create automated fix
+        Ok(AutomatedFix {
+            advisory_id: advisory.id.clone(),
+            package_name: advisory.affected_packages[0].clone(),
+            current_version: "current".to_string(), // Would be extracted from project
+            target_version: "target".to_string(),   // Would be extracted from advisory
+            fix_type: "update".to_string(),
+        })
+    }
+
+    async fn estimate_remediation_time(
+        &self,
+        automated_fixes: &[AutomatedFix],
+        manual_reviews: &[String],
+    ) -> Result<String> {
+        let automated_time = automated_fixes.len() as f64 * 5.0; // 5 minutes per automated fix
+        let manual_time = manual_reviews.len() as f64 * 30.0;    // 30 minutes per manual review
+        
+        let total_minutes = automated_time + manual_time;
+        
+        if total_minutes < 60.0 {
+            Ok(format!("{} minutes", total_minutes as u32))
+        } else {
+            Ok(format!("{} hours", (total_minutes / 60.0).ceil() as u32))
+        }
+    }
+
+    async fn create_scan_summary(&self, advisories: &[SecurityAdvisory]) -> Result<ScanSummary> {
+        let mut critical_count = 0;
+        let mut high_count = 0;
+        let mut medium_count = 0;
+        let mut low_count = 0;
+        
+        for advisory in advisories {
+            match advisory.severity.as_str() {
+                "critical" => critical_count += 1,
+                "high" => high_count += 1,
+                "medium" => medium_count += 1,
+                "low" => low_count += 1,
+                _ => {}
+            }
+        }
+        
+        Ok(ScanSummary {
+            total_vulnerabilities: advisories.len() as u32,
+            critical_count,
+            high_count,
+            medium_count,
+            low_count,
+            scan_duration: 0.0, // Would be measured during actual scan
+        })
+    }
+
+    fn parse_cargo_dependencies(&self, content: &str) -> HashMap<String, String> {
+        // Parse Cargo.toml dependencies
+        let mut deps = HashMap::new();
+        // Implementation would parse TOML and extract dependencies
+        deps
+    }
+
+    fn parse_package_dependencies(&self, content: &str) -> HashMap<String, String> {
+        // Parse package.json dependencies
+        let mut deps = HashMap::new();
+        // Implementation would parse JSON and extract dependencies
+        deps
+    }
+}
+
+pub struct SecurityReportGenerator;
+
+#[async_trait]
+impl McpTool for SecurityReportGenerator {
+    fn name(&self) -> &'static str {
+        "security_report_generation"
+    }
+
+    fn description(&self) -> &'static str {
+        "Generate comprehensive security reports and publish to GitHub"
+    }
+
+    async fn execute(&self, scan_response: SecurityScanResponse) -> Result<String> {
+        let report_content = self.generate_markdown_report(&scan_response).await?;
+        let report_path = self.save_report(&report_content).await?;
+        let github_url = self.publish_to_github(&report_path).await?;
+        
+        Ok(github_url)
+    }
+}
+
+impl SecurityReportGenerator {
+    async fn generate_markdown_report(&self, scan_response: &SecurityScanResponse) -> Result<String> {
+        let mut report = String::new();
+        
+        report.push_str("# Security Scan Report\n\n");
+        report.push_str(&format!("**Scan Date:** {}\n", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")));
+        report.push_str(&format!("**Total Vulnerabilities:** {}\n\n", scan_response.scan_summary.total_vulnerabilities));
+        
+        // Summary section
+        report.push_str("## Summary\n\n");
+        report.push_str(&format!("- Critical: {}\n", scan_response.scan_summary.critical_count));
+        report.push_str(&format!("- High: {}\n", scan_response.scan_summary.high_count));
+        report.push_str(&format!("- Medium: {}\n", scan_response.scan_summary.medium_count));
+        report.push_str(&format!("- Low: {}\n\n", scan_response.scan_summary.low_count));
+        
+        // Vulnerabilities section
+        report.push_str("## Vulnerabilities\n\n");
+        for advisory in &scan_response.vulnerabilities {
+            report.push_str(&format!("### {}\n", advisory.title));
+            report.push_str(&format!("**Severity:** {}\n", advisory.severity));
+            report.push_str(&format!("**Priority Score:** {:.2}\n", advisory.priority_score));
+            report.push_str(&format!("**Affected Packages:** {}\n", advisory.affected_packages.join(", ")));
+            report.push_str(&format!("**Description:** {}\n", advisory.description));
+            report.push_str(&format!("**Remediation:** {}\n\n", advisory.remediation));
+        }
+        
+        // Remediation plan
+        report.push_str("## Remediation Plan\n\n");
+        report.push_str(&format!("**Estimated Time:** {}\n\n", scan_response.remediation_plan.estimated_time));
+        
+        if !scan_response.remediation_plan.automated_fixes.is_empty() {
+            report.push_str("### Automated Fixes\n\n");
+            for fix in &scan_response.remediation_plan.automated_fixes {
+                report.push_str(&format!("- {}: {} → {}\n", fix.package_name, fix.current_version, fix.target_version));
+            }
+            report.push_str("\n");
+        }
+        
+        if !scan_response.remediation_plan.manual_reviews.is_empty() {
+            report.push_str("### Manual Reviews Required\n\n");
+            for advisory_id in &scan_response.remediation_plan.manual_reviews {
+                report.push_str(&format!("- {}\n", advisory_id));
+            }
+        }
+        
+        Ok(report)
+    }
+
+    async fn save_report(&self, content: &str) -> Result<String> {
+        let filename = format!("security-report-{}.md", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
+        let path = format!("reports/{}", filename);
+        
+        tokio::fs::create_dir_all("reports").await?;
+        tokio::fs::write(&path, content).await?;
+        
+        Ok(path)
+    }
+
+    async fn publish_to_github(&self, report_path: &str) -> Result<String> {
+        // Create a new branch for the security report
+        let branch_name = format!("security-report-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
+        
+        // Use git commands to create branch and push
+        tokio::process::Command::new("git")
+            .args(&["checkout", "-b", &branch_name])
+            .output()
+            .await?;
+        
+        tokio::process::Command::new("git")
+            .args(&["add", report_path])
+            .output()
+            .await?;
+        
+        tokio::process::Command::new("git")
+            .args(&["commit", "-m", "Add security scan report"])
+            .output()
+            .await?;
+        
+        tokio::process::Command::new("git")
+            .args(&["push", "origin", &branch_name])
+            .output()
+            .await?;
+        
+        // Create pull request using GitHub CLI
+        let pr_output = tokio::process::Command::new("gh")
+            .args(&[
+                "pr", "create",
+                "--title", "Security Scan Report",
+                "--body", "Automated security scan report generated by Cypher agent",
+                "--head", &branch_name
+            ])
+            .output()
+            .await?;
+        
+        let pr_url = String::from_utf8(pr_output.stdout)?;
+        Ok(pr_url.trim().to_string())
+    }
+}
+```
+
+This enhanced architecture now includes avatar generation using the [Imagine.art API](https://www.imagine.art/dashboard), Blaze agent specialization for Svelte development, Cypher agent for security scanning and remediation, and engaging ASCII art startup displays, making the agent system more professional and visually appealing while maintaining the core functionality improvements.

@@ -575,6 +575,23 @@ done
 - Landing page development using Blaze agent
 - Clear role separation between Rex and Blaze
 
+### Cypher Agent Security Specialization
+**Requirements:**
+- Create dedicated Cypher agent for automated security scanning and remediation
+- Implement automatic security advisory download using GitHub CLI
+- Prioritize security vulnerabilities by severity and impact
+- Automate remediation processes for common security issues
+- Generate comprehensive security reports and publish to GitHub
+- Integrate with existing CI/CD pipeline after test completion
+
+**Success Criteria:**
+- Cypher agent container fully operational and specialized for security
+- GitHub CLI integration for security advisory downloads working
+- Automated vulnerability prioritization and remediation implemented
+- Security reports generated and published to GitHub automatically
+- Integration with post-test workflow functioning properly
+- Clear role separation and security-focused tool configuration
+
 ### Agent Container ASCII Art
 **Requirements:**
 - Display agent name and avatar in ASCII art on container startup
