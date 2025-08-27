@@ -1596,4 +1596,677 @@ impl SecurityReportGenerator {
 }
 ```
 
-This enhanced architecture now includes avatar generation using the [Imagine.art API](https://www.imagine.art/dashboard), Blaze agent specialization for Svelte development, Cypher agent for security scanning and remediation, and engaging ASCII art startup displays, making the agent system more professional and visually appealing while maintaining the core functionality improvements.
+### 13. Standalone Agent MCP Tools
+
+Custom tools for standalone agent workflows triggered by specific events.
+
+#### Bug Remediation Tools
+```rust
+// src/tools/bug_remediation_tools.rs
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BugIssue {
+    pub id: u64,
+    pub title: String,
+    pub description: String,
+    pub labels: Vec<String>,
+    pub assignee: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BugAnalysisRequest {
+    pub issue_id: u64,
+    pub repository: String,
+    pub branch: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BugAnalysisResponse {
+    pub issue: BugIssue,
+    pub reproduction_steps: Vec<String>,
+    pub root_cause: String,
+    pub affected_files: Vec<String>,
+    pub remediation_plan: RemediationPlan,
+    pub test_cases: Vec<TestCase>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TestCase {
+    pub name: String,
+    pub description: String,
+    pub steps: Vec<String>,
+    pub expected_result: String,
+}
+
+pub struct BugRemediationTool;
+
+#[async_trait]
+impl McpTool for BugRemediationTool {
+    fn name(&self) -> &'static str {
+        "bug_remediation_workflow"
+    }
+
+    fn description(&self) -> &'static str {
+        "Complete bug remediation workflow: analyze, reproduce, fix, and create PR"
+    }
+
+    async fn execute(&self, request: BugAnalysisRequest) -> Result<BugAnalysisResponse> {
+        // Analyze the bug issue
+        let issue = self.fetch_issue(request.issue_id).await?;
+        
+        // Attempt to reproduce the bug
+        let reproduction_steps = self.reproduce_bug(&issue).await?;
+        
+        // Identify root cause
+        let root_cause = self.identify_root_cause(&issue, &reproduction_steps).await?;
+        
+        // Find affected files
+        let affected_files = self.find_affected_files(&root_cause).await?;
+        
+        // Create remediation plan
+        let remediation_plan = self.create_remediation_plan(&root_cause, &affected_files).await?;
+        
+        // Generate test cases
+        let test_cases = self.generate_test_cases(&issue, &reproduction_steps).await?;
+        
+        Ok(BugAnalysisResponse {
+            issue,
+            reproduction_steps,
+            root_cause,
+            affected_files,
+            remediation_plan,
+            test_cases,
+        })
+    }
+}
+
+impl BugRemediationTool {
+    async fn fetch_issue(&self, issue_id: u64) -> Result<BugIssue> {
+        // Use GitHub API to fetch issue details
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&format!("https://api.github.com/repos/5dlabs/cto/issues/{}", issue_id))
+            .header("Authorization", format!("Bearer {}", std::env::var("GITHUB_TOKEN")?))
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
+
+        let issue: BugIssue = response.json().await?;
+        Ok(issue)
+    }
+
+    async fn reproduce_bug(&self, issue: &BugIssue) -> Result<Vec<String>> {
+        let mut steps = Vec::new();
+        
+        // Analyze issue description for reproduction steps
+        if issue.description.contains("steps to reproduce") {
+            steps = self.extract_reproduction_steps(&issue.description).await?;
+        } else {
+            // Generate reproduction steps based on issue content
+            steps = self.generate_reproduction_steps(issue).await?;
+        }
+        
+        // Attempt to reproduce the bug
+        for step in &steps {
+            let success = self.execute_reproduction_step(step).await?;
+            if !success {
+                return Err(anyhow::anyhow!("Failed to reproduce bug at step: {}", step));
+            }
+        }
+        
+        Ok(steps)
+    }
+
+    async fn identify_root_cause(&self, issue: &BugIssue, steps: &[String]) -> Result<String> {
+        // Analyze error messages, stack traces, and code patterns
+        let error_patterns = self.extract_error_patterns(&issue.description).await?;
+        let stack_trace = self.extract_stack_trace(&issue.description).await?;
+        
+        // Use code analysis to identify root cause
+        let root_cause = self.analyze_code_patterns(&error_patterns, &stack_trace).await?;
+        
+        Ok(root_cause)
+    }
+
+    async fn create_remediation_plan(&self, root_cause: &str, files: &[String]) -> Result<RemediationPlan> {
+        let mut plan = RemediationPlan::new();
+        
+        // Create fixes for each affected file
+        for file in files {
+            let fix = self.create_file_fix(file, root_cause).await?;
+            plan.add_fix(fix);
+        }
+        
+        // Add test coverage
+        let test_fix = self.create_test_coverage(root_cause).await?;
+        plan.add_fix(test_fix);
+        
+        Ok(plan)
+    }
+
+    async fn generate_test_cases(&self, issue: &BugIssue, steps: &[String]) -> Result<Vec<TestCase>> {
+        let mut test_cases = Vec::new();
+        
+        // Create test case for the bug
+        let bug_test = TestCase {
+            name: format!("Test for issue #{}", issue.id),
+            description: issue.title.clone(),
+            steps: steps.to_vec(),
+            expected_result: "Should not reproduce the bug".to_string(),
+        };
+        test_cases.push(bug_test);
+        
+        // Create regression tests
+        let regression_tests = self.create_regression_tests(issue).await?;
+        test_cases.extend(regression_tests);
+        
+        Ok(test_cases)
+    }
+
+    async fn create_pull_request(&self, issue: &BugIssue, fixes: &[Fix]) -> Result<String> {
+        // Create feature branch
+        let branch_name = format!("fix/issue-{}", issue.id);
+        self.create_branch(&branch_name).await?;
+        
+        // Apply fixes
+        for fix in fixes {
+            self.apply_fix(fix).await?;
+        }
+        
+        // Commit changes
+        let commit_message = format!("Fix #{}: {}", issue.id, issue.title);
+        self.commit_changes(&commit_message).await?;
+        
+        // Push branch
+        self.push_branch(&branch_name).await?;
+        
+        // Create pull request
+        let pr_url = self.create_pr(&branch_name, issue).await?;
+        
+        Ok(pr_url)
+    }
+
+    async fn trigger_qa_process(&self, pr_url: &str) -> Result<()> {
+        // Trigger the existing QA workflow
+        let workflow_id = "qa-review.yml";
+        self.trigger_workflow(workflow_id, pr_url).await?;
+        
+        Ok(())
+    }
+}
+```
+
+#### Feature Request Tools
+```rust
+// src/tools/feature_request_tools.rs
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FeatureRequest {
+    pub id: u64,
+    pub title: String,
+    pub description: String,
+    pub labels: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FeatureAnalysisRequest {
+    pub issue_id: u64,
+    pub repository: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FeatureAnalysisResponse {
+    pub feature: FeatureRequest,
+    pub requirements: Vec<String>,
+    pub prd_content: String,
+    pub architecture_content: String,
+    pub tasks: Vec<TaskDefinition>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TaskDefinition {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub priority: String,
+    pub estimated_time: String,
+}
+
+pub struct FeatureRequestTool;
+
+#[async_trait]
+impl McpTool for FeatureRequestTool {
+    fn name(&self) -> &'static str {
+        "feature_request_workflow"
+    }
+
+    fn description(&self) -> &'static str {
+        "Process feature requests: create PRD, architecture, and task documentation"
+    }
+
+    async fn execute(&self, request: FeatureAnalysisRequest) -> Result<FeatureAnalysisResponse> {
+        // Fetch the feature request issue
+        let feature = self.fetch_feature_request(request.issue_id).await?;
+        
+        // Extract requirements
+        let requirements = self.extract_requirements(&feature).await?;
+        
+        // Generate PRD
+        let prd_content = self.generate_prd(&feature, &requirements).await?;
+        
+        // Generate architecture document
+        let architecture_content = self.generate_architecture(&feature, &requirements).await?;
+        
+        // Generate tasks
+        let tasks = self.generate_tasks(&feature, &requirements).await?;
+        
+        Ok(FeatureAnalysisResponse {
+            feature,
+            requirements,
+            prd_content,
+            architecture_content,
+            tasks,
+        })
+    }
+}
+
+impl FeatureRequestTool {
+    async fn fetch_feature_request(&self, issue_id: u64) -> Result<FeatureRequest> {
+        // Use GitHub API to fetch issue details
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&format!("https://api.github.com/repos/5dlabs/cto/issues/{}", issue_id))
+            .header("Authorization", format!("Bearer {}", std::env::var("GITHUB_TOKEN")?))
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
+
+        let feature: FeatureRequest = response.json().await?;
+        Ok(feature)
+    }
+
+    async fn extract_requirements(&self, feature: &FeatureRequest) -> Result<Vec<String>> {
+        let mut requirements = Vec::new();
+        
+        // Parse feature description for requirements
+        let lines: Vec<&str> = feature.description.lines().collect();
+        let mut in_requirements = false;
+        
+        for line in lines {
+            if line.contains("requirements:") || line.contains("Requirements:") {
+                in_requirements = true;
+                continue;
+            }
+            
+            if in_requirements && line.trim().starts_with('-') {
+                requirements.push(line.trim().trim_start_matches('-').trim().to_string());
+            }
+        }
+        
+        // If no explicit requirements found, generate from description
+        if requirements.is_empty() {
+            requirements = self.generate_requirements_from_description(&feature.description).await?;
+        }
+        
+        Ok(requirements)
+    }
+
+    async fn generate_prd(&self, feature: &FeatureRequest, requirements: &[String]) -> Result<String> {
+        let mut prd = String::new();
+        
+        prd.push_str("# Product Requirements Document\n\n");
+        prd.push_str(&format!("## Feature: {}\n\n", feature.title));
+        prd.push_str(&format!("**Issue ID:** #{}\n", feature.id));
+        prd.push_str(&format!("**Created:** {}\n\n", feature.created_at));
+        
+        prd.push_str("## Overview\n\n");
+        prd.push_str(&feature.description);
+        prd.push_str("\n\n");
+        
+        prd.push_str("## Requirements\n\n");
+        for (i, requirement) in requirements.iter().enumerate() {
+            prd.push_str(&format!("{}. {}\n", i + 1, requirement));
+        }
+        prd.push_str("\n");
+        
+        prd.push_str("## Success Criteria\n\n");
+        prd.push_str("- Feature implemented according to requirements\n");
+        prd.push_str("- All tests passing\n");
+        prd.push_str("- Documentation updated\n");
+        prd.push_str("- Code review completed\n\n");
+        
+        Ok(prd)
+    }
+
+    async fn generate_architecture(&self, feature: &FeatureRequest, requirements: &[String]) -> Result<String> {
+        let mut architecture = String::new();
+        
+        architecture.push_str("# Architecture Document\n\n");
+        architecture.push_str(&format!("## Feature: {}\n\n", feature.title));
+        
+        architecture.push_str("## System Design\n\n");
+        architecture.push_str("### Components\n\n");
+        architecture.push_str("- Component 1: Description\n");
+        architecture.push_str("- Component 2: Description\n");
+        architecture.push_str("- Component 3: Description\n\n");
+        
+        architecture.push_str("### Data Flow\n\n");
+        architecture.push_str("```mermaid\ngraph TD\n");
+        architecture.push_str("    A[Input] --> B[Processing]\n");
+        architecture.push_str("    B --> C[Output]\n");
+        architecture.push_str("```\n\n");
+        
+        architecture.push_str("## Implementation Plan\n\n");
+        for (i, requirement) in requirements.iter().enumerate() {
+            architecture.push_str(&format!("### Phase {}\n", i + 1));
+            architecture.push_str(&format!("- {}\n", requirement));
+            architecture.push_str("\n");
+        }
+        
+        Ok(architecture)
+    }
+
+    async fn generate_tasks(&self, feature: &FeatureRequest, requirements: &[String]) -> Result<Vec<TaskDefinition>> {
+        let mut tasks = Vec::new();
+        
+        for (i, requirement) in requirements.iter().enumerate() {
+            let task = TaskDefinition {
+                id: format!("{}-{}", feature.id, i + 1),
+                title: format!("Implement: {}", requirement),
+                description: requirement.clone(),
+                priority: if i == 0 { "high".to_string() } else { "medium".to_string() },
+                estimated_time: "2-4 hours".to_string(),
+            };
+            tasks.push(task);
+        }
+        
+        // Add documentation task
+        let doc_task = TaskDefinition {
+            id: format!("{}-docs", feature.id),
+            title: "Update documentation".to_string(),
+            description: "Update relevant documentation for the new feature".to_string(),
+            priority: "medium".to_string(),
+            estimated_time: "1-2 hours".to_string(),
+        };
+        tasks.push(doc_task);
+        
+        Ok(tasks)
+    }
+
+    async fn create_intake_documentation(&self, feature: &FeatureRequest, prd: &str, architecture: &str) -> Result<String> {
+        // Create intake documentation following existing process
+        let intake_dir = format!("docs/intake/feature-{}", feature.id);
+        tokio::fs::create_dir_all(&intake_dir).await?;
+        
+        // Write PRD
+        tokio::fs::write(format!("{}/prd.txt", intake_dir), prd).await?;
+        
+        // Write architecture
+        tokio::fs::write(format!("{}/architecture.md", intake_dir), architecture).await?;
+        
+        // Update issue with documentation links
+        let comment = format!(
+            "Documentation created for feature request:\n\n- [PRD]({}/prd.txt)\n- [Architecture]({}/architecture.md)",
+            intake_dir, intake_dir
+        );
+        
+        self.add_issue_comment(feature.id, &comment).await?;
+        
+        Ok(intake_dir)
+    }
+}
+```
+
+#### CI Failure Remediation Tools
+```rust
+// src/tools/ci_remediation_tools.rs
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CIFailure {
+    pub workflow_id: String,
+    pub run_id: u64,
+    pub conclusion: String,
+    pub failure_reason: String,
+    pub logs: String,
+    pub affected_files: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CIRemediationRequest {
+    pub workflow_id: String,
+    pub run_id: u64,
+    pub repository: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CIRemediationResponse {
+    pub failure: CIFailure,
+    pub failure_pattern: String,
+    pub remediation_plan: RemediationPlan,
+    pub fix_applied: bool,
+    pub fix_report: String,
+}
+
+pub struct CIRemediationTool;
+
+#[async_trait]
+impl McpTool for CIRemediationTool {
+    fn name(&self) -> &'static str {
+        "ci_remediation_workflow"
+    }
+
+    fn description(&self) -> &'static str {
+        "Automatically remediate CI failures: analyze, fix, and validate"
+    }
+
+    async fn execute(&self, request: CIRemediationRequest) -> Result<CIRemediationResponse> {
+        // Fetch CI failure details
+        let failure = self.fetch_ci_failure(&request.workflow_id, request.run_id).await?;
+        
+        // Analyze failure pattern
+        let failure_pattern = self.analyze_failure_pattern(&failure).await?;
+        
+        // Create remediation plan
+        let remediation_plan = self.create_remediation_plan(&failure, &failure_pattern).await?;
+        
+        // Apply fixes
+        let fix_applied = self.apply_fixes(&remediation_plan).await?;
+        
+        // Generate fix report
+        let fix_report = self.generate_fix_report(&failure, &remediation_plan, fix_applied).await?;
+        
+        Ok(CIRemediationResponse {
+            failure,
+            failure_pattern,
+            remediation_plan,
+            fix_applied,
+            fix_report,
+        })
+    }
+}
+
+impl CIRemediationTool {
+    async fn fetch_ci_failure(&self, workflow_id: &str, run_id: u64) -> Result<CIFailure> {
+        // Use GitHub API to fetch workflow run details
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&format!(
+                "https://api.github.com/repos/5dlabs/cto/actions/runs/{}",
+                run_id
+            ))
+            .header("Authorization", format!("Bearer {}", std::env::var("GITHUB_TOKEN")?))
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await?;
+
+        let run_data: serde_json::Value = response.json().await?;
+        
+        // Extract logs
+        let logs = self.fetch_workflow_logs(run_id).await?;
+        
+        // Determine affected files
+        let affected_files = self.determine_affected_files(&logs).await?;
+        
+        Ok(CIFailure {
+            workflow_id: workflow_id.to_string(),
+            run_id,
+            conclusion: run_data["conclusion"].as_str().unwrap_or("failure").to_string(),
+            failure_reason: self.extract_failure_reason(&logs).await?,
+            logs,
+            affected_files,
+        })
+    }
+
+    async fn analyze_failure_pattern(&self, failure: &CIFailure) -> Result<String> {
+        let logs = &failure.logs;
+        
+        // Common CI failure patterns
+        if logs.contains("cargo clippy") && logs.contains("error:") {
+            return Ok("rust_linting_failure".to_string());
+        }
+        
+        if logs.contains("cargo test") && logs.contains("FAILED") {
+            return Ok("rust_test_failure".to_string());
+        }
+        
+        if logs.contains("yaml-lint") && logs.contains("error") {
+            return Ok("yaml_linting_failure".to_string());
+        }
+        
+        if logs.contains("npm install") && logs.contains("error") {
+            return Ok("npm_dependency_failure".to_string());
+        }
+        
+        if logs.contains("docker build") && logs.contains("error") {
+            return Ok("docker_build_failure".to_string());
+        }
+        
+        Ok("unknown_failure_pattern".to_string())
+    }
+
+    async fn create_remediation_plan(&self, failure: &CIFailure, pattern: &str) -> Result<RemediationPlan> {
+        let mut plan = RemediationPlan::new();
+        
+        match pattern.as_str() {
+            "rust_linting_failure" => {
+                let fix = self.create_rust_lint_fix(failure).await?;
+                plan.add_fix(fix);
+            }
+            "rust_test_failure" => {
+                let fix = self.create_rust_test_fix(failure).await?;
+                plan.add_fix(fix);
+            }
+            "yaml_linting_failure" => {
+                let fix = self.create_yaml_lint_fix(failure).await?;
+                plan.add_fix(fix);
+            }
+            "npm_dependency_failure" => {
+                let fix = self.create_npm_fix(failure).await?;
+                plan.add_fix(fix);
+            }
+            "docker_build_failure" => {
+                let fix = self.create_docker_fix(failure).await?;
+                plan.add_fix(fix);
+            }
+            _ => {
+                // Generic fix for unknown patterns
+                let fix = self.create_generic_fix(failure).await?;
+                plan.add_fix(fix);
+            }
+        }
+        
+        Ok(plan)
+    }
+
+    async fn apply_fixes(&self, plan: &RemediationPlan) -> Result<bool> {
+        let mut all_successful = true;
+        
+        for fix in &plan.fixes {
+            let success = self.apply_single_fix(fix).await?;
+            if !success {
+                all_successful = false;
+            }
+        }
+        
+        if all_successful {
+            // Commit and push fixes
+            self.commit_and_push_fixes(plan).await?;
+        }
+        
+        Ok(all_successful)
+    }
+
+    async fn generate_fix_report(&self, failure: &CIFailure, plan: &RemediationPlan, applied: bool) -> Result<String> {
+        let mut report = String::new();
+        
+        report.push_str("# CI Failure Remediation Report\n\n");
+        report.push_str(&format!("**Workflow:** {}\n", failure.workflow_id));
+        report.push_str(&format!("**Run ID:** {}\n", failure.run_id));
+        report.push_str(&format!("**Failure Pattern:** {}\n", plan.pattern));
+        report.push_str(&format!("**Fix Applied:** {}\n\n", if applied { "Yes" } else { "No" }));
+        
+        report.push_str("## Failure Analysis\n\n");
+        report.push_str(&format!("**Reason:** {}\n", failure.failure_reason));
+        report.push_str(&format!("**Affected Files:** {}\n\n", failure.affected_files.join(", ")));
+        
+        report.push_str("## Remediation Actions\n\n");
+        for fix in &plan.fixes {
+            report.push_str(&format!("- {}\n", fix.description));
+        }
+        
+        if applied {
+            report.push_str("\n## Status: ✅ Fixed\n");
+            report.push_str("The CI failure has been automatically remediated.\n");
+        } else {
+            report.push_str("\n## Status: ⚠️ Manual Intervention Required\n");
+            report.push_str("The failure could not be automatically fixed. Manual review needed.\n");
+        }
+        
+        Ok(report)
+    }
+
+    async fn create_rust_lint_fix(&self, failure: &CIFailure) -> Result<Fix> {
+        // Extract specific linting errors and create fixes
+        let lint_errors = self.extract_rust_lint_errors(&failure.logs).await?;
+        
+        let mut fix_content = String::new();
+        for error in lint_errors {
+            fix_content.push_str(&format!("// Fix: {}\n", error));
+        }
+        
+        Ok(Fix {
+            file_path: "src/main.rs".to_string(), // Would be determined from logs
+            content: fix_content,
+            description: "Fix Rust linting errors".to_string(),
+        })
+    }
+
+    async fn create_yaml_lint_fix(&self, failure: &CIFailure) -> Result<Fix> {
+        // Fix YAML formatting issues
+        let yaml_errors = self.extract_yaml_errors(&failure.logs).await?;
+        
+        let mut fix_content = String::new();
+        for error in yaml_errors {
+            fix_content.push_str(&format!("# Fix: {}\n", error));
+        }
+        
+        Ok(Fix {
+            file_path: "config.yaml".to_string(), // Would be determined from logs
+            content: fix_content,
+            description: "Fix YAML linting errors".to_string(),
+        })
+    }
+}
+```
+
+This enhanced architecture now includes avatar generation using the [Imagine.art API](https://www.imagine.art/dashboard), Blaze agent specialization for Svelte development, Cypher agent for security scanning and remediation, standalone agent workflows for bug remediation, feature requests, and CI failure remediation, and engaging ASCII art startup displays, making the agent system more professional and visually appealing while maintaining the core functionality improvements.

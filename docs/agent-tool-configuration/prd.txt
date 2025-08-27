@@ -592,6 +592,35 @@ done
 - Integration with post-test workflow functioning properly
 - Clear role separation and security-focused tool configuration
 
+### Standalone Agent Workflows
+**Requirements:**
+- **Bug Remediation Agent**: Automatically triggered by GitHub issues with "bug" label
+  - Detect bug issues via webhook triggers
+  - Attempt to reproduce the reported issue
+  - Create comprehensive remediation plan
+  - Generate pull request on feature branch with fixes
+  - Trigger existing QA process for validation
+- **Feature Request Agent**: Process issues labeled as "feature request"
+  - Detect feature request issues via webhook triggers
+  - Create PRD and architecture documentation
+  - Follow existing intake process for new features
+  - Generate task documentation for implementation
+  - Integrate with current documentation workflow
+- **CI Failure Remediation Agent**: Automatically respond to CI failures
+  - Monitor CI/CD pipeline for failures
+  - Detect common failure patterns (Actions, linting, etc.)
+  - Implement immediate remediation without QA process
+  - Handle single-agent remediation for CI issues
+  - Provide failure analysis and resolution reports
+
+**Success Criteria:**
+- Bug remediation agent successfully reproduces and fixes reported issues
+- Feature request agent creates proper PRD/architecture documentation
+- CI failure agent resolves common CI issues automatically
+- All agents integrate seamlessly with existing workflows
+- Webhook triggers function reliably for all agent types
+- QA process integration works correctly for bug fixes
+
 ### Agent Container ASCII Art
 **Requirements:**
 - Display agent name and avatar in ASCII art on container startup
