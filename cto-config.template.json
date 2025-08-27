@@ -27,7 +27,7 @@
     
     "_comment_intake": "Default values for intake() tool - project intake workflows",
     "intake": {
-      "model": "claude-opus-4-20250514",
+      "model": "opus",
       "githubApp": "5DLabs-Morgan"
     }
   },
@@ -43,12 +43,12 @@
   "_field_documentation": {
     "version": "Config file format version",
     
-    "defaults.docs.model": "Claude model for documentation generation (e.g., claude-opus-4-20250514, claude-3-5-sonnet-20241022)",
+    "defaults.docs.model": "Claude model for documentation generation (e.g., claude-opus-4-20250514, claude-3-5-sonnet-20241022, or opus/sonnet for CLAUDE code)",
     "defaults.docs.githubApp": "Default GitHub App for docs workflows",
     "defaults.docs.includeCodebase": "Whether to include existing codebase as markdown context",
     "defaults.docs.sourceBranch": "Default source branch to work from",
     
-    "defaults.code.model": "Claude model for code implementation (e.g., claude-opus-4-20250514, claude-3-5-sonnet-20241022)",
+    "defaults.code.model": "Claude model for code implementation (e.g., claude-opus-4-20250514, claude-3-5-sonnet-20241022, or opus/sonnet for CLAUDE code)",
     "defaults.code.githubApp": "Default GitHub App for code workflows", 
     "defaults.code.continueSession": "Whether to continue previous Claude session by default",
     "defaults.code.workingDirectory": "Default working directory within repository (. for root)",

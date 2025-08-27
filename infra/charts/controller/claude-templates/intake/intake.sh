@@ -419,35 +419,48 @@ fi
 # Configure models with fallback
 echo "🤖 Configuring AI models..."
 
-# Test if OpenAI API key is valid by making a simple API call
-OPENAI_VALID=false
-if [ -n "$OPENAI_API_KEY" ]; then
-  echo "🔍 Testing OpenAI API key validity..."
-  # Test the API key with a simple models call
-  if curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
-          -H "Content-Type: application/json" \
-          "https://api.openai.com/v1/models" > /dev/null 2>&1; then
-    echo "✅ OpenAI API key is valid"
-    OPENAI_VALID=true
-  else
-    echo "⚠️ OpenAI API key is invalid or expired, falling back to Claude"
-    OPENAI_VALID=false
-  fi
-fi
+# Configure TaskMaster to use CLAUDE code with Opus for main and research, Sonnet for fallback
+echo "✅ Using CLAUDE code; setting main=opus, research=opus, fallback=sonnet"
 
-if [ "$OPENAI_VALID" = true ]; then
-  # Use GPT-5 as primary when OpenAI key is valid; keep Opus (or configured model) as research; fallback to GPT-5
-  echo "✅ Using OpenAI; setting main=gpt-5, research=$MODEL, fallback=gpt-5"
-  task-master models --set-main "gpt-5"
-  task-master models --set-research "$MODEL"
-  task-master models --set-fallback "gpt-5"
-else
-  # No valid OpenAI key: use provided model for both roles; fallback to Claude Sonnet
-  echo "ℹ️ Using Claude only; setting main=$MODEL, research=$MODEL, fallback=claude-3-5-sonnet-20241022"
-  task-master models --set-main "$MODEL"
-  task-master models --set-research "$MODEL"
-  task-master models --set-fallback "claude-3-5-sonnet-20241022"
-fi
+# Create CLAUDE code configuration
+cat > .taskmaster/config.json << EOF
+{
+  "project": {
+    "name": "$PROJECT_NAME",
+    "description": "Auto-generated project from intake pipeline",
+    "version": "0.1.0"
+  },
+  "models": {
+    "main": {
+      "provider": "claude-code",
+      "modelId": "opus",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    },
+    "research": {
+      "provider": "claude-code",
+      "modelId": "opus",
+      "maxTokens": 32000,
+      "temperature": 0.1
+    },
+    "fallback": {
+      "provider": "claude-code",
+      "modelId": "sonnet",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    }
+  },
+  "parameters": {
+    "maxTokens": 8000,
+    "temperature": 0.7
+  },
+  "global": {
+    "defaultTag": "master"
+  }
+}
+EOF
+
+echo "✅ CLAUDE code configuration created"
 
 # Parse PRD
 echo "📄 Parsing PRD to generate tasks..."

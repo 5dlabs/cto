@@ -569,10 +569,10 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             config.defaults.docs.model.clone()
         });
 
-    // Validate model name
-    if !model.starts_with("claude-") {
+    // Validate model name (support both Claude API and CLAUDE code formats)
+    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model.as_str()) {
         return Err(anyhow!(
-            "Invalid model '{}'. Must be a valid Claude model name",
+            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
             model
         ));
     }
@@ -747,10 +747,10 @@ fn handle_code_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             config.defaults.code.model.clone()
         });
 
-    // Validate model name
-    if !model.starts_with("claude-") {
+    // Validate model name (support both Claude API and CLAUDE code formats)
+    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model.as_str()) {
         return Err(anyhow!(
-            "Invalid model '{}'. Must be a valid Claude model name",
+            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
             model
         ));
     }
@@ -999,10 +999,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             config.defaults.play.model.clone()
         });
 
-    // Validate model name
-    if !model.starts_with("claude-") {
+    // Validate model name (support both Claude API and CLAUDE code formats)
+    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model.as_str()) {
         return Err(anyhow!(
-            "Invalid model '{}'. Must be a valid Claude model name",
+            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
             model
         ));
     }
