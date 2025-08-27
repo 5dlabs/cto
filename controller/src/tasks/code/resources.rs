@@ -668,8 +668,8 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "WORKFLOW_NAME",
                 "value": code_run.metadata.labels.as_ref()
                     .and_then(|labels| labels.get("workflow-name"))
-                    .unwrap_or(&"unknown".to_string())
-                    .clone()
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string())
             }),
             json!({
                 "name": "NAMESPACE",
