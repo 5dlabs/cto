@@ -577,17 +577,17 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 - Human (CTO) performs final merge
 
 EOF
+
+    # Copy base CLAUDE.md from ConfigMap if it exists (match Rex pattern)
+    if [ -f "/task-files/CLAUDE.md" ]; then
+        cat /task-files/CLAUDE.md >> "/workspace/CLAUDE.md"
+        echo "✓ Appended base CLAUDE.md content from ConfigMap"
+    fi
+
+    # Copy to working directory for consistency with Rex pattern
+    cp "/workspace/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
+    echo "✓ Created Tess-specific CLAUDE.md memory"
 fi  # End of CLAUDE.md creation if block
-
-# Copy base CLAUDE.md from ConfigMap if it exists (match Rex pattern)
-if [ -f "/task-files/CLAUDE.md" ]; then
-    cat /task-files/CLAUDE.md >> "/workspace/CLAUDE.md"
-    echo "✓ Appended base CLAUDE.md content from ConfigMap"
-fi
-
-# Copy to working directory for consistency with Rex pattern
-cp "/workspace/CLAUDE.md" "$CLAUDE_WORK_DIR/CLAUDE.md"
-echo "✓ Created Tess-specific CLAUDE.md memory"
 
 # Copy guidelines files to working directory (match Rex pattern)
 if [ -f "/task-files/coding-guidelines.md" ]; then
@@ -790,7 +790,7 @@ Your STRICT testing requirements:
 
 10. **MANDATORY PRE-APPROVAL CHECKLIST**:
     Before you can APPROVE, ALL of these MUST be true:
-    □ CI Status: Run \`gh pr checks \$PR_NUMBER --json name,status\` - ALL must show "completed" with "success"
+    □ CI Status: Run \`gh pr checks {{pr_number}} --json name,status\` - ALL must show "completed" with "success"
     □ Test Coverage: Must be >= 95% (verify with coverage tools)
     □ All Tests Pass: 100% of tests must pass, no skipped tests
     □ Acceptance Criteria: 100% of Task {{task_id}} criteria met
@@ -800,15 +800,21 @@ Your STRICT testing requirements:
     
     **VERIFICATION COMMANDS TO RUN BEFORE APPROVING**:
     \`\`\`bash
-    # 1. Verify CI is completely green
-    gh pr checks {{pr_number}} | grep -E "pass|success|✓"
-    # If you see any failures or pending checks, CANNOT APPROVE
+    # 1. Verify CI is completely green - NO FAILURES ALLOWED
+    gh pr checks {{pr_number}}
+    # EVERY check must show "pass" or ✓ 
+    # If you see ANY "fail", "pending", or "skipping" - CANNOT APPROVE
     
-    # 2. Alternative: Check workflow runs
-    gh run list --limit 5 | head -10
-    # Look for any failures or in_progress runs
+    # 2. Count the checks status
+    TOTAL_CHECKS=\$(gh pr checks {{pr_number}} | grep -c "^")
+    PASSING_CHECKS=\$(gh pr checks {{pr_number}} | grep -c "pass\\|✓")
+    if [ "\$TOTAL_CHECKS" != "\$PASSING_CHECKS" ]; then
+        echo "❌ NOT ALL CHECKS PASSING - CANNOT APPROVE"
+        echo "Total: \$TOTAL_CHECKS, Passing: \$PASSING_CHECKS"
+        exit 1
+    fi
     
-    # 3. Only if ALL checks pass can you approve
+    # 3. Only if ALL checks show "pass" can you approve
     \`\`\`
     
     IF ANY ITEM IS UNCHECKED, YOU CANNOT APPROVE!
@@ -956,9 +962,11 @@ Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 
 # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
 # FIRST: Verify you can approve
-CI_FAILED=\$(gh pr checks {{pr_number}} --json conclusion -q '.[] | select(.conclusion != "success")' | wc -l)
+CI_OUTPUT=\$(gh pr checks {{pr_number}})
+CI_FAILED=\$(echo "\$CI_OUTPUT" | grep -c "fail\\|pending\\|skipping" || true)
 if [ "\$CI_FAILED" -gt 0 ]; then
-  echo "❌ CANNOT APPROVE - CI HAS FAILURES"
+  echo "❌ CANNOT APPROVE - CI HAS FAILURES OR IS INCOMPLETE"
+  echo "\$CI_OUTPUT"
   exit 1
 fi
 
