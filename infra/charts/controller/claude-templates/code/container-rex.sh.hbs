@@ -437,10 +437,9 @@ mkdir -p "/workspace/$TARGET_REPO_DIR/task"
     rm -rf /tmp/docs-repo
     echo "✓ Docs repository cleaned up"
     
-    # Set working directory to the target repository root
-    REPO_NAME="$TARGET_REPO_DIR"
-    echo "✓ Working directory: /workspace/$REPO_NAME"
-fi
+# Set working directory to the target repository root
+REPO_NAME="$TARGET_REPO_DIR"
+echo "✓ Working directory: /workspace/$REPO_NAME"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
