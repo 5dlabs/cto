@@ -416,14 +416,79 @@ if [ -f "$ARCH_FILE" ] && [ -s "$ARCH_FILE" ]; then
     cp "$ARCH_FILE" ".taskmaster/docs/architecture.md"
 fi
 
-# Configure models with fallback
+# Configure models with Claude Code and GPT-5 fallback
 echo "🤖 Configuring AI models..."
 
-# Configure TaskMaster to use CLAUDE code with Opus for main and research, Sonnet for fallback
-echo "✅ Using CLAUDE code; setting main=opus, research=opus, fallback=sonnet"
+# Test if OpenAI API key is valid by making a simple API call
+OPENAI_VALID=false
+if [ -n "$OPENAI_API_KEY" ]; then
+  echo "🔍 Testing OpenAI API key validity..."
+  # Test the API key with a simple models call
+  if curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
+          -H "Content-Type: application/json" \
+          "https://api.openai.com/v1/models" > /dev/null 2>&1; then
+    echo "✅ OpenAI API key is valid"
+    OPENAI_VALID=true
+  else
+    echo "⚠️ OpenAI API key is invalid or expired, falling back to Claude only"
+    OPENAI_VALID=false
+  fi
+fi
 
-# Create CLAUDE code configuration
-cat > .taskmaster/config.json << EOF
+# Check if ANTHROPIC_API_KEY is available for Claude Code
+if [ -z "$ANTHROPIC_API_KEY" ]; then
+    echo "❌ ANTHROPIC_API_KEY is required for Claude Code but not set"
+    exit 1
+fi
+
+# Configure Claude Code to use ANTHROPIC_API_KEY
+echo "🔧 Configuring Claude Code authentication..."
+mkdir -p ~/.config/claude-code
+cat > ~/.config/claude-code/config.json << EOF
+{
+  "apiKey": "$ANTHROPIC_API_KEY"
+}
+EOF
+
+if [ "$OPENAI_VALID" = true ]; then
+  # Use Claude Code for main/research, GPT-5 for fallback
+  echo "✅ Using Claude Code with GPT-5 fallback"
+  cat > .taskmaster/config.json << EOF
+{
+  "project": {
+    "name": "$PROJECT_NAME",
+    "description": "Auto-generated project from intake pipeline",
+    "version": "0.1.0"
+  },
+  "models": {
+    "main": {
+      "provider": "claude-code",
+      "modelId": "opus",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    },
+    "research": {
+      "provider": "claude-code",
+      "modelId": "opus",
+      "maxTokens": 32000,
+      "temperature": 0.1
+    },
+    "fallback": {
+      "provider": "openai",
+      "modelId": "gpt-5",
+      "maxTokens": 8000,
+      "temperature": 0.7
+    }
+  },
+  "global": {
+    "defaultTag": "master"
+  }
+}
+EOF
+else
+  # Use Claude Code for all roles
+  echo "✅ Using Claude Code for all roles"
+  cat > .taskmaster/config.json << EOF
 {
   "project": {
     "name": "$PROJECT_NAME",
@@ -450,17 +515,14 @@ cat > .taskmaster/config.json << EOF
       "temperature": 0.2
     }
   },
-  "parameters": {
-    "maxTokens": 8000,
-    "temperature": 0.7
-  },
   "global": {
     "defaultTag": "master"
   }
 }
 EOF
+fi
 
-echo "✅ CLAUDE code configuration created"
+echo "✅ Claude Code configuration written"
 
 # Parse PRD
 echo "📄 Parsing PRD to generate tasks..."
