@@ -663,6 +663,14 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }),
+            // Add workflow name from CodeRun labels for PR correlation
+            json!({
+                "name": "WORKFLOW_NAME",
+                "value": code_run.metadata.labels.as_ref()
+                    .and_then(|labels| labels.get("workflow-name"))
+                    .unwrap_or(&"unknown".to_string())
+                    .clone()
+            }),
         ];
 
         // Process task requirements if present
