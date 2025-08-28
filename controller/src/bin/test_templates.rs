@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut handlebars = Handlebars::new();
 
     // Template directory
-    let template_dir = Path::new("orchestrator-core/templates");
+    let template_dir = Path::new("/Users/jonathonfritz/code/work-projects/5dlabs/cto/infra/charts/controller/claude-templates");
 
     // Test docs templates
     test_docs_templates(&mut handlebars, template_dir)?;
