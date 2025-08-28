@@ -1136,6 +1136,24 @@ fi
 INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
 USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE_CLEAN" | jq -Rs .)
 
+# 🚨 CRITICAL FIX: Wait for sidecar to be ready to prevent race condition
+echo "⏳ Waiting for sidecar to be ready..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+        echo "✓ Sidecar is ready (attempt $((RETRY_COUNT + 1)))"
+        break
+    fi
+    echo "⏳ Sidecar not ready, waiting... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+    sleep 1
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "⚠️ Sidecar not ready after ${MAX_RETRIES}s, proceeding with fallback"
+fi
+
 # Send via sidecar HTTP endpoint
 if printf '{"text":%s}\n' "$USER_COMBINED" | \
      curl -fsS -X POST http://127.0.0.1:8080/input \
