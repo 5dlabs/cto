@@ -921,7 +921,9 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         // Check if we have non-empty task requirements
-        let has_valid_requirements = code_run.spec.task_requirements
+        let has_valid_requirements = code_run
+            .spec
+            .task_requirements
             .as_ref()
             .map(|r| !r.trim().is_empty())
             .unwrap_or(false);
