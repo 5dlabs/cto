@@ -478,7 +478,9 @@ fi
 
 # Create initial CLAUDE.md if needed
 if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
-    cat > /workspace/CLAUDE.md << 'EOF'
+    # Use PR_NUMBER from environment if available, otherwise use template value
+    PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+    cat > /workspace/CLAUDE.md << EOF
 # TESS - ULTRA-STRICT Quality Assurance Agent
 
 ## Agent Role & Philosophy
@@ -719,7 +721,7 @@ You are Tess - the quality gatekeeper for **Task {{task_id}} ONLY**. Your job is
 Your STRICT testing requirements:
 
 1. **CRITICAL: Verify CI Status FIRST (ABSOLUTE BLOCKER)**:
-   - Run: \`gh pr checks {{pr_number}}\` to see CI status
+   - Run: \`gh pr checks $PR_NUM\` to see CI status
    - If ANY CI check is failing: DO NOT EXIT
    - Instead: Write tests to fix the failures
    - Push your changes: \`git add . && git commit -m "test: fix failing tests" && git push\`
@@ -783,14 +785,14 @@ Your STRICT testing requirements:
    - After posting REQUEST CHANGES, DO NOT STOP
    - Fix the issues yourself by writing tests
    - Push your fixes and wait for CI
-   - Check \`gh pr checks {{pr_number}}\` again
+   - Check \`gh pr checks $PR_NUM\` again
    - If still failing, keep fixing and pushing
    - REPEAT until you can post APPROVE
    - You are NOT ALLOWED to finish without APPROVE status
 
 10. **MANDATORY PRE-APPROVAL CHECKLIST**:
     Before you can APPROVE, ALL of these MUST be true:
-    □ CI Status: Run \`gh pr checks {{pr_number}} --json name,status\` - ALL must show "completed" with "success"
+    □ CI Status: Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
     □ Test Coverage: Must be >= 95% (verify with coverage tools)
     □ All Tests Pass: 100% of tests must pass, no skipped tests
     □ Acceptance Criteria: 100% of Task {{task_id}} criteria met
@@ -801,13 +803,13 @@ Your STRICT testing requirements:
     **VERIFICATION COMMANDS TO RUN BEFORE APPROVING**:
     \`\`\`bash
     # 1. Verify CI is completely green - NO FAILURES ALLOWED
-    gh pr checks {{pr_number}}
+    gh pr checks $PR_NUM
     # EVERY check must show "pass" or ✓ 
     # If you see ANY "fail", "pending", or "skipping" - CANNOT APPROVE
     
     # 2. Verify all checks are passing using tab-separated status field
     # gh pr checks output format: NAME<TAB>STATUS<TAB>CONCLUSION<TAB>URL
-    CI_OUTPUT=\$(gh pr checks {{pr_number}})
+    CI_OUTPUT=\$(gh pr checks $PR_NUM)
     if [ -z "\$CI_OUTPUT" ]; then
         echo "❌ No CI checks found - cannot verify"
         exit 1
@@ -974,7 +976,7 @@ Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 
 # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
 # FIRST: Verify you can approve
-CI_OUTPUT=\$(gh pr checks {{pr_number}})
+CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-{{pr_number}}})
 if [ -z "\$CI_OUTPUT" ]; then
   echo "❌ No CI checks found - cannot approve"
   exit 1
@@ -1040,7 +1042,7 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 
 **CRITICAL ITERATION REQUIREMENT**:
 - DO NOT EXIT until ALL of the following are true:
-  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks {{pr_number}}
+  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks ${PR_NUMBER:-{{pr_number}}}
   2. Test coverage is >= 95%
   3. All acceptance criteria for Task {{task_id}} are met
   4. Kubernetes deployment succeeds (if you have access)
@@ -1049,7 +1051,7 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 - If ANY of these are not met:
   1. Write/fix tests as needed
   2. Push your changes
-  3. Wait for CI to run (use: sleep 120 && gh pr checks {{pr_number}})
+  3. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-{{pr_number}}})
   4. Check status again
   5. KEEP ITERATING until everything passes
 
