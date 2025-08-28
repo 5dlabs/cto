@@ -748,7 +748,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    - Do NOT proceed until quality standards are met
 6. **Review against task requirements**: Verify implementation matches acceptance criteria
 7. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
-8. **Success criteria**: Quality checks AND Docker build must pass for approval
+8. **Success criteria**: Quality checks must pass for approval. CI/CD validation required only when workflows exist.
 
 ## Quality Standards (MUST PASS IN GITHUB ACTIONS WHEN WORKFLOWS EXIST, OTHERWISE LOCALLY!)
 - **Zero tolerance** for clippy warnings at pedantic level (in CI if workflows exist, locally otherwise)
