@@ -529,18 +529,12 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 
 ## Testing Workflow Phases
 
-### Phase 0: CI/CD Setup (DO THIS FIRST!)
-- AS SOON as there's enough code to test, set up CI/CD:
-  - Create `.github/workflows/test.yml` for GitHub Actions
-  - Configure test running with coverage reporting
-  - Set up coverage badges and reports
-  - Add status checks that must pass before merge
-  - Include linting, formatting, and type checking
-- Example GitHub Actions workflow for each language:
-  - Python: pytest + coverage + black + mypy
-  - JavaScript: jest + eslint + prettier
-  - Go: go test + golangci-lint + coverage
-  - Rust: cargo test + clippy + fmt + tarpaulin
+### Phase 0: CI/CD Setup (MOVED TO CLIO)
+- ⚠️ **CI/CD setup is now handled by Clio agent**
+- Clio will create and manage `.github/workflows/` files
+- Focus on testing the code that exists
+- If CI is missing, request it from Clio rather than creating it yourself
+- Validate existing CI/CD if present, but don't create new workflows
 
 ### Phase 1: Task-Specific Acceptance Criteria Verification
 - Review implementation against **THIS SPECIFIC TASK'S** acceptance criteria ONLY
@@ -574,7 +568,7 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 
 ## CRITICAL RULES
 - **CAN** write and push test files (*_test.*, *.test.*, spec.*, etc.)
-- **CAN** create and modify CI/CD workflows (.github/workflows/*)
+- **CANNOT** create CI/CD workflows - that's Clio's job
 - **CAN** modify test configuration files (jest.config.js, pytest.ini, etc.)
 - **CANNOT** modify implementation/business logic code
 - **CANNOT** modify non-test files (except test configs and CI/CD)
@@ -825,7 +819,7 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
     \`\`\`bash
     # 1. Verify CI is completely green - NO FAILURES ALLOWED
     # Check CI status (only if workflows exist)
-   if [ -d ".github/workflows" ] && [ "$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | wc -l)" -gt 0 ]; then
+   if [ -d ".github/workflows" ] && [ -n "$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | head -1)" ]; then
        gh pr checks $PR_NUM
    else
        echo "ℹ️  No GitHub Actions workflows found - skipping CI validation"
@@ -1111,8 +1105,15 @@ if ! mkfifo "$FIFO_PATH" 2>/dev/null; then
 fi
 chmod 666 "$FIFO_PATH" || true
 
-# Start Claude (reader) first in background
-$CLAUDE_CMD < "$FIFO_PATH" &
+# Start Claude with output capture to handle stream responses
+echo "🔄 Starting Claude process with stream output handling..."
+
+# Create a temporary file to capture Claude's output
+CLAUDE_OUTPUT_FILE="/tmp/claude-output-$(date +%s).jsonl"
+touch "$CLAUDE_OUTPUT_FILE"
+
+# Start Claude and capture both stdout and stderr
+$CLAUDE_CMD < "$FIFO_PATH" > "$CLAUDE_OUTPUT_FILE" 2>&1 &
 CLAUDE_PID=$!
 
 # Add timeout protection - if Claude doesn't start within 30 seconds, fail gracefully
@@ -1136,6 +1137,24 @@ fi
 INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
 USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE_CLEAN" | jq -Rs .)
 
+# 🚨 CRITICAL FIX: Wait for sidecar to be ready to prevent race condition
+echo "⏳ Waiting for sidecar to be ready..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+        echo "✓ Sidecar is ready (attempt $((RETRY_COUNT + 1)))"
+        break
+    fi
+    echo "⏳ Sidecar not ready, waiting... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+    sleep 1
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo "⚠️ Sidecar not ready after ${MAX_RETRIES}s, proceeding with fallback"
+fi
+
 # Send via sidecar HTTP endpoint
 if printf '{"text":%s}\n' "$USER_COMBINED" | \
      curl -fsS -X POST http://127.0.0.1:8080/input \
@@ -1150,6 +1169,36 @@ else
   exec 9>&-  # Close immediately to send EOF to Claude
 fi
 
+# Monitor Claude's output in real-time and handle responses
+echo "📡 Monitoring Claude's stream output..."
+while kill -0 "$CLAUDE_PID" 2>/dev/null; do
+    # Check for new output lines
+    if [ -f "$CLAUDE_OUTPUT_FILE" ] && [ -s "$CLAUDE_OUTPUT_FILE" ]; then
+        # Process new lines (last 10 to avoid processing old data repeatedly)
+        tail -10 "$CLAUDE_OUTPUT_FILE" | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                # Parse the JSON line to check for errors
+                if echo "$line" | jq -e '.type == "assistant" and (.message.content[1]?)' >/dev/null 2>&1; then
+                    echo "⚠️ Detected potential cache_control issue in response"
+                    echo "📝 Response line: $line"
+                fi
+
+                # Check for API errors in assistant messages
+                if echo "$line" | jq -e '.type == "assistant" and (.message.content[0].text? | contains("API Error"))' >/dev/null 2>&1; then
+                    echo "❌ Detected API error in Claude response"
+                    echo "🔍 Error details: $line" | jq -r '.message.content[0].text' 2>/dev/null || echo "$line"
+                fi
+
+                # Log assistant messages for debugging
+                if echo "$line" | jq -e '.type == "assistant"' >/dev/null 2>&1; then
+                    echo "🤖 Claude response received"
+                fi
+            fi
+        done
+    fi
+    sleep 1
+done
+
 # Wait for Claude process to complete
 wait "$CLAUDE_PID"
 CLAUDE_EXIT_CODE=$?
@@ -1157,11 +1206,35 @@ CLAUDE_EXIT_CODE=$?
 # Close FIFO writer if it was opened
 exec 9>&- 2>/dev/null || true
 
+# Final output analysis
+if [ -f "$CLAUDE_OUTPUT_FILE" ] && [ -s "$CLAUDE_OUTPUT_FILE" ]; then
+    echo "📊 Final Claude output analysis:"
+    echo "Total output lines: $(wc -l < "$CLAUDE_OUTPUT_FILE")"
+
+    # Check for cache_control errors in final output
+    if grep -q "cache_control" "$CLAUDE_OUTPUT_FILE"; then
+        echo "❌ Found cache_control errors in output:"
+        grep -A 2 -B 2 "cache_control" "$CLAUDE_OUTPUT_FILE"
+    else
+        echo "✅ No cache_control errors found in output"
+    fi
+
+    # Check for API errors
+    if grep -q "API Error" "$CLAUDE_OUTPUT_FILE"; then
+        echo "❌ Found API errors in output:"
+        grep -A 1 -B 1 "API Error" "$CLAUDE_OUTPUT_FILE"
+    fi
+fi
+
 if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
   echo "✅ Tess QA testing completed successfully"
 else
   echo "⚠️ Tess QA testing exited with code: $CLAUDE_EXIT_CODE"
+  echo "📄 Check Claude output file for details: $CLAUDE_OUTPUT_FILE"
 fi
+
+# Cleanup
+rm -f "$CLAUDE_OUTPUT_FILE" 2>/dev/null || true
 
 # Gracefully stop sidecar (with enhanced debugging and retries)
 echo "🔧 Attempting sidecar shutdown..."
