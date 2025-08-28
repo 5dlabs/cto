@@ -1145,8 +1145,9 @@ if [ $COUNT -ge $TIMEOUT ]; then
     exit 1
 fi
 
-# Compose initial user turn
-USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE" | jq -Rs .)
+# Compose initial user turn - clean up empty lines that cause cache_control errors
+INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
+USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE_CLEAN" | jq -Rs .)
 
 # Send via sidecar HTTP endpoint
 if printf '{"text":%s}\n' "$USER_COMBINED" | \
