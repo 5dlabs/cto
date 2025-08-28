@@ -23,7 +23,7 @@
       "service": "cto"
     },
     "play": {
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-3-5-sonnet-20241022",
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
       "testingAgent": "5DLabs-Tess",
