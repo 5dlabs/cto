@@ -414,11 +414,17 @@ git push
 ### 2. CI/CD Failure Fixes (HIGH PRIORITY)
 Monitor CI status and fix any failures OR stuck jobs:
 \\\`\\\`\\\`bash
-# Check CI status - look for BOTH failures AND stuck jobs
-gh pr checks $PR_NUM
-# Get PR branch dynamically
-PR_BRANCH=\\\$(gh pr view $PR_NUM --json headRefName -q .headRefName)
-gh run list --branch="\\\$PR_BRANCH" --limit 5
+# Check if repository has workflows before checking CI status
+if [ -d ".github/workflows" ] && [ "\\\$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | wc -l)" -gt 0 ]; then
+  # Check CI status - look for BOTH failures AND stuck jobs
+  gh pr checks $PR_NUM
+  # Get PR branch dynamically
+  PR_BRANCH=\\\$(gh pr view $PR_NUM --json headRefName -q .headRefName)
+  gh run list --branch="\\\$PR_BRANCH" --limit 5
+else
+  echo "ℹ️  No GitHub Actions workflows found in repository"
+  echo "   CI/CD checks will be skipped for this repository"
+fi
 
 # If jobs are stuck/not starting:
 # 1. Check workflow syntax:
@@ -722,8 +728,9 @@ CLEO_PROMPT="$CLEO_PROMPT
      * Fix any workflow configuration issues
    - KEEP ITERATING: Fix issues, push, check CI, repeat until ALL JOBS RUN AND PASS
 5. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
-   - Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
-   - **CRITICAL: Check for stuck/pending jobs**:
+   - **If repository has workflows**: Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
+   - **If no workflows**: Skip CI validation and proceed to code quality checks
+   - **CRITICAL: Check for stuck/pending jobs** (only if workflows exist):
      * Look for jobs showing "Waiting" or "Pending" for > 2 minutes
      * Check 'gh run list --branch=$(gh pr view {{pr_number}} --json headRefName -q .headRefName)' for workflow status
      * If jobs aren't starting, investigate:
@@ -731,14 +738,14 @@ CLEO_PROMPT="$CLEO_PROMPT
        - Workflow syntax errors? Validate with 'actionlint' or GitHub UI
        - Missing workflow triggers? Check 'on:' section
        - Concurrency limits? Check workflow 'concurrency:' settings
-   - **Common fixes for stuck jobs**:
+   - **Common fixes for stuck jobs** (only if workflows exist):
      * Add/fix 'runs-on: ubuntu-latest' (or appropriate runner)
      * Remove invalid actions or fix version tags
      * Ensure workflow file is in .github/workflows/
      * Check if workflow needs to be enabled in Actions settings
-   - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI
-   - SUCCESS = ALL jobs completed successfully (not just "not failed")
-   - Do NOT proceed until GitHub shows ALL green checks
+   - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI (when workflows exist)
+   - SUCCESS = Code quality checks pass + CI passes (if workflows exist) OR code quality checks pass (if no workflows)
+   - Do NOT proceed until quality standards are met
 6. **Review against task requirements**: Verify implementation matches acceptance criteria
 7. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
 8. **Success criteria**: Quality checks AND Docker build must pass for approval
