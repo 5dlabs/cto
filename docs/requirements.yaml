@@ -3,20 +3,20 @@
 # This file applies to ALL tasks in the project automatically
 # Located at: docs/requirements.yaml (project-level configuration)
 
-# Secrets from Kubernetes (managed by External Secrets)
-secrets:
-  # Namespace: agent-platform
-  - name: agent-admin-secrets
-
 # Static environment variables (non-secret configuration)
 environment:
   # Logging
   RUST_LOG: "info,doc_server=debug"
 
-  # Expected environment variables provided by the secret `agent-admin-secrets`:
-  # - KUBECONFIG_B64   (base64-encoded kubeconfig for kubectl)
-  # - ARGOCD_SERVER    (e.g., https://argocd-server.argocd.svc.cluster.local)
-  # - ARGOCD_AUTH_TOKEN (Argo CD API token)
-  # - GITHUB_ADMIN_TOKEN (admin-level GitHub PAT for provisioning only)
-  # Tools should read these from process env; do not commit secrets into this file.
+# Note: No secrets are defined here. If you need secrets for your project:
+# 1. Create the secret in your cluster (e.g., via External Secrets)
+# 2. Add the secret reference below:
+#
+# secrets:
+#   - name: your-secret-name
+#
+# 3. Or add environment variables that reference secret keys:
+#
+# environment:
+#   YOUR_SECRET_VAR: "value-from-secret"
 

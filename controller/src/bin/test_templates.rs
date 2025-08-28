@@ -15,8 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize handlebars engine
     let mut handlebars = Handlebars::new();
 
-    // Template directory
-    let template_dir = Path::new("orchestrator-core/templates");
+    // Template directory - relative path from controller directory to infra/charts/controller/claude-templates
+    let template_dir = Path::new("../infra/charts/controller/claude-templates");
 
     // Test docs templates
     test_docs_templates(&mut handlebars, template_dir)?;
