@@ -1126,9 +1126,8 @@ if [ $COUNT -ge $TIMEOUT ]; then
     exit 1
 fi
 
-# Compose initial user turn - clean up empty lines that cause cache_control errors
+# Clean up initial guidance and send via sidecar - simplified approach
 INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
-USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE_CLEAN" | jq -Rs .)
 
 # Wait for sidecar to be ready (simple check like Cleo)
 echo "⏳ Waiting for sidecar to be ready..."
@@ -1147,17 +1146,18 @@ if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
     echo "⚠️ Sidecar not ready after ${MAX_RETRIES}s, proceeding with fallback"
 fi
 
-# Send via sidecar HTTP endpoint
-if printf '{"text":%s}\n' "$USER_COMBINED" | \
+# Send via sidecar HTTP endpoint - use raw text to avoid JSON formatting issues
+if printf '{"text":%s}\n' "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")" | \
      curl -fsS -X POST http://127.0.0.1:8080/input \
        -H 'Content-Type: application/json' \
        --data-binary @- >/dev/null 2>&1; then
   echo "✓ Initial QA guidance sent via sidecar /input"
 else
   echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-  # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
+  # Fallback: construct JSON properly to avoid cache_control errors
   exec 9>"$FIFO_PATH"
-  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' \
+         "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")" >&9
   exec 9>&-  # Close immediately to send EOF to Claude
 fi
 
