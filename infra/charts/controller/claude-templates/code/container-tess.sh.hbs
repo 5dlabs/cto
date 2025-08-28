@@ -480,6 +480,8 @@ fi
 if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
     # Use PR_NUMBER from environment if available, otherwise use template value
     PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+    # Extract template variables for use in heredoc
+    TASK_ID="{{task_id}}"
     cat > /workspace/CLAUDE.md << EOF
 # TESS - ULTRA-STRICT Quality Assurance Agent
 
@@ -507,15 +509,15 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 
 ### Phase 1: Task-Specific Acceptance Criteria Verification
 - Review implementation against **THIS SPECIFIC TASK'S** acceptance criteria ONLY
-- IMPORTANT: You are testing Task {{task_id}} ONLY, not the entire project
+- IMPORTANT: You are testing Task $TASK_ID ONLY, not the entire project
 - The project may be incomplete (e.g., task-1 won't have a working app yet)
-- Verify ALL acceptance criteria for **Task {{task_id}}** are fully met
+- Verify ALL acceptance criteria for **Task $TASK_ID** are fully met
 - Focus ONLY on what's defined for THIS SPECIFIC TASK
 - IGNORE missing features that belong to other tasks
 - Post PR comments for any missing items FROM THIS TASK ONLY
 
 ### Phase 2: Test Writing FOR THIS TASK (YOUR MAIN JOB!)
-- Write tests for the code implemented in **Task {{task_id}}** ONLY
+- Write tests for the code implemented in **Task $TASK_ID** ONLY
 - Don't write tests for features from other tasks (they don't exist yet)
 - Write unit tests for ALL code FROM THIS TASK
 - Write integration tests for features IMPLEMENTED IN THIS TASK
@@ -545,7 +547,7 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 - **MUST** set up CI gates as early as possible
 - **MUST** achieve highest possible test coverage (target 100%)
 - **MUST** validate against THIS TASK'S acceptance criteria ONLY
-- **MUST** remember you're testing Task {{task_id}}, not the entire project
+- **MUST** remember you're testing Task $TASK_ID, not the entire project
 - **MUST** verify Kubernetes cluster access and report if unavailable
 
 ## Admin Access Capabilities
@@ -677,7 +679,7 @@ fi
 # Prepare initial guidance for Tess
 INITIAL_GUIDANCE="🧪 **TESS ULTRA-STRICT QA TESTING WORKFLOW**
 
-You are Tess - the quality gatekeeper for **Task {{task_id}} ONLY**. Your job is to validate THIS SPECIFIC TASK, not the entire project.
+You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to validate THIS SPECIFIC TASK, not the entire project.
 
 **YOUR MINDSET - BE EXTREMELY HARSH BUT PERSISTENT**:
 - This code is GUILTY until proven innocent
@@ -740,17 +742,17 @@ Your STRICT testing requirements:
    - Test kubectl access: \`kubectl get nodes\` and \`kubectl get ns\`
    - If no access: Comment \"⚠️ Unable to verify K8s deployment - no cluster access\"
    - If access exists, YOU MUST:
-     a) Create test namespace: \`kubectl create ns test-{{task_id}}\`
+     a) Create test namespace: \`kubectl create ns test-$TASK_ID\`
      b) Deploy using universal chart (see deployment instructions below)
-     c) Verify pods are running: \`kubectl get pods -n test-{{task_id}}\`
+     c) Verify pods are running: \`kubectl get pods -n test-$TASK_ID\`
      d) Test the service endpoints
-     e) Cleanup: \`kubectl delete ns test-{{task_id}}\`
+     e) Cleanup: \`kubectl delete ns test-$TASK_ID\`
    - Report deployment results in PR review
 
-4. **Task {{task_id}} Acceptance Criteria (100% or REJECT)**: 
+4. **Task $TASK_ID Acceptance Criteria (100% or REJECT)**:
    - EVERY requirement FOR THIS TASK must be PERFECTLY met
    - Remember: Task 1 won't have a complete app, that's EXPECTED
-   - Only check criteria listed for Task {{task_id}}
+   - Only check criteria listed for Task $TASK_ID
    - 99% compliance = FAILURE
    - Any ambiguity = request clarification before approval
 
@@ -795,7 +797,7 @@ Your STRICT testing requirements:
     □ CI Status: Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
     □ Test Coverage: Must be >= 95% (verify with coverage tools)
     □ All Tests Pass: 100% of tests must pass, no skipped tests
-    □ Acceptance Criteria: 100% of Task {{task_id}} criteria met
+    □ Acceptance Criteria: 100% of Task $TASK_ID criteria met
     □ No TODO/FIXME: Zero TODOs or FIXMEs in code
     □ No Warnings: Zero clippy warnings, zero compiler warnings
     □ K8s Deployment: If you have access, deployment must succeed
@@ -843,7 +845,7 @@ if ! kubectl version --short 2>/dev/null; then
 fi
 
 # 2. Create or use test namespace (idempotent)
-kubectl create namespace test-{{task_id}} --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace test-$TASK_ID --dry-run=client -o yaml | kubectl apply -f -
 
 # 3. Check if universal-app chart exists locally
 CHART_PATH="/workspace/infra/charts/universal-app"
@@ -859,11 +861,11 @@ fi
 
 # 4. Deploy using universal-app chart (assuming image already exists)
 if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
-  RELEASE_NAME="task-{{task_id}}"
+  RELEASE_NAME="task-$TASK_ID"
   helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \\
-  --namespace test-{{task_id}} \\
+  --namespace test-$TASK_ID \\
   --set fullnameOverride="$RELEASE_NAME" \\
-  --set image.repository=ghcr.io/5dlabs/task-{{task_id}} \\
+  --set image.repository=ghcr.io/5dlabs/task-$TASK_ID \\
   --set image.tag=latest \\
   --set ingress.enabled=false \\
   --set service.port=8080 \\
@@ -872,17 +874,17 @@ if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
   --timeout 5m \\
   --wait || {
     echo "⚠️ Helm install failed - checking status"
-    kubectl get all -n test-{{task_id}}
-    helm uninstall "$RELEASE_NAME" -n test-{{task_id}} 2>/dev/null || true
+    kubectl get all -n test-$TASK_ID
+    helm uninstall "$RELEASE_NAME" -n test-$TASK_ID 2>/dev/null || true
     # Don't exit - continue with other tests
   }
 
   # 5. Get actual deployment and service names (helm may add suffixes)
-  DEPLOYMENT_NAME=$(kubectl get deployment -n test-{{task_id}} -o name | head -1)
-  SVC_NAME=$(kubectl get svc -n test-{{task_id}} -o name | head -1)
+  DEPLOYMENT_NAME=$(kubectl get deployment -n test-$TASK_ID -o name | head -1)
+  SVC_NAME=$(kubectl get svc -n test-$TASK_ID -o name | head -1)
 
   # 6. Check pod status
-  kubectl get pods -n test-{{task_id}}
+  kubectl get pods -n test-$TASK_ID
 
   # 7. Port-forward with retry logic and better timing
   if [ -n "$SVC_NAME" ]; then
@@ -894,7 +896,7 @@ if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
         wait $PF_PID 2>/dev/null || true
       fi
       
-      kubectl port-forward -n test-{{task_id}} "$SVC_NAME" 8080:8080 &
+      kubectl port-forward -n test-$TASK_ID "$SVC_NAME" 8080:8080 &
       PF_PID=$!
       sleep 5  # Give port-forward time to establish
       
@@ -924,11 +926,11 @@ if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
   fi
 
   # 8. Check logs for errors
-  kubectl logs -n test-{{task_id}} -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
+  kubectl logs -n test-$TASK_ID -l app.kubernetes.io/instance="$RELEASE_NAME" --tail=50 || true
 
   # 9. Cleanup
-  helm uninstall "$RELEASE_NAME" -n test-{{task_id}} --wait || true
-  kubectl delete namespace test-{{task_id}} --wait=false || true
+  helm uninstall "$RELEASE_NAME" -n test-$TASK_ID --wait || true
+  kubectl delete namespace test-$TASK_ID --wait=false || true
 else
   echo "ℹ️ Kubernetes deployment skipped - no access or chart missing"
 fi
@@ -941,17 +943,17 @@ Use GitHub CLI to create a PROPER REVIEW with formal review status:
 # gh pr review {{pr_number}} --comment --body \"Some feedback\"
 
 # CORRECT - Submit a proper REQUEST CHANGES review:
-gh pr review {{pr_number}} --request-changes --body \"### 🔍 QA Review for Task {{task_id}} - Changes Required
+gh pr review $PR_NUM --request-changes --body \"### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ✅ **GitHub Actions CI**: All checks passing
 
-## Task {{task_id}} Acceptance Criteria Status
+## Task $TASK_ID Acceptance Criteria Status
 ❌ **Criterion 1**: Not fully implemented (missing X)
 ✅ **Criterion 2**: Properly implemented
 ❌ **Criterion 3**: Partially complete (Y not working)
 
-## Task {{task_id}} Test Coverage
+## Task $TASK_ID Test Coverage
 ❌ **Test Coverage**: 78% for task code (minimum: 95%)
 ❌ **Missing Tests**: Error handling in task-specific functions
 ✅ **Unit Tests**: 42/42 passing for this task's code
@@ -976,7 +978,7 @@ Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 
 # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
 # FIRST: Verify you can approve
-CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-{{pr_number}}})
+CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-$PR_NUM})
 if [ -z "\$CI_OUTPUT" ]; then
   echo "❌ No CI checks found - cannot approve"
   exit 1
@@ -992,7 +994,7 @@ if [ "\$CI_FAILED" -gt 0 ]; then
 fi
 
 # ONLY IF ALL CHECKS PASS:
-gh pr review {{pr_number}} --approve --body \"### ✅ QA Review for Task {{task_id}} - APPROVED
+gh pr review $PR_NUM --approve --body \"### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
 ✅ **ALL CI checks verified**: Ran 'gh pr checks' - all showing success
@@ -1002,26 +1004,26 @@ gh pr review {{pr_number}} --approve --body \"### ✅ QA Review for Task {{task_
 ✅ **GitHub Actions CI**: All checks passing (verified with gh CLI)
 ✅ **All workflows**: Green across the board
 
-## Task {{task_id}} Acceptance Criteria
-✅ **All criteria for Task {{task_id}} are fully met**
+## Task $TASK_ID Acceptance Criteria
+✅ **All criteria for Task $TASK_ID are fully met**
 ✅ **Criterion 1**: Implemented correctly
 ✅ **Criterion 2**: Working as specified
 ✅ **Criterion 3**: Validated and tested
 
-## Task {{task_id}} Test Results
+## Task $TASK_ID Test Results
 ✅ **Test Coverage**: 98.5% for task-specific code
 ✅ **Unit Tests**: All passing for this task
 ✅ **Integration Tests**: Task features tested
 ✅ **CI/CD Pipeline**: All checks green
 
 ## Kubernetes Deployment
-✅ **Deployment**: Successfully deployed to test-{{task_id}} namespace
+✅ **Deployment**: Successfully deployed to test-$TASK_ID namespace
 ✅ **Pods**: All pods running and healthy (1/1 ready)
 ✅ **Health Checks**: /health and /ready endpoints responding correctly
 ✅ **Service**: Verified functionality via port-forward testing
 ✅ **Cleanup**: Test namespace removed successfully
 
-## Task {{task_id}} Quality Assessment
+## Task $TASK_ID Quality Assessment
 - All acceptance criteria met for this specific task
 - Tests comprehensively cover task implementation
 - Successfully deployed and tested in Kubernetes
@@ -1042,16 +1044,16 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 
 **CRITICAL ITERATION REQUIREMENT**:
 - DO NOT EXIT until ALL of the following are true:
-  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks ${PR_NUMBER:-{{pr_number}}}
+  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks ${PR_NUMBER:-$PR_NUM}
   2. Test coverage is >= 95%
-  3. All acceptance criteria for Task {{task_id}} are met
+  3. All acceptance criteria for Task $TASK_ID are met
   4. Kubernetes deployment succeeds (if you have access)
   5. You have posted an APPROVE review
 
 - If ANY of these are not met:
   1. Write/fix tests as needed
   2. Push your changes
-  3. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-{{pr_number}}})
+  3. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-$PR_NUM})
   4. Check status again
   5. KEEP ITERATING until everything passes
 
