@@ -77,6 +77,8 @@ echo "🎯 Agent: {{github_app}}"
 echo "🧪 Focus: Comprehensive testing, deployment validation, test coverage"
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: 120% satisfaction through exhaustive testing"
+echo "🔍 Debug Session: $(date '+%Y-%m-%d %H:%M:%S') - PID: $$"
+echo "📊 Log Level: DEBUG (showing JSON construction details)"
 
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
@@ -1126,9 +1128,18 @@ if [ $COUNT -ge $TIMEOUT ]; then
     exit 1
 fi
 
-# Compose initial user turn - clean up empty lines that cause cache_control errors
+# =============================================================================
+# DEBUG LOGGING: JSON CONSTRUCTION PROCESS
+# =============================================================================
+echo "🔍 DEBUG: Starting JSON construction process..."
+echo "📝 Original INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE} characters"
+echo "📝 Original INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE:0:100}..."
+
+# Clean up initial guidance and send via sidecar - simplified approach
+echo "🧹 Cleaning INITIAL_GUIDANCE (removing empty lines and trailing spaces)..."
 INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
-USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE_CLEAN" | jq -Rs .)
+echo "✅ Cleaned INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE_CLEAN} characters"
+echo "✅ Cleaned INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE_CLEAN:0:100}..."
 
 # Wait for sidecar to be ready (simple check like Cleo)
 echo "⏳ Waiting for sidecar to be ready..."
@@ -1147,34 +1158,77 @@ if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
     echo "⚠️ Sidecar not ready after ${MAX_RETRIES}s, proceeding with fallback"
 fi
 
-# Send via sidecar HTTP endpoint
-if printf '{"text":%s}\n' "$USER_COMBINED" | \
+# =============================================================================
+# DEBUG LOGGING: SIDECAR JSON CONSTRUCTION
+# =============================================================================
+echo "🔧 Constructing JSON for sidecar transmission..."
+
+# Create the JSON payload for sidecar
+SIDECAR_JSON=$(printf '{"text":%s}' "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
+echo "📤 Sidecar JSON payload length: ${#SIDECAR_JSON} characters"
+echo "📤 Sidecar JSON payload preview: ${SIDECAR_JSON:0:200}..."
+echo "🔍 Full sidecar JSON structure:"
+echo "$SIDECAR_JSON" | jq . 2>/dev/null || echo "❌ Sidecar JSON parsing failed: $SIDECAR_JSON"
+
+# Send via sidecar HTTP endpoint - use raw text to avoid JSON formatting issues
+echo "📡 Sending to sidecar /input endpoint..."
+if printf '%s\n' "$SIDECAR_JSON" | \
      curl -fsS -X POST http://127.0.0.1:8080/input \
        -H 'Content-Type: application/json' \
        --data-binary @- >/dev/null 2>&1; then
-  echo "✓ Initial QA guidance sent via sidecar /input"
+  echo "✅ Initial QA guidance sent via sidecar /input"
 else
   echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-  # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
+  # Fallback: construct JSON properly to avoid cache_control errors
+  echo "🔧 Constructing FIFO JSON payload..."
+  FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
+              "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
+  echo "📤 FIFO JSON payload length: ${#FIFO_JSON} characters"
+  echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
+  echo "🔍 Full FIFO JSON structure:"
+  echo "$FIFO_JSON" | jq . 2>/dev/null || echo "❌ FIFO JSON parsing failed: $FIFO_JSON"
+
   exec 9>"$FIFO_PATH"
-  printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+  printf '%s\n' "$FIFO_JSON" >&9
   exec 9>&-  # Close immediately to send EOF to Claude
+  echo "✅ Initial QA guidance sent via FIFO fallback"
 fi
 
 # Simple wait like Cleo - no complex monitoring
 
+# =============================================================================
+# DEBUG LOGGING: CLAUDE EXECUTION MONITORING
+# =============================================================================
+echo "🤖 Monitoring Claude execution..."
+echo "🔍 Claude PID: $CLAUDE_PID"
+
 # Wait for Claude process to complete
+echo "⏳ Waiting for Claude process to complete..."
 wait "$CLAUDE_PID"
 CLAUDE_EXIT_CODE=$?
+
+echo "🔚 Claude process completed with exit code: $CLAUDE_EXIT_CODE"
 
 # Close FIFO writer if it was opened
 exec 9>&- 2>/dev/null || true
 
+# =============================================================================
+# DEBUG LOGGING: FINAL STATUS
+# =============================================================================
 if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
   echo "✅ Tess QA testing completed successfully"
+  echo "📊 Final status: SUCCESS (exit code 0)"
 else
   echo "⚠️ Tess QA testing exited with code: $CLAUDE_EXIT_CODE"
+  echo "📊 Final status: FAILURE (exit code $CLAUDE_EXIT_CODE)"
+  echo "🔍 This usually indicates a cache_control or API error occurred"
 fi
+
+echo "🔍 Process information:"
+echo "  - PID: $CLAUDE_PID"
+echo "  - Exit code: $CLAUDE_EXIT_CODE"
+echo "  - Working directory: $(pwd)"
+echo "  - Repository: $REPO_NAME"
 
 # Gracefully stop sidecar (with enhanced debugging and retries)
 echo "🔧 Attempting sidecar shutdown..."
