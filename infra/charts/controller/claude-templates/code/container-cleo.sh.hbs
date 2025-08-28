@@ -398,9 +398,9 @@ else
 
 ### 1. Merge Conflict Resolution (DO FIRST!)
 Check for merge conflicts and resolve them immediately:
-```bash
+\\\`\\\`\\\`bash
 # Check if PR has conflicts
-gh pr view {{pr_number}} --json mergeable,mergeStateStatus
+gh pr view $PR_NUM --json mergeable,mergeStateStatus
 
 # If conflicts exist:
 git fetch origin main
@@ -409,16 +409,16 @@ git merge origin/main
 git add -A
 git commit -m "fix: resolve merge conflicts with main"
 git push
-```
+\\\`\\\`\\\`
 
 ### 2. CI/CD Failure Fixes (HIGH PRIORITY)
 Monitor CI status and fix any failures OR stuck jobs:
-```bash
+\\\`\\\`\\\`bash
 # Check CI status - look for BOTH failures AND stuck jobs
-gh pr checks {{pr_number}}
+gh pr checks $PR_NUM
 # Get PR branch dynamically
-PR_BRANCH=$(gh pr view {{pr_number}} --json headRefName -q .headRefName)
-gh run list --branch="$PR_BRANCH" --limit 5
+PR_BRANCH=\\\$(gh pr view $PR_NUM --json headRefName -q .headRefName)
+gh run list --branch="\\\$PR_BRANCH" --limit 5
 
 # If jobs are stuck/not starting:
 # 1. Check workflow syntax:
@@ -438,22 +438,22 @@ cat .github/workflows/*.yml | head -50
 # - Update dependencies if needed
 # - Fix test failures
 # - Adjust CI configuration if needed
-```
+\\\`\\\`\\\`
 
 ## Code Quality Requirements
 
 ### Change Detection Logic
 Analyze git diff to determine appropriate quality checks:
-```bash
-RUST_CHANGES=$(git diff --name-only origin/main...HEAD | grep -E '\.(rs|toml)$' || true)
-YAML_CHANGES=$(git diff --name-only origin/main...HEAD | grep -E '\.(yaml|yml)$' || true)
-```
+\\\`\\\`\\\`bash
+RUST_CHANGES=\\\$(git diff --name-only origin/main...HEAD | grep -E '\\\.(rs|toml)\\\$' || true)
+YAML_CHANGES=\\\$(git diff --name-only origin/main...HEAD | grep -E '\\\.(yaml|yml)\\\$' || true)
+\\\`\\\`\\\`
 
 ### Quality Check Execution
 **For Rust Changes:**
-1. `cargo clippy -- -D warnings -D clippy::pedantic` (zero tolerance)
-2. `cargo fmt` (auto-fix formatting)
-3. `cargo test` (all tests must pass)
+1. \\\`cargo clippy -- -D warnings -D clippy::pedantic\\\` (zero tolerance)
+2. \\\`cargo fmt\\\` (auto-fix formatting)
+3. \\\`cargo test\\\` (all tests must pass)
 
 **For YAML Changes:**
 1. YAML syntax validation with yamllint
@@ -609,10 +609,10 @@ CLEO_PROMPT="$CLEO_PROMPT
    - If not, create using these PROVEN TEMPLATES:
    
    **a) Dockerfile (Runtime-only, expects pre-built binary):**
-   ```dockerfile
+   \\\`\\\`\\\`dockerfile
    FROM debian:bookworm-slim
-   RUN apt-get update && apt-get install -y \
-       ca-certificates libssl3 wget --no-install-recommends \
+   RUN apt-get update && apt-get install -y \\\\
+       ca-certificates libssl3 wget --no-install-recommends \\\\
        && rm -rf /var/lib/apt/lists/* && apt-get clean
    RUN useradd -r -u 1000 -m -d /app -s /bin/bash app
    WORKDIR /app
@@ -620,20 +620,20 @@ CLEO_PROMPT="$CLEO_PROMPT
    RUN chmod +x /app/<binary-name> && chown -R app:app /app
    USER app
    EXPOSE 8080
-   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+   HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\\\
        CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
    CMD ["./<binary-name>"]
-   ```
-   
+   \\\`\\\`\\\`
+
    **b) CI Workflow (.github/workflows/ci.yml):**
-   ```yaml
+   \\\`\\\`\\\`yaml
    name: Continuous Integration
    on:
      push:
        branches: [main]
      pull_request:
        branches: [main]
-   
+
    jobs:
      lint-rust:
        runs-on: ubuntu-22.04
@@ -651,7 +651,7 @@ CLEO_PROMPT="$CLEO_PROMPT
            run: cargo fmt --all -- --check
          - name: Clippy
            run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic
-   
+
      test-rust:
        runs-on: ubuntu-22.04
        steps:
@@ -665,19 +665,19 @@ CLEO_PROMPT="$CLEO_PROMPT
              shared-key: "rust-cache-ci"
          - name: Run tests
            run: cargo test --all-features --all-targets
-   ```
+   \\\`\\\`\\\`
    
    **c) Deploy Workflow (.github/workflows/deploy.yml) for k8s-runner:**
-   ```yaml
+   \\\`\\\`\\\`yaml
    name: Deploy
    on:
      push:
        branches: [main, develop, feature/*, feat/*, fix/*]
-   
+
    env:
      REGISTRY: ghcr.io
-     IMAGE_BASE: ${{ github.repository_owner }}
-   
+     IMAGE_BASE: \\\$\\\{\\{ github.repository_owner \\\}\\\}
+
    jobs:
      build:
        runs-on: [k8s-runner]  # Use self-hosted runner for speed
@@ -689,16 +689,16 @@ CLEO_PROMPT="$CLEO_PROMPT
          - name: Build binary
            env:
              RUSTC_WRAPPER: "sccache"
-             CARGO_TARGET_DIR: "$HOME/cache/target"
+             CARGO_TARGET_DIR: "\\\$HOME/cache/target"
            run: |
              cargo build --release
-             cp $HOME/cache/target/release/<binary> ./<binary>
+             cp \\\$HOME/cache/target/release/<binary> ./<binary>
          - uses: docker/setup-buildx-action@v3
          - uses: docker/login-action@v3
            with:
              registry: ghcr.io
-             username: ${{ github.actor }}
-             password: ${{ secrets.GITHUB_TOKEN }}
+             username: \\\$\\\{\\{ github.actor \\\}\\\}
+             password: \\\$\\\{\\{ secrets.GITHUB_TOKEN \\\}\\\}
          - uses: docker/build-push-action@v5
            with:
              context: .
@@ -706,11 +706,11 @@ CLEO_PROMPT="$CLEO_PROMPT
              platforms: linux/amd64,linux/arm64
              push: true
              tags: |
-               ghcr.io/${{ github.repository }}:latest
-               ghcr.io/${{ github.repository }}:${{ github.sha }}
+               ghcr.io/\\\$\\\{\\{ github.repository \\\}\\\}:latest
+               ghcr.io/\\\$\\\{\\{ github.repository \\\}\\\}:\\\$\\\{\\{ github.sha \\\}\\\}
              cache-from: type=gha
              cache-to: type=gha,mode=max
-   ```
+   \\\`\\\`\\\`
    
    - Commit and push the CI configuration
    - Push any code fixes you made locally
