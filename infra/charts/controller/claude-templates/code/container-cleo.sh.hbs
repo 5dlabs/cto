@@ -750,21 +750,25 @@ CLEO_PROMPT="$CLEO_PROMPT
 7. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
 8. **Success criteria**: Quality checks AND Docker build must pass for approval
 
-## Quality Standards (MUST PASS IN GITHUB ACTIONS, NOT JUST LOCALLY!)
-- **Zero tolerance** for clippy warnings at pedantic level IN GITHUB ACTIONS
-- **Perfect formatting** required (cargo fmt --check must pass IN CI)
-- **All tests pass** (cargo test must succeed IN CI)
+## Quality Standards (MUST PASS IN GITHUB ACTIONS WHEN WORKFLOWS EXIST, OTHERWISE LOCALLY!)
+- **Zero tolerance** for clippy warnings at pedantic level (in CI if workflows exist, locally otherwise)
+- **Perfect formatting** required (cargo fmt --check must pass in CI if workflows exist, locally otherwise)
+- **All tests pass** (cargo test must succeed in CI if workflows exist, locally otherwise)
 - **Clean YAML** syntax and structure
-- **CI/CD Pipeline** MUST be working with successful Docker image build
-- **GitHub Actions** must show green checks for ALL quality gates
+- **CI/CD Pipeline** SHOULD be working with successful Docker image build (when workflows exist)
+- **GitHub Actions** SHOULD show green checks for ALL quality gates (when workflows exist)
 - **Task compliance** (implementation should meet acceptance criteria)
 
 ## CRITICAL REMINDER
-Your success is measured by GitHub Actions CI status, NOT local checks!
-- You MUST push your changes to see them tested in CI
-- You MUST iterate: fix locally → push → check CI → repeat until green
-- Clippy pedantic MUST pass in GitHub Actions before you can add 'ready-for-qa' label
-- **ALL CI JOBS MUST ACTUALLY RUN** - stuck/pending jobs = FAILURE
+Your success is measured by:
+- **If workflows exist**: GitHub Actions CI status, NOT local checks
+  - You MUST push your changes to see them tested in CI
+  - You MUST iterate: fix locally → push → check CI → repeat until green
+  - Clippy pedantic MUST pass in GitHub Actions before you can add 'ready-for-qa' label
+  - **ALL CI JOBS MUST ACTUALLY RUN** - stuck/pending jobs = FAILURE
+- **If no workflows**: Local quality checks and task compliance
+  - Run quality checks locally: cargo clippy, cargo fmt, cargo test
+  - Ensure code meets quality standards before approval
 
 ## TROUBLESHOOTING STUCK CI JOBS
 If CI jobs won't start (showing \"Waiting\" or \"Pending\" indefinitely):
