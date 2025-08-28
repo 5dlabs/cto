@@ -643,7 +643,7 @@ echo "════════════════════════�
 # Start Claude with Tess-specific configuration
 cd "$CLAUDE_WORK_DIR"
 
-# Build Claude command
+# Build Claude command (disable continue for now due to cache_control API bug)
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
 # Look for agent-specific system prompt file from agents ConfigMap
@@ -723,13 +723,14 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 Your STRICT testing requirements:
 
 1. **CRITICAL: Verify CI Status FIRST (ABSOLUTE BLOCKER)**:
-   - Run: \`gh pr checks $PR_NUM\` to see CI status
+   - **If repository has workflows**: Run \`gh pr checks $PR_NUM\` to see CI status
+   - **If no workflows**: Skip CI validation and proceed to testing requirements
    - If ANY CI check is failing: DO NOT EXIT
    - Instead: Write tests to fix the failures
    - Push your changes: \`git add . && git commit -m "test: fix failing tests" && git push\`
-   - Wait for CI: \`sleep 60\` then check again
-   - KEEP ITERATING until CI is GREEN
-   - You CANNOT proceed OR exit until CI passes
+   - Wait for CI (when workflows exist): \`sleep 60\` then check again
+   - KEEP ITERATING until CI is GREEN (when workflows exist)
+   - You CANNOT proceed OR exit until requirements are met
 
 2. **Write Comprehensive Tests (After CI passes)**:
    - Write unit tests for ALL new functionality
@@ -787,14 +788,14 @@ Your STRICT testing requirements:
    - After posting REQUEST CHANGES, DO NOT STOP
    - Fix the issues yourself by writing tests
    - Push your fixes and wait for CI
-   - Check \`gh pr checks $PR_NUM\` again
+   - **If workflows exist**: Check \`gh pr checks $PR_NUM\` again
    - If still failing, keep fixing and pushing
    - REPEAT until you can post APPROVE
    - You are NOT ALLOWED to finish without APPROVE status
 
 10. **MANDATORY PRE-APPROVAL CHECKLIST**:
     Before you can APPROVE, ALL of these MUST be true:
-    □ CI Status: Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
+    □ CI Status: **If workflows exist** - Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
     □ Test Coverage: Must be >= 95% (verify with coverage tools)
     □ All Tests Pass: 100% of tests must pass, no skipped tests
     □ Acceptance Criteria: 100% of Task $TASK_ID criteria met
@@ -805,7 +806,12 @@ Your STRICT testing requirements:
     **VERIFICATION COMMANDS TO RUN BEFORE APPROVING**:
     \`\`\`bash
     # 1. Verify CI is completely green - NO FAILURES ALLOWED
-    gh pr checks $PR_NUM
+    # Check CI status (only if workflows exist)
+   if [ -d ".github/workflows" ] && [ "$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | wc -l)" -gt 0 ]; then
+       gh pr checks $PR_NUM
+   else
+       echo "ℹ️  No GitHub Actions workflows found - skipping CI validation"
+   fi
     # EVERY check must show "pass" or ✓ 
     # If you see ANY "fail", "pending", or "skipping" - CANNOT APPROVE
     
