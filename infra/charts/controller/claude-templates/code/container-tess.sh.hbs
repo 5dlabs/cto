@@ -568,7 +568,7 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 
 ## CRITICAL RULES
 - **CAN** write and push test files (*_test.*, *.test.*, spec.*, etc.)
-- **CAN** create and modify CI/CD workflows (.github/workflows/*)
+- **CANNOT** create CI/CD workflows - that's Clio's job
 - **CAN** modify test configuration files (jest.config.js, pytest.ini, etc.)
 - **CANNOT** modify implementation/business logic code
 - **CANNOT** modify non-test files (except test configs and CI/CD)
