@@ -10,18 +10,18 @@ REPOSITORY="${REPOSITORY:-5dlabs/cto-play-test}"
 MONITOR_INTERVAL="${MONITOR_INTERVAL:-30}"  # seconds
 MAX_RUNTIME="${MAX_RUNTIME:-7200}"  # 2 hours max
 
-# Safely determine LOG_DIR - handle case where logs directory doesn't exist
+# Safely determine LOG_DIR - always create new directory for each monitoring session
 if [[ -z "$LOG_DIR" ]]; then
     # Create base logs directory if it doesn't exist
     mkdir -p "workflow-monitor/logs" 2>/dev/null || true
 
-    # Find the most recent log directory, or create a new one if none exist
-    if [[ -d "workflow-monitor/logs" ]] && [[ $(ls -1d workflow-monitor/logs/*/ 2>/dev/null | wc -l) -gt 0 ]]; then
-        LOG_DIR="workflow-monitor/logs/$(ls -1d workflow-monitor/logs/*/ | sort | tail -1 | xargs basename)"
-    else
-        # No existing log directories, create a new timestamped one
-        LOG_DIR="workflow-monitor/logs/$(date +%Y%m%d-%H%M%S)"
-    fi
+    # Always create a new timestamped directory for clean session isolation
+    # This prevents log mixing between different monitoring runs
+    LOG_DIR="workflow-monitor/logs/$(date +%Y%m%d-%H%M%S)"
+
+    # Create the log directory immediately to ensure logging functions work
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+    touch "$LOG_DIR/monitor.log" 2>/dev/null || true
 fi
 
 # Colors
