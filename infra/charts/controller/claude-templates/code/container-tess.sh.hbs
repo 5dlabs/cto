@@ -4,27 +4,51 @@
 echo "🔧 Setting up Rust environment..."
 
 # Source Rust environment if available (fixes cargo not found issues)
-if [ -f "$HOME/.cargo/env" ]; then
-    . "$HOME/.cargo/env"
-    echo "✓ Sourced Rust environment from $HOME/.cargo/env"
-fi
+# Try multiple possible locations for Rust environment
+RUST_ENV_SOURCES=(
+    "$HOME/.cargo/env"
+    "/root/.cargo/env"
+    "/usr/local/cargo/env"
+    "/home/ubuntu/.cargo/env"
+    "/home/user/.cargo/env"
+)
 
-# Also try root cargo env as fallback
-if [ -f "/root/.cargo/env" ]; then
-    . "/root/.cargo/env"
-    echo "✓ Sourced Rust environment from /root/.cargo/env"
-fi
+for env_file in "${RUST_ENV_SOURCES[@]}"; do
+    if [ -f "$env_file" ]; then
+        echo "✓ Sourcing Rust environment from $env_file"
+        . "$env_file"
+        # Export PATH explicitly after sourcing
+        export PATH="$HOME/.cargo/bin:/usr/local/cargo/bin:$PATH"
+        break
+    fi
+done
 
 # Ensure rustup has a default toolchain set
 if command -v rustup >/dev/null 2>&1; then
+    echo "✓ Rustup found, ensuring stable toolchain is default..."
     rustup default stable 2>/dev/null || true
+    # Re-source environment after setting default
+    if [ -f "$HOME/.cargo/env" ]; then
+        . "$HOME/.cargo/env"
+    elif [ -f "/root/.cargo/env" ]; then
+        . "/root/.cargo/env"
+    fi
+    export PATH="$HOME/.cargo/bin:/usr/local/cargo/bin:$PATH"
     echo "✓ Ensured stable Rust toolchain is default"
 else
     echo "⚠️ rustup not found in PATH"
 fi
 
-# Verify Rust is available
+# Verify Rust is available with multiple fallback attempts
 if command -v cargo >/dev/null 2>&1; then
+    echo "✓ Cargo is available: $(cargo --version)"
+elif [ -f "/usr/local/cargo/bin/cargo" ]; then
+    echo "✓ Found cargo at /usr/local/cargo/bin/cargo"
+    export PATH="/usr/local/cargo/bin:$PATH"
+    echo "✓ Cargo is available: $(cargo --version)"
+elif [ -f "$HOME/.cargo/bin/cargo" ]; then
+    echo "✓ Found cargo at $HOME/.cargo/bin/cargo"
+    export PATH="$HOME/.cargo/bin:$PATH"
     echo "✓ Cargo is available: $(cargo --version)"
 else
     echo "❌ Cargo not found in PATH"
@@ -32,6 +56,17 @@ else
     echo "Attempting to find cargo..."
     find /usr -name cargo 2>/dev/null | head -5 || echo "No cargo found in /usr"
     find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
+    find /root -name cargo 2>/dev/null | head -5 || echo "No cargo found in /root"
+    # Try to install Rust as last resort
+    echo "🔧 Attempting to install Rust via rustup..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || true
+    . "$HOME/.cargo/env" || true
+    export PATH="$HOME/.cargo/bin:$PATH"
+    if command -v cargo >/dev/null 2>&1; then
+        echo "✓ Cargo installed and available: $(cargo --version)"
+    else
+        echo "❌ Failed to install Rust, continuing without cargo..."
+    fi
 fi
 
 echo '════════════════════════════════════════════════════════════════'
@@ -643,7 +678,7 @@ echo "════════════════════════�
 # Start Claude with Tess-specific configuration
 cd "$CLAUDE_WORK_DIR"
 
-# Build Claude command (disable continue for now due to cache_control API bug)
+# Build Claude command (continue flag disabled due to cache_control API bug)
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
 # Look for agent-specific system prompt file from agents ConfigMap
@@ -654,11 +689,11 @@ else
     echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
 fi
 
-# Add continue flag if this is a retry attempt or user requested continuation
-{{#if continue_session}}
-CLAUDE_CMD="$CLAUDE_CMD --continue"
-echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
-{{/if}}
+# Continue flag disabled due to cache_control API bug
+# {{#if continue_session}}
+# CLAUDE_CMD="$CLAUDE_CMD --continue"
+# echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
+# {{/if}}
 
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    STARTING CLAUDE EXECUTION                  ║"
@@ -1082,15 +1117,37 @@ echo "════════════════════════�
 echo "║                    STARTING TESS QA EXECUTION                 ║"
 echo "════════════════════════════════════════════════════════════════"
 
-# Seed initial user turn via a FIFO
+# Seed initial user turn via a FIFO with timeout protection
 FIFO_PATH="/workspace/agent-input.jsonl"
 rm -f "$FIFO_PATH" 2>/dev/null || true
-mkfifo "$FIFO_PATH"
+
+# Create FIFO with error handling
+if ! mkfifo "$FIFO_PATH" 2>/dev/null; then
+    echo "❌ Failed to create FIFO at $FIFO_PATH"
+    exit 1
+fi
 chmod 666 "$FIFO_PATH" || true
 
 # Start Claude (reader) first in background
 $CLAUDE_CMD < "$FIFO_PATH" &
 CLAUDE_PID=$!
+
+# Add timeout protection - if Claude doesn't start within 30 seconds, fail gracefully
+TIMEOUT=30
+COUNT=0
+while [ $COUNT -lt $TIMEOUT ]; do
+    if kill -0 "$CLAUDE_PID" 2>/dev/null; then
+        break
+    fi
+    sleep 1
+    COUNT=$((COUNT + 1))
+done
+
+if [ $COUNT -ge $TIMEOUT ]; then
+    echo "❌ Claude process failed to start within $TIMEOUT seconds"
+    kill "$CLAUDE_PID" 2>/dev/null || true
+    exit 1
+fi
 
 # Compose initial user turn
 USER_COMBINED=$(printf "%s" "$INITIAL_GUIDANCE" | jq -Rs .)
