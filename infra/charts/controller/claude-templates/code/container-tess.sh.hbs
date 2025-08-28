@@ -689,11 +689,7 @@ else
     echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
 fi
 
-# Continue flag disabled due to cache_control API bug
-# {{#if continue_session}}
-# CLAUDE_CMD="$CLAUDE_CMD --continue"
-# echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
-# {{/if}}
+# Continue flag disabled due to cache_control API bug - removed conditional logic
 
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    STARTING CLAUDE EXECUTION                  ║"
