@@ -6,10 +6,23 @@ set -e
 
 # Configuration
 NAMESPACE="${NAMESPACE:-agent-platform}"
-LOG_DIR="${LOG_DIR:-workflow-monitor/logs/$(ls -t workflow-monitor/logs/ | head -1)}"
 REPOSITORY="${REPOSITORY:-5dlabs/cto-play-test}"
 MONITOR_INTERVAL="${MONITOR_INTERVAL:-30}"  # seconds
 MAX_RUNTIME="${MAX_RUNTIME:-7200}"  # 2 hours max
+
+# Safely determine LOG_DIR - handle case where logs directory doesn't exist
+if [[ -z "$LOG_DIR" ]]; then
+    # Create base logs directory if it doesn't exist
+    mkdir -p "workflow-monitor/logs" 2>/dev/null || true
+
+    # Find the most recent log directory, or create a new one if none exist
+    if [[ -d "workflow-monitor/logs" ]] && [[ $(ls -1d workflow-monitor/logs/*/ 2>/dev/null | wc -l) -gt 0 ]]; then
+        LOG_DIR="workflow-monitor/logs/$(ls -1d workflow-monitor/logs/*/ | sort | tail -1 | xargs basename)"
+    else
+        # No existing log directories, create a new timestamped one
+        LOG_DIR="workflow-monitor/logs/$(date +%Y%m%d-%H%M%S)"
+    fi
+fi
 
 # Colors
 RED='\033[0;31m'
