@@ -920,10 +920,15 @@ impl<'a> CodeResourceManager<'a> {
             }));
         }
 
-        // Check if we have task requirements (and they're not empty)
-        if let Some(requirements_b64) = &code_run.spec.task_requirements {
-            if !requirements_b64.trim().is_empty() {
-                use base64::{engine::general_purpose, Engine as _};
+        // Check if we have non-empty task requirements
+        let has_valid_requirements = code_run.spec.task_requirements
+            .as_ref()
+            .map(|r| !r.trim().is_empty())
+            .unwrap_or(false);
+
+        if has_valid_requirements {
+            let requirements_b64 = code_run.spec.task_requirements.as_ref().unwrap();
+            use base64::{engine::general_purpose, Engine as _};
 
             // Decode base64
             let decoded = general_purpose::STANDARD
@@ -993,7 +998,6 @@ impl<'a> CodeResourceManager<'a> {
                         }));
                     }
                 }
-            }
             }
             // Only process legacy env_from_secrets if task requirements don't exist
             // This prevents conflicts between task_requirements and legacy env_from_secrets
