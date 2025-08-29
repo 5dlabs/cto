@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7-labs
 ## Optimized runtime base with BuildKit caching for faster CI builds
-FROM ubuntu:24.04
+FROM quay.io/ubuntu/ubuntu:24.04
 
 # Use bash for complex RUN steps
 SHELL ["/bin/bash", "-lc"]
