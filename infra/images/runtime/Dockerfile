@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
   # Version control and development
-  git procps sudo fzf zsh man-db unzip gnupg2 gh \
+  git procps sudo fzf zsh man-db unzip gnupg2 \
   # Networking tools
   iproute2 dnsutils netcat-openbsd nmap net-tools tcpdump wireshark-cli \
   ethtool bridge-utils vlan arping hping3 iperf3 socat telnet openssh-client \
@@ -186,6 +186,17 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     gh extension install github/gh-copilot 2>/dev/null || true && \
     gh extension install github/gh-codeql 2>/dev/null || true
+
+# Install GitHub CLI
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    for i in 1 2 3; do \
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+        echo "deb [arch=${DL_ARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+        apt-get update && apt-get install -y gh && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
 
 # Install stern
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \

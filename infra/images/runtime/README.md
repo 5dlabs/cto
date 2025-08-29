@@ -142,7 +142,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **Command History Persistence** - Preserved across container restarts
 
 ### Version Control & Git Tools
-- **Git** with advanced features
+- **Git** with advanced features and optimized defaults
 - **GitHub CLI (gh)** - GitHub command-line interface with Copilot and CodeQL extensions
 - **git-delta** - Enhanced git diff viewer
 - **git-lfs** - Git Large File Storage

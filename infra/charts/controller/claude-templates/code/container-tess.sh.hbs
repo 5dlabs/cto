@@ -1313,6 +1313,8 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 0
 fi
 
+echo "✅ GitHub CLI available"
+
 # Check authentication
 if ! gh auth status >/dev/null 2>&1; then
   echo "❌ GitHub CLI not authenticated"
@@ -1711,25 +1713,12 @@ done
 
 if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
   echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-  echo "🔧 Force terminating sidecar processes..."
-  pkill -f "sidecar" || echo "No sidecar processes found to kill"
+  echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
+  echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
 fi
 
-# Wait for sidecar to actually terminate
-echo "⏳ Waiting for sidecar termination..."
-timeout=10
-while [ $timeout -gt 0 ]; do
-  if ! pgrep -f "sidecar" > /dev/null 2>&1; then
-    echo "✅ Sidecar terminated successfully"
-    break
-  fi
-  sleep 1
-  timeout=$((timeout - 1))
-done
-
-if [ $timeout -eq 0 ]; then
-  echo "⚠️ Sidecar still running after wait period"
-fi
+# Note: Cannot wait for sidecar termination from this container due to PID namespace isolation
+# Kubernetes will handle sidecar termination when the main container exits
 
 # Perform final cleanup of our own processes
 echo "🔧 Performing final process cleanup..."
