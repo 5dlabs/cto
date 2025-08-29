@@ -347,6 +347,33 @@ else
     cd "$(basename "$CLAUDE_WORK_DIR")"
 fi
 
+# Utility function for safe Git operations
+safe_git_pull() {
+    local remote="$1"
+    local branch="$2"
+
+    echo "📥 Attempting to pull from $remote/$branch..."
+
+    # Try rebase first (cleaner history)
+    if git pull --rebase "$remote" "$branch" 2>/dev/null; then
+        echo "✓ Successfully pulled with rebase"
+        return 0
+    fi
+
+    # Try merge if rebase fails
+    if git pull --no-rebase "$remote" "$branch" 2>/dev/null; then
+        echo "✓ Successfully pulled with merge"
+        return 0
+    fi
+
+    # If both fail, show current status and continue
+    echo "⚠️ Could not pull due to divergent branches or conflicts"
+    echo "📍 Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+    echo "📍 Local changes: $(git status --porcelain | wc -l) files modified"
+    echo "📍 Continuing with current branch state"
+    return 1
+}
+
 # Checkout PR branch for testing review
 if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "🔄 Checking out PR #$PR_NUMBER for QA testing..."
@@ -359,15 +386,20 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
             echo "✓ Checked out existing branch: $PR_BRANCH"
         else
             echo "📝 Creating new local branch from remote: $PR_BRANCH"
-            git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null || {
+            if git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null; then
+                echo "✓ Created new branch: $PR_BRANCH"
+            else
                 echo "⚠️ Could not create branch $PR_BRANCH, staying on current branch"
-                continue
-            }
+                # Skip to the next part without the continue
+            fi
         fi
 
-        # Handle divergent branches gracefully using utility function
-        if ! safe_git_pull origin "$PR_BRANCH"; then
-            echo "📍 Continuing with current branch state for testing"
+        # Only attempt pull if we successfully checked out/created the branch
+        if [ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" = "$PR_BRANCH" ]; then
+            # Handle divergent branches gracefully using utility function
+            if ! safe_git_pull origin "$PR_BRANCH"; then
+                echo "📍 Continuing with current branch state for testing"
+            fi
         fi
         echo "✓ Checked out PR branch: $PR_BRANCH"
     else
@@ -690,33 +722,6 @@ export REPO_NAME
 # TARGET_REPO_DIR no longer needed - repository cloned directly to CLAUDE_WORK_DIR
 
 echo "════════════════════════════════════════════════════════════════"
-# Utility function for safe Git operations
-safe_git_pull() {
-    local remote="$1"
-    local branch="$2"
-
-    echo "📥 Attempting to pull from $remote/$branch..."
-
-    # Try rebase first (cleaner history)
-    if git pull --rebase "$remote" "$branch" 2>/dev/null; then
-        echo "✓ Successfully pulled with rebase"
-        return 0
-    fi
-
-    # Try merge if rebase fails
-    if git pull --no-rebase "$remote" "$branch" 2>/dev/null; then
-        echo "✓ Successfully pulled with merge"
-        return 0
-    fi
-
-    # If both fail, show current status and continue
-    echo "⚠️ Could not pull due to divergent branches or conflicts"
-    echo "📍 Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
-    echo "📍 Local changes: $(git status --porcelain | wc -l) files modified"
-    echo "📍 Continuing with current branch state"
-    return 1
-}
-
 echo "✅ TESS TESTING AGENT READY"
 echo "════════════════════════════════════════════════════════════════"
 echo "📁 Working Directory: $CLAUDE_WORK_DIR"
