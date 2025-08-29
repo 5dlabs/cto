@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "intake": {
-      "model": "opus",
+      "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Morgan"
     },
     "code": {
