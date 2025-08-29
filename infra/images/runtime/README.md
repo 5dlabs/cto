@@ -18,7 +18,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **ss** - Modern socket statistics (from iproute2)
 - **ip** - Modern network configuration (from iproute2)
 - **tcpdump** - Command-line packet analyzer
-- **Wireshark CLI** - Network protocol analyzer
+- **tshark** - Wireshark command-line network protocol analyzer
 - **mtr** - Network diagnostic tool combining traceroute and ping
 - **traceroute** - Network path tracing
 - **arping** - ARP ping utility for Layer 2 connectivity
@@ -73,12 +73,12 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **sd** - Simple sed replacement
 
 ### Cloud Development Tools
-- **AWS CLI** - Amazon Web Services command-line interface
+- **AWS CLI v2** - Amazon Web Services command-line interface (latest version)
 - **Docker CLI** - Container management
 - **Docker Compose** - Multi-container orchestration
 
 ### Container Tools
-- **dive** - Docker image layer analyzer
+- **Docker CLI** - Container management and inspection
 
 ### Database Clients
 - **PostgreSQL client** - psql command-line tool
@@ -104,7 +104,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **yq** - YAML processor
 - **pandoc** - Universal document converter
 - **unzip** - Archive extraction
-- **pigz, pbzip2, pxz** - Fast compression utilities
+- **pigz, pbzip2** - Fast compression utilities
 - **ca-certificates** - SSL certificate bundle
 - **man-db** - Manual pages
 
