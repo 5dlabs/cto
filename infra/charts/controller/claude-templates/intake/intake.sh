@@ -573,9 +573,22 @@ fi
 if [ "$EXPAND_TASKS" = "true" ]; then
     echo "🌳 Expanding tasks with subtasks using Claude API..."
 
-    # Switch to regular Claude API provider for faster expansion (no codebase analysis needed)
+    # Switch ONLY the main provider to regular Claude API for faster expansion
+    # Keep research with Claude Code for any research operations
     if [ "$OPENAI_VALID" = true ]; then
-        cat > .taskmaster/config.json << EOF
+        # Read current config and update only the main provider
+        if [ -f ".taskmaster/config.json" ]; then
+            # Use jq to update only the main provider in the existing config
+            jq '.models.main = {
+                "provider": "anthropic",
+                "modelId": "claude-3-7-sonnet-20250219",
+                "maxTokens": 64000,
+                "temperature": 0.2
+            }' .taskmaster/config.json > .taskmaster/config_temp.json && mv .taskmaster/config_temp.json .taskmaster/config.json
+            echo "✅ Updated main provider to Claude API, kept research with Claude Code"
+        else
+            echo "⚠️ Config file not found, using default Claude API config"
+            cat > .taskmaster/config.json << EOF
 {
   "project": {
     "name": "$PROJECT_NAME",
@@ -590,8 +603,8 @@ if [ "$EXPAND_TASKS" = "true" ]; then
       "temperature": 0.2
     },
     "research": {
-      "provider": "anthropic",
-      "modelId": "claude-3-7-sonnet-20250219",
+      "provider": "claude-code",
+      "modelId": "$MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
@@ -607,6 +620,7 @@ if [ "$EXPAND_TASKS" = "true" ]; then
   }
 }
 EOF
+        fi
     fi
 
     task-master expand --all --force --file "$TASKS_FILE" || {
