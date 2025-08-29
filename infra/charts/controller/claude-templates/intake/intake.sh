@@ -443,8 +443,17 @@ fi
 
 # Configure Claude Code to use ANTHROPIC_API_KEY
 echo "🔧 Configuring Claude Code authentication..."
-mkdir -p ~/.config/claude-code
-cat > ~/.config/claude-code/config.json << EOF
+# Try to create config directory, fallback to /tmp if permission denied
+if mkdir -p ~/.config/claude-code 2>/dev/null; then
+    CONFIG_DIR=~/.config/claude-code
+    echo "✅ Using user config directory: $CONFIG_DIR"
+else
+    CONFIG_DIR=/tmp/claude-code-config
+    mkdir -p $CONFIG_DIR
+    echo "⚠️ Permission denied for user config, using temp directory: $CONFIG_DIR"
+fi
+
+cat > $CONFIG_DIR/config.json << EOF
 {
   "apiKey": "$ANTHROPIC_API_KEY"
 }
@@ -597,7 +606,8 @@ EOF
 
         # Run Claude to review and update tasks
         echo "🔍 Running Claude review..."
-        # Avoid interactive permission prompts by piping prompt content and skipping permissions
+        # Set Claude config directory and avoid interactive permission prompts
+        export CLAUDE_CONFIG_DIR="$CONFIG_DIR"
         if [ -s "/tmp/review-prompt.md" ]; then
           cat /tmp/review-prompt.md | claude -p --output-format stream-json --verbose --model "$MODEL" --dangerously-skip-permissions || {
               echo "⚠️ Claude review failed, but continuing..."
