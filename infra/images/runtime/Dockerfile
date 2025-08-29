@@ -12,12 +12,51 @@ ENV TZ="$TZ"
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-  git procps sudo fzf zsh man-db unzip gnupg2 gh iproute2 dnsutils jq \
-  netcat-openbsd ca-certificates curl wget docker.io postgresql-client \
-  redis-tools tree build-essential binutils pkg-config libssl-dev lldb lld clang mold \
-  libpq-dev \
+  # Version control and development
+  git procps sudo fzf zsh man-db unzip gnupg2 gh \
+  # Networking tools
+  iproute2 dnsutils netcat-openbsd nmap net-tools tcpdump wireshark-cli \
+  ethtool bridge-utils vlan arping hping3 iperf3 socat telnet openssh-client \
+  mtr-tiny traceroute \
+  # System utilities
+  jq ca-certificates curl wget docker.io postgresql-client redis-tools tree \
+  build-essential binutils pkg-config libssl-dev lldb lld clang mold libpq-dev \
+  # Programming languages
   python3 python3-venv python3-pip python-is-python3 \
+  # Debugging and monitoring
   strace lsof htop psmisc ripgrep fd-find bat httpie openssl \
+  # Code quality and linting
+  shellcheck yamllint markdownlint \
+  # Development utilities
+  tmux ncdu silversearcher-ag \
+  # Cloud development tools
+  awscli \
+  # Container tools
+  dive \
+  # Database clients
+  mysql-client sqlite3 \
+  # Documentation tools
+  pandoc \
+  # Version management
+  direnv \
+  # Process monitoring
+  iotop \
+  # Text processing
+  sd \
+  # Git enhancements
+  git-lfs git-extras \
+  # Build tools
+  ninja-build meson \
+  # Compression
+  pigz pbzip2 pxz \
+  # Security
+  gnupg-agent \
+  # Development languages
+  php-cli ruby-full perl \
+  # Additional Python tools
+  python3-dev python3-setuptools \
+  # Additional Node.js tools
+  yarn \
   && rm -rf /var/lib/apt/lists/* \
   && update-alternatives --install /usr/local/bin/fd fd /usr/bin/fdfind 10 \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
@@ -133,7 +172,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
-# Install yq  
+# Install yq
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
@@ -142,6 +181,11 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         chmod +x /usr/local/bin/yq && break || \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
+
+# Install GitHub CLI extensions
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    gh extension install github/gh-copilot 2>/dev/null || true && \
+    gh extension install github/gh-codeql 2>/dev/null || true
 
 # Install stern
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -152,6 +196,17 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         curl -fsSL -o "/tmp/${STERN_TAR}" "https://github.com/stern/stern/releases/latest/download/${STERN_TAR}" && \
         tar -C /usr/local/bin -xzf "/tmp/${STERN_TAR}" stern && \
         rm -f "/tmp/${STERN_TAR}" && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
+
+# Install Docker Compose v2
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name') && \
+    for i in 1 2 3; do \
+        curl -fsSL -o /usr/local/bin/docker-compose "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${DL_ARCH}" && \
+        chmod +x /usr/local/bin/docker-compose && break || \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
@@ -179,6 +234,34 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
 RUN git clone --depth=1 https://github.com/ahmetb/kubectx /opt/kubectx \
   && ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx \
   && ln -sf /opt/kubectx/kubens /usr/local/bin/kubens
+
+# Install Python development tools
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --break-system-packages --no-cache-dir \
+        black \
+        isort \
+        flake8 \
+        mypy \
+        pre-commit \
+        ruff \
+        yamllint \
+        sqlfluff \
+        bandit \
+        safety \
+        pip-tools || true
+
+# Install Node.js development tools
+RUN --mount=type=cache,target=/root/.cache \
+    npm install -g --no-fund \
+        eslint \
+        prettier \
+        typescript \
+        @types/node \
+        nodemon \
+        concurrently \
+        cross-env \
+        dotenv-cli \
+        zx || true
 
 # Install Rust toolchain for root
 RUN --mount=type=cache,target=/root/.cache \
@@ -247,6 +330,30 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" -x
+
+# Setup development shell enhancements
+RUN echo 'export EDITOR=vim' >> ~/.bashrc && \
+    echo 'export EDITOR=vim' >> ~/.zshrc && \
+    echo 'alias ll="ls -la"' >> ~/.bashrc && \
+    echo 'alias ll="ls -la"' >> ~/.zshrc && \
+    echo 'alias grep="grep --color=auto"' >> ~/.bashrc && \
+    echo 'alias grep="grep --color=auto"' >> ~/.zshrc
+
+# Configure git defaults for development
+RUN git config --global init.defaultBranch main && \
+    git config --global pull.rebase true && \
+    git config --global push.autoSetupRemote true
+
+# Setup Python virtual environment template
+RUN python3 -m venv ~/.venv/base && \
+    ~/.venv/base/bin/pip install --upgrade pip setuptools wheel
+
+# Create development helper scripts
+RUN echo '#!/bin/bash\n# Development helper script\nset -e\n\nif [ $# -eq 0 ]; then\n    echo "Usage: $0 <command>"\n    echo "Available commands: setup-py, setup-node, setup-go, clean"\n    exit 1\nfi\n\ncase "$1" in\n    setup-py)\n        if [ ! -d "venv" ]; then\n            python3 -m venv venv\n        fi\n        venv/bin/pip install --upgrade pip\n        ;;\n    setup-node)\n        if [ ! -d "node_modules" ]; then\n            npm install\n        fi\n        ;;\n    setup-go)\n        if [ ! -f "go.mod" ]; then\n            go mod init $(basename $(pwd))\n        fi\n        ;;\n    clean)\n        rm -rf venv node_modules target dist build *.log\n        ;;\n    *)\n        echo "Unknown command: $1"\n        exit 1\n        ;;\nesac' > ~/dev-helper.sh && \
+    chmod +x ~/dev-helper.sh
+
+# Add helper script to PATH
+ENV PATH="/home/node:${PATH}"
 
 # Labels / defaults
 USER node
