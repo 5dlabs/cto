@@ -52,33 +52,71 @@ echo "  ✓ Project name: $PROJECT_NAME"
 REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE" 2>/dev/null || echo "")
 echo "  ✓ Repository URL: $REPOSITORY_URL"
 
-GITHUB_APP=$(jq -r '.github_app' "$CONFIG_FILE" 2>/dev/null || echo "")
-echo "  ✓ GitHub App: $GITHUB_APP"
+# GITHUB_APP is now required from environment variables (no ConfigMap fallback)
 
 # Parse granular model configuration (from Argo workflow parameters)
-PRIMARY_MODEL="${PRIMARY_MODEL:-$(jq -r '.model' "$CONFIG_FILE" 2>/dev/null || echo "claude-3-7-sonnet-20250219")}"
-RESEARCH_MODEL="${RESEARCH_MODEL:-$(jq -r '.model' "$CONFIG_FILE" 2>/dev/null || echo "opus")}"
-FALLBACK_MODEL="${FALLBACK_MODEL:-gpt-4o}"
+# NO FALLBACKS - if parameters not received, fail loudly to expose configuration issues
 
-PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-anthropic}"
-RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-claude-code}"
-FALLBACK_PROVIDER="${FALLBACK_PROVIDER:-openai}"
+if [ -z "$PRIMARY_MODEL" ]; then
+    echo "❌ PRIMARY_MODEL environment variable not set - configuration transmission failed"
+    exit 1
+fi
 
+if [ -z "$RESEARCH_MODEL" ]; then
+    echo "❌ RESEARCH_MODEL environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$FALLBACK_MODEL" ]; then
+    echo "❌ FALLBACK_MODEL environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$PRIMARY_PROVIDER" ]; then
+    echo "❌ PRIMARY_PROVIDER environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$RESEARCH_PROVIDER" ]; then
+    echo "❌ RESEARCH_PROVIDER environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$FALLBACK_PROVIDER" ]; then
+    echo "❌ FALLBACK_PROVIDER environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$NUM_TASKS" ]; then
+    echo "❌ NUM_TASKS environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$EXPAND_TASKS" ]; then
+    echo "❌ EXPAND_TASKS environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$ANALYZE_COMPLEXITY" ]; then
+    echo "❌ ANALYZE_COMPLEXITY environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$GITHUB_APP" ]; then
+    echo "❌ GITHUB_APP environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+echo "  ✓ GitHub App: $GITHUB_APP"
 echo "  ✓ Primary Model: $PRIMARY_MODEL ($PRIMARY_PROVIDER)"
 echo "  ✓ Research Model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)"
 echo "  ✓ Fallback Model: $FALLBACK_MODEL ($FALLBACK_PROVIDER)"
+echo "  ✓ Num tasks: $NUM_TASKS"
+echo "  ✓ Expand tasks: $EXPAND_TASKS"
+echo "  ✓ Analyze complexity: $ANALYZE_COMPLEXITY"
 
 # Legacy MODEL variable for backward compatibility
 MODEL="$PRIMARY_MODEL"
-
-NUM_TASKS=$(jq -r '.num_tasks' "$CONFIG_FILE" 2>/dev/null || echo "10")
-echo "  ✓ Num tasks: $NUM_TASKS"
-
-EXPAND_TASKS=$(jq -r '.expand_tasks' "$CONFIG_FILE" 2>/dev/null || echo "false")
-echo "  ✓ Expand tasks: $EXPAND_TASKS"
-
-ANALYZE_COMPLEXITY=$(jq -r '.analyze_complexity' "$CONFIG_FILE" 2>/dev/null || echo "false")
-echo "  ✓ Analyze complexity: $ANALYZE_COMPLEXITY"
 
 echo "🔍 Configuration summary:"
 echo "  - Project: ${PROJECT_NAME:-[empty]}"
