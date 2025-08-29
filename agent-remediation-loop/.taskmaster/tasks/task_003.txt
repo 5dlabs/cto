@@ -5,18 +5,20 @@
 # Priority: high
 # Description: Deploy Argo Events Sensor to process feedback comments and trigger Rex remediation CodeRuns
 # Details:
-Implement Sensor that listens to GitHub webhook events and triggers remediation workflow:
+Implement Sensor that integrates with existing play workflow infrastructure to trigger Rex remediation:
 
-1. Create Sensor CRD with proper event filtering
+1. Create Sensor CRD following patterns from play-workflow-sensors.yaml
 2. Extract task ID from PR labels using JSONPath
-3. Generate remediation CodeRun with feedback context
-4. Pass comment ID and iteration count to Rex
+3. Generate CodeRun resources (not workflows) with REMEDIATION_MODE=true
+4. Pass comment ID and iteration count to Rex via environment variables
 5. Implement retry logic and error handling
 
 Key features:
+- Builds on existing GitHub webhook EventSource
+- Creates CodeRun resources for Rust controller to process
+- Integrates with implementation-agent-remediation sensor for cancellation
+- Uses ConfigMaps for state tracking (implemented separately)
 - JSONPath expressions for data extraction
-- Dynamic resource generation with templates
-- Proper label propagation
 - Event deduplication
 
 Implementation:
@@ -25,122 +27,141 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: pr-comment-remediation
+  namespace: github-webhooks
 spec:
+  eventBusName: default
   dependencies:
     - name: feedback-comment
+      eventSourceName: github
+      eventName: issue_comment
       filters:
         data:
           - path: body.comment.body
+            type: string
             comparator: "~"
             value: ".*🔴 Required Changes.*"
   triggers:
     - template:
+        name: create-remediation-coderun
         k8s:
           operation: create
-          parameters:
-            - src: {dependencyName: feedback-comment, dataKey: body.issue.number}
-              dest: spec.pr_number
-            - src: {dependencyName: feedback-comment, dataKey: body.comment.id}
-              dest: spec.pr_comment_id
+          source:
+            resource:
+              apiVersion: cto.5dlabs.com/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: remediation-rex-
+                labels:
+                  task-id: ""  # Extracted from PR
+                  iteration: ""  # From ConfigMap
+              spec:
+                github_app: rex
+                remediation_mode: true
+                pr_comment_id: ""  # From event
 ```
 
+When Rex pushes fixes, the existing implementation-agent-remediation sensor handles Cleo/Tess cancellation automatically.
+
 # Test Strategy:
-1. Test sensor activation with valid feedback comments
-2. Verify CodeRun creation with correct parameters
+1. Test sensor activation with valid feedback comments in play workflow
+2. Verify CodeRun creation with REMEDIATION_MODE=true
 3. Test filtering logic (should ignore non-feedback comments)
-4. Validate task ID extraction from labels
-5. Test error scenarios and recovery mechanisms
+4. Validate task ID extraction from PR labels
+5. Test integration with existing implementation-agent-remediation sensor
+6. Verify play workflow continues normally after Rex remediation
 
 # Subtasks:
-## 1. Define Sensor CRD with Event Dependencies [pending]
+## 1. Define Sensor CRD Following Existing Patterns [pending]
 ### Dependencies: None
-### Description: Create the base Sensor Custom Resource Definition with GitHub webhook event dependencies and proper metadata
+### Description: Create the Sensor CRD modeled after existing sensors in play-workflow-sensors.yaml
 ### Details:
-Implement the Sensor CRD structure with:
-- Metadata including name 'pr-comment-remediation' and namespace
-- Dependencies section defining 'feedback-comment' dependency
-- EventBus configuration for GitHub events
+Implement the Sensor CRD structure following existing patterns:
+- Place in infra/gitops/resources/github-webhooks/ alongside existing sensors
+- Metadata with name 'pr-comment-remediation' in namespace 'github-webhooks'
+- Use existing GitHub EventSource (already configured)
+- EventBus configuration matching other play workflow sensors
 - Proper API version (argoproj.io/v1alpha1) and kind
-- Annotations for documentation and versioning
-- Labels for organization and filtering
+- Labels and annotations consistent with play-workflow-sensors
+- Follow naming conventions from implementation-agent-remediation sensor
 
 ## 2. Configure JSONPath Event Filters [pending]
 ### Dependencies: 3.1
 ### Description: Implement JSONPath expressions to filter PR comments containing feedback markers and extract required data fields
 ### Details:
-Set up comprehensive filtering logic:
-- Filter for comment body containing '🔴 Required Changes' pattern using regex comparator
-- Add path filters for action type (created/edited)
+Set up filtering logic matching existing sensor patterns:
+- Filter for comment body containing '🔴 Required Changes' using regex comparator
+- Add eventName filter for 'issue_comment' events
 - Implement JSONPath for extracting PR number (body.issue.number)
-- Extract comment ID (body.comment.id) and author (body.comment.user.login)
-- Add filters to exclude bot comments except from authorized quality agents
-- Implement data transformation expressions for nested JSON structures
+- Extract comment ID (body.comment.id) for passing to Rex
+- Extract PR labels array for task ID identification
+- Add filters to exclude bot comments except from Cleo/Tess
+- Use same filter structure as implementation-agent-remediation sensor
 
 ## 3. Create CodeRun Resource Template [pending]
 ### Dependencies: 3.2
-### Description: Build the Kubernetes resource template for generating Rex remediation CodeRun objects with proper parameterization
+### Description: Build the Kubernetes resource template for generating Rex remediation CodeRun objects
 ### Details:
-Design CodeRun generation template:
-- Define K8s operation as 'create' with apiVersion and kind
-- Map webhook data to CodeRun spec fields using parameter substitution
-- Configure Rex container image and command arguments
-- Set environment variables for REMEDIATION_MODE, PR_COMMENT_ID, TASK_ID
-- Add resource limits and requests
-- Configure volume mounts for GitHub credentials and task context
-- Implement metadata labels for tracking and cleanup
+Design CodeRun generation template using existing CRD:
+- Use apiVersion: cto.5dlabs.com/v1alpha1, kind: CodeRun
+- Set github_app: rex (controller uses this for agent identification)
+- Add spec.remediation_mode: true flag for Rex to detect mode
+- Pass PR comment ID via spec.pr_comment_id field
+- Use generateName for unique CodeRun names
+- Add labels for task-id and iteration tracking
+- Match resource structure from existing CodeRun implementations
+- Controller will handle PVC mounting and container execution
 
 ## 4. Implement Task ID Extraction from PR Labels [pending]
 ### Dependencies: 3.3
-### Description: Create logic to extract task IDs from PR labels and map them to remediation context
+### Description: Create logic to extract task IDs from PR labels and add to CodeRun metadata
 ### Details:
-Build task identification system:
-- Parse PR labels array using JSONPath (body.issue.labels[*].name)
-- Filter for labels matching 'task-*' pattern
-- Extract numeric task ID from label string
-- Implement fallback logic if task label is missing
-- Add validation for task ID format and existence
-- Map task ID to corresponding task context from ConfigMap
-- Handle multiple task labels scenario with priority logic
+Build task identification using JSONPath:
+- Parse PR labels using body.issue.labels[?(@.name =~ 'task-.*')].name
+- Extract numeric task ID from 'task-X' label format
+- Add extracted task-id to CodeRun labels for tracking
+- Implement parameter mapping from event data to resource
+- Use same JSONPath patterns as other play workflow sensors
+- Handle missing task label scenario with default behavior
+- Task context will be loaded by Rex from ConfigMap (separate implementation)
 
-## 5. Add Iteration Counter and Limit Logic [pending]
+## 5. Add Iteration Tracking via ConfigMap [pending]
 ### Dependencies: 3.4
-### Description: Implement iteration tracking to monitor remediation cycles and enforce limits with escalation triggers
+### Description: Implement iteration counter using ConfigMap for state persistence across remediation cycles
 ### Details:
-Create iteration management system:
-- Read current iteration count from PR labels or annotations
-- Increment counter for each remediation trigger
-- Check against MAX_ITERATIONS environment variable (default: 3)
-- Implement escalation trigger when limit exceeded
-- Add iteration count to CodeRun metadata and environment
-- Create label update logic for iteration tracking
-- Generate metrics for iteration monitoring
-- Include iteration history in remediation context
+Create iteration management integrated with play workflow:
+- Read current iteration from ConfigMap (remediation-state-{task-id})
+- Increment counter and update ConfigMap via trigger
+- Pass iteration count to CodeRun via label or annotation
+- Rex will check iteration limit (MAX_ITERATIONS env var)
+- ConfigMap managed separately from sensor (controller responsibility)
+- Follow state management patterns from play workflow
+- Sensor only reads/updates counter, escalation handled elsewhere
 
 ## 6. Configure Retry and Error Handling [pending]
 ### Dependencies: 3.5
-### Description: Implement robust retry mechanisms and error handling for sensor failures and resource creation issues
+### Description: Implement retry mechanisms matching existing sensor configurations
 ### Details:
-Build reliability features:
-- Configure exponential backoff retry policy (initial: 1s, max: 30s)
-- Set maximum retry attempts (default: 5)
-- Implement error categorization (transient vs permanent)
-- Add dead letter queue for failed events
-- Create error notification mechanism
-- Implement circuit breaker for GitHub API calls
-- Add timeout configurations for resource creation
-- Create recovery procedures for partial failures
+Build reliability features consistent with play workflow:
+- Use same retry policy as implementation-agent-remediation sensor
+- Configure exponential backoff (if supported by trigger type)
+- Handle CodeRun creation failures gracefully
+- Add error logging to match existing sensor patterns
+- Leverage EventBus delivery guarantees
+- No custom dead letter queue (use platform defaults)
+- Timeout configurations matching other sensors
+- Errors logged but not blocking play workflow progression
 
-## 7. Implement Event Deduplication Mechanism [pending]
+## 7. Implement Event Deduplication [pending]
 ### Dependencies: 3.6
-### Description: Create deduplication logic to prevent duplicate remediation triggers from identical or rapid successive events
+### Description: Add deduplication to prevent duplicate CodeRuns from rapid comment edits
 ### Details:
-Design deduplication system:
-- Implement event ID generation using hash of comment ID + timestamp
-- Create Redis-based or ConfigMap cache for recent events (TTL: 5 minutes)
-- Add duplicate detection before trigger execution
-- Configure time window for considering events as duplicates
-- Implement event correlation for related comments
-- Add logging for skipped duplicate events
-- Create metrics for deduplication effectiveness
-- Test with rapid comment edits and webhook retries
+Design deduplication following platform patterns:
+- Use event ID from GitHub webhook (built-in deduplication)
+- Leverage Argo Events' native deduplication features
+- Configure dependency filters to ignore duplicate events
+- Time window configuration (default 60 seconds)
+- No custom caching needed (platform handles this)
+- Test with GitHub's webhook retry behavior
+- Ensure idempotent CodeRun creation
+- Match deduplication approach from other play sensors
 

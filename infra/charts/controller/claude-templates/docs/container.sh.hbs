@@ -336,15 +336,71 @@ $details
 $test_strategy
 EOF
       
-      # Also generate XML format for enhanced LLM processing
+      # Generate XML format optimized for LLM consumption with enhanced structure
       # Extract additional fields for XML structure
       priority=$(_decode '.priority // "medium"')
       dependencies=$(_decode '.dependencies // []' | jq -r 'if type == "array" then . else [] end | join(", ")')
       status=$(_decode '.status // "pending"')
-      
+
+      # Determine technology stack from task content for role definition
+      if echo "$details" | grep -qi "rust\|cargo\|tokio\|serde"; then
+        tech_role="senior Rust developer specializing in Kubernetes controllers and cloud-native applications"
+      elif echo "$details" | grep -qi "kubernetes\|k8s\|argo\|helm"; then
+        tech_role="senior Kubernetes engineer specializing in GitOps workflows and Argo Events"
+      elif echo "$details" | grep -qi "argo\|workflow\|events"; then
+        tech_role="senior DevOps engineer specializing in Argo Workflows and event-driven automation"
+      else
+        tech_role="senior software engineer and coding agent specializing in the project's technology stack"
+      fi
+
+      # Extract technical specifications from task details
+      specs=""
+      if echo "$details" | grep -A 10 -i "technical\|requirements\|specifications" >/dev/null 2>&1; then
+        specs_section=$(echo "$details" | sed -n '/technical\|requirements\|specifications/I,/^$/p' | head -10)
+        while IFS= read -r line; do
+          # Case-insensitive check to exclude section headers
+          if [[ -n "$line" ]] && ! echo "$line" | grep -qi "^[[:space:]]*\(technical\|requirements\|specifications\)[[:space:]]*$"; then
+            # XML escape the content
+            escaped_line=$(echo "$line" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g')
+            specs="${specs}<spec>$escaped_line</spec>$'\n'        "
+          fi
+        done <<< "$specs_section"
+      fi
+
+      # Fallback specs if none found
+      if [ -z "$specs" ]; then
+        specs="<spec>Follow the project&apos;s existing architecture and coding patterns</spec>
+        <spec>Ensure compatibility with the current technology stack</spec>
+        <spec>Implement proper error handling and logging</spec>
+        <spec>Follow established security best practices</spec>"
+      fi
+
+      # Extract acceptance criteria from test strategy
+      criteria=""
+      if [ -n "$test_strategy" ]; then
+        # Split test strategy into individual criteria on numbered items (1., 2., etc.)
+        IFS=$'\n' read -rd '' -a test_parts <<< "$(echo "$test_strategy" | grep -E '^[[:space:]]*[0-9]+\.')"
+        for part in "${test_parts[@]}"; do
+          part=$(echo "$part" | sed 's/^[[:space:]]*[0-9]\+\.[[:space:]]*//;s/[[:space:]]*$//')
+          if [ -n "$part" ] && [ ${#part} -gt 10 ]; then
+            # XML escape the content
+            escaped_part=$(echo "$part" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g')
+            criteria="${criteria}<criterion>$escaped_part</criterion>$'\n'        "
+          fi
+        done
+      fi
+
+      # Fallback criteria if none extracted
+      if [ -z "$criteria" ]; then
+        criteria="<criterion>Implementation must be complete and functional</criterion>
+        <criterion>Code must follow the project&apos;s style guidelines and conventions</criterion>
+        <criterion>All edge cases should be properly handled</criterion>
+        <criterion>Implementation should be well-documented with clear comments</criterion>"
+      fi
+
       cat > "$task_dir/task.xml" << XML_EOF
 <prompt>
-    <role>You are a senior software engineer and coding agent specializing in the project's technology stack.</role>
+    <role>You are a $tech_role.</role>
     <task>
         <id>$task_id</id>
         <title>$title</title>
@@ -354,36 +410,31 @@ EOF
         <dependencies>$dependencies</dependencies>
     </task>
     <technical_specifications>
-        <spec>Follow the project's existing architecture and coding patterns</spec>
-        <spec>Ensure compatibility with the current technology stack</spec>
-        <spec>Implement proper error handling and logging</spec>
-        <spec>Follow established security best practices</spec>
+        $specs
     </technical_specifications>
     <implementation_details>
         $details
     </implementation_details>
     <acceptance_criteria>
-        <criterion>Implementation must be complete and functional</criterion>
-        <criterion>Code must follow the project's style guidelines and conventions</criterion>
-        <criterion>All edge cases should be properly handled</criterion>
-        <criterion>Implementation should be well-documented with clear comments</criterion>
+        $criteria
     </acceptance_criteria>
     <test_strategy>
         $test_strategy
     </test_strategy>
     <instructions>
-        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns. 
-        Provide complete, production-ready code that follows best practices. Include necessary imports, 
+        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns.
+        Provide complete, production-ready code that follows best practices. Include necessary imports,
         error handling, and documentation. Test your solution thoroughly before finalizing.
+        Ensure compatibility with the existing technology stack and architectural patterns.
     </instructions>
 </prompt>
 XML_EOF
       
       gen_count=$((gen_count+1))
       echo "✓ Generated docs/task-$task_id/task.txt"
-      echo "✓ Generated docs/task-$task_id/task.xml"
+      echo "✓ Generated docs/task-$task_id/task.xml (XML format for LLM consumption)"
     done
-  echo "Generated $gen_count task files from tasks.json"
+  echo "Generated $gen_count task directories with txt and xml files from tasks.json"
 elif [ -d "$CLAUDE_WORK_DIR/.taskmaster/tasks" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/.taskmaster/tasks" 2>/dev/null)" ]; then
   echo "📋 Found individual task files, copying to docs directory..."
   

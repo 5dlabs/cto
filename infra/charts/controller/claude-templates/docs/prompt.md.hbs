@@ -48,13 +48,12 @@ Focus specifically on task {{task_id}} and create:
 **IMPORTANT: SKIP TASKS THAT ALREADY HAVE COMPLETE DOCUMENTATION**
 
 Before processing any task, check if ALL required files already exist:
-- `task.md` 
+- `task.md`
 - `prompt.md`
 - `acceptance-criteria.md`
-- `client-config.json`
-- `toolman-guide.md`
+- `task.xml`
 
-If ALL five files exist and have substantial content (not just stubs), SKIP that task to save tokens and time.
+If ALL four files exist and have substantial content (not just stubs), SKIP that task to save tokens and time.
 
 **YOU MUST CREATE DOCUMENTATION FOR EVERY TASK THAT NEEDS IT. DO NOT SKIP ANY INCOMPLETE TASKS.**
 
@@ -63,8 +62,7 @@ For each task that needs documentation (process ALL incomplete tasks, no excepti
 - `task.md` - Comprehensive task overview and implementation guide
 - `prompt.md` - Autonomous prompt for AI agents
 - `acceptance-criteria.md` - Clear acceptance criteria and test cases
-- `client-config.json` - MCP client configuration for code implementation agents
-- `toolman-guide.md` - Task-specific guide explaining which tools to use and when
+- `task.xml` - XML-structured prompt optimized for LLM consumption
 
 **Progress Requirements:**
 - Announce each task as you start it: "📝 Processing Task [ID]: [Title]"
@@ -73,99 +71,64 @@ For each task that needs documentation (process ALL incomplete tasks, no excepti
 
 Place all documentation in `.taskmaster/docs/task-{id}/` directories.
 
-### Step 2.1: Toolman Configuration Generation (MANDATORY)
+### Step 2.3: XML Prompt Generation (MANDATORY)
 
-**🔧 CRITICAL: Generate Simple MCP Client Configuration**
+**🔧 CRITICAL: Generate XML-Structured Prompt for LLM Consumption**
 
-For each task, you MUST create a `client-config.json` file that is a **SIMPLE CLIENT CONFIGURATION** - NOT a task specification document.
+For each task, you MUST create a `task.xml` file that combines all task information into an XML structure optimized for LLM processing. This single file will contain all the technical specifications, acceptance criteria, and implementation guidance needed for coding agents.
 
-**🚨 IMPORTANT: This is a CLIENT CONFIG FILE, not a detailed task document!**
-
-**REQUIRED FORMAT (EXACT STRUCTURE):**
-```json
-{
-  "remoteTools": [
-    "tool_name_1",
-    "tool_name_2"
-  ],
-  "localServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-      "tools": ["read_file", "write_file", "list_directory", "create_directory", "edit_file"],
-      "workingDirectory": "project_root"
-    }
-  }
-}
+**REQUIRED XML STRUCTURE:**
+```xml
+<prompt>
+    <role>You are a senior coding agent specializing in [technology stack from task].</role>
+    <task>
+        <id>[Task ID]</id>
+        <title>[Task Title]</title>
+        <description>[Complete task description]</description>
+        <priority>[high|medium|low]</priority>
+        <status>[pending|in-progress|done]</status>
+        <dependencies>[comma-separated dependency IDs]</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>[Technical requirement 1]</spec>
+        <spec>[Technical requirement 2]</spec>
+        <spec>[Technical requirement N]</spec>
+    </technical_specifications>
+    <implementation_details>
+        [Detailed implementation guidance from task.txt]
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>[Acceptance criterion 1]</criterion>
+        <criterion>[Acceptance criterion 2]</criterion>
+        <criterion>[Acceptance criterion N]</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        [Testing approach and requirements]
+    </test_strategy>
+    <instructions>
+        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns.
+        Provide complete, production-ready code that follows best practices. Include necessary imports,
+        error handling, and documentation. Test your solution thoroughly before finalizing.
+    </instructions>
+</prompt>
 ```
 
-**❌ DO NOT GENERATE:** 
-- Task specifications with `task_id`, `task_name`, `task_type` 
-- Complex metadata like `priority`, `status`, `estimated_duration`
-- Detailed planning documents with `required_tools`, `recommended_tools`
-- Nested configuration objects with `tool_configuration`, `technical_requirements`
-- Any fields other than `remoteTools` and `localServers`
+**XML Generation Requirements:**
+1. **Single Comprehensive File**: Combine task.md, prompt.md, and acceptance-criteria.md content into one XML structure
+2. **Structured Data**: Use appropriate XML tags to organize information hierarchically
+3. **LLM Optimization**: Follow the XML format proven to work best with Claude and other LLMs
+4. **Complete Information**: Include ALL technical specifications, dependencies, and implementation details
+5. **Machine Readable**: Ensure the XML is well-formed and parseable
+6. **Role Definition**: Set appropriate role based on task technology stack (e.g., "senior Rust developer", "Kubernetes expert")
+7. **Implementation Focus**: Emphasize production-ready code with proper error handling and testing
 
-**✅ CORRECT APPROACH:**
-1. **Read the Catalog Below**: Examine available tools and capabilities
-2. **Select Remote Tools**: Choose specific remote tool names from the catalog for `remoteTools` array
-3. **Configure Local Servers**: Use exact command/args from catalog for local servers (usually just filesystem)
-4. **Keep It Simple**: Only include `remoteTools` and `localServers` fields - nothing else!
-
-**Example for Infrastructure Task:**
-```json
-{
-  "remoteTools": [
-    "kubernetes_listResources",
-    "kubernetes_getResource",
-    "kubernetes_createResource"
-  ],
-  "localServers": {
-    "filesystem": {
-      "command": "npx", 
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-      "tools": ["read_file", "write_file", "edit_file", "list_directory"],
-      "workingDirectory": "project_root"
-    }
-  }
-}
-```
-
-**Available Tool Catalog:**
-The complete toolman catalog is provided below. Use ONLY tool names that appear in this catalog.
-
-### Step 2.2: Toolman Guide Generation (MANDATORY)
-
-**📖 CRITICAL: Generate Task-Specific Tool Usage Guide**
-
-For each task, you MUST create a comprehensive `toolman-guide.md` file that explains how and when to use the selected tools based on the catalog information.
-
-**Guide Generation Requirements:**
-1. **Use Catalog Descriptions**: Leverage the detailed tool descriptions, use cases, and categories from the catalog below
-2. **Document Tool Arguments**: Clearly document all arguments, parameters, and configuration options for each selected tool based on catalog information
-3. **Task-Specific Context**: Explain how each selected tool applies specifically to this task's requirements
-4. **When to Use**: Provide clear guidance on when to use each tool during task implementation
-5. **How to Use**: Include practical examples and best practices based on catalog information
-6. **Tool Relationships**: Explain how tools work together and their sequence of use
-7. **Common Patterns**: Reference the selection guidelines and patterns from the catalog
-
-**Guide Structure:**
-- **Overview**: Brief explanation of the tool selection for this task
-- **Core Tools**: Primary tools with detailed usage instructions
-- **Supporting Tools**: Secondary tools and their specific use cases
-- **Implementation Flow**: Suggested order and workflow for using the tools
-- **Best Practices**: Task-specific tips and recommendations
-- **Troubleshooting**: Common issues and solutions based on tool capabilities
-
-**Content Source**: Use the rich catalog information below as your primary source for tool descriptions, capabilities, use cases, and implementation guidance. The catalog contains everything you need to create comprehensive, actionable tool guides.
-
----
-
-{{{toolman_catalog_markdown}}}
-
----
-
-**Note**: All configuration format details, selection guidelines, examples, and validation requirements are provided in the tool catalog section above. Use that information to generate appropriate `client-config.json` files for each task.
+**Content Mapping Guidelines:**
+- Extract role from task technology (Rust, Kubernetes, Go, etc.)
+- Pull task details from the individual task.txt file
+- Convert acceptance criteria into `<criterion>` elements
+- Include all technical specifications as `<spec>` elements
+- Add implementation details from task description
+- Include test strategy from task requirements
 
 ### Step 3: Complete Documentation Generation
 **⚠️ CRITICAL: You MUST generate ALL documentation files as specified above.**
@@ -200,9 +163,9 @@ For each task, you MUST create a comprehensive `toolman-guide.md` file that expl
 ```
 🎉 DOCUMENTATION GENERATION COMPLETE 🎉
 ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
-✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, client-config.json, toolman-guide.md)
+✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, task.xml)
 📋 Total files created: [COUNT]
-🔧 Generated task-specific Toolman configurations for code implementation
+🔧 Generated XML-structured prompts optimized for LLM consumption
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook
 ```
 
