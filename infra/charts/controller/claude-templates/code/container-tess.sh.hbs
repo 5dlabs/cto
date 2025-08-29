@@ -354,8 +354,21 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     git fetch origin --prune
     PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
     if [ -n "$PR_BRANCH" ]; then
-        git checkout "$PR_BRANCH" || git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH"
-        git pull origin "$PR_BRANCH" || echo "⚠️  Could not pull latest changes"
+        # Try to checkout/create the branch
+        if git checkout "$PR_BRANCH" 2>/dev/null; then
+            echo "✓ Checked out existing branch: $PR_BRANCH"
+        else
+            echo "📝 Creating new local branch from remote: $PR_BRANCH"
+            git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null || {
+                echo "⚠️ Could not create branch $PR_BRANCH, staying on current branch"
+                continue
+            }
+        fi
+
+        # Handle divergent branches gracefully using utility function
+        if ! safe_git_pull origin "$PR_BRANCH"; then
+            echo "📍 Continuing with current branch state for testing"
+        fi
         echo "✓ Checked out PR branch: $PR_BRANCH"
     else
         echo "⚠️ Could not determine PR branch name, staying on default branch"
@@ -442,11 +455,26 @@ DOCS_REPO_URL="{{docs_repository_url}}"
 DOCS_BRANCH="{{#if docs_branch}}{{docs_branch}}{{else}}main{{/if}}"
 DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:${GITHUB_TOKEN}@github.com/|")
 
-if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo; then
-    echo "❌ Failed to clone docs repository"
-    exit 1
+if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo 2>/dev/null; then
+    echo "❌ Failed to clone docs repository from $DOCS_REPO_URL"
+    echo "📍 This may be due to authentication or network issues"
+    echo "📍 Continuing without task files from docs repository"
+else
+    cd /tmp/docs-repo || {
+        echo "⚠️ Could not change to docs repository directory"
+        cd "$CLAUDE_WORK_DIR"
+    }
+
+    # Try to checkout the docs branch with error handling
+    if git checkout "$DOCS_BRANCH" 2>/dev/null; then
+        echo "✓ Checked out docs branch: $DOCS_BRANCH"
+        cd "$CLAUDE_WORK_DIR"
+    else
+        echo "⚠️ Could not checkout docs branch $DOCS_BRANCH"
+        echo "📍 Available branches: $(git branch -r 2>/dev/null | head -5 || echo 'unknown')"
+        cd "$CLAUDE_WORK_DIR"
+    fi
 fi
-cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd "$CLAUDE_WORK_DIR"
 
 # Copy task files
 mkdir -p "$CLAUDE_WORK_DIR/task"
@@ -662,6 +690,33 @@ export REPO_NAME
 # TARGET_REPO_DIR no longer needed - repository cloned directly to CLAUDE_WORK_DIR
 
 echo "════════════════════════════════════════════════════════════════"
+# Utility function for safe Git operations
+safe_git_pull() {
+    local remote="$1"
+    local branch="$2"
+
+    echo "📥 Attempting to pull from $remote/$branch..."
+
+    # Try rebase first (cleaner history)
+    if git pull --rebase "$remote" "$branch" 2>/dev/null; then
+        echo "✓ Successfully pulled with rebase"
+        return 0
+    fi
+
+    # Try merge if rebase fails
+    if git pull --no-rebase "$remote" "$branch" 2>/dev/null; then
+        echo "✓ Successfully pulled with merge"
+        return 0
+    fi
+
+    # If both fail, show current status and continue
+    echo "⚠️ Could not pull due to divergent branches or conflicts"
+    echo "📍 Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+    echo "📍 Local changes: $(git status --porcelain | wc -l) files modified"
+    echo "📍 Continuing with current branch state"
+    return 1
+}
+
 echo "✅ TESS TESTING AGENT READY"
 echo "════════════════════════════════════════════════════════════════"
 echo "📁 Working Directory: $CLAUDE_WORK_DIR"
