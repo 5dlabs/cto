@@ -1,0 +1,31 @@
+# Task ID: 8
+# Title: Setup Authentication Middleware
+# Status: pending
+# Dependencies: 5
+# Priority: medium
+# Description: Create middleware to protect routes using JWT authentication.
+# Details:
+Implement Express middleware to check JWT tokens on protected routes.
+
+# Test Strategy:
+Access protected routes with and without valid JWT tokens to verify middleware functionality.
+
+# Subtasks:
+## 1. Create JWT Authentication Middleware [pending]
+### Dependencies: None
+### Description: Develop Express middleware that verifies JWT tokens.
+### Details:
+Implement middleware to extract and validate JWT tokens for protecting routes.
+
+## 2. Integrate Middleware with Protected Routes [pending]
+### Dependencies: 8.1
+### Description: Apply JWT authentication middleware to specific routes.
+### Details:
+Ensure that the middleware is correctly applied to routes that require authentication.
+
+## 3. Test Middleware with Valid and Invalid Tokens [pending]
+### Dependencies: 8.1, 8.2
+### Description: Conduct tests using both valid and invalid JWT tokens to ensure middleware functionality.
+### Details:
+Test access to protected routes with valid and invalid JWT tokens to verify correct behavior of the authentication middleware.
+

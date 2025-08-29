@@ -1,0 +1,31 @@
+# Task ID: 1
+# Title: Setup Project Repository
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Initialize the Git repository and setup the project structure.
+# Details:
+Create a new Git repository. Setup the initial project structure with directories for frontend and backend. Include a README.md with basic project information.
+
+# Test Strategy:
+Verify repository initialization, directory structure, and README.md content.
+
+# Subtasks:
+## 1. Initialize Git Repository [pending]
+### Dependencies: None
+### Description: Create a new Git repository to manage project version control.
+### Details:
+Use Git to create a new repository. Ensure the repository is properly configured to track changes and is ready for initial commit.
+
+## 2. Set Up Project Directory Structure [pending]
+### Dependencies: 1.1
+### Description: Create the initial project directories for frontend and backend.
+### Details:
+Organize the project by creating separate directories for the frontend and backend components. Ensure directory names are consistent with project standards.
+
+## 3. Draft Initial README.md [pending]
+### Dependencies: 1.2
+### Description: Create a README.md file with basic project information.
+### Details:
+Write a README.md file that includes the project name, description, and any initial setup instructions. Ensure it provides a clear overview of the project purpose and setup.
+
