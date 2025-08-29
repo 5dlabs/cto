@@ -82,8 +82,8 @@ RUN --mount=type=cache,target=/root/.cache \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
 
-# Enable corepack (yarn/pnpm) for Node.js (guard if missing)
-RUN if command -v corepack >/dev/null 2>&1; then corepack enable; fi
+# Enable corepack (pnpm only, skip yarn since we use system yarn)
+RUN if command -v corepack >/dev/null 2>&1; then corepack enable pnpm; fi
 
 # Install latest stable Go (robust arch/version selection)
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
