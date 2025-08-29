@@ -1306,25 +1306,29 @@ echo "📊 Checking CI status for PR #$PR_NUM..."
 echo "🔍 Pre-flight check: GitHub CLI availability..."
 
 # Check if GitHub CLI is available (should be pre-installed in base image)
+GH_AVAILABLE=true
 if ! command -v gh >/dev/null 2>&1; then
   echo "❌ GitHub CLI not found in PATH"
   echo "⚠️ GitHub CLI should be pre-installed in the base image"
-  echo "📝 Tess QA workflow completed (GitHub CLI unavailable)"
-  exit 0
+  echo "📝 Will skip PR review posting (GitHub CLI unavailable)"
+  GH_AVAILABLE=false
+else
+  echo "✅ GitHub CLI available"
+  
+  # Check authentication
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "❌ GitHub CLI not authenticated"
+    echo "⚠️ Cannot perform CI checks or PR reviews without authentication"
+    echo "📝 Will skip PR review posting (GitHub authentication unavailable)"
+    GH_AVAILABLE=false
+  else
+    echo "✅ GitHub CLI is available and authenticated"
+  fi
 fi
 
-echo "✅ GitHub CLI available"
-
-# Check authentication
-if ! gh auth status >/dev/null 2>&1; then
-  echo "❌ GitHub CLI not authenticated"
-  echo "⚠️ Cannot perform CI checks or PR reviews without authentication"
-  echo "📝 Tess QA workflow completed (GitHub authentication unavailable)"
-  exit 0
-fi
-
-echo "✅ GitHub CLI is available and authenticated"
-
+# Only perform PR review if GitHub CLI is available
+if [ "$GH_AVAILABLE" = "true" ]; then
+  
 # Function to safely execute gh command with error handling
 check_ci_status() {
   local pr_num="$1"
@@ -1398,7 +1402,7 @@ case $CI_STATUS in
     echo "📝 Tess QA completed but unable to post PR review due to GitHub CLI issues"
     echo "✅ QA workflow finished successfully despite GitHub CLI problems"
     echo "🔍 Recommendation: Install and authenticate GitHub CLI for full functionality"
-    exit 0
+    # Don't exit here - continue to sidecar shutdown
     ;;
   2)
     echo "⚠️ PR not found - posting REQUEST CHANGES review"
@@ -1414,7 +1418,6 @@ case $CI_STATUS in
 - [ ] Update PR reference if needed
 
 **Note**: Cannot proceed with QA until valid PR is specified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    exit 0
     ;;
   3)
     echo "⚠️ Network error - posting REQUEST CHANGES review"
@@ -1430,7 +1433,6 @@ case $CI_STATUS in
 - [ ] Retry after network issues are resolved
 
 **Note**: Cannot proceed with QA until CI status can be verified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    exit 0
     ;;
   4)
     echo "⚠️ Authentication error - posting REQUEST CHANGES review"
@@ -1447,7 +1449,6 @@ case $CI_STATUS in
 - [ ] Contact administrator for token refresh
 
 **Note**: Cannot proceed with QA until authentication is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    exit 0
     ;;
   5)
     echo "⚠️ Repository access error - posting REQUEST CHANGES review"
@@ -1464,7 +1465,6 @@ case $CI_STATUS in
 - [ ] Contact administrator for access issues
 
 **Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    exit 0
     ;;
 esac
 
@@ -1667,6 +1667,12 @@ $SUCCESS_DETAILS
 
 **Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   fi
+fi
+
+else
+  # GitHub CLI not available - skip PR review
+  echo "📝 Skipping PR review posting due to GitHub CLI unavailability"
+  echo "✅ Tess QA workflow completed but could not post PR review"
 fi
 
 # =============================================================================
