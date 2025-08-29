@@ -11,6 +11,20 @@ trap 'echo "❌ Error occurred at line $LINENO with exit code $?. Last command: 
 echo "🚀 Starting Project Intake Process"
 echo "================================="
 
+# Debug: Show ALL environment variables related to our workflow
+echo "🔍 DEBUG: Environment Variables Received:"
+echo "  PRIMARY_MODEL: ${PRIMARY_MODEL:-[NOT SET]}"
+echo "  PRIMARY_PROVIDER: ${PRIMARY_PROVIDER:-[NOT SET]}"
+echo "  RESEARCH_MODEL: ${RESEARCH_MODEL:-[NOT SET]}"
+echo "  RESEARCH_PROVIDER: ${RESEARCH_PROVIDER:-[NOT SET]}"
+echo "  FALLBACK_MODEL: ${FALLBACK_MODEL:-[NOT SET]}"
+echo "  FALLBACK_PROVIDER: ${FALLBACK_PROVIDER:-[NOT SET]}"
+echo "  NUM_TASKS: ${NUM_TASKS:-[NOT SET]}"
+echo "  EXPAND_TASKS: ${EXPAND_TASKS:-[NOT SET]}"
+echo "  ANALYZE_COMPLEXITY: ${ANALYZE_COMPLEXITY:-[NOT SET]}"
+echo "  GITHUB_APP: ${GITHUB_APP:-[NOT SET]}"
+echo "================================="
+
 # Load configuration from mounted ConfigMap
 CONFIG_FILE="/intake-files/config.json"
 PRD_FILE="/intake-files/prd.txt"
@@ -22,9 +36,16 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Debug: Show what's in the config file
-echo "📄 Config file contents:"
+echo "📄 Config file contents (from ConfigMap):"
 cat "$CONFIG_FILE" || echo "Failed to cat config file"
 echo ""
+echo "📄 Parsed values from ConfigMap:"
+echo "  primary_model from JSON: $(jq -r '.primary_model // "[NOT IN JSON]"' "$CONFIG_FILE")"
+echo "  primary_provider from JSON: $(jq -r '.primary_provider // "[NOT IN JSON]"' "$CONFIG_FILE")"
+echo "  research_model from JSON: $(jq -r '.research_model // "[NOT IN JSON]"' "$CONFIG_FILE")"
+echo "  research_provider from JSON: $(jq -r '.research_provider // "[NOT IN JSON]"' "$CONFIG_FILE")"
+echo "  fallback_model from JSON: $(jq -r '.fallback_model // "[NOT IN JSON]"' "$CONFIG_FILE")"
+echo "  fallback_provider from JSON: $(jq -r '.fallback_provider // "[NOT IN JSON]"' "$CONFIG_FILE")"
 echo "---"
 
 # Preview PRD and Architecture to verify correctness
