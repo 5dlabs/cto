@@ -1,0 +1,31 @@
+# Task ID: 6
+# Title: Develop API for User Statistics
+# Status: pending
+# Dependencies: 2, 5
+# Priority: medium
+# Description: Create backend API endpoints to fetch user statistics.
+# Details:
+Develop RESTful API endpoints using Express to return user statistics from the PostgreSQL database. Ensure data is aggregated and formatted correctly.
+
+# Test Strategy:
+Test API endpoints for correct data retrieval and response formatting.
+
+# Subtasks:
+## 1. Design API Endpoints [pending]
+### Dependencies: None
+### Description: Define the structure and routes for API endpoints to fetch user statistics.
+### Details:
+Plan the API method types and endpoints paths. Consider RESTful principles and ensure endpoints align with expected data outputs.
+
+## 2. Implement Data Aggregation Logic [pending]
+### Dependencies: 6.1
+### Description: Develop logic to aggregate user statistics from the PostgreSQL database.
+### Details:
+Write SQL queries and Node.js functions to retrieve and aggregate user data. Ensure data is processed efficiently and results are formatted correctly.
+
+## 3. Test API Endpoints [pending]
+### Dependencies: 6.1, 6.2
+### Description: Test the API endpoints for correct data retrieval and response formatting.
+### Details:
+Use tools like Postman or automated testing frameworks to verify endpoints return accurate and correctly formatted data. Include edge cases and error handling in tests.
+

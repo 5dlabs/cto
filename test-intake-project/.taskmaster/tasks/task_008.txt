@@ -1,0 +1,25 @@
+# Task ID: 8
+# Title: Implement Frontend Design
+# Status: pending
+# Dependencies: 3
+# Priority: medium
+# Description: Apply a cohesive and responsive design to the frontend application.
+# Details:
+Utilize CSS frameworks such as Bootstrap or Tailwind CSS to style the React application. Ensure the design is responsive and accessible.
+
+# Test Strategy:
+Verify that the application UI is responsive and looks good across different devices and screen sizes.
+
+# Subtasks:
+## 1. Apply Basic Design [pending]
+### Dependencies: None
+### Description: Apply a cohesive design to the frontend application using CSS frameworks.
+### Details:
+Utilize Bootstrap or Tailwind CSS for styling the React application. Ensure basic styles are consistent and visually appealing.
+
+## 2. Ensure Responsiveness and Accessibility [pending]
+### Dependencies: 8.1
+### Description: Enhance the frontend design to be responsive and accessible.
+### Details:
+Ensure the application layout is responsive for various devices and screen sizes. Implement accessibility features such as ARIA roles and keyboard navigation support.
+

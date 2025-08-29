@@ -1,0 +1,31 @@
+# Task ID: 1
+# Title: Setup Project Repository
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Initialize the project repository with the specified tech stack.
+# Details:
+Initialize a new Git repository and set up the project with React and TypeScript for the frontend, Node.js and Express for the backend, and PostgreSQL for the database. Ensure all necessary dependencies are listed in package.json and install them.
+
+# Test Strategy:
+Verify that the project builds and runs without errors after setup.
+
+# Subtasks:
+## 1. Initialize Git Repository [pending]
+### Dependencies: None
+### Description: Create a new Git repository for the project.
+### Details:
+Set up a new Git repository and create an initial commit.
+
+## 2. Set Up Frontend with React and TypeScript [pending]
+### Dependencies: 1.1
+### Description: Initialize the frontend using React and TypeScript.
+### Details:
+Create a React project with TypeScript template. Ensure necessary dependencies are added to package.json.
+
+## 3. Set Up Backend with Node.js and Express [pending]
+### Dependencies: 1.1
+### Description: Initialize the backend using Node.js and Express.
+### Details:
+Create a basic Express server setup. List all necessary dependencies in package.json and install them.
+
