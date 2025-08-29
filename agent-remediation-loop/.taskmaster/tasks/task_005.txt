@@ -1,0 +1,100 @@
+# Task ID: 5
+# Title: Enhance Rex Container for Remediation
+# Status: pending
+# Dependencies: 2, 4
+# Priority: high
+# Description: Modify Rex container script to handle remediation mode with feedback processing and iteration limits
+# Details:
+Extend Rex container startup script to support remediation workflow:
+
+1. Detect REMEDIATION_MODE environment variable
+2. Fetch PR comment using GitHub CLI (gh api)
+3. Parse feedback and extract metadata
+4. Check iteration limits and trigger escalation if exceeded
+5. Prepare enhanced context for Claude/AI model
+6. Preserve original task context while adding feedback
+
+Bash script enhancements:
+```bash
+#!/bin/bash
+if [ "$REMEDIATION_MODE" = "true" ]; then
+    echo "🔧 REMEDIATION MODE - Iteration $ITERATION_COUNT/10"
+    
+    # Fetch comment
+    COMMENT=$(gh api /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID)
+    
+    # Check iteration limit
+    if [ "$ITERATION_COUNT" -ge "10" ]; then
+        gh pr comment $PR_NUMBER --body "⚠️ Max iterations reached. Human intervention required."
+        exit 1
+    fi
+    
+    # Prepare remediation context
+    cat > /workspace/remediation-context.md << EOF
+You are addressing QA feedback (Iteration $ITERATION_COUNT/10).
+Feedback: $(echo $COMMENT | jq -r .body)
+Priority: $SEVERITY
+Please implement comprehensive fixes for all issues.
+EOF
+    
+    # Merge with original context
+    cat /workspace/CLAUDE.original.md /workspace/remediation-context.md > /workspace/CLAUDE.md
+fi
+```
+
+# Test Strategy:
+1. Test remediation mode activation and context preparation
+2. Verify GitHub API calls and error handling
+3. Test iteration limit enforcement and escalation
+4. Validate context merging preserves original requirements
+5. Test with various feedback formats and edge cases
+
+# Subtasks:
+## 1. Implement Environment Variable Detection [pending]
+### Dependencies: None
+### Description: Add logic to detect and validate REMEDIATION_MODE environment variable in Rex container startup script
+### Details:
+Create bash script section that checks for REMEDIATION_MODE environment variable at container startup. Validate required environment variables including ITERATION_COUNT, PR_NUMBER, OWNER, REPO, FEEDBACK_COMMENT_ID, and SEVERITY. Implement early exit if remediation mode is not enabled. Add proper logging for mode detection and validation results.
+
+## 2. Integrate GitHub API Comment Fetching [pending]
+### Dependencies: 5.1
+### Description: Implement GitHub CLI integration to fetch PR comment data using provided comment ID
+### Details:
+Use gh CLI tool to fetch comment from GitHub API endpoint /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID. Implement error handling for API failures including rate limiting, authentication errors, and network issues. Parse JSON response to extract comment body and metadata. Add retry logic with exponential backoff for transient failures.
+
+## 3. Build Feedback Parser and Metadata Extractor [pending]
+### Dependencies: 5.2
+### Description: Create parsing logic to extract structured feedback data and metadata from fetched PR comments
+### Details:
+Parse comment body to extract issue types, severity levels, and specific feedback items. Use jq or similar JSON processing to extract nested fields. Identify and parse markdown formatting including checkboxes and code blocks. Extract metadata such as author, timestamp, and comment ID. Validate feedback format and handle malformed comments gracefully.
+
+## 4. Implement Iteration Limit Checking [pending]
+### Dependencies: 5.1
+### Description: Add iteration counter validation and escalation trigger when limits are exceeded
+### Details:
+Check ITERATION_COUNT against maximum threshold of 10 iterations. Implement escalation logic when limit is reached including posting warning comment to PR using gh pr comment. Set appropriate exit codes for different termination scenarios. Log iteration status and remaining attempts. Create mechanism to bypass limits for emergency fixes if needed.
+
+## 5. Create AI Context Preparation Module [pending]
+### Dependencies: 5.3, 5.4
+### Description: Build system to prepare enhanced context for Claude/AI model with remediation instructions
+### Details:
+Generate remediation-context.md file with structured feedback information. Format feedback into clear AI instructions including iteration count, severity, and specific issues. Include relevant code snippets and error messages from feedback. Add contextual hints about common resolution patterns. Ensure context is concise yet comprehensive for effective AI processing.
+
+## 6. Implement Original Context Preservation [pending]
+### Dependencies: 5.1
+### Description: Add mechanism to preserve and backup original CLAUDE.md context before modifications
+### Details:
+Create backup of original CLAUDE.md file as CLAUDE.original.md at container startup. Implement file existence checks and error handling for missing context files. Add versioning mechanism to track context modifications across iterations. Ensure atomic file operations to prevent corruption. Create recovery mechanism if context files are damaged.
+
+## 7. Build Context Merging Logic [pending]
+### Dependencies: 5.5, 5.6
+### Description: Implement file merging system to combine original and remediation contexts into final CLAUDE.md
+### Details:
+Concatenate CLAUDE.original.md and remediation-context.md into final CLAUDE.md file. Implement proper section separators and headers for clarity. Ensure UTF-8 encoding and proper line endings are preserved. Add validation to verify merged file is valid and complete. Handle edge cases like empty files or binary content.
+
+## 8. Create Integration Tests with PR Comments [pending]
+### Dependencies: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
+### Description: Develop comprehensive test suite for Rex container remediation mode using actual GitHub PR scenarios
+### Details:
+Create test fixtures with sample PR comments in various formats. Test complete remediation flow from environment detection to context generation. Verify GitHub API integration with mock responses and real API calls. Test iteration limit enforcement and escalation scenarios. Validate context merging produces expected output. Test error recovery and edge cases including network failures and malformed data.
+

@@ -1,0 +1,72 @@
+# Task ID: 1
+# Title: Setup GitHub Webhook Infrastructure
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Configure GitHub webhook event source and Argo Events infrastructure for PR comment detection and processing
+# Details:
+Create and deploy GitHub webhook EventSource configuration for capturing issue_comment and pull_request_review_comment events. Implementation:
+1. Deploy EventSource CRD with webhook endpoint configuration (port 12000)
+2. Configure GitHub App/OAuth token with appropriate scopes (repo:status, public_repo, write:discussion)
+3. Set up webhook secret for security
+4. Implement health check endpoint
+5. Configure event filtering for 'created' action only
+
+Key technologies:
+- Argo Events v1.9+ (latest stable)
+- GitHub Webhooks API v3
+- Kubernetes secrets for token management
+
+Pseudo-code for EventSource:
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github-pr-feedback
+spec:
+  github:
+    org:
+      repositories: [{names: ['*']}]
+      webhook: {endpoint: /github, port: '12000'}
+      events: [issue_comment, pull_request_review_comment]
+      apiToken: {name: github-token, key: token}
+```
+
+# Test Strategy:
+1. Send test webhook payloads using GitHub's webhook testing tool
+2. Verify EventSource receives and logs events correctly
+3. Test with malformed payloads to ensure error handling
+4. Validate webhook signature verification
+5. Load test with multiple concurrent events
+
+# Subtasks:
+## 1. Create EventSource CRD YAML Configuration [pending]
+### Dependencies: None
+### Description: Design and create the GitHub webhook EventSource Custom Resource Definition with proper repository targeting and event filtering
+### Details:
+Create the EventSource YAML manifest with GitHub provider configuration including: webhook endpoint on port 12000, repository targeting using wildcard pattern, event types (issue_comment, pull_request_review_comment), and reference to Kubernetes secret for API token. Include proper metadata, namespace configuration, and labels for resource management. The EventSource should be configured to listen specifically for comment creation events and ignore edits/deletions.
+
+## 2. Configure GitHub App and Create Kubernetes Secrets [pending]
+### Dependencies: None
+### Description: Set up GitHub App with required permissions and create Kubernetes secrets for secure token storage
+### Details:
+Create GitHub App with permissions: repo:status, public_repo, write:discussion. Generate private key and app installation token. Create Kubernetes secret 'github-token' containing the installation token in the same namespace as EventSource. Additionally create webhook secret for payload verification. Document the GitHub App ID, installation ID, and required scopes. Implement token rotation strategy if using time-limited tokens.
+
+## 3. Deploy EventSource and Configure Webhook Endpoint [pending]
+### Dependencies: 1.1, 1.2
+### Description: Deploy the EventSource to Kubernetes cluster and configure GitHub repository webhook settings
+### Details:
+Apply EventSource CRD to cluster using kubectl. Verify EventSource pod deployment and service creation. Configure GitHub repository webhook URL pointing to EventSource endpoint (cluster ingress/service URL on port 12000). Set webhook content type to application/json. Configure webhook secret for HMAC signature verification. Enable SSL verification if using HTTPS endpoint. Test webhook connectivity using GitHub's webhook delivery test feature.
+
+## 4. Implement Event Filtering and Validation Logic [pending]
+### Dependencies: 1.3
+### Description: Configure EventSource to filter for 'created' action only and validate incoming webhook payloads
+### Details:
+Add event filtering configuration to EventSource spec to process only 'created' actions for both issue_comment and pull_request_review_comment events. Implement webhook signature validation using HMAC-SHA256. Configure payload size limits and rate limiting. Add filtering to ignore bot comments except from authorized accounts (Tess QA). Implement logging for filtered events for debugging. Test with various comment actions (created, edited, deleted) to ensure proper filtering.
+
+## 5. Setup Health Monitoring and Webhook Testing [pending]
+### Dependencies: 1.4
+### Description: Implement health check endpoints and comprehensive testing procedures for webhook infrastructure
+### Details:
+Configure liveness and readiness probes for EventSource pod. Implement /health endpoint returning EventSource status and last received event timestamp. Set up Prometheus metrics for webhook events (received, processed, failed). Create testing suite: send test payloads via curl/Postman, verify signature validation with invalid secrets, test malformed JSON handling, load test with 50+ concurrent webhooks. Document troubleshooting procedures and common webhook delivery issues. Set up alerts for webhook failures or processing delays.
+

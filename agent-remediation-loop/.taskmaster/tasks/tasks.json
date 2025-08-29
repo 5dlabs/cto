@@ -1,0 +1,759 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup GitHub Webhook Infrastructure",
+        "description": "Configure GitHub webhook event source and Argo Events infrastructure for PR comment detection and processing",
+        "details": "Create and deploy GitHub webhook EventSource configuration for capturing issue_comment and pull_request_review_comment events. Implementation:\n1. Deploy EventSource CRD with webhook endpoint configuration (port 12000)\n2. Configure GitHub App/OAuth token with appropriate scopes (repo:status, public_repo, write:discussion)\n3. Set up webhook secret for security\n4. Implement health check endpoint\n5. Configure event filtering for 'created' action only\n\nKey technologies:\n- Argo Events v1.9+ (latest stable)\n- GitHub Webhooks API v3\n- Kubernetes secrets for token management\n\nPseudo-code for EventSource:\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: EventSource\nmetadata:\n  name: github-pr-feedback\nspec:\n  github:\n    org:\n      repositories: [{names: ['*']}]\n      webhook: {endpoint: /github, port: '12000'}\n      events: [issue_comment, pull_request_review_comment]\n      apiToken: {name: github-token, key: token}\n```",
+        "testStrategy": "1. Send test webhook payloads using GitHub's webhook testing tool\n2. Verify EventSource receives and logs events correctly\n3. Test with malformed payloads to ensure error handling\n4. Validate webhook signature verification\n5. Load test with multiple concurrent events",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create EventSource CRD YAML Configuration",
+            "description": "Design and create the GitHub webhook EventSource Custom Resource Definition with proper repository targeting and event filtering",
+            "dependencies": [],
+            "details": "Create the EventSource YAML manifest with GitHub provider configuration including: webhook endpoint on port 12000, repository targeting using wildcard pattern, event types (issue_comment, pull_request_review_comment), and reference to Kubernetes secret for API token. Include proper metadata, namespace configuration, and labels for resource management. The EventSource should be configured to listen specifically for comment creation events and ignore edits/deletions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Configure GitHub App and Create Kubernetes Secrets",
+            "description": "Set up GitHub App with required permissions and create Kubernetes secrets for secure token storage",
+            "dependencies": [],
+            "details": "Create GitHub App with permissions: repo:status, public_repo, write:discussion. Generate private key and app installation token. Create Kubernetes secret 'github-token' containing the installation token in the same namespace as EventSource. Additionally create webhook secret for payload verification. Document the GitHub App ID, installation ID, and required scopes. Implement token rotation strategy if using time-limited tokens.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Deploy EventSource and Configure Webhook Endpoint",
+            "description": "Deploy the EventSource to Kubernetes cluster and configure GitHub repository webhook settings",
+            "dependencies": [
+              "1.1",
+              "1.2"
+            ],
+            "details": "Apply EventSource CRD to cluster using kubectl. Verify EventSource pod deployment and service creation. Configure GitHub repository webhook URL pointing to EventSource endpoint (cluster ingress/service URL on port 12000). Set webhook content type to application/json. Configure webhook secret for HMAC signature verification. Enable SSL verification if using HTTPS endpoint. Test webhook connectivity using GitHub's webhook delivery test feature.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Event Filtering and Validation Logic",
+            "description": "Configure EventSource to filter for 'created' action only and validate incoming webhook payloads",
+            "dependencies": [
+              "1.3"
+            ],
+            "details": "Add event filtering configuration to EventSource spec to process only 'created' actions for both issue_comment and pull_request_review_comment events. Implement webhook signature validation using HMAC-SHA256. Configure payload size limits and rate limiting. Add filtering to ignore bot comments except from authorized accounts (Tess QA). Implement logging for filtered events for debugging. Test with various comment actions (created, edited, deleted) to ensure proper filtering.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Setup Health Monitoring and Webhook Testing",
+            "description": "Implement health check endpoints and comprehensive testing procedures for webhook infrastructure",
+            "dependencies": [
+              "1.4"
+            ],
+            "details": "Configure liveness and readiness probes for EventSource pod. Implement /health endpoint returning EventSource status and last received event timestamp. Set up Prometheus metrics for webhook events (received, processed, failed). Create testing suite: send test payloads via curl/Postman, verify signature validation with invalid secrets, test malformed JSON handling, load test with 50+ concurrent webhooks. Document troubleshooting procedures and common webhook delivery issues. Set up alerts for webhook failures or processing delays.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement Feedback Comment Parser",
+        "description": "Build robust parsing system to extract structured feedback from PR comments with '🔴 Required Changes' format",
+        "details": "Create a comment parsing module that extracts structured feedback data from Tess QA comments. Implementation in Rust/Go:\n\n1. Define data structures for feedback (IssueType, Severity, etc.)\n2. Implement regex patterns for extracting metadata\n3. Parse markdown checkboxes for acceptance criteria\n4. Handle edge cases and malformed comments\n5. Validate author authorization (must be Tess or approved reviewer)\n\nKey components:\n- Regex patterns for Issue Type/Severity extraction\n- Markdown parser for structured sections\n- Error handling with fallback to manual review\n\nPseudo-code:\n```rust\npub fn parse_feedback(comment: &str) -> Result<StructuredFeedback> {\n    if !comment.contains(\"🔴 Required Changes\") {\n        return Err(\"Not actionable feedback\");\n    }\n    \n    let issue_type = extract_pattern(r\"Issue Type.*\\[(.*?)\\]\");\n    let severity = extract_pattern(r\"Severity.*\\[(.*?)\\]\");\n    let criteria = extract_checkboxes(comment);\n    \n    Ok(StructuredFeedback {\n        issue_type: parse_issue_type(issue_type)?,\n        severity: parse_severity(severity)?,\n        criteria_not_met: criteria,\n        // ... other fields\n    })\n}\n```",
+        "testStrategy": "1. Unit tests with various comment formats (valid and invalid)\n2. Test edge cases: missing fields, special characters, long descriptions\n3. Performance tests with large comments\n4. Integration tests with actual GitHub comment payloads\n5. Security tests for injection attacks in comment content",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Data Structures and Enums",
+            "description": "Create comprehensive data structures and enums for representing structured feedback components",
+            "dependencies": [],
+            "details": "Define Rust/Go structs for StructuredFeedback, IssueType enum (security, performance, quality, etc.), Severity enum (critical, high, medium, low), CriteriaStatus, and FeedbackMetadata. Include fields for author validation, timestamps, PR context, and nested structures for complex feedback scenarios. Ensure proper serialization/deserialization support for JSON and implement Display traits for logging.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Regex Pattern Extraction",
+            "description": "Build regex-based metadata extraction system for parsing Issue Type, Severity, and other structured fields",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Create a regex pattern library with patterns for extracting Issue Type (r\"Issue Type.*\\[(.*?)\\]\"), Severity (r\"Severity.*\\[(.*?)\\]\"), affected files, line numbers, and custom metadata fields. Implement extract_pattern() function with proper error handling, support for multiline matching, and fallback strategies for variations in formatting. Include performance optimizations using compiled regex patterns.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build Markdown Checkbox Parser",
+            "description": "Implement parser for extracting and analyzing markdown checkboxes from acceptance criteria sections",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Create extract_checkboxes() function to parse markdown checkbox syntax (- [ ] and - [x]), maintain checkbox state and associated text, handle nested lists and indentation, and support various markdown flavors. Return structured data mapping criteria descriptions to their completion status. Handle edge cases like escaped characters, code blocks containing checkboxes, and malformed markdown.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add Author Validation Logic",
+            "description": "Implement authorization system to validate comment authors against approved reviewer list",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Build validate_author() function checking if comment author is Tess QA bot or in approved reviewer allowlist. Implement configurable allowlist management, support for team-based permissions, and integration with GitHub API for user verification. Add special handling for bot accounts, service accounts, and admin overrides. Include caching mechanism for authorization results to reduce API calls.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Error Handling and Fallbacks",
+            "description": "Create comprehensive error handling system with graceful degradation and manual review fallbacks",
+            "dependencies": [
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "Design error types for parsing failures (MalformedComment, MissingRequiredField, InvalidAuthor), implement Result<StructuredFeedback, ParseError> return types, create fallback parsing strategies for partial extraction, and add logging with context for debugging. Implement retry logic for transient failures, queue malformed comments for manual review, and provide detailed error messages for operators.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create Comprehensive Unit Tests",
+            "description": "Develop extensive test suite covering all parsing scenarios, edge cases, and security considerations",
+            "dependencies": [
+              "2.2",
+              "2.3",
+              "2.4",
+              "2.5"
+            ],
+            "details": "Write unit tests for valid comment parsing with all field combinations, malformed comments with missing/invalid fields, edge cases (empty comments, special characters, Unicode), performance tests with large comments (>10MB), security tests for injection attacks (XSS, command injection), regex performance and catastrophic backtracking prevention, and integration tests with real GitHub webhook payloads. Include property-based testing for fuzzing input validation.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Create Remediation Sensor and Trigger",
+        "description": "Deploy Argo Events Sensor to process feedback comments and trigger Rex remediation CodeRuns",
+        "details": "Implement Sensor that listens to GitHub webhook events and triggers remediation workflow:\n\n1. Create Sensor CRD with proper event filtering\n2. Extract task ID from PR labels using JSONPath\n3. Generate remediation CodeRun with feedback context\n4. Pass comment ID and iteration count to Rex\n5. Implement retry logic and error handling\n\nKey features:\n- JSONPath expressions for data extraction\n- Dynamic resource generation with templates\n- Proper label propagation\n- Event deduplication\n\nImplementation:\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Sensor\nmetadata:\n  name: pr-comment-remediation\nspec:\n  dependencies:\n    - name: feedback-comment\n      filters:\n        data:\n          - path: body.comment.body\n            comparator: \"~\"\n            value: \".*🔴 Required Changes.*\"\n  triggers:\n    - template:\n        k8s:\n          operation: create\n          parameters:\n            - src: {dependencyName: feedback-comment, dataKey: body.issue.number}\n              dest: spec.pr_number\n            - src: {dependencyName: feedback-comment, dataKey: body.comment.id}\n              dest: spec.pr_comment_id\n```",
+        "testStrategy": "1. Test sensor activation with valid feedback comments\n2. Verify CodeRun creation with correct parameters\n3. Test filtering logic (should ignore non-feedback comments)\n4. Validate task ID extraction from labels\n5. Test error scenarios and recovery mechanisms",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Sensor CRD with Event Dependencies",
+            "description": "Create the base Sensor Custom Resource Definition with GitHub webhook event dependencies and proper metadata",
+            "dependencies": [],
+            "details": "Implement the Sensor CRD structure with:\n- Metadata including name 'pr-comment-remediation' and namespace\n- Dependencies section defining 'feedback-comment' dependency\n- EventBus configuration for GitHub events\n- Proper API version (argoproj.io/v1alpha1) and kind\n- Annotations for documentation and versioning\n- Labels for organization and filtering",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Configure JSONPath Event Filters",
+            "description": "Implement JSONPath expressions to filter PR comments containing feedback markers and extract required data fields",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Set up comprehensive filtering logic:\n- Filter for comment body containing '🔴 Required Changes' pattern using regex comparator\n- Add path filters for action type (created/edited)\n- Implement JSONPath for extracting PR number (body.issue.number)\n- Extract comment ID (body.comment.id) and author (body.comment.user.login)\n- Add filters to exclude bot comments except from authorized quality agents\n- Implement data transformation expressions for nested JSON structures",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create CodeRun Resource Template",
+            "description": "Build the Kubernetes resource template for generating Rex remediation CodeRun objects with proper parameterization",
+            "dependencies": [
+              "3.2"
+            ],
+            "details": "Design CodeRun generation template:\n- Define K8s operation as 'create' with apiVersion and kind\n- Map webhook data to CodeRun spec fields using parameter substitution\n- Configure Rex container image and command arguments\n- Set environment variables for REMEDIATION_MODE, PR_COMMENT_ID, TASK_ID\n- Add resource limits and requests\n- Configure volume mounts for GitHub credentials and task context\n- Implement metadata labels for tracking and cleanup",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Task ID Extraction from PR Labels",
+            "description": "Create logic to extract task IDs from PR labels and map them to remediation context",
+            "dependencies": [
+              "3.3"
+            ],
+            "details": "Build task identification system:\n- Parse PR labels array using JSONPath (body.issue.labels[*].name)\n- Filter for labels matching 'task-*' pattern\n- Extract numeric task ID from label string\n- Implement fallback logic if task label is missing\n- Add validation for task ID format and existence\n- Map task ID to corresponding task context from ConfigMap\n- Handle multiple task labels scenario with priority logic",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add Iteration Counter and Limit Logic",
+            "description": "Implement iteration tracking to monitor remediation cycles and enforce limits with escalation triggers",
+            "dependencies": [
+              "3.4"
+            ],
+            "details": "Create iteration management system:\n- Read current iteration count from PR labels or annotations\n- Increment counter for each remediation trigger\n- Check against MAX_ITERATIONS environment variable (default: 3)\n- Implement escalation trigger when limit exceeded\n- Add iteration count to CodeRun metadata and environment\n- Create label update logic for iteration tracking\n- Generate metrics for iteration monitoring\n- Include iteration history in remediation context",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Configure Retry and Error Handling",
+            "description": "Implement robust retry mechanisms and error handling for sensor failures and resource creation issues",
+            "dependencies": [
+              "3.5"
+            ],
+            "details": "Build reliability features:\n- Configure exponential backoff retry policy (initial: 1s, max: 30s)\n- Set maximum retry attempts (default: 5)\n- Implement error categorization (transient vs permanent)\n- Add dead letter queue for failed events\n- Create error notification mechanism\n- Implement circuit breaker for GitHub API calls\n- Add timeout configurations for resource creation\n- Create recovery procedures for partial failures",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement Event Deduplication Mechanism",
+            "description": "Create deduplication logic to prevent duplicate remediation triggers from identical or rapid successive events",
+            "dependencies": [
+              "3.6"
+            ],
+            "details": "Design deduplication system:\n- Implement event ID generation using hash of comment ID + timestamp\n- Create Redis-based or ConfigMap cache for recent events (TTL: 5 minutes)\n- Add duplicate detection before trigger execution\n- Configure time window for considering events as duplicates\n- Implement event correlation for related comments\n- Add logging for skipped duplicate events\n- Create metrics for deduplication effectiveness\n- Test with rapid comment edits and webhook retries",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Implement State Management System",
+        "description": "Build ConfigMap-based state tracking for remediation iterations and feedback history",
+        "details": "Create state management system using Kubernetes ConfigMaps to track remediation progress:\n\n1. Design ConfigMap schema for state storage\n2. Implement CRUD operations for state management\n3. Add iteration counter with atomic updates\n4. Store feedback history as JSON array\n5. Implement state recovery and cleanup\n\nKey components:\n- ConfigMap per task (task-{id}-state)\n- Atomic increment operations\n- JSON serialization for complex data\n- TTL-based cleanup\n\nImplementation approach:\n```go\ntype StateManager struct {\n    client kubernetes.Interface\n    namespace string\n}\n\nfunc (sm *StateManager) IncrementIteration(taskID string) (int, error) {\n    cm, err := sm.getOrCreateConfigMap(taskID)\n    iteration, _ := strconv.Atoi(cm.Data[\"iteration\"])\n    \n    if iteration >= MAX_ITERATIONS {\n        return iteration, ErrMaxIterations\n    }\n    \n    cm.Data[\"iteration\"] = strconv.Itoa(iteration + 1)\n    cm.Data[\"last_update\"] = time.Now().Format(time.RFC3339)\n    \n    _, err = sm.client.CoreV1().ConfigMaps(sm.namespace).Update(cm)\n    return iteration + 1, err\n}\n```",
+        "testStrategy": "1. Test ConfigMap creation and updates\n2. Verify atomic iteration increments under concurrent access\n3. Test state recovery after system restart\n4. Validate JSON serialization/deserialization\n5. Test cleanup of old state data",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design ConfigMap Schema and Data Structure",
+            "description": "Design the schema for storing state data in Kubernetes ConfigMaps with proper field definitions and versioning",
+            "dependencies": [],
+            "details": "Define ConfigMap structure with fields: task_id, iteration (int), feedback_history (JSON array), last_update (RFC3339), status (string), error_messages (array), metadata (map). Create naming convention 'task-{id}-state'. Define data types and size limits considering ConfigMap 1MB restriction. Design version field for schema evolution.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement CRUD Operations for State Management",
+            "description": "Build Create, Read, Update, Delete operations for ConfigMap-based state storage with proper error handling",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Implement StateManager struct with Kubernetes client. Create methods: getOrCreateConfigMap(taskID), updateState(taskID, data), getState(taskID), deleteState(taskID). Add retry logic with exponential backoff for transient failures. Implement optimistic locking using resourceVersion for concurrent updates. Handle ConfigMap not found scenarios gracefully.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build Atomic Iteration Counter Logic",
+            "description": "Implement thread-safe iteration counter with atomic increment operations and maximum iteration enforcement",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "Create IncrementIteration(taskID) method with atomic updates using Kubernetes resourceVersion. Implement MAX_ITERATIONS constant (10). Add GetCurrentIteration(taskID) for reading. Use retry logic for handling concurrent modification conflicts. Include iteration history tracking with timestamps. Return ErrMaxIterations when limit reached.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Feedback History JSON Storage",
+            "description": "Build JSON serialization system for storing and retrieving feedback history as structured data in ConfigMaps",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "Create FeedbackEntry struct with fields: timestamp, author, severity, issue_type, description, resolved. Implement AppendFeedback(taskID, entry) and GetFeedbackHistory(taskID) methods. Add JSON validation and schema versioning. Implement compression for large feedback arrays. Handle malformed JSON recovery. Add pagination support for large histories.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create State Recovery and Consistency Mechanisms",
+            "description": "Implement state recovery system for handling crashes, restarts, and inconsistent states",
+            "dependencies": [
+              "4.3",
+              "4.4"
+            ],
+            "details": "Build RecoverState(taskID) method to restore from ConfigMap after crashes. Implement state validation to detect corrupted data. Create state snapshots before critical operations. Add consistency checks between iteration counter and feedback history. Implement automatic state repair for common corruption patterns. Add health check endpoint for state manager.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement TTL-based Cleanup Automation",
+            "description": "Build automated cleanup system to remove old state data based on time-to-live configurations",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "Create background goroutine for periodic cleanup scans (every 6 hours). Implement TTL checking based on last_update timestamp (default 7 days). Add CleanupOldStates() method with configurable retention period. Create soft delete with grace period before permanent removal. Implement cleanup metrics and logging. Add manual cleanup trigger endpoint for operations.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Enhance Rex Container for Remediation",
+        "description": "Modify Rex container script to handle remediation mode with feedback processing and iteration limits",
+        "details": "Extend Rex container startup script to support remediation workflow:\n\n1. Detect REMEDIATION_MODE environment variable\n2. Fetch PR comment using GitHub CLI (gh api)\n3. Parse feedback and extract metadata\n4. Check iteration limits and trigger escalation if exceeded\n5. Prepare enhanced context for Claude/AI model\n6. Preserve original task context while adding feedback\n\nBash script enhancements:\n```bash\n#!/bin/bash\nif [ \"$REMEDIATION_MODE\" = \"true\" ]; then\n    echo \"🔧 REMEDIATION MODE - Iteration $ITERATION_COUNT/10\"\n    \n    # Fetch comment\n    COMMENT=$(gh api /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID)\n    \n    # Check iteration limit\n    if [ \"$ITERATION_COUNT\" -ge \"10\" ]; then\n        gh pr comment $PR_NUMBER --body \"⚠️ Max iterations reached. Human intervention required.\"\n        exit 1\n    fi\n    \n    # Prepare remediation context\n    cat > /workspace/remediation-context.md << EOF\nYou are addressing QA feedback (Iteration $ITERATION_COUNT/10).\nFeedback: $(echo $COMMENT | jq -r .body)\nPriority: $SEVERITY\nPlease implement comprehensive fixes for all issues.\nEOF\n    \n    # Merge with original context\n    cat /workspace/CLAUDE.original.md /workspace/remediation-context.md > /workspace/CLAUDE.md\nfi\n```",
+        "testStrategy": "1. Test remediation mode activation and context preparation\n2. Verify GitHub API calls and error handling\n3. Test iteration limit enforcement and escalation\n4. Validate context merging preserves original requirements\n5. Test with various feedback formats and edge cases",
+        "priority": "high",
+        "dependencies": [
+          2,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Environment Variable Detection",
+            "description": "Add logic to detect and validate REMEDIATION_MODE environment variable in Rex container startup script",
+            "dependencies": [],
+            "details": "Create bash script section that checks for REMEDIATION_MODE environment variable at container startup. Validate required environment variables including ITERATION_COUNT, PR_NUMBER, OWNER, REPO, FEEDBACK_COMMENT_ID, and SEVERITY. Implement early exit if remediation mode is not enabled. Add proper logging for mode detection and validation results.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Integrate GitHub API Comment Fetching",
+            "description": "Implement GitHub CLI integration to fetch PR comment data using provided comment ID",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Use gh CLI tool to fetch comment from GitHub API endpoint /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID. Implement error handling for API failures including rate limiting, authentication errors, and network issues. Parse JSON response to extract comment body and metadata. Add retry logic with exponential backoff for transient failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build Feedback Parser and Metadata Extractor",
+            "description": "Create parsing logic to extract structured feedback data and metadata from fetched PR comments",
+            "dependencies": [
+              "5.2"
+            ],
+            "details": "Parse comment body to extract issue types, severity levels, and specific feedback items. Use jq or similar JSON processing to extract nested fields. Identify and parse markdown formatting including checkboxes and code blocks. Extract metadata such as author, timestamp, and comment ID. Validate feedback format and handle malformed comments gracefully.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Iteration Limit Checking",
+            "description": "Add iteration counter validation and escalation trigger when limits are exceeded",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Check ITERATION_COUNT against maximum threshold of 10 iterations. Implement escalation logic when limit is reached including posting warning comment to PR using gh pr comment. Set appropriate exit codes for different termination scenarios. Log iteration status and remaining attempts. Create mechanism to bypass limits for emergency fixes if needed.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create AI Context Preparation Module",
+            "description": "Build system to prepare enhanced context for Claude/AI model with remediation instructions",
+            "dependencies": [
+              "5.3",
+              "5.4"
+            ],
+            "details": "Generate remediation-context.md file with structured feedback information. Format feedback into clear AI instructions including iteration count, severity, and specific issues. Include relevant code snippets and error messages from feedback. Add contextual hints about common resolution patterns. Ensure context is concise yet comprehensive for effective AI processing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement Original Context Preservation",
+            "description": "Add mechanism to preserve and backup original CLAUDE.md context before modifications",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Create backup of original CLAUDE.md file as CLAUDE.original.md at container startup. Implement file existence checks and error handling for missing context files. Add versioning mechanism to track context modifications across iterations. Ensure atomic file operations to prevent corruption. Create recovery mechanism if context files are damaged.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Build Context Merging Logic",
+            "description": "Implement file merging system to combine original and remediation contexts into final CLAUDE.md",
+            "dependencies": [
+              "5.5",
+              "5.6"
+            ],
+            "details": "Concatenate CLAUDE.original.md and remediation-context.md into final CLAUDE.md file. Implement proper section separators and headers for clarity. Ensure UTF-8 encoding and proper line endings are preserved. Add validation to verify merged file is valid and complete. Handle edge cases like empty files or binary content.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Create Integration Tests with PR Comments",
+            "description": "Develop comprehensive test suite for Rex container remediation mode using actual GitHub PR scenarios",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.3",
+              "5.4",
+              "5.5",
+              "5.6",
+              "5.7"
+            ],
+            "details": "Create test fixtures with sample PR comments in various formats. Test complete remediation flow from environment detection to context generation. Verify GitHub API integration with mock responses and real API calls. Test iteration limit enforcement and escalation scenarios. Validate context merging produces expected output. Test error recovery and edge cases including network failures and malformed data.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement Agent Cancellation System",
+        "description": "Build system to cancel running Cleo/Tess agents when Rex pushes remediation fixes",
+        "details": "Create push-triggered cancellation mechanism for quality agents:\n\n1. Deploy sensor for Rex push events\n2. Implement CodeRun deletion by label selector\n3. Remove 'ready-for-qa' label from PR\n4. Add 'remediation-in-progress' label\n5. Handle race conditions and partial failures\n\nImplementation using Argo Events:\n```yaml\napiVersion: argoproj.io/v1alpha1\nkind: Sensor\nmetadata:\n  name: rex-push-cleanup\nspec:\n  dependencies:\n    - name: rex-push\n      filters:\n        data:\n          - path: body.pusher.name\n            value: [\"5DLabs-Rex[bot]\", \"5DLabs-Rex\"]\n  triggers:\n    - template:\n        k8s:\n          operation: delete\n          source:\n            resource:\n              apiVersion: platform.5dlabs.com/v1\n              kind: CodeRun\n          labelSelector:\n            matchExpressions:\n              - {key: agent-type, operator: In, values: [cleo, tess]}\n              - {key: task-id, operator: Exists}\n```\n\nGo implementation for label management:\n```go\nfunc (c *Controller) resetPRLabels(prNumber int) error {\n    client := github.NewClient(nil).WithAuthToken(token)\n    \n    // Remove ready-for-qa\n    _, err := client.Issues.RemoveLabelForIssue(ctx, owner, repo, prNumber, \"ready-for-qa\")\n    \n    // Add remediation-in-progress\n    _, _, err = client.Issues.AddLabelsToIssue(ctx, owner, repo, prNumber, []string{\"remediation-in-progress\"})\n    \n    return err\n}\n```",
+        "testStrategy": "1. Test agent cancellation on Rex push events\n2. Verify label management (removal and addition)\n3. Test with multiple concurrent agents\n4. Validate cleanup doesn't affect other tasks\n5. Test recovery from partial failures",
+        "priority": "high",
+        "dependencies": [
+          1,
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Deploy Rex Push Event Sensor",
+            "description": "Create and deploy Argo Events sensor to detect Rex bot push events on GitHub",
+            "dependencies": [],
+            "details": "Implement EventSource and Sensor configuration to capture GitHub webhook events when Rex pushes code. Configure filters to detect pushes from '5DLabs-Rex[bot]' and '5DLabs-Rex' users. Set up webhook secret validation and ensure proper event filtering to avoid false triggers. Deploy to Kubernetes cluster with appropriate namespace and RBAC permissions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement CodeRun Deletion Logic",
+            "description": "Build Kubernetes client to delete CodeRun resources based on label selectors",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create Go/Rust module using Kubernetes client-go to delete CodeRun resources matching specific labels (agent-type: cleo/tess, task-id exists). Implement batch deletion with proper error handling. Add retry logic for transient failures. Ensure deletion only affects CodeRuns for the specific PR/task being remediated.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build PR Label Management Module",
+            "description": "Implement GitHub API client to remove 'ready-for-qa' label from pull requests",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create GitHub client module to manage PR labels. Implement atomic label removal for 'ready-for-qa' with proper error handling. Use GitHub API v4 (GraphQL) for efficient operations. Add verification logic to ensure label exists before removal attempt. Include retry mechanism for API rate limiting scenarios.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add Remediation Progress Label",
+            "description": "Implement logic to add 'remediation-in-progress' label to PRs during remediation",
+            "dependencies": [
+              "6.3"
+            ],
+            "details": "Extend label management module to add 'remediation-in-progress' label atomically after removing 'ready-for-qa'. Implement idempotent operation to handle duplicate requests. Add timestamp metadata to track when remediation started. Ensure label is properly colored and visible in GitHub UI.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Race Condition Handler",
+            "description": "Build synchronization mechanism to handle concurrent agent operations safely",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Implement distributed locking using Kubernetes lease objects or Redis to prevent race conditions. Add transaction-like semantics for multi-step operations (delete CodeRun + update labels). Implement optimistic concurrency control with version checking. Add conflict resolution logic when multiple Rex instances push simultaneously. Include deadlock detection and recovery mechanisms.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create Partial Failure Recovery System",
+            "description": "Build recovery mechanism for handling partial failures in cancellation operations",
+            "dependencies": [
+              "6.5"
+            ],
+            "details": "Implement state tracking for multi-step cancellation process using ConfigMap or database. Add rollback capabilities when operations partially fail. Create reconciliation loop to detect and fix inconsistent states. Implement alerting for manual intervention when automatic recovery fails. Add comprehensive logging for debugging partial failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Develop Integration Tests for Concurrent Agents",
+            "description": "Create comprehensive test suite for agent cancellation with concurrent operations",
+            "dependencies": [
+              "6.1",
+              "6.2",
+              "6.3",
+              "6.4",
+              "6.5",
+              "6.6"
+            ],
+            "details": "Build integration tests simulating multiple Cleo/Tess agents running concurrently. Test Rex push triggering cancellation of correct agents only. Verify label transitions are atomic and consistent. Test recovery from network failures, API timeouts, and partial deletions. Include chaos testing with random failures. Validate no orphaned resources after cancellation. Test performance with 10+ concurrent agents.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Build Label-Based Workflow Orchestration",
+        "description": "Implement PR label management system for tracking remediation state and iteration counts",
+        "details": "Create comprehensive label management for workflow state tracking:\n\n1. Design label schema (task-{id}, iteration-{n}, status labels)\n2. Implement atomic label updates via GitHub API\n3. Handle label transitions based on workflow events\n4. Add skip-automation override detection\n5. Implement label cleanup after completion\n\nLabel state machine:\n- task-{id}: Persistent task association\n- iteration-{n}: Updated each remediation cycle\n- needs-remediation: Added by Tess\n- remediation-in-progress: Active during Rex fixes\n- ready-for-qa: Added after Cleo\n- approved: Final state\n- skip-automation: Human override\n\nImplementation:\n```typescript\nclass LabelOrchestrator {\n    async transitionState(pr: number, from: State, to: State) {\n        const labels = await this.getLabels(pr);\n        \n        if (labels.includes('skip-automation')) {\n            throw new Error('Automation disabled by human override');\n        }\n        \n        await this.removeLabel(pr, stateToLabel(from));\n        await this.addLabel(pr, stateToLabel(to));\n        \n        if (to === State.Remediation) {\n            const iteration = this.extractIteration(labels) + 1;\n            await this.updateIterationLabel(pr, iteration);\n        }\n    }\n}\n```",
+        "testStrategy": "1. Test all label state transitions\n2. Verify iteration counter updates\n3. Test skip-automation override behavior\n4. Validate concurrent label updates\n5. Test label cleanup after task completion",
+        "priority": "medium",
+        "dependencies": [
+          4,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design and Document Label Schema",
+            "description": "Define comprehensive label schema for workflow state tracking including naming conventions, state transitions, and usage guidelines",
+            "dependencies": [],
+            "details": "Create detailed documentation for label schema including: task-{id} format for task association, iteration-{n} counter format, status labels (needs-remediation, remediation-in-progress, ready-for-qa, approved), skip-automation override label. Document valid state transitions, label lifecycle, and cleanup rules. Create TypeScript interfaces for label types and state machine definitions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement GitHub API Label Integration",
+            "description": "Build GitHub API client wrapper for atomic label operations with rate limiting and retry logic",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "Implement GitHub API integration layer with methods for: getLabels(), addLabel(), removeLabel(), updateLabel(). Include rate limiting handling, exponential backoff for retries, batch operations support, and error handling for API failures. Ensure atomic operations using GitHub's label locking mechanism. Add logging and metrics collection for API calls.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build State Transition Logic Engine",
+            "description": "Implement core state machine for label transitions with validation and state consistency checks",
+            "dependencies": [
+              "7.1",
+              "7.2"
+            ],
+            "details": "Create LabelOrchestrator class with transitionState() method implementing state machine logic. Build state validation to ensure legal transitions only. Implement iteration counter extraction and increment logic. Add state history tracking for audit purposes. Include rollback capability for failed transitions. Implement stateToLabel() and labelToState() conversion functions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add Skip-Automation Override Detection",
+            "description": "Implement detection and handling of skip-automation label to disable automated workflows",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Build override detection system that checks for skip-automation label before any state transition. Implement early exit with appropriate error messages when override detected. Add notification system to alert relevant parties when automation is skipped. Include audit logging for override events. Create bypass mechanism for emergency situations with proper authorization.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Label Cleanup System",
+            "description": "Build automated cleanup for removing obsolete labels after workflow completion or termination",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Create cleanup manager that removes workflow labels after task completion. Implement TTL-based cleanup for abandoned tasks. Build selective cleanup that preserves task-{id} labels for history. Add cleanup triggers for success, failure, and timeout scenarios. Include dry-run mode for testing cleanup operations. Implement cleanup scheduling to avoid conflicts with active workflows.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Handle Concurrent Label Updates",
+            "description": "Implement concurrency control and conflict resolution for simultaneous label operations",
+            "dependencies": [
+              "7.2",
+              "7.3"
+            ],
+            "details": "Build optimistic locking mechanism using ETags or version numbers. Implement conflict detection and resolution strategies (last-write-wins, merge, or retry). Add distributed lock support using Redis or similar for critical sections. Create queue-based label update system to serialize conflicting operations. Include deadlock detection and prevention. Add metrics for concurrent operation conflicts and resolution success rates.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Implement Escalation and Termination Logic",
+        "description": "Build escalation system for max iterations and implement various termination conditions",
+        "details": "Create comprehensive termination and escalation handling:\n\n1. Implement iteration limit checking (max 10)\n2. Create escalation notification system\n3. Add timeout protection (4-hour limit)\n4. Implement success criteria detection\n5. Handle manual intervention requests\n\nEscalation triggers:\n- Max iterations reached\n- Timeout exceeded\n- Critical errors\n- Manual override requested\n\nImplementation:\n```rust\npub struct EscalationManager {\n    max_iterations: u8,\n    timeout_duration: Duration,\n    notification_channels: Vec<NotificationChannel>,\n}\n\nimpl EscalationManager {\n    pub async fn check_escalation(&self, state: &RemediationState) -> Result<EscalationAction> {\n        // Check iteration limit\n        if state.iteration >= self.max_iterations {\n            self.notify_escalation(\"Max iterations reached\", &state).await?;\n            return Ok(EscalationAction::StopAndNotify);\n        }\n        \n        // Check timeout\n        if Utc::now() - state.start_time > self.timeout_duration {\n            self.notify_escalation(\"Timeout exceeded\", &state).await?;\n            return Ok(EscalationAction::StopAndNotify);\n        }\n        \n        // Check for skip-automation label\n        if self.has_skip_label(&state.pr_number).await? {\n            return Ok(EscalationAction::SkipAutomation);\n        }\n        \n        Ok(EscalationAction::Continue)\n    }\n    \n    async fn post_escalation_comment(&self, pr: u32, reason: &str) {\n        let comment = format!(\n            \"## 🚨 Remediation Escalation\\n\\n\\\n            **Reason**: {}\\n\\n\\\n            Automated remediation has been stopped. Human intervention required.\\\n            \\n\\ncc: @platform-team @cto\",\n            reason\n        );\n        \n        github_client.create_comment(pr, &comment).await?;\n    }\n}\n```",
+        "testStrategy": "1. Test iteration limit enforcement\n2. Verify timeout detection and handling\n3. Test escalation notifications (PR comments, alerts)\n4. Validate skip-automation label detection\n5. Test graceful termination and cleanup",
+        "priority": "high",
+        "dependencies": [
+          4,
+          5,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Iteration Limit Checking",
+            "description": "Create iteration counter and limit enforcement mechanism with max 10 iterations",
+            "dependencies": [],
+            "details": "Implement the iteration tracking and checking logic in EscalationManager. Create atomic counter updates in state management, implement check_iteration_limit() method that compares current iteration against max_iterations constant (10), and ensure thread-safe increment operations. Include proper error handling for state retrieval failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Timeout Detection System",
+            "description": "Build 4-hour timeout detection mechanism with timestamp tracking",
+            "dependencies": [],
+            "details": "Create timeout monitoring system that tracks start_time in RemediationState, implements check_timeout() method comparing elapsed time against 4-hour Duration constant, handles timezone considerations using UTC timestamps, and includes grace period handling for long-running operations. Implement proper time calculation using chrono crate.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build Critical Error Detection",
+            "description": "Implement system to identify and classify critical errors requiring escalation",
+            "dependencies": [],
+            "details": "Create error classification system with CriticalError enum defining error types (SystemFailure, AuthenticationError, RateLimitExceeded, etc.), implement is_critical_error() method to analyze error types and severity, add pattern matching for known critical error signatures, and include error context preservation for debugging. Handle both Rex agent errors and external API failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Manual Override Detection",
+            "description": "Create system to detect and respond to manual intervention requests via PR labels",
+            "dependencies": [],
+            "details": "Build manual override detection using has_skip_label() method checking for 'skip-automation' label, implement label monitoring via GitHub API, add support for multiple override labels ('manual-review-required', 'pause-automation'), and include label change event handling. Ensure proper authorization checks for label modifications.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create Escalation Notification System",
+            "description": "Build multi-channel notification system for escalation events",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.3",
+              "8.4"
+            ],
+            "details": "Implement NotificationChannel trait with implementations for GitHub comments, Slack webhooks, and email notifications. Create notify_escalation() method that formats escalation messages with context, sends notifications to configured channels asynchronously, includes retry logic for failed notifications, and maintains notification history. Add @mentions for platform-team and CTO in GitHub comments.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement PR Comment Posting for Escalations",
+            "description": "Create formatted GitHub PR comment system for escalation notifications",
+            "dependencies": [
+              "8.5"
+            ],
+            "details": "Build post_escalation_comment() method that creates structured markdown comments with escalation emoji (🚨), reason formatting, remediation history summary, and team mentions. Include comment deduplication to prevent spam, rate limiting compliance, and proper error handling for GitHub API failures. Add links to relevant logs and state information.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement Success Criteria Detection",
+            "description": "Build system to detect successful remediation completion and exit gracefully",
+            "dependencies": [],
+            "details": "Create success detection logic checking for all tests passing, Tess approval comments, resolved feedback items, and clean CI status. Implement check_success_criteria() method that validates PR approval status, verifies no pending required changes, confirms all quality checks passed, and detects explicit success signals. Include success notification formatting.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Build Graceful Termination Procedures",
+            "description": "Implement cleanup and state preservation during termination",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.3",
+              "8.4",
+              "8.7"
+            ],
+            "details": "Create terminate_remediation() method handling state persistence to ConfigMap, cleanup of temporary resources, final status comment posting, and metric recording. Implement proper cleanup for running Rex agents, label updates (remove 'remediation-in-progress'), state archival for debugging, and webhook notification of termination. Ensure idempotent cleanup operations.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Create Comprehensive Termination Path Testing",
+            "description": "Implement full test coverage for all escalation and termination scenarios",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.3",
+              "8.4",
+              "8.5",
+              "8.6",
+              "8.7",
+              "8.8"
+            ],
+            "details": "Build test suite covering iteration limit boundary cases (9, 10, 11 iterations), timeout scenarios with time mocking, critical error escalation paths, manual override label detection, notification delivery verification, success criteria validation, and cleanup operation testing. Include integration tests simulating full escalation flows, concurrent termination handling, and recovery from partial failures. Add performance tests for high-load scenarios.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Create Monitoring and Observability",
+        "description": "Implement comprehensive monitoring with Prometheus metrics, structured logging, and alerting",
+        "details": "Build observability layer for remediation loop monitoring:\n\n1. Define and expose Prometheus metrics\n2. Implement structured JSON logging\n3. Create Grafana dashboards\n4. Set up alerting rules\n5. Add distributed tracing\n\nKey metrics:\n- remediation_cycles_total{task_id, outcome}\n- remediation_iteration_count{task_id}\n- remediation_duration_seconds{task_id, iteration}\n- agent_cancellations_total{agent_type}\n- escalations_total{reason}\n\nImplementation:\n```go\nvar (\n    remediationCycles = prometheus.NewCounterVec(\n        prometheus.CounterOpts{\n            Name: \"remediation_cycles_total\",\n            Help: \"Total remediation cycles by outcome\",\n        },\n        []string{\"task_id\", \"outcome\"},\n    )\n    \n    remediationDuration = prometheus.NewHistogramVec(\n        prometheus.HistogramOpts{\n            Name: \"remediation_duration_seconds\",\n            Help: \"Duration of remediation cycles\",\n            Buckets: prometheus.ExponentialBuckets(10, 2, 10),\n        },\n        []string{\"task_id\", \"iteration\"},\n    )\n)\n\n// Structured logging\nlogger.Info(\"remediation_started\",\n    zap.String(\"task_id\", taskID),\n    zap.Int(\"iteration\", iteration),\n    zap.String(\"severity\", severity),\n    zap.String(\"trigger\", \"pr_comment\"),\n)\n```\n\nAlerting rules:\n```yaml\nalerts:\n  - name: ExcessiveRemediationCycles\n    expr: remediation_iteration_count > 7\n    annotations:\n      summary: \"Task {{$labels.task_id}} has {{$value}} cycles\"\n  - name: RemediationStuck\n    expr: rate(remediation_cycles_total[2h]) == 0\n    annotations:\n      summary: \"No progress in 2 hours\"\n```",
+        "testStrategy": "1. Verify metrics are correctly exposed and incremented\n2. Test structured logging output format\n3. Validate alerting rules trigger correctly\n4. Test dashboard data aggregation\n5. Verify trace propagation across services",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          6,
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Implement Security and RBAC Controls",
+        "description": "Set up security controls, RBAC permissions, and validation for the remediation system",
+        "details": "Implement comprehensive security layer:\n\n1. Configure minimal GitHub token permissions\n2. Set up Kubernetes RBAC for agent operations\n3. Implement comment validation and sanitization\n4. Add rate limiting for API calls\n5. Implement audit logging\n\nSecurity measures:\n- Token scoping (repo:status, public_repo, write:discussion)\n- Input validation against injection attacks\n- Rate limiting (100 req/min per task)\n- Authorized reviewer allowlist\n- Audit trail for all operations\n\nRBAC configuration:\n```yaml\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: remediation-controller\nrules:\n  - apiGroups: [\"\"]\n    resources: [\"configmaps\"]\n    verbs: [\"get\", \"list\", \"create\", \"update\", \"patch\"]\n  - apiGroups: [\"platform.5dlabs.com\"]\n    resources: [\"coderuns\"]\n    verbs: [\"get\", \"list\", \"create\", \"delete\"]\n  - apiGroups: [\"argoproj.io\"]\n    resources: [\"sensors\", \"eventsources\"]\n    verbs: [\"get\", \"list\", \"watch\"]\n```\n\nValidation implementation:\n```go\nfunc validateFeedback(feedback *StructuredFeedback, author string) error {\n    // Check authorized reviewers\n    if !isAuthorizedReviewer(author) {\n        return fmt.Errorf(\"unauthorized feedback source: %s\", author)\n    }\n    \n    // Sanitize input\n    feedback.Description = sanitizeHTML(feedback.Description)\n    \n    // Check for malicious patterns\n    if containsMaliciousPattern(feedback.Description) {\n        auditLog.Warn(\"malicious content detected\", \"author\", author)\n        return fmt.Errorf(\"invalid feedback content\")\n    }\n    \n    // Validate severity and type\n    if !isValidSeverity(feedback.Severity) || !isValidIssueType(feedback.IssueType) {\n        return fmt.Errorf(\"invalid feedback metadata\")\n    }\n    \n    return nil\n}\n```",
+        "testStrategy": "1. Test token permission restrictions\n2. Verify RBAC prevents unauthorized operations\n3. Test input validation with malicious payloads\n4. Verify rate limiting enforcement\n5. Test audit logging completeness and accuracy",
+        "priority": "high",
+        "dependencies": [
+          1,
+          3,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-29T19:26:25.611Z",
+      "updated": "2025-08-29T19:26:25.611Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
