@@ -1,0 +1,132 @@
+# Task ID: 6
+# Title: Implement Agent Cancellation System
+# Status: pending
+# Dependencies: 1, 3, 4
+# Priority: high
+# Description: Enhance existing agent cancellation system to handle concurrent operations and improve race condition handling when Rex pushes remediation fixes
+# Details:
+Enhance the existing implementation-agent-remediation sensor with advanced cancellation capabilities:
+
+**Existing Foundation (Already Implemented):**
+- Rex push event detection via implementation-agent-remediation sensor
+- Basic CodeRun deletion for Cleo/Tess agents
+- PR label management (removes 'ready-for-qa', adds 'remediation-in-progress')
+
+**Required Enhancements:**
+1. Concurrent operation handling with distributed locking
+2. Advanced race condition prevention
+3. State-aware cancellation logic
+4. Integration with state management system (Task 4)
+5. Partial failure recovery mechanisms
+
+**Enhanced Sensor Configuration:**
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: implementation-agent-remediation  # Existing sensor
+spec:
+  dependencies:
+    - name: rex-push
+      filters:
+        data:
+          - path: body.pusher.name
+            value: ["5DLabs-Rex[bot]", "5DLabs-Rex"]
+  triggers:
+    - template:
+        k8s:
+          operation: patch  # Enhanced with state checks
+          source:
+            resource:
+              apiVersion: platform.5dlabs.com/v1
+              kind: CodeRun
+          labelSelector:
+            matchExpressions:
+              - {key: agent-type, operator: In, values: [cleo, tess]}
+              - {key: task-id, operator: Exists}
+```
+
+**Enhanced Go Controller Logic:**
+```go
+func (c *Controller) enhancedCancellation(prNumber int, taskID string) error {
+    // Acquire distributed lock
+    lock := c.acquireLock(fmt.Sprintf("cancel-%s", taskID))
+    defer lock.Release()
+    
+    // Check current state from ConfigMap
+    state := c.getRemediationState(taskID)
+    if state.CancellationInProgress {
+        return nil // Already being handled
+    }
+    
+    // Mark cancellation started
+    state.CancellationInProgress = true
+    c.updateRemediationState(taskID, state)
+    
+    // Perform cancellation with retry logic
+    err := c.cancelWithRetry(taskID, 3)
+    
+    // Update labels atomically
+    c.updatePRLabelsAtomic(prNumber, state)
+    
+    return err
+}
+```
+
+# Test Strategy:
+1. Test enhanced cancellation with 10+ concurrent agents
+2. Verify distributed locking prevents race conditions
+3. Test integration with state management system
+4. Validate partial failure recovery mechanisms
+5. Test atomic label transitions under load
+6. Verify no orphaned resources after concurrent cancellations
+
+# Subtasks:
+## 1. Enhance Existing Rex Push Event Sensor [pending]
+### Dependencies: None
+### Description: Extend the implementation-agent-remediation sensor with advanced filtering and state checks
+### Details:
+Modify the existing sensor in infra/gitops/resources/github-webhooks/play-workflow-sensors.yaml to add: 1) Additional filtering for concurrent push events, 2) State validation before triggering cancellation, 3) Enhanced error handling for webhook processing, 4) Correlation ID generation for tracking related operations. Ensure backward compatibility with current functionality.
+
+## 2. Implement Distributed Locking for Concurrent Operations [pending]
+### Dependencies: None
+### Description: Build distributed locking mechanism using Kubernetes leases to prevent race conditions
+### Details:
+Create Go module using k8s.io/client-go coordination/v1 API for distributed locking. Implement lease-based locking with automatic renewal and timeout. Add lock acquisition with exponential backoff. Create lock namespace isolation per task-id. Implement deadlock detection using lease annotations. Ensure locks are released on controller restart or crash.
+
+## 3. Enhance CodeRun Deletion with State Awareness [pending]
+### Dependencies: 6.1, 6.2
+### Description: Improve CodeRun deletion logic to check state before cancellation
+### Details:
+Extend existing deletion logic to: 1) Query state ConfigMap before deletion, 2) Verify agent hasn't already completed, 3) Implement graceful termination with SIGTERM before SIGKILL, 4) Add deletion confirmation via status check, 5) Update state after successful deletion. Integrate with Task 4's state management system.
+
+## 4. Implement Atomic Label Transitions [pending]
+### Dependencies: 6.2
+### Description: Enhance PR label management with atomic operations and conflict resolution
+### Details:
+Improve existing label management to: 1) Use GitHub's ETag for optimistic concurrency control, 2) Implement compare-and-swap operations for label updates, 3) Add retry logic with exponential backoff for conflicts, 4) Batch label operations to reduce API calls, 5) Add validation that correct labels exist before/after operations.
+
+## 5. Build Concurrent Cancellation Coordinator [pending]
+### Dependencies: 6.2, 6.3, 6.4
+### Description: Create coordination layer for managing multiple simultaneous cancellations
+### Details:
+Implement coordinator that: 1) Tracks all active cancellations in shared ConfigMap, 2) Prevents duplicate cancellation requests, 3) Manages cancellation priority queue, 4) Implements circuit breaker for cascading failures, 5) Provides cancellation status API for monitoring. Add metrics for cancellation success/failure rates.
+
+## 6. Implement Advanced Recovery System [pending]
+### Dependencies: 6.5
+### Description: Build sophisticated recovery mechanism for partial failures during concurrent operations
+### Details:
+Create recovery system that: 1) Detects partial failures through state inconsistencies, 2) Implements automatic rollback for failed multi-step operations, 3) Adds manual intervention triggers for unrecoverable states, 4) Creates reconciliation loop running every 30 seconds, 5) Implements cleanup for orphaned locks and resources. Include comprehensive observability.
+
+## 7. Create Stress Tests for Concurrent Cancellations [pending]
+### Dependencies: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
+### Description: Develop comprehensive test suite for high-concurrency scenarios
+### Details:
+Build stress tests that: 1) Simulate 20+ concurrent Rex pushes, 2) Test with random network delays and failures, 3) Verify no lost cancellations or orphaned agents, 4) Test lock contention and timeout scenarios, 5) Validate state consistency after chaos testing, 6) Measure cancellation latency under load. Include performance regression tests.
+
+## 8. Integrate with State Management System [pending]
+### Dependencies: 6.3, 6.5
+### Description: Connect enhanced cancellation system with Task 4's state management
+### Details:
+Implement integration that: 1) Updates remediation state during cancellation, 2) Records cancellation history in state ConfigMap, 3) Uses state to determine if re-cancellation is needed, 4) Implements state-based recovery decisions, 5) Adds state validation before and after cancellation operations.
+

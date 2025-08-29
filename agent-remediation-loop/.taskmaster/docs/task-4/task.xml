@@ -1,0 +1,140 @@
+<prompt>
+    <role>You are a senior Rust developer specializing in Kubernetes controller development and state management systems.</role>
+    <task>
+        <id>4</id>
+        <title>Implement State Management System</title>
+        <description>Build comprehensive ConfigMap-based state tracking for remediation iterations and feedback history in Rust controller</description>
+        <priority>medium</priority>
+        <status>pending</status>
+        <dependencies>None</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Use Kubernetes ConfigMaps as storage backend with JSON serialization</spec>
+        <spec>Implement atomic operations using server-side apply for concurrent safety</spec>
+        <spec>Create remediation::state module in controller/src/ directory</spec>
+        <spec>Support maximum 10 iterations with atomic counter and overflow protection</spec>
+        <spec>Store feedback history as JSON-serialized Vec&lt;FeedbackEntry&gt; with compression</spec>
+        <spec>Handle ConfigMap 1MB size limit with automatic history compression</spec>
+        <spec>Implement TTL-based cleanup using Tokio background tasks (6-hour intervals)</spec>
+        <spec>Provide state recovery mechanisms for controller restart scenarios</spec>
+        <spec>Use serde for JSON serialization with proper error handling</spec>
+        <spec>Integrate with existing kube-rs client and service account</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create a comprehensive state management system that enhances the existing Rust controller with persistent state capabilities:
+        
+        1. Design data structures in controller/src/remediation/state.rs:
+           - RemediationState struct with task_id, iteration, status, feedback_history, timestamps, metadata
+           - FeedbackEntry struct with timestamp, author, severity, issue_type, description, resolved status
+           - Enums for RemediationStatus, FeedbackSeverity, IssueType with serde derives
+           - Custom StateError enum for comprehensive error handling
+        
+        2. Implement StateManager with Kubernetes integration:
+           - Constructor taking existing Kube Client and namespace
+           - get_state() method to retrieve state from ConfigMaps
+           - create_or_update_state() using server-side apply for atomicity
+           - configmap_name() helper generating "task-{id}-state" names
+           - Proper ConfigMap labels and annotations for management
+        
+        3. Build atomic iteration counter:
+           - increment_iteration() method with MAX_ITERATIONS=10 enforcement  
+           - get_current_iteration() for reading current state
+           - Atomic operations using Kubernetes server-side apply
+           - Concurrent modification handling with optimistic locking
+           - Iteration history tracking with chronological metadata
+        
+        4. Implement feedback history management:
+           - append_feedback() method with JSON serialization
+           - get_feedback_history() for retrieving stored entries
+           - Automatic compression when approaching 1MB ConfigMap limit
+           - Smart truncation preserving recent and high-priority feedback
+           - Deduplication logic to prevent duplicate entries
+        
+        5. Create state recovery system:
+           - recover_state() method for controller restart scenarios
+           - State validation with automatic repair for inconsistencies
+           - Version compatibility checking and schema migration support
+           - Integration with controller reconciliation loop
+           - Recovery metadata tracking for audit purposes
+        
+        6. Implement TTL cleanup with Tokio:
+           - Background task running every 6 hours using tokio::time::interval
+           - cleanup_old_states() method with configurable retention (7 days default)
+           - Label-based ConfigMap querying for efficient cleanup operations
+           - Protection for active tasks, soft delete with grace period
+           - Cleanup metrics and comprehensive logging
+        
+        7. Add comprehensive error handling:
+           - Custom StateError enum covering all failure modes
+           - Proper error propagation through Result types
+           - Structured logging using tracing crate
+           - Integration with controller's existing error patterns
+        
+        The system must handle concurrent access from multiple controller replicas, provide atomic operations, and maintain data consistency across restarts while integrating seamlessly with the existing controller infrastructure.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>StateManager module created at controller/src/remediation/state.rs with proper integration</criterion>
+        <criterion>RemediationState and FeedbackEntry data structures with complete serde serialization</criterion>
+        <criterion>ConfigMap-based storage using "task-{id}-state" naming convention</criterion>
+        <criterion>Atomic iteration counter with MAX_ITERATIONS=10 enforcement</criterion>
+        <criterion>Feedback history management with JSON storage and automatic compression</criterion>
+        <criterion>State recovery system handling controller restarts and data validation</criterion>
+        <criterion>TTL cleanup system with Tokio background tasks and configurable retention</criterion>
+        <criterion>Comprehensive error handling with custom StateError enum</criterion>
+        <criterion>Structured logging integrated with tracing crate</criterion>
+        <criterion>Concurrent access safety with server-side apply atomicity</criterion>
+        <criterion>ConfigMap size monitoring and handling (1MB limit)</criterion>
+        <criterion>Integration with existing controller without breaking changes</criterion>
+        <criterion>Unit and integration test coverage above 90%</criterion>
+        <criterion>Performance requirements met (sub-second operations)</criterion>
+        <criterion>Recovery from corrupted or missing state data</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        1. Unit Testing:
+           - Test all StateManager methods with mock Kubernetes client
+           - Validate data structure serialization/deserialization with edge cases
+           - Test error conditions and recovery scenarios in isolation
+           - Verify iteration counter atomicity and limit enforcement
+           - Test feedback history compression and deduplication logic
+        
+        2. Integration Testing:
+           - Deploy to real Kubernetes cluster and test ConfigMap operations
+           - Test concurrent access with multiple controller instances
+           - Validate state persistence across controller restarts
+           - Test cleanup operations with real ConfigMaps and TTL scenarios
+           - Verify performance under realistic load conditions
+        
+        3. State Recovery Testing:
+           - Test recovery from various corruption scenarios
+           - Validate state repair and migration functionality
+           - Test integration with controller reconciliation loop
+           - Verify graceful handling of missing or invalid ConfigMaps
+        
+        4. Performance Testing:
+           - Measure operation latencies under normal and high load
+           - Test memory usage with large feedback histories
+           - Validate cleanup performance with many ConfigMaps
+           - Test concurrent access performance and scalability
+        
+        5. Error Handling Testing:
+           - Test all error conditions with proper error propagation
+           - Validate logging output and structured error information
+           - Test recovery from transient Kubernetes API failures
+           - Verify graceful degradation when storage unavailable
+    </test_strategy>
+    <instructions>
+        Start by examining the existing controller structure to understand patterns and conventions. Pay special attention to how the controller handles Kubernetes resources, error handling, and logging.
+        
+        Design comprehensive data structures first, ensuring they can evolve over time with proper versioning. Consider the full lifecycle of state data from creation through cleanup.
+        
+        Implement atomic operations carefully using Kubernetes server-side apply to ensure data consistency across multiple controller replicas. Test concurrent access scenarios thoroughly.
+        
+        Create robust error handling that integrates with the controller's existing patterns. Ensure all operations are properly logged and monitored.
+        
+        Build comprehensive tests covering all functionality including edge cases and failure scenarios. Test with real Kubernetes clusters to validate integration.
+        
+        Focus on performance and resource efficiency, especially when dealing with large feedback histories that approach ConfigMap size limits.
+        
+        Document all public interfaces thoroughly and provide clear examples of how to integrate the StateManager with existing controller functionality.
+    </instructions>
+</prompt>
