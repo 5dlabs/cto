@@ -398,16 +398,16 @@ echo "🔍 Testing task-master command..."
 task-master --version || echo "⚠️ task-master --version failed"
 task-master --help > /dev/null 2>&1 || echo "⚠️ task-master --help failed"
 
-# First attempt: Try clean init with all flags
-echo "🔍 Attempting TaskMaster init with full flags..."
+# First attempt: Try clean init with minimal IDE files
+echo "🔍 Attempting TaskMaster init..."
 # Use the full path to ensure we're calling the right binary
+# Note: Removed --rules flag to avoid creating unnecessary IDE files
+# Note: Removed --aliases flag as not needed in container environment
 "$TASK_MASTER_PATH" init --yes \
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
-    --rules "claude" \
-    --skip-install \
-    --aliases
+    --skip-install
 INIT_EXIT_CODE=$?
 
 echo "🔍 Init result: exit code $INIT_EXIT_CODE"
@@ -528,6 +528,11 @@ fi
 
 # Configure Claude Code to use ANTHROPIC_API_KEY
 echo "🔧 Configuring Claude Code authentication..."
+# TaskMaster expects ANTHROPIC_API_KEY in environment, not config file
+# Export it to ensure it's available to child processes
+export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+
+# Also try to set up Claude Code config in case it's needed
 # Try to create config directory, fallback to /tmp if permission denied
 if mkdir -p ~/.config/claude-code 2>/dev/null; then
     CONFIG_DIR=~/.config/claude-code
@@ -536,6 +541,8 @@ else
     CONFIG_DIR=/tmp/claude-code-config
     mkdir -p $CONFIG_DIR
     echo "⚠️ Permission denied for user config, using temp directory: $CONFIG_DIR"
+    # Set environment variable so Claude Code knows where to find config
+    export CLAUDE_CONFIG_DIR="$CONFIG_DIR"
 fi
 
 cat > $CONFIG_DIR/config.json << EOF
@@ -543,6 +550,9 @@ cat > $CONFIG_DIR/config.json << EOF
   "apiKey": "$ANTHROPIC_API_KEY"
 }
 EOF
+
+# Debug: Verify API key is set
+echo "🔍 DEBUG: ANTHROPIC_API_KEY is ${ANTHROPIC_API_KEY:+[SET]}${ANTHROPIC_API_KEY:-[NOT SET]}"
 
 # Set up dynamic provider selection for different operations
 echo "✅ Configuring TaskMaster models: Primary=$PRIMARY_MODEL, Research=$RESEARCH_MODEL, Fallback=$FALLBACK_MODEL"
@@ -626,9 +636,15 @@ echo "✅ Claude Code configuration written"
 echo "🔍 DEBUG: TaskMaster config contents:"
 cat .taskmaster/config.json | jq '.' || echo "Failed to display config"
 
-# Parse PRD with Claude Code (for research and codebase analysis)
-echo "📄 Parsing PRD to generate tasks with Research model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)..."
-# Note: Removed --research flag as we're explicitly setting research model in config
+# Parse PRD with main model (not research, to avoid Perplexity)
+echo "📄 Parsing PRD to generate tasks with Primary model: $PRIMARY_MODEL ($PRIMARY_PROVIDER)..."
+# Debug: Check if claude command is available (for claude-code provider)
+if [ "$PRIMARY_PROVIDER" = "claude-code" ] || [ "$RESEARCH_PROVIDER" = "claude-code" ]; then
+    echo "🔍 DEBUG: Checking claude-code availability..."
+    which claude || echo "⚠️ claude command not found in PATH"
+    echo "🔍 DEBUG: PATH=$PATH"
+fi
+# Note: Using main model, not research flag which forces Perplexity
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
     --force || {
