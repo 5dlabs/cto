@@ -331,7 +331,7 @@ echo "🔍 Attempting TaskMaster init with full flags..."
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
-    --rules "claude" \
+    --rules "claude,cursor" \
     --skip-install \
     --aliases
 INIT_EXIT_CODE=$?
