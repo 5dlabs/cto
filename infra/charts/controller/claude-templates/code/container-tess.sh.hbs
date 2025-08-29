@@ -1204,10 +1204,16 @@ echo "🔍 Claude PID: $CLAUDE_PID"
 
 # Wait for Claude process to complete
 echo "⏳ Waiting for Claude process to complete..."
-wait "$CLAUDE_PID"
+wait "$CLAUDE_PID" 2>/dev/null || true
 CLAUDE_EXIT_CODE=$?
 
 echo "🔚 Claude process completed with exit code: $CLAUDE_EXIT_CODE"
+
+# Safety check: Ensure we don't have any syntax errors that could cause command interpretation issues
+echo "🔍 DEBUG: Performing safety checks..."
+if [ -n "$(echo "$INITIAL_GUIDANCE" | grep '^fix:')" ]; then
+  echo "⚠️ WARNING: Found lines starting with 'fix:' in INITIAL_GUIDANCE - this could cause command interpretation errors"
+fi
 
 # Close FIFO writer if it was opened
 exec 9>&- 2>/dev/null || true
@@ -1221,6 +1227,10 @@ echo "🔍 Posting PR review based on testing results..."
 PR_NUM="${PR_NUMBER:-{{pr_number}}}"
 TASK_ID="{{task_id}}"
 
+# Debug: Show what we got for PR_NUM
+echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}', pr_number template='{{pr_number}}'"
+echo "🔍 DEBUG: Resolved PR_NUM='$PR_NUM'"
+
 # Check CI status to determine review type
 echo "📊 Checking CI status for PR #$PR_NUM..."
 
@@ -1228,6 +1238,8 @@ echo "📊 Checking CI status for PR #$PR_NUM..."
 if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
   echo "❌ Error: PR_NUM is empty or not properly set"
   echo "⚠️ Cannot proceed with PR review - invalid PR number"
+  echo "🔍 DEBUG: This usually means PR_NUMBER environment variable is not set"
+  echo "🔍 DEBUG: Check that the CodeRun spec has pr_number set"
   exit 1
 fi
 
@@ -1605,42 +1617,80 @@ echo "  - PR Review: Posted to #$PR_NUM"
 # Gracefully stop sidecar (with enhanced debugging and retries)
 echo "🔧 Attempting sidecar shutdown..."
 shutdown_attempts=0
-max_shutdown_attempts=3
+max_shutdown_attempts=5
 
+# First, try graceful shutdown via HTTP
 while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-  if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 5 2>/dev/null; then
+  echo "🔄 Shutdown attempt $((shutdown_attempts + 1))/$max_shutdown_attempts"
+  if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 10 2>/dev/null; then
     echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
     break
   else
     shutdown_attempts=$((shutdown_attempts + 1))
     echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
     if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-      echo "Retrying in 2 seconds..."
-      sleep 2
+      echo "⏳ Waiting 3 seconds before retry..."
+      sleep 3
     fi
   fi
 done
 
+# If graceful shutdown failed, try force termination
 if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-  echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-  echo "🔧 Force terminating sidecar processes..."
-  pkill -f "sidecar" || echo "No sidecar processes found to kill"
+  echo "❌ Failed to shutdown sidecar gracefully after $max_shutdown_attempts attempts"
+
+  # Try to find and kill sidecar processes
+  echo "🔧 Attempting to force terminate sidecar processes..."
+
+  # Method 1: Kill by process name
+  if pkill -f "sidecar" 2>/dev/null; then
+    echo "✓ Killed sidecar processes with pkill"
+  else
+    echo "⚠️ No sidecar processes found with pkill"
+  fi
+
+  # Method 2: Kill by port (if sidecar is listening on 8080)
+  sidecar_pid=$(lsof -ti:8080 2>/dev/null || echo "")
+  if [ -n "$sidecar_pid" ]; then
+    echo "🔍 Found process listening on port 8080: $sidecar_pid"
+    if kill -TERM "$sidecar_pid" 2>/dev/null; then
+      echo "✓ Sent TERM signal to sidecar process $sidecar_pid"
+    fi
+  fi
+
+  # Method 3: Kill any remaining processes with sidecar in command line
+  remaining_pids=$(ps aux | grep -v grep | grep sidecar | awk '{print $2}' || echo "")
+  if [ -n "$remaining_pids" ]; then
+    echo "🔍 Found remaining sidecar processes: $remaining_pids"
+    echo "$remaining_pids" | xargs kill -KILL 2>/dev/null || true
+    echo "✓ Sent KILL signal to remaining sidecar processes"
+  fi
 fi
 
-# Wait for sidecar to actually terminate
+# Wait for sidecar to actually terminate with extended timeout
 echo "⏳ Waiting for sidecar termination..."
-timeout=10
+timeout=20
+terminated=false
+
 while [ $timeout -gt 0 ]; do
-  if ! pgrep -f "sidecar" > /dev/null 2>&1; then
+  if ! pgrep -f "sidecar" > /dev/null 2>&1 && ! lsof -i:8080 > /dev/null 2>&1; then
     echo "✅ Sidecar terminated successfully"
+    terminated=true
     break
   fi
-  sleep 1
-  timeout=$((timeout - 1))
+  echo "⏳ Sidecar still running, waiting... ($timeout seconds remaining)"
+  sleep 2
+  timeout=$((timeout - 2))
 done
 
-if [ $timeout -eq 0 ]; then
-  echo "⚠️ Sidecar still running after wait period"
+if [ "$terminated" = false ]; then
+  echo "⚠️ Sidecar still running after extended wait period"
+  echo "🔍 Current processes:"
+  ps aux | grep -v grep | grep sidecar || echo "No sidecar processes found"
+  echo "🔍 Port 8080 usage:"
+  lsof -i:8080 || echo "Port 8080 not in use"
+else
+  echo "✅ Sidecar cleanup completed successfully"
 fi
 
 # Perform cleanup
