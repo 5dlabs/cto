@@ -1587,7 +1587,7 @@ $FAILED_DETAILS
 - [ ] Resolve build errors
 - [ ] Verify all workflows pass
 
-**Note**: Will re-evaluate once CI issues are resolved."
+**Note**: Will re-evaluate once CI issues are resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   elif [ "$PENDING_CHECKS" -gt 0 ]; then
     echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
     # Get details of pending checks
