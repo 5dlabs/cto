@@ -63,17 +63,37 @@ struct CodeDefaults {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct IntakeDefaults {
+struct ModelConfig {
     model: String,
+    provider: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct IntakeDefaults {
     #[serde(rename = "githubApp")]
     github_app: String,
+    primary: ModelConfig,
+    research: ModelConfig,
+    fallback: ModelConfig,
 }
 
 impl Default for IntakeDefaults {
     fn default() -> Self {
+        // No defaults - require explicit configuration
         IntakeDefaults {
-            model: "claude-3-5-sonnet-20241022".to_string(),
-            github_app: "agent-platform".to_string(), // Should be configured in cto-config.json
+            github_app: String::new(),
+            primary: ModelConfig {
+                model: String::new(),
+                provider: String::new(),
+            },
+            research: ModelConfig {
+                model: String::new(),
+                provider: String::new(),
+            },
+            fallback: ModelConfig {
+                model: String::new(),
+                provider: String::new(),
+            },
         }
     }
 }
@@ -97,15 +117,16 @@ struct PlayDefaults {
 
 impl Default for PlayDefaults {
     fn default() -> Self {
+        // No defaults - require explicit configuration
         PlayDefaults {
-            model: "claude-3-5-sonnet-20241022".to_string(),
-            implementation_agent: "5DLabs-Rex".to_string(),
-            quality_agent: "5DLabs-Cleo".to_string(),
-            testing_agent: "5DLabs-Tess".to_string(),
-            repository: Some("5dlabs/cto".to_string()),
-            service: Some("cto".to_string()),
-            docs_repository: Some("5dlabs/cto".to_string()),
-            docs_project_directory: Some("docs".to_string()),
+            model: String::new(),
+            implementation_agent: String::new(),
+            quality_agent: String::new(),
+            testing_agent: String::new(),
+            repository: None,
+            service: None,
+            docs_repository: None,
+            docs_project_directory: None,
         }
     }
 }
@@ -1025,7 +1046,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     
     // Only check for requirements if we have a valid workspace directory
     let requirements_path = if let Ok(workspace_dir) = workspace_dir_result {
-        let docs_dir = workspace_dir.join(&docs_project_directory);
+        let docs_dir = workspace_dir.join(docs_project_directory);
         let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
         let project_requirements_path = docs_dir.join("requirements.yaml");
         
@@ -1192,15 +1213,47 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let branch = get_git_current_branch_in_dir(Some(&workspace_dir))?;
     eprintln!("🎯 Using branch: {branch}");
 
-    // Use configuration values with defaults
-    let github_app = &config.defaults.intake.github_app;
-    let model = &config.defaults.intake.model;
+    // Use configuration values with defaults (client can override)
+    let github_app = arguments
+        .get("github_app")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.github_app);
+
+    // Extract model configuration (client can specify granular control)
+    let primary_model = arguments
+        .get("primary_model")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.primary.model);
+    let research_model = arguments
+        .get("research_model")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.research.model);
+    let fallback_model = arguments
+        .get("fallback_model")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.fallback.model);
+
+    // Extract provider configuration
+    let primary_provider = arguments
+        .get("primary_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.primary.provider);
+    let research_provider = arguments
+        .get("research_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.research.provider);
+    let fallback_provider = arguments
+        .get("fallback_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.fallback.provider);
     let num_tasks = 50; // Standard task count
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
 
     eprintln!("🤖 Using GitHub App: {github_app}");
-    eprintln!("🧠 Using model: {model}");
+    eprintln!("🧠 Using Primary Model: {primary_model} ({primary_provider})");
+    eprintln!("🔬 Using Research Model: {research_model} ({research_provider})");
+    eprintln!("🛡️  Using Fallback Model: {fallback_model} ({fallback_provider})");
 
     // Create a ConfigMap with the intake files to avoid YAML escaping issues
     let configmap_name = format!(
@@ -1216,7 +1269,13 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "project_name": project_name,
         "repository_url": format!("https://github.com/{}", repository_name),
         "github_app": github_app,
-        "model": model,
+        "primary_model": primary_model,
+        "research_model": research_model,
+        "fallback_model": fallback_model,
+        "primary_provider": primary_provider,
+        "research_provider": research_provider,
+        "fallback_provider": fallback_provider,
+        "model": primary_model, // Legacy compatibility
         "num_tasks": num_tasks,
         "expand_tasks": expand_tasks,
         "analyze_complexity": analyze_complexity
@@ -1270,7 +1329,17 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             "-p",
             &format!("github-app={github_app}"),
             "-p",
-            &format!("model={model}"),
+            &format!("primary-model={primary_model}"),
+            "-p",
+            &format!("research-model={research_model}"),
+            "-p",
+            &format!("fallback-model={fallback_model}"),
+            "-p",
+            &format!("primary-provider={primary_provider}"),
+            "-p",
+            &format!("research-provider={research_provider}"),
+            "-p",
+            &format!("fallback-provider={fallback_provider}"),
             "-p",
             &format!("num-tasks={num_tasks}"),
             "-p",

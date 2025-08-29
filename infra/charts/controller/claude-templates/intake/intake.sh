@@ -52,26 +52,79 @@ echo "  ✓ Project name: $PROJECT_NAME"
 REPOSITORY_URL=$(jq -r '.repository_url' "$CONFIG_FILE" 2>/dev/null || echo "")
 echo "  ✓ Repository URL: $REPOSITORY_URL"
 
-GITHUB_APP=$(jq -r '.github_app' "$CONFIG_FILE" 2>/dev/null || echo "")
+# GITHUB_APP is now required from environment variables (no ConfigMap fallback)
+
+# Parse granular model configuration (from Argo workflow parameters)
+# NO FALLBACKS - if parameters not received, fail loudly to expose configuration issues
+
+if [ -z "$PRIMARY_MODEL" ]; then
+    echo "❌ PRIMARY_MODEL environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$RESEARCH_MODEL" ]; then
+    echo "❌ RESEARCH_MODEL environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$FALLBACK_MODEL" ]; then
+    echo "❌ FALLBACK_MODEL environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$PRIMARY_PROVIDER" ]; then
+    echo "❌ PRIMARY_PROVIDER environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$RESEARCH_PROVIDER" ]; then
+    echo "❌ RESEARCH_PROVIDER environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$FALLBACK_PROVIDER" ]; then
+    echo "❌ FALLBACK_PROVIDER environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$NUM_TASKS" ]; then
+    echo "❌ NUM_TASKS environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$EXPAND_TASKS" ]; then
+    echo "❌ EXPAND_TASKS environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$ANALYZE_COMPLEXITY" ]; then
+    echo "❌ ANALYZE_COMPLEXITY environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
+if [ -z "$GITHUB_APP" ]; then
+    echo "❌ GITHUB_APP environment variable not set - configuration transmission failed"
+    exit 1
+fi
+
 echo "  ✓ GitHub App: $GITHUB_APP"
-
-MODEL=$(jq -r '.model' "$CONFIG_FILE" 2>/dev/null || echo "claude-3-5-sonnet-20241022")
-echo "  ✓ Model: $MODEL"
-
-NUM_TASKS=$(jq -r '.num_tasks' "$CONFIG_FILE" 2>/dev/null || echo "10")
+echo "  ✓ Primary Model: $PRIMARY_MODEL ($PRIMARY_PROVIDER)"
+echo "  ✓ Research Model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)"
+echo "  ✓ Fallback Model: $FALLBACK_MODEL ($FALLBACK_PROVIDER)"
 echo "  ✓ Num tasks: $NUM_TASKS"
-
-EXPAND_TASKS=$(jq -r '.expand_tasks' "$CONFIG_FILE" 2>/dev/null || echo "false")
 echo "  ✓ Expand tasks: $EXPAND_TASKS"
-
-ANALYZE_COMPLEXITY=$(jq -r '.analyze_complexity' "$CONFIG_FILE" 2>/dev/null || echo "false")
 echo "  ✓ Analyze complexity: $ANALYZE_COMPLEXITY"
+
+# Legacy MODEL variable for backward compatibility
+MODEL="$PRIMARY_MODEL"
 
 echo "🔍 Configuration summary:"
 echo "  - Project: ${PROJECT_NAME:-[empty]}"
 echo "  - Repository: ${REPOSITORY_URL:-[empty]}"
 echo "  - GitHub App: ${GITHUB_APP:-[empty]}"
-echo "  - Model: ${MODEL:-[empty]}"
+echo "  - Primary Model: ${PRIMARY_MODEL:-[empty]} (${PRIMARY_PROVIDER:-[empty]})"
+echo "  - Research Model: ${RESEARCH_MODEL:-[empty]} (${RESEARCH_PROVIDER:-[empty]})"
+echo "  - Fallback Model: ${FALLBACK_MODEL:-[empty]} (${FALLBACK_PROVIDER:-[empty]})"
 echo "  - Num Tasks: ${NUM_TASKS:-[empty]}"
 echo "  - Expand: ${EXPAND_TASKS:-[empty]}"
 echo "  - Analyze: ${ANALYZE_COMPLEXITY:-[empty]}"
@@ -331,7 +384,7 @@ echo "🔍 Attempting TaskMaster init with full flags..."
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
-    --rules "claude,cursor" \
+    --rules "claude" \
     --skip-install \
     --aliases
 INIT_EXIT_CODE=$?
@@ -365,7 +418,7 @@ else
         mkdir -p .taskmaster/reports
         mkdir -p .taskmaster/templates
         
-        # Create a minimal config.json file
+        # Create config.json with granular model configuration
         cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -374,13 +427,24 @@ else
     "version": "0.1.0"
   },
   "models": {
-    "main": "claude-3-5-sonnet-20241022",
-    "research": "claude-3-5-sonnet-20241022",
-    "fallback": "claude-3-5-sonnet-20241022"
-  },
-  "parameters": {
-    "maxTokens": 8000,
-    "temperature": 0.7
+    "main": {
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    },
+    "research": {
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
+      "maxTokens": 32000,
+      "temperature": 0.1
+    },
+    "fallback": {
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
+    }
   },
   "global": {
     "defaultTag": "master"
@@ -459,9 +523,13 @@ cat > $CONFIG_DIR/config.json << EOF
 }
 EOF
 
+# Set up dynamic provider selection for different operations
+echo "✅ TaskMaster configured with Opus model and GPT-4o fallback"
+
+# Enable codebase analysis for research operations
+export TASKMASTER_ENABLE_CODEBASE_ANALYSIS=true
+
 if [ "$OPENAI_VALID" = true ]; then
-  # Use Claude Code for main/research, GPT-5 for fallback
-  echo "✅ Using Claude Code with GPT-5 fallback"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -471,20 +539,20 @@ if [ "$OPENAI_VALID" = true ]; then
   },
   "models": {
     "main": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
     "fallback": {
-      "provider": "openai",
-      "modelId": "gpt-4o",
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
       "maxTokens": 8000,
       "temperature": 0.7
     }
@@ -495,8 +563,8 @@ if [ "$OPENAI_VALID" = true ]; then
 }
 EOF
 else
-  # Use Claude Code for main/research, but no fallback if OpenAI unavailable
-  echo "✅ Using Claude Code (no GPT fallback available)"
+  # Use configured providers for main/research, but no fallback if OpenAI unavailable
+  echo "✅ Using configured models (no GPT fallback available)"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -506,22 +574,22 @@ else
   },
   "models": {
     "main": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
     "fallback": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
-      "maxTokens": 64000,
-      "temperature": 0.2
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
     }
   },
   "global": {
@@ -533,11 +601,12 @@ fi
 
 echo "✅ Claude Code configuration written"
 
-# Parse PRD
-echo "📄 Parsing PRD to generate tasks..."
+# Parse PRD with Claude Code (for research and codebase analysis)
+echo "📄 Parsing PRD to generate tasks with Claude Code..."
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
-    --force || {
+    --force \
+    --research || {
     echo "❌ Failed to parse PRD"
     exit 1
 }
@@ -564,9 +633,60 @@ if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
     }
 fi
 
-# Expand tasks if requested
+# Expand tasks if requested (switch to regular Claude API for faster expansion)
 if [ "$EXPAND_TASKS" = "true" ]; then
-    echo "🌳 Expanding tasks with subtasks..."
+    echo "🌳 Expanding tasks with subtasks using Claude API..."
+
+    # Switch ONLY the main provider to regular Claude API for faster expansion
+    # Keep research with Claude Code for any research operations
+    if [ "$OPENAI_VALID" = true ]; then
+        # Read current config and update only the main provider
+        if [ -f ".taskmaster/config.json" ]; then
+            # Use jq to update only the main provider in the existing config
+            jq --arg provider "$PRIMARY_PROVIDER" --arg model "$PRIMARY_MODEL" '.models.main = {
+                "provider": $provider,
+                "modelId": $model,
+                "maxTokens": 64000,
+                "temperature": 0.2
+            }' .taskmaster/config.json > .taskmaster/config_temp.json && mv .taskmaster/config_temp.json .taskmaster/config.json
+            echo "✅ Updated main provider to $PRIMARY_PROVIDER ($PRIMARY_MODEL), kept research with $RESEARCH_PROVIDER"
+        else
+            echo "⚠️ Config file not found, using default Claude API config"
+            cat > .taskmaster/config.json << EOF
+{
+  "project": {
+    "name": "$PROJECT_NAME",
+    "description": "Auto-generated project from intake pipeline",
+    "version": "0.1.0"
+  },
+  "models": {
+    "main": {
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    },
+    "research": {
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
+      "maxTokens": 32000,
+      "temperature": 0.1
+    },
+    "fallback": {
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
+    }
+  },
+  "global": {
+    "defaultTag": "master"
+  }
+}
+EOF
+        fi
+    fi
+
     task-master expand --all --force --file "$TASKS_FILE" || {
         echo "❌ expand failed"
         exit 1

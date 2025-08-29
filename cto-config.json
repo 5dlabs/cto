@@ -7,10 +7,6 @@
       "includeCodebase": false,
       "sourceBranch": "main"
     },
-    "intake": {
-      "model": "opus",
-      "githubApp": "5DLabs-Morgan"
-    },
     "code": {
       "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Rex",
@@ -21,6 +17,21 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
       "service": "cto"
+    },
+    "intake": {
+      "githubApp": "5DLabs-Morgan",
+      "primary": {
+        "model": "claude-3-7-sonnet-20250219",
+        "provider": "anthropic"
+      },
+      "research": {
+        "model": "claude-opus-4-1-20250805",
+        "provider": "claude-code"
+      },
+      "fallback": {
+        "model": "gpt-4o",
+        "provider": "openai"
+      }
     },
     "play": {
       "model": "claude-sonnet-4-20250514",
