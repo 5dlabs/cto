@@ -636,18 +636,19 @@ echo "✅ Claude Code configuration written"
 echo "🔍 DEBUG: TaskMaster config contents:"
 cat .taskmaster/config.json | jq '.' || echo "Failed to display config"
 
-# Parse PRD with main model (not research, to avoid Perplexity)
-echo "📄 Parsing PRD to generate tasks with Primary model: $PRIMARY_MODEL ($PRIMARY_PROVIDER)..."
+# Parse PRD with research model for better analysis
+echo "📄 Parsing PRD to generate tasks with Research model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)..."
 # Debug: Check if claude command is available (for claude-code provider)
 if [ "$PRIMARY_PROVIDER" = "claude-code" ] || [ "$RESEARCH_PROVIDER" = "claude-code" ]; then
     echo "🔍 DEBUG: Checking claude-code availability..."
     which claude || echo "⚠️ claude command not found in PATH"
     echo "🔍 DEBUG: PATH=$PATH"
 fi
-# Note: Using main model, not research flag which forces Perplexity
+# Use --research flag to use the configured research model
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
-    --force || {
+    --force \
+    --research || {
     echo "❌ Failed to parse PRD"
     exit 1
 }
