@@ -475,7 +475,7 @@ if [ "$OPENAI_VALID" = true ]; then
     },
     "fallback": {
       "provider": "openai",
-      "modelId": "gpt-4",
+      "modelId": "gpt-4o",
       "maxTokens": 8000,
       "temperature": 0.7
     }
