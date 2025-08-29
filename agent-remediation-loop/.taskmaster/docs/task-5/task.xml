@@ -1,0 +1,163 @@
+<prompt>
+    <role>You are a senior DevOps engineer specializing in containerized applications, GitHub integration, and automated remediation systems.</role>
+    <task>
+        <id>5</id>
+        <title>Enhance Rex Container for Remediation</title>
+        <description>Create a separate Rex remediation container script to handle remediation mode with feedback processing and iteration limits</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>2, 4</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Create separate remediation script at infra/images/rex-remediation/container-rex-remediation.sh</spec>
+        <spec>Implement strict REMEDIATION_MODE=true validation with fail-fast behavior</spec>
+        <spec>Build original task context fetching from multiple sources with fallback mechanisms</spec>
+        <spec>Integrate GitHub CLI for PR comment retrieval with retry logic and error handling</spec>
+        <spec>Parse feedback content for severity, issue type, and specific problems using bash/jq</spec>
+        <spec>Enforce 10-iteration limit with escalation comment posting and team notifications</spec>
+        <spec>Generate remediation-specific CLAUDE.md context emphasizing targeted fixes</spec>
+        <spec>Create container image with required tools: bash, gh CLI, jq, curl, git</spec>
+        <spec>Ensure seamless integration with existing CodeRun CRD and play workflow</spec>
+        <spec>Implement comprehensive testing including unit, integration, and end-to-end tests</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create a specialized remediation container that fundamentally differs from normal Rex implementation:
+
+        1. Build separate remediation script (container-rex-remediation.sh):
+           - Strict validation requiring REMEDIATION_MODE=true environment variable
+           - Clear error messages and fail-fast behavior for incorrect usage
+           - Modular function structure with proper error handling and logging
+           - Complete separation from normal Rex implementation logic
+           - Comprehensive environment variable validation for required parameters
+
+        2. Implement original task context fetching system:
+           - Search multiple locations: /workspace/docs/task-{id}.md, .taskmaster/docs/task-{id}/task.md
+           - Fallback to Task Master API using curl/jq when files unavailable
+           - Graceful handling of missing context with appropriate warnings
+           - Export ORIGINAL_TASK_CONTEXT for template generation
+           - Context size validation and truncation for large descriptions
+
+        3. Build GitHub API integration for feedback retrieval:
+           - Use gh CLI with proper authentication validation
+           - Implement gh api calls to fetch comment by FEEDBACK_COMMENT_ID
+           - Extract comment body, author, creation timestamp using jq parsing
+           - Retry logic with exponential backoff for transient API failures
+           - Repository detection from GITHUB_REPOSITORY or git remote parsing
+
+        4. Create intelligent feedback parsing system:
+           - Extract severity levels from comment content (Critical, High, Medium, Low)
+           - Classify issue types (Bug, Performance, Security, Documentation, General)
+           - Parse specific issues from markdown bullet points and numbered lists
+           - Track checkbox completion progress for task tracking
+           - Export parsed metadata as environment variables for context generation
+
+        5. Implement iteration limit enforcement:
+           - Check ITERATION_COUNT against MAX_ITERATIONS=10 constant
+           - Generate comprehensive escalation comment with task summary
+           - Tag @platform-team and @cto for human intervention
+           - Post escalation comment using gh pr comment with proper formatting
+           - Terminate process gracefully with exit code 1 when limits exceeded
+
+        6. Generate remediation-specific AI context:
+           - Create CLAUDE.md combining original requirements with feedback
+           - Emphasize targeted fix approach vs. broad reimplementation
+           - Include clear DO/DON'T guidelines for surgical changes
+           - Add iteration count and urgency indicators
+           - Format for optimal AI comprehension and focused action
+
+        7. Build container infrastructure:
+           - Create Dockerfile installing gh CLI, jq, curl, git, bash
+           - Copy remediation scripts with proper executable permissions
+           - Configure workspace volume mount and Claude runner integration
+           - Set appropriate entrypoint for remediation mode activation
+           - Ensure GitHub authentication works in containerized environment
+
+        8. Create comprehensive testing framework:
+           - Unit tests for all bash functions with mocked dependencies
+           - Integration tests with real GitHub API and container builds
+           - End-to-end workflow testing with CodeRun integration
+           - Performance testing for large feedback processing
+           - Security testing for input validation and privilege handling
+
+        The remediation container must provide targeted, surgical fixes while preserving existing functionality, differing fundamentally from broad implementation approaches.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Separate remediation script created with strict REMEDIATION_MODE validation</criterion>
+        <criterion>Original task context successfully fetched from multiple sources with fallbacks</criterion>
+        <criterion>GitHub API integration retrieves PR comments with retry logic</criterion>
+        <criterion>Feedback content parsed intelligently with metadata extraction</criterion>
+        <criterion>Iteration limits enforced with escalation comments and team notifications</criterion>
+        <criterion>Remediation-specific AI context generated emphasizing targeted fixes</criterion>
+        <criterion>Container image built with all required dependencies and proper configuration</criterion>
+        <criterion>Seamless integration with existing CodeRun CRD and play workflow</criterion>
+        <criterion>Comprehensive test coverage including unit, integration, and end-to-end</criterion>
+        <criterion>Error handling covers all failure scenarios with clear messages</criterion>
+        <criterion>Authentication works with existing GitHub App credentials</criterion>
+        <criterion>No interference with normal Rex container operations</criterion>
+        <criterion>Performance meets requirements for container environment</criterion>
+        <criterion>Security validated with input sanitization and minimal privileges</criterion>
+        <criterion>Documentation complete with usage and troubleshooting guides</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        1. Unit Testing:
+           - Test all bash functions with mocked external dependencies (gh, curl, jq)
+           - Validate environment variable checking with various missing/invalid inputs
+           - Test task context fetching with different file locations and missing files
+           - Verify feedback parsing with various markdown formats and edge cases
+           - Test iteration limit logic with boundary conditions and escalation
+
+        2. Integration Testing:
+           - Test GitHub CLI integration with real API endpoints and authentication
+           - Build and run container in test environment with proper volumes
+           - Validate CodeRun integration with test Kubernetes cluster
+           - Test complete workflow from trigger through context generation
+           - Verify authentication works in containerized environment
+
+        3. End-to-End Testing:
+           - Create test PR with task label and feedback comment
+           - Trigger remediation container through normal workflow
+           - Verify all steps complete successfully with proper outputs
+           - Test error recovery and retry mechanisms
+           - Validate integration with downstream Claude runner process
+
+        4. Performance Testing:
+           - Measure container startup time and resource usage
+           - Test with large feedback content and task descriptions
+           - Verify memory usage remains within container limits
+           - Test concurrent container execution scenarios
+           - Measure API call latencies and timeout handling
+
+        5. Security Testing:
+           - Validate input sanitization prevents injection attacks
+           - Test container runs with minimal required privileges
+           - Verify no sensitive data leaks in logs or environment
+           - Test GitHub token handling and scoping
+           - Validate file permissions and access controls
+
+        6. Error Scenario Testing:
+           - Test network failures during GitHub API calls
+           - Verify behavior with malformed JSON responses
+           - Test missing or corrupted task context files
+           - Validate authentication failure handling
+           - Test container restart and recovery scenarios
+    </test_strategy>
+    <instructions>
+        Begin by understanding the fundamental difference between implementation and remediation approaches. The remediation container must focus on surgical fixes rather than broad implementation.
+
+        Create a completely separate script that validates REMEDIATION_MODE strictly. Study the existing Rex container to understand patterns but implement fundamentally different logic focused on targeted fixes.
+
+        Build robust GitHub API integration using the gh CLI tool. Implement proper retry logic and error handling for all external API calls. Test authentication thoroughly in containerized environments.
+
+        Design intelligent feedback parsing that extracts meaningful metadata. Consider various markdown formats and edge cases. Make the parser resilient to malformed content while extracting useful information.
+
+        Implement iteration limit enforcement strictly. Create compelling escalation comments that provide context and clear calls to action. Ensure human intervention is properly requested when limits are reached.
+
+        Focus on generating AI context that emphasizes targeted fixes over reimplementation. Provide clear guidelines that prevent scope creep while ensuring all feedback issues are addressed.
+
+        Build comprehensive tests that cover all functionality. Pay special attention to integration testing with real external services. Test error scenarios thoroughly.
+
+        Document everything clearly including troubleshooting guides. The remediation container should be easy to debug and maintain by other team members.
+
+        Consider security implications throughout the implementation. Validate all inputs and ensure minimal privilege operation.
+    </instructions>
+</prompt>
