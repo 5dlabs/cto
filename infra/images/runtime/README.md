@@ -104,7 +104,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **yq** - YAML processor
 - **pandoc** - Universal document converter
 - **unzip** - Archive extraction
-- **pigz, pbzip2, pxz** - Fast compression utilities
+- **pigz, pbzip2** - Fast compression utilities
 - **ca-certificates** - SSL certificate bundle
 - **man-db** - Manual pages
 
