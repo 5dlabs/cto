@@ -1326,9 +1326,6 @@ else
   fi
 fi
 
-# Only perform PR review if GitHub CLI is available
-if [ "$GH_AVAILABLE" = "true" ]; then
-  
 # Function to safely execute gh command with error handling
 check_ci_status() {
   local pr_num="$1"
@@ -1383,20 +1380,22 @@ check_ci_status() {
   return 0
 }
 
-# Get CI status using robust JSON parsing
-CI_JSON=$(check_ci_status "$PR_NUM")
-CI_STATUS=$?
+# Only perform PR review if GitHub CLI is available
+if [ "$GH_AVAILABLE" = "true" ]; then
+  # Get CI status using robust JSON parsing
+  CI_JSON=$(check_ci_status "$PR_NUM")
+  CI_STATUS=$?
 
-# Validate CI_JSON is valid JSON before proceeding
-if [ $CI_STATUS -eq 0 ] && [ -n "$CI_JSON" ]; then
-  # Basic JSON validation - check if it starts and ends with brackets
-  if ! (echo "$CI_JSON" | grep -q '^\[' && echo "$CI_JSON" | grep -q '\]$'); then
-    echo "⚠️ Invalid JSON format received from gh pr checks - falling back to text parsing"
-    CI_STATUS=1
+  # Validate CI_JSON is valid JSON before proceeding
+  if [ $CI_STATUS -eq 0 ] && [ -n "$CI_JSON" ]; then
+    # Basic JSON validation - check if it starts and ends with brackets
+    if ! (echo "$CI_JSON" | grep -q '^\[' && echo "$CI_JSON" | grep -q '\]$'); then
+      echo "⚠️ Invalid JSON format received from gh pr checks - falling back to text parsing"
+      CI_STATUS=1
+    fi
   fi
-fi
 
-case $CI_STATUS in
+  case $CI_STATUS in
   1)
     echo "⚠️ GitHub CLI unavailable - cannot perform PR reviews"
     echo "📝 Tess QA completed but unable to post PR review due to GitHub CLI issues"
@@ -1466,13 +1465,13 @@ case $CI_STATUS in
 
 **Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     ;;
-esac
+  esac
 
-# Parse CI status from JSON output
-if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
-  echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
-  # Post REQUEST CHANGES review for missing CI
-  timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+  # Parse CI status from JSON output
+  if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
+    echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
+    # Post REQUEST CHANGES review for missing CI
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Missing CI Setup**: No GitHub Actions workflows detected
@@ -1667,13 +1666,45 @@ $SUCCESS_DETAILS
 
 **Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   fi
-fi
-
+  
 else
   # GitHub CLI not available - skip PR review
   echo "📝 Skipping PR review posting due to GitHub CLI unavailability"
   echo "✅ Tess QA workflow completed but could not post PR review"
 fi
+
+# Function to ensure sidecar shutdown
+shutdown_sidecar() {
+  echo "🔧 Signaling sidecar to shutdown..."
+  touch /workspace/.agent_done 2>/dev/null || true
+  
+  echo "🔧 Attempting sidecar shutdown..."
+  local shutdown_attempts=0
+  local max_shutdown_attempts=3
+  
+  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+      break
+    else
+      shutdown_attempts=$((shutdown_attempts + 1))
+      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+        echo "Retrying in 2 seconds..."
+        sleep 2
+      fi
+    fi
+  done
+  
+  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+    echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
+    echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
+  fi
+}
+
+# Set trap to ensure sidecar shutdown on exit
+trap shutdown_sidecar EXIT
 
 # =============================================================================
 # DEBUG LOGGING: FINAL STATUS
@@ -1694,37 +1725,8 @@ echo "  - Working directory: $(pwd)"
 echo "  - Repository: $REPO_NAME"
 echo "  - PR Review: Posted to #$PR_NUM"
 
-# Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
-echo "🔧 Signaling sidecar to shutdown..."
-touch /workspace/.agent_done 2>/dev/null || true
-
-# Gracefully stop sidecar to allow Job to complete (all containers must exit)
-echo "🔧 Attempting sidecar shutdown..."
-shutdown_attempts=0
-max_shutdown_attempts=3
-
-while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-  if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-    echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-    break
-  else
-    shutdown_attempts=$((shutdown_attempts + 1))
-    echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-    if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-      echo "Retrying in 2 seconds..."
-      sleep 2
-    fi
-  fi
-done
-
-if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-  echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-  echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
-  echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
-fi
-
-# Note: Cannot wait for sidecar termination from this container due to PID namespace isolation
-# Kubernetes will handle sidecar termination when the main container exits
+# Sidecar shutdown is handled by the EXIT trap defined earlier
+# The shutdown_sidecar function will be called automatically when the script exits
 
 # Perform final cleanup of our own processes
 echo "🔧 Performing final process cleanup..."
