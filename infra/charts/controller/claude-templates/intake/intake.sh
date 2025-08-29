@@ -545,7 +545,7 @@ cat > $CONFIG_DIR/config.json << EOF
 EOF
 
 # Set up dynamic provider selection for different operations
-echo "✅ TaskMaster configured with Opus model and GPT-4o fallback"
+echo "✅ Configuring TaskMaster models: Primary=$PRIMARY_MODEL, Research=$RESEARCH_MODEL, Fallback=$FALLBACK_MODEL"
 
 # Enable codebase analysis for research operations
 export TASKMASTER_ENABLE_CODEBASE_ANALYSIS=true
@@ -585,7 +585,7 @@ if [ "$OPENAI_VALID" = true ]; then
 EOF
 else
   # Use configured providers for main/research, but no fallback if OpenAI unavailable
-  echo "✅ Using configured models (no GPT fallback available)"
+  echo "⚠️ OpenAI API key invalid/missing, configuring without OpenAI fallback"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -622,12 +622,16 @@ fi
 
 echo "✅ Claude Code configuration written"
 
+# Debug: Show what TaskMaster config was written
+echo "🔍 DEBUG: TaskMaster config contents:"
+cat .taskmaster/config.json | jq '.' || echo "Failed to display config"
+
 # Parse PRD with Claude Code (for research and codebase analysis)
-echo "📄 Parsing PRD to generate tasks with Claude Code..."
+echo "📄 Parsing PRD to generate tasks with Research model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)..."
+# Note: Removed --research flag as we're explicitly setting research model in config
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
-    --force \
-    --research || {
+    --force || {
     echo "❌ Failed to parse PRD"
     exit 1
 }

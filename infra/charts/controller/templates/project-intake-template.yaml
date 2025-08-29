@@ -20,41 +20,41 @@ spec:
         description: "Project name (auto-detected if not provided)"
         value: ""
       - name: repository-url
-        description: "Target repository for the generated project"
-        value: "{{ .Values.agents.morgan.defaultRepository | default "https://github.com/5dlabs/projects" }}"
+        description: "Target repository for the generated project - auto-detected from git"
+        # NO DEFAULT - auto-detected by MCP/script
       - name: source-branch
-        description: "Source branch to work from"
-        value: "main"
+        description: "Source branch to work from - auto-detected from git"
+        # NO DEFAULT - auto-detected by MCP/script
       - name: github-app
-        description: "GitHub App to use for authentication"
-        value: "{{ .Values.agents.morgan.githubApp | default "5DLabs-Morgan" }}"
+        description: "GitHub App to use for authentication - REQUIRED from client config"
+        # NO DEFAULT - must be provided by MCP client from config
       - name: primary-model
-        description: "Primary AI model for main operations (task expansion)"
-        value: "{{ .Values.agents.morgan.defaultModel | default "claude-3-7-sonnet-20250219" }}"
+        description: "Primary AI model for main operations (task expansion) - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: research-model
-        description: "Research AI model for PRD analysis and codebase understanding"
-        value: "{{ .Values.agents.morgan.defaultModel | default "claude-opus-4-20250514" }}"
+        description: "Research AI model for PRD analysis and codebase understanding - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: fallback-model
-        description: "Fallback AI model when primary fails"
-        value: "gpt-4o"
+        description: "Fallback AI model when primary fails - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: primary-provider
-        description: "Primary AI provider (anthropic, openai, etc.)"
-        value: "anthropic"
+        description: "Primary AI provider (anthropic, openai, claude-code, etc.) - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: research-provider
-        description: "Research AI provider (claude-code, anthropic, etc.)"
-        value: "claude-code"
+        description: "Research AI provider (claude-code, anthropic, etc.) - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: fallback-provider
-        description: "Fallback AI provider"
-        value: "openai"
+        description: "Fallback AI provider - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: num-tasks
-        description: "Target number of tasks to generate"
-        value: "50"
+        description: "Target number of tasks to generate - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: expand-tasks
-        description: "Whether to expand tasks with subtasks"
-        value: "true"
+        description: "Whether to expand tasks with subtasks - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
       - name: analyze-complexity
-        description: "Whether to analyze task complexity"
-        value: "true"
+        description: "Whether to analyze task complexity - REQUIRED from client"
+        # NO DEFAULT - must be provided by MCP client
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
