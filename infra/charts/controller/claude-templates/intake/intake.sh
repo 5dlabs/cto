@@ -398,16 +398,16 @@ echo "🔍 Testing task-master command..."
 task-master --version || echo "⚠️ task-master --version failed"
 task-master --help > /dev/null 2>&1 || echo "⚠️ task-master --help failed"
 
-# First attempt: Try clean init with all flags
-echo "🔍 Attempting TaskMaster init with full flags..."
+# First attempt: Try clean init with Claude rules only
+echo "🔍 Attempting TaskMaster init..."
 # Use the full path to ensure we're calling the right binary
+# --rules "claude" creates only Claude-specific files (CLAUDE.md)
 "$TASK_MASTER_PATH" init --yes \
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
     --rules "claude" \
-    --skip-install \
-    --aliases
+    --skip-install
 INIT_EXIT_CODE=$?
 
 echo "🔍 Init result: exit code $INIT_EXIT_CODE"
@@ -528,6 +528,11 @@ fi
 
 # Configure Claude Code to use ANTHROPIC_API_KEY
 echo "🔧 Configuring Claude Code authentication..."
+# TaskMaster expects ANTHROPIC_API_KEY in environment, not config file
+# Export it to ensure it's available to child processes
+export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+
+# Also try to set up Claude Code config in case it's needed
 # Try to create config directory, fallback to /tmp if permission denied
 if mkdir -p ~/.config/claude-code 2>/dev/null; then
     CONFIG_DIR=~/.config/claude-code
@@ -536,6 +541,8 @@ else
     CONFIG_DIR=/tmp/claude-code-config
     mkdir -p $CONFIG_DIR
     echo "⚠️ Permission denied for user config, using temp directory: $CONFIG_DIR"
+    # Set environment variable so Claude Code knows where to find config
+    export CLAUDE_CONFIG_DIR="$CONFIG_DIR"
 fi
 
 cat > $CONFIG_DIR/config.json << EOF
@@ -544,8 +551,11 @@ cat > $CONFIG_DIR/config.json << EOF
 }
 EOF
 
+# Debug: Verify API key is set
+echo "🔍 DEBUG: ANTHROPIC_API_KEY is ${ANTHROPIC_API_KEY:+[SET]}${ANTHROPIC_API_KEY:-[NOT SET]}"
+
 # Set up dynamic provider selection for different operations
-echo "✅ TaskMaster configured with Opus model and GPT-4o fallback"
+echo "✅ Configuring TaskMaster models: Primary=$PRIMARY_MODEL, Research=$RESEARCH_MODEL, Fallback=$FALLBACK_MODEL"
 
 # Enable codebase analysis for research operations
 export TASKMASTER_ENABLE_CODEBASE_ANALYSIS=true
@@ -585,7 +595,7 @@ if [ "$OPENAI_VALID" = true ]; then
 EOF
 else
   # Use configured providers for main/research, but no fallback if OpenAI unavailable
-  echo "✅ Using configured models (no GPT fallback available)"
+  echo "⚠️ OpenAI API key invalid/missing, configuring without OpenAI fallback"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -622,8 +632,19 @@ fi
 
 echo "✅ Claude Code configuration written"
 
-# Parse PRD with Claude Code (for research and codebase analysis)
-echo "📄 Parsing PRD to generate tasks with Claude Code..."
+# Debug: Show what TaskMaster config was written
+echo "🔍 DEBUG: TaskMaster config contents:"
+cat .taskmaster/config.json | jq '.' || echo "Failed to display config"
+
+# Parse PRD with research model for better analysis
+echo "📄 Parsing PRD to generate tasks with Research model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)..."
+# Debug: Check if claude command is available (for claude-code provider)
+if [ "$PRIMARY_PROVIDER" = "claude-code" ] || [ "$RESEARCH_PROVIDER" = "claude-code" ]; then
+    echo "🔍 DEBUG: Checking claude-code availability..."
+    which claude || echo "⚠️ claude command not found in PATH"
+    echo "🔍 DEBUG: PATH=$PATH"
+fi
+# Use --research flag to use the configured research model
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
     --force \
