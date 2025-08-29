@@ -604,16 +604,25 @@ Files to review:
 Make the necessary modifications directly to ensure the tasks and architecture are fully aligned.
 EOF
 
-        # Run Claude to review and update tasks
-        echo "🔍 Running Claude review..."
-        # Set Claude config directory and avoid interactive permission prompts
+        # Run Claude Code to review and update tasks
+        echo "🔍 Running Claude Code review..."
+        # Set Claude config directory
         export CLAUDE_CONFIG_DIR="$CONFIG_DIR"
         if [ -s "/tmp/review-prompt.md" ]; then
-          cat /tmp/review-prompt.md | claude -p --output-format stream-json --verbose --model "$MODEL" --dangerously-skip-permissions || {
-              echo "⚠️ Claude review failed, but continuing..."
+          echo "📝 Processing review prompt with Claude Code..."
+          # Claude Code uses simpler command line arguments
+          timeout 300 claude --model "$MODEL" < /tmp/review-prompt.md > /tmp/claude-output.json 2>/tmp/claude-error.log || {
+              echo "⚠️ Claude Code review failed (exit code: $?), but continuing..."
+              echo "Error log:" && cat /tmp/claude-error.log 2>/dev/null || echo "No error log available"
           }
+          # Check if we got a valid response
+          if [ -s "/tmp/claude-output.json" ]; then
+              echo "✅ Claude Code review completed successfully"
+          else
+              echo "⚠️ Claude Code review produced no output"
+          fi
         else
-          echo "⚠️ Review prompt file missing or empty; skipping Claude review"
+          echo "⚠️ Review prompt file missing or empty; skipping Claude Code review"
         fi
         
         echo "✅ Task review complete"
