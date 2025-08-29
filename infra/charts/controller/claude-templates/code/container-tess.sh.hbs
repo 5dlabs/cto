@@ -1411,7 +1411,7 @@ case $CI_STATUS in
 - [ ] Check if PR was closed or merged
 - [ ] Update PR reference if needed
 
-**Note**: Cannot proceed with QA until valid PR is specified."
+**Note**: Cannot proceed with QA until valid PR is specified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
   3)
@@ -1611,7 +1611,7 @@ $PENDING_DETAILS
 - [ ] Verify all checks pass successfully
 - [ ] Address any failures that may occur
 
-**Note**: Will re-evaluate once all CI checks are complete."
+**Note**: Will re-evaluate once all CI checks are complete." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
     echo "✅ All CI checks passing - posting APPROVE review"
     # Get details of successful checks
@@ -1641,7 +1641,7 @@ $SUCCESS_DETAILS
 - **Ready for merge**: All requirements satisfied
 - **No outstanding issues**: Clean, production-ready code
 
-**APPROVED** - Ready for merge to main branch."
+**APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
     timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
@@ -1663,7 +1663,7 @@ $SUCCESS_DETAILS
 - [ ] Verify workflow completion
 - [ ] Contact administrator if issues persist
 
-**Note**: Will re-evaluate once CI status is clear."
+**Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   fi
 fi
 
