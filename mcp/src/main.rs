@@ -1025,7 +1025,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     
     // Only check for requirements if we have a valid workspace directory
     let requirements_path = if let Ok(workspace_dir) = workspace_dir_result {
-        let docs_dir = workspace_dir.join(&docs_project_directory);
+        let docs_dir = workspace_dir.join(docs_project_directory);
         let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
         let project_requirements_path = docs_dir.join("requirements.yaml");
         
@@ -1230,7 +1230,9 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let analyze_complexity = true; // Always analyze for better breakdown
 
     eprintln!("🤖 Using GitHub App: {github_app}");
-    eprintln!("🧠 Using model: {model}");
+    eprintln!("🧠 Using Primary Model: {primary_model} ({primary_provider})");
+    eprintln!("🔬 Using Research Model: {research_model} ({research_provider})");
+    eprintln!("🛡️  Using Fallback Model: {fallback_model} ({fallback_provider})");
 
     // Create a ConfigMap with the intake files to avoid YAML escaping issues
     let configmap_name = format!(
@@ -1246,7 +1248,13 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "project_name": project_name,
         "repository_url": format!("https://github.com/{}", repository_name),
         "github_app": github_app,
-        "model": model,
+        "primary_model": primary_model,
+        "research_model": research_model,
+        "fallback_model": fallback_model,
+        "primary_provider": primary_provider,
+        "research_provider": research_provider,
+        "fallback_provider": fallback_provider,
+        "model": primary_model, // Legacy compatibility
         "num_tasks": num_tasks,
         "expand_tasks": expand_tasks,
         "analyze_complexity": analyze_complexity
