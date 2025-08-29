@@ -797,12 +797,12 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 **Your STRICT testing requirements:**
 
 1. **CRITICAL: Verify CI Status FIRST (ABSOLUTE BLOCKER)**:
-   - **If repository has workflows**: Run \`gh pr checks $PR_NUM\` to see CI status
+   - **If repository has workflows**: Run \\`gh pr checks $PR_NUM\\` to see CI status
    - **If no workflows**: Skip CI validation and proceed to testing requirements
    - If ANY CI check is failing: DO NOT EXIT
    - Instead: Write tests to fix the failures
-   - Push your changes: \`git add . && git commit -m "test: fix failing tests" && git push\`
-   - Wait for CI (when workflows exist): \`sleep 60\` then check again
+   - Push your changes: \\`git add . && git commit -m "test: fix failing tests" && git push\\`
+   - Wait for CI (when workflows exist): \\`sleep 60\\` then check again
    - KEEP ITERATING until CI is GREEN (when workflows exist)
    - You CANNOT proceed OR exit until requirements are met
 
@@ -814,14 +814,14 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
    - Push all test files to the repository
 
 3. **Deploy to Kubernetes (MANDATORY IF ACCESS EXISTS)**:
-   - Test kubectl access: \`kubectl get nodes\` and \`kubectl get ns\`
+   - Test kubectl access: \\`kubectl get nodes\\` and \\`kubectl get ns\\`
    - If no access: Comment \"⚠️ Unable to verify K8s deployment - no cluster access\"
    - If access exists, YOU MUST:
-     a) Create test namespace: \`kubectl create ns test-$TASK_ID\`
+     a) Create test namespace: \\`kubectl create ns test-$TASK_ID\\`
      b) Deploy using universal chart (see deployment instructions below)
-     c) Verify pods are running: \`kubectl get pods -n test-$TASK_ID\`
+     c) Verify pods are running: \\`kubectl get pods -n test-$TASK_ID\\`
      d) Test the service endpoints
-     e) Cleanup: \`kubectl delete ns test-$TASK_ID\`
+     e) Cleanup: \\`kubectl delete ns test-$TASK_ID\\`
    - Report deployment results in PR review
 
 4. **Task $TASK_ID Acceptance Criteria (100% or REJECT)**:
@@ -862,14 +862,14 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
    - After posting REQUEST CHANGES, DO NOT STOP
    - Fix the issues yourself by writing tests
    - Push your fixes and wait for CI
-   - **If workflows exist**: Check \`gh pr checks $PR_NUM\` again
+   - **If workflows exist**: Check \\`gh pr checks $PR_NUM\\` again
    - If still failing, keep fixing and pushing
    - REPEAT until you can post APPROVE
    - You are NOT ALLOWED to finish without APPROVE status
 
 10. **MANDATORY PRE-APPROVAL CHECKLIST**:
     Before you can APPROVE, ALL of these MUST be true:
-    □ CI Status: **If workflows exist** - Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
+    □ CI Status: **If workflows exist** - Run \\`gh pr checks $PR_NUM --json name,status\\` - ALL must show "completed" with "success"
     □ Test Coverage: Must be >= 95% (verify with coverage tools)
     □ All Tests Pass: 100% of tests must pass, no skipped tests
     □ Acceptance Criteria: 100% of Task $TASK_ID criteria met
@@ -1116,9 +1116,9 @@ Task {{task_id}} implementation meets all requirements and is ready for the next
 \`\`\`
 
 **IMPORTANT RULES**:
-1. NEVER use \`--comment\` flag - it creates regular comments, not reviews
-2. ALWAYS use \`--request-changes\` when issues are found
-3. ONLY use \`--approve\` when ALL tests pass and quality is perfect
+1. NEVER use \\`--comment\\` flag - it creates regular comments, not reviews
+2. ALWAYS use \\`--request-changes\\` when issues are found
+3. ONLY use \\`--approve\\` when ALL tests pass and quality is perfect
 4. Include detailed feedback in the review body
 5. Format your review with clear sections and checkboxes
 
@@ -1305,43 +1305,21 @@ echo "📊 Checking CI status for PR #$PR_NUM..."
 # Pre-flight check: Verify GitHub CLI is available and working
 echo "🔍 Pre-flight check: GitHub CLI availability..."
 
-# Try to install GitHub CLI if not available
-if ! command -v gh >/dev/null 2>&1; then
-  echo "⚠️ GitHub CLI not found, attempting to install..."
-  if command -v apt-get >/dev/null 2>&1; then
-    echo "📦 Installing GitHub CLI via apt-get..."
-    apt-get update >/dev/null 2>&1 && apt-get install -y gh >/dev/null 2>&1
-    if command -v gh >/dev/null 2>&1; then
-      echo "✅ GitHub CLI installed successfully"
-    else
-      echo "❌ Failed to install GitHub CLI"
-    fi
-  elif command -v yum >/dev/null 2>&1; then
-    echo "📦 Installing GitHub CLI via yum..."
-    yum install -y gh >/dev/null 2>&1
-    if command -v gh >/dev/null 2>&1; then
-      echo "✅ GitHub CLI installed successfully"
-    else
-      echo "❌ Failed to install GitHub CLI"
-    fi
-  else
-    echo "❌ No supported package manager found for GitHub CLI installation"
-  fi
-fi
-
-# Check again after potential installation
+# Check if GitHub CLI is available (should be pre-installed in base image)
 if ! command -v gh >/dev/null 2>&1; then
   echo "❌ GitHub CLI not found in PATH"
-  echo "⚠️ Cannot perform CI checks or PR reviews without GitHub CLI"
-  echo "📝 Tess QA workflow completed successfully (GitHub integration unavailable)"
+  echo "⚠️ GitHub CLI should be pre-installed in the base image"
+  echo "📝 Tess QA workflow completed (GitHub CLI unavailable)"
   exit 0
 fi
+
+echo "✅ GitHub CLI available"
 
 # Check authentication
 if ! gh auth status >/dev/null 2>&1; then
   echo "❌ GitHub CLI not authenticated"
   echo "⚠️ Cannot perform CI checks or PR reviews without authentication"
-  echo "📝 Tess QA workflow completed successfully (GitHub authentication unavailable)"
+  echo "📝 Tess QA workflow completed (GitHub authentication unavailable)"
   exit 0
 fi
 
@@ -1369,8 +1347,8 @@ check_ci_status() {
     return 1
   fi
   
-  # Get CI checks in JSON format with proper error handling
-  if ! gh pr checks "$pr_num" --json name,status,conclusion,url 2>"$temp_file"; then
+  # Get CI checks in JSON format with proper error handling (with timeout)
+  if ! timeout 30 gh pr checks "$pr_num" --json name,status,conclusion,url 2>"$temp_file"; then
     local error_output
     error_output=$(cat "$temp_file" 2>/dev/null || echo "Unknown error")
     rm -f "$temp_file"
@@ -1424,7 +1402,7 @@ case $CI_STATUS in
     ;;
   2)
     echo "⚠️ PR not found - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **PR Not Found**: Pull request #$PR_NUM does not exist
@@ -1435,12 +1413,12 @@ case $CI_STATUS in
 - [ ] Check if PR was closed or merged
 - [ ] Update PR reference if needed
 
-**Note**: Cannot proceed with QA until valid PR is specified."
+**Note**: Cannot proceed with QA until valid PR is specified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
   3)
     echo "⚠️ Network error - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Network Error**: Unable to connect to GitHub API
@@ -1451,12 +1429,12 @@ case $CI_STATUS in
 - [ ] Verify GitHub API access
 - [ ] Retry after network issues are resolved
 
-**Note**: Cannot proceed with QA until CI status can be verified."
+**Note**: Cannot proceed with QA until CI status can be verified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
   4)
     echo "⚠️ Authentication error - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Authentication Error**: GitHub token permissions insufficient
@@ -1468,12 +1446,12 @@ case $CI_STATUS in
 - [ ] Ensure token hasn't expired
 - [ ] Contact administrator for token refresh
 
-**Note**: Cannot proceed with QA until authentication is resolved."
+**Note**: Cannot proceed with QA until authentication is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
   5)
     echo "⚠️ Repository access error - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Repository Access Error**: Repository not found or not accessible
@@ -1485,7 +1463,7 @@ case $CI_STATUS in
 - [ ] Ensure repository URL is correct
 - [ ] Contact administrator for access issues
 
-**Note**: Cannot proceed with QA until repository access is resolved."
+**Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
 esac
@@ -1494,7 +1472,7 @@ esac
 if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
   echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
   # Post REQUEST CHANGES review for missing CI
-  gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+  timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Missing CI Setup**: No GitHub Actions workflows detected
@@ -1506,7 +1484,7 @@ if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
 - [ ] Configure deployment verification
 - [ ] Add branch protection rules
 
-**Note**: Cannot proceed with QA until CI is properly configured."
+**Note**: Cannot proceed with QA until CI is properly configured." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 else
   # Function to parse JSON without jq dependency
   parse_ci_json() {
@@ -1596,7 +1574,7 @@ else
       FAILED_DETAILS=$(extract_check_details "$CI_JSON" "failed")
     fi
     
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **CI Failures Detected**: $FAILED_CHECKS out of $TOTAL_CHECKS check(s) failing
@@ -1611,7 +1589,7 @@ $FAILED_DETAILS
 - [ ] Resolve build errors
 - [ ] Verify all workflows pass
 
-**Note**: Will re-evaluate once CI issues are resolved."
+**Note**: Will re-evaluate once CI issues are resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   elif [ "$PENDING_CHECKS" -gt 0 ]; then
     echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
     # Get details of pending checks
@@ -1621,7 +1599,7 @@ $FAILED_DETAILS
       PENDING_DETAILS=$(extract_check_details "$CI_JSON" "pending")
     fi
     
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ⏳ **CI Checks Pending**: $PENDING_CHECKS out of $TOTAL_CHECKS check(s) still running
@@ -1635,7 +1613,7 @@ $PENDING_DETAILS
 - [ ] Verify all checks pass successfully
 - [ ] Address any failures that may occur
 
-**Note**: Will re-evaluate once all CI checks are complete."
+**Note**: Will re-evaluate once all CI checks are complete." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
     echo "✅ All CI checks passing - posting APPROVE review"
     # Get details of successful checks
@@ -1645,7 +1623,7 @@ $PENDING_DETAILS
       SUCCESS_DETAILS=$(extract_check_details "$CI_JSON" "success")
     fi
     
-    gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
+    timeout 30 gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
 ✅ **ALL CI checks verified**: $SUCCESS_CHECKS out of $TOTAL_CHECKS checks passing
@@ -1665,10 +1643,10 @@ $SUCCESS_DETAILS
 - **Ready for merge**: All requirements satisfied
 - **No outstanding issues**: Clean, production-ready code
 
-**APPROVED** - Ready for merge to main branch."
+**APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ⚠️ **Unexpected CI State**: Unable to determine final CI status
@@ -1687,7 +1665,7 @@ $SUCCESS_DETAILS
 - [ ] Verify workflow completion
 - [ ] Contact administrator if issues persist
 
-**Note**: Will re-evaluate once CI status is clear."
+**Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   fi
 fi
 
@@ -1714,16 +1692,33 @@ echo "  - PR Review: Posted to #$PR_NUM"
 echo "🔧 Signaling sidecar to shutdown..."
 touch /workspace/.agent_done 2>/dev/null || true
 
-# Try graceful shutdown via HTTP
-echo "🔧 Attempting graceful sidecar shutdown..."
-if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 10 2>/dev/null; then
-  echo "✓ Sidecar shutdown request sent successfully"
-else
-  echo "⚠️ Sidecar shutdown request failed"
+# Gracefully stop sidecar to allow Job to complete (all containers must exit)
+echo "🔧 Attempting sidecar shutdown..."
+shutdown_attempts=0
+max_shutdown_attempts=3
+
+while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+  if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+    echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+    break
+  else
+    shutdown_attempts=$((shutdown_attempts + 1))
+    echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+    if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+      echo "Retrying in 2 seconds..."
+      sleep 2
+    fi
+  fi
+done
+
+if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+  echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+  echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
+  echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
 fi
 
-# Brief wait for sidecar to process shutdown
-sleep 2
+# Note: Cannot wait for sidecar termination from this container due to PID namespace isolation
+# Kubernetes will handle sidecar termination when the main container exits
 
 # Perform final cleanup of our own processes
 echo "🔧 Performing final process cleanup..."
