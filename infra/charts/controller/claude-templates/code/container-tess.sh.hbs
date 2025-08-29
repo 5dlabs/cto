@@ -1256,14 +1256,23 @@ check_ci_status() {
     local error_output
     error_output=$(cat "$temp_file" 2>/dev/null || echo "Unknown error")
     rm -f "$temp_file"
-    
-    # Check for specific error conditions
-    if echo "$error_output" | grep -q "pull request not found\|could not resolve to a PullRequest"; then
+
+    # Log the full error for debugging
+    echo "🔍 DEBUG: gh pr checks failed with error: $error_output" >&2
+
+    # Check for specific error conditions with more comprehensive patterns
+    if echo "$error_output" | grep -q "pull request not found\|could not resolve to a PullRequest\|PR not found"; then
       echo "❌ Error: PR #$pr_num not found"
       return 2
-    elif echo "$error_output" | grep -q "network\|timeout\|connection"; then
-      echo "❌ Error: Network issue accessing GitHub API"
+    elif echo "$error_output" | grep -q "network\|timeout\|connection\|HTTP\|API rate limit"; then
+      echo "❌ Error: Network or API issue accessing GitHub ($error_output)"
       return 3
+    elif echo "$error_output" | grep -q "authentication\|token\|unauthorized\|forbidden"; then
+      echo "❌ Error: Authentication failed - check GitHub token permissions"
+      return 4
+    elif echo "$error_output" | grep -q "repository not found\|not accessible"; then
+      echo "❌ Error: Repository not accessible or not found"
+      return 5
     else
       echo "❌ Error: Failed to get PR checks: $error_output"
       return 1
@@ -1277,6 +1286,15 @@ check_ci_status() {
 # Get CI status using robust JSON parsing
 CI_JSON=$(check_ci_status "$PR_NUM")
 CI_STATUS=$?
+
+# Validate CI_JSON is valid JSON before proceeding
+if [ $CI_STATUS -eq 0 ] && [ -n "$CI_JSON" ]; then
+  # Basic JSON validation - check if it starts and ends with brackets
+  if ! (echo "$CI_JSON" | grep -q '^\[' && echo "$CI_JSON" | grep -q '\]$'); then
+    echo "⚠️ Invalid JSON format received from gh pr checks - falling back to text parsing"
+    CI_STATUS=1
+  fi
+fi
 
 case $CI_STATUS in
   1)
@@ -1326,6 +1344,40 @@ case $CI_STATUS in
 - [ ] Retry after network issues are resolved
 
 **Note**: Cannot proceed with QA until CI status can be verified."
+    exit 0
+    ;;
+  4)
+    echo "⚠️ Authentication error - posting REQUEST CHANGES review"
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+❌ **Authentication Error**: GitHub token permissions insufficient
+❌ **Cannot verify**: CI status check failed due to auth issues
+
+## Required Actions
+- [ ] Verify GitHub token has correct permissions
+- [ ] Check repository access permissions
+- [ ] Ensure token hasn't expired
+- [ ] Contact administrator for token refresh
+
+**Note**: Cannot proceed with QA until authentication is resolved."
+    exit 0
+    ;;
+  5)
+    echo "⚠️ Repository access error - posting REQUEST CHANGES review"
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+❌ **Repository Access Error**: Repository not found or not accessible
+❌ **Cannot verify**: CI status check failed due to repo access issues
+
+## Required Actions
+- [ ] Verify repository exists and is accessible
+- [ ] Check repository permissions for the token
+- [ ] Ensure repository URL is correct
+- [ ] Contact administrator for access issues
+
+**Note**: Cannot proceed with QA until repository access is resolved."
     exit 0
     ;;
 esac
