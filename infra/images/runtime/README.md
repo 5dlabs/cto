@@ -73,12 +73,12 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **sd** - Simple sed replacement
 
 ### Cloud Development Tools
-- **AWS CLI** - Amazon Web Services command-line interface
+- **AWS CLI v2** - Amazon Web Services command-line interface (latest version)
 - **Docker CLI** - Container management
 - **Docker Compose** - Multi-container orchestration
 
 ### Container Tools
-- **dive** - Docker image layer analyzer
+- **Docker CLI** - Container management and inspection
 
 ### Database Clients
 - **PostgreSQL client** - psql command-line tool
