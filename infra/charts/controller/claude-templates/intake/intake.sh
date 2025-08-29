@@ -463,13 +463,13 @@ if [ "$OPENAI_VALID" = true ]; then
   "models": {
     "main": {
       "provider": "claude-code",
-      "modelId": "opus",
+      "modelId": "$MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
       "provider": "claude-code",
-      "modelId": "opus",
+      "modelId": "$MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
@@ -498,19 +498,19 @@ else
   "models": {
     "main": {
       "provider": "claude-code",
-      "modelId": "opus",
+      "modelId": "$MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
       "provider": "claude-code",
-      "modelId": "opus",
+      "modelId": "$MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
     "fallback": {
       "provider": "claude-code",
-      "modelId": "opus",
+      "modelId": "$MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     }
