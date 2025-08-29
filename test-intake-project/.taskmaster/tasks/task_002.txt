@@ -1,0 +1,37 @@
+# Task ID: 2
+# Title: Configure PostgreSQL Database
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Set up PostgreSQL database and configure it to work with the backend.
+# Details:
+Install PostgreSQL locally, create a new database named 'test_project', and configure connection settings in the backend using 'pg' package.
+
+# Test Strategy:
+Connect to the database using a Node.js script and verify the connection is successful.
+
+# Subtasks:
+## 1. Install PostgreSQL Locally [pending]
+### Dependencies: None
+### Description: Download and install PostgreSQL on the local machine.
+### Details:
+Ensure PostgreSQL is installed and running on the local environment. Follow the PostgreSQL documentation for installation steps.
+
+## 2. Create 'test_project' Database [pending]
+### Dependencies: 2.1
+### Description: Create a new database named 'test_project'.
+### Details:
+Use the PostgreSQL command line tool or a GUI tool like pgAdmin to create the database.
+
+## 3. Configure Backend Connection [pending]
+### Dependencies: 2.1, 2.2
+### Description: Set up the backend to connect to the 'test_project' PostgreSQL database.
+### Details:
+Edit the backend configuration files to include PostgreSQL connection details using the 'pg' package.
+
+## 4. Write Script to Test Database Connection [pending]
+### Dependencies: 2.3
+### Description: Create a Node.js script to test the database connection.
+### Details:
+Write a script that connects to the 'test_project' database and logs a success message if the connection is established.
+
