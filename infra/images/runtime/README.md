@@ -18,7 +18,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **ss** - Modern socket statistics (from iproute2)
 - **ip** - Modern network configuration (from iproute2)
 - **tcpdump** - Command-line packet analyzer
-- **Wireshark CLI** - Network protocol analyzer
+- **tshark** - Wireshark command-line network protocol analyzer
 - **mtr** - Network diagnostic tool combining traceroute and ping
 - **traceroute** - Network path tracing
 - **arping** - ARP ping utility for Layer 2 connectivity

@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   # Version control and development
   git procps sudo fzf zsh man-db unzip gnupg2 \
   # Networking tools
-  iproute2 dnsutils netcat-openbsd nmap net-tools tcpdump wireshark-cli \
+  iproute2 dnsutils netcat-openbsd nmap net-tools tcpdump tshark \
   ethtool bridge-utils vlan arping hping3 iperf3 socat telnet openssh-client \
   mtr-tiny traceroute \
   # System utilities
@@ -29,10 +29,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   shellcheck yamllint markdownlint \
   # Development utilities
   tmux ncdu silversearcher-ag \
-  # Cloud development tools
-  awscli \
-  # Container tools
-  dive \
   # Database clients
   mysql-client sqlite3 \
   # Documentation tools
@@ -48,7 +44,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   # Build tools
   ninja-build meson \
   # Compression
-  pigz pbzip2 pxz \
+  pigz pbzip2 \
   # Security
   gnupg-agent \
   # Development languages
@@ -195,6 +191,18 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
         curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
         echo "deb [arch=${DL_ARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
         apt-get update && apt-get install -y gh && break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done
+
+# Install AWS CLI v2
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=x86_64 ;; arm64) DL_ARCH=aarch64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    for i in 1 2 3; do \
+        curl -fsSL -o "/tmp/awscli.zip" "https://awscli.amazonaws.com/awscli-exe-linux-${DL_ARCH}.zip" && \
+        unzip -q /tmp/awscli.zip -d /tmp && \
+        /tmp/aws/install && \
+        rm -rf /tmp/aws /tmp/awscli.zip && break || \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
