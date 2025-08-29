@@ -38,12 +38,29 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         direnv \
         # Process monitoring
         iotop \
-        # Network debugging
-        mtr-tiny \
-        traceroute \
-        nmap \
-        # Text processing
-        sd \
+                        # Network debugging and analysis
+                mtr-tiny \
+                traceroute \
+                nmap \
+                netcat-traditional \
+                net-tools \
+                iproute2 \
+                dnsutils \
+                tcpdump \
+                wireshark-cli \
+                ethtool \
+                bridge-utils \
+                vlan \
+                arping \
+                hping3 \
+                iperf3 \
+                socat \
+                telnet \
+                openssh-client \
+                curl \
+                wget \
+                # Text processing
+                sd \
         # Git enhancements
         git-lfs \
         git-extras \

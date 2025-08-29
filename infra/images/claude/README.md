@@ -197,7 +197,14 @@ kubectl create secret generic claude-secrets \
 - **pgcli, mycli** for enhanced database interaction
 
 ### Networking & Debugging
-- **mtr, traceroute, nmap** for network diagnostics
+- **nmap, ncat, netstat, ss, ip** for network scanning and connections
+- **tcpdump, wireshark-cli** for network packet analysis
+- **mtr, traceroute, ping, arping** for network path analysis
+- **iperf3, hping3** for network performance testing
+- **socat, telnet, openssh-client** for network utilities
+- **dig, nslookup, host** for DNS resolution
+- **curl, wget** for HTTP/HTTPS testing
+- **ethtool, bridge-utils, vlan** for network interface management
 - **strace, lsof, psmisc** for process debugging
 - **openssl, gnupg** for security operations
 
