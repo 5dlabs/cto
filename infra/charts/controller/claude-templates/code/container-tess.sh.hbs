@@ -91,6 +91,39 @@ REPO_URL="{{repository_url}}"
 # GitHub App authentication is configured via environment variables
 echo "Using GitHub App authentication for testing workflow"
 
+# Function to ensure sidecar shutdown
+shutdown_sidecar() {
+  echo "🔧 Signaling sidecar to shutdown..."
+  touch /workspace/.agent_done 2>/dev/null || true
+
+  echo "🔧 Attempting sidecar shutdown..."
+  local shutdown_attempts=0
+  local max_shutdown_attempts=3
+
+  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+      break
+    else
+      shutdown_attempts=$((shutdown_attempts + 1))
+      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+        echo "Retrying in 2 seconds..."
+        sleep 2
+      fi
+    fi
+  done
+
+  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+    echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
+    echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
+  fi
+}
+
+# Set trap to ensure sidecar shutdown on exit
+trap shutdown_sidecar EXIT
+
 # Authenticate with GitHub App
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     echo "Authenticating with GitHub App..."
@@ -1673,38 +1706,7 @@ else
   echo "✅ Tess QA workflow completed but could not post PR review"
 fi
 
-# Function to ensure sidecar shutdown
-shutdown_sidecar() {
-  echo "🔧 Signaling sidecar to shutdown..."
-  touch /workspace/.agent_done 2>/dev/null || true
-  
-  echo "🔧 Attempting sidecar shutdown..."
-  local shutdown_attempts=0
-  local max_shutdown_attempts=3
-  
-  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-      break
-    else
-      shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-        echo "Retrying in 2 seconds..."
-        sleep 2
-      fi
-    fi
-  done
-  
-  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-    echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
-    echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
-  fi
-}
 
-# Set trap to ensure sidecar shutdown on exit
-trap shutdown_sidecar EXIT
 
 # =============================================================================
 # DEBUG LOGGING: FINAL STATUS
