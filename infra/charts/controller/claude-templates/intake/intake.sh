@@ -331,7 +331,7 @@ echo "🔍 Attempting TaskMaster init with full flags..."
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
-    --rules "claude,cursor" \
+    --rules "cursor" \
     --skip-install \
     --aliases
 INIT_EXIT_CODE=$?
@@ -459,9 +459,13 @@ cat > $CONFIG_DIR/config.json << EOF
 }
 EOF
 
+# Set up dynamic provider selection for different operations
+echo "✅ TaskMaster configured with Opus model and GPT-4o fallback"
+
+# Enable codebase analysis for research operations
+export TASKMASTER_ENABLE_CODEBASE_ANALYSIS=true
+
 if [ "$OPENAI_VALID" = true ]; then
-  # Use Claude Code for main/research, GPT-5 for fallback
-  echo "✅ Using Claude Code with GPT-5 fallback"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -533,11 +537,12 @@ fi
 
 echo "✅ Claude Code configuration written"
 
-# Parse PRD
-echo "📄 Parsing PRD to generate tasks..."
+# Parse PRD with Claude Code (for research and codebase analysis)
+echo "📄 Parsing PRD to generate tasks with Claude Code..."
 task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
-    --force || {
+    --force \
+    --research || {
     echo "❌ Failed to parse PRD"
     exit 1
 }
@@ -564,9 +569,46 @@ if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
     }
 fi
 
-# Expand tasks if requested
+# Expand tasks if requested (switch to regular Claude API for faster expansion)
 if [ "$EXPAND_TASKS" = "true" ]; then
-    echo "🌳 Expanding tasks with subtasks..."
+    echo "🌳 Expanding tasks with subtasks using Claude API..."
+
+    # Switch to regular Claude API provider for faster expansion (no codebase analysis needed)
+    if [ "$OPENAI_VALID" = true ]; then
+        cat > .taskmaster/config.json << EOF
+{
+  "project": {
+    "name": "$PROJECT_NAME",
+    "description": "Auto-generated project from intake pipeline",
+    "version": "0.1.0"
+  },
+  "models": {
+    "main": {
+      "provider": "anthropic",
+      "modelId": "claude-3-7-sonnet-20250219",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    },
+    "research": {
+      "provider": "anthropic",
+      "modelId": "claude-3-7-sonnet-20250219",
+      "maxTokens": 32000,
+      "temperature": 0.1
+    },
+    "fallback": {
+      "provider": "openai",
+      "modelId": "gpt-4o",
+      "maxTokens": 8000,
+      "temperature": 0.7
+    }
+  },
+  "global": {
+    "defaultTag": "master"
+  }
+}
+EOF
+    fi
+
     task-master expand --all --force --file "$TASKS_FILE" || {
         echo "❌ expand failed"
         exit 1
