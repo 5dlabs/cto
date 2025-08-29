@@ -121,9 +121,6 @@ shutdown_sidecar() {
   fi
 }
 
-# Set trap to ensure sidecar shutdown on exit
-trap shutdown_sidecar EXIT
-
 # Authenticate with GitHub App
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     echo "Authenticating with GitHub App..."
@@ -1183,6 +1180,11 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 - NEVER exit with a REQUEST CHANGES review - keep working until it's fixed
 - Your success is measured by getting to APPROVED status
 - **IF YOU APPROVE WITH FAILING CI, YOU HAVE FAILED YOUR MISSION**"
+
+# Set trap to ensure sidecar shutdown on exit (set here after all functions are defined)
+# Using explicit function call for compatibility with /bin/sh
+trap 'echo "🚨 EXIT TRAP TRIGGERED - Shutting down sidecar..."; shutdown_sidecar' EXIT INT TERM
+echo "✅ EXIT trap set for sidecar shutdown"
 
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
