@@ -1223,9 +1223,115 @@ TASK_ID="{{task_id}}"
 
 # Check CI status to determine review type
 echo "📊 Checking CI status for PR #$PR_NUM..."
-CI_OUTPUT=$(gh pr checks "$PR_NUM" 2>/dev/null || echo "")
 
-if [ -z "$CI_OUTPUT" ]; then
+# Validate PR_NUM is not empty
+if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
+  echo "❌ Error: PR_NUM is empty or not properly set"
+  echo "⚠️ Cannot proceed with PR review - invalid PR number"
+  exit 1
+fi
+
+# Function to safely execute gh command with error handling
+check_ci_status() {
+  local pr_num="$1"
+  local temp_file
+  temp_file=$(mktemp)
+  
+  # Check if gh is available and authenticated
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "❌ Error: gh CLI is not installed"
+    rm -f "$temp_file"
+    return 1
+  fi
+  
+  # Test gh authentication
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "❌ Error: gh CLI is not authenticated"
+    rm -f "$temp_file"
+    return 1
+  fi
+  
+  # Get CI checks in JSON format with proper error handling
+  if ! gh pr checks "$pr_num" --json name,status,conclusion,url 2>"$temp_file"; then
+    local error_output
+    error_output=$(cat "$temp_file" 2>/dev/null || echo "Unknown error")
+    rm -f "$temp_file"
+    
+    # Check for specific error conditions
+    if echo "$error_output" | grep -q "pull request not found\|could not resolve to a PullRequest"; then
+      echo "❌ Error: PR #$pr_num not found"
+      return 2
+    elif echo "$error_output" | grep -q "network\|timeout\|connection"; then
+      echo "❌ Error: Network issue accessing GitHub API"
+      return 3
+    else
+      echo "❌ Error: Failed to get PR checks: $error_output"
+      return 1
+    fi
+  fi
+  
+  rm -f "$temp_file"
+  return 0
+}
+
+# Get CI status using robust JSON parsing
+CI_JSON=$(check_ci_status "$PR_NUM")
+CI_STATUS=$?
+
+case $CI_STATUS in
+  1)
+    echo "⚠️ GitHub CLI error - posting REQUEST CHANGES review"
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+❌ **GitHub CLI Error**: Unable to check CI status
+❌ **Cannot verify**: CI status unknown due to technical issues
+
+## Required Actions
+- [ ] Verify GitHub CLI is properly installed and authenticated
+- [ ] Check network connectivity to GitHub
+- [ ] Retry CI status check
+- [ ] Contact administrator if issues persist
+
+**Note**: Cannot proceed with QA until CI status can be verified."
+    exit 0
+    ;;
+  2)
+    echo "⚠️ PR not found - posting REQUEST CHANGES review"
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+❌ **PR Not Found**: Pull request #$PR_NUM does not exist
+❌ **Cannot verify**: Invalid PR reference
+
+## Required Actions
+- [ ] Verify correct PR number
+- [ ] Check if PR was closed or merged
+- [ ] Update PR reference if needed
+
+**Note**: Cannot proceed with QA until valid PR is specified."
+    exit 0
+    ;;
+  3)
+    echo "⚠️ Network error - posting REQUEST CHANGES review"
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+❌ **Network Error**: Unable to connect to GitHub API
+❌ **Cannot verify**: CI status check failed due to connectivity issues
+
+## Required Actions
+- [ ] Check network connectivity
+- [ ] Verify GitHub API access
+- [ ] Retry after network issues are resolved
+
+**Note**: Cannot proceed with QA until CI status can be verified."
+    exit 0
+    ;;
+esac
+
+# Parse CI status from JSON output
+if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
   echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
   # Post REQUEST CHANGES review for missing CI
   gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
@@ -1241,18 +1347,103 @@ if [ -z "$CI_OUTPUT" ]; then
 - [ ] Add branch protection rules
 
 **Note**: Cannot proceed with QA until CI is properly configured."
-elif echo "$CI_OUTPUT" | grep -q "fail\|error"; then
-  echo "❌ CI failures detected - posting REQUEST CHANGES review"
-  # Post REQUEST CHANGES review for failed CI
-  FAILED_CHECKS=$(echo "$CI_OUTPUT" | grep -E "fail|error" | wc -l)
-  gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+else
+  # Function to parse JSON without jq dependency
+  parse_ci_json() {
+    local json="$1"
+    local field="$2"
+    local value="$3"
+    
+    # Count total checks
+    if [ "$field" = "total" ]; then
+      echo "$json" | grep -o '"name"' | wc -l
+      return
+    fi
+    
+    # Count by status and conclusion
+    case "$field" in
+      "completed")
+        echo "$json" | grep -o '"status":"completed"' | wc -l
+        ;;
+      "success")
+        # Count objects that have both completed status and success conclusion
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | wc -l
+        ;;
+      "failed")
+        # Count objects that have completed status and failure/cancelled/timed_out conclusion
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | wc -l
+        ;;
+      "pending")
+        local total completed
+        total=$(echo "$json" | grep -o '"name"' | wc -l)
+        completed=$(echo "$json" | grep -o '"status":"completed"' | wc -l)
+        echo $((total - completed))
+        ;;
+    esac
+  }
+  
+  # Function to extract check details
+  extract_check_details() {
+    local json="$1"
+    local type="$2"
+    
+    case "$type" in
+      "failed")
+        # Extract failed check names and conclusions
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | sed -E 's/.*"name":"([^"]+)".*"conclusion":"([^"]+)".*/- \1 (\2)/'
+        ;;
+      "pending")
+        # Extract pending check names and statuses
+        echo "$json" | sed 's/},{/\n/g' | grep -v '"status":"completed"' | sed -E 's/.*"name":"([^"]+)".*"status":"([^"]+)".*/- \1 (\2)/'
+        ;;
+      "success")
+        # Extract successful check names
+        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | sed -E 's/.*"name":"([^"]+)".*/- \1 ✅/'
+        ;;
+    esac
+  }
+  
+  # Use jq if available, otherwise use fallback parsing
+  if command -v jq >/dev/null 2>&1; then
+    echo "📋 Using jq for JSON parsing"
+    TOTAL_CHECKS=$(echo "$CI_JSON" | jq -r '. | length')
+    COMPLETED_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed")] | length')
+    SUCCESS_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and .conclusion == "success")] | length')
+    FAILED_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | length')
+    PENDING_CHECKS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status != "completed")] | length')
+  else
+    echo "📋 Using fallback JSON parsing (jq not available)"
+    TOTAL_CHECKS=$(parse_ci_json "$CI_JSON" "total")
+    COMPLETED_CHECKS=$(parse_ci_json "$CI_JSON" "completed")
+    SUCCESS_CHECKS=$(parse_ci_json "$CI_JSON" "success")
+    FAILED_CHECKS=$(parse_ci_json "$CI_JSON" "failed")
+    PENDING_CHECKS=$(parse_ci_json "$CI_JSON" "pending")
+  fi
+  
+  echo "📊 CI Status Summary:"
+  echo "  - Total checks: $TOTAL_CHECKS"
+  echo "  - Completed: $COMPLETED_CHECKS"
+  echo "  - Successful: $SUCCESS_CHECKS"
+  echo "  - Failed: $FAILED_CHECKS"
+  echo "  - Pending: $PENDING_CHECKS"
+  
+  if [ "$FAILED_CHECKS" -gt 0 ]; then
+    echo "❌ CI failures detected - posting REQUEST CHANGES review"
+    # Get details of failed checks
+    if command -v jq >/dev/null 2>&1; then
+      FAILED_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | map("- " + .name + " (" + .conclusion + ")") | join("\n")')
+    else
+      FAILED_DETAILS=$(extract_check_details "$CI_JSON" "failed")
+    fi
+    
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
-❌ **CI Failures Detected**: $FAILED_CHECKS check(s) failing
+❌ **CI Failures Detected**: $FAILED_CHECKS out of $TOTAL_CHECKS check(s) failing
 ❌ **Cannot approve**: All CI checks must pass
 
 ## Failed Checks
-$(echo "$CI_OUTPUT" | grep -E "fail|error" | sed 's/^/- /')
+$FAILED_DETAILS
 
 ## Required Actions
 - [ ] Fix all failing CI checks
@@ -1261,18 +1452,48 @@ $(echo "$CI_OUTPUT" | grep -E "fail|error" | sed 's/^/- /')
 - [ ] Verify all workflows pass
 
 **Note**: Will re-evaluate once CI issues are resolved."
-else
-  echo "✅ All CI checks passing - posting APPROVE review"
-  # Post APPROVE review for passing CI
-  gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
+  elif [ "$PENDING_CHECKS" -gt 0 ]; then
+    echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
+    # Get details of pending checks
+    if command -v jq >/dev/null 2>&1; then
+      PENDING_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status != "completed")] | map("- " + .name + " (" + .status + ")") | join("\n")')
+    else
+      PENDING_DETAILS=$(extract_check_details "$CI_JSON" "pending")
+    fi
+    
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+⏳ **CI Checks Pending**: $PENDING_CHECKS out of $TOTAL_CHECKS check(s) still running
+❌ **Cannot approve**: All CI checks must complete successfully
+
+## Pending Checks
+$PENDING_DETAILS
+
+## Required Actions
+- [ ] Wait for all CI checks to complete
+- [ ] Verify all checks pass successfully
+- [ ] Address any failures that may occur
+
+**Note**: Will re-evaluate once all CI checks are complete."
+  elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
+    echo "✅ All CI checks passing - posting APPROVE review"
+    # Get details of successful checks
+    if command -v jq >/dev/null 2>&1; then
+      SUCCESS_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and .conclusion == "success")] | map("- " + .name + " ✅") | join("\n")')
+    else
+      SUCCESS_DETAILS=$(extract_check_details "$CI_JSON" "success")
+    fi
+    
+    gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
-✅ **ALL CI checks verified**: All GitHub Actions checks passing
+✅ **ALL CI checks verified**: $SUCCESS_CHECKS out of $TOTAL_CHECKS checks passing
 ✅ **No failures found**: Zero failing checks confirmed
 
 ## CI Status
 ✅ **GitHub Actions CI**: All checks passing
-✅ **All workflows**: Green across the board
+$SUCCESS_DETAILS
 
 ## Task $TASK_ID Acceptance Criteria
 ✅ **All criteria met**: Implementation complete and verified
@@ -1285,6 +1506,29 @@ else
 - **No outstanding issues**: Clean, production-ready code
 
 **APPROVED** - Ready for merge to main branch."
+  else
+    echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
+    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+
+## CI Status
+⚠️ **Unexpected CI State**: Unable to determine final CI status
+❌ **Cannot approve**: CI status unclear
+
+## Current Status
+- Total checks: $TOTAL_CHECKS
+- Completed: $COMPLETED_CHECKS
+- Successful: $SUCCESS_CHECKS
+- Failed: $FAILED_CHECKS
+- Pending: $PENDING_CHECKS
+
+## Required Actions
+- [ ] Review CI check configuration
+- [ ] Ensure all checks are properly defined
+- [ ] Verify workflow completion
+- [ ] Contact administrator if issues persist
+
+**Note**: Will re-evaluate once CI status is clear."
+  fi
 fi
 
 # =============================================================================
