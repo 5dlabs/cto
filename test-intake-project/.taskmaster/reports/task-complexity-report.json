@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-29T17:34:11.225Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Setup Project Repository",
+			"complexityScore": 3,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down the repository setup into creating the repository, setting up the directory structure, initializing npm projects, and creating the .gitignore file.",
+			"reasoning": "The task involves several straightforward steps like initializing a repository and setting up a basic structure. It is not complex but has multiple small parts."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Setup Frontend with React and TypeScript",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Detail the setup process into scaffolding the app, configuring TypeScript, and running the application for testing.",
+			"reasoning": "Using Create React App simplifies the process, but configuring TypeScript and ensuring everything runs correctly adds moderate complexity."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Setup Backend with Node.js and Express",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Divide the task into setting up the Express app, configuring JSON parsing, and creating a test route.",
+			"reasoning": "Setting up Express is straightforward, but ensuring it is configured correctly with routes and parsing introduces some complexity."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Configure PostgreSQL Database",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Outline subtasks for installing PostgreSQL, creating a database, configuring environment variables, and testing the connection.",
+			"reasoning": "Database setup involves installing software, configuration, and testing connections, which adds to the complexity."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Implement User Registration",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into creating frontend form, backend API development, database interaction, validation, and integration testing.",
+			"reasoning": "User registration requires integration between frontend and backend, database operations, and validation logic, increasing complexity."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Implement User Login with JWT",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Divide into form creation, JWT authentication implementation, backend API, frontend storage, and testing.",
+			"reasoning": "This task involves implementing secure authentication, which includes handling JWTs and ensuring secure storage, adding complexity."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Develop Dashboard with User Statistics",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Detail tasks into creating frontend dashboard, setting up protected routes, fetching data from backend, and displaying statistics.",
+			"reasoning": "Developing a protected dashboard involves authentication checks and data fetching/display, which are moderately complex."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Implement Error Handling",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Outline subtasks for implementing try-catch in backend, frontend user-friendly messages, and backend error logging.",
+			"reasoning": "Error handling involves implementing consistent practices across the codebase, which requires careful planning and integration."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Code Review and Best Practices",
+			"complexityScore": 6,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Divide into reviewing code style, assessing structure, and evaluating security practices.",
+			"reasoning": "Code review requires a detailed analysis of existing code, which can be time-consuming and involves assessing various best practices."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Final Testing and Deployment",
+			"complexityScore": 8,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into final testing, setting up deployment pipeline, deploying to cloud, and verifying live environment.",
+			"reasoning": "Final testing and deployment involve multiple stages including testing, configuring a deployment pipeline, and coordinating a live rollout, making it complex."
+		}
+	]
+}

@@ -1,0 +1,37 @@
+# Task ID: 7
+# Title: Develop Dashboard with User Statistics
+# Status: pending
+# Dependencies: 6
+# Priority: medium
+# Description: Create a dashboard to display user statistics after login.
+# Details:
+Develop a protected dashboard route in the frontend. Use the JWT for authentication to fetch user statistics from the backend. Display the statistics in the frontend.
+
+# Test Strategy:
+Log in as a user and verify that the dashboard displays the correct statistics.
+
+# Subtasks:
+## 1. Create Frontend Dashboard Component [pending]
+### Dependencies: None
+### Description: Develop a React component for the user statistics dashboard.
+### Details:
+Use React to build a component that will serve as the main view for displaying user statistics. Ensure the component is styled appropriately and is responsive.
+
+## 2. Set Up Protected Routes [pending]
+### Dependencies: 7.1
+### Description: Implement route protection for the dashboard using JWT.
+### Details:
+Use JWT authentication to protect the dashboard route. Ensure that only authenticated users can access the dashboard by verifying the token on each request.
+
+## 3. Fetch User Statistics from Backend [pending]
+### Dependencies: 7.2
+### Description: Implement data fetching logic to retrieve user statistics from the backend API.
+### Details:
+Use an HTTP client like Axios to send requests to the backend API and retrieve user statistics. Handle loading states and possible errors during data fetching.
+
+## 4. Display User Statistics in Dashboard [pending]
+### Dependencies: 7.3
+### Description: Render the fetched user statistics data in the dashboard component.
+### Details:
+Use React state management to store the fetched data and display it in a user-friendly format. Implement visualizations or tables as necessary to present the statistics clearly.
+
