@@ -398,15 +398,15 @@ echo "🔍 Testing task-master command..."
 task-master --version || echo "⚠️ task-master --version failed"
 task-master --help > /dev/null 2>&1 || echo "⚠️ task-master --help failed"
 
-# First attempt: Try clean init with minimal IDE files
+# First attempt: Try clean init with Claude rules only
 echo "🔍 Attempting TaskMaster init..."
 # Use the full path to ensure we're calling the right binary
-# Note: Removed --rules flag to avoid creating unnecessary IDE files
-# Note: Removed --aliases flag as not needed in container environment
+# --rules "claude" creates only Claude-specific files (CLAUDE.md)
 "$TASK_MASTER_PATH" init --yes \
     --name "$PROJECT_NAME" \
     --description "Auto-generated project from intake pipeline" \
     --version "0.1.0" \
+    --rules "claude" \
     --skip-install
 INIT_EXIT_CODE=$?
 
