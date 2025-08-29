@@ -1,24 +1,30 @@
 # Task ID: 6
 # Title: Implement Agent Cancellation System
 # Status: pending
-# Dependencies: 1, 3
+# Dependencies: 1, 3, 4
 # Priority: high
-# Description: Build system to cancel running Cleo/Tess agents when Rex pushes remediation fixes
+# Description: Enhance existing agent cancellation system to handle concurrent operations and improve race condition handling when Rex pushes remediation fixes
 # Details:
-Create push-triggered cancellation mechanism for quality agents:
+Enhance the existing implementation-agent-remediation sensor with advanced cancellation capabilities:
 
-1. Deploy sensor for Rex push events
-2. Implement CodeRun deletion by label selector
-3. Remove 'ready-for-qa' label from PR
-4. Add 'remediation-in-progress' label
-5. Handle race conditions and partial failures
+**Existing Foundation (Already Implemented):**
+- Rex push event detection via implementation-agent-remediation sensor
+- Basic CodeRun deletion for Cleo/Tess agents
+- PR label management (removes 'ready-for-qa', adds 'remediation-in-progress')
 
-Implementation using Argo Events:
+**Required Enhancements:**
+1. Concurrent operation handling with distributed locking
+2. Advanced race condition prevention
+3. State-aware cancellation logic
+4. Integration with state management system (Task 4)
+5. Partial failure recovery mechanisms
+
+**Enhanced Sensor Configuration:**
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: rex-push-cleanup
+  name: implementation-agent-remediation  # Existing sensor
 spec:
   dependencies:
     - name: rex-push
@@ -29,7 +35,7 @@ spec:
   triggers:
     - template:
         k8s:
-          operation: delete
+          operation: patch  # Enhanced with state checks
           source:
             resource:
               apiVersion: platform.5dlabs.com/v1
@@ -40,68 +46,87 @@ spec:
               - {key: task-id, operator: Exists}
 ```
 
-Go implementation for label management:
+**Enhanced Go Controller Logic:**
 ```go
-func (c *Controller) resetPRLabels(prNumber int) error {
-    client := github.NewClient(nil).WithAuthToken(token)
+func (c *Controller) enhancedCancellation(prNumber int, taskID string) error {
+    // Acquire distributed lock
+    lock := c.acquireLock(fmt.Sprintf("cancel-%s", taskID))
+    defer lock.Release()
     
-    // Remove ready-for-qa
-    _, err := client.Issues.RemoveLabelForIssue(ctx, owner, repo, prNumber, "ready-for-qa")
+    // Check current state from ConfigMap
+    state := c.getRemediationState(taskID)
+    if state.CancellationInProgress {
+        return nil // Already being handled
+    }
     
-    // Add remediation-in-progress
-    _, _, err = client.Issues.AddLabelsToIssue(ctx, owner, repo, prNumber, []string{"remediation-in-progress"})
+    // Mark cancellation started
+    state.CancellationInProgress = true
+    c.updateRemediationState(taskID, state)
+    
+    // Perform cancellation with retry logic
+    err := c.cancelWithRetry(taskID, 3)
+    
+    // Update labels atomically
+    c.updatePRLabelsAtomic(prNumber, state)
     
     return err
 }
 ```
 
 # Test Strategy:
-1. Test agent cancellation on Rex push events
-2. Verify label management (removal and addition)
-3. Test with multiple concurrent agents
-4. Validate cleanup doesn't affect other tasks
-5. Test recovery from partial failures
+1. Test enhanced cancellation with 10+ concurrent agents
+2. Verify distributed locking prevents race conditions
+3. Test integration with state management system
+4. Validate partial failure recovery mechanisms
+5. Test atomic label transitions under load
+6. Verify no orphaned resources after concurrent cancellations
 
 # Subtasks:
-## 1. Deploy Rex Push Event Sensor [pending]
+## 1. Enhance Existing Rex Push Event Sensor [pending]
 ### Dependencies: None
-### Description: Create and deploy Argo Events sensor to detect Rex bot push events on GitHub
+### Description: Extend the implementation-agent-remediation sensor with advanced filtering and state checks
 ### Details:
-Implement EventSource and Sensor configuration to capture GitHub webhook events when Rex pushes code. Configure filters to detect pushes from '5DLabs-Rex[bot]' and '5DLabs-Rex' users. Set up webhook secret validation and ensure proper event filtering to avoid false triggers. Deploy to Kubernetes cluster with appropriate namespace and RBAC permissions.
+Modify the existing sensor in infra/gitops/resources/github-webhooks/play-workflow-sensors.yaml to add: 1) Additional filtering for concurrent push events, 2) State validation before triggering cancellation, 3) Enhanced error handling for webhook processing, 4) Correlation ID generation for tracking related operations. Ensure backward compatibility with current functionality.
 
-## 2. Implement CodeRun Deletion Logic [pending]
-### Dependencies: 6.1
-### Description: Build Kubernetes client to delete CodeRun resources based on label selectors
+## 2. Implement Distributed Locking for Concurrent Operations [pending]
+### Dependencies: None
+### Description: Build distributed locking mechanism using Kubernetes leases to prevent race conditions
 ### Details:
-Create Go/Rust module using Kubernetes client-go to delete CodeRun resources matching specific labels (agent-type: cleo/tess, task-id exists). Implement batch deletion with proper error handling. Add retry logic for transient failures. Ensure deletion only affects CodeRuns for the specific PR/task being remediated.
+Create Go module using k8s.io/client-go coordination/v1 API for distributed locking. Implement lease-based locking with automatic renewal and timeout. Add lock acquisition with exponential backoff. Create lock namespace isolation per task-id. Implement deadlock detection using lease annotations. Ensure locks are released on controller restart or crash.
 
-## 3. Build PR Label Management Module [pending]
-### Dependencies: 6.1
-### Description: Implement GitHub API client to remove 'ready-for-qa' label from pull requests
+## 3. Enhance CodeRun Deletion with State Awareness [pending]
+### Dependencies: 6.1, 6.2
+### Description: Improve CodeRun deletion logic to check state before cancellation
 ### Details:
-Create GitHub client module to manage PR labels. Implement atomic label removal for 'ready-for-qa' with proper error handling. Use GitHub API v4 (GraphQL) for efficient operations. Add verification logic to ensure label exists before removal attempt. Include retry mechanism for API rate limiting scenarios.
+Extend existing deletion logic to: 1) Query state ConfigMap before deletion, 2) Verify agent hasn't already completed, 3) Implement graceful termination with SIGTERM before SIGKILL, 4) Add deletion confirmation via status check, 5) Update state after successful deletion. Integrate with Task 4's state management system.
 
-## 4. Add Remediation Progress Label [pending]
-### Dependencies: 6.3
-### Description: Implement logic to add 'remediation-in-progress' label to PRs during remediation
+## 4. Implement Atomic Label Transitions [pending]
+### Dependencies: 6.2
+### Description: Enhance PR label management with atomic operations and conflict resolution
 ### Details:
-Extend label management module to add 'remediation-in-progress' label atomically after removing 'ready-for-qa'. Implement idempotent operation to handle duplicate requests. Add timestamp metadata to track when remediation started. Ensure label is properly colored and visible in GitHub UI.
+Improve existing label management to: 1) Use GitHub's ETag for optimistic concurrency control, 2) Implement compare-and-swap operations for label updates, 3) Add retry logic with exponential backoff for conflicts, 4) Batch label operations to reduce API calls, 5) Add validation that correct labels exist before/after operations.
 
-## 5. Implement Race Condition Handler [pending]
+## 5. Build Concurrent Cancellation Coordinator [pending]
 ### Dependencies: 6.2, 6.3, 6.4
-### Description: Build synchronization mechanism to handle concurrent agent operations safely
+### Description: Create coordination layer for managing multiple simultaneous cancellations
 ### Details:
-Implement distributed locking using Kubernetes lease objects or Redis to prevent race conditions. Add transaction-like semantics for multi-step operations (delete CodeRun + update labels). Implement optimistic concurrency control with version checking. Add conflict resolution logic when multiple Rex instances push simultaneously. Include deadlock detection and recovery mechanisms.
+Implement coordinator that: 1) Tracks all active cancellations in shared ConfigMap, 2) Prevents duplicate cancellation requests, 3) Manages cancellation priority queue, 4) Implements circuit breaker for cascading failures, 5) Provides cancellation status API for monitoring. Add metrics for cancellation success/failure rates.
 
-## 6. Create Partial Failure Recovery System [pending]
+## 6. Implement Advanced Recovery System [pending]
 ### Dependencies: 6.5
-### Description: Build recovery mechanism for handling partial failures in cancellation operations
+### Description: Build sophisticated recovery mechanism for partial failures during concurrent operations
 ### Details:
-Implement state tracking for multi-step cancellation process using ConfigMap or database. Add rollback capabilities when operations partially fail. Create reconciliation loop to detect and fix inconsistent states. Implement alerting for manual intervention when automatic recovery fails. Add comprehensive logging for debugging partial failures.
+Create recovery system that: 1) Detects partial failures through state inconsistencies, 2) Implements automatic rollback for failed multi-step operations, 3) Adds manual intervention triggers for unrecoverable states, 4) Creates reconciliation loop running every 30 seconds, 5) Implements cleanup for orphaned locks and resources. Include comprehensive observability.
 
-## 7. Develop Integration Tests for Concurrent Agents [pending]
+## 7. Create Stress Tests for Concurrent Cancellations [pending]
 ### Dependencies: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6
-### Description: Create comprehensive test suite for agent cancellation with concurrent operations
+### Description: Develop comprehensive test suite for high-concurrency scenarios
 ### Details:
-Build integration tests simulating multiple Cleo/Tess agents running concurrently. Test Rex push triggering cancellation of correct agents only. Verify label transitions are atomic and consistent. Test recovery from network failures, API timeouts, and partial deletions. Include chaos testing with random failures. Validate no orphaned resources after cancellation. Test performance with 10+ concurrent agents.
+Build stress tests that: 1) Simulate 20+ concurrent Rex pushes, 2) Test with random network delays and failures, 3) Verify no lost cancellations or orphaned agents, 4) Test lock contention and timeout scenarios, 5) Validate state consistency after chaos testing, 6) Measure cancellation latency under load. Include performance regression tests.
+
+## 8. Integrate with State Management System [pending]
+### Dependencies: 6.3, 6.5
+### Description: Connect enhanced cancellation system with Task 4's state management
+### Details:
+Implement integration that: 1) Updates remediation state during cancellation, 2) Records cancellation history in state ConfigMap, 3) Uses state to determine if re-cancellation is needed, 4) Implements state-based recovery decisions, 5) Adds state validation before and after cancellation operations.
 

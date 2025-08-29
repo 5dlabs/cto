@@ -3,86 +3,102 @@
 # Status: pending
 # Dependencies: None
 # Priority: medium
-# Description: Build ConfigMap-based state tracking for remediation iterations and feedback history
+# Description: Build ConfigMap-based state tracking for remediation iterations and feedback history in Rust controller
 # Details:
-Create state management system using Kubernetes ConfigMaps to track remediation progress:
+Enhance the existing Rust controller to manage remediation state using Kubernetes ConfigMaps:
 
-1. Design ConfigMap schema for state storage
-2. Implement CRUD operations for state management
-3. Add iteration counter with atomic updates
-4. Store feedback history as JSON array
-5. Implement state recovery and cleanup
+1. Create remediation::state module in controller/src/
+2. Design ConfigMap schema for state storage
+3. Implement CRUD operations using Kube client
+4. Add atomic iteration counter with proper locking
+5. Store feedback history as JSON-serialized data
+6. Implement state recovery and cleanup patterns
 
 Key components:
+- Rust module at controller/src/remediation/state.rs
 - ConfigMap per task (task-{id}-state)
-- Atomic increment operations
-- JSON serialization for complex data
-- TTL-based cleanup
+- Atomic operations using Kube API
+- JSON serialization with serde
+- TTL-based cleanup following controller patterns
 
 Implementation approach:
-```go
-type StateManager struct {
-    client kubernetes.Interface
-    namespace string
+```rust
+use kube::{Api, Client};
+use k8s_openapi::api::core::v1::ConfigMap;
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone)]
+pub struct StateManager {
+    client: Client,
+    namespace: String,
 }
 
-func (sm *StateManager) IncrementIteration(taskID string) (int, error) {
-    cm, err := sm.getOrCreateConfigMap(taskID)
-    iteration, _ := strconv.Atoi(cm.Data["iteration"])
-    
-    if iteration >= MAX_ITERATIONS {
-        return iteration, ErrMaxIterations
+impl StateManager {
+    pub async fn increment_iteration(&self, task_id: &str) -> Result<u32, Error> {
+        let api: Api<ConfigMap> = Api::namespaced(self.client.clone(), &self.namespace);
+        let cm_name = format!("task-{}-state", task_id);
+        
+        // Use server-side apply for atomic updates
+        let mut cm = self.get_or_create_configmap(&cm_name).await?;
+        let iteration: u32 = cm.data.get("iteration")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        
+        if iteration >= MAX_ITERATIONS {
+            return Err(Error::MaxIterations);
+        }
+        
+        cm.data.insert("iteration".to_string(), (iteration + 1).to_string());
+        cm.data.insert("last_update".to_string(), Utc::now().to_rfc3339());
+        
+        api.replace(&cm_name, &PostParams::default(), &cm).await?;
+        Ok(iteration + 1)
     }
-    
-    cm.Data["iteration"] = strconv.Itoa(iteration + 1)
-    cm.Data["last_update"] = time.Now().Format(time.RFC3339)
-    
-    _, err = sm.client.CoreV1().ConfigMaps(sm.namespace).Update(cm)
-    return iteration + 1, err
 }
 ```
 
 # Test Strategy:
-1. Test ConfigMap creation and updates
-2. Verify atomic iteration increments under concurrent access
-3. Test state recovery after system restart
-4. Validate JSON serialization/deserialization
-5. Test cleanup of old state data
+1. Test ConfigMap creation and updates via Rust integration tests
+2. Verify atomic iteration increments using Kube client mocks
+3. Test state recovery after controller restart
+4. Validate JSON serialization with serde test cases
+5. Test cleanup of old state data with time-based mocking
+6. Integration tests with actual Kubernetes cluster
 
 # Subtasks:
 ## 1. Design ConfigMap Schema and Data Structure [pending]
 ### Dependencies: None
-### Description: Design the schema for storing state data in Kubernetes ConfigMaps with proper field definitions and versioning
+### Description: Design the schema for storing state data in Kubernetes ConfigMaps with proper field definitions and versioning, compatible with Rust serialization
 ### Details:
-Define ConfigMap structure with fields: task_id, iteration (int), feedback_history (JSON array), last_update (RFC3339), status (string), error_messages (array), metadata (map). Create naming convention 'task-{id}-state'. Define data types and size limits considering ConfigMap 1MB restriction. Design version field for schema evolution.
+Define ConfigMap structure with fields: task_id, iteration (u32), feedback_history (Vec<FeedbackEntry> as JSON), last_update (RFC3339), status (enum), error_messages (Vec<String>), metadata (HashMap). Create naming convention 'task-{id}-state'. Define Rust structs with serde attributes for serialization. Design version field for schema evolution. Consider ConfigMap 1MB limit when designing JSON structure.
 
-## 2. Implement CRUD Operations for State Management [pending]
+## 2. Implement Rust StateManager in Controller [pending]
 ### Dependencies: 4.1
-### Description: Build Create, Read, Update, Delete operations for ConfigMap-based state storage with proper error handling
+### Description: Build StateManager struct in controller/src/remediation/state.rs with CRUD operations using existing Kube client
 ### Details:
-Implement StateManager struct with Kubernetes client. Create methods: getOrCreateConfigMap(taskID), updateState(taskID, data), getState(taskID), deleteState(taskID). Add retry logic with exponential backoff for transient failures. Implement optimistic locking using resourceVersion for concurrent updates. Handle ConfigMap not found scenarios gracefully.
+Create controller/src/remediation/state.rs module. Implement StateManager struct reusing controller's Kube client. Create async methods: get_or_create_configmap(task_id), update_state(task_id, data), get_state(task_id), delete_state(task_id). Use kube-rs retry mechanisms for transient failures. Implement optimistic locking using resourceVersion. Follow existing controller error handling patterns. Add proper logging with tracing crate.
 
-## 3. Build Atomic Iteration Counter Logic [pending]
+## 3. Build Atomic Iteration Counter in Rust [pending]
 ### Dependencies: 4.2
-### Description: Implement thread-safe iteration counter with atomic increment operations and maximum iteration enforcement
+### Description: Implement thread-safe iteration counter using Kubernetes server-side apply for atomic operations
 ### Details:
-Create IncrementIteration(taskID) method with atomic updates using Kubernetes resourceVersion. Implement MAX_ITERATIONS constant (10). Add GetCurrentIteration(taskID) for reading. Use retry logic for handling concurrent modification conflicts. Include iteration history tracking with timestamps. Return ErrMaxIterations when limit reached.
+Create async increment_iteration(task_id) method using server-side apply for atomicity. Define MAX_ITERATIONS constant (10) in controller config. Add get_current_iteration(task_id) for reading. Use kube-rs retry logic for handling concurrent modification conflicts. Track iteration history with chrono timestamps. Return custom Error::MaxIterations when limit reached. Ensure atomicity across multiple controller replicas.
 
-## 4. Implement Feedback History JSON Storage [pending]
+## 4. Implement Feedback History with Serde JSON [pending]
 ### Dependencies: 4.2
-### Description: Build JSON serialization system for storing and retrieving feedback history as structured data in ConfigMaps
+### Description: Build JSON serialization system using serde for storing and retrieving feedback history in ConfigMaps
 ### Details:
-Create FeedbackEntry struct with fields: timestamp, author, severity, issue_type, description, resolved. Implement AppendFeedback(taskID, entry) and GetFeedbackHistory(taskID) methods. Add JSON validation and schema versioning. Implement compression for large feedback arrays. Handle malformed JSON recovery. Add pagination support for large histories.
+Create FeedbackEntry struct with serde derive macros: timestamp (DateTime<Utc>), author (String), severity (enum), issue_type (enum), description (String), resolved (bool). Implement async append_feedback(task_id, entry) and get_feedback_history(task_id) methods. Use serde_json for serialization with proper error handling. Implement compression with flate2 for large feedback arrays. Add JSON schema validation. Handle pagination for large histories using iterator pattern.
 
-## 5. Create State Recovery and Consistency Mechanisms [pending]
+## 5. Create State Recovery in Rust Controller [pending]
 ### Dependencies: 4.3, 4.4
-### Description: Implement state recovery system for handling crashes, restarts, and inconsistent states
+### Description: Implement state recovery system integrated with controller's reconciliation loop
 ### Details:
-Build RecoverState(taskID) method to restore from ConfigMap after crashes. Implement state validation to detect corrupted data. Create state snapshots before critical operations. Add consistency checks between iteration counter and feedback history. Implement automatic state repair for common corruption patterns. Add health check endpoint for state manager.
+Build async recover_state(task_id) method to restore from ConfigMap after controller restarts. Integrate with controller's reconciliation loop for automatic recovery. Implement state validation using serde validation attributes. Create state snapshots before critical operations using ConfigMap annotations. Add consistency checks between iteration counter and feedback history. Implement automatic state repair for common corruption patterns. Add health check to controller's /healthz endpoint.
 
-## 6. Implement TTL-based Cleanup Automation [pending]
+## 6. Implement TTL Cleanup with Tokio Tasks [pending]
 ### Dependencies: 4.2
-### Description: Build automated cleanup system to remove old state data based on time-to-live configurations
+### Description: Build automated cleanup system using tokio background tasks following controller patterns
 ### Details:
-Create background goroutine for periodic cleanup scans (every 6 hours). Implement TTL checking based on last_update timestamp (default 7 days). Add CleanupOldStates() method with configurable retention period. Create soft delete with grace period before permanent removal. Implement cleanup metrics and logging. Add manual cleanup trigger endpoint for operations.
+Create tokio background task for periodic cleanup scans (every 6 hours) in controller startup. Implement TTL checking based on last_update timestamp (default 7 days from config). Add async cleanup_old_states() method with configurable retention. Use ConfigMap labels for soft delete with grace period. Implement cleanup metrics using prometheus crate. Add manual cleanup trigger via controller's admin API. Follow controller's existing background task patterns.
 

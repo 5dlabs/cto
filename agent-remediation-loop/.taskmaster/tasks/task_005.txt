@@ -3,98 +3,141 @@
 # Status: pending
 # Dependencies: 2, 4
 # Priority: high
-# Description: Modify Rex container script to handle remediation mode with feedback processing and iteration limits
+# Description: Create a separate Rex remediation container script to handle remediation mode with feedback processing and iteration limits
 # Details:
-Extend Rex container startup script to support remediation workflow:
+Create a DEDICATED remediation container script for Rex (separate from the normal implementation script) to handle the remediation workflow. The remediation container needs completely different context preparation focused on fixing issues rather than implementing from scratch.
 
-1. Detect REMEDIATION_MODE environment variable
-2. Fetch PR comment using GitHub CLI (gh api)
-3. Parse feedback and extract metadata
-4. Check iteration limits and trigger escalation if exceeded
-5. Prepare enhanced context for Claude/AI model
-6. Preserve original task context while adding feedback
+New remediation script location: infra/images/rex-remediation/ or container-rex-remediation.sh
 
-Bash script enhancements:
+Key differences from normal Rex:
+- Different prompting strategy (fix specific issues vs implement features)
+- Needs BOTH original task context AND feedback context
+- More focused, targeted changes rather than broad implementation
+- Must preserve working functionality while fixing issues
+
+Remediation script requirements:
+1. Detect REMEDIATION_MODE environment variable (passed via CodeRun spec)
+2. Fetch original task details from Task Master or documentation
+3. Fetch PR comment using GitHub CLI (already available)
+4. Parse feedback and extract metadata
+5. Check iteration limits and trigger escalation if exceeded
+6. Prepare remediation-specific CLAUDE.md with:
+   - Original task context for understanding requirements
+   - Current feedback that needs addressing
+   - Clear fix-focused instructions
+   - Iteration count and limits
+
+Example remediation script structure:
 ```bash
 #!/bin/bash
-if [ "$REMEDIATION_MODE" = "true" ]; then
-    echo "🔧 REMEDIATION MODE - Iteration $ITERATION_COUNT/10"
-    
-    # Fetch comment
-    COMMENT=$(gh api /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID)
-    
-    # Check iteration limit
-    if [ "$ITERATION_COUNT" -ge "10" ]; then
-        gh pr comment $PR_NUMBER --body "⚠️ Max iterations reached. Human intervention required."
-        exit 1
-    fi
-    
-    # Prepare remediation context
-    cat > /workspace/remediation-context.md << EOF
-You are addressing QA feedback (Iteration $ITERATION_COUNT/10).
-Feedback: $(echo $COMMENT | jq -r .body)
-Priority: $SEVERITY
-Please implement comprehensive fixes for all issues.
-EOF
-    
-    # Merge with original context
-    cat /workspace/CLAUDE.original.md /workspace/remediation-context.md > /workspace/CLAUDE.md
+# Rex Remediation Container Script - Separate from normal Rex
+
+if [ "$REMEDIATION_MODE" != "true" ]; then
+    echo "Error: This script requires REMEDIATION_MODE=true"
+    exit 1
 fi
+
+echo "🔧 REX REMEDIATION MODE - Iteration $ITERATION_COUNT/10"
+
+# Fetch original task context
+ORIGINAL_TASK=$(cat /workspace/docs/task-${TASK_ID}.md || echo "Task context not found")
+
+# Fetch feedback comment
+COMMENT=$(gh api /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID)
+
+# Check iteration limit
+if [ "$ITERATION_COUNT" -ge "10" ]; then
+    gh pr comment $PR_NUMBER --body "⚠️ Max iterations reached. Human intervention required."
+    exit 1
+fi
+
+# Prepare remediation-specific context
+cat > /workspace/CLAUDE.md << EOF
+# REMEDIATION MODE - Fix Required Issues
+
+You are in remediation mode (Iteration $ITERATION_COUNT/10).
+Your task is to FIX specific issues while preserving working functionality.
+
+## Original Task Requirements
+$ORIGINAL_TASK
+
+## Issues to Fix (Priority: $SEVERITY)
+$(echo $COMMENT | jq -r .body)
+
+## Instructions
+1. Review the original requirements to understand context
+2. Address ALL issues mentioned in the feedback
+3. Make targeted fixes without breaking working features
+4. Focus on the specific problems identified
+5. Do NOT reimplement from scratch
+EOF
+
+# Invoke Claude runner with remediation context
+exec /usr/local/bin/claude-runner
 ```
 
+The remediation container will:
+- Use GitHub CLI for fetching comments (existing auth)
+- Work with the existing CodeRun CRD
+- Be triggered by the remediation sensor
+- Push fixes that trigger implementation-agent-remediation sensor
+
 # Test Strategy:
-1. Test remediation mode activation and context preparation
-2. Verify GitHub API calls and error handling
-3. Test iteration limit enforcement and escalation
-4. Validate context merging preserves original requirements
-5. Test with various feedback formats and edge cases
+1. Test separate remediation script activation via REMEDIATION_MODE
+2. Verify original task context fetching from Task Master/docs
+3. Test GitHub API calls for comment retrieval
+4. Validate remediation-specific context generation
+5. Test iteration limit enforcement and escalation
+6. Verify integration with existing play workflow and CodeRun CRD
+7. Test that normal Rex container remains unaffected
+8. Validate fix-focused prompting produces targeted changes
 
 # Subtasks:
-## 1. Implement Environment Variable Detection [pending]
+## 1. Create Separate Rex Remediation Container Script [pending]
 ### Dependencies: None
-### Description: Add logic to detect and validate REMEDIATION_MODE environment variable in Rex container startup script
+### Description: Create a new dedicated remediation container script separate from the existing Rex implementation script
 ### Details:
-Create bash script section that checks for REMEDIATION_MODE environment variable at container startup. Validate required environment variables including ITERATION_COUNT, PR_NUMBER, OWNER, REPO, FEEDBACK_COMMENT_ID, and SEVERITY. Implement early exit if remediation mode is not enabled. Add proper logging for mode detection and validation results.
+Create a new remediation-specific container script at infra/images/rex-remediation/ or container-rex-remediation.sh. This script will be completely separate from the normal Rex implementation script to handle the different context preparation and prompting strategies needed for remediation. The script should fail fast if REMEDIATION_MODE is not set, ensuring it's only used for remediation workflows. Structure the script with clear sections for task context fetching, feedback retrieval, context preparation, and Claude runner invocation.
 
-## 2. Integrate GitHub API Comment Fetching [pending]
+## 2. Implement Original Task Context Fetching [pending]
 ### Dependencies: 5.1
-### Description: Implement GitHub CLI integration to fetch PR comment data using provided comment ID
+### Description: Add logic to fetch the original task details from Task Master or documentation to provide context for remediation
 ### Details:
-Use gh CLI tool to fetch comment from GitHub API endpoint /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID. Implement error handling for API failures including rate limiting, authentication errors, and network issues. Parse JSON response to extract comment body and metadata. Add retry logic with exponential backoff for transient failures.
+Implement fetching of original task requirements from Task Master system or documentation files. Use TASK_ID environment variable to locate the correct task details (e.g., /workspace/docs/task-${TASK_ID}.md or via Task Master API). This context is critical for understanding what was supposed to be implemented originally. Handle cases where task context might not be available with appropriate fallbacks. Ensure the fetched context includes acceptance criteria, implementation requirements, and any relevant specifications.
 
-## 3. Build Feedback Parser and Metadata Extractor [pending]
-### Dependencies: 5.2
-### Description: Create parsing logic to extract structured feedback data and metadata from fetched PR comments
-### Details:
-Parse comment body to extract issue types, severity levels, and specific feedback items. Use jq or similar JSON processing to extract nested fields. Identify and parse markdown formatting including checkboxes and code blocks. Extract metadata such as author, timestamp, and comment ID. Validate feedback format and handle malformed comments gracefully.
-
-## 4. Implement Iteration Limit Checking [pending]
+## 3. Add GitHub API Comment Fetching for Feedback [pending]
 ### Dependencies: 5.1
-### Description: Add iteration counter validation and escalation trigger when limits are exceeded
+### Description: Implement GitHub CLI integration to fetch PR comment containing feedback
 ### Details:
-Check ITERATION_COUNT against maximum threshold of 10 iterations. Implement escalation logic when limit is reached including posting warning comment to PR using gh pr comment. Set appropriate exit codes for different termination scenarios. Log iteration status and remaining attempts. Create mechanism to bypass limits for emergency fixes if needed.
+Use the gh CLI tool to fetch the feedback comment from GitHub API endpoint /repos/$OWNER/$REPO/issues/comments/$FEEDBACK_COMMENT_ID. Leverage existing GitHub App authentication that Rex containers already use. Implement error handling for API failures including rate limiting and network issues. Parse JSON response using jq to extract comment body and metadata. Add retry logic with exponential backoff for transient failures.
 
-## 5. Create AI Context Preparation Module [pending]
-### Dependencies: 5.3, 5.4
-### Description: Build system to prepare enhanced context for Claude/AI model with remediation instructions
+## 4. Build Feedback Parser for Remediation Context [pending]
+### Dependencies: 5.3
+### Description: Create parsing logic to extract and format feedback for remediation-specific context
 ### Details:
-Generate remediation-context.md file with structured feedback information. Format feedback into clear AI instructions including iteration count, severity, and specific issues. Include relevant code snippets and error messages from feedback. Add contextual hints about common resolution patterns. Ensure context is concise yet comprehensive for effective AI processing.
+Parse comment body to extract issue types, severity levels, and specific problems to fix. Use jq for JSON processing and text parsing for markdown content. Identify and preserve markdown formatting including checkboxes, code blocks, and issue descriptions. Extract metadata such as severity, issue categories, and specific file references. Format feedback into clear, actionable items for the AI context. Handle malformed comments gracefully with appropriate error messages.
 
-## 6. Implement Original Context Preservation [pending]
+## 5. Implement Iteration Limit Checking [pending]
 ### Dependencies: 5.1
-### Description: Add mechanism to preserve and backup original CLAUDE.md context before modifications
+### Description: Add iteration counter validation with escalation logic specific to remediation
 ### Details:
-Create backup of original CLAUDE.md file as CLAUDE.original.md at container startup. Implement file existence checks and error handling for missing context files. Add versioning mechanism to track context modifications across iterations. Ensure atomic file operations to prevent corruption. Create recovery mechanism if context files are damaged.
+Check ITERATION_COUNT environment variable against maximum threshold of 10 iterations. Implement escalation by posting a warning comment to the PR using gh CLI when limit is reached. Set appropriate exit codes (exit 1 for escalation, exit 0 for success). Log iteration status clearly for debugging and monitoring. Include iteration count in all output messages and the remediation context. Ensure escalation message clearly indicates human intervention is required.
 
-## 7. Build Context Merging Logic [pending]
-### Dependencies: 5.5, 5.6
-### Description: Implement file merging system to combine original and remediation contexts into final CLAUDE.md
+## 6. Create Remediation-Specific AI Context [pending]
+### Dependencies: 5.2, 5.4, 5.5
+### Description: Build specialized context preparation that combines original requirements with feedback for fix-focused prompting
 ### Details:
-Concatenate CLAUDE.original.md and remediation-context.md into final CLAUDE.md file. Implement proper section separators and headers for clarity. Ensure UTF-8 encoding and proper line endings are preserved. Add validation to verify merged file is valid and complete. Handle edge cases like empty files or binary content.
+Generate a remediation-specific CLAUDE.md file that differs significantly from normal implementation context. Structure the context with clear sections: Original Task Requirements (from Task Master), Issues to Fix (from PR feedback), and Remediation Instructions. Emphasize fixing specific issues rather than reimplementing features. Include iteration count and severity prominently. Add explicit instructions to preserve working functionality while addressing problems. Format the context to guide targeted, surgical fixes rather than broad changes.
 
-## 8. Create Integration Tests with PR Comments [pending]
+## 7. Configure Container Image and Deployment [pending]
+### Dependencies: 5.1
+### Description: Set up the remediation container image build and deployment configuration
+### Details:
+Create Dockerfile or container configuration for the remediation-specific Rex container if needed. Ensure all required tools are available: gh CLI, jq, bash, and Claude runner. Configure the container to use the remediation script as the entrypoint when REMEDIATION_MODE is set. Update Kubernetes manifests or Helm charts to reference the remediation container variant. Ensure proper volume mounts for workspace access and secret mounting for GitHub authentication.
+
+## 8. Test Remediation Container End-to-End [pending]
 ### Dependencies: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
-### Description: Develop comprehensive test suite for Rex container remediation mode using actual GitHub PR scenarios
+### Description: Validate the separate remediation container works correctly within the existing play workflow
 ### Details:
-Create test fixtures with sample PR comments in various formats. Test complete remediation flow from environment detection to context generation. Verify GitHub API integration with mock responses and real API calls. Test iteration limit enforcement and escalation scenarios. Validate context merging produces expected output. Test error recovery and edge cases including network failures and malformed data.
+Test remediation container activation via REMEDIATION_MODE environment variable. Verify original task context is successfully fetched and included. Test GitHub API integration for comment retrieval with existing authentication. Validate the remediation-specific context produces focused fixes rather than reimplementation. Test iteration limits and escalation behavior. Verify the container integrates properly with CodeRun CRD and remediation sensor. Ensure normal Rex containers remain unaffected by these changes. Test that fixes pushed by remediation container properly trigger the implementation-agent-remediation sensor.
 
