@@ -361,8 +361,9 @@ EOF
           # Case-insensitive check to exclude section headers
           if [[ -n "$line" ]] && ! echo "$line" | grep -qi "^[[:space:]]*\(technical\|requirements\|specifications\)[[:space:]]*$"; then
             # XML escape the content
-            escaped_line=$(echo "$line" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g')
-            specs="${specs}<spec>$escaped_line</spec>$'\n'        "
+            escaped_line=$(echo "$line" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&#39;/g')
+            specs="${specs}<spec>$escaped_line</spec>
+        "
           fi
         done <<< "$specs_section"
       fi
@@ -379,13 +380,15 @@ EOF
       criteria=""
       if [ -n "$test_strategy" ]; then
         # Split test strategy into individual criteria on numbered items (1., 2., etc.)
-        IFS=$'\n' read -rd '' -a test_parts <<< "$(echo "$test_strategy" | grep -E '^[[:space:]]*[0-9]+\.')"
+        # Use word boundaries to avoid splitting on version numbers or decimals
+        IFS=$'\n' read -rd '' -a test_parts <<< "$(echo "$test_strategy" | grep -E '^[[:space:]]*[0-9]+[[:space:]]*\.[[:space:]]*[A-Z]')"
         for part in "${test_parts[@]}"; do
           part=$(echo "$part" | sed 's/^[[:space:]]*[0-9]\+\.[[:space:]]*//;s/[[:space:]]*$//')
           if [ -n "$part" ] && [ ${#part} -gt 10 ]; then
             # XML escape the content
-            escaped_part=$(echo "$part" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g')
-            criteria="${criteria}<criterion>$escaped_part</criterion>$'\n'        "
+            escaped_part=$(echo "$part" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&#39;/g')
+            criteria="${criteria}<criterion>$escaped_part</criterion>
+        "
           fi
         done
       fi
