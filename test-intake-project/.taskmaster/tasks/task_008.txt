@@ -1,0 +1,37 @@
+# Task ID: 8
+# Title: Setup Testing Frameworks
+# Status: pending
+# Dependencies: 1, 2, 3
+# Priority: medium
+# Description: Set up testing frameworks for both frontend and backend.
+# Details:
+Use Jest and React Testing Library for frontend tests. Set up Mocha and Chai for backend testing. Configure test scripts in package.json for easy execution.
+
+# Test Strategy:
+Create sample tests for both frontend components and backend endpoints. Ensure tests run successfully and provide accurate results.
+
+# Subtasks:
+## 1. Set up Jest and React Testing Library [pending]
+### Dependencies: None
+### Description: Install and configure Jest along with React Testing Library for frontend testing.
+### Details:
+Add Jest and React Testing Library as dependencies in the package.json and configure Jest to work with React components.
+
+## 2. Configure Mocha and Chai [pending]
+### Dependencies: None
+### Description: Install and set up Mocha and Chai for backend testing.
+### Details:
+Add Mocha and Chai to the package.json dependencies and configure the testing environment for backend tests.
+
+## 3. Write Sample Tests [pending]
+### Dependencies: 8.1, 8.2
+### Description: Create sample tests for both frontend components and backend endpoints.
+### Details:
+Write basic test cases using Jest for frontend components and Mocha/Chai for backend endpoints to ensure the setup is correct.
+
+## 4. Configure Test Scripts in package.json [pending]
+### Dependencies: 8.1, 8.2, 8.3
+### Description: Add scripts to package.json for running tests easily.
+### Details:
+Update the package.json file to include npm scripts that facilitate running the frontend and backend tests.
+

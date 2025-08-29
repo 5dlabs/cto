@@ -1,0 +1,31 @@
+# Task ID: 3
+# Title: Setup Backend with Node.js and Express
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Initialize the backend project using Node.js and Express.
+# Details:
+Set up a basic Express server with TypeScript support. Configure the server to listen on a designated port and verify the setup with a simple endpoint that returns 'Hello World'.
+
+# Test Strategy:
+Send a GET request to the server endpoint and verify the response is 'Hello World'. Ensure no TypeScript or runtime errors occur.
+
+# Subtasks:
+## 1. Initialize Express Server [pending]
+### Dependencies: None
+### Description: Set up a basic Express server project with Node.js.
+### Details:
+Create a new Node.js project and install Express. Set up an initial Express server that listens on a specific port.
+
+## 2. Add TypeScript Support [pending]
+### Dependencies: 3.1
+### Description: Integrate TypeScript into the Express server setup.
+### Details:
+Install TypeScript and necessary type definitions for Node.js and Express. Configure tsconfig.json for the project.
+
+## 3. Implement 'Hello World' Endpoint [pending]
+### Dependencies: 3.1, 3.2
+### Description: Create a simple endpoint that returns 'Hello World'.
+### Details:
+Add a basic GET endpoint to the Express server which returns 'Hello World' when accessed.
+

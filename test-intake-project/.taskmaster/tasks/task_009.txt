@@ -1,0 +1,25 @@
+# Task ID: 9
+# Title: Document Project Setup and Usage
+# Status: pending
+# Dependencies: 1, 8
+# Priority: low
+# Description: Create documentation for project setup and usage guidelines.
+# Details:
+Write a comprehensive README.md that includes setup instructions, usage, and contribution guidelines. Document API endpoints and frontend usage.
+
+# Test Strategy:
+Review documentation for clarity and completeness. Ensure someone new to the project can set it up and understand its purpose based on the README.md.
+
+# Subtasks:
+## 1. Write Setup Instructions [pending]
+### Dependencies: None
+### Description: Create detailed setup instructions for the project.
+### Details:
+Include instructions for downloading the repository, installing dependencies, and running the project locally. Cover both frontend and backend setup processes.
+
+## 2. Document API Endpoints and Frontend Usage [pending]
+### Dependencies: 9.1
+### Description: Provide documentation for API endpoints and frontend usage.
+### Details:
+List and describe all API endpoints with their request and response formats. Include examples. Document how to use the frontend application, including key features and navigation.
+
