@@ -79,19 +79,20 @@ struct IntakeDefaults {
 
 impl Default for IntakeDefaults {
     fn default() -> Self {
+        // No defaults - require explicit configuration
         IntakeDefaults {
-            github_app: "5DLabs-Morgan".to_string(),
+            github_app: String::new(),
             primary: ModelConfig {
-                model: "claude-3-7-sonnet-20250219".to_string(),
-                provider: "anthropic".to_string(),
+                model: String::new(),
+                provider: String::new(),
             },
             research: ModelConfig {
-                model: "opus".to_string(),
-                provider: "claude-code".to_string(),
+                model: String::new(),
+                provider: String::new(),
             },
             fallback: ModelConfig {
-                model: "gpt-4o".to_string(),
-                provider: "openai".to_string(),
+                model: String::new(),
+                provider: String::new(),
             },
         }
     }
@@ -116,15 +117,16 @@ struct PlayDefaults {
 
 impl Default for PlayDefaults {
     fn default() -> Self {
+        // No defaults - require explicit configuration
         PlayDefaults {
-            model: "claude-3-5-sonnet-20241022".to_string(),
-            implementation_agent: "5DLabs-Rex".to_string(),
-            quality_agent: "5DLabs-Cleo".to_string(),
-            testing_agent: "5DLabs-Tess".to_string(),
-            repository: Some("5dlabs/cto".to_string()),
-            service: Some("cto".to_string()),
-            docs_repository: Some("5dlabs/cto".to_string()),
-            docs_project_directory: Some("docs".to_string()),
+            model: String::new(),
+            implementation_agent: String::new(),
+            quality_agent: String::new(),
+            testing_agent: String::new(),
+            repository: None,
+            service: None,
+            docs_repository: None,
+            docs_project_directory: None,
         }
     }
 }
