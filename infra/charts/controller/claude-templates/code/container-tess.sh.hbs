@@ -1308,24 +1308,47 @@ echo "🔍 Pre-flight check: GitHub CLI availability..."
 # Try to install GitHub CLI if not available
 if ! command -v gh >/dev/null 2>&1; then
   echo "⚠️ GitHub CLI not found, attempting to install..."
+
   if command -v apt-get >/dev/null 2>&1; then
-    echo "📦 Installing GitHub CLI via apt-get..."
-    apt-get update >/dev/null 2>&1 && apt-get install -y gh >/dev/null 2>&1
+    echo "📦 Installing GitHub CLI via apt-get (Ubuntu/Debian)..."
+    # Add GitHub CLI repository
+    if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg >/tmp/githubcli-archive-keyring.gpg 2>/dev/null; then
+      cat /tmp/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg >/dev/null 2>&1
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list >/dev/null 2>&1
+      apt-get update >/dev/null 2>&1
+      apt-get install -y gh >/dev/null 2>&1
+    else
+      # Fallback: try direct download
+      echo "📦 Fallback: downloading GitHub CLI directly..."
+      curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_*_linux_amd64.tar.gz >/tmp/gh.tar.gz 2>/dev/null || curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_*_linux_arm64.tar.gz >/tmp/gh.tar.gz 2>/dev/null
+      if [ -f /tmp/gh.tar.gz ]; then
+        tar -xzf /tmp/gh.tar.gz -C /tmp >/dev/null 2>&1
+        find /tmp -name "gh" -type f -executable | head -1 | xargs -I {} mv {} /usr/local/bin/ >/dev/null 2>&1
+        chmod +x /usr/local/bin/gh >/dev/null 2>&1
+      fi
+    fi
+
     if command -v gh >/dev/null 2>&1; then
       echo "✅ GitHub CLI installed successfully"
     else
-      echo "❌ Failed to install GitHub CLI"
+      echo "❌ Failed to install GitHub CLI via apt-get"
     fi
+
   elif command -v yum >/dev/null 2>&1; then
-    echo "📦 Installing GitHub CLI via yum..."
-    yum install -y gh >/dev/null 2>&1
+    echo "📦 Installing GitHub CLI via yum (RHEL/CentOS)..."
+    yum install -y gh >/dev/null 2>&1 || dnf install -y gh >/dev/null 2>&1
     if command -v gh >/dev/null 2>&1; then
       echo "✅ GitHub CLI installed successfully"
     else
-      echo "❌ Failed to install GitHub CLI"
+      echo "❌ Failed to install GitHub CLI via yum"
     fi
+
   else
     echo "❌ No supported package manager found for GitHub CLI installation"
+    echo "ℹ️ Available package managers:"
+    command -v apt-get >/dev/null 2>&1 && echo "  - apt-get (Ubuntu/Debian)"
+    command -v yum >/dev/null 2>&1 && echo "  - yum (RHEL/CentOS)"
+    command -v apk >/dev/null 2>&1 && echo "  - apk (Alpine)"
   fi
 fi
 
