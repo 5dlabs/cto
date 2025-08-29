@@ -358,7 +358,8 @@ EOF
       if echo "$details" | grep -A 10 -i "technical\|requirements\|specifications" >/dev/null 2>&1; then
         specs_section=$(echo "$details" | sed -n '/technical\|requirements\|specifications/I,/^$/p' | head -10)
         while IFS= read -r line; do
-          if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*(technical|requirements|specifications)[[:space:]]*$ ]]; then
+          # Case-insensitive check to exclude section headers
+          if [[ -n "$line" ]] && ! echo "$line" | grep -qi "^[[:space:]]*\(technical\|requirements\|specifications\)[[:space:]]*$"; then
             specs="${specs}<spec>$line</spec>\n        "
           fi
         done <<< "$specs_section"
