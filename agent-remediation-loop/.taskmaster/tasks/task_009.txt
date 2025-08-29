@@ -1,0 +1,71 @@
+# Task ID: 9
+# Title: Create Monitoring and Observability
+# Status: pending
+# Dependencies: 3, 6, 8
+# Priority: medium
+# Description: Implement comprehensive monitoring with Prometheus metrics, structured logging, and alerting
+# Details:
+Build observability layer for remediation loop monitoring:
+
+1. Define and expose Prometheus metrics
+2. Implement structured JSON logging
+3. Create Grafana dashboards
+4. Set up alerting rules
+5. Add distributed tracing
+
+Key metrics:
+- remediation_cycles_total{task_id, outcome}
+- remediation_iteration_count{task_id}
+- remediation_duration_seconds{task_id, iteration}
+- agent_cancellations_total{agent_type}
+- escalations_total{reason}
+
+Implementation:
+```go
+var (
+    remediationCycles = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "remediation_cycles_total",
+            Help: "Total remediation cycles by outcome",
+        },
+        []string{"task_id", "outcome"},
+    )
+    
+    remediationDuration = prometheus.NewHistogramVec(
+        prometheus.HistogramOpts{
+            Name: "remediation_duration_seconds",
+            Help: "Duration of remediation cycles",
+            Buckets: prometheus.ExponentialBuckets(10, 2, 10),
+        },
+        []string{"task_id", "iteration"},
+    )
+)
+
+// Structured logging
+logger.Info("remediation_started",
+    zap.String("task_id", taskID),
+    zap.Int("iteration", iteration),
+    zap.String("severity", severity),
+    zap.String("trigger", "pr_comment"),
+)
+```
+
+Alerting rules:
+```yaml
+alerts:
+  - name: ExcessiveRemediationCycles
+    expr: remediation_iteration_count > 7
+    annotations:
+      summary: "Task {{$labels.task_id}} has {{$value}} cycles"
+  - name: RemediationStuck
+    expr: rate(remediation_cycles_total[2h]) == 0
+    annotations:
+      summary: "No progress in 2 hours"
+```
+
+# Test Strategy:
+1. Verify metrics are correctly exposed and incremented
+2. Test structured logging output format
+3. Validate alerting rules trigger correctly
+4. Test dashboard data aggregation
+5. Verify trace propagation across services

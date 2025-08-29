@@ -1,0 +1,146 @@
+# Task ID: 3
+# Title: Create Remediation Sensor and Trigger
+# Status: pending
+# Dependencies: 1, 2
+# Priority: high
+# Description: Deploy Argo Events Sensor to process feedback comments and trigger Rex remediation CodeRuns
+# Details:
+Implement Sensor that listens to GitHub webhook events and triggers remediation workflow:
+
+1. Create Sensor CRD with proper event filtering
+2. Extract task ID from PR labels using JSONPath
+3. Generate remediation CodeRun with feedback context
+4. Pass comment ID and iteration count to Rex
+5. Implement retry logic and error handling
+
+Key features:
+- JSONPath expressions for data extraction
+- Dynamic resource generation with templates
+- Proper label propagation
+- Event deduplication
+
+Implementation:
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pr-comment-remediation
+spec:
+  dependencies:
+    - name: feedback-comment
+      filters:
+        data:
+          - path: body.comment.body
+            comparator: "~"
+            value: ".*🔴 Required Changes.*"
+  triggers:
+    - template:
+        k8s:
+          operation: create
+          parameters:
+            - src: {dependencyName: feedback-comment, dataKey: body.issue.number}
+              dest: spec.pr_number
+            - src: {dependencyName: feedback-comment, dataKey: body.comment.id}
+              dest: spec.pr_comment_id
+```
+
+# Test Strategy:
+1. Test sensor activation with valid feedback comments
+2. Verify CodeRun creation with correct parameters
+3. Test filtering logic (should ignore non-feedback comments)
+4. Validate task ID extraction from labels
+5. Test error scenarios and recovery mechanisms
+
+# Subtasks:
+## 1. Define Sensor CRD with Event Dependencies [pending]
+### Dependencies: None
+### Description: Create the base Sensor Custom Resource Definition with GitHub webhook event dependencies and proper metadata
+### Details:
+Implement the Sensor CRD structure with:
+- Metadata including name 'pr-comment-remediation' and namespace
+- Dependencies section defining 'feedback-comment' dependency
+- EventBus configuration for GitHub events
+- Proper API version (argoproj.io/v1alpha1) and kind
+- Annotations for documentation and versioning
+- Labels for organization and filtering
+
+## 2. Configure JSONPath Event Filters [pending]
+### Dependencies: 3.1
+### Description: Implement JSONPath expressions to filter PR comments containing feedback markers and extract required data fields
+### Details:
+Set up comprehensive filtering logic:
+- Filter for comment body containing '🔴 Required Changes' pattern using regex comparator
+- Add path filters for action type (created/edited)
+- Implement JSONPath for extracting PR number (body.issue.number)
+- Extract comment ID (body.comment.id) and author (body.comment.user.login)
+- Add filters to exclude bot comments except from authorized quality agents
+- Implement data transformation expressions for nested JSON structures
+
+## 3. Create CodeRun Resource Template [pending]
+### Dependencies: 3.2
+### Description: Build the Kubernetes resource template for generating Rex remediation CodeRun objects with proper parameterization
+### Details:
+Design CodeRun generation template:
+- Define K8s operation as 'create' with apiVersion and kind
+- Map webhook data to CodeRun spec fields using parameter substitution
+- Configure Rex container image and command arguments
+- Set environment variables for REMEDIATION_MODE, PR_COMMENT_ID, TASK_ID
+- Add resource limits and requests
+- Configure volume mounts for GitHub credentials and task context
+- Implement metadata labels for tracking and cleanup
+
+## 4. Implement Task ID Extraction from PR Labels [pending]
+### Dependencies: 3.3
+### Description: Create logic to extract task IDs from PR labels and map them to remediation context
+### Details:
+Build task identification system:
+- Parse PR labels array using JSONPath (body.issue.labels[*].name)
+- Filter for labels matching 'task-*' pattern
+- Extract numeric task ID from label string
+- Implement fallback logic if task label is missing
+- Add validation for task ID format and existence
+- Map task ID to corresponding task context from ConfigMap
+- Handle multiple task labels scenario with priority logic
+
+## 5. Add Iteration Counter and Limit Logic [pending]
+### Dependencies: 3.4
+### Description: Implement iteration tracking to monitor remediation cycles and enforce limits with escalation triggers
+### Details:
+Create iteration management system:
+- Read current iteration count from PR labels or annotations
+- Increment counter for each remediation trigger
+- Check against MAX_ITERATIONS environment variable (default: 3)
+- Implement escalation trigger when limit exceeded
+- Add iteration count to CodeRun metadata and environment
+- Create label update logic for iteration tracking
+- Generate metrics for iteration monitoring
+- Include iteration history in remediation context
+
+## 6. Configure Retry and Error Handling [pending]
+### Dependencies: 3.5
+### Description: Implement robust retry mechanisms and error handling for sensor failures and resource creation issues
+### Details:
+Build reliability features:
+- Configure exponential backoff retry policy (initial: 1s, max: 30s)
+- Set maximum retry attempts (default: 5)
+- Implement error categorization (transient vs permanent)
+- Add dead letter queue for failed events
+- Create error notification mechanism
+- Implement circuit breaker for GitHub API calls
+- Add timeout configurations for resource creation
+- Create recovery procedures for partial failures
+
+## 7. Implement Event Deduplication Mechanism [pending]
+### Dependencies: 3.6
+### Description: Create deduplication logic to prevent duplicate remediation triggers from identical or rapid successive events
+### Details:
+Design deduplication system:
+- Implement event ID generation using hash of comment ID + timestamp
+- Create Redis-based or ConfigMap cache for recent events (TTL: 5 minutes)
+- Add duplicate detection before trigger execution
+- Configure time window for considering events as duplicates
+- Implement event correlation for related comments
+- Add logging for skipped duplicate events
+- Create metrics for deduplication effectiveness
+- Test with rapid comment edits and webhook retries
+

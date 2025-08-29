@@ -1,0 +1,88 @@
+# Task ID: 4
+# Title: Implement State Management System
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Build ConfigMap-based state tracking for remediation iterations and feedback history
+# Details:
+Create state management system using Kubernetes ConfigMaps to track remediation progress:
+
+1. Design ConfigMap schema for state storage
+2. Implement CRUD operations for state management
+3. Add iteration counter with atomic updates
+4. Store feedback history as JSON array
+5. Implement state recovery and cleanup
+
+Key components:
+- ConfigMap per task (task-{id}-state)
+- Atomic increment operations
+- JSON serialization for complex data
+- TTL-based cleanup
+
+Implementation approach:
+```go
+type StateManager struct {
+    client kubernetes.Interface
+    namespace string
+}
+
+func (sm *StateManager) IncrementIteration(taskID string) (int, error) {
+    cm, err := sm.getOrCreateConfigMap(taskID)
+    iteration, _ := strconv.Atoi(cm.Data["iteration"])
+    
+    if iteration >= MAX_ITERATIONS {
+        return iteration, ErrMaxIterations
+    }
+    
+    cm.Data["iteration"] = strconv.Itoa(iteration + 1)
+    cm.Data["last_update"] = time.Now().Format(time.RFC3339)
+    
+    _, err = sm.client.CoreV1().ConfigMaps(sm.namespace).Update(cm)
+    return iteration + 1, err
+}
+```
+
+# Test Strategy:
+1. Test ConfigMap creation and updates
+2. Verify atomic iteration increments under concurrent access
+3. Test state recovery after system restart
+4. Validate JSON serialization/deserialization
+5. Test cleanup of old state data
+
+# Subtasks:
+## 1. Design ConfigMap Schema and Data Structure [pending]
+### Dependencies: None
+### Description: Design the schema for storing state data in Kubernetes ConfigMaps with proper field definitions and versioning
+### Details:
+Define ConfigMap structure with fields: task_id, iteration (int), feedback_history (JSON array), last_update (RFC3339), status (string), error_messages (array), metadata (map). Create naming convention 'task-{id}-state'. Define data types and size limits considering ConfigMap 1MB restriction. Design version field for schema evolution.
+
+## 2. Implement CRUD Operations for State Management [pending]
+### Dependencies: 4.1
+### Description: Build Create, Read, Update, Delete operations for ConfigMap-based state storage with proper error handling
+### Details:
+Implement StateManager struct with Kubernetes client. Create methods: getOrCreateConfigMap(taskID), updateState(taskID, data), getState(taskID), deleteState(taskID). Add retry logic with exponential backoff for transient failures. Implement optimistic locking using resourceVersion for concurrent updates. Handle ConfigMap not found scenarios gracefully.
+
+## 3. Build Atomic Iteration Counter Logic [pending]
+### Dependencies: 4.2
+### Description: Implement thread-safe iteration counter with atomic increment operations and maximum iteration enforcement
+### Details:
+Create IncrementIteration(taskID) method with atomic updates using Kubernetes resourceVersion. Implement MAX_ITERATIONS constant (10). Add GetCurrentIteration(taskID) for reading. Use retry logic for handling concurrent modification conflicts. Include iteration history tracking with timestamps. Return ErrMaxIterations when limit reached.
+
+## 4. Implement Feedback History JSON Storage [pending]
+### Dependencies: 4.2
+### Description: Build JSON serialization system for storing and retrieving feedback history as structured data in ConfigMaps
+### Details:
+Create FeedbackEntry struct with fields: timestamp, author, severity, issue_type, description, resolved. Implement AppendFeedback(taskID, entry) and GetFeedbackHistory(taskID) methods. Add JSON validation and schema versioning. Implement compression for large feedback arrays. Handle malformed JSON recovery. Add pagination support for large histories.
+
+## 5. Create State Recovery and Consistency Mechanisms [pending]
+### Dependencies: 4.3, 4.4
+### Description: Implement state recovery system for handling crashes, restarts, and inconsistent states
+### Details:
+Build RecoverState(taskID) method to restore from ConfigMap after crashes. Implement state validation to detect corrupted data. Create state snapshots before critical operations. Add consistency checks between iteration counter and feedback history. Implement automatic state repair for common corruption patterns. Add health check endpoint for state manager.
+
+## 6. Implement TTL-based Cleanup Automation [pending]
+### Dependencies: 4.2
+### Description: Build automated cleanup system to remove old state data based on time-to-live configurations
+### Details:
+Create background goroutine for periodic cleanup scans (every 6 hours). Implement TTL checking based on last_update timestamp (default 7 days). Add CleanupOldStates() method with configurable retention period. Create soft delete with grace period before permanent removal. Implement cleanup metrics and logging. Add manual cleanup trigger endpoint for operations.
+

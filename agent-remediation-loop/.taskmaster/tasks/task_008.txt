@@ -1,0 +1,127 @@
+# Task ID: 8
+# Title: Implement Escalation and Termination Logic
+# Status: pending
+# Dependencies: 4, 5, 7
+# Priority: high
+# Description: Build escalation system for max iterations and implement various termination conditions
+# Details:
+Create comprehensive termination and escalation handling:
+
+1. Implement iteration limit checking (max 10)
+2. Create escalation notification system
+3. Add timeout protection (4-hour limit)
+4. Implement success criteria detection
+5. Handle manual intervention requests
+
+Escalation triggers:
+- Max iterations reached
+- Timeout exceeded
+- Critical errors
+- Manual override requested
+
+Implementation:
+```rust
+pub struct EscalationManager {
+    max_iterations: u8,
+    timeout_duration: Duration,
+    notification_channels: Vec<NotificationChannel>,
+}
+
+impl EscalationManager {
+    pub async fn check_escalation(&self, state: &RemediationState) -> Result<EscalationAction> {
+        // Check iteration limit
+        if state.iteration >= self.max_iterations {
+            self.notify_escalation("Max iterations reached", &state).await?;
+            return Ok(EscalationAction::StopAndNotify);
+        }
+        
+        // Check timeout
+        if Utc::now() - state.start_time > self.timeout_duration {
+            self.notify_escalation("Timeout exceeded", &state).await?;
+            return Ok(EscalationAction::StopAndNotify);
+        }
+        
+        // Check for skip-automation label
+        if self.has_skip_label(&state.pr_number).await? {
+            return Ok(EscalationAction::SkipAutomation);
+        }
+        
+        Ok(EscalationAction::Continue)
+    }
+    
+    async fn post_escalation_comment(&self, pr: u32, reason: &str) {
+        let comment = format!(
+            "## 🚨 Remediation Escalation\n\n\
+            **Reason**: {}\n\n\
+            Automated remediation has been stopped. Human intervention required.\
+            \n\ncc: @platform-team @cto",
+            reason
+        );
+        
+        github_client.create_comment(pr, &comment).await?;
+    }
+}
+```
+
+# Test Strategy:
+1. Test iteration limit enforcement
+2. Verify timeout detection and handling
+3. Test escalation notifications (PR comments, alerts)
+4. Validate skip-automation label detection
+5. Test graceful termination and cleanup
+
+# Subtasks:
+## 1. Implement Iteration Limit Checking [pending]
+### Dependencies: None
+### Description: Create iteration counter and limit enforcement mechanism with max 10 iterations
+### Details:
+Implement the iteration tracking and checking logic in EscalationManager. Create atomic counter updates in state management, implement check_iteration_limit() method that compares current iteration against max_iterations constant (10), and ensure thread-safe increment operations. Include proper error handling for state retrieval failures.
+
+## 2. Implement Timeout Detection System [pending]
+### Dependencies: None
+### Description: Build 4-hour timeout detection mechanism with timestamp tracking
+### Details:
+Create timeout monitoring system that tracks start_time in RemediationState, implements check_timeout() method comparing elapsed time against 4-hour Duration constant, handles timezone considerations using UTC timestamps, and includes grace period handling for long-running operations. Implement proper time calculation using chrono crate.
+
+## 3. Build Critical Error Detection [pending]
+### Dependencies: None
+### Description: Implement system to identify and classify critical errors requiring escalation
+### Details:
+Create error classification system with CriticalError enum defining error types (SystemFailure, AuthenticationError, RateLimitExceeded, etc.), implement is_critical_error() method to analyze error types and severity, add pattern matching for known critical error signatures, and include error context preservation for debugging. Handle both Rex agent errors and external API failures.
+
+## 4. Implement Manual Override Detection [pending]
+### Dependencies: None
+### Description: Create system to detect and respond to manual intervention requests via PR labels
+### Details:
+Build manual override detection using has_skip_label() method checking for 'skip-automation' label, implement label monitoring via GitHub API, add support for multiple override labels ('manual-review-required', 'pause-automation'), and include label change event handling. Ensure proper authorization checks for label modifications.
+
+## 5. Create Escalation Notification System [pending]
+### Dependencies: 8.1, 8.2, 8.3, 8.4
+### Description: Build multi-channel notification system for escalation events
+### Details:
+Implement NotificationChannel trait with implementations for GitHub comments, Slack webhooks, and email notifications. Create notify_escalation() method that formats escalation messages with context, sends notifications to configured channels asynchronously, includes retry logic for failed notifications, and maintains notification history. Add @mentions for platform-team and CTO in GitHub comments.
+
+## 6. Implement PR Comment Posting for Escalations [pending]
+### Dependencies: 8.5
+### Description: Create formatted GitHub PR comment system for escalation notifications
+### Details:
+Build post_escalation_comment() method that creates structured markdown comments with escalation emoji (🚨), reason formatting, remediation history summary, and team mentions. Include comment deduplication to prevent spam, rate limiting compliance, and proper error handling for GitHub API failures. Add links to relevant logs and state information.
+
+## 7. Implement Success Criteria Detection [pending]
+### Dependencies: None
+### Description: Build system to detect successful remediation completion and exit gracefully
+### Details:
+Create success detection logic checking for all tests passing, Tess approval comments, resolved feedback items, and clean CI status. Implement check_success_criteria() method that validates PR approval status, verifies no pending required changes, confirms all quality checks passed, and detects explicit success signals. Include success notification formatting.
+
+## 8. Build Graceful Termination Procedures [pending]
+### Dependencies: 8.1, 8.2, 8.3, 8.4, 8.7
+### Description: Implement cleanup and state preservation during termination
+### Details:
+Create terminate_remediation() method handling state persistence to ConfigMap, cleanup of temporary resources, final status comment posting, and metric recording. Implement proper cleanup for running Rex agents, label updates (remove 'remediation-in-progress'), state archival for debugging, and webhook notification of termination. Ensure idempotent cleanup operations.
+
+## 9. Create Comprehensive Termination Path Testing [pending]
+### Dependencies: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8
+### Description: Implement full test coverage for all escalation and termination scenarios
+### Details:
+Build test suite covering iteration limit boundary cases (9, 10, 11 iterations), timeout scenarios with time mocking, critical error escalation paths, manual override label detection, notification delivery verification, success criteria validation, and cleanup operation testing. Include integration tests simulating full escalation flows, concurrent termination handling, and recovery from partial failures. Add performance tests for high-load scenarios.
+
