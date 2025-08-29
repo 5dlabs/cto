@@ -1,0 +1,22 @@
+# Test Intake Project
+
+## Overview
+This is a test project to validate the intake workflow functionality.
+
+## Requirements
+1. Create a simple web application
+2. Implement basic user authentication
+3. Add a dashboard with user statistics
+4. Include proper error handling
+
+## Technical Stack
+- Frontend: React with TypeScript
+- Backend: Node.js with Express
+- Database: PostgreSQL
+- Authentication: JWT tokens
+
+## Acceptance Criteria
+- Users can register and login
+- Dashboard shows user statistics
+- Application handles errors gracefully
+- Code follows best practices

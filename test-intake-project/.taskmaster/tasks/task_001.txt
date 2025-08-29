@@ -1,0 +1,25 @@
+# Task ID: 1
+# Title: Setup Project Repository
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Initialize a new Git repository for the project and set up the basic project structure.
+# Details:
+Create a new directory for the project and initialize a Git repository. Set up the basic directory structure for a React and Node.js application. Ensure the directory includes folders for the frontend (React) and backend (Node.js) components. Create an initial README.md file with project details.
+
+# Test Strategy:
+Verify that the repository is initialized correctly with the appropriate directory structure and README.md file.
+
+# Subtasks:
+## 1. Initialize Git Repository [pending]
+### Dependencies: None
+### Description: Create a new directory for the project and initialize a Git repository.
+### Details:
+Ensure that a new directory is created for the project and a Git repository is initialized within it. Verify that the repository is set up correctly with an initial commit.
+
+## 2. Set Up Project Directory Structure [pending]
+### Dependencies: 1.1
+### Description: Set up the basic directory structure for a React and Node.js application.
+### Details:
+Create folders for the frontend (React) and backend (Node.js) components within the project directory. Add an initial README.md file with project details. Ensure the structure is ready for development.
+

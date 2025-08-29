@@ -1,0 +1,37 @@
+# Task ID: 6
+# Title: Create Dashboard with User Statistics
+# Status: pending
+# Dependencies: 2, 5
+# Priority: high
+# Description: Develop a dashboard component on the frontend to display user statistics.
+# Details:
+Create a protected route for the dashboard in the React application. Fetch user statistics from the backend and display them in a user-friendly format. Use charts or tables as needed.
+
+# Test Strategy:
+Verify the dashboard route is protected and requires authentication. Check that user statistics are fetched and displayed correctly.
+
+# Subtasks:
+## 1. Create Dashboard Component [pending]
+### Dependencies: None
+### Description: Develop the frontend dashboard component to display user statistics.
+### Details:
+Use React and TypeScript to create a reusable dashboard component that can display user statistics using charts or tables.
+
+## 2. Set Up Protected Route [pending]
+### Dependencies: 6.1
+### Description: Implement a protected route for the dashboard in the React application.
+### Details:
+Configure routing in the React app to include a protected route for the dashboard component, ensuring it requires authentication.
+
+## 3. Fetch User Statistics from Backend [pending]
+### Dependencies: 6.2
+### Description: Integrate the frontend with the backend to fetch user statistics.
+### Details:
+Use an API call to fetch user statistics from the backend service and handle the data in the frontend.
+
+## 4. Render User Statistics [pending]
+### Dependencies: 6.3
+### Description: Display the fetched user statistics in a user-friendly format on the dashboard.
+### Details:
+Use appropriate UI elements such as charts or tables to render the statistics on the dashboard, ensuring clarity and usability.
+

@@ -1,0 +1,25 @@
+# Task ID: 3
+# Title: Initialize Backend with Node.js and Express
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Set up the backend server using Node.js and Express framework.
+# Details:
+Initialize a new Node.js project and install Express as a dependency. Set up a basic Express server with a single endpoint to test server functionality.
+
+# Test Strategy:
+Start the Express server and verify the test endpoint returns the expected response.
+
+# Subtasks:
+## 1. Initialize Node.js Project [pending]
+### Dependencies: None
+### Description: Create a new Node.js project and install Express as a dependency.
+### Details:
+Use npm to initialize a new Node.js project. Install Express using npm as a project dependency.
+
+## 2. Set Up Basic Express Server [pending]
+### Dependencies: 3.1
+### Description: Configure a basic Express server with a test endpoint.
+### Details:
+Create an Express server and set up a single GET endpoint to return a 'Hello World' message.
+
