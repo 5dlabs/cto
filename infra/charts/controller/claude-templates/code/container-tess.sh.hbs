@@ -1427,7 +1427,7 @@ case $CI_STATUS in
 - [ ] Verify GitHub API access
 - [ ] Retry after network issues are resolved
 
-**Note**: Cannot proceed with QA until CI status can be verified."
+**Note**: Cannot proceed with QA until CI status can be verified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
   4)
@@ -1444,7 +1444,7 @@ case $CI_STATUS in
 - [ ] Ensure token hasn't expired
 - [ ] Contact administrator for token refresh
 
-**Note**: Cannot proceed with QA until authentication is resolved."
+**Note**: Cannot proceed with QA until authentication is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
   5)
@@ -1461,7 +1461,7 @@ case $CI_STATUS in
 - [ ] Ensure repository URL is correct
 - [ ] Contact administrator for access issues
 
-**Note**: Cannot proceed with QA until repository access is resolved."
+**Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     exit 0
     ;;
 esac
@@ -1482,7 +1482,7 @@ if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
 - [ ] Configure deployment verification
 - [ ] Add branch protection rules
 
-**Note**: Cannot proceed with QA until CI is properly configured."
+**Note**: Cannot proceed with QA until CI is properly configured." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 else
   # Function to parse JSON without jq dependency
   parse_ci_json() {
