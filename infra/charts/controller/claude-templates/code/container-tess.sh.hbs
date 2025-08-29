@@ -1714,16 +1714,46 @@ echo "  - PR Review: Posted to #$PR_NUM"
 echo "🔧 Signaling sidecar to shutdown..."
 touch /workspace/.agent_done 2>/dev/null || true
 
-# Try graceful shutdown via HTTP
-echo "🔧 Attempting graceful sidecar shutdown..."
-if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 10 2>/dev/null; then
-  echo "✓ Sidecar shutdown request sent successfully"
-else
-  echo "⚠️ Sidecar shutdown request failed"
+# Gracefully stop sidecar to allow Job to complete (all containers must exit)
+echo "🔧 Attempting sidecar shutdown..."
+shutdown_attempts=0
+max_shutdown_attempts=3
+
+while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+  if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+    echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+    break
+  else
+    shutdown_attempts=$((shutdown_attempts + 1))
+    echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+    if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+      echo "Retrying in 2 seconds..."
+      sleep 2
+    fi
+  fi
+done
+
+if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+  echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+  echo "🔧 Force terminating sidecar processes..."
+  pkill -f "sidecar" || echo "No sidecar processes found to kill"
 fi
 
-# Brief wait for sidecar to process shutdown
-sleep 2
+# Wait for sidecar to actually terminate
+echo "⏳ Waiting for sidecar termination..."
+timeout=10
+while [ $timeout -gt 0 ]; do
+  if ! pgrep -f "sidecar" > /dev/null 2>&1; then
+    echo "✅ Sidecar terminated successfully"
+    break
+  fi
+  sleep 1
+  timeout=$((timeout - 1))
+done
+
+if [ $timeout -eq 0 ]; then
+  echo "⚠️ Sidecar still running after wait period"
+fi
 
 # Perform final cleanup of our own processes
 echo "🔧 Performing final process cleanup..."
