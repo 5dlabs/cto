@@ -1371,8 +1371,3 @@ echo "tess-qa-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-compl
 
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
-
-# Always exit successfully to keep workflow running
-echo "🔚 Force terminating container..."
-echo "📝 Note: Container always exits with code 0 to allow workflow continuation"
-exit 0
