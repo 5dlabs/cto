@@ -239,6 +239,42 @@ fn get_intake_schema() -> Value {
                 "project_name": {
                     "type": "string",
                     "description": "Name of the project subdirectory containing intake files (required)"
+                },
+                "github_app": {
+                    "type": "string",
+                    "description": "GitHub App to use (optional, defaults to configuration)"
+                },
+                "primary_model": {
+                    "type": "string",
+                    "description": "Primary model for task generation (optional, defaults to configuration)"
+                },
+                "primary_provider": {
+                    "type": "string",
+                    "description": "Provider for primary model (e.g., anthropic, claude-code, openai)"
+                },
+                "research_model": {
+                    "type": "string",
+                    "description": "Model for research operations (optional, defaults to configuration)"
+                },
+                "research_provider": {
+                    "type": "string",
+                    "description": "Provider for research model (e.g., anthropic, claude-code, openai)"
+                },
+                "fallback_model": {
+                    "type": "string",
+                    "description": "Fallback model if primary fails (optional, defaults to configuration)"
+                },
+                "fallback_provider": {
+                    "type": "string",
+                    "description": "Provider for fallback model (e.g., anthropic, claude-code, openai)"
+                },
+                "prd_content": {
+                    "type": "string",
+                    "description": "PRD content (optional, overrides file reading)"
+                },
+                "architecture_content": {
+                    "type": "string",
+                    "description": "Architecture content (optional, overrides file reading)"
                 }
             },
             "required": ["project_name"]
