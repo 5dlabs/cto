@@ -28,9 +28,24 @@ spec:
       - name: github-app
         description: "GitHub App to use for authentication"
         value: "{{ .Values.agents.morgan.githubApp | default "5DLabs-Morgan" }}"
-      - name: model
-        description: "AI model to use for task generation"
+      - name: primary-model
+        description: "Primary AI model for main operations (task expansion)"
+        value: "{{ .Values.agents.morgan.defaultModel | default "claude-3-7-sonnet-20250219" }}"
+      - name: research-model
+        description: "Research AI model for PRD analysis and codebase understanding"
         value: "{{ .Values.agents.morgan.defaultModel | default "claude-opus-4-20250514" }}"
+      - name: fallback-model
+        description: "Fallback AI model when primary fails"
+        value: "gpt-4o"
+      - name: primary-provider
+        description: "Primary AI provider (anthropic, openai, etc.)"
+        value: "anthropic"
+      - name: research-provider
+        description: "Research AI provider (claude-code, anthropic, etc.)"
+        value: "claude-code"
+      - name: fallback-provider
+        description: "Fallback AI provider"
+        value: "openai"
       - name: num-tasks
         description: "Target number of tasks to generate"
         value: "50"
@@ -66,8 +81,18 @@ spec:
               value: "{{`{{workflow.parameters.repository-url}}`}}"
             - name: github-app
               value: "{{`{{workflow.parameters.github-app}}`}}"
-            - name: model
-              value: "{{`{{workflow.parameters.model}}`}}"
+            - name: primary-model
+              value: "{{`{{workflow.parameters.primary-model}}`}}"
+            - name: research-model
+              value: "{{`{{workflow.parameters.research-model}}`}}"
+            - name: fallback-model
+              value: "{{`{{workflow.parameters.fallback-model}}`}}"
+            - name: primary-provider
+              value: "{{`{{workflow.parameters.primary-provider}}`}}"
+            - name: research-provider
+              value: "{{`{{workflow.parameters.research-provider}}`}}"
+            - name: fallback-provider
+              value: "{{`{{workflow.parameters.fallback-provider}}`}}"
             - name: num-tasks
               value: "{{`{{workflow.parameters.num-tasks}}`}}"
             - name: expand-tasks
@@ -97,7 +122,12 @@ spec:
         - name: project-name
         - name: repository-url
         - name: github-app
-        - name: model
+        - name: primary-model
+        - name: research-model
+        - name: fallback-model
+        - name: primary-provider
+        - name: research-provider
+        - name: fallback-provider
         - name: num-tasks
         - name: expand-tasks
         - name: analyze-complexity

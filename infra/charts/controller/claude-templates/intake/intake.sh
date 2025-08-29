@@ -55,8 +55,21 @@ echo "  ✓ Repository URL: $REPOSITORY_URL"
 GITHUB_APP=$(jq -r '.github_app' "$CONFIG_FILE" 2>/dev/null || echo "")
 echo "  ✓ GitHub App: $GITHUB_APP"
 
-MODEL=$(jq -r '.model' "$CONFIG_FILE" 2>/dev/null || echo "claude-3-5-sonnet-20241022")
-echo "  ✓ Model: $MODEL"
+# Parse granular model configuration (from Argo workflow parameters)
+PRIMARY_MODEL="${PRIMARY_MODEL:-$(jq -r '.model' "$CONFIG_FILE" 2>/dev/null || echo "claude-3-7-sonnet-20250219")}"
+RESEARCH_MODEL="${RESEARCH_MODEL:-$(jq -r '.model' "$CONFIG_FILE" 2>/dev/null || echo "opus")}"
+FALLBACK_MODEL="${FALLBACK_MODEL:-gpt-4o}"
+
+PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-anthropic}"
+RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-claude-code}"
+FALLBACK_PROVIDER="${FALLBACK_PROVIDER:-openai}"
+
+echo "  ✓ Primary Model: $PRIMARY_MODEL ($PRIMARY_PROVIDER)"
+echo "  ✓ Research Model: $RESEARCH_MODEL ($RESEARCH_PROVIDER)"
+echo "  ✓ Fallback Model: $FALLBACK_MODEL ($FALLBACK_PROVIDER)"
+
+# Legacy MODEL variable for backward compatibility
+MODEL="$PRIMARY_MODEL"
 
 NUM_TASKS=$(jq -r '.num_tasks' "$CONFIG_FILE" 2>/dev/null || echo "10")
 echo "  ✓ Num tasks: $NUM_TASKS"
@@ -71,7 +84,9 @@ echo "🔍 Configuration summary:"
 echo "  - Project: ${PROJECT_NAME:-[empty]}"
 echo "  - Repository: ${REPOSITORY_URL:-[empty]}"
 echo "  - GitHub App: ${GITHUB_APP:-[empty]}"
-echo "  - Model: ${MODEL:-[empty]}"
+echo "  - Primary Model: ${PRIMARY_MODEL:-[empty]} (${PRIMARY_PROVIDER:-[empty]})"
+echo "  - Research Model: ${RESEARCH_MODEL:-[empty]} (${RESEARCH_PROVIDER:-[empty]})"
+echo "  - Fallback Model: ${FALLBACK_MODEL:-[empty]} (${FALLBACK_PROVIDER:-[empty]})"
 echo "  - Num Tasks: ${NUM_TASKS:-[empty]}"
 echo "  - Expand: ${EXPAND_TASKS:-[empty]}"
 echo "  - Analyze: ${ANALYZE_COMPLEXITY:-[empty]}"
@@ -365,7 +380,7 @@ else
         mkdir -p .taskmaster/reports
         mkdir -p .taskmaster/templates
         
-        # Create a minimal config.json file
+        # Create config.json with granular model configuration
         cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -374,13 +389,24 @@ else
     "version": "0.1.0"
   },
   "models": {
-    "main": "claude-3-5-sonnet-20241022",
-    "research": "claude-3-5-sonnet-20241022",
-    "fallback": "claude-3-5-sonnet-20241022"
-  },
-  "parameters": {
-    "maxTokens": 8000,
-    "temperature": 0.7
+    "main": {
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
+      "maxTokens": 64000,
+      "temperature": 0.2
+    },
+    "research": {
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
+      "maxTokens": 32000,
+      "temperature": 0.1
+    },
+    "fallback": {
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
+    }
   },
   "global": {
     "defaultTag": "master"
@@ -475,20 +501,20 @@ if [ "$OPENAI_VALID" = true ]; then
   },
   "models": {
     "main": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
     "fallback": {
-      "provider": "openai",
-      "modelId": "gpt-4o",
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
       "maxTokens": 8000,
       "temperature": 0.7
     }
@@ -499,8 +525,8 @@ if [ "$OPENAI_VALID" = true ]; then
 }
 EOF
 else
-  # Use Claude Code for main/research, but no fallback if OpenAI unavailable
-  echo "✅ Using Claude Code (no GPT fallback available)"
+  # Use configured providers for main/research, but no fallback if OpenAI unavailable
+  echo "✅ Using configured models (no GPT fallback available)"
   cat > .taskmaster/config.json << EOF
 {
   "project": {
@@ -510,22 +536,22 @@ else
   },
   "models": {
     "main": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
     "fallback": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
-      "maxTokens": 64000,
-      "temperature": 0.2
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
+      "maxTokens": 8000,
+      "temperature": 0.7
     }
   },
   "global": {
@@ -579,13 +605,13 @@ if [ "$EXPAND_TASKS" = "true" ]; then
         # Read current config and update only the main provider
         if [ -f ".taskmaster/config.json" ]; then
             # Use jq to update only the main provider in the existing config
-            jq '.models.main = {
-                "provider": "anthropic",
-                "modelId": "claude-3-7-sonnet-20250219",
+            jq --arg provider "$PRIMARY_PROVIDER" --arg model "$PRIMARY_MODEL" '.models.main = {
+                "provider": $provider,
+                "modelId": $model,
                 "maxTokens": 64000,
                 "temperature": 0.2
             }' .taskmaster/config.json > .taskmaster/config_temp.json && mv .taskmaster/config_temp.json .taskmaster/config.json
-            echo "✅ Updated main provider to Claude API, kept research with Claude Code"
+            echo "✅ Updated main provider to $PRIMARY_PROVIDER ($PRIMARY_MODEL), kept research with $RESEARCH_PROVIDER"
         else
             echo "⚠️ Config file not found, using default Claude API config"
             cat > .taskmaster/config.json << EOF
@@ -597,20 +623,20 @@ if [ "$EXPAND_TASKS" = "true" ]; then
   },
   "models": {
     "main": {
-      "provider": "anthropic",
-      "modelId": "claude-3-7-sonnet-20250219",
+      "provider": "$PRIMARY_PROVIDER",
+      "modelId": "$PRIMARY_MODEL",
       "maxTokens": 64000,
       "temperature": 0.2
     },
     "research": {
-      "provider": "claude-code",
-      "modelId": "$MODEL",
+      "provider": "$RESEARCH_PROVIDER",
+      "modelId": "$RESEARCH_MODEL",
       "maxTokens": 32000,
       "temperature": 0.1
     },
     "fallback": {
-      "provider": "openai",
-      "modelId": "gpt-4o",
+      "provider": "$FALLBACK_PROVIDER",
+      "modelId": "$FALLBACK_MODEL",
       "maxTokens": 8000,
       "temperature": 0.7
     }

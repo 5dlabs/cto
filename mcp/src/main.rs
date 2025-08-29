@@ -1197,10 +1197,34 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .get("github_app")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.intake.github_app);
-    let model = arguments
-        .get("model")
+
+    // Extract model configuration (client can specify granular control)
+    let primary_model = arguments
+        .get("primary_model")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.intake.model);
+    let research_model = arguments
+        .get("research_model")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intake.model);
+    let fallback_model = arguments
+        .get("fallback_model")
+        .and_then(|v| v.as_str())
+        .unwrap_or("gpt-4o");
+
+    // Extract provider configuration
+    let primary_provider = arguments
+        .get("primary_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("anthropic");
+    let research_provider = arguments
+        .get("research_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("claude-code");
+    let fallback_provider = arguments
+        .get("fallback_provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("openai");
     let num_tasks = 50; // Standard task count
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
@@ -1276,7 +1300,17 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             "-p",
             &format!("github-app={github_app}"),
             "-p",
-            &format!("model={model}"),
+            &format!("primary-model={primary_model}"),
+            "-p",
+            &format!("research-model={research_model}"),
+            "-p",
+            &format!("fallback-model={fallback_model}"),
+            "-p",
+            &format!("primary-provider={primary_provider}"),
+            "-p",
+            &format!("research-provider={research_provider}"),
+            "-p",
+            &format!("fallback-provider={fallback_provider}"),
             "-p",
             &format!("num-tasks={num_tasks}"),
             "-p",
