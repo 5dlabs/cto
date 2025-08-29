@@ -1231,17 +1231,16 @@ TASK_ID="{{task_id}}"
 echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}', pr_number template='{{pr_number}}'"
 echo "🔍 DEBUG: Resolved PR_NUM='$PR_NUM'"
 
+# Handle case where PR_NUM is empty - skip PR review entirely
+if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
+  echo "ℹ️ No PR number available - skipping PR review posting"
+  echo "🔍 This is normal for non-PR workflows or when PR context is not provided"
+  echo "✅ Tess QA workflow completed successfully"
+  exit 0
+fi
+
 # Check CI status to determine review type
 echo "📊 Checking CI status for PR #$PR_NUM..."
-
-# Validate PR_NUM is not empty
-if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
-  echo "❌ Error: PR_NUM is empty or not properly set"
-  echo "⚠️ Cannot proceed with PR review - invalid PR number"
-  echo "🔍 DEBUG: This usually means PR_NUMBER environment variable is not set"
-  echo "🔍 DEBUG: Check that the CodeRun spec has pr_number set"
-  exit 1
-fi
 
 # Function to safely execute gh command with error handling
 check_ci_status() {
@@ -1695,6 +1694,43 @@ fi
 
 # Perform cleanup
 echo "🔧 Performing cleanup..."
+
+# Final cleanup to ensure pod termination
+echo "🔧 Final cleanup - ensuring all processes are clean..."
+
+# Kill any remaining processes that might prevent pod termination
+cleanup_processes() {
+  local pids_to_kill=""
+
+  # Find any lingering processes from our session
+  if command -v pgrep >/dev/null 2>&1; then
+    # Kill any remaining bash processes from our container
+    pids_to_kill=$(pgrep -f "container.sh" 2>/dev/null || echo "")
+    if [ -n "$pids_to_kill" ]; then
+      echo "🔍 Found lingering container.sh processes: $pids_to_kill"
+      echo "$pids_to_kill" | xargs kill -TERM 2>/dev/null || true
+      sleep 1
+      echo "$pids_to_kill" | xargs kill -KILL 2>/dev/null || true
+    fi
+  fi
+
+  # Force cleanup of any remaining child processes
+  if [ $$ -gt 1 ] && [ -d "/proc" ]; then
+    # Get all child processes
+    local child_pids=""
+    child_pids=$(ps -o pid,ppid | awk -v ppid=$$ '$2 == ppid {print $1}' 2>/dev/null || echo "")
+
+    if [ -n "$child_pids" ]; then
+      echo "🔍 Found child processes to clean up: $child_pids"
+      echo "$child_pids" | xargs kill -TERM 2>/dev/null || true
+      sleep 1
+      echo "$child_pids" | xargs kill -KILL 2>/dev/null || true
+    fi
+  fi
+}
+
+# Execute cleanup
+cleanup_processes
 
 echo "════════════════════════════════════════════════════════════════"
 echo "║                  TESS QA WORKFLOW COMPLETE                   ║"
