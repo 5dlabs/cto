@@ -208,6 +208,27 @@ spec:
                 name: github-app-5dlabs-morgan
                 key: client-secret
                 optional: true
+          # Intake model and provider configuration
+          - name: GITHUB_APP
+            value: "{{`{{workflow.parameters.github-app}}`}}"
+          - name: PRIMARY_MODEL
+            value: "{{`{{workflow.parameters.primary-model}}`}}"
+          - name: RESEARCH_MODEL
+            value: "{{`{{workflow.parameters.research-model}}`}}"
+          - name: FALLBACK_MODEL
+            value: "{{`{{workflow.parameters.fallback-model}}`}}"
+          - name: PRIMARY_PROVIDER
+            value: "{{`{{workflow.parameters.primary-provider}}`}}"
+          - name: RESEARCH_PROVIDER
+            value: "{{`{{workflow.parameters.research-provider}}`}}"
+          - name: FALLBACK_PROVIDER
+            value: "{{`{{workflow.parameters.fallback-provider}}`}}"
+          - name: NUM_TASKS
+            value: "{{`{{workflow.parameters.num-tasks}}`}}"
+          - name: EXPAND_TASKS
+            value: "{{`{{workflow.parameters.expand-tasks}}`}}"
+          - name: ANALYZE_COMPLEXITY
+            value: "{{`{{workflow.parameters.analyze-complexity}}`}}"
       volumes:
         - name: intake-files
           configMap:

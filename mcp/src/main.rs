@@ -63,17 +63,36 @@ struct CodeDefaults {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct IntakeDefaults {
+struct ModelConfig {
     model: String,
+    provider: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct IntakeDefaults {
     #[serde(rename = "githubApp")]
     github_app: String,
+    primary: ModelConfig,
+    research: ModelConfig,
+    fallback: ModelConfig,
 }
 
 impl Default for IntakeDefaults {
     fn default() -> Self {
         IntakeDefaults {
-            model: "claude-3-5-sonnet-20241022".to_string(),
-            github_app: "agent-platform".to_string(), // Should be configured in cto-config.json
+            github_app: "5DLabs-Morgan".to_string(),
+            primary: ModelConfig {
+                model: "claude-3-7-sonnet-20250219".to_string(),
+                provider: "anthropic".to_string(),
+            },
+            research: ModelConfig {
+                model: "opus".to_string(),
+                provider: "claude-code".to_string(),
+            },
+            fallback: ModelConfig {
+                model: "gpt-4o".to_string(),
+                provider: "openai".to_string(),
+            },
         }
     }
 }
@@ -1192,7 +1211,7 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let branch = get_git_current_branch_in_dir(Some(&workspace_dir))?;
     eprintln!("🎯 Using branch: {branch}");
 
-    // Use configuration values with defaults (client can override via MCP JSON)
+    // Use configuration values with defaults (client can override)
     let github_app = arguments
         .get("github_app")
         .and_then(|v| v.as_str())
@@ -1202,29 +1221,29 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let primary_model = arguments
         .get("primary_model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.model);
+        .unwrap_or(&config.defaults.intake.primary.model);
     let research_model = arguments
         .get("research_model")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intake.model);
+        .unwrap_or(&config.defaults.intake.research.model);
     let fallback_model = arguments
         .get("fallback_model")
         .and_then(|v| v.as_str())
-        .unwrap_or("gpt-4o");
+        .unwrap_or(&config.defaults.intake.fallback.model);
 
     // Extract provider configuration
     let primary_provider = arguments
         .get("primary_provider")
         .and_then(|v| v.as_str())
-        .unwrap_or("anthropic");
+        .unwrap_or(&config.defaults.intake.primary.provider);
     let research_provider = arguments
         .get("research_provider")
         .and_then(|v| v.as_str())
-        .unwrap_or("claude-code");
+        .unwrap_or(&config.defaults.intake.research.provider);
     let fallback_provider = arguments
         .get("fallback_provider")
         .and_then(|v| v.as_str())
-        .unwrap_or("openai");
+        .unwrap_or(&config.defaults.intake.fallback.provider);
     let num_tasks = 50; // Standard task count
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
