@@ -1305,58 +1305,11 @@ echo "📊 Checking CI status for PR #$PR_NUM..."
 # Pre-flight check: Verify GitHub CLI is available and working
 echo "🔍 Pre-flight check: GitHub CLI availability..."
 
-# Try to install GitHub CLI if not available
-if ! command -v gh >/dev/null 2>&1; then
-  echo "⚠️ GitHub CLI not found, attempting to install..."
-
-  if command -v apt-get >/dev/null 2>&1; then
-    echo "📦 Installing GitHub CLI via apt-get (Ubuntu/Debian)..."
-    # Add GitHub CLI repository
-    if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg >/tmp/githubcli-archive-keyring.gpg 2>/dev/null; then
-      cat /tmp/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg >/dev/null 2>&1
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list >/dev/null 2>&1
-      apt-get update >/dev/null 2>&1
-      apt-get install -y gh >/dev/null 2>&1
-    else
-      # Fallback: try direct download
-      echo "📦 Fallback: downloading GitHub CLI directly..."
-      curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_*_linux_amd64.tar.gz >/tmp/gh.tar.gz 2>/dev/null || curl -fsSL https://github.com/cli/cli/releases/latest/download/gh_*_linux_arm64.tar.gz >/tmp/gh.tar.gz 2>/dev/null
-      if [ -f /tmp/gh.tar.gz ]; then
-        tar -xzf /tmp/gh.tar.gz -C /tmp >/dev/null 2>&1
-        find /tmp -name "gh" -type f -executable | head -1 | xargs -I {} mv {} /usr/local/bin/ >/dev/null 2>&1
-        chmod +x /usr/local/bin/gh >/dev/null 2>&1
-      fi
-    fi
-
-    if command -v gh >/dev/null 2>&1; then
-      echo "✅ GitHub CLI installed successfully"
-    else
-      echo "❌ Failed to install GitHub CLI via apt-get"
-    fi
-
-  elif command -v yum >/dev/null 2>&1; then
-    echo "📦 Installing GitHub CLI via yum (RHEL/CentOS)..."
-    yum install -y gh >/dev/null 2>&1 || dnf install -y gh >/dev/null 2>&1
-    if command -v gh >/dev/null 2>&1; then
-      echo "✅ GitHub CLI installed successfully"
-    else
-      echo "❌ Failed to install GitHub CLI via yum"
-    fi
-
-  else
-    echo "❌ No supported package manager found for GitHub CLI installation"
-    echo "ℹ️ Available package managers:"
-    command -v apt-get >/dev/null 2>&1 && echo "  - apt-get (Ubuntu/Debian)"
-    command -v yum >/dev/null 2>&1 && echo "  - yum (RHEL/CentOS)"
-    command -v apk >/dev/null 2>&1 && echo "  - apk (Alpine)"
-  fi
-fi
-
-# Check again after potential installation
+# Check if GitHub CLI is available (should be pre-installed in base image)
 if ! command -v gh >/dev/null 2>&1; then
   echo "❌ GitHub CLI not found in PATH"
-  echo "⚠️ Cannot perform CI checks or PR reviews without GitHub CLI"
-  echo "📝 Tess QA workflow completed successfully (GitHub integration unavailable)"
+  echo "⚠️ GitHub CLI should be pre-installed in the base image"
+  echo "📝 Tess QA workflow completed (GitHub CLI unavailable)"
   exit 0
 fi
 
@@ -1364,7 +1317,7 @@ fi
 if ! gh auth status >/dev/null 2>&1; then
   echo "❌ GitHub CLI not authenticated"
   echo "⚠️ Cannot perform CI checks or PR reviews without authentication"
-  echo "📝 Tess QA workflow completed successfully (GitHub authentication unavailable)"
+  echo "📝 Tess QA workflow completed (GitHub authentication unavailable)"
   exit 0
 fi
 
@@ -1392,8 +1345,8 @@ check_ci_status() {
     return 1
   fi
   
-  # Get CI checks in JSON format with proper error handling
-  if ! gh pr checks "$pr_num" --json name,status,conclusion,url 2>"$temp_file"; then
+  # Get CI checks in JSON format with proper error handling (with timeout)
+  if ! timeout 30 gh pr checks "$pr_num" --json name,status,conclusion,url 2>"$temp_file"; then
     local error_output
     error_output=$(cat "$temp_file" 2>/dev/null || echo "Unknown error")
     rm -f "$temp_file"
@@ -1447,7 +1400,7 @@ case $CI_STATUS in
     ;;
   2)
     echo "⚠️ PR not found - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **PR Not Found**: Pull request #$PR_NUM does not exist
@@ -1463,7 +1416,7 @@ case $CI_STATUS in
     ;;
   3)
     echo "⚠️ Network error - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Network Error**: Unable to connect to GitHub API
@@ -1479,7 +1432,7 @@ case $CI_STATUS in
     ;;
   4)
     echo "⚠️ Authentication error - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Authentication Error**: GitHub token permissions insufficient
@@ -1496,7 +1449,7 @@ case $CI_STATUS in
     ;;
   5)
     echo "⚠️ Repository access error - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Repository Access Error**: Repository not found or not accessible
@@ -1517,7 +1470,7 @@ esac
 if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
   echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
   # Post REQUEST CHANGES review for missing CI
-  gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+  timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **Missing CI Setup**: No GitHub Actions workflows detected
@@ -1619,7 +1572,7 @@ else
       FAILED_DETAILS=$(extract_check_details "$CI_JSON" "failed")
     fi
     
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ❌ **CI Failures Detected**: $FAILED_CHECKS out of $TOTAL_CHECKS check(s) failing
@@ -1644,7 +1597,7 @@ $FAILED_DETAILS
       PENDING_DETAILS=$(extract_check_details "$CI_JSON" "pending")
     fi
     
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ⏳ **CI Checks Pending**: $PENDING_CHECKS out of $TOTAL_CHECKS check(s) still running
@@ -1668,7 +1621,7 @@ $PENDING_DETAILS
       SUCCESS_DETAILS=$(extract_check_details "$CI_JSON" "success")
     fi
     
-    gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
+    timeout 30 gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
 ✅ **ALL CI checks verified**: $SUCCESS_CHECKS out of $TOTAL_CHECKS checks passing
@@ -1691,7 +1644,7 @@ $SUCCESS_DETAILS
 **APPROVED** - Ready for merge to main branch."
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
-    gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
 
 ## CI Status
 ⚠️ **Unexpected CI State**: Unable to determine final CI status

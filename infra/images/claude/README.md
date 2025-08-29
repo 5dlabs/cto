@@ -155,27 +155,60 @@ kubectl create secret generic claude-secrets \
 
 ## Included Tools
 
+### Core Development Stack
+- **Node.js 20** with npm, yarn, and pnpm
+- **Python 3** with pip, venv, and development tools
+- **Go** with latest stable version
+- **Rust** with cargo, clippy, rustfmt, and rust-analyzer
+- **PHP, Ruby, Perl** for multi-language development
 
+### Version Control & Git
+- **Git** with enhanced tools (git-lfs, git-extras, git-delta)
+- **GitHub CLI (gh)** with Copilot and CodeQL extensions
+- **Pre-configured git defaults** for development workflows
 
-- Node.js 20
+### Code Quality & Linting
+- **ESLint, Prettier, TypeScript** for JavaScript/TypeScript
+- **Black, isort, flake8, mypy, ruff** for Python
+- **Clippy, rustfmt** for Rust
+- **ShellCheck, Yamllint, Markdownlint** for shell and markup
+- **SQLFluff** for SQL
+- **Bandit, Safety** for security scanning
 
+### Cloud & Infrastructure
+- **AWS CLI** for cloud development
+- **kubectl, helm, kustomize** for Kubernetes
+- **Docker CLI and Docker Compose** for containers
+- **Argo CD, Argo Workflows** for GitOps
+- **k9s, kubectx, kubens, stern** for K8s debugging
+- **Talosctl** for Talos Linux management
 
-- npm/npx
+### Development Utilities
+- **tmux, htop, ncdu, iotop** for system monitoring
+- **ripgrep, silversearcher-ag, fd** for fast file searching
+- **bat, httpie, jq** for data processing
+- **pandoc** for document conversion
+- **direnv** for environment management
+- **sccache** for faster compilation
+- **dive** for Docker image analysis
 
+### Database Tools
+- **PostgreSQL, MySQL, Redis, SQLite** clients
+- **pgcli, mycli** for enhanced database interaction
 
-- git
+### Networking & Debugging
+- **mtr, traceroute, nmap** for network diagnostics
+- **strace, lsof, psmisc** for process debugging
+- **openssl, gnupg** for security operations
 
+### Build Tools
+- **ninja-build, meson** for modern build systems
+- **pkg-config, build-essential** for compilation
+- **pigz, pbzip2, pxz** for fast compression
 
-- zsh with powerline10k
-
-
-- fzf (fuzzy finder)
-
-
-- gh (GitHub CLI)
-
-
-- jq (JSON processor)
-
-
-- Standard development utilities
+### Development Workflow Helpers
+- **TaskMaster AI** for task management
+- **Toolman client** for MCP server interaction
+- **Development helper scripts** for quick project setup
+- **Pre-configured Python virtual environment template**
+- **Shell aliases and git configurations** for productivity
