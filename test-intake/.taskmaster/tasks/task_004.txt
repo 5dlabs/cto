@@ -1,0 +1,209 @@
+# Task ID: 4
+# Title: Core Task Management API (CRUD, Subtasks, Dependencies, Time Tracking, Attachments)
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Deliver the primary REST endpoints for tasks including rich descriptions, assignment, status transitions, dependencies, timers, and file attachments.
+# Details:
+Libraries:
+- Validation: zod 3.x + nestjs-zod 3.x (or class-validator if preferred)
+- File upload: S3 SDK @aws-sdk/client-s3 3.x; MinIO in dev
+- Rich text: store TipTap JSON; enforce size limits and sanitize server-side
+
+Endpoints (NestJS Controller):
+- POST /projects/:id/tasks {title, description, dueDate, assigneeId, estimateHrs}
+- GET /projects/:id/tasks?status=&assigneeId=&q=
+- PATCH /tasks/:id {title?, description?, status?, dueDate?, assigneeId?, priority?}
+- POST /tasks/:id/subtasks {...}
+- POST /tasks/:id/dependencies {dependsOnId}
+- DELETE /tasks/:id/dependencies/:dependsOnId
+- POST /tasks/:id/time/start, POST /tasks/:id/time/stop
+- POST /attachments/presign {scope: 'task'|'project', scopeId, filename, mimeType, size}
+- POST /tasks/:id/attachments { storageKey, filename, mimeType, size }
+- POST /tasks/:id/comments { body }
+
+Business rules:
+- Block starting tasks if any blocking dependency is not done.
+- Status transitions allowed per policy map.
+- Validate estimates are within reasonable range (0-1000 hours).
+
+Pseudo-code (presign):
+const key = `tasks/${taskId}/${cuid()}/${filename}`;
+const cmd = new PutObjectCommand({ Bucket, Key: key, ContentType: mimeType });
+const url = await getSignedUrl(s3, cmd, { expiresIn: 900 });
+return { url, key };
+
+Search:
+- Basic ILIKE on title; later add trigram index.
+
+OpenAPI:
+- Decorate DTOs to expose Swagger; export JSON for integrators.
+
+
+# Test Strategy:
+- Unit tests services: creating tasks, subtasks, dependencies graph checks.
+- Integration tests against Postgres with testcontainers; ensure cascade rules do not orphan rows.
+- Upload tests: presign yields working PUT; validate object appears in MinIO.
+- Negative tests: cannot start time if blocked; invalid transitions rejected.
+
+# Subtasks:
+## 1. Prisma data model and migrations for tasks domain [pending]
+### Dependencies: None
+### Description: Design and migrate database schema for tasks, dependencies, time tracking, attachments, and comments with proper indexes.
+### Details:
+• Define Task { id, projectId, parentId (nullable), title, descriptionJson (TipTap), status, dueDate, assigneeId, estimateHrs, priority, createdAt, updatedAt }.
+• Define TaskDependency { taskId, dependsOnId, createdAt }; add PK/unique (taskId, dependsOnId) and check (taskId != dependsOnId).
+• Define TimeEntry { id, taskId, userId, startedAt, endedAt (nullable), durationS (computed on stop), createdAt } and unique partial index for open entries per (taskId,userId) where endedAt IS NULL.
+• Define Attachment { id, taskId, storageKey, filename, mimeType, size, createdAt }.
+• Define Comment { id, taskId, userId, body, createdAt }.
+• Foreign keys with ON DELETE CASCADE where safe (e.g., task -> subtasks/comments/attachments/timeEntries).
+• Indexes: tasks(projectId, status), tasks(projectId, assigneeId), tasks(projectId, dueDate), tasks(title) for ILIKE; enable pg_trgm extension behind a feature flag for later.
+• Generate Prisma client and run initial migration.
+
+## 2. Zod DTOs and TipTap JSON sanitization [pending]
+### Dependencies: None
+### Description: Create request/response DTOs using zod with size limits and server-side sanitization for rich text.
+### Details:
+• Implement sanitizeTipTapJson(json) to allow whitelisted nodes/marks and enforce max stringified size (e.g., 64KB).
+• DTOs: CreateTaskDTO { title, descriptionJson?, dueDate?, assigneeId?, estimateHrs? }; UpdateTaskDTO { title?, descriptionJson?, status?, dueDate?, assigneeId?, priority? }.
+• DTOs: ListTasksQuery { status?, assigneeId?, q?, page?, limit?, sort? } with defaults and bounds.
+• DTOs: CreateSubtaskDTO { title, descriptionJson?, dueDate?, assigneeId?, estimateHrs? }.
+• DTOs: AddDependencyDTO { dependsOnId }.
+• DTOs: PresignDTO { scope: 'task'|'project', scopeId, filename, mimeType, size } with file size/type constraints.
+• DTOs: LinkAttachmentDTO { storageKey, filename, mimeType, size }.
+• DTOs: CreateCommentDTO { body } with length limits and basic sanitization.
+• Integrate nestjs-zod pipes for validation and response schemas.
+
+## 3. Business rules module (status policy, estimates, dependency logic) [pending]
+### Dependencies: None
+### Description: Centralize domain policies: allowed status transitions, estimate bounds, dependency checks, and cycle detection.
+### Details:
+• Define AllowedStatusTransitions map; expose canTransition(from, to).
+• Implement validateEstimate(hrs) enforcing 0–1000 inclusive.
+• Implement isBlockedByDependencies(taskId): checks any dependsOn not in 'done' (or terminal) status.
+• Implement detectCycle(taskId, dependsOnId) using DFS/BFS via Prisma lookups.
+• Define typed DomainError classes (e.g., InvalidTransitionError, DependencyBlockedError, ValidationError).
+
+## 4. POST /projects/:id/tasks (create task) [pending]
+### Dependencies: 4.1, 4.2, 4.3
+### Description: Controller and service to create tasks within a project with rich descriptions and estimates validation.
+### Details:
+• Controller method binds :id projectId; validate body with CreateTaskDTO.
+• Service createTask: verify project exists, optional assignee exists; sanitize description; validate estimate via business rules.
+• Persist task; return DTO including assignee and minimal project info.
+• Prisma include: assignee, dependencies count.
+• Emit domain event (internal) for future real-time hooks.
+
+## 5. GET /projects/:id/tasks (list with filters/search/pagination) [pending]
+### Dependencies: 4.1, 4.2
+### Description: List tasks by project with status/assignee filters, ILIKE search on title, and pagination.
+### Details:
+• Controller parses ListTasksQuery; enforce page/limit bounds; default sort by updatedAt desc.
+• Service query: WHERE projectId=:id AND optional filters; title ILIKE '%'||q||'%'.
+• Return paginated result { items, page, limit, total }.
+• Ensure Prisma query uses proper indexes; include counts for subtasks and open dependencies.
+• Add lightweight text search with ILIKE; keep room for trigram index later.
+
+## 6. PATCH /tasks/:id (update with status transitions) [pending]
+### Dependencies: 4.1, 4.2, 4.3
+### Description: Update task fields and enforce status transition policy, estimate validation, and sanitization.
+### Details:
+• Controller validates UpdateTaskDTO; route param :id.
+• Service: fetch current status; if status change requested, verify via canTransition.
+• Validate estimate bounds if present; sanitize description JSON.
+• Persist changes; return updated task with includes.
+• Optionally append status change audit row (future-proof).
+
+## 7. POST /tasks/:id/subtasks (create subtask) [pending]
+### Dependencies: 4.1, 4.2, 4.3
+### Description: Create a subtask under a parent task, inheriting project and validating inputs.
+### Details:
+• Controller binds parent :id; validate CreateSubtaskDTO.
+• Service: ensure parent exists; inherit projectId; optionally cap nesting to one level via validation.
+• Persist child task with parentId=parent.id; validate estimate and sanitize description.
+• Return created subtask with parent summary.
+
+## 8. Task dependencies endpoints (add/remove with cycle checks) [pending]
+### Dependencies: 4.1, 4.2, 4.3
+### Description: Implement adding and removing task dependencies with validations and cycle detection.
+### Details:
+• POST /tasks/:id/dependencies: validate dependsOnId; ensure both tasks exist and belong to same project; no self-dependency.
+• Use detectCycle before insert; create TaskDependency record; idempotent behavior on duplicates.
+• DELETE /tasks/:id/dependencies/:dependsOnId: remove relation if exists; return 204.
+• Return updated dependency lists as needed.
+
+## 9. Time tracking endpoints (start/stop) with concurrency safeguards [pending]
+### Dependencies: 4.1, 4.2, 4.3, 4.8
+### Description: Implement POST /tasks/:id/time/start and /stop with blocking rules, locking, and duration computation.
+### Details:
+• start: verify no open time entry for (userId, taskId); check isBlockedByDependencies(taskId) => if true, reject; create TimeEntry in tx.
+• Concurrency: enforce unique open entry via partial index and handle conflicts gracefully (409); optionally SELECT FOR UPDATE on user open entries.
+• stop: find open entry for user+task; set endedAt=now; compute durationS; persist in tx.
+• Return active entry on start and finalized entry on stop.
+
+## 10. POST /attachments/presign (S3/MinIO presign) [pending]
+### Dependencies: 4.1, 4.2
+### Description: Generate presigned PUT URLs for task/project-scoped uploads using @aws-sdk/client-s3 against MinIO in dev.
+### Details:
+• Configure S3 client with MinIO endpoint, region, access keys, forcePathStyle.
+• Validate PresignDTO; ensure scopeId exists for 'task' or 'project'.
+• Build key: `${scope}s/${scopeId}/${cuid()}/${filename}`; set ContentType from mimeType.
+• Use PutObjectCommand + getSignedUrl(s3, cmd, { expiresIn: 900 }).
+• Return { url, key } ensuring key is used later to link attachment.
+• Enforce size/mimeType limits; optionally set expected content length headers.
+
+## 11. POST /tasks/:id/attachments (link uploaded object) [pending]
+### Dependencies: 4.1, 4.10
+### Description: Persist attachment metadata and link presigned-uploaded objects to tasks.
+### Details:
+• Validate LinkAttachmentDTO; ensure storageKey prefix matches tasks/:id path.
+• Optionally HEAD the object to verify presence/size/mime; trust in test/dev as needed.
+• Insert Attachment row; return attachment record.
+• Prevent duplicate linking by unique(taskId, storageKey).
+
+## 12. POST /tasks/:id/comments (create comment) [pending]
+### Dependencies: 4.1, 4.2
+### Description: Allow users to add comments to tasks with sanitized body and length limits.
+### Details:
+• Validate CreateCommentDTO; enforce max length (e.g., 2–4KB) and sanitize.
+• Ensure task exists and user is authorized (RBAC added later).
+• Persist Comment row; return created comment with author summary and timestamps.
+
+## 13. RBAC guard and authorization policies [pending]
+### Dependencies: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12
+### Description: Integrate role-based access control for task endpoints using NestJS guards and project-scoped permissions.
+### Details:
+• Implement RolesGuard + ProjectAccessGuard; derive user from JWT; load project membership/role.
+• Define policies: who can create/update tasks, manage dependencies, track time, upload/link attachments, and comment.
+• Apply @UseGuards to all task-related controllers; add route-level decorators where needed.
+• Add forbidden/unauthorized responses to controllers.
+
+## 14. Cross-cutting: Pino logging and standardized error handling [pending]
+### Dependencies: 4.2, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12
+### Description: Add structured logging for key actions and unify validation/business error responses.
+### Details:
+• Configure Pino logger with request-id correlation and sensitive field redaction.
+• Log key events: task create/update, dependency add/remove, time start/stop, presign, attachment link, comment create.
+• Implement ExceptionFilter to map ZodError -> 400 with standardized shape; DomainError -> 409/422 with codes; unexpected -> 500 with safe message.
+• Ensure consistent error envelope { error: { code, message, details? } } across controllers.
+
+## 15. Swagger/OpenAPI documentation and grouping [pending]
+### Dependencies: 4.2, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12
+### Description: Decorate DTOs and controllers for Swagger, group under Tasks, and export OpenAPI JSON; include presigned upload flow docs.
+### Details:
+• Add @ApiTags, @ApiOperation, @ApiOkResponse, @ApiBody to all endpoints; ensure DTOs are referenced.
+• Document query params and pagination schema for list endpoint.
+• Provide examples for presign + upload + link flow (step-by-step request/response pairs).
+• Configure Swagger module and export OpenAPI JSON for integrators.
+• Add security scheme for JWT.
+
+## 16. Testing suite: unit, integration (Postgres + MinIO), and negative cases [pending]
+### Dependencies: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13, 4.14, 4.15
+### Description: Write unit tests for services and integration tests with testcontainers covering edge and negative scenarios.
+### Details:
+• Unit: TasksService create/update validations, status transitions, estimate bounds; dependency cycle detection; isBlockedByDependencies; time tracking start/stop logic.
+• Integration: spin up Postgres + MinIO via testcontainers; CRUD flows; list pagination/search; dependencies add/remove; time tracking concurrency; RBAC-protected routes.
+• Upload tests: presign -> PUT to MinIO -> link attachment -> verify record; invalid mime/size rejects.
+• Negative: cannot start time when blocked; invalid transition rejected; duplicate dependency; open time entry conflict.
+• Ensure DB cleanup between tests and snapshots for API responses where appropriate.
+

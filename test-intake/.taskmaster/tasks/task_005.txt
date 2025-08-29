@@ -1,0 +1,145 @@
+# Task ID: 5
+# Title: Project Planning Basics (Projects, Milestones, Gantt Data, Resource & Budget Fields)
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Expose APIs for project creation, milestones, deliverables, and provide Gantt-friendly data for the frontend drag-and-drop timeline.
+# Details:
+Endpoints:
+- POST /projects {name, description, startDate, endDate, teamId, budgetCents}
+- PATCH /projects/:id {name?, dates?, status?, budgetCents?}
+- GET /projects/:id/gantt -> returns tasks with start/end, dependencies for Gantt chart
+- POST /projects/:id/milestones, PATCH/DELETE milestones
+- Resource hints: GET /teams/:id/capacity?from&to returns capacity summary based on team members and time entries
+
+Implementation details:
+- On task update, compute critical dates for Gantt (start: earliest of dueDate/derived; end: dueDate or estimate-based).
+- Add simple capacity calc: hoursAvailable = members*40h/week minus planned estimates windowed.
+- Budget tracking: sum of cost rates * timeEntries duration (store default hourly rate per user/team in future).
+
+Frontend integration:
+- Use a lightweight Gantt lib (e.g., frappe-gantt or Syncfusion/vis-timeline). Start with read-only; drag-and-drop later.
+
+Pseudo-code (Gantt transform):
+return tasks.map(t => ({ id: t.id, name: t.title, start: t.startDate ?? project.startDate, end: t.dueDate ?? addHours(start, t.estimateHrs||0), dependencies: t.dependencies.map(d=>d.dependsOnId) }));
+
+
+# Test Strategy:
+- API contract tests for Gantt endpoint data shape.
+- Unit tests for capacity calculation with mocked time entries.
+- Verify milestone CRUD and indexes for date-range queries perform under seed of 10k tasks.
+
+# Subtasks:
+## 1. Implement Project Create/Update with Validation and RBAC [pending]
+### Dependencies: None
+### Description: Build POST /projects and PATCH /projects/:id with input validation, RBAC, and consistent response/error shapes.
+### Details:
+- Validation: name (1-140 chars), description optional, startDate <= endDate, teamId must exist, budgetCents integer >= 0, status enum: planned|active|on_hold|completed.
+- RBAC: only org admins or managers of the target teamId can create/update projects; regular users can read (if applicable) but cannot modify.
+- Persistence: ensure model has fields {name, description, startDate, endDate, teamId, status, budgetCents, createdById, updatedById}.
+- API: POST returns 201 with created project; PATCH returns 200 with updated project; use consistent error shape {code, message, details}.
+- Auditing: set createdById/updatedById from auth context; write basic access logs.
+- OpenAPI: document schemas and examples for both endpoints.
+- Edge cases: reject negative budgets, invalid dates, team mismatch, or forbidden updates on completed projects without admin override.
+
+## 2. Milestones CRUD (POST/PATCH/DELETE) with Date Indexes [pending]
+### Dependencies: 5.1
+### Description: Add milestone endpoints under a project with validation and DB indexes to support date-range queries.
+### Details:
+- Model: Milestone {id, projectId FK, title, description?, milestoneDate, status: 'planned'|'achieved'|'canceled', createdAt, updatedAt}.
+- Indexes: (projectId, milestoneDate), (projectId, title) for fast lookups.
+- Endpoints: POST /projects/:id/milestones, PATCH /projects/:id/milestones/:milestoneId, DELETE /projects/:id/milestones/:milestoneId.
+- Validation: title 1-140; milestoneDate present; optional status transitions (planned->achieved/canceled).
+- RBAC: same as project update permissions.
+- Constraints: ensure milestone.projectId matches path param; enforce referential integrity and cascade delete on project removal.
+- Responses: return created/updated milestone; DELETE returns 204.
+- Guardrails: optionally warn if milestoneDate falls outside project start/end.
+
+## 3. Compute Task Critical Dates on Task Update [pending]
+### Dependencies: 5.1
+### Description: Implement service logic to compute and store task start/end dates used by the Gantt view whenever tasks or dependencies change.
+### Details:
+- Computed fields: task.computedStartAt, task.computedEndAt (persisted for speed).
+- Algorithm (simple):
+  - baseStart = task.startDate ?? project.startDate
+  - depEnd = max(computedEndAt of all dependencies) if any
+  - start = max(baseStart, depEnd?)
+  - end = task.dueDate ?? addHours(start, task.estimateHrs || 0)
+- Triggers: recompute on task create/update, dependency add/remove, estimate/dueDate change, project startDate change.
+- Resilience: protect against cycles (assume Task 4 dependency validation prevents cycles); use topological recompute order if batch updating.
+- Observability: log recompute counts and duration; flag tasks with missing estimates and no dueDate.
+- Backfill: one-off migration/script to populate computed fields for existing tasks.
+
+## 4. GET /projects/:id/gantt Transform [pending]
+### Dependencies: 5.1, 5.2, 5.3
+### Description: Expose Gantt-friendly data for a project by transforming tasks and dependencies into the frontend shape.
+### Details:
+- Query: select project and its tasks with fields {id, title, startDate, dueDate, estimateHrs, computedStartAt, computedEndAt} and dependency edges.
+- Transform: tasks.map(t => ({ id: t.id, name: t.title, start: t.computedStartAt ?? (t.startDate ?? project.startDate), end: t.computedEndAt ?? (t.dueDate ?? addHours(start, t.estimateHrs||0)), dependencies: t.dependencies.map(d => d.dependsOnId) })).
+- Response shape: { project: {id, name, startDate, endDate}, tasks: [...], milestones: [...] } where milestones includes {id, name, date} from Milestones.
+- Filters: support ?from&to to limit returned tasks/milestones by overlap with window; optional ?limit (default 1000, max 10000) for safety.
+- Performance: use Prisma select/includes to avoid N+1; batch-fetch dependencies; ensure relevant indexes exist.
+- Read-only: no drag/drop updates yet; ensure CORS and caching headers (ETag) for identical payloads.
+
+## 5. GET /teams/:id/capacity Simple Availability [pending]
+### Dependencies: None
+### Description: Provide a capacity summary for a team between a date range using a simple hours-available calculation.
+### Details:
+- Input: GET /teams/:id/capacity?from=ISO&to=ISO&bucket=day|week (default week). Validate from<=to and window <= 180 days.
+- Data sources: team active members; planned hours from task estimates; actual hours from time entries.
+- Calculation: hoursAvailable = members * 40h/week (or 8h/day * days) - plannedEstimatesInWindow. If actual time exists, subtract actuals from availability and optionally cap planned subtraction to not double-count.
+- Output: { teamId, from, to, bucket, memberCount, availability: [{ start, end, hoursCapacity, hoursPlanned, hoursActual, hoursAvailable }] }.
+- Assumptions: 40h/week baseline; ignore holidays for now; timezone set to UTC.
+- RBAC: managers of the team and admins only.
+- Edge cases: no members => capacity 0; handle partial weeks at window edges.
+
+## 6. Budget Fields Exposure and Basic Aggregates [pending]
+### Dependencies: 5.1
+### Description: Expose project budget fields and compute actual cost from time entries using user/team cost rates.
+### Details:
+- Fields: ensure Project has budgetCents (int), currencyCode (optional future), and expose in responses.
+- Aggregation: actualCostCents = sum(timeEntry.durationHours * (user.costRateCents ?? team.defaultCostRateCents ?? 0)) for entries linked to the project.
+- Service: implement ProjectBudgetService.getSummary(projectId) => { budgetCents, actualCostCents, remainingCents }.
+- API integration: include budget summary in POST/PATCH /projects responses and optionally in GET /projects/:id (if available) and /projects/:id/gantt's project block.
+- Performance: compute on demand with indexed queries; add simple caching layer with short TTL if needed.
+- Validation: prevent negative budgets; allow updating budgetCents via PATCH.
+
+## 7. Prisma Query Optimization and Indexing [pending]
+### Dependencies: 5.1, 5.2, 5.4, 5.5, 5.6
+### Description: Optimize queries and add indexes to support Gantt, milestones, capacity, and budget queries at scale.
+### Details:
+- Indexes: tasks(projectId, computedStartAt), tasks(projectId, computedEndAt), tasks(projectId, dueDate), milestones(projectId, milestoneDate), task_dependencies(taskId, dependsOnId), time_entries(projectId, startedAt), team_members(teamId, userId).
+- Query shaping: use select to fetch only needed fields; prefetch dependency edges in one query; avoid N+1.
+- Pagination/limits: enforce safe limits on Gantt queries; add cursors where appropriate.
+- DB checks: run EXPLAIN on heavy queries (Gantt, capacity, budget) and document plans; adjust indexes accordingly.
+- Caching: enable HTTP caching (ETag) for Gantt; consider memoizing budget summaries for short intervals.
+- Error budgets: set timeouts and fallbacks for long-running queries; log slow queries with thresholds.
+
+## 8. Unit Tests: Gantt Transform and Capacity Math [pending]
+### Dependencies: 5.3, 5.4, 5.5
+### Description: Write unit tests covering Gantt data transformation and capacity calculations, including edge cases.
+### Details:
+- Gantt tests: no dueDate uses estimate; dependency shifts start; project start fallback; zero estimate results in start==end; filter by window; milestone inclusion.
+- Capacity tests: multiple members; partial weeks; no members; overlap of planned vs actual; boundary dates; bucket day vs week.
+- Tooling: Jest + ts-jest; mock Prisma/services; deterministic time via fake timers.
+- Coverage: target >= 85% lines in related modules; snapshot representative responses.
+
+## 9. API Contract Tests for Endpoints and Error Shapes [pending]
+### Dependencies: 5.1, 5.2, 5.4, 5.5, 5.6
+### Description: Add contract tests to verify request/response schemas, query params, and error handling for new endpoints.
+### Details:
+- Endpoints covered: POST/PATCH /projects; POST/PATCH/DELETE /projects/:id/milestones; GET /projects/:id/gantt (?from&to&limit); GET /teams/:id/capacity (?from&to&bucket).
+- Validate JSON schema (zod) for success and failure cases; ensure consistent {code, message, details} errors.
+- Negative tests: RBAC forbidden, invalid dates, invalid teamId/projectId, window too large, limit overflow, missing required fields.
+- Backward-compatibility: pin snapshots for response shapes; generate OpenAPI docs and diff if available.
+
+## 10. Performance Seeds and Benchmark (≤10k Tasks) [pending]
+### Dependencies: 5.1, 5.2, 5.4, 5.5
+### Description: Seed realistic data and benchmark Gantt and capacity endpoints to ensure acceptable performance with large datasets.
+### Details:
+- Seeder: create ~5 teams, 1k projects, 10k+ tasks, random dependencies, milestones, and time entries; ensure indexes are applied before benchmarking.
+- Benchmarks: use autocannon/k6 to test GET /projects/:id/gantt and GET /teams/:id/capacity under load.
+- Targets: Gantt p95 < 200ms for 1k tasks; < 600ms for 10k tasks; capacity p95 < 200ms for 6-month window.
+- Telemetry: record CPU/memory; log slow queries; verify no N+1.
+- Report: document results, bottlenecks, and tuning applied (indexes, query shapes, limits).
+

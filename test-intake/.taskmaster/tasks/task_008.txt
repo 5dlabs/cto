@@ -1,0 +1,117 @@
+# Task ID: 8
+# Title: Analytics & Reporting MVP (Dashboards, Exports)
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Provide initial analytics endpoints and simple dashboards: project status, team performance, resource utilization, and CSV export.
+# Details:
+Approach:
+- Use Postgres CTEs/window functions for aggregates; cache results in Redis for 60-120s
+- Endpoints:
+  - GET /analytics/overview?teamId&from&to
+  - GET /analytics/resource-utilization?teamId&from&to
+  - GET /analytics/budget-vs-actual?projectId
+  - GET /reports/export.csv?type=... (stream CSV)
+- Frontend: charts with chart.js or Recharts; tables with sticky headers
+
+Example SQL (resource utilization):
+WITH te AS (
+  SELECT userId, SUM(EXTRACT(EPOCH FROM (COALESCE(endedAt, now()) - startedAt))) AS secs
+  FROM TimeEntry WHERE startedAt BETWEEN $1 AND $2 GROUP BY userId
+)
+SELECT u.id, u.name, te.secs/3600 as hours, (40*weeks) as capacity FROM users u LEFT JOIN te ON u.id=te.userId;
+
+OpenAPI tags for analytics; ensure pagination and filters.
+
+
+# Test Strategy:
+- Unit tests for repo methods constructing SQL; snapshot responses for seeded data.
+- Performance test: 10k tasks, 100k time entries; queries under 300ms with proper indexes.
+- CSV export: verify streaming and proper content-type; Excel compatibility.
+
+# Subtasks:
+## 1. Define endpoints and scaffold Analytics/Reports module [pending]
+### Dependencies: None
+### Description: Design endpoint contracts and scaffold controllers/services for analytics and CSV export.
+### Details:
+- Create AnalyticsModule and ReportsModule (or single AnalyticsModule with ReportsController).
+- Endpoints: GET /analytics/overview?teamId&from&to; GET /analytics/resource-utilization?teamId&from&to&page&limit; GET /analytics/budget-vs-actual?projectId; GET /reports/export.csv?type=overview|resource-utilization|budget-vs-actual&teamId&projectId&from&to.
+- Define DTOs for query params with defaults (from/to default last 30 days; page=1; limit=50).
+- Establish minimal response shapes for each endpoint to guide implementation and tests.
+- Register OpenAPI tags placeholders: Analytics, Reports (detailed docs in subtask 9).
+
+## 2. Implement SQL queries (CTEs/window functions) via Prisma [pending]
+### Dependencies: 8.1
+### Description: Build repository layer using Prisma $queryRaw with optimized Postgres CTEs/window functions.
+### Details:
+- Resource utilization: CTE summing timeEntry seconds per user in range; compute hours and capacity (weeklyCapacityHours*weeks in range); compute utilizationPct.
+- Overview: project status counts, team performance summaries, trending aggregates (7/30-day windows) using DATE_TRUNC and window functions as needed.
+- Budget vs actual: join projects to time entries; compute actualHours, variance; include actualCost/varianceCost if rate tables available; otherwise hours-only path.
+- Encapsulate queries behind repository/services; return typed DTOs.
+- Add recommended indexes: timeentry(startedAt), timeentry(userId, startedAt), timeentry(projectId, startedAt), tasks(projectId, status).
+
+## 3. Add Redis caching (60–120s) with cache keys by filters [pending]
+### Dependencies: 8.2
+### Description: Introduce short-lived caching for analytics responses with filter-scoped keys.
+### Details:
+- Use Redis with TTL 60–120s; key pattern: analytics:{endpoint}:{hash(teamId|projectId|from|to|page|limit|userScope)}.
+- Wrap service methods with cache get/set; serialize JSON safely; set X-Cache header (hit/miss) for observability.
+- Ensure cached content respects RBAC by including user/team scope in the key to avoid leakage.
+- Provide invalidation helpers (optional) though TTL likely sufficient for MVP.
+
+## 4. Implement streaming CSV export [pending]
+### Dependencies: 8.1, 8.2
+### Description: Build memory-safe CSV export that streams data for requested report type.
+### Details:
+- Controller: GET /reports/export.csv with type switch mapping to repository query.
+- Use Node streams (e.g., fast-csv or csv-stringify) and pipeline; fetch in chunks/iterators to avoid loading entire dataset.
+- Set headers: Content-Type text/csv; Content-Disposition attachment with sensible filename; prepend UTF-8 BOM for Excel compatibility.
+- Column schemas per type: overview (project,status,count,...), resource-utilization (userId,name,hours,capacity,utilizationPct), budget-vs-actual (projectId,name,budgetHours,actualHours,varianceHours,budgetCost,actualCost,varianceCost).
+- Respect filters and RBAC; avoid caching stream content; optionally include generation timestamp in first row.
+
+## 5. Pagination, sorting, and filter validation [pending]
+### Dependencies: 8.1
+### Description: Validate and normalize query parameters; implement pagination/sorting where applicable.
+### Details:
+- Use class-validator (or zod) with Nest ValidationPipe; enforce ISO8601 dates, from<=to, max range (e.g., 366 days), page>=1, limit within [10,1000].
+- Implement pagination for list-like endpoints (e.g., resource-utilization users); include meta {page,limit,total?}.
+- Optional sorting params: sortBy=hours|utilizationPct, sortDir=asc|desc.
+- Normalize timezones (treat as UTC) and clamp to boundaries.
+- Return consistent envelope: {data, meta} for paginated endpoints.
+
+## 6. RBAC scoping to teams/projects [pending]
+### Dependencies: 8.1, 8.5
+### Description: Enforce authorization and tenant scoping across analytics and reports.
+### Details:
+- Integrate CASL Ability checks in controllers/services; require membership/permissions for teamId/projectId.
+- Apply WHERE clauses to constrain by team/project scope; prevent cross-tenant leakage.
+- Return 403 for unauthorized scopes; 400 for missing required scope (e.g., teamId where needed).
+- Ensure CSV export applies identical RBAC rules.
+
+## 7. Unit tests for query builders and caching [pending]
+### Dependencies: 8.2, 8.3, 8.5, 8.6
+### Description: Test SQL repositories and cache behavior with seeded test data.
+### Details:
+- Seed minimal fixtures for users, teams, projects, tasks, timeEntries.
+- Verify resource-utilization aggregates, overview status counts, and budget vs actual math via snapshots/assertions.
+- Test cache keys vary by filters and user scope; TTL respected; cache hit/miss toggles correct.
+- Validate input parsing/validation errors and pagination metadata.
+
+## 8. Performance testing with large seeded data [pending]
+### Dependencies: 8.2, 8.3, 8.5
+### Description: Load-test analytics queries and optimize with indexes.
+### Details:
+- Seed ~10k tasks and ~100k time entries; vary date ranges and teams.
+- Measure P95 latency under 300ms for main queries (resource-utilization, overview) with EXPLAIN ANALYZE.
+- Tune indexes and query plans (avoid sequential scans); document results.
+- Run concurrent requests (e.g., 20–50 RPS) to validate caching effectiveness.
+
+## 9. OpenAPI documentation and examples [pending]
+### Dependencies: 8.1, 8.2, 8.4, 8.5, 8.6
+### Description: Publish comprehensive API docs with examples for analytics and CSV export.
+### Details:
+- Annotate controllers with @ApiTags('Analytics','Reports') and @ApiQuery/@ApiResponse.
+- Document query params, pagination, validation rules, and RBAC error responses (401/403).
+- Provide example responses for each endpoint and CSV schema description; mark CSV content-type and streaming behavior.
+- Ensure generated spec includes tags, enums for type, and response schemas for DTOs.
+

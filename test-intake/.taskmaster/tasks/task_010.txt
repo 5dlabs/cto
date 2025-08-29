@@ -1,0 +1,144 @@
+# Task ID: 10
+# Title: Security, Compliance Hooks, Audit Logging, and Observability
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Implement cross-cutting concerns: audit logs, rate limits, input validation hardening, OpenTelemetry, health checks, and base compliance features.
+# Details:
+Security:
+- Audit log table: {id, userId, action, entityType, entityId, metadata JSON, ip, ua, createdAt}
+- Middleware to record audit events for mutating endpoints
+- Input validation: zod schemas with strict() and maximum payload size; sanitize rich-text
+- Rate limiting: global + per-IP via Fastify rate limit; per-user for sensitive endpoints
+- TLS: enforce HTTPS behind proxy; HSTS; CORS restrict origins; CSP for web
+- Secrets: load via process.env with validation; disallow default passwords
+- Data retention & GDPR: endpoints to export/delete user data (Phase 2), data minimization by default
+
+Observability:
+- OpenTelemetry SDK 1.x + auto-instrumentations for Nest/HTTP/PG/Redis; export to OTLP collector
+- Metrics: Prometheus endpoint /metrics (use prom-client) for process and business metrics
+- Health: /health using @godaddy/terminus or @nestjs/terminus; liveness/readiness including DB/Redis/MinIO
+- Logs: pino JSON logs, include trace_id
+
+Pseudo-code (audit):
+@Injectable() class AuditInterceptor implements NestInterceptor { intercept(ctx, next) { /* on success, persist audit row */ } }
+
+
+# Test Strategy:
+- Verify audit entries for create/update/delete across core entities with correct actor and IP.
+- Security tests: rate limit triggers; payload size exceeded returns 413.
+- OTel: local collector receives spans; traces visible in Jaeger/Tempo; logs include trace_id.
+- Health checks fail when DB down; readiness gating in Kubernetes simulated locally via compose.
+
+# Subtasks:
+## 1. Audit log schema and persistence layer [pending]
+### Dependencies: None
+### Description: Create audit_log table/model and a persistence service to store audit events.
+### Details:
+- Add Prisma model audit_log: {id cuid, userId?, action, entityType?, entityId?, metadata Json, ip?, ua?, createdAt default now}
+- Create indexes: createdAt, userId, (entityType, entityId), action; consider partial index on recent window
+- Generate migration and update Prisma client
+- Implement AuditLogService with create() and query helpers; validate payload size and JSON safety
+- Document retention policy knobs (TTL/archival future)
+
+## 2. Request context for IP, UA, user [pending]
+### Dependencies: None
+### Description: Capture IP/UA/user and expose via request-scoped context.
+### Details:
+- Add middleware to read IP (X-Forwarded-For aware), UA, and authenticated userId
+- Provide a request-scoped provider using AsyncLocalStorage or nestjs-cls to access these values anywhere
+- Persist a requestId (header x-request-id or generated) for correlation
+- Sanitize/normalize IP formats (IPv4/IPv6) and truncate UA length
+
+## 3. AuditInterceptor for mutating actions [pending]
+### Dependencies: 10.1, 10.2
+### Description: Implement interceptor to record audit events after successful mutations.
+### Details:
+- Create Nest interceptor that runs on POST/PUT/PATCH/DELETE or via @AuditAction decorator
+- Derive action, entityType, and entityId from route/handler metadata or params
+- On success, call AuditLogService.create with userId, ip, ua, and optional metadata (diffs, payload keys only)
+- Ensure no PII leakage in metadata; redact known fields
+- Register globally or bind to mutating controllers
+
+## 4. Global input validation and payload limits [pending]
+### Dependencies: None
+### Description: Harden validation with zod strict schemas, payload size limits, and rich-text sanitization.
+### Details:
+- Integrate zod with strict() and stripUnknown; return consistent 400 errors
+- Configure Fastify JSON/body limit (e.g., 1MB) and return 413 on exceed
+- Implement server-side rich-text sanitization (isomorphic-dompurify) with safe allowlists
+- Add centralized validation pipe and error formatter with correlation/requestId
+
+## 5. Rate limiting (global, per-IP, per-user) [pending]
+### Dependencies: None
+### Description: Configure global and fine-grained rate limits with Fastify.
+### Details:
+- Install and configure @fastify/rate-limit with Redis store if available
+- Global per-IP limits with sensible window; exclude /health and /metrics
+- Per-user limiter guard/decorator for sensitive routes (keyed by userId; fallback to IP)
+- Standardize 429 response shape and headers; add config knobs via env
+
+## 6. Security headers and TLS enforcement [pending]
+### Dependencies: None
+### Description: Apply helmet, HSTS, CSP, strict CORS, and HTTPS behind proxy.
+### Details:
+- Enable trust proxy and enforce HTTPS redirect (except health/metrics if needed)
+- Add helmet with HSTS and robust CSP; parameterize by env (dev relaxed, prod strict)
+- Configure CORS with explicit origin allowlist and credential policy
+- Add referrer-policy, x-content-type-options, frameguard, and permissions-policy
+
+## 7. OpenTelemetry SDK and exporters [pending]
+### Dependencies: None
+### Description: Set up tracing/metrics auto-instrumentation and OTLP export.
+### Details:
+- Install @opentelemetry/sdk-node, auto-instrumentations, OTLP trace exporter
+- Instrument HTTP/Nest, PostgreSQL, Redis; set resource attrs (service.name, version)
+- Configure sampler (e.g., parentbased_traceidratio via env) and batch processor
+- Export to local/remote collector (OTLP gRPC/HTTP) with env-driven endpoint and auth
+
+## 8. Pino JSON logging with trace correlation [pending]
+### Dependencies: 10.7
+### Description: Configure structured logs and include trace_id/span_id for correlation.
+### Details:
+- Integrate pino/pino-http with Fastify/Nest and redact sensitive fields
+- Enrich logs with requestId, userId, ip, ua from request context
+- Pull trace_id/span_id from OTel context; add log level bindings per env
+- Pretty printing in dev; ship JSON in prod; ensure log lines are single-line JSON
+
+## 9. Prometheus /metrics endpoint [pending]
+### Dependencies: None
+### Description: Expose process and business metrics using prom-client.
+### Details:
+- Initialize prom-client default metrics and collect GC/event loop stats
+- Add /metrics route with text/plain; guard with IP allowlist or auth if needed
+- Define custom business metrics (e.g., tasks_created_total, rate_limit_hits_total)
+- Add histogram/timers for HTTP latency; label with method, route, status
+
+## 10. Health checks (liveness/readiness) [pending]
+### Dependencies: None
+### Description: Implement /health with readiness for DB/Redis/MinIO and liveness.
+### Details:
+- Use @nestjs/terminus (or @godaddy/terminus) to define checks
+- DB: Prisma $queryRaw SELECT 1; Redis: PING; MinIO/S3: list bucket or head bucket
+- Readiness returns 503 on dependency failure; liveness cheap/no-op
+- Add shutdown hooks (onSignal/beforeShutdown) and configurable timeouts
+
+## 11. Secrets and config validation; block unsafe defaults [pending]
+### Dependencies: None
+### Description: Validate environment configuration and prevent default credentials.
+### Details:
+- Define zod schema for process.env (DB URLs, OTLP, JWT secrets, CORS origins, rate limits)
+- Fail fast on missing/weak secrets; require HTTPS in prod
+- Add startup check to reject known default admin/passwords
+- Centralize config access via a ConfigService wrapper with typed getters
+
+## 12. Test suite and CI for cross-cutting concerns [pending]
+### Dependencies: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11
+### Description: Add unit/e2e tests and CI wiring for audit, limits, validation, OTel, health, and metrics.
+### Details:
+- Audit: assert create/update/delete emit rows with correct actor/ip/ua
+- Security: trigger 429 and verify headers; payload > limit returns 413
+- OTel: spans exported to local collector; logs include trace_id
+- Health: readiness fails when DB/Redis/MinIO down; metrics endpoint exposes counters
+- Integrate testcontainers (Postgres, Redis, MinIO, optional otel-collector); add CI jobs
+

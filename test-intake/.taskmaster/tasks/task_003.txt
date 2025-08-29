@@ -1,0 +1,124 @@
+# Task ID: 3
+# Title: Authentication (JWT, OAuth2/SSO-ready) and RBAC Guards
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Implement secure auth with session/JWT, prepare SSO integration hooks, and role-based access control using CASL.
+# Details:
+Libraries:
+- @nestjs/passport 10.x, passport 0.6.x, passport-jwt 4.x
+- For OAuth2: passport-oauth2 1.x; for OIDC: passport-openidconnect 0.2.x (wire later to Auth0/Okta)
+- Optional SAML SSO (Phase 2/3): passport-saml 3.x
+- Password hashing: argon2 0.31.x
+- RBAC: @casl/ability 6.x, nest-casl or custom AbilityFactory
+- MFA: TOTP via speakeasy 2.x; WebAuthn later via @simplewebauthn/server 10.x
+
+Implementation:
+- AuthModule with strategies: Local (optional), JWT (access/refresh), OAuth callback endpoints (/auth/oauth/callback)
+- Token management: short-lived access (15m) + refresh (7d) with rotation and revocation list in Redis.
+- Session-less APIs using Authorization: Bearer tokens. CSRF not needed for API; if cookie-based in web, set SameSite=Lax and CSRF token.
+- RBAC: Define abilities per Role (ADMIN, MANAGER, USER) with project/team scoping. Inject Ability into controllers via guards.
+
+Pseudo-code (AbilityFactory):
+export function defineAbilityFor(user: User) {
+  return new AbilityBuilder(createMongoAbility).can('read', 'Project', { teamId: { $in: user.teamIds } });
+}
+
+Nest Guard example:
+@Injectable() class PoliciesGuard implements CanActivate { /* check req.user ability vs. handler metadata */ }
+
+Security headers: helmet; CORS configured for web origin.
+
+Frontend integration: Next.js route handlers use next-auth optional; or custom fetch with token storage in httpOnly cookies.
+
+
+# Test Strategy:
+- Unit tests for strategies (mock userService) with Jest.
+- E2E tests: login, refresh, revoke; 401/403 on protected endpoints.
+- RBAC tests: ensure USER cannot access other teams' projects; MANAGER can manage team resources; ADMIN full access.
+
+# Subtasks:
+## 1. Scaffold AuthModule, Config, and Prisma User Repository [pending]
+### Dependencies: None
+### Description: Initialize NestJS AuthModule, configuration, and Prisma integration with a User repository.
+### Details:
+Tasks: create AuthModule; integrate ConfigModule for env validation (JWT_ACCESS_SECRET/PRIVATE_KEY, JWT_REFRESH_SECRET/PRIVATE_KEY, TOKEN_ISSUER, TOKEN_AUDIENCE, ACCESS_TTL=15m, REFRESH_TTL=7d, REDIS_URL, FEATURE_LOCAL_AUTH, COOKIE_MODE); wire PrismaService; implement UserRepo with methods: findByEmail, findById, updateLastLogin, setMfaSecret, enableMfa, disableMfa, upsertOAuthUser, storeRefreshSession, revokeRefreshSession(s). Define Prisma User fields: id, email, passwordHash (nullable if SSO), roles (enum[]: ADMIN|MANAGER|USER), teamIds (string[]), oauthProvider, oauthSubject, mfaEnabled (bool), mfaSecret (encrypted), createdAt, updatedAt. Ensure module exports services required by other modules.
+
+## 2. Optional Local Auth with Argon2 Password Hashing [pending]
+### Dependencies: 3.1
+### Description: Implement Local strategy (feature-flagged) and secure password hashing/verification using argon2.
+### Details:
+Use argon2 v0.31.x (argon2id). Parameters: memoryCost ~ 64-128MB, timeCost 2-3, parallelism 1; store encoded hash. Implement LocalStrategy via passport-local; AuthService.validateLocal(email, password) with timing-safe verification. Add optional registration or seed utility for test users. Enforce password policy (min length 10, complexity basic). Feature flag: FEATURE_LOCAL_AUTH=true enables /auth/login local flow.
+
+## 3. JWT Access/Refresh Token Service and Strategies [pending]
+### Dependencies: 3.1
+### Description: Create JWT token generation/verification with Passport strategies for access and refresh tokens.
+### Details:
+Use @nestjs/jwt + passport-jwt 4.x. Access token: exp 15m; Refresh token: exp 7d; include jti for rotation. Claims: sub (userId), roles, teamIds hash/version, iat, exp, iss, aud, jti. Prefer RS256 (provide PRIVATE_KEY/PUBLIC_KEY); fallback HS256 with strong secrets. Implement AccessTokenStrategy (AuthGuard('jwt')) and RefreshTokenStrategy (AuthGuard('jwt-refresh')) with extractors from Authorization: Bearer and optionally cookies. Provide JwtService wrapper to sign/verify with configured issuer/audience.
+
+## 4. Redis-backed Refresh Token Rotation and Revocation [pending]
+### Dependencies: 3.3
+### Description: Implement secure refresh token rotation, storage, and revocation via Redis.
+### Details:
+Use ioredis or @nestjs-modules/ioredis with REDIS_URL. Store refresh sessions keyed by user and family: auth:rt:<userId>:<jti> => {familyId, ua, ip, exp}. On refresh: verify existing jti, issue new jti, atomically revoke old, store new, and prevent reuse (reuse detection triggers family revoke). Implement logout to revoke current jti; support revoke-all for user. TTLs align with exp+grace. Track device metadata (ip, ua) for session management.
+
+## 5. Core Auth Endpoints (/auth/login, /auth/refresh, /auth/logout, /auth/me) [pending]
+### Dependencies: 3.2, 3.3, 3.4
+### Description: Expose primary authentication REST endpoints with DTO validation and rate limiting.
+### Details:
+Controllers & DTOs: POST /auth/login {email,password,mfaCode?}; POST /auth/refresh (from cookie or Authorization: Bearer <refresh>); POST /auth/logout; GET /auth/me. On login: validate local or SSO-mapped user, enforce MFA if enabled, issue access+refresh, set httpOnly cookies if COOKIE_MODE=true (SameSite=Lax, Secure, Path=/, domain via config). On refresh: rotate tokens via Redis; return new pair. On logout: revoke current refresh jti. Apply validation (class-validator/zod), and per-IP rate limit for login. Return minimal user profile in /me.
+
+## 6. JWT Guard for Bearer Authentication [pending]
+### Dependencies: 3.3
+### Description: Provide a reusable JwtAuthGuard and public-route decorator for session-less APIs.
+### Details:
+Create JwtAuthGuard extending AuthGuard('jwt') to read tokens from Authorization header (and cookies when enabled). Implement @Public() decorator to bypass guard. Attach req.user from token payload and load fresh user from DB if needed. Handle 401/403 responses consistently. Prepare request-scoped injection of Ability later.
+
+## 7. OAuth2/OIDC Strategy Stubs and /auth/oauth/callback Wiring [pending]
+### Dependencies: 3.1, 3.3, 3.5
+### Description: Add stubs for passport-oauth2 and passport-openidconnect with a unified callback handler.
+### Details:
+Implement strategy stubs (no provider specific config yet) using passport-oauth2 1.x and passport-openidconnect 0.2.x. Routes: GET /auth/oauth/:provider, GET/POST /auth/oauth/callback. Validate state/nonce; normalize profile; map or upsert user (oauthProvider, oauthSubject). Issue JWTs via AuthService and optionally set cookies. Leave placeholders for Auth0/Okta envs (AUTH0_DOMAIN, OKTA_ISSUER, CLIENT_ID/SECRET). Ensure sessionless flow.
+
+## 8. MFA TOTP Scaffolding Endpoints [pending]
+### Dependencies: 3.5, 3.6
+### Description: Provide endpoints to generate, verify, enable, and disable TOTP-based MFA.
+### Details:
+Use speakeasy 2.x. Endpoints: POST /auth/mfa/totp/setup (returns base32 secret + otpauth URL), POST /auth/mfa/totp/verify {token}, POST /auth/mfa/totp/disable. Store secret encrypted at rest (e.g., using app key) and mark mfaEnabled on successful verification with two valid consecutive codes. During login, require mfaCode if mfaEnabled. Apply rate limits and lockout after repeated failures.
+
+## 9. CASL AbilityFactory with Role and Team/Project Scoping [pending]
+### Dependencies: 3.1
+### Description: Define role-based permissions using @casl/ability with team/project scoping.
+### Details:
+Implement AbilityFactory using AbilityBuilder(createMongoAbility). Roles: ADMIN -> manage all; MANAGER -> manage Team and Projects where teamId in user.teamIds; USER -> read Team/Projects where teamId in user.teamIds, manage own resources. Example: can('read','Project',{teamId:{$in:user.teamIds}}). Define subjects and types; export provider to build ability per request user.
+
+## 10. Policy Decorators and PoliciesGuard Integration [pending]
+### Dependencies: 3.6, 3.9
+### Description: Create decorators and a PoliciesGuard to enforce CASL policies in controllers.
+### Details:
+Add @CheckPolicies((ability)=>...) decorator to attach metadata. Implement PoliciesGuard (CanActivate) to build ability from req.user via AbilityFactory and evaluate handler policies. Provide helper to infer subject from route params/body. Optionally add interceptor to inject ability into request scope for services.
+
+## 11. Security Headers, CORS, and Token Transport Configuration [pending]
+### Dependencies: 3.1, 3.3
+### Description: Configure helmet, CORS for web origin, and cookie vs header token transport options.
+### Details:
+Enable helmet with sensible defaults; configure HSTS in production behind proxy; restrict CORS to allowed origins from env (supports Next.js app). If COOKIE_MODE=true, set httpOnly, Secure, SameSite=Lax cookies and require CSRF token for mutating browser requests; otherwise use Authorization: Bearer. Document and implement toggles for frontend integration (next-auth or custom fetch).
+
+## 12. Unit Tests for Strategies and RBAC Guards [pending]
+### Dependencies: 3.2, 3.3, 3.6, 3.9, 3.10
+### Description: Write Jest unit tests for Local/JWT strategies and CASL guard logic.
+### Details:
+Mock Prisma and Redis. Tests: LocalStrategy validate (success, bad password, mfa required); JWT strategies (valid, expired, wrong issuer/audience); JwtAuthGuard behavior (public routes, missing token); AbilityFactory rules per role; PoliciesGuard allows/denies correctly. Snapshot token payload shape (sans secrets).
+
+## 13. E2E Tests for Login, Refresh/Rotation, Logout, and RBAC [pending]
+### Dependencies: 3.4, 3.5, 3.6, 3.9, 3.10, 3.11
+### Description: Create Supertest-based E2E tests covering core auth flows and authorization denials.
+### Details:
+Spin up Nest app with test Redis. Seed users/teams/projects. Scenarios: login -> access protected endpoint; refresh rotates tokens and old jti reuse blocked; logout revokes session; cookie and header modes; 401/403 on protected routes; RBAC: USER blocked across teams, MANAGER manages team resources, ADMIN full access. Include /auth/me and basic MFA happy path if enabled.
+
+## 14. Documentation for Auth Architecture, Token Models, and SSO Readiness [pending]
+### Dependencies: 3.3, 3.4, 3.5, 3.7, 3.8, 3.9, 3.10, 3.11
+### Description: Author developer docs covering APIs, flows, claims, lifetimes, rotation, and integration notes.
+### Details:
+Produce README/ADR: architecture diagram; token claims (sub, roles, teamIds, jti, iss, aud), lifetimes (15m/7d), rotation/revocation process, Redis keys, cookie vs header guidance, CSRF notes, security headers, Next.js integration (next-auth or custom), OAuth/OIDC wiring and provider hookup steps (Auth0/Okta), MFA TOTP setup. Include env var reference and example requests/responses.
+

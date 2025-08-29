@@ -1,0 +1,146 @@
+# Task ID: 6
+# Title: Real-time Updates, Notifications, and In-App Activity Feed
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Provide sub-100ms real-time updates for task/project events via WebSockets and basic notification system with digest emails.
+# Details:
+Libraries:
+- @nestjs/websockets 10.x with socket.io 4.7.x + socket.io-redis-adapter for horizontal scaling
+- Email: nodemailer 6.x + Mailhog in dev
+- Rate-limiting: @nestjs/throttler 6.x or fastify-rate-limit 8.x
+
+Implementation:
+- Gateway: /ws authenticated via JWT during connection (query token or auth header upgrade)
+- Rooms: project:<id>, user:<id> for targeted events
+- Emit events on task create/update/comment/time tracking start/stop
+- Notifications table: {id, userId, type, payload, readAt}
+- Email digest job (BullMQ in Task 9) to send periodic updates
+
+Pseudo-code (emit):
+this.server.to(`project:${projectId}`).emit('task.updated', { id, changes });
+
+Security:
+- Validate room join authorization via RBAC.
+- Backpressure: enable max http buffer size; limit events per client.
+
+
+# Test Strategy:
+- WebSocket E2E tests with socket.io-client asserting receipt after REST changes.
+- Load test with autocannon/k6: 5k concurrent connections, event fan-out latencies under target.
+- Unit tests for notification preferences and rate limits.
+
+# Subtasks:
+## 1. WebSocket Gateway with JWT Authentication [pending]
+### Dependencies: None
+### Description: Create NestJS WebSocket gateway at /ws with socket.io and JWT auth on connection.
+### Details:
+- Use @nestjs/websockets 10.x with socket.io 4.7.x; namespace/path: /ws
+- Accept JWT via Authorization header on upgrade or query param token; verify and attach user to socket.data.user
+- Configure CORS and transports; prefer websocket, allow polling fallback if needed
+- Reject connection with clear error event on invalid/expired token
+- Provide basic connected/heartbeat events; expose server instance via DI
+
+## 2. Room Model and RBAC Join/Leave [pending]
+### Dependencies: 6.1
+### Description: Implement project:<id> and user:<id> rooms with authorization checks.
+### Details:
+- On connect, auto-join user:<userId>
+- Implement subscribe.project and unsubscribe.project events; validate via RBAC (CASL Ability) that user can read the project before joining project:<id>
+- Server-side leave all rooms on disconnect; ensure no leakage across tenants
+- Add guards to prevent joining arbitrary rooms; validate IDs are UUID/number as applicable
+
+## 3. Emit Real-time Events from Domain Services [pending]
+### Dependencies: 6.1, 6.2
+### Description: Wire task/project/comment/time tracking services to emit socket events to rooms.
+### Details:
+- Hook into create/update/delete/comment/time start/stop flows to emit events
+- Event names: task.created, task.updated, task.commented, task.deleted, project.updated, time.started, time.stopped
+- Payload: minimal, containing ids, changes, actorId, timestamps
+- Target rooms: project:<projectId> for project-related events; user:<userId> for direct mentions/assignments
+- Ensure idempotent emission and error handling does not affect primary transaction
+
+## 4. Notifications Persistence Layer [pending]
+### Dependencies: 6.3
+### Description: Create notifications table and service to store/read/mark notifications.
+### Details:
+- Table: notifications { id (uuid), userId, type (text/enum), payload (jsonb), readAt (timestamp null), createdAt }
+- Indexes: (userId, readAt asc, createdAt desc)
+- Service methods: createForUsers, listByUser({unreadOnly, limit, cursor}), markRead(id, userId), markAllRead(userId)
+- Map emitted events to notification types (e.g., task.assigned, task.commented)
+- Basic preference stub (enabled true by default) for future expansion
+
+## 5. Notifications REST API [pending]
+### Dependencies: 6.4
+### Description: Expose endpoints to list notifications and mark read/unread.
+### Details:
+- GET /notifications?unreadOnly=&limit=&cursor= (auth required)
+- PATCH /notifications/:id/read (mark read); POST /notifications/read-all
+- Cursor-based pagination using createdAt,id tie-breaker
+- Return consistent shape: { items: [...], nextCursor }
+- Enforce RBAC so users can only access their notifications
+
+## 6. Email Digest Job with Nodemailer [pending]
+### Dependencies: 6.4
+### Description: Implement digest email processor to send periodic updates using nodemailer.
+### Details:
+- Use BullMQ queue 'email-digest' (scheduler wiring handled in Task 9); add processor to aggregate unread notifications per user since last digest
+- Render simple text/HTML email; in dev send via nodemailer 6.x to Mailhog
+- Store lastDigestAt per user or maintain a digest watermark to avoid duplicates
+- Configurable cadence (hourly/daily) via environment; skip users with zero notifications or opted-out
+
+## 7. Socket.io Redis Adapter for Horizontal Scaling [pending]
+### Dependencies: 6.1
+### Description: Enable socket.io-redis-adapter to support multi-instance deployments.
+### Details:
+- Integrate @socket.io/redis-adapter with ioredis; use REDIS_URL env
+- Apply adapter to gateway; verify room join/leave and broadcast work across instances
+- Provide local docker-compose to spin 2 app instances + Redis for manual verification
+- Handle graceful shutdown and reconnect strategies
+
+## 8. Throttling, Rate Limits, and Backpressure [pending]
+### Dependencies: 6.1
+### Description: Protect gateway and clients with rate limits and buffer controls.
+### Details:
+- Configure maxHttpBufferSize and per-message size limits
+- Implement per-socket event rate limiting (e.g., 20 msgs/10s) and subscription caps; emit error events when exceeded
+- Use @nestjs/throttler for REST where applicable and custom middleware/guard for WS events
+- Drop/queue strategy for high load; track and log dropped messages per client
+
+## 9. E2E Tests for Real-time Events [pending]
+### Dependencies: 6.1, 6.2, 6.3
+### Description: Add socket.io-client E2E tests to assert event receipt after CRUD actions.
+### Details:
+- Spin app with Postgres and Redis (testcontainers)
+- Obtain JWT, connect to /ws, subscribe to project:<id>
+- Perform REST actions (create/update task, add comment, start/stop time) and assert corresponding events received
+- Measure latency between REST response and event reception; assert median < 100ms under test env
+- Negative tests: invalid JWT rejected; unauthorized project subscription denied
+
+## 10. Load and Fan-out Testing [pending]
+### Dependencies: 6.1, 6.7, 6.8
+### Description: Create k6/autocannon scripts to simulate 5k concurrent sockets and fan-out.
+### Details:
+- Provision scripts to open thousands of WS connections and subscribe to rooms
+- Trigger events to rooms with 1k+ members; capture end-to-end delivery latency distribution
+- Ensure rate limits configured to not interfere with synthetic load (override via env)
+- Document setup and success criteria: p50<100ms, p95<200ms for fan-out
+
+## 11. Observability and Metrics for Real-time System [pending]
+### Dependencies: 6.1, 6.3, 6.7
+### Description: Add metrics, logs, and traces for connections and event fan-out.
+### Details:
+- Expose Prometheus metrics: ws_connections_total, ws_connections_active, ws_messages_emitted_total, ws_messages_dropped_total; histograms for emit_latency_ms and fanout_latency_ms
+- Add per-room membership gauges and adapter-level metrics (Redis pub/sub ops)
+- OpenTelemetry spans around event production and emission; propagate correlation IDs from HTTP to WS
+- Structured logs for rate limit violations and auth failures
+
+## 12. Client Integration Docs and Examples [pending]
+### Dependencies: 6.1, 6.2, 6.3, 6.5
+### Description: Produce documentation and examples for subscribing and handling events.
+### Details:
+- Describe auth handshake (query vs header), reconnect/backoff, and error handling
+- List event names and payload shapes; show joining user and project rooms safely
+- Provide JS/TS snippet using socket.io-client; include REST notifications usage and marking read
+- Note scaling behavior with Redis adapter and rate limit guidelines; troubleshooting tips
+

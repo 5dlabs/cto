@@ -1,0 +1,175 @@
+# Task ID: 9
+# Title: Automation & Workflow Foundation (Rules Engine, Jobs, Webhooks, SLA Alerts)
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Create a lightweight automation engine to run rules on events, background job processing, outbound webhooks, and SLA timers.
+# Details:
+Libraries:
+- BullMQ 4.x (Redis) for queues; @nestjs/bullmq integration
+- Rules: json-rules-engine 5.x or custom simple evaluator
+- Webhooks: sign payloads with HMAC-SHA256; retry with exponential backoff
+
+Features:
+- Rules model: {id, name, scope: 'project'|'global', triggers:['task.created','task.updated'], conditions: JSON, actions: JSON}
+- Actions supported MVP: add comment, change status, assign user, send webhook, notify user
+- SLA timers: on task creation, if dueDate set, schedule job to check breach and notify
+
+Pseudo-code (rule evaluate):
+engine.addRule({ conditions, event: { type: 'fire', params: actions } });
+const facts = { task, project, user };
+engine.run(facts).then(({ events }) => events.forEach(runAction));
+
+BullMQ queues: 'events', 'emails', 'webhooks', 'sla'; workers with concurrency tuned; Redis TLS in prod.
+Security: store webhook secrets per integration; sign payloads: X-Signature: sha256=...
+
+
+# Test Strategy:
+- Unit: condition evaluation given facts; action runner side effects mocked.
+- Integration: enqueue task.updated, verify matching rules fire and produce expected changes.
+- Webhooks: signature verification test with sample secret; retry/backoff validated.
+- SLA: schedule job and simulate time advancing (fake timers) -> breach notification created.
+
+# Subtasks:
+## 1. BullMQ and NestJS integration with core queues [pending]
+### Dependencies: None
+### Description: Set up BullMQ 4.x with @nestjs/bullmq, Redis connection (TLS in prod), and define core queues: events, emails, webhooks, sla.
+### Details:
+- Install and configure BullMQ 4.x and @nestjs/bullmq.
+- Configure Redis connection via env (REDIS_URL, REDIS_TLS=true in prod) with health checks.
+- Register queues: events, emails, webhooks, sla; create process handlers scaffolding and concurrency defaults.
+- Add global queue options (removeOnComplete/Fail, attempts defaults where sensible).
+- Provide a health endpoint and a smoke test route to enqueue and process a dummy job on each queue.
+- Acceptance: All queues connect successfully; smoke jobs are processed; metrics/logs confirm worker startup.
+
+## 2. Rules model and CRUD API [pending]
+### Dependencies: None
+### Description: Define Rules entity and implement CRUD endpoints with validation and scoping.
+### Details:
+- Data model fields: id, name, scope ('project'|'global'), projectId (nullable when global), triggers (array), conditions (JSON), actions (JSON), isActive (boolean), createdAt, updatedAt.
+- Input validation for triggers, conditions, actions; enforce allowed action types (add_comment, change_status, assign_user, send_webhook, notify_user).
+- Endpoints: list (filter by scope/project), get, create, update, delete, toggle active.
+- Authorization: only admins or project admins can manage rules; scope enforcement.
+- Acceptance: CRUD works with validation; rules persisted and retrievable; isActive respected.
+
+## 3. Event publisher into 'events' queue [pending]
+### Dependencies: 9.1
+### Description: Publish domain events from task/project services to the events queue with a stable schema.
+### Details:
+- Define event schema: { id, type: 'task.created'|'task.updated'|..., occurredAt, actorId, projectId, taskId?, payload }.
+- Hook into task/project create/update/comment flows to publish events.
+- Use deterministic jobId (e.g., event id) to avoid duplicates; set minimal retry policy.
+- Include correlationId/requestId for tracing.
+- Acceptance: Creating/updating a task enqueues a well-formed event visible in the events queue.
+
+## 4. Rules evaluation service using json-rules-engine [pending]
+### Dependencies: 9.1, 9.2
+### Description: Implement evaluator that loads matching rules by scope/trigger and evaluates against facts {task, project, user}.
+### Details:
+- Integrate json-rules-engine 5.x; wrap with a service that maps stored conditions/actions to engine rules.
+- Fact builder: load minimal task, project, user facts needed by conditions; avoid N+1 queries.
+- Evaluation flow: for an event, fetch active rules with matching trigger and scope; run engine; collect fired actions.
+- Error handling and timeouts per evaluation to protect workers.
+- Acceptance: Given seeded rules and sample facts, evaluator returns expected actions deterministically.
+
+## 5. Action runners implementation [pending]
+### Dependencies: 9.4
+### Description: Implement handlers for add comment, change status, assign user, notify user, and enqueue webhook send.
+### Details:
+- Define a unified ActionRunner with type-dispatched handlers.
+- add_comment: create comment linked to task; include system actor and message template support.
+- change_status: transition task status with validation of allowed states.
+- assign_user: set assignee if permitted and not already assigned.
+- notify_user: enqueue email or in-app notification.
+- send_webhook: enqueue job in webhooks queue with target URL, payload, headers.
+- Idempotency: compute actionKey per rule firing to skip duplicates on retries.
+- Acceptance: Each action updates state or enqueues follow-up jobs correctly and idempotently.
+
+## 6. Webhook delivery with HMAC-SHA256 and retries [pending]
+### Dependencies: 9.1, 9.5
+### Description: Deliver outbound webhooks with signed payloads and exponential backoff retries.
+### Details:
+- Store per-integration secret securely; do not log secrets.
+- Compute signature: X-Signature: sha256=<hex(hmac(secret, rawBody))>; include X-Event-Type and X-Request-Id.
+- Implement webhooks worker: POST JSON with timeout, follow redirects disabled, TLS verification enabled.
+- Retry policy: exponential backoff with jitter (e.g., base 2s, max 1h, up to 7 attempts); respect 4xx vs 5xx (no retry on 410/422).
+- Record delivery attempts/status for observability.
+- Acceptance: Webhook recipients can verify signature; failures retry per policy; successes recorded.
+
+## 7. SLA timers scheduling and breach checks [pending]
+### Dependencies: 9.1, 9.5
+### Description: Schedule SLA jobs on task creation and check for due-date breaches, then notify/mark.
+### Details:
+- On task.created with dueDate, schedule delayed job in sla queue at dueDate.
+- SLA worker: at execution, reload task; if not completed and dueDate passed, mark as breached and notify responsible users.
+- Optional grace period config; reschedule if dueDate changed.
+- Idempotent operations on repeated executions.
+- Acceptance: Tasks with due dates schedule jobs; breaches trigger notify actions only once.
+
+## 8. Concurrency, rate limiting, and idempotency safeguards [pending]
+### Dependencies: 9.1, 9.5, 9.6, 9.7
+### Description: Tune worker concurrency, set rate limits, and enforce idempotency to prevent duplicate side effects.
+### Details:
+- Configure per-queue concurrency based on workload; use BullMQ limiter to throttle external calls (webhooks, emails).
+- Use deterministic jobId and dedup keys for actions and deliveries; store processed action keys to skip duplicates.
+- Add transactional guards around state-changing actions.
+- Implement dead-letter handling and retry limits to avoid poison message loops.
+- Acceptance: Load tests show no duplicate actions under retries; external calls respect rate limits.
+
+## 9. Admin tooling to enable/disable rules [pending]
+### Dependencies: 9.2
+### Description: Provide endpoints and minimal UI hooks to toggle rules on/off and view last fired metadata.
+### Details:
+- API: PATCH /rules/:id { isActive } with audit logging of actor/time.
+- Store lastFiredAt, lastResult summary for visibility.
+- Optional admin UI stubs or admin-only endpoints returning rule stats.
+- Acceptance: Admin can enable/disable rules; evaluator respects isActive immediately.
+
+## 10. Observability for jobs and automation [pending]
+### Dependencies: 9.1, 9.3, 9.5, 9.6, 9.7
+### Description: Add metrics, structured logs, and dashboards for queues, rules firing, and deliveries.
+### Details:
+- Expose Prometheus metrics: queue_depth, job_latency, job_duration, webhook_attempts, webhook_failures, rules_fired, actions_applied, sla_scheduled, sla_breaches.
+- Structured logs with correlationId and eventId; sample failure payloads safely.
+- Add dead-letter and failed job inspection; optional bull-board for dev.
+- Health/readiness probes reflect Redis connectivity and worker liveness.
+- Acceptance: Metrics endpoints reflect real activity; failed jobs are inspectable; logs include correlation IDs.
+
+## 11. Unit tests for evaluator and action runners [pending]
+### Dependencies: 9.4, 9.5, 9.6
+### Description: Create unit tests covering condition evaluation and each action handler with side effects mocked.
+### Details:
+- Evaluator tests: given facts and rules, assert expected actions; cover edge cases (missing facts, invalid conditions).
+- Action tests: mock repositories and external clients; assert idempotency behavior and validation errors.
+- Webhook signing unit test: header format and signature computation.
+- Acceptance: >90% coverage on evaluator/actions modules; tests pass reliably.
+
+## 12. End-to-end integration tests for rule firing [pending]
+### Dependencies: 9.1, 9.3, 9.4, 9.5
+### Description: Test full flow from event enqueue to actions applied using a real Redis and workers.
+### Details:
+- Spin up Redis via testcontainers; start Nest app with workers enabled.
+- Seed rules; perform task update/create; await queue drains; assert state changes and enqueued follow-ups.
+- Include cases for multiple matching rules, conflicting actions resolved deterministically.
+- Acceptance: E2E tests demonstrate rules are fired and actions executed as expected.
+
+## 13. Webhook signature verification and retry tests [pending]
+### Dependencies: 9.6
+### Description: Validate HMAC signature correctness and retry/backoff behavior under failure scenarios.
+### Details:
+- Use a mock HTTP server to capture requests and verify X-Signature against known secret and raw body.
+- Simulate 5xx/timeout responses to assert exponential backoff schedule and max attempts.
+- Ensure no retries on specific 4xx (e.g., 410/422) and that jitter is applied within bounds.
+- Acceptance: Tests confirm correct signature and retry logic across scenarios.
+
+## 14. Documentation for events, rules, actions, webhooks, and SLAs [pending]
+### Dependencies: 9.3, 9.4, 9.5, 9.6, 9.7, 9.10
+### Description: Author developer docs for event schema, rule structure, supported actions, webhook signing, and SLA behavior.
+### Details:
+- Document event types and payload schema; include facts available to rules.
+- Specify rules JSON shapes with examples; list supported actions and required fields.
+- Describe webhook delivery, headers, signing algorithm, and retry policy for consumers.
+- Explain SLA scheduling and breach detection.
+- Include operational runbooks: scaling workers, inspecting failures, and metrics glossary.
+- Acceptance: Docs reviewed and published; internal consumers can self-serve integrations.
+

@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-29T18:38:42.681Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Monorepo Bootstrap, Tooling, and Local Dev Environment",
+			"complexityScore": 7,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Break this into concrete steps for a new repo with no existing code: 1) Initialize pnpm 9 workspace at root with engines>=20.10 and turbo 2 pipeline (build/lint/test/dev per spec); 2) Scaffold apps/backend (NestJS 10 + Fastify 4) and apps/web (Next.js 14 App Router, TS) with exact versions; 3) Create packages/shared with TypeScript config and zod primitives; 4) Configure ESLint 9, Prettier 3, TS ESLint across monorepo with base config shared; 5) Set up Husky 9, lint-staged 15, commitlint 18 with conventional commits; 6) Add Dockerfiles for backend/web and infra/docker/compose.yaml including postgres:16, redis:7.2, minio:latest, mailhog, optional keycloak; 7) Create .env, .env.local, .env.example and implement typed env validation via zod in both apps; 8) Wire pino/pino-pretty logging and helmet/CORS defaults; 9) Add GitHub Actions workflow with pnpm cache, lint, test, build jobs; 10) Add dev scripts and Turbo tasks (including cache, outputs); 11) Add health endpoints for backend (GET /health) and basic Next.js page; 12) Write bootstrap README and Makefile/scripts for docker-compose up/down, prisma placeholder, and CI badges. Include acceptance criteria: docker-compose up yields reachable Postgres/Redis/MinIO; web at :3000, backend at :4000; CI green with caches effective.",
+			"reasoning": "Repo appears empty; this is greenfield setup across multiple tools and services but follows standard patterns; no reuse available; moderate integration work."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Database Schema and Prisma Setup",
+			"complexityScore": 7,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Plan and implement: 1) Add prisma and @prisma/client 5.x at workspace root and generate client for backend; 2) prisma init with postgresql provider and DATABASE_URL from .env; 3) Model all entities exactly as specified (relations, indexes, enums, decimals, bigints); 4) Consider cascade behaviors and add @@index/@@unique constraints; 5) Create initial migration npx prisma migrate dev -n init; 6) Seed script to create admin user, sample team, project, tasks; 7) Package.json scripts (prisma:generate, prisma:migrate, prisma:seed); 8) Configure backend PrismaService with proper shutdown hooks and logging; 9) Add integration tests using testcontainers-node to spin Postgres and run CRUD assertions; 10) Prepare CI step to prisma validate and db push against ephemeral DB. Document any raw SQL needed for JSON/trigram indexes.",
+			"reasoning": "Comprehensive schema with many relations and indexes; greenfield with no existing ORM; complexity driven by modeling correctness and migrations; depends on Task 1 groundwork."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Authentication (JWT, OAuth2/SSO-ready) and RBAC Guards",
+			"complexityScore": 8,
+			"recommendedSubtasks": 14,
+			"expansionPrompt": "Deliver an Auth module in NestJS with: 1) User repository integration via Prisma; 2) Argon2 password hashing and local login (optional feature flag); 3) JWT access (15m) + refresh (7d) tokens with rotation; 4) Redis-based refresh token store/revocation; 5) Endpoints: POST /auth/login, POST /auth/refresh, POST /auth/logout, GET /auth/me; 6) Passport JWT strategy for Bearer tokens; 7) OAuth2/OIDC strategy stubs and /auth/oauth/callback wiring (no provider yet); 8) MFA TOTP scaffolding endpoints (generate, verify) gated for later; 9) CASL AbilityFactory with role-based rules and team/project scoping; 10) Guards/interceptors to inject ability and enforce policies; 11) CORS/helmet config and cookie vs header token options; 12) Unit tests for strategies and guards; 13) E2E tests for login/refresh/revoke and RBAC denials; 14) Docs for token structure, lifetimes, and rotation.",
+			"reasoning": "Security-sensitive feature set with token rotation, Redis, and RBAC via CASL; no existing auth; integration across controllers and guards increases complexity."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Core Task Management API (CRUD, Subtasks, Dependencies, Time Tracking, Attachments)",
+			"complexityScore": 9,
+			"recommendedSubtasks": 16,
+			"expansionPrompt": "Implement a Tasks module: 1) Define zod DTOs with size limits and sanitization for TipTap JSON; 2) Services and controllers for endpoints listed (create/list/update tasks, subtasks, dependencies add/remove, time start/stop, comments create); 3) Enforce business rules: dependency blocks, status transition policy map, estimates validation; 4) Prisma queries with proper includes for dependencies and indices; 5) Time tracking start/stop logic with durationS computation and concurrency safeguards; 6) File presign endpoint using @aws-sdk/client-s3 against MinIO dev; 7) Attachments create and link to tasks; 8) Basic search (ILIKE) with pagination and filters; 9) Swagger decorators and OpenAPI grouping; 10) RBAC guard integration; 11) Input validation errors standardized; 12) Pino logging for key actions; 13) Unit tests for services and edge cases; 14) Integration tests with Postgres and MinIO (testcontainers); 15) Negative tests for invalid transitions/blocked timers; 16) Docs and examples for presigned upload flow.",
+			"reasoning": "Large surface area of endpoints with non-trivial domain rules and storage integration (S3-compatible); greenfield; depends on Tasks 1–3; high coordination across modules."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Project Planning Basics (Projects, Milestones, Gantt Data, Resource & Budget Fields)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Create Projects module: 1) CRUD for Project (POST/PATCH) with validation and RBAC; 2) Milestones CRUD (POST/PATCH/DELETE) with indexes for date queries; 3) GET /projects/:id/gantt to transform tasks into Gantt-friendly data, including dependencies; 4) Compute task start/end from dueDate/estimate defaults; 5) Capacity endpoint GET /teams/:id/capacity?from&to with simple hoursAvailable calc; 6) Budget fields exposed and basic aggregates; 7) Prisma queries optimized with selects/indexes; 8) Unit tests for Gantt transform and capacity math; 9) Contract tests for API shape and pagination; 10) Performance seeds and benchmark under 10k tasks.",
+			"reasoning": "Adds new endpoints but builds atop existing schema; math/transforms are moderate; no complex external integrations needed; relies on 2 and 4."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Real-time Updates, Notifications, and In-App Activity Feed",
+			"complexityScore": 8,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Add realtime/notifications: 1) NestJS Gateway with socket.io, JWT auth on connection; 2) Room model: project:<id>, user:<id>, join/leave with RBAC checks; 3) Emit events on task/project/comment/time changes from services; 4) Persist notifications table and simple read/unread; 5) REST to list/mark notifications; 6) Email delivery via nodemailer to Mailhog; 7) Socket.io Redis adapter scaffold for horizontal scaling; 8) Throttling/rate limits for events; 9) E2E tests with socket.io-client for event receipt on CRUD actions; 10) Load test scripts and config; 11) Observability for event fan-out; 12) Docs for client subscription patterns.",
+			"reasoning": "WebSocket security and correctness, persistence for notifications, and integration with existing mutations; some scaling concerns; dependent on auth and core APIs."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Collaboration: Comments, Mentions, Document Sharing & Versioning",
+			"complexityScore": 7,
+			"recommendedSubtasks": 11,
+			"expansionPrompt": "Enhance collaboration: 1) Extend Comment model for parentCommentId and type (comment/chat); 2) Endpoints for threaded comments list/create; 3) Mentions parsing from TipTap JSON and user resolution; 4) Mention notifications creation and WS broadcast; 5) Project-level document endpoints using Attachment with versioning logic; 6) MIME/type whitelist and size limits; 7) (Optional) virus scanning hook abstraction; 8) Access control via RBAC to team members; 9) Unit tests: mention extraction, versioning; 10) Integration tests: access control, thread retrieval; 11) WS test for project chat flow.",
+			"reasoning": "Builds on schema and WS; moderate parsing/versioning logic; primarily backend with some real-time aspects; leverages prior modules."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Analytics & Reporting MVP (Dashboards, Exports)",
+			"complexityScore": 7,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Create Analytics module: 1) Define endpoints for overview, resource-utilization, budget-vs-actual, and CSV export; 2) Implement Prisma raw SQL or views with CTEs/window functions; 3) Add Redis caching (60–120s) with cache keys by filters; 4) Streaming CSV export with proper headers and memory safety; 5) Pagination and filter validation; 6) RBAC scoping to teams/projects; 7) Unit tests for query builders and caches; 8) Performance test with seeded data; 9) OpenAPI docs and response examples.",
+			"reasoning": "Data-heavy endpoints with SQL complexity and caching; no new infra; depends on accurate schema and time entry data; moderate complexity."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Automation & Workflow Foundation (Rules Engine, Jobs, Webhooks, SLA Alerts)",
+			"complexityScore": 9,
+			"recommendedSubtasks": 14,
+			"expansionPrompt": "Introduce automation: 1) Add BullMQ setup (queues: events, emails, webhooks, sla) with Nest integration; 2) Rules model and CRUD endpoints; 3) Event publisher from task/project services into 'events' queue; 4) Rules evaluation using json-rules-engine (facts: task, project, user); 5) Action runners: add comment, change status, assign user, notify user, send webhook; 6) Webhook signing HMAC-SHA256 and retry/backoff; 7) SLA timers scheduling and breach checks; 8) Concurrency and idempotency safeguards; 9) Admin tooling to enable/disable rules; 10) Observability for jobs; 11) Unit tests for evaluator and actions; 12) Integration tests for end-to-end rule firing; 13) Webhook signature verification tests; 14) Docs for event schema and actions.",
+			"reasoning": "Multiple subsystems (queues, rules engine, webhooks, timers) with side effects and retries; high coordination and test surface; leverages Redis and core APIs."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Security, Compliance Hooks, Audit Logging, and Observability",
+			"complexityScore": 8,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Implement cross-cutting features: 1) AuditInterceptor to record mutating actions to audit_log table; 2) Store IP/UA via request context; 3) Global validation via zod with strict schemas and payload size limits; 4) Fastify rate limits global and per-user for sensitive routes; 5) Security headers (helmet), HSTS, CSP, strict CORS; 6) OpenTelemetry SDK with Nest/HTTP/PG/Redis auto-instrumentations to OTLP; 7) Pino logs with trace_id correlation; 8) Prometheus /metrics with process and custom business metrics; 9) Health checks with @nestjs/terminus for DB/Redis/MinIO; 10) Secrets validation and unsafe default prevention; 11) GDPR placeholders (export/delete stubs) documented; 12) Tests for audit entries, rate limits, 413 handling, OTel span emission, and health readiness.",
+			"reasoning": "Spans multiple concerns that touch most modules; instrumentation and security policy wiring are nuanced; no existing scaffolding; relies on earlier tasks to be in place."
+		}
+	]
+}

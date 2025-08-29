@@ -1,0 +1,187 @@
+# Task ID: 1
+# Title: Monorepo Bootstrap, Tooling, and Local Dev Environment
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Initialize a polyrepo/monorepo baseline for web, backend, and shared packages with modern tooling, containerized dev stack, and CI skeleton.
+# Details:
+Stack and versions (pin or use exact in package.json):
+- Node.js: 20.x LTS (engines >=20.10)
+- Package manager: pnpm 9.x
+- Monorepo: Turborepo 2.x (alternatively Nx—keep Turbo for simplicity)
+- Backend: NestJS 10.x + Fastify 4.x, TypeScript 5.x, ts-node-dev for local
+- Frontend: Next.js 14.x + React 18.x + TypeScript 5.x (App Router)
+- ORM: Prisma 5.x
+- DB: PostgreSQL 15/16 (Docker)
+- Cache/Queues: Redis 7.2 (Docker)
+- Object Storage (attachments): MinIO (S3-compatible) latest (Docker)
+- Lint/Format: ESLint 9.x, Prettier 3.x, Typescript ESLint
+- Testing: Jest 29.x (backend), Vitest 1.x + React Testing Library (frontend), Playwright 1.x (E2E)
+- API Docs: Swagger (NestJS @nestjs/swagger 7.x)
+- Logging: pino/pino-pretty 9.x
+- Git hooks: Husky 9.x + lint-staged 15.x + commitlint 18.x (conventional commits)
+- Containers: Docker + docker-compose for dev
+- CI: GitHub Actions with Node + pnpm cache, build, test, lint
+
+Actions:
+- Create repo structure:
+  - apps/backend (NestJS) 
+  - apps/web (Next.js)
+  - packages/shared (shared types, zod schemas)
+  - infra/docker (compose.yaml for postgres, redis, minio, mailhog, keycloak optional for SSO dev)
+  - .github/workflows/ci.yml
+- Configure pnpm workspaces and turbo.json (pipeline: build, lint, test, dev)
+- Docker compose services: postgres:16, redis:7.2, minio:RELEASE.latest, mailhog, optional keycloak:24
+- Environment management: .env, .env.local, .env.example with typed validation via zod in both apps
+- Security headers: helmet 7.x (backend proxy) and Next.js headers in next.config.js
+
+Pseudo-commands:
+- pnpm dlx create-nest-app backend --package-manager=pnpm --strict --skip-git
+- pnpm dlx create-next-app web --ts --eslint --app --src-dir --tailwind (optional)
+- pnpm add -w -D turbo eslint prettier husky lint-staged @commitlint/{config-conventional,cli}
+- Initialize Husky hooks: pre-commit (lint-staged), commit-msg (commitlint)
+
+Pseudo-code: turbo.json
+{
+  "pipeline": {
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
+    "lint": {},
+    "test": { "dependsOn": ["build"] },
+    "dev": { "cache": false }
+  }
+}
+
+
+# Test Strategy:
+- Validate local dev up with docker-compose up -d and apps connect to Postgres/Redis/MinIO.
+- CI pipeline runs lint/test/build on PR; ensure caching works.
+- Lint/format checks block bad commits via Husky.
+- Verify Next.js dev server (localhost:3000) and NestJS (localhost:4000) respond with health endpoints.
+
+# Subtasks:
+## 1. Initialize pnpm workspace and Turborepo baseline [pending]
+### Dependencies: None
+### Description: Create root workspace with pnpm 9, Node engines >=20.10, and Turborepo 2 pipeline (build/lint/test/dev).
+### Details:
+- Initialize git repo and root package.json (private: true, name, version, packageManager: pnpm@9.x, engines: { node: ">=20.10" }).
+- Enable pnpm via Corepack (corepack enable && corepack prepare pnpm@9.x --activate).
+- Create pnpm-workspace.yaml including apps/* and packages/*.
+- Add dev deps at root: turbo@2.x.
+- Create turbo.json with pipeline: build (dependsOn ^build, outputs dist/** .next/**), lint, test (dependsOn build), dev (cache false).
+- Add .gitignore (.turbo, node_modules, .pnpm-store, dist, .next, coverage, .env*, pnpm-lock.yaml if desired check-in policy decided), .editorconfig.
+- Add tsconfig.base.json with compilerOptions (TS 5) and path aliases for packages/*.
+- Decide on exact dependency pinning policy: set save-exact=true in .npmrc or use pnpm config to pin exact versions.
+
+## 2. Scaffold backend (NestJS+Fastify) and frontend (Next.js) apps [pending]
+### Dependencies: 1.1
+### Description: Generate apps/backend and apps/web with exact versions and base scripts.
+### Details:
+- Backend: pnpm dlx create-nest-app backend --package-manager=pnpm --strict --skip-git; move to apps/backend. Install @nestjs/platform-fastify@10.x fastify@4.x ts-node-dev@2.x pino@9.x pino-pretty@10.x helmet@7.x.
+- Configure Nest main.ts to use Fastify adapter, enable CORS, register helmet, wire pino logging.
+- Frontend: pnpm dlx create-next-app web --ts --eslint --app --src-dir --tailwind (optional); move to apps/web. Ensure Next 14.x, React 18.x, TS 5.x.
+- Set dev ports: backend 4000, web 3000. Add scripts: dev, build, start for both apps.
+- Pin exact versions in package.json for key libs.
+
+## 3. Create shared package with TypeScript and zod primitives [pending]
+### Dependencies: 1.1
+### Description: Set up packages/shared for types, zod schemas, and base utilities.
+### Details:
+- Create packages/shared with package.json (type: module, main: dist/index.js, types: dist/index.d.ts), build script using tsc, and tsconfig.json extending root.
+- Add zod@3.x; create src/index.ts exporting shared types, zod schemas (e.g., ID schema, pagination, ISO date, env schema fragments).
+- Configure path alias @shared/* in tsconfig.base.json and use in apps.
+- Ensure build outputs to dist/ and add to turbo build outputs.
+
+## 4. Configure ESLint 9, Prettier 3, and TypeScript ESLint across monorepo [pending]
+### Dependencies: 1.1, 1.2, 1.3
+### Description: Add linting/formatting with a shared base config used by all packages and apps.
+### Details:
+- Add dev deps at root: eslint@9.x prettier@3.x @typescript-eslint/parser@8.x @typescript-eslint/eslint-plugin@8.x eslint-config-prettier@9.x eslint-plugin-import@2.x eslint-plugin-unused-imports@3.x.
+- Create root eslint config (e.g., eslint.config.js flat config) with TS/React/Node rules, Prettier integration, ignore patterns.
+- Create .prettierrc and .prettierignore; ensure consistent quote/semicolons and endOfLine settings.
+- Add lint scripts: "lint": "turbo run lint", and per-package scripts to run eslint.
+- Verify linting in both apps and shared package runs clean.
+
+## 5. Set up Husky, lint-staged, and commitlint (conventional commits) [pending]
+### Dependencies: 1.4
+### Description: Install and configure Git hooks to enforce lint/format and commit message conventions.
+### Details:
+- Add dev deps at root: husky@9.x lint-staged@15.x @commitlint/cli@18.x @commitlint/config-conventional@18.x.
+- Initialize Husky: pnpm dlx husky install; add prepare script "husky install".
+- Add .husky/pre-commit: run "pnpm lint-staged". Configure lint-staged to run eslint --fix, prettier --write on staged JS/TS/JSON/MD.
+- Add .husky/commit-msg: run "pnpm commitlint --edit $1" with commitlint.config.js extending config-conventional.
+- Document usage in README later.
+
+## 6. Add Dockerfiles and docker-compose dev stack [pending]
+### Dependencies: 1.1
+### Description: Create Dockerfiles for apps and infra/docker/compose.yaml with Postgres 16, Redis 7.2, MinIO latest, MailHog, and optional Keycloak.
+### Details:
+- Create infra/docker/compose.yaml with services:
+  - postgres: image postgres:16, ports 5432, volumes pgdata, env POSTGRES_USER/DB/PASSWORD, healthcheck.
+  - redis: image redis:7.2, ports 6379, healthcheck.
+  - minio: image minio/minio:RELEASE.2024-xx-xxTxx-xx-xxZ (or latest), command server /data --console-address :9001, ports 9000/9001, env MINIO_ROOT_USER/MINIO_ROOT_PASSWORD, volumes.
+  - mailhog: image mailhog/mailhog:latest, ports 1025/8025.
+  - keycloak (optional): quay.io/keycloak/keycloak:24, dev mode, ports 8080.
+- Define network and volumes; set default credentials suitable for dev only.
+- Add .dockerignore for node contexts; create apps/backend/Dockerfile and apps/web/Dockerfile (Node 20-alpine, pnpm install with frozen lockfile, build, run).
+
+## 7. Environment files and typed validation (zod) for both apps [pending]
+### Dependencies: 1.2, 1.3, 1.6
+### Description: Create .env, .env.local, .env.example and implement runtime env validation with zod in backend and web.
+### Details:
+- At repo root, add .env.example listing required vars: NODE_ENV, PORT (backend), DATABASE_URL, REDIS_URL, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET, NEXT_PUBLIC_API_URL, BACKEND_URL, etc.
+- Create .env for local dev pointing to docker-compose services (postgres, redis, minio) and .env.local (gitignored).
+- Backend: apps/backend/src/config/env.ts defines zod schema and parses process.env at bootstrap; exit with error if invalid.
+- Web: apps/web/src/env.ts validates required NEXT_PUBLIC_* and server-only vars; throw at startup if invalid.
+- Wire schema exports into app config and ensure no defaults mask missing critical secrets.
+
+## 8. Wire logging (pino) and security headers (helmet/CORS/Next headers) [pending]
+### Dependencies: 1.2, 1.7
+### Description: Standardize logging and basic security hardening for dev.
+### Details:
+- Backend: configure Fastify logger using pino with pretty transport in dev; structure logs with level, time, reqId. Add request logging, error serialization. Configure helmet@7 and CORS defaults (allow localhost origins, credentials as needed).
+- Frontend: add Next.js headers in next.config.js (CSP basic, HSTS in prod, referrer-policy, x-content-type-options). Optionally add next-safe middleware in future.
+- Ensure logs honor NODE_ENV and log level env vars.
+
+## 9. Set up GitHub Actions CI workflow [pending]
+### Dependencies: 1.1, 1.4, 1.5, 1.6, 1.8
+### Description: Create .github/workflows/ci.yml with pnpm cache and jobs for lint, test, and build.
+### Details:
+- Workflow triggers: push/pull_request to main branches.
+- Steps: checkout, setup-node@v4 (node 20.x, cache: pnpm), enable Corepack, pnpm install --frozen-lockfile, turbo cache dir caching (optional).
+- Jobs:
+  - lint: pnpm turbo run lint --filter=... (all)
+  - test: pnpm turbo run test (backend with Jest, web with Next/Vitest default where applicable)
+  - build: pnpm turbo run build
+- Use concurrency to cancel in-progress runs for same branch; upload build/test artifacts on failure.
+- Ensure CI uses exact versions and respects engines.
+
+## 10. Define Turbo tasks, dev scripts, and testing scaffolding [pending]
+### Dependencies: 1.1, 1.2, 1.3, 1.4
+### Description: Finalize turbo.json, package scripts, and initial test setup (Jest backend, Vitest/RTL frontend, Playwright E2E skeleton).
+### Details:
+- turbo.json: confirm pipeline from spec; set outputs for dist/** and .next/**; mark dev cache: false.
+- Root scripts: "dev": "turbo run dev --parallel", "build": "turbo run build", "lint": "turbo run lint", "test": "turbo run test", "prepare": "husky install".
+- Backend: add Jest 29.x, ts-jest config or Nest default; sample test for a service/controller; scripts: test, test:watch, test:cov.
+- Frontend: add vitest@1.x, @testing-library/react, jsdom; setup files; sample component test; scripts: test, test:watch.
+- Add Playwright@1.x dev dep at root with basic e2e directory and example spec; ci step can skip e2e for now.
+- Ensure tsconfigs and paths compile across packages.
+
+## 11. Add backend health endpoint and basic Next.js page [pending]
+### Dependencies: 1.2, 1.6, 1.8, 1.10
+### Description: Expose GET /health in backend and a basic home page in web; verify local dev ports.
+### Details:
+- Backend: add HealthController GET /health returning { status: 'ok', uptime, version }; optionally test DB/Redis connectivity if env available.
+- Frontend: add simple app/page.tsx with project title; optionally add /health page that fetches backend /health.
+- Verify pnpm dev starts both apps (web:3000, api:4000) and endpoints respond.
+- Add tests covering /health controller and a simple React component render.
+
+## 12. Bootstrap README and Makefile/scripts with acceptance criteria [pending]
+### Dependencies: 1.2, 1.6, 1.7, 1.9, 1.10, 1.11
+### Description: Document project, add Makefile helpers, and ensure acceptance criteria are testable.
+### Details:
+- README: stack overview with exact versions, repo layout, setup steps (Node 20.x, pnpm 9), environment setup, running dev (pnpm dev), Docker services, CI status badge, troubleshooting.
+- Makefile (or package scripts): make docker-up/down/logs, make db-shell, make minio-console, make ci (lint+test+build), make clean.
+- Prisma placeholder: note future Task 2; add stub command in Makefile for prisma generate.
+- Acceptance criteria: docker-compose up yields reachable Postgres/Redis/MinIO; web at :3000, backend at :4000; CI workflow green with effective pnpm/turbo caches; pre-commit hooks block lint errors; /health responds 200.
+- Add CONTRIBUTING.md with commit convention and branch strategy.
+

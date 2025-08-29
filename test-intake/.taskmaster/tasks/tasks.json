@@ -1,0 +1,1595 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Monorepo Bootstrap, Tooling, and Local Dev Environment",
+        "description": "Initialize a polyrepo/monorepo baseline for web, backend, and shared packages with modern tooling, containerized dev stack, and CI skeleton.",
+        "details": "Stack and versions (pin or use exact in package.json):\n- Node.js: 20.x LTS (engines >=20.10)\n- Package manager: pnpm 9.x\n- Monorepo: Turborepo 2.x (alternatively Nx—keep Turbo for simplicity)\n- Backend: NestJS 10.x + Fastify 4.x, TypeScript 5.x, ts-node-dev for local\n- Frontend: Next.js 14.x + React 18.x + TypeScript 5.x (App Router)\n- ORM: Prisma 5.x\n- DB: PostgreSQL 15/16 (Docker)\n- Cache/Queues: Redis 7.2 (Docker)\n- Object Storage (attachments): MinIO (S3-compatible) latest (Docker)\n- Lint/Format: ESLint 9.x, Prettier 3.x, Typescript ESLint\n- Testing: Jest 29.x (backend), Vitest 1.x + React Testing Library (frontend), Playwright 1.x (E2E)\n- API Docs: Swagger (NestJS @nestjs/swagger 7.x)\n- Logging: pino/pino-pretty 9.x\n- Git hooks: Husky 9.x + lint-staged 15.x + commitlint 18.x (conventional commits)\n- Containers: Docker + docker-compose for dev\n- CI: GitHub Actions with Node + pnpm cache, build, test, lint\n\nActions:\n- Create repo structure:\n  - apps/backend (NestJS) \n  - apps/web (Next.js)\n  - packages/shared (shared types, zod schemas)\n  - infra/docker (compose.yaml for postgres, redis, minio, mailhog, keycloak optional for SSO dev)\n  - .github/workflows/ci.yml\n- Configure pnpm workspaces and turbo.json (pipeline: build, lint, test, dev)\n- Docker compose services: postgres:16, redis:7.2, minio:RELEASE.latest, mailhog, optional keycloak:24\n- Environment management: .env, .env.local, .env.example with typed validation via zod in both apps\n- Security headers: helmet 7.x (backend proxy) and Next.js headers in next.config.js\n\nPseudo-commands:\n- pnpm dlx create-nest-app backend --package-manager=pnpm --strict --skip-git\n- pnpm dlx create-next-app web --ts --eslint --app --src-dir --tailwind (optional)\n- pnpm add -w -D turbo eslint prettier husky lint-staged @commitlint/{config-conventional,cli}\n- Initialize Husky hooks: pre-commit (lint-staged), commit-msg (commitlint)\n\nPseudo-code: turbo.json\n{\n  \"pipeline\": {\n    \"build\": { \"dependsOn\": [\"^build\"], \"outputs\": [\"dist/**\", \".next/**\"] },\n    \"lint\": {},\n    \"test\": { \"dependsOn\": [\"build\"] },\n    \"dev\": { \"cache\": false }\n  }\n}\n",
+        "testStrategy": "- Validate local dev up with docker-compose up -d and apps connect to Postgres/Redis/MinIO.\n- CI pipeline runs lint/test/build on PR; ensure caching works.\n- Lint/format checks block bad commits via Husky.\n- Verify Next.js dev server (localhost:3000) and NestJS (localhost:4000) respond with health endpoints.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize pnpm workspace and Turborepo baseline",
+            "description": "Create root workspace with pnpm 9, Node engines >=20.10, and Turborepo 2 pipeline (build/lint/test/dev).",
+            "dependencies": [],
+            "details": "- Initialize git repo and root package.json (private: true, name, version, packageManager: pnpm@9.x, engines: { node: \">=20.10\" }).\n- Enable pnpm via Corepack (corepack enable && corepack prepare pnpm@9.x --activate).\n- Create pnpm-workspace.yaml including apps/* and packages/*.\n- Add dev deps at root: turbo@2.x.\n- Create turbo.json with pipeline: build (dependsOn ^build, outputs dist/** .next/**), lint, test (dependsOn build), dev (cache false).\n- Add .gitignore (.turbo, node_modules, .pnpm-store, dist, .next, coverage, .env*, pnpm-lock.yaml if desired check-in policy decided), .editorconfig.\n- Add tsconfig.base.json with compilerOptions (TS 5) and path aliases for packages/*.\n- Decide on exact dependency pinning policy: set save-exact=true in .npmrc or use pnpm config to pin exact versions.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Scaffold backend (NestJS+Fastify) and frontend (Next.js) apps",
+            "description": "Generate apps/backend and apps/web with exact versions and base scripts.",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "- Backend: pnpm dlx create-nest-app backend --package-manager=pnpm --strict --skip-git; move to apps/backend. Install @nestjs/platform-fastify@10.x fastify@4.x ts-node-dev@2.x pino@9.x pino-pretty@10.x helmet@7.x.\n- Configure Nest main.ts to use Fastify adapter, enable CORS, register helmet, wire pino logging.\n- Frontend: pnpm dlx create-next-app web --ts --eslint --app --src-dir --tailwind (optional); move to apps/web. Ensure Next 14.x, React 18.x, TS 5.x.\n- Set dev ports: backend 4000, web 3000. Add scripts: dev, build, start for both apps.\n- Pin exact versions in package.json for key libs.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create shared package with TypeScript and zod primitives",
+            "description": "Set up packages/shared for types, zod schemas, and base utilities.",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "- Create packages/shared with package.json (type: module, main: dist/index.js, types: dist/index.d.ts), build script using tsc, and tsconfig.json extending root.\n- Add zod@3.x; create src/index.ts exporting shared types, zod schemas (e.g., ID schema, pagination, ISO date, env schema fragments).\n- Configure path alias @shared/* in tsconfig.base.json and use in apps.\n- Ensure build outputs to dist/ and add to turbo build outputs.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Configure ESLint 9, Prettier 3, and TypeScript ESLint across monorepo",
+            "description": "Add linting/formatting with a shared base config used by all packages and apps.",
+            "dependencies": [
+              "1.1",
+              "1.2",
+              "1.3"
+            ],
+            "details": "- Add dev deps at root: eslint@9.x prettier@3.x @typescript-eslint/parser@8.x @typescript-eslint/eslint-plugin@8.x eslint-config-prettier@9.x eslint-plugin-import@2.x eslint-plugin-unused-imports@3.x.\n- Create root eslint config (e.g., eslint.config.js flat config) with TS/React/Node rules, Prettier integration, ignore patterns.\n- Create .prettierrc and .prettierignore; ensure consistent quote/semicolons and endOfLine settings.\n- Add lint scripts: \"lint\": \"turbo run lint\", and per-package scripts to run eslint.\n- Verify linting in both apps and shared package runs clean.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Set up Husky, lint-staged, and commitlint (conventional commits)",
+            "description": "Install and configure Git hooks to enforce lint/format and commit message conventions.",
+            "dependencies": [
+              "1.4"
+            ],
+            "details": "- Add dev deps at root: husky@9.x lint-staged@15.x @commitlint/cli@18.x @commitlint/config-conventional@18.x.\n- Initialize Husky: pnpm dlx husky install; add prepare script \"husky install\".\n- Add .husky/pre-commit: run \"pnpm lint-staged\". Configure lint-staged to run eslint --fix, prettier --write on staged JS/TS/JSON/MD.\n- Add .husky/commit-msg: run \"pnpm commitlint --edit $1\" with commitlint.config.js extending config-conventional.\n- Document usage in README later.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add Dockerfiles and docker-compose dev stack",
+            "description": "Create Dockerfiles for apps and infra/docker/compose.yaml with Postgres 16, Redis 7.2, MinIO latest, MailHog, and optional Keycloak.",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "- Create infra/docker/compose.yaml with services:\n  - postgres: image postgres:16, ports 5432, volumes pgdata, env POSTGRES_USER/DB/PASSWORD, healthcheck.\n  - redis: image redis:7.2, ports 6379, healthcheck.\n  - minio: image minio/minio:RELEASE.2024-xx-xxTxx-xx-xxZ (or latest), command server /data --console-address :9001, ports 9000/9001, env MINIO_ROOT_USER/MINIO_ROOT_PASSWORD, volumes.\n  - mailhog: image mailhog/mailhog:latest, ports 1025/8025.\n  - keycloak (optional): quay.io/keycloak/keycloak:24, dev mode, ports 8080.\n- Define network and volumes; set default credentials suitable for dev only.\n- Add .dockerignore for node contexts; create apps/backend/Dockerfile and apps/web/Dockerfile (Node 20-alpine, pnpm install with frozen lockfile, build, run).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Environment files and typed validation (zod) for both apps",
+            "description": "Create .env, .env.local, .env.example and implement runtime env validation with zod in backend and web.",
+            "dependencies": [
+              "1.2",
+              "1.3",
+              "1.6"
+            ],
+            "details": "- At repo root, add .env.example listing required vars: NODE_ENV, PORT (backend), DATABASE_URL, REDIS_URL, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET, NEXT_PUBLIC_API_URL, BACKEND_URL, etc.\n- Create .env for local dev pointing to docker-compose services (postgres, redis, minio) and .env.local (gitignored).\n- Backend: apps/backend/src/config/env.ts defines zod schema and parses process.env at bootstrap; exit with error if invalid.\n- Web: apps/web/src/env.ts validates required NEXT_PUBLIC_* and server-only vars; throw at startup if invalid.\n- Wire schema exports into app config and ensure no defaults mask missing critical secrets.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Wire logging (pino) and security headers (helmet/CORS/Next headers)",
+            "description": "Standardize logging and basic security hardening for dev.",
+            "dependencies": [
+              "1.2",
+              "1.7"
+            ],
+            "details": "- Backend: configure Fastify logger using pino with pretty transport in dev; structure logs with level, time, reqId. Add request logging, error serialization. Configure helmet@7 and CORS defaults (allow localhost origins, credentials as needed).\n- Frontend: add Next.js headers in next.config.js (CSP basic, HSTS in prod, referrer-policy, x-content-type-options). Optionally add next-safe middleware in future.\n- Ensure logs honor NODE_ENV and log level env vars.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Set up GitHub Actions CI workflow",
+            "description": "Create .github/workflows/ci.yml with pnpm cache and jobs for lint, test, and build.",
+            "dependencies": [
+              "1.1",
+              "1.4",
+              "1.5",
+              "1.6",
+              "1.8"
+            ],
+            "details": "- Workflow triggers: push/pull_request to main branches.\n- Steps: checkout, setup-node@v4 (node 20.x, cache: pnpm), enable Corepack, pnpm install --frozen-lockfile, turbo cache dir caching (optional).\n- Jobs:\n  - lint: pnpm turbo run lint --filter=... (all)\n  - test: pnpm turbo run test (backend with Jest, web with Next/Vitest default where applicable)\n  - build: pnpm turbo run build\n- Use concurrency to cancel in-progress runs for same branch; upload build/test artifacts on failure.\n- Ensure CI uses exact versions and respects engines.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Define Turbo tasks, dev scripts, and testing scaffolding",
+            "description": "Finalize turbo.json, package scripts, and initial test setup (Jest backend, Vitest/RTL frontend, Playwright E2E skeleton).",
+            "dependencies": [
+              "1.1",
+              "1.2",
+              "1.3",
+              "1.4"
+            ],
+            "details": "- turbo.json: confirm pipeline from spec; set outputs for dist/** and .next/**; mark dev cache: false.\n- Root scripts: \"dev\": \"turbo run dev --parallel\", \"build\": \"turbo run build\", \"lint\": \"turbo run lint\", \"test\": \"turbo run test\", \"prepare\": \"husky install\".\n- Backend: add Jest 29.x, ts-jest config or Nest default; sample test for a service/controller; scripts: test, test:watch, test:cov.\n- Frontend: add vitest@1.x, @testing-library/react, jsdom; setup files; sample component test; scripts: test, test:watch.\n- Add Playwright@1.x dev dep at root with basic e2e directory and example spec; ci step can skip e2e for now.\n- Ensure tsconfigs and paths compile across packages.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Add backend health endpoint and basic Next.js page",
+            "description": "Expose GET /health in backend and a basic home page in web; verify local dev ports.",
+            "dependencies": [
+              "1.2",
+              "1.6",
+              "1.8",
+              "1.10"
+            ],
+            "details": "- Backend: add HealthController GET /health returning { status: 'ok', uptime, version }; optionally test DB/Redis connectivity if env available.\n- Frontend: add simple app/page.tsx with project title; optionally add /health page that fetches backend /health.\n- Verify pnpm dev starts both apps (web:3000, api:4000) and endpoints respond.\n- Add tests covering /health controller and a simple React component render.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Bootstrap README and Makefile/scripts with acceptance criteria",
+            "description": "Document project, add Makefile helpers, and ensure acceptance criteria are testable.",
+            "dependencies": [
+              "1.2",
+              "1.6",
+              "1.7",
+              "1.9",
+              "1.10",
+              "1.11"
+            ],
+            "details": "- README: stack overview with exact versions, repo layout, setup steps (Node 20.x, pnpm 9), environment setup, running dev (pnpm dev), Docker services, CI status badge, troubleshooting.\n- Makefile (or package scripts): make docker-up/down/logs, make db-shell, make minio-console, make ci (lint+test+build), make clean.\n- Prisma placeholder: note future Task 2; add stub command in Makefile for prisma generate.\n- Acceptance criteria: docker-compose up yields reachable Postgres/Redis/MinIO; web at :3000, backend at :4000; CI workflow green with effective pnpm/turbo caches; pre-commit hooks block lint errors; /health responds 200.\n- Add CONTRIBUTING.md with commit convention and branch strategy.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Database Schema and Prisma Setup",
+        "description": "Introduce Prisma ORM, define core schema for users, teams, projects, tasks, subtasks, dependencies, time tracking, comments, attachments, and templates.",
+        "details": "Setup:\n- pnpm add -w prisma@5.x @prisma/client@5.x\n- npx prisma init --datasource-provider postgresql\n- Configure DATABASE_URL from .env; enable connection pooling via pgbouncer later.\n\nCore Entities (prisma/schema.prisma):\nmodel User {\n  id           String   @id @default(cuid())\n  email        String   @unique\n  name         String\n  authProvider String   // 'local' | 'oauth' | 'saml'\n  mfaEnabled   Boolean  @default(false)\n  role         Role     @default(USER)\n  teams        TeamMember[]\n  timeEntries  TimeEntry[]\n  tasks        Task[]   @relation(\"AssigneeTasks\")\n  createdAt    DateTime @default(now())\n  updatedAt    DateTime @updatedAt\n}\n\nmodel Team {\n  id        String        @id @default(cuid())\n  name      String        @unique\n  members   TeamMember[]\n  projects  Project[]\n  createdAt DateTime      @default(now())\n}\n\nmodel TeamMember {\n  id      String @id @default(cuid())\n  userId  String\n  teamId  String\n  role    String  // team-scoped role\n  user    User    @relation(fields: [userId], references: [id])\n  team    Team    @relation(fields: [teamId], references: [id])\n  @@unique([userId, teamId])\n}\n\nmodel Project {\n  id           String      @id @default(cuid())\n  name         String\n  code         String?     @unique\n  description  String?\n  startDate    DateTime?\n  endDate      DateTime?\n  budgetCents  BigInt?     @db.BigInt\n  status       String      // planning | active | paused | completed\n  teamId       String\n  milestones   Milestone[]\n  tasks        Task[]\n  risks        Risk[]\n  createdAt    DateTime    @default(now())\n  updatedAt    DateTime    @updatedAt\n  team         Team        @relation(fields: [teamId], references: [id])\n}\n\nmodel Milestone {\n  id         String   @id @default(cuid())\n  projectId  String\n  name       String\n  dueDate    DateTime?\n  project    Project  @relation(fields: [projectId], references: [id])\n  @@index([projectId, dueDate])\n}\n\nmodel Task {\n  id           String   @id @default(cuid())\n  projectId    String\n  title        String\n  description  Json?    // rich text (TipTap JSON)\n  status       String   // backlog|todo|in_progress|blocked|review|done\n  priority     String   // low|medium|high|urgent\n  estimateHrs  Decimal? @db.Decimal(5,2)\n  dueDate      DateTime?\n  assigneeId   String?\n  parentId     String?\n  attachments  Attachment[]\n  comments     Comment[]\n  timeEntries  TimeEntry[]\n  dependencies TaskDependency[] @relation(\"TaskDeps_Task\")\n  blockedBy    TaskDependency[] @relation(\"TaskDeps_DependsOn\")\n  project      Project  @relation(fields: [projectId], references: [id])\n  assignee     User?    @relation(\"AssigneeTasks\", fields: [assigneeId], references: [id])\n  parent       Task?    @relation(\"Subtasks\", fields: [parentId], references: [id])\n  subtasks     Task[]   @relation(\"Subtasks\")\n  createdAt    DateTime @default(now())\n  updatedAt    DateTime @updatedAt\n  @@index([projectId, status, dueDate])\n}\n\nmodel TaskDependency {\n  id          String @id @default(cuid())\n  taskId      String\n  dependsOnId String\n  task        Task   @relation(\"TaskDeps_Task\", fields: [taskId], references: [id])\n  dependsOn   Task   @relation(\"TaskDeps_DependsOn\", fields: [dependsOnId], references: [id])\n  @@unique([taskId, dependsOnId])\n}\n\nmodel TimeEntry {\n  id        String   @id @default(cuid())\n  taskId    String\n  userId    String\n  startedAt DateTime\n  endedAt   DateTime?\n  durationS Int?     // computed on end\n  task      Task     @relation(fields: [taskId], references: [id])\n  user      User     @relation(fields: [userId], references: [id])\n  @@index([taskId, userId, startedAt])\n}\n\nmodel Attachment {\n  id        String   @id @default(cuid())\n  taskId    String?\n  projectId String?\n  filename  String\n  mimeType  String\n  size      Int\n  storageKey String // S3 key\n  version    Int     @default(1)\n  uploadedBy String\n  createdAt  DateTime @default(now())\n  task      Task?    @relation(fields: [taskId], references: [id])\n  project   Project? @relation(fields: [projectId], references: [id])\n}\n\nmodel Comment {\n  id        String   @id @default(cuid())\n  taskId    String\n  authorId  String\n  body      Json\n  createdAt DateTime @default(now())\n  task      Task     @relation(fields: [taskId], references: [id])\n  author    User     @relation(fields: [authorId], references: [id])\n}\n\nmodel Risk {\n  id         String   @id @default(cuid())\n  projectId  String\n  title      String\n  impact     String\n  likelihood String\n  mitigation String?\n  status     String // open|mitigated|closed\n  project    Project @relation(fields: [projectId], references: [id])\n}\n\nenum Role { USER MANAGER ADMIN }\n\nIndexes: create GIN on description if needed with Prisma extension or SQL.\nMigrations: npx prisma migrate dev -n init\nSeed script: create default admin user and sample project.\n",
+        "testStrategy": "- Use Prisma validate and migrate in CI. Run npx prisma db push on ephemeral DB container.\n- Integration tests with testcontainers-node spinning Postgres; seed and assert CRUD on core entities.\n- Verify referential integrity (deleting project cascades tasks? Prefer soft-delete later).",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add Prisma dependencies at workspace root",
+            "description": "Install Prisma ORM and client libraries and align tooling versions.",
+            "dependencies": [],
+            "details": "Run pnpm add -w prisma@5.x @prisma/client@5.x. Ensure Node 20.x and pnpm 9.x are set in package.json engines and packageManager. Commit lockfile and verify Turborepo picks up workspace changes.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Initialize Prisma with PostgreSQL provider and env",
+            "description": "Bootstrap Prisma configuration and environment variables.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Run npx prisma init --datasource-provider postgresql. Add DATABASE_URL to .env and .env.example (e.g., postgresql://user:pass@localhost:5432/app?schema=public). Note: plan to enable PgBouncer later; keep connection string compatible.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement core Prisma schema models",
+            "description": "Define all models, relations, and enum exactly as specified.",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "Edit prisma/schema.prisma to include models: User, Team, TeamMember, Project, Milestone, Task, TaskDependency, TimeEntry, Attachment, Comment, Risk and enum Role. Use correct relation names (AssigneeTasks, TaskDeps_Task, TaskDeps_DependsOn, Subtasks), types (Decimal(5,2), BigInt), and inline indexes/uniques (e.g., @@unique([userId, teamId]), @@index on Task and Milestone).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Define referential actions, additional indexes, and raw SQL extensions",
+            "description": "Finalize constraints, decide on deletion behaviors, and prepare advanced indexes.",
+            "dependencies": [
+              "2.3"
+            ],
+            "details": "Set referential actions: restrict project deletion if tasks exist (no cascade), setNull for Task.assigneeId and Task.parentId, keep TaskDependency pairs unique. Add helpful indexes (e.g., Project teamId,status; Attachment projectId,taskId). Prepare SQL migration snippet to add a GIN index for JSON search on Task.description: CREATE INDEX IF NOT EXISTS idx_task_description_gin ON \"Task\" USING GIN (\"description\" jsonb_path_ops).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add package.json scripts for Prisma lifecycle",
+            "description": "Provide convenient scripts to manage Prisma operations.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Add scripts: prisma:generate=\"prisma generate\", prisma:migrate=\"prisma migrate dev\", prisma:deploy=\"prisma migrate deploy\", prisma:validate=\"prisma validate\", db:push=\"prisma db push\", prisma:seed=\"tsx prisma/seed.ts\". Optionally set prisma.seed in package.json to tsx prisma/seed.ts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Generate Prisma Client and wire PrismaService in backend",
+            "description": "Create a NestJS PrismaService with logging and graceful shutdown.",
+            "dependencies": [
+              "2.3",
+              "2.5"
+            ],
+            "details": "Run pnpm prisma:generate. Implement PrismaService extending PrismaClient with log levels in dev, enableShutdownHooks(app), and request-scoped clean-up as needed. Export via PrismaModule and inject in repositories/providers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Create and apply initial migration",
+            "description": "Create initial schema migration and apply to local database.",
+            "dependencies": [
+              "2.4"
+            ],
+            "details": "Run npx prisma migrate dev -n init. Inspect generated SQL to ensure all tables, enums, indexes, and the JSON GIN index are present. Commit prisma/migrations and updated schema.prisma.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Implement seed script for admin, team, project, and sample tasks",
+            "description": "Seed initial data to bootstrap environments.",
+            "dependencies": [
+              "2.6",
+              "2.7"
+            ],
+            "details": "Create prisma/seed.ts to upsert an admin user (role ADMIN), create a sample team and TeamMember link, a sample project with milestones, tasks, subtasks, dependencies, comments, attachments, and time entries. Use transactions and upsert to keep it idempotent.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Integration tests with Testcontainers for Prisma CRUD and relations",
+            "description": "Validate schema behavior against a real Postgres instance.",
+            "dependencies": [
+              "2.7"
+            ],
+            "details": "Use testcontainers-node to start Postgres. Run prisma migrate deploy and minimal seeding. Assert CRUD for users, teams, projects, tasks, task dependencies, time entries, comments, attachments. Verify unique constraints, indexes used on typical queries, and referential actions (e.g., cannot delete project with tasks).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "CI pipeline step for Prisma validate, db push, and tests",
+            "description": "Automate schema checks and tests in CI with an ephemeral DB.",
+            "dependencies": [
+              "2.5",
+              "2.9"
+            ],
+            "details": "In CI (e.g., GitHub Actions), add Postgres service container. Steps: pnpm install, pnpm prisma:generate, prisma validate, prisma migrate deploy or db push to ephemeral DB, run unit/integration tests, and upload migration artifacts. Document raw SQL index requirements and local setup in README.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Authentication (JWT, OAuth2/SSO-ready) and RBAC Guards",
+        "description": "Implement secure auth with session/JWT, prepare SSO integration hooks, and role-based access control using CASL.",
+        "details": "Libraries:\n- @nestjs/passport 10.x, passport 0.6.x, passport-jwt 4.x\n- For OAuth2: passport-oauth2 1.x; for OIDC: passport-openidconnect 0.2.x (wire later to Auth0/Okta)\n- Optional SAML SSO (Phase 2/3): passport-saml 3.x\n- Password hashing: argon2 0.31.x\n- RBAC: @casl/ability 6.x, nest-casl or custom AbilityFactory\n- MFA: TOTP via speakeasy 2.x; WebAuthn later via @simplewebauthn/server 10.x\n\nImplementation:\n- AuthModule with strategies: Local (optional), JWT (access/refresh), OAuth callback endpoints (/auth/oauth/callback)\n- Token management: short-lived access (15m) + refresh (7d) with rotation and revocation list in Redis.\n- Session-less APIs using Authorization: Bearer tokens. CSRF not needed for API; if cookie-based in web, set SameSite=Lax and CSRF token.\n- RBAC: Define abilities per Role (ADMIN, MANAGER, USER) with project/team scoping. Inject Ability into controllers via guards.\n\nPseudo-code (AbilityFactory):\nexport function defineAbilityFor(user: User) {\n  return new AbilityBuilder(createMongoAbility).can('read', 'Project', { teamId: { $in: user.teamIds } });\n}\n\nNest Guard example:\n@Injectable() class PoliciesGuard implements CanActivate { /* check req.user ability vs. handler metadata */ }\n\nSecurity headers: helmet; CORS configured for web origin.\n\nFrontend integration: Next.js route handlers use next-auth optional; or custom fetch with token storage in httpOnly cookies.\n",
+        "testStrategy": "- Unit tests for strategies (mock userService) with Jest.\n- E2E tests: login, refresh, revoke; 401/403 on protected endpoints.\n- RBAC tests: ensure USER cannot access other teams' projects; MANAGER can manage team resources; ADMIN full access.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Scaffold AuthModule, Config, and Prisma User Repository",
+            "description": "Initialize NestJS AuthModule, configuration, and Prisma integration with a User repository.",
+            "dependencies": [],
+            "details": "Tasks: create AuthModule; integrate ConfigModule for env validation (JWT_ACCESS_SECRET/PRIVATE_KEY, JWT_REFRESH_SECRET/PRIVATE_KEY, TOKEN_ISSUER, TOKEN_AUDIENCE, ACCESS_TTL=15m, REFRESH_TTL=7d, REDIS_URL, FEATURE_LOCAL_AUTH, COOKIE_MODE); wire PrismaService; implement UserRepo with methods: findByEmail, findById, updateLastLogin, setMfaSecret, enableMfa, disableMfa, upsertOAuthUser, storeRefreshSession, revokeRefreshSession(s). Define Prisma User fields: id, email, passwordHash (nullable if SSO), roles (enum[]: ADMIN|MANAGER|USER), teamIds (string[]), oauthProvider, oauthSubject, mfaEnabled (bool), mfaSecret (encrypted), createdAt, updatedAt. Ensure module exports services required by other modules.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Optional Local Auth with Argon2 Password Hashing",
+            "description": "Implement Local strategy (feature-flagged) and secure password hashing/verification using argon2.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Use argon2 v0.31.x (argon2id). Parameters: memoryCost ~ 64-128MB, timeCost 2-3, parallelism 1; store encoded hash. Implement LocalStrategy via passport-local; AuthService.validateLocal(email, password) with timing-safe verification. Add optional registration or seed utility for test users. Enforce password policy (min length 10, complexity basic). Feature flag: FEATURE_LOCAL_AUTH=true enables /auth/login local flow.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "JWT Access/Refresh Token Service and Strategies",
+            "description": "Create JWT token generation/verification with Passport strategies for access and refresh tokens.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Use @nestjs/jwt + passport-jwt 4.x. Access token: exp 15m; Refresh token: exp 7d; include jti for rotation. Claims: sub (userId), roles, teamIds hash/version, iat, exp, iss, aud, jti. Prefer RS256 (provide PRIVATE_KEY/PUBLIC_KEY); fallback HS256 with strong secrets. Implement AccessTokenStrategy (AuthGuard('jwt')) and RefreshTokenStrategy (AuthGuard('jwt-refresh')) with extractors from Authorization: Bearer and optionally cookies. Provide JwtService wrapper to sign/verify with configured issuer/audience.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Redis-backed Refresh Token Rotation and Revocation",
+            "description": "Implement secure refresh token rotation, storage, and revocation via Redis.",
+            "dependencies": [
+              "3.3"
+            ],
+            "details": "Use ioredis or @nestjs-modules/ioredis with REDIS_URL. Store refresh sessions keyed by user and family: auth:rt:<userId>:<jti> => {familyId, ua, ip, exp}. On refresh: verify existing jti, issue new jti, atomically revoke old, store new, and prevent reuse (reuse detection triggers family revoke). Implement logout to revoke current jti; support revoke-all for user. TTLs align with exp+grace. Track device metadata (ip, ua) for session management.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Core Auth Endpoints (/auth/login, /auth/refresh, /auth/logout, /auth/me)",
+            "description": "Expose primary authentication REST endpoints with DTO validation and rate limiting.",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4"
+            ],
+            "details": "Controllers & DTOs: POST /auth/login {email,password,mfaCode?}; POST /auth/refresh (from cookie or Authorization: Bearer <refresh>); POST /auth/logout; GET /auth/me. On login: validate local or SSO-mapped user, enforce MFA if enabled, issue access+refresh, set httpOnly cookies if COOKIE_MODE=true (SameSite=Lax, Secure, Path=/, domain via config). On refresh: rotate tokens via Redis; return new pair. On logout: revoke current refresh jti. Apply validation (class-validator/zod), and per-IP rate limit for login. Return minimal user profile in /me.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "JWT Guard for Bearer Authentication",
+            "description": "Provide a reusable JwtAuthGuard and public-route decorator for session-less APIs.",
+            "dependencies": [
+              "3.3"
+            ],
+            "details": "Create JwtAuthGuard extending AuthGuard('jwt') to read tokens from Authorization header (and cookies when enabled). Implement @Public() decorator to bypass guard. Attach req.user from token payload and load fresh user from DB if needed. Handle 401/403 responses consistently. Prepare request-scoped injection of Ability later.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "OAuth2/OIDC Strategy Stubs and /auth/oauth/callback Wiring",
+            "description": "Add stubs for passport-oauth2 and passport-openidconnect with a unified callback handler.",
+            "dependencies": [
+              "3.1",
+              "3.3",
+              "3.5"
+            ],
+            "details": "Implement strategy stubs (no provider specific config yet) using passport-oauth2 1.x and passport-openidconnect 0.2.x. Routes: GET /auth/oauth/:provider, GET/POST /auth/oauth/callback. Validate state/nonce; normalize profile; map or upsert user (oauthProvider, oauthSubject). Issue JWTs via AuthService and optionally set cookies. Leave placeholders for Auth0/Okta envs (AUTH0_DOMAIN, OKTA_ISSUER, CLIENT_ID/SECRET). Ensure sessionless flow.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "MFA TOTP Scaffolding Endpoints",
+            "description": "Provide endpoints to generate, verify, enable, and disable TOTP-based MFA.",
+            "dependencies": [
+              "3.5",
+              "3.6"
+            ],
+            "details": "Use speakeasy 2.x. Endpoints: POST /auth/mfa/totp/setup (returns base32 secret + otpauth URL), POST /auth/mfa/totp/verify {token}, POST /auth/mfa/totp/disable. Store secret encrypted at rest (e.g., using app key) and mark mfaEnabled on successful verification with two valid consecutive codes. During login, require mfaCode if mfaEnabled. Apply rate limits and lockout after repeated failures.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "CASL AbilityFactory with Role and Team/Project Scoping",
+            "description": "Define role-based permissions using @casl/ability with team/project scoping.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Implement AbilityFactory using AbilityBuilder(createMongoAbility). Roles: ADMIN -> manage all; MANAGER -> manage Team and Projects where teamId in user.teamIds; USER -> read Team/Projects where teamId in user.teamIds, manage own resources. Example: can('read','Project',{teamId:{$in:user.teamIds}}). Define subjects and types; export provider to build ability per request user.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Policy Decorators and PoliciesGuard Integration",
+            "description": "Create decorators and a PoliciesGuard to enforce CASL policies in controllers.",
+            "dependencies": [
+              "3.6",
+              "3.9"
+            ],
+            "details": "Add @CheckPolicies((ability)=>...) decorator to attach metadata. Implement PoliciesGuard (CanActivate) to build ability from req.user via AbilityFactory and evaluate handler policies. Provide helper to infer subject from route params/body. Optionally add interceptor to inject ability into request scope for services.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Security Headers, CORS, and Token Transport Configuration",
+            "description": "Configure helmet, CORS for web origin, and cookie vs header token transport options.",
+            "dependencies": [
+              "3.1",
+              "3.3"
+            ],
+            "details": "Enable helmet with sensible defaults; configure HSTS in production behind proxy; restrict CORS to allowed origins from env (supports Next.js app). If COOKIE_MODE=true, set httpOnly, Secure, SameSite=Lax cookies and require CSRF token for mutating browser requests; otherwise use Authorization: Bearer. Document and implement toggles for frontend integration (next-auth or custom fetch).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Unit Tests for Strategies and RBAC Guards",
+            "description": "Write Jest unit tests for Local/JWT strategies and CASL guard logic.",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.6",
+              "3.9",
+              "3.10"
+            ],
+            "details": "Mock Prisma and Redis. Tests: LocalStrategy validate (success, bad password, mfa required); JWT strategies (valid, expired, wrong issuer/audience); JwtAuthGuard behavior (public routes, missing token); AbilityFactory rules per role; PoliciesGuard allows/denies correctly. Snapshot token payload shape (sans secrets).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 13,
+            "title": "E2E Tests for Login, Refresh/Rotation, Logout, and RBAC",
+            "description": "Create Supertest-based E2E tests covering core auth flows and authorization denials.",
+            "dependencies": [
+              "3.4",
+              "3.5",
+              "3.6",
+              "3.9",
+              "3.10",
+              "3.11"
+            ],
+            "details": "Spin up Nest app with test Redis. Seed users/teams/projects. Scenarios: login -> access protected endpoint; refresh rotates tokens and old jti reuse blocked; logout revokes session; cookie and header modes; 401/403 on protected routes; RBAC: USER blocked across teams, MANAGER manages team resources, ADMIN full access. Include /auth/me and basic MFA happy path if enabled.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 14,
+            "title": "Documentation for Auth Architecture, Token Models, and SSO Readiness",
+            "description": "Author developer docs covering APIs, flows, claims, lifetimes, rotation, and integration notes.",
+            "dependencies": [
+              "3.3",
+              "3.4",
+              "3.5",
+              "3.7",
+              "3.8",
+              "3.9",
+              "3.10",
+              "3.11"
+            ],
+            "details": "Produce README/ADR: architecture diagram; token claims (sub, roles, teamIds, jti, iss, aud), lifetimes (15m/7d), rotation/revocation process, Redis keys, cookie vs header guidance, CSRF notes, security headers, Next.js integration (next-auth or custom), OAuth/OIDC wiring and provider hookup steps (Auth0/Okta), MFA TOTP setup. Include env var reference and example requests/responses.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Core Task Management API (CRUD, Subtasks, Dependencies, Time Tracking, Attachments)",
+        "description": "Deliver the primary REST endpoints for tasks including rich descriptions, assignment, status transitions, dependencies, timers, and file attachments.",
+        "details": "Libraries:\n- Validation: zod 3.x + nestjs-zod 3.x (or class-validator if preferred)\n- File upload: S3 SDK @aws-sdk/client-s3 3.x; MinIO in dev\n- Rich text: store TipTap JSON; enforce size limits and sanitize server-side\n\nEndpoints (NestJS Controller):\n- POST /projects/:id/tasks {title, description, dueDate, assigneeId, estimateHrs}\n- GET /projects/:id/tasks?status=&assigneeId=&q=\n- PATCH /tasks/:id {title?, description?, status?, dueDate?, assigneeId?, priority?}\n- POST /tasks/:id/subtasks {...}\n- POST /tasks/:id/dependencies {dependsOnId}\n- DELETE /tasks/:id/dependencies/:dependsOnId\n- POST /tasks/:id/time/start, POST /tasks/:id/time/stop\n- POST /attachments/presign {scope: 'task'|'project', scopeId, filename, mimeType, size}\n- POST /tasks/:id/attachments { storageKey, filename, mimeType, size }\n- POST /tasks/:id/comments { body }\n\nBusiness rules:\n- Block starting tasks if any blocking dependency is not done.\n- Status transitions allowed per policy map.\n- Validate estimates are within reasonable range (0-1000 hours).\n\nPseudo-code (presign):\nconst key = `tasks/${taskId}/${cuid()}/${filename}`;\nconst cmd = new PutObjectCommand({ Bucket, Key: key, ContentType: mimeType });\nconst url = await getSignedUrl(s3, cmd, { expiresIn: 900 });\nreturn { url, key };\n\nSearch:\n- Basic ILIKE on title; later add trigram index.\n\nOpenAPI:\n- Decorate DTOs to expose Swagger; export JSON for integrators.\n",
+        "testStrategy": "- Unit tests services: creating tasks, subtasks, dependencies graph checks.\n- Integration tests against Postgres with testcontainers; ensure cascade rules do not orphan rows.\n- Upload tests: presign yields working PUT; validate object appears in MinIO.\n- Negative tests: cannot start time if blocked; invalid transitions rejected.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Prisma data model and migrations for tasks domain",
+            "description": "Design and migrate database schema for tasks, dependencies, time tracking, attachments, and comments with proper indexes.",
+            "dependencies": [],
+            "details": "• Define Task { id, projectId, parentId (nullable), title, descriptionJson (TipTap), status, dueDate, assigneeId, estimateHrs, priority, createdAt, updatedAt }.\n• Define TaskDependency { taskId, dependsOnId, createdAt }; add PK/unique (taskId, dependsOnId) and check (taskId != dependsOnId).\n• Define TimeEntry { id, taskId, userId, startedAt, endedAt (nullable), durationS (computed on stop), createdAt } and unique partial index for open entries per (taskId,userId) where endedAt IS NULL.\n• Define Attachment { id, taskId, storageKey, filename, mimeType, size, createdAt }.\n• Define Comment { id, taskId, userId, body, createdAt }.\n• Foreign keys with ON DELETE CASCADE where safe (e.g., task -> subtasks/comments/attachments/timeEntries).\n• Indexes: tasks(projectId, status), tasks(projectId, assigneeId), tasks(projectId, dueDate), tasks(title) for ILIKE; enable pg_trgm extension behind a feature flag for later.\n• Generate Prisma client and run initial migration.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Zod DTOs and TipTap JSON sanitization",
+            "description": "Create request/response DTOs using zod with size limits and server-side sanitization for rich text.",
+            "dependencies": [],
+            "details": "• Implement sanitizeTipTapJson(json) to allow whitelisted nodes/marks and enforce max stringified size (e.g., 64KB).\n• DTOs: CreateTaskDTO { title, descriptionJson?, dueDate?, assigneeId?, estimateHrs? }; UpdateTaskDTO { title?, descriptionJson?, status?, dueDate?, assigneeId?, priority? }.\n• DTOs: ListTasksQuery { status?, assigneeId?, q?, page?, limit?, sort? } with defaults and bounds.\n• DTOs: CreateSubtaskDTO { title, descriptionJson?, dueDate?, assigneeId?, estimateHrs? }.\n• DTOs: AddDependencyDTO { dependsOnId }.\n• DTOs: PresignDTO { scope: 'task'|'project', scopeId, filename, mimeType, size } with file size/type constraints.\n• DTOs: LinkAttachmentDTO { storageKey, filename, mimeType, size }.\n• DTOs: CreateCommentDTO { body } with length limits and basic sanitization.\n• Integrate nestjs-zod pipes for validation and response schemas.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Business rules module (status policy, estimates, dependency logic)",
+            "description": "Centralize domain policies: allowed status transitions, estimate bounds, dependency checks, and cycle detection.",
+            "dependencies": [],
+            "details": "• Define AllowedStatusTransitions map; expose canTransition(from, to).\n• Implement validateEstimate(hrs) enforcing 0–1000 inclusive.\n• Implement isBlockedByDependencies(taskId): checks any dependsOn not in 'done' (or terminal) status.\n• Implement detectCycle(taskId, dependsOnId) using DFS/BFS via Prisma lookups.\n• Define typed DomainError classes (e.g., InvalidTransitionError, DependencyBlockedError, ValidationError).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "POST /projects/:id/tasks (create task)",
+            "description": "Controller and service to create tasks within a project with rich descriptions and estimates validation.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "• Controller method binds :id projectId; validate body with CreateTaskDTO.\n• Service createTask: verify project exists, optional assignee exists; sanitize description; validate estimate via business rules.\n• Persist task; return DTO including assignee and minimal project info.\n• Prisma include: assignee, dependencies count.\n• Emit domain event (internal) for future real-time hooks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "GET /projects/:id/tasks (list with filters/search/pagination)",
+            "description": "List tasks by project with status/assignee filters, ILIKE search on title, and pagination.",
+            "dependencies": [
+              "4.1",
+              "4.2"
+            ],
+            "details": "• Controller parses ListTasksQuery; enforce page/limit bounds; default sort by updatedAt desc.\n• Service query: WHERE projectId=:id AND optional filters; title ILIKE '%'||q||'%'.\n• Return paginated result { items, page, limit, total }.\n• Ensure Prisma query uses proper indexes; include counts for subtasks and open dependencies.\n• Add lightweight text search with ILIKE; keep room for trigram index later.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "PATCH /tasks/:id (update with status transitions)",
+            "description": "Update task fields and enforce status transition policy, estimate validation, and sanitization.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "• Controller validates UpdateTaskDTO; route param :id.\n• Service: fetch current status; if status change requested, verify via canTransition.\n• Validate estimate bounds if present; sanitize description JSON.\n• Persist changes; return updated task with includes.\n• Optionally append status change audit row (future-proof).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "POST /tasks/:id/subtasks (create subtask)",
+            "description": "Create a subtask under a parent task, inheriting project and validating inputs.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "• Controller binds parent :id; validate CreateSubtaskDTO.\n• Service: ensure parent exists; inherit projectId; optionally cap nesting to one level via validation.\n• Persist child task with parentId=parent.id; validate estimate and sanitize description.\n• Return created subtask with parent summary.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Task dependencies endpoints (add/remove with cycle checks)",
+            "description": "Implement adding and removing task dependencies with validations and cycle detection.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "• POST /tasks/:id/dependencies: validate dependsOnId; ensure both tasks exist and belong to same project; no self-dependency.\n• Use detectCycle before insert; create TaskDependency record; idempotent behavior on duplicates.\n• DELETE /tasks/:id/dependencies/:dependsOnId: remove relation if exists; return 204.\n• Return updated dependency lists as needed.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Time tracking endpoints (start/stop) with concurrency safeguards",
+            "description": "Implement POST /tasks/:id/time/start and /stop with blocking rules, locking, and duration computation.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3",
+              "4.8"
+            ],
+            "details": "• start: verify no open time entry for (userId, taskId); check isBlockedByDependencies(taskId) => if true, reject; create TimeEntry in tx.\n• Concurrency: enforce unique open entry via partial index and handle conflicts gracefully (409); optionally SELECT FOR UPDATE on user open entries.\n• stop: find open entry for user+task; set endedAt=now; compute durationS; persist in tx.\n• Return active entry on start and finalized entry on stop.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "POST /attachments/presign (S3/MinIO presign)",
+            "description": "Generate presigned PUT URLs for task/project-scoped uploads using @aws-sdk/client-s3 against MinIO in dev.",
+            "dependencies": [
+              "4.1",
+              "4.2"
+            ],
+            "details": "• Configure S3 client with MinIO endpoint, region, access keys, forcePathStyle.\n• Validate PresignDTO; ensure scopeId exists for 'task' or 'project'.\n• Build key: `${scope}s/${scopeId}/${cuid()}/${filename}`; set ContentType from mimeType.\n• Use PutObjectCommand + getSignedUrl(s3, cmd, { expiresIn: 900 }).\n• Return { url, key } ensuring key is used later to link attachment.\n• Enforce size/mimeType limits; optionally set expected content length headers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "POST /tasks/:id/attachments (link uploaded object)",
+            "description": "Persist attachment metadata and link presigned-uploaded objects to tasks.",
+            "dependencies": [
+              "4.1",
+              "4.10"
+            ],
+            "details": "• Validate LinkAttachmentDTO; ensure storageKey prefix matches tasks/:id path.\n• Optionally HEAD the object to verify presence/size/mime; trust in test/dev as needed.\n• Insert Attachment row; return attachment record.\n• Prevent duplicate linking by unique(taskId, storageKey).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "POST /tasks/:id/comments (create comment)",
+            "description": "Allow users to add comments to tasks with sanitized body and length limits.",
+            "dependencies": [
+              "4.1",
+              "4.2"
+            ],
+            "details": "• Validate CreateCommentDTO; enforce max length (e.g., 2–4KB) and sanitize.\n• Ensure task exists and user is authorized (RBAC added later).\n• Persist Comment row; return created comment with author summary and timestamps.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 13,
+            "title": "RBAC guard and authorization policies",
+            "description": "Integrate role-based access control for task endpoints using NestJS guards and project-scoped permissions.",
+            "dependencies": [
+              "4.4",
+              "4.5",
+              "4.6",
+              "4.7",
+              "4.8",
+              "4.9",
+              "4.10",
+              "4.11",
+              "4.12"
+            ],
+            "details": "• Implement RolesGuard + ProjectAccessGuard; derive user from JWT; load project membership/role.\n• Define policies: who can create/update tasks, manage dependencies, track time, upload/link attachments, and comment.\n• Apply @UseGuards to all task-related controllers; add route-level decorators where needed.\n• Add forbidden/unauthorized responses to controllers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 14,
+            "title": "Cross-cutting: Pino logging and standardized error handling",
+            "description": "Add structured logging for key actions and unify validation/business error responses.",
+            "dependencies": [
+              "4.2",
+              "4.4",
+              "4.5",
+              "4.6",
+              "4.7",
+              "4.8",
+              "4.9",
+              "4.10",
+              "4.11",
+              "4.12"
+            ],
+            "details": "• Configure Pino logger with request-id correlation and sensitive field redaction.\n• Log key events: task create/update, dependency add/remove, time start/stop, presign, attachment link, comment create.\n• Implement ExceptionFilter to map ZodError -> 400 with standardized shape; DomainError -> 409/422 with codes; unexpected -> 500 with safe message.\n• Ensure consistent error envelope { error: { code, message, details? } } across controllers.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 15,
+            "title": "Swagger/OpenAPI documentation and grouping",
+            "description": "Decorate DTOs and controllers for Swagger, group under Tasks, and export OpenAPI JSON; include presigned upload flow docs.",
+            "dependencies": [
+              "4.2",
+              "4.4",
+              "4.5",
+              "4.6",
+              "4.7",
+              "4.8",
+              "4.9",
+              "4.10",
+              "4.11",
+              "4.12"
+            ],
+            "details": "• Add @ApiTags, @ApiOperation, @ApiOkResponse, @ApiBody to all endpoints; ensure DTOs are referenced.\n• Document query params and pagination schema for list endpoint.\n• Provide examples for presign + upload + link flow (step-by-step request/response pairs).\n• Configure Swagger module and export OpenAPI JSON for integrators.\n• Add security scheme for JWT.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 16,
+            "title": "Testing suite: unit, integration (Postgres + MinIO), and negative cases",
+            "description": "Write unit tests for services and integration tests with testcontainers covering edge and negative scenarios.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3",
+              "4.4",
+              "4.5",
+              "4.6",
+              "4.7",
+              "4.8",
+              "4.9",
+              "4.10",
+              "4.11",
+              "4.12",
+              "4.13",
+              "4.14",
+              "4.15"
+            ],
+            "details": "• Unit: TasksService create/update validations, status transitions, estimate bounds; dependency cycle detection; isBlockedByDependencies; time tracking start/stop logic.\n• Integration: spin up Postgres + MinIO via testcontainers; CRUD flows; list pagination/search; dependencies add/remove; time tracking concurrency; RBAC-protected routes.\n• Upload tests: presign -> PUT to MinIO -> link attachment -> verify record; invalid mime/size rejects.\n• Negative: cannot start time when blocked; invalid transition rejected; duplicate dependency; open time entry conflict.\n• Ensure DB cleanup between tests and snapshots for API responses where appropriate.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Project Planning Basics (Projects, Milestones, Gantt Data, Resource & Budget Fields)",
+        "description": "Expose APIs for project creation, milestones, deliverables, and provide Gantt-friendly data for the frontend drag-and-drop timeline.",
+        "details": "Endpoints:\n- POST /projects {name, description, startDate, endDate, teamId, budgetCents}\n- PATCH /projects/:id {name?, dates?, status?, budgetCents?}\n- GET /projects/:id/gantt -> returns tasks with start/end, dependencies for Gantt chart\n- POST /projects/:id/milestones, PATCH/DELETE milestones\n- Resource hints: GET /teams/:id/capacity?from&to returns capacity summary based on team members and time entries\n\nImplementation details:\n- On task update, compute critical dates for Gantt (start: earliest of dueDate/derived; end: dueDate or estimate-based).\n- Add simple capacity calc: hoursAvailable = members*40h/week minus planned estimates windowed.\n- Budget tracking: sum of cost rates * timeEntries duration (store default hourly rate per user/team in future).\n\nFrontend integration:\n- Use a lightweight Gantt lib (e.g., frappe-gantt or Syncfusion/vis-timeline). Start with read-only; drag-and-drop later.\n\nPseudo-code (Gantt transform):\nreturn tasks.map(t => ({ id: t.id, name: t.title, start: t.startDate ?? project.startDate, end: t.dueDate ?? addHours(start, t.estimateHrs||0), dependencies: t.dependencies.map(d=>d.dependsOnId) }));\n",
+        "testStrategy": "- API contract tests for Gantt endpoint data shape.\n- Unit tests for capacity calculation with mocked time entries.\n- Verify milestone CRUD and indexes for date-range queries perform under seed of 10k tasks.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Project Create/Update with Validation and RBAC",
+            "description": "Build POST /projects and PATCH /projects/:id with input validation, RBAC, and consistent response/error shapes.",
+            "dependencies": [],
+            "details": "- Validation: name (1-140 chars), description optional, startDate <= endDate, teamId must exist, budgetCents integer >= 0, status enum: planned|active|on_hold|completed.\n- RBAC: only org admins or managers of the target teamId can create/update projects; regular users can read (if applicable) but cannot modify.\n- Persistence: ensure model has fields {name, description, startDate, endDate, teamId, status, budgetCents, createdById, updatedById}.\n- API: POST returns 201 with created project; PATCH returns 200 with updated project; use consistent error shape {code, message, details}.\n- Auditing: set createdById/updatedById from auth context; write basic access logs.\n- OpenAPI: document schemas and examples for both endpoints.\n- Edge cases: reject negative budgets, invalid dates, team mismatch, or forbidden updates on completed projects without admin override.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Milestones CRUD (POST/PATCH/DELETE) with Date Indexes",
+            "description": "Add milestone endpoints under a project with validation and DB indexes to support date-range queries.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "- Model: Milestone {id, projectId FK, title, description?, milestoneDate, status: 'planned'|'achieved'|'canceled', createdAt, updatedAt}.\n- Indexes: (projectId, milestoneDate), (projectId, title) for fast lookups.\n- Endpoints: POST /projects/:id/milestones, PATCH /projects/:id/milestones/:milestoneId, DELETE /projects/:id/milestones/:milestoneId.\n- Validation: title 1-140; milestoneDate present; optional status transitions (planned->achieved/canceled).\n- RBAC: same as project update permissions.\n- Constraints: ensure milestone.projectId matches path param; enforce referential integrity and cascade delete on project removal.\n- Responses: return created/updated milestone; DELETE returns 204.\n- Guardrails: optionally warn if milestoneDate falls outside project start/end.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Compute Task Critical Dates on Task Update",
+            "description": "Implement service logic to compute and store task start/end dates used by the Gantt view whenever tasks or dependencies change.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "- Computed fields: task.computedStartAt, task.computedEndAt (persisted for speed).\n- Algorithm (simple):\n  - baseStart = task.startDate ?? project.startDate\n  - depEnd = max(computedEndAt of all dependencies) if any\n  - start = max(baseStart, depEnd?)\n  - end = task.dueDate ?? addHours(start, task.estimateHrs || 0)\n- Triggers: recompute on task create/update, dependency add/remove, estimate/dueDate change, project startDate change.\n- Resilience: protect against cycles (assume Task 4 dependency validation prevents cycles); use topological recompute order if batch updating.\n- Observability: log recompute counts and duration; flag tasks with missing estimates and no dueDate.\n- Backfill: one-off migration/script to populate computed fields for existing tasks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "GET /projects/:id/gantt Transform",
+            "description": "Expose Gantt-friendly data for a project by transforming tasks and dependencies into the frontend shape.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.3"
+            ],
+            "details": "- Query: select project and its tasks with fields {id, title, startDate, dueDate, estimateHrs, computedStartAt, computedEndAt} and dependency edges.\n- Transform: tasks.map(t => ({ id: t.id, name: t.title, start: t.computedStartAt ?? (t.startDate ?? project.startDate), end: t.computedEndAt ?? (t.dueDate ?? addHours(start, t.estimateHrs||0)), dependencies: t.dependencies.map(d => d.dependsOnId) })).\n- Response shape: { project: {id, name, startDate, endDate}, tasks: [...], milestones: [...] } where milestones includes {id, name, date} from Milestones.\n- Filters: support ?from&to to limit returned tasks/milestones by overlap with window; optional ?limit (default 1000, max 10000) for safety.\n- Performance: use Prisma select/includes to avoid N+1; batch-fetch dependencies; ensure relevant indexes exist.\n- Read-only: no drag/drop updates yet; ensure CORS and caching headers (ETag) for identical payloads.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "GET /teams/:id/capacity Simple Availability",
+            "description": "Provide a capacity summary for a team between a date range using a simple hours-available calculation.",
+            "dependencies": [],
+            "details": "- Input: GET /teams/:id/capacity?from=ISO&to=ISO&bucket=day|week (default week). Validate from<=to and window <= 180 days.\n- Data sources: team active members; planned hours from task estimates; actual hours from time entries.\n- Calculation: hoursAvailable = members * 40h/week (or 8h/day * days) - plannedEstimatesInWindow. If actual time exists, subtract actuals from availability and optionally cap planned subtraction to not double-count.\n- Output: { teamId, from, to, bucket, memberCount, availability: [{ start, end, hoursCapacity, hoursPlanned, hoursActual, hoursAvailable }] }.\n- Assumptions: 40h/week baseline; ignore holidays for now; timezone set to UTC.\n- RBAC: managers of the team and admins only.\n- Edge cases: no members => capacity 0; handle partial weeks at window edges.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Budget Fields Exposure and Basic Aggregates",
+            "description": "Expose project budget fields and compute actual cost from time entries using user/team cost rates.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "- Fields: ensure Project has budgetCents (int), currencyCode (optional future), and expose in responses.\n- Aggregation: actualCostCents = sum(timeEntry.durationHours * (user.costRateCents ?? team.defaultCostRateCents ?? 0)) for entries linked to the project.\n- Service: implement ProjectBudgetService.getSummary(projectId) => { budgetCents, actualCostCents, remainingCents }.\n- API integration: include budget summary in POST/PATCH /projects responses and optionally in GET /projects/:id (if available) and /projects/:id/gantt's project block.\n- Performance: compute on demand with indexed queries; add simple caching layer with short TTL if needed.\n- Validation: prevent negative budgets; allow updating budgetCents via PATCH.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Prisma Query Optimization and Indexing",
+            "description": "Optimize queries and add indexes to support Gantt, milestones, capacity, and budget queries at scale.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.4",
+              "5.5",
+              "5.6"
+            ],
+            "details": "- Indexes: tasks(projectId, computedStartAt), tasks(projectId, computedEndAt), tasks(projectId, dueDate), milestones(projectId, milestoneDate), task_dependencies(taskId, dependsOnId), time_entries(projectId, startedAt), team_members(teamId, userId).\n- Query shaping: use select to fetch only needed fields; prefetch dependency edges in one query; avoid N+1.\n- Pagination/limits: enforce safe limits on Gantt queries; add cursors where appropriate.\n- DB checks: run EXPLAIN on heavy queries (Gantt, capacity, budget) and document plans; adjust indexes accordingly.\n- Caching: enable HTTP caching (ETag) for Gantt; consider memoizing budget summaries for short intervals.\n- Error budgets: set timeouts and fallbacks for long-running queries; log slow queries with thresholds.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Unit Tests: Gantt Transform and Capacity Math",
+            "description": "Write unit tests covering Gantt data transformation and capacity calculations, including edge cases.",
+            "dependencies": [
+              "5.3",
+              "5.4",
+              "5.5"
+            ],
+            "details": "- Gantt tests: no dueDate uses estimate; dependency shifts start; project start fallback; zero estimate results in start==end; filter by window; milestone inclusion.\n- Capacity tests: multiple members; partial weeks; no members; overlap of planned vs actual; boundary dates; bucket day vs week.\n- Tooling: Jest + ts-jest; mock Prisma/services; deterministic time via fake timers.\n- Coverage: target >= 85% lines in related modules; snapshot representative responses.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "API Contract Tests for Endpoints and Error Shapes",
+            "description": "Add contract tests to verify request/response schemas, query params, and error handling for new endpoints.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.4",
+              "5.5",
+              "5.6"
+            ],
+            "details": "- Endpoints covered: POST/PATCH /projects; POST/PATCH/DELETE /projects/:id/milestones; GET /projects/:id/gantt (?from&to&limit); GET /teams/:id/capacity (?from&to&bucket).\n- Validate JSON schema (zod) for success and failure cases; ensure consistent {code, message, details} errors.\n- Negative tests: RBAC forbidden, invalid dates, invalid teamId/projectId, window too large, limit overflow, missing required fields.\n- Backward-compatibility: pin snapshots for response shapes; generate OpenAPI docs and diff if available.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Performance Seeds and Benchmark (≤10k Tasks)",
+            "description": "Seed realistic data and benchmark Gantt and capacity endpoints to ensure acceptable performance with large datasets.",
+            "dependencies": [
+              "5.1",
+              "5.2",
+              "5.4",
+              "5.5"
+            ],
+            "details": "- Seeder: create ~5 teams, 1k projects, 10k+ tasks, random dependencies, milestones, and time entries; ensure indexes are applied before benchmarking.\n- Benchmarks: use autocannon/k6 to test GET /projects/:id/gantt and GET /teams/:id/capacity under load.\n- Targets: Gantt p95 < 200ms for 1k tasks; < 600ms for 10k tasks; capacity p95 < 200ms for 6-month window.\n- Telemetry: record CPU/memory; log slow queries; verify no N+1.\n- Report: document results, bottlenecks, and tuning applied (indexes, query shapes, limits).",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Real-time Updates, Notifications, and In-App Activity Feed",
+        "description": "Provide sub-100ms real-time updates for task/project events via WebSockets and basic notification system with digest emails.",
+        "details": "Libraries:\n- @nestjs/websockets 10.x with socket.io 4.7.x + socket.io-redis-adapter for horizontal scaling\n- Email: nodemailer 6.x + Mailhog in dev\n- Rate-limiting: @nestjs/throttler 6.x or fastify-rate-limit 8.x\n\nImplementation:\n- Gateway: /ws authenticated via JWT during connection (query token or auth header upgrade)\n- Rooms: project:<id>, user:<id> for targeted events\n- Emit events on task create/update/comment/time tracking start/stop\n- Notifications table: {id, userId, type, payload, readAt}\n- Email digest job (BullMQ in Task 9) to send periodic updates\n\nPseudo-code (emit):\nthis.server.to(`project:${projectId}`).emit('task.updated', { id, changes });\n\nSecurity:\n- Validate room join authorization via RBAC.\n- Backpressure: enable max http buffer size; limit events per client.\n",
+        "testStrategy": "- WebSocket E2E tests with socket.io-client asserting receipt after REST changes.\n- Load test with autocannon/k6: 5k concurrent connections, event fan-out latencies under target.\n- Unit tests for notification preferences and rate limits.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "WebSocket Gateway with JWT Authentication",
+            "description": "Create NestJS WebSocket gateway at /ws with socket.io and JWT auth on connection.",
+            "dependencies": [],
+            "details": "- Use @nestjs/websockets 10.x with socket.io 4.7.x; namespace/path: /ws\n- Accept JWT via Authorization header on upgrade or query param token; verify and attach user to socket.data.user\n- Configure CORS and transports; prefer websocket, allow polling fallback if needed\n- Reject connection with clear error event on invalid/expired token\n- Provide basic connected/heartbeat events; expose server instance via DI",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Room Model and RBAC Join/Leave",
+            "description": "Implement project:<id> and user:<id> rooms with authorization checks.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "- On connect, auto-join user:<userId>\n- Implement subscribe.project and unsubscribe.project events; validate via RBAC (CASL Ability) that user can read the project before joining project:<id>\n- Server-side leave all rooms on disconnect; ensure no leakage across tenants\n- Add guards to prevent joining arbitrary rooms; validate IDs are UUID/number as applicable",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Emit Real-time Events from Domain Services",
+            "description": "Wire task/project/comment/time tracking services to emit socket events to rooms.",
+            "dependencies": [
+              "6.1",
+              "6.2"
+            ],
+            "details": "- Hook into create/update/delete/comment/time start/stop flows to emit events\n- Event names: task.created, task.updated, task.commented, task.deleted, project.updated, time.started, time.stopped\n- Payload: minimal, containing ids, changes, actorId, timestamps\n- Target rooms: project:<projectId> for project-related events; user:<userId> for direct mentions/assignments\n- Ensure idempotent emission and error handling does not affect primary transaction",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Notifications Persistence Layer",
+            "description": "Create notifications table and service to store/read/mark notifications.",
+            "dependencies": [
+              "6.3"
+            ],
+            "details": "- Table: notifications { id (uuid), userId, type (text/enum), payload (jsonb), readAt (timestamp null), createdAt }\n- Indexes: (userId, readAt asc, createdAt desc)\n- Service methods: createForUsers, listByUser({unreadOnly, limit, cursor}), markRead(id, userId), markAllRead(userId)\n- Map emitted events to notification types (e.g., task.assigned, task.commented)\n- Basic preference stub (enabled true by default) for future expansion",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Notifications REST API",
+            "description": "Expose endpoints to list notifications and mark read/unread.",
+            "dependencies": [
+              "6.4"
+            ],
+            "details": "- GET /notifications?unreadOnly=&limit=&cursor= (auth required)\n- PATCH /notifications/:id/read (mark read); POST /notifications/read-all\n- Cursor-based pagination using createdAt,id tie-breaker\n- Return consistent shape: { items: [...], nextCursor }\n- Enforce RBAC so users can only access their notifications",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Email Digest Job with Nodemailer",
+            "description": "Implement digest email processor to send periodic updates using nodemailer.",
+            "dependencies": [
+              "6.4"
+            ],
+            "details": "- Use BullMQ queue 'email-digest' (scheduler wiring handled in Task 9); add processor to aggregate unread notifications per user since last digest\n- Render simple text/HTML email; in dev send via nodemailer 6.x to Mailhog\n- Store lastDigestAt per user or maintain a digest watermark to avoid duplicates\n- Configurable cadence (hourly/daily) via environment; skip users with zero notifications or opted-out",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Socket.io Redis Adapter for Horizontal Scaling",
+            "description": "Enable socket.io-redis-adapter to support multi-instance deployments.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "- Integrate @socket.io/redis-adapter with ioredis; use REDIS_URL env\n- Apply adapter to gateway; verify room join/leave and broadcast work across instances\n- Provide local docker-compose to spin 2 app instances + Redis for manual verification\n- Handle graceful shutdown and reconnect strategies",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Throttling, Rate Limits, and Backpressure",
+            "description": "Protect gateway and clients with rate limits and buffer controls.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "- Configure maxHttpBufferSize and per-message size limits\n- Implement per-socket event rate limiting (e.g., 20 msgs/10s) and subscription caps; emit error events when exceeded\n- Use @nestjs/throttler for REST where applicable and custom middleware/guard for WS events\n- Drop/queue strategy for high load; track and log dropped messages per client",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "E2E Tests for Real-time Events",
+            "description": "Add socket.io-client E2E tests to assert event receipt after CRUD actions.",
+            "dependencies": [
+              "6.1",
+              "6.2",
+              "6.3"
+            ],
+            "details": "- Spin app with Postgres and Redis (testcontainers)\n- Obtain JWT, connect to /ws, subscribe to project:<id>\n- Perform REST actions (create/update task, add comment, start/stop time) and assert corresponding events received\n- Measure latency between REST response and event reception; assert median < 100ms under test env\n- Negative tests: invalid JWT rejected; unauthorized project subscription denied",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Load and Fan-out Testing",
+            "description": "Create k6/autocannon scripts to simulate 5k concurrent sockets and fan-out.",
+            "dependencies": [
+              "6.1",
+              "6.7",
+              "6.8"
+            ],
+            "details": "- Provision scripts to open thousands of WS connections and subscribe to rooms\n- Trigger events to rooms with 1k+ members; capture end-to-end delivery latency distribution\n- Ensure rate limits configured to not interfere with synthetic load (override via env)\n- Document setup and success criteria: p50<100ms, p95<200ms for fan-out",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Observability and Metrics for Real-time System",
+            "description": "Add metrics, logs, and traces for connections and event fan-out.",
+            "dependencies": [
+              "6.1",
+              "6.3",
+              "6.7"
+            ],
+            "details": "- Expose Prometheus metrics: ws_connections_total, ws_connections_active, ws_messages_emitted_total, ws_messages_dropped_total; histograms for emit_latency_ms and fanout_latency_ms\n- Add per-room membership gauges and adapter-level metrics (Redis pub/sub ops)\n- OpenTelemetry spans around event production and emission; propagate correlation IDs from HTTP to WS\n- Structured logs for rate limit violations and auth failures",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Client Integration Docs and Examples",
+            "description": "Produce documentation and examples for subscribing and handling events.",
+            "dependencies": [
+              "6.1",
+              "6.2",
+              "6.3",
+              "6.5"
+            ],
+            "details": "- Describe auth handshake (query vs header), reconnect/backoff, and error handling\n- List event names and payload shapes; show joining user and project rooms safely\n- Provide JS/TS snippet using socket.io-client; include REST notifications usage and marking read\n- Note scaling behavior with Redis adapter and rate limit guidelines; troubleshooting tips",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Collaboration: Comments, Mentions, Document Sharing & Versioning",
+        "description": "Implement threaded comments with @mentions, document upload with version control, and basic project chat channel scaffolding.",
+        "details": "Features:\n- Comments: support JSON content (rich), store mentions (resolved to user IDs), notify mentioned users\n- Threads: parentCommentId nullable on Comment; fetch threads\n- Documents: use Attachment model for project-level files; version increment when same filename uploaded for same scope\n- Basic chat: reuse comments with type='chat' for project channel; WebSocket broadcast to project room\n\nImplementation details:\n- Mentions parsing: regex on content or TipTap marks; resolve to users\n- Access: ensure only team members can access project docs/comments\n- Virus scanning hook (optional): clamav container or external service; at least MIME/type whitelist\n\nPseudo-code (versioning):\nconst existing = await prisma.attachment.findFirst({ where: { projectId, filename }, orderBy: { version: 'desc' } });\nconst version = (existing?.version ?? 0) + 1;\nawait prisma.attachment.create({ data: { projectId, filename, version, storageKey, mimeType, size, uploadedBy } });\n",
+        "testStrategy": "- Unit tests: mention extraction and notification creation.\n- Integration: upload doc v1, v2; list shows versions; access control enforced.\n- WebSocket test: chat message appears for project subscribers and persists.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Database schema updates for comments and document versioning",
+            "description": "Extend Comment and Attachment models to support threads, mentions, chat type, and versioning.",
+            "dependencies": [],
+            "details": "- Comment model: id, projectId, authorId, content (JSON), mentions (string[] of userIds), type ('comment' | 'chat'), parentCommentId (nullable), createdAt, updatedAt.\n- Indexes: (projectId, createdAt), (parentCommentId, createdAt), (projectId, type, createdAt), GIN on mentions if supported.\n- Attachment model: ensure fields projectId, filename, version (int), storageKey, mimeType, size, uploadedBy, createdAt; unique composite (projectId, filename, version).\n- Prisma migration with referential integrity (parentCommentId self-reference), onDelete SET NULL for parentCommentId.\n- Backfill/defaults for existing rows if needed.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Project-level RBAC and access control guards",
+            "description": "Implement policy checks ensuring only team members can access project comments, chat, and documents.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "- Policy helpers: canReadProject, canWriteProjectComment, canUploadProjectDocument; verify membership via TeamMember or ProjectMember tables.\n- NestJS Guard/middleware to enforce on routes and WS handshakes.\n- Deny access with 403, avoid leaking existence of resources.\n- Audit log hook for denied attempts (optional).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Mentions parsing and resolution utility",
+            "description": "Parse TipTap JSON or plain text for @mentions and resolve to user IDs within project scope.",
+            "dependencies": [
+              "7.1",
+              "7.2"
+            ],
+            "details": "- Inputs: { projectId, contentJson | plainText }.\n- Extraction order: TipTap marks of type 'mention' (attrs: id/email/username), fallback regex /@([A-Za-z0-9._-]+)/.\n- Resolve candidates to users; filter to project team members; dedupe; exclude author.\n- Outputs: { sanitizedContentJson, resolvedUserIds, rawMentions }.\n- Enforce content size and sanitize unknown nodes/marks.\n- Error if mentions exceed limit (e.g., 50).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Mention notifications and delivery pipeline",
+            "description": "Create mention notifications and deliver via WebSocket; email hook stub for future.",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "- On comment/chat creation, for each resolved mention: create Notification { type: 'mention', userId, actorId, projectId, resourceType: 'comment', resourceId, readAt: null } with idempotency key (resourceId:userId).\n- Publish WS event to each mentioned user's personal channel.\n- Do not notify the author about self-mentions.\n- Background job stub for email; feature flag to enable/disable.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "WebSocket project room scaffolding",
+            "description": "Establish WS namespaces/rooms per project and event contracts.",
+            "dependencies": [
+              "7.1",
+              "7.2"
+            ],
+            "details": "- Namespace/room: projects:{projectId}; join after auth guard validates membership.\n- Events: comment.created, chat.message, document.uploaded, document.versioned.\n- Payloads include ids, author summary, content excerpt, timestamps.\n- Rate limiting and basic throttling for senders.\n- Heartbeat/ping handling and reconnection guidance.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Threaded comments API (list/create)",
+            "description": "Implement endpoints to create and fetch threaded comments with mentions and notifications.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.3",
+              "7.4",
+              "7.5"
+            ],
+            "details": "- POST /projects/:projectId/comments { contentJson, parentCommentId? } => create type='comment'; parse mentions; persist mentions []; notify and WS broadcast comment.created.\n- GET /projects/:projectId/comments?parentId=null|id => paginated list of top-level or replies; include reply counts.\n- Optional: GET /projects/:projectId/threads to fetch top-level with first N replies.\n- Thread id convention: parentCommentId ?? id.\n- Validate parent belongs to same project; depth limited to 1 (thread + replies).\n- Response includes resolved mentions as user summaries.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Project chat using comments (type='chat')",
+            "description": "Provide basic project chat endpoints reusing Comment model and WS broadcasting.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.3",
+              "7.4",
+              "7.5",
+              "7.6"
+            ],
+            "details": "- POST /projects/:projectId/chat { contentJson } => creates Comment with type='chat', parentCommentId=null; reuse mentions parsing and notifications; broadcast chat.message to project room.\n- GET /projects/:projectId/chat?cursor=&limit= => paginated reverse-chronological list; supports since/after for live scroll.\n- Content sanitization identical to comments; store mentions.\n- Optional: soft-delete endpoint for sender/admins.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Document upload endpoints with versioning and validation",
+            "description": "Implement project document endpoints using Attachment model with version control, MIME whitelist, and size limits.",
+            "dependencies": [
+              "7.1",
+              "7.2",
+              "7.5"
+            ],
+            "details": "- POST /projects/:projectId/documents/initiate { filename, mimeType, size } => validate MIME whitelist and size; compute storageKey; return presigned PUT URL.\n- POST /projects/:projectId/documents/complete { filename, storageKey, mimeType, size } => compute version then persist and broadcast document.versioned.\n- Versioning pseudocode:\n  const existing = await prisma.attachment.findFirst({ where: { projectId, filename }, orderBy: { version: 'desc' } });\n  const version = (existing?.version ?? 0) + 1;\n  await prisma.attachment.create({ data: { projectId, filename, version, storageKey, mimeType, size, uploadedBy } });\n- GET /projects/:projectId/documents lists latest per filename with latestVersion; optional GET /projects/:projectId/documents/:filename/versions.\n- Reject disallowed types and oversize uploads with 400.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Optional virus scanning hook abstraction",
+            "description": "Introduce a pluggable scanner (e.g., ClamAV) to scan uploaded objects before/after persistence.",
+            "dependencies": [
+              "7.8",
+              "7.2"
+            ],
+            "details": "- Interface: Scanner.scanObject(storageKey, mimeType) => { status: 'clean'|'infected'|'error', signature? }.\n- Implementation: stub no-op by default; optional ClamAV via TCP; configurable timeouts and max size.\n- Flow: run scan after upload initiate/complete; if infected, mark attachment quarantined or block create; emit alert and skip WS broadcast.\n- Feature flag: SCAN_UPLOADS=true|false.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Unit tests for mentions and versioning",
+            "description": "Cover mention extraction/resolution, notification dedupe, MIME whitelist, and version increment logic.",
+            "dependencies": [
+              "7.3",
+              "7.4",
+              "7.8"
+            ],
+            "details": "- Mentions: TipTap marks and regex; dedupe; membership filtering; self-mention ignored.\n- Notifications: idempotency on same commentId/userId.\n- Versioning: v1 -> v2 on same filename; independent filenames unaffected; concurrency test with transactional lock or retry.\n- Validation: reject disallowed MIME; enforce size limit boundaries.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Integration and WebSocket tests",
+            "description": "End-to-end tests for access control, thread retrieval, document versions listing, and WS chat/comment flow.",
+            "dependencies": [
+              "7.2",
+              "7.5",
+              "7.6",
+              "7.7",
+              "7.8"
+            ],
+            "details": "- Access control: non-member gets 403 on comments/chat/documents; member succeeds.\n- Threads: create thread and replies; list returns correct structure and counts.\n- Documents: upload v1 then v2; list shows both versions and latest flag.\n- WS: subscribers in project room receive chat.message and comment.created; outsiders do not; message payloads match contract.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Analytics & Reporting MVP (Dashboards, Exports)",
+        "description": "Provide initial analytics endpoints and simple dashboards: project status, team performance, resource utilization, and CSV export.",
+        "details": "Approach:\n- Use Postgres CTEs/window functions for aggregates; cache results in Redis for 60-120s\n- Endpoints:\n  - GET /analytics/overview?teamId&from&to\n  - GET /analytics/resource-utilization?teamId&from&to\n  - GET /analytics/budget-vs-actual?projectId\n  - GET /reports/export.csv?type=... (stream CSV)\n- Frontend: charts with chart.js or Recharts; tables with sticky headers\n\nExample SQL (resource utilization):\nWITH te AS (\n  SELECT userId, SUM(EXTRACT(EPOCH FROM (COALESCE(endedAt, now()) - startedAt))) AS secs\n  FROM TimeEntry WHERE startedAt BETWEEN $1 AND $2 GROUP BY userId\n)\nSELECT u.id, u.name, te.secs/3600 as hours, (40*weeks) as capacity FROM users u LEFT JOIN te ON u.id=te.userId;\n\nOpenAPI tags for analytics; ensure pagination and filters.\n",
+        "testStrategy": "- Unit tests for repo methods constructing SQL; snapshot responses for seeded data.\n- Performance test: 10k tasks, 100k time entries; queries under 300ms with proper indexes.\n- CSV export: verify streaming and proper content-type; Excel compatibility.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define endpoints and scaffold Analytics/Reports module",
+            "description": "Design endpoint contracts and scaffold controllers/services for analytics and CSV export.",
+            "dependencies": [],
+            "details": "- Create AnalyticsModule and ReportsModule (or single AnalyticsModule with ReportsController).\n- Endpoints: GET /analytics/overview?teamId&from&to; GET /analytics/resource-utilization?teamId&from&to&page&limit; GET /analytics/budget-vs-actual?projectId; GET /reports/export.csv?type=overview|resource-utilization|budget-vs-actual&teamId&projectId&from&to.\n- Define DTOs for query params with defaults (from/to default last 30 days; page=1; limit=50).\n- Establish minimal response shapes for each endpoint to guide implementation and tests.\n- Register OpenAPI tags placeholders: Analytics, Reports (detailed docs in subtask 9).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement SQL queries (CTEs/window functions) via Prisma",
+            "description": "Build repository layer using Prisma $queryRaw with optimized Postgres CTEs/window functions.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "- Resource utilization: CTE summing timeEntry seconds per user in range; compute hours and capacity (weeklyCapacityHours*weeks in range); compute utilizationPct.\n- Overview: project status counts, team performance summaries, trending aggregates (7/30-day windows) using DATE_TRUNC and window functions as needed.\n- Budget vs actual: join projects to time entries; compute actualHours, variance; include actualCost/varianceCost if rate tables available; otherwise hours-only path.\n- Encapsulate queries behind repository/services; return typed DTOs.\n- Add recommended indexes: timeentry(startedAt), timeentry(userId, startedAt), timeentry(projectId, startedAt), tasks(projectId, status).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add Redis caching (60–120s) with cache keys by filters",
+            "description": "Introduce short-lived caching for analytics responses with filter-scoped keys.",
+            "dependencies": [
+              "8.2"
+            ],
+            "details": "- Use Redis with TTL 60–120s; key pattern: analytics:{endpoint}:{hash(teamId|projectId|from|to|page|limit|userScope)}.\n- Wrap service methods with cache get/set; serialize JSON safely; set X-Cache header (hit/miss) for observability.\n- Ensure cached content respects RBAC by including user/team scope in the key to avoid leakage.\n- Provide invalidation helpers (optional) though TTL likely sufficient for MVP.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement streaming CSV export",
+            "description": "Build memory-safe CSV export that streams data for requested report type.",
+            "dependencies": [
+              "8.1",
+              "8.2"
+            ],
+            "details": "- Controller: GET /reports/export.csv with type switch mapping to repository query.\n- Use Node streams (e.g., fast-csv or csv-stringify) and pipeline; fetch in chunks/iterators to avoid loading entire dataset.\n- Set headers: Content-Type text/csv; Content-Disposition attachment with sensible filename; prepend UTF-8 BOM for Excel compatibility.\n- Column schemas per type: overview (project,status,count,...), resource-utilization (userId,name,hours,capacity,utilizationPct), budget-vs-actual (projectId,name,budgetHours,actualHours,varianceHours,budgetCost,actualCost,varianceCost).\n- Respect filters and RBAC; avoid caching stream content; optionally include generation timestamp in first row.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Pagination, sorting, and filter validation",
+            "description": "Validate and normalize query parameters; implement pagination/sorting where applicable.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "- Use class-validator (or zod) with Nest ValidationPipe; enforce ISO8601 dates, from<=to, max range (e.g., 366 days), page>=1, limit within [10,1000].\n- Implement pagination for list-like endpoints (e.g., resource-utilization users); include meta {page,limit,total?}.\n- Optional sorting params: sortBy=hours|utilizationPct, sortDir=asc|desc.\n- Normalize timezones (treat as UTC) and clamp to boundaries.\n- Return consistent envelope: {data, meta} for paginated endpoints.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "RBAC scoping to teams/projects",
+            "description": "Enforce authorization and tenant scoping across analytics and reports.",
+            "dependencies": [
+              "8.1",
+              "8.5"
+            ],
+            "details": "- Integrate CASL Ability checks in controllers/services; require membership/permissions for teamId/projectId.\n- Apply WHERE clauses to constrain by team/project scope; prevent cross-tenant leakage.\n- Return 403 for unauthorized scopes; 400 for missing required scope (e.g., teamId where needed).\n- Ensure CSV export applies identical RBAC rules.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Unit tests for query builders and caching",
+            "description": "Test SQL repositories and cache behavior with seeded test data.",
+            "dependencies": [
+              "8.2",
+              "8.3",
+              "8.5",
+              "8.6"
+            ],
+            "details": "- Seed minimal fixtures for users, teams, projects, tasks, timeEntries.\n- Verify resource-utilization aggregates, overview status counts, and budget vs actual math via snapshots/assertions.\n- Test cache keys vary by filters and user scope; TTL respected; cache hit/miss toggles correct.\n- Validate input parsing/validation errors and pagination metadata.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Performance testing with large seeded data",
+            "description": "Load-test analytics queries and optimize with indexes.",
+            "dependencies": [
+              "8.2",
+              "8.3",
+              "8.5"
+            ],
+            "details": "- Seed ~10k tasks and ~100k time entries; vary date ranges and teams.\n- Measure P95 latency under 300ms for main queries (resource-utilization, overview) with EXPLAIN ANALYZE.\n- Tune indexes and query plans (avoid sequential scans); document results.\n- Run concurrent requests (e.g., 20–50 RPS) to validate caching effectiveness.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "OpenAPI documentation and examples",
+            "description": "Publish comprehensive API docs with examples for analytics and CSV export.",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.4",
+              "8.5",
+              "8.6"
+            ],
+            "details": "- Annotate controllers with @ApiTags('Analytics','Reports') and @ApiQuery/@ApiResponse.\n- Document query params, pagination, validation rules, and RBAC error responses (401/403).\n- Provide example responses for each endpoint and CSV schema description; mark CSV content-type and streaming behavior.\n- Ensure generated spec includes tags, enums for type, and response schemas for DTOs.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Automation & Workflow Foundation (Rules Engine, Jobs, Webhooks, SLA Alerts)",
+        "description": "Create a lightweight automation engine to run rules on events, background job processing, outbound webhooks, and SLA timers.",
+        "details": "Libraries:\n- BullMQ 4.x (Redis) for queues; @nestjs/bullmq integration\n- Rules: json-rules-engine 5.x or custom simple evaluator\n- Webhooks: sign payloads with HMAC-SHA256; retry with exponential backoff\n\nFeatures:\n- Rules model: {id, name, scope: 'project'|'global', triggers:['task.created','task.updated'], conditions: JSON, actions: JSON}\n- Actions supported MVP: add comment, change status, assign user, send webhook, notify user\n- SLA timers: on task creation, if dueDate set, schedule job to check breach and notify\n\nPseudo-code (rule evaluate):\nengine.addRule({ conditions, event: { type: 'fire', params: actions } });\nconst facts = { task, project, user };\nengine.run(facts).then(({ events }) => events.forEach(runAction));\n\nBullMQ queues: 'events', 'emails', 'webhooks', 'sla'; workers with concurrency tuned; Redis TLS in prod.\nSecurity: store webhook secrets per integration; sign payloads: X-Signature: sha256=...\n",
+        "testStrategy": "- Unit: condition evaluation given facts; action runner side effects mocked.\n- Integration: enqueue task.updated, verify matching rules fire and produce expected changes.\n- Webhooks: signature verification test with sample secret; retry/backoff validated.\n- SLA: schedule job and simulate time advancing (fake timers) -> breach notification created.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "BullMQ and NestJS integration with core queues",
+            "description": "Set up BullMQ 4.x with @nestjs/bullmq, Redis connection (TLS in prod), and define core queues: events, emails, webhooks, sla.",
+            "dependencies": [],
+            "details": "- Install and configure BullMQ 4.x and @nestjs/bullmq.\n- Configure Redis connection via env (REDIS_URL, REDIS_TLS=true in prod) with health checks.\n- Register queues: events, emails, webhooks, sla; create process handlers scaffolding and concurrency defaults.\n- Add global queue options (removeOnComplete/Fail, attempts defaults where sensible).\n- Provide a health endpoint and a smoke test route to enqueue and process a dummy job on each queue.\n- Acceptance: All queues connect successfully; smoke jobs are processed; metrics/logs confirm worker startup.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Rules model and CRUD API",
+            "description": "Define Rules entity and implement CRUD endpoints with validation and scoping.",
+            "dependencies": [],
+            "details": "- Data model fields: id, name, scope ('project'|'global'), projectId (nullable when global), triggers (array), conditions (JSON), actions (JSON), isActive (boolean), createdAt, updatedAt.\n- Input validation for triggers, conditions, actions; enforce allowed action types (add_comment, change_status, assign_user, send_webhook, notify_user).\n- Endpoints: list (filter by scope/project), get, create, update, delete, toggle active.\n- Authorization: only admins or project admins can manage rules; scope enforcement.\n- Acceptance: CRUD works with validation; rules persisted and retrievable; isActive respected.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Event publisher into 'events' queue",
+            "description": "Publish domain events from task/project services to the events queue with a stable schema.",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "- Define event schema: { id, type: 'task.created'|'task.updated'|..., occurredAt, actorId, projectId, taskId?, payload }.\n- Hook into task/project create/update/comment flows to publish events.\n- Use deterministic jobId (e.g., event id) to avoid duplicates; set minimal retry policy.\n- Include correlationId/requestId for tracing.\n- Acceptance: Creating/updating a task enqueues a well-formed event visible in the events queue.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Rules evaluation service using json-rules-engine",
+            "description": "Implement evaluator that loads matching rules by scope/trigger and evaluates against facts {task, project, user}.",
+            "dependencies": [
+              "9.1",
+              "9.2"
+            ],
+            "details": "- Integrate json-rules-engine 5.x; wrap with a service that maps stored conditions/actions to engine rules.\n- Fact builder: load minimal task, project, user facts needed by conditions; avoid N+1 queries.\n- Evaluation flow: for an event, fetch active rules with matching trigger and scope; run engine; collect fired actions.\n- Error handling and timeouts per evaluation to protect workers.\n- Acceptance: Given seeded rules and sample facts, evaluator returns expected actions deterministically.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Action runners implementation",
+            "description": "Implement handlers for add comment, change status, assign user, notify user, and enqueue webhook send.",
+            "dependencies": [
+              "9.4"
+            ],
+            "details": "- Define a unified ActionRunner with type-dispatched handlers.\n- add_comment: create comment linked to task; include system actor and message template support.\n- change_status: transition task status with validation of allowed states.\n- assign_user: set assignee if permitted and not already assigned.\n- notify_user: enqueue email or in-app notification.\n- send_webhook: enqueue job in webhooks queue with target URL, payload, headers.\n- Idempotency: compute actionKey per rule firing to skip duplicates on retries.\n- Acceptance: Each action updates state or enqueues follow-up jobs correctly and idempotently.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Webhook delivery with HMAC-SHA256 and retries",
+            "description": "Deliver outbound webhooks with signed payloads and exponential backoff retries.",
+            "dependencies": [
+              "9.1",
+              "9.5"
+            ],
+            "details": "- Store per-integration secret securely; do not log secrets.\n- Compute signature: X-Signature: sha256=<hex(hmac(secret, rawBody))>; include X-Event-Type and X-Request-Id.\n- Implement webhooks worker: POST JSON with timeout, follow redirects disabled, TLS verification enabled.\n- Retry policy: exponential backoff with jitter (e.g., base 2s, max 1h, up to 7 attempts); respect 4xx vs 5xx (no retry on 410/422).\n- Record delivery attempts/status for observability.\n- Acceptance: Webhook recipients can verify signature; failures retry per policy; successes recorded.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "SLA timers scheduling and breach checks",
+            "description": "Schedule SLA jobs on task creation and check for due-date breaches, then notify/mark.",
+            "dependencies": [
+              "9.1",
+              "9.5"
+            ],
+            "details": "- On task.created with dueDate, schedule delayed job in sla queue at dueDate.\n- SLA worker: at execution, reload task; if not completed and dueDate passed, mark as breached and notify responsible users.\n- Optional grace period config; reschedule if dueDate changed.\n- Idempotent operations on repeated executions.\n- Acceptance: Tasks with due dates schedule jobs; breaches trigger notify actions only once.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Concurrency, rate limiting, and idempotency safeguards",
+            "description": "Tune worker concurrency, set rate limits, and enforce idempotency to prevent duplicate side effects.",
+            "dependencies": [
+              "9.1",
+              "9.5",
+              "9.6",
+              "9.7"
+            ],
+            "details": "- Configure per-queue concurrency based on workload; use BullMQ limiter to throttle external calls (webhooks, emails).\n- Use deterministic jobId and dedup keys for actions and deliveries; store processed action keys to skip duplicates.\n- Add transactional guards around state-changing actions.\n- Implement dead-letter handling and retry limits to avoid poison message loops.\n- Acceptance: Load tests show no duplicate actions under retries; external calls respect rate limits.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Admin tooling to enable/disable rules",
+            "description": "Provide endpoints and minimal UI hooks to toggle rules on/off and view last fired metadata.",
+            "dependencies": [
+              "9.2"
+            ],
+            "details": "- API: PATCH /rules/:id { isActive } with audit logging of actor/time.\n- Store lastFiredAt, lastResult summary for visibility.\n- Optional admin UI stubs or admin-only endpoints returning rule stats.\n- Acceptance: Admin can enable/disable rules; evaluator respects isActive immediately.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Observability for jobs and automation",
+            "description": "Add metrics, structured logs, and dashboards for queues, rules firing, and deliveries.",
+            "dependencies": [
+              "9.1",
+              "9.3",
+              "9.5",
+              "9.6",
+              "9.7"
+            ],
+            "details": "- Expose Prometheus metrics: queue_depth, job_latency, job_duration, webhook_attempts, webhook_failures, rules_fired, actions_applied, sla_scheduled, sla_breaches.\n- Structured logs with correlationId and eventId; sample failure payloads safely.\n- Add dead-letter and failed job inspection; optional bull-board for dev.\n- Health/readiness probes reflect Redis connectivity and worker liveness.\n- Acceptance: Metrics endpoints reflect real activity; failed jobs are inspectable; logs include correlation IDs.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Unit tests for evaluator and action runners",
+            "description": "Create unit tests covering condition evaluation and each action handler with side effects mocked.",
+            "dependencies": [
+              "9.4",
+              "9.5",
+              "9.6"
+            ],
+            "details": "- Evaluator tests: given facts and rules, assert expected actions; cover edge cases (missing facts, invalid conditions).\n- Action tests: mock repositories and external clients; assert idempotency behavior and validation errors.\n- Webhook signing unit test: header format and signature computation.\n- Acceptance: >90% coverage on evaluator/actions modules; tests pass reliably.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "End-to-end integration tests for rule firing",
+            "description": "Test full flow from event enqueue to actions applied using a real Redis and workers.",
+            "dependencies": [
+              "9.1",
+              "9.3",
+              "9.4",
+              "9.5"
+            ],
+            "details": "- Spin up Redis via testcontainers; start Nest app with workers enabled.\n- Seed rules; perform task update/create; await queue drains; assert state changes and enqueued follow-ups.\n- Include cases for multiple matching rules, conflicting actions resolved deterministically.\n- Acceptance: E2E tests demonstrate rules are fired and actions executed as expected.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 13,
+            "title": "Webhook signature verification and retry tests",
+            "description": "Validate HMAC signature correctness and retry/backoff behavior under failure scenarios.",
+            "dependencies": [
+              "9.6"
+            ],
+            "details": "- Use a mock HTTP server to capture requests and verify X-Signature against known secret and raw body.\n- Simulate 5xx/timeout responses to assert exponential backoff schedule and max attempts.\n- Ensure no retries on specific 4xx (e.g., 410/422) and that jitter is applied within bounds.\n- Acceptance: Tests confirm correct signature and retry logic across scenarios.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 14,
+            "title": "Documentation for events, rules, actions, webhooks, and SLAs",
+            "description": "Author developer docs for event schema, rule structure, supported actions, webhook signing, and SLA behavior.",
+            "dependencies": [
+              "9.3",
+              "9.4",
+              "9.5",
+              "9.6",
+              "9.7",
+              "9.10"
+            ],
+            "details": "- Document event types and payload schema; include facts available to rules.\n- Specify rules JSON shapes with examples; list supported actions and required fields.\n- Describe webhook delivery, headers, signing algorithm, and retry policy for consumers.\n- Explain SLA scheduling and breach detection.\n- Include operational runbooks: scaling workers, inspecting failures, and metrics glossary.\n- Acceptance: Docs reviewed and published; internal consumers can self-serve integrations.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Security, Compliance Hooks, Audit Logging, and Observability",
+        "description": "Implement cross-cutting concerns: audit logs, rate limits, input validation hardening, OpenTelemetry, health checks, and base compliance features.",
+        "details": "Security:\n- Audit log table: {id, userId, action, entityType, entityId, metadata JSON, ip, ua, createdAt}\n- Middleware to record audit events for mutating endpoints\n- Input validation: zod schemas with strict() and maximum payload size; sanitize rich-text\n- Rate limiting: global + per-IP via Fastify rate limit; per-user for sensitive endpoints\n- TLS: enforce HTTPS behind proxy; HSTS; CORS restrict origins; CSP for web\n- Secrets: load via process.env with validation; disallow default passwords\n- Data retention & GDPR: endpoints to export/delete user data (Phase 2), data minimization by default\n\nObservability:\n- OpenTelemetry SDK 1.x + auto-instrumentations for Nest/HTTP/PG/Redis; export to OTLP collector\n- Metrics: Prometheus endpoint /metrics (use prom-client) for process and business metrics\n- Health: /health using @godaddy/terminus or @nestjs/terminus; liveness/readiness including DB/Redis/MinIO\n- Logs: pino JSON logs, include trace_id\n\nPseudo-code (audit):\n@Injectable() class AuditInterceptor implements NestInterceptor { intercept(ctx, next) { /* on success, persist audit row */ } }\n",
+        "testStrategy": "- Verify audit entries for create/update/delete across core entities with correct actor and IP.\n- Security tests: rate limit triggers; payload size exceeded returns 413.\n- OTel: local collector receives spans; traces visible in Jaeger/Tempo; logs include trace_id.\n- Health checks fail when DB down; readiness gating in Kubernetes simulated locally via compose.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Audit log schema and persistence layer",
+            "description": "Create audit_log table/model and a persistence service to store audit events.",
+            "dependencies": [],
+            "details": "- Add Prisma model audit_log: {id cuid, userId?, action, entityType?, entityId?, metadata Json, ip?, ua?, createdAt default now}\n- Create indexes: createdAt, userId, (entityType, entityId), action; consider partial index on recent window\n- Generate migration and update Prisma client\n- Implement AuditLogService with create() and query helpers; validate payload size and JSON safety\n- Document retention policy knobs (TTL/archival future)",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Request context for IP, UA, user",
+            "description": "Capture IP/UA/user and expose via request-scoped context.",
+            "dependencies": [],
+            "details": "- Add middleware to read IP (X-Forwarded-For aware), UA, and authenticated userId\n- Provide a request-scoped provider using AsyncLocalStorage or nestjs-cls to access these values anywhere\n- Persist a requestId (header x-request-id or generated) for correlation\n- Sanitize/normalize IP formats (IPv4/IPv6) and truncate UA length",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "AuditInterceptor for mutating actions",
+            "description": "Implement interceptor to record audit events after successful mutations.",
+            "dependencies": [
+              "10.1",
+              "10.2"
+            ],
+            "details": "- Create Nest interceptor that runs on POST/PUT/PATCH/DELETE or via @AuditAction decorator\n- Derive action, entityType, and entityId from route/handler metadata or params\n- On success, call AuditLogService.create with userId, ip, ua, and optional metadata (diffs, payload keys only)\n- Ensure no PII leakage in metadata; redact known fields\n- Register globally or bind to mutating controllers",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Global input validation and payload limits",
+            "description": "Harden validation with zod strict schemas, payload size limits, and rich-text sanitization.",
+            "dependencies": [],
+            "details": "- Integrate zod with strict() and stripUnknown; return consistent 400 errors\n- Configure Fastify JSON/body limit (e.g., 1MB) and return 413 on exceed\n- Implement server-side rich-text sanitization (isomorphic-dompurify) with safe allowlists\n- Add centralized validation pipe and error formatter with correlation/requestId",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Rate limiting (global, per-IP, per-user)",
+            "description": "Configure global and fine-grained rate limits with Fastify.",
+            "dependencies": [],
+            "details": "- Install and configure @fastify/rate-limit with Redis store if available\n- Global per-IP limits with sensible window; exclude /health and /metrics\n- Per-user limiter guard/decorator for sensitive routes (keyed by userId; fallback to IP)\n- Standardize 429 response shape and headers; add config knobs via env",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Security headers and TLS enforcement",
+            "description": "Apply helmet, HSTS, CSP, strict CORS, and HTTPS behind proxy.",
+            "dependencies": [],
+            "details": "- Enable trust proxy and enforce HTTPS redirect (except health/metrics if needed)\n- Add helmet with HSTS and robust CSP; parameterize by env (dev relaxed, prod strict)\n- Configure CORS with explicit origin allowlist and credential policy\n- Add referrer-policy, x-content-type-options, frameguard, and permissions-policy",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "OpenTelemetry SDK and exporters",
+            "description": "Set up tracing/metrics auto-instrumentation and OTLP export.",
+            "dependencies": [],
+            "details": "- Install @opentelemetry/sdk-node, auto-instrumentations, OTLP trace exporter\n- Instrument HTTP/Nest, PostgreSQL, Redis; set resource attrs (service.name, version)\n- Configure sampler (e.g., parentbased_traceidratio via env) and batch processor\n- Export to local/remote collector (OTLP gRPC/HTTP) with env-driven endpoint and auth",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Pino JSON logging with trace correlation",
+            "description": "Configure structured logs and include trace_id/span_id for correlation.",
+            "dependencies": [
+              "10.7"
+            ],
+            "details": "- Integrate pino/pino-http with Fastify/Nest and redact sensitive fields\n- Enrich logs with requestId, userId, ip, ua from request context\n- Pull trace_id/span_id from OTel context; add log level bindings per env\n- Pretty printing in dev; ship JSON in prod; ensure log lines are single-line JSON",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Prometheus /metrics endpoint",
+            "description": "Expose process and business metrics using prom-client.",
+            "dependencies": [],
+            "details": "- Initialize prom-client default metrics and collect GC/event loop stats\n- Add /metrics route with text/plain; guard with IP allowlist or auth if needed\n- Define custom business metrics (e.g., tasks_created_total, rate_limit_hits_total)\n- Add histogram/timers for HTTP latency; label with method, route, status",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Health checks (liveness/readiness)",
+            "description": "Implement /health with readiness for DB/Redis/MinIO and liveness.",
+            "dependencies": [],
+            "details": "- Use @nestjs/terminus (or @godaddy/terminus) to define checks\n- DB: Prisma $queryRaw SELECT 1; Redis: PING; MinIO/S3: list bucket or head bucket\n- Readiness returns 503 on dependency failure; liveness cheap/no-op\n- Add shutdown hooks (onSignal/beforeShutdown) and configurable timeouts",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 11,
+            "title": "Secrets and config validation; block unsafe defaults",
+            "description": "Validate environment configuration and prevent default credentials.",
+            "dependencies": [],
+            "details": "- Define zod schema for process.env (DB URLs, OTLP, JWT secrets, CORS origins, rate limits)\n- Fail fast on missing/weak secrets; require HTTPS in prod\n- Add startup check to reject known default admin/passwords\n- Centralize config access via a ConfigService wrapper with typed getters",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 12,
+            "title": "Test suite and CI for cross-cutting concerns",
+            "description": "Add unit/e2e tests and CI wiring for audit, limits, validation, OTel, health, and metrics.",
+            "dependencies": [
+              "10.1",
+              "10.2",
+              "10.3",
+              "10.4",
+              "10.5",
+              "10.6",
+              "10.7",
+              "10.8",
+              "10.9",
+              "10.10",
+              "10.11"
+            ],
+            "details": "- Audit: assert create/update/delete emit rows with correct actor/ip/ua\n- Security: trigger 429 and verify headers; payload > limit returns 413\n- OTel: spans exported to local collector; logs include trace_id\n- Health: readiness fails when DB/Redis/MinIO down; metrics endpoint exposes counters\n- Integrate testcontainers (Postgres, Redis, MinIO, optional otel-collector); add CI jobs",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-29T18:36:56.253Z",
+      "updated": "2025-08-29T18:36:56.253Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

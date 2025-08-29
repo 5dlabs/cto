@@ -1,0 +1,227 @@
+# Task ID: 2
+# Title: Database Schema and Prisma Setup
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Introduce Prisma ORM, define core schema for users, teams, projects, tasks, subtasks, dependencies, time tracking, comments, attachments, and templates.
+# Details:
+Setup:
+- pnpm add -w prisma@5.x @prisma/client@5.x
+- npx prisma init --datasource-provider postgresql
+- Configure DATABASE_URL from .env; enable connection pooling via pgbouncer later.
+
+Core Entities (prisma/schema.prisma):
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  authProvider String   // 'local' | 'oauth' | 'saml'
+  mfaEnabled   Boolean  @default(false)
+  role         Role     @default(USER)
+  teams        TeamMember[]
+  timeEntries  TimeEntry[]
+  tasks        Task[]   @relation("AssigneeTasks")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Team {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  members   TeamMember[]
+  projects  Project[]
+  createdAt DateTime      @default(now())
+}
+
+model TeamMember {
+  id      String @id @default(cuid())
+  userId  String
+  teamId  String
+  role    String  // team-scoped role
+  user    User    @relation(fields: [userId], references: [id])
+  team    Team    @relation(fields: [teamId], references: [id])
+  @@unique([userId, teamId])
+}
+
+model Project {
+  id           String      @id @default(cuid())
+  name         String
+  code         String?     @unique
+  description  String?
+  startDate    DateTime?
+  endDate      DateTime?
+  budgetCents  BigInt?     @db.BigInt
+  status       String      // planning | active | paused | completed
+  teamId       String
+  milestones   Milestone[]
+  tasks        Task[]
+  risks        Risk[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  team         Team        @relation(fields: [teamId], references: [id])
+}
+
+model Milestone {
+  id         String   @id @default(cuid())
+  projectId  String
+  name       String
+  dueDate    DateTime?
+  project    Project  @relation(fields: [projectId], references: [id])
+  @@index([projectId, dueDate])
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  projectId    String
+  title        String
+  description  Json?    // rich text (TipTap JSON)
+  status       String   // backlog|todo|in_progress|blocked|review|done
+  priority     String   // low|medium|high|urgent
+  estimateHrs  Decimal? @db.Decimal(5,2)
+  dueDate      DateTime?
+  assigneeId   String?
+  parentId     String?
+  attachments  Attachment[]
+  comments     Comment[]
+  timeEntries  TimeEntry[]
+  dependencies TaskDependency[] @relation("TaskDeps_Task")
+  blockedBy    TaskDependency[] @relation("TaskDeps_DependsOn")
+  project      Project  @relation(fields: [projectId], references: [id])
+  assignee     User?    @relation("AssigneeTasks", fields: [assigneeId], references: [id])
+  parent       Task?    @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks     Task[]   @relation("Subtasks")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([projectId, status, dueDate])
+}
+
+model TaskDependency {
+  id          String @id @default(cuid())
+  taskId      String
+  dependsOnId String
+  task        Task   @relation("TaskDeps_Task", fields: [taskId], references: [id])
+  dependsOn   Task   @relation("TaskDeps_DependsOn", fields: [dependsOnId], references: [id])
+  @@unique([taskId, dependsOnId])
+}
+
+model TimeEntry {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  startedAt DateTime
+  endedAt   DateTime?
+  durationS Int?     // computed on end
+  task      Task     @relation(fields: [taskId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  @@index([taskId, userId, startedAt])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  taskId    String?
+  projectId String?
+  filename  String
+  mimeType  String
+  size      Int
+  storageKey String // S3 key
+  version    Int     @default(1)
+  uploadedBy String
+  createdAt  DateTime @default(now())
+  task      Task?    @relation(fields: [taskId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      Json
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+model Risk {
+  id         String   @id @default(cuid())
+  projectId  String
+  title      String
+  impact     String
+  likelihood String
+  mitigation String?
+  status     String // open|mitigated|closed
+  project    Project @relation(fields: [projectId], references: [id])
+}
+
+enum Role { USER MANAGER ADMIN }
+
+Indexes: create GIN on description if needed with Prisma extension or SQL.
+Migrations: npx prisma migrate dev -n init
+Seed script: create default admin user and sample project.
+
+
+# Test Strategy:
+- Use Prisma validate and migrate in CI. Run npx prisma db push on ephemeral DB container.
+- Integration tests with testcontainers-node spinning Postgres; seed and assert CRUD on core entities.
+- Verify referential integrity (deleting project cascades tasks? Prefer soft-delete later).
+
+# Subtasks:
+## 1. Add Prisma dependencies at workspace root [pending]
+### Dependencies: None
+### Description: Install Prisma ORM and client libraries and align tooling versions.
+### Details:
+Run pnpm add -w prisma@5.x @prisma/client@5.x. Ensure Node 20.x and pnpm 9.x are set in package.json engines and packageManager. Commit lockfile and verify Turborepo picks up workspace changes.
+
+## 2. Initialize Prisma with PostgreSQL provider and env [pending]
+### Dependencies: 2.1
+### Description: Bootstrap Prisma configuration and environment variables.
+### Details:
+Run npx prisma init --datasource-provider postgresql. Add DATABASE_URL to .env and .env.example (e.g., postgresql://user:pass@localhost:5432/app?schema=public). Note: plan to enable PgBouncer later; keep connection string compatible.
+
+## 3. Implement core Prisma schema models [pending]
+### Dependencies: 2.2
+### Description: Define all models, relations, and enum exactly as specified.
+### Details:
+Edit prisma/schema.prisma to include models: User, Team, TeamMember, Project, Milestone, Task, TaskDependency, TimeEntry, Attachment, Comment, Risk and enum Role. Use correct relation names (AssigneeTasks, TaskDeps_Task, TaskDeps_DependsOn, Subtasks), types (Decimal(5,2), BigInt), and inline indexes/uniques (e.g., @@unique([userId, teamId]), @@index on Task and Milestone).
+
+## 4. Define referential actions, additional indexes, and raw SQL extensions [pending]
+### Dependencies: 2.3
+### Description: Finalize constraints, decide on deletion behaviors, and prepare advanced indexes.
+### Details:
+Set referential actions: restrict project deletion if tasks exist (no cascade), setNull for Task.assigneeId and Task.parentId, keep TaskDependency pairs unique. Add helpful indexes (e.g., Project teamId,status; Attachment projectId,taskId). Prepare SQL migration snippet to add a GIN index for JSON search on Task.description: CREATE INDEX IF NOT EXISTS idx_task_description_gin ON "Task" USING GIN ("description" jsonb_path_ops).
+
+## 5. Add package.json scripts for Prisma lifecycle [pending]
+### Dependencies: 2.1
+### Description: Provide convenient scripts to manage Prisma operations.
+### Details:
+Add scripts: prisma:generate="prisma generate", prisma:migrate="prisma migrate dev", prisma:deploy="prisma migrate deploy", prisma:validate="prisma validate", db:push="prisma db push", prisma:seed="tsx prisma/seed.ts". Optionally set prisma.seed in package.json to tsx prisma/seed.ts.
+
+## 6. Generate Prisma Client and wire PrismaService in backend [pending]
+### Dependencies: 2.3, 2.5
+### Description: Create a NestJS PrismaService with logging and graceful shutdown.
+### Details:
+Run pnpm prisma:generate. Implement PrismaService extending PrismaClient with log levels in dev, enableShutdownHooks(app), and request-scoped clean-up as needed. Export via PrismaModule and inject in repositories/providers.
+
+## 7. Create and apply initial migration [pending]
+### Dependencies: 2.4
+### Description: Create initial schema migration and apply to local database.
+### Details:
+Run npx prisma migrate dev -n init. Inspect generated SQL to ensure all tables, enums, indexes, and the JSON GIN index are present. Commit prisma/migrations and updated schema.prisma.
+
+## 8. Implement seed script for admin, team, project, and sample tasks [pending]
+### Dependencies: 2.6, 2.7
+### Description: Seed initial data to bootstrap environments.
+### Details:
+Create prisma/seed.ts to upsert an admin user (role ADMIN), create a sample team and TeamMember link, a sample project with milestones, tasks, subtasks, dependencies, comments, attachments, and time entries. Use transactions and upsert to keep it idempotent.
+
+## 9. Integration tests with Testcontainers for Prisma CRUD and relations [pending]
+### Dependencies: 2.7
+### Description: Validate schema behavior against a real Postgres instance.
+### Details:
+Use testcontainers-node to start Postgres. Run prisma migrate deploy and minimal seeding. Assert CRUD for users, teams, projects, tasks, task dependencies, time entries, comments, attachments. Verify unique constraints, indexes used on typical queries, and referential actions (e.g., cannot delete project with tasks).
+
+## 10. CI pipeline step for Prisma validate, db push, and tests [pending]
+### Dependencies: 2.5, 2.9
+### Description: Automate schema checks and tests in CI with an ephemeral DB.
+### Details:
+In CI (e.g., GitHub Actions), add Postgres service container. Steps: pnpm install, pnpm prisma:generate, prisma validate, prisma migrate deploy or db push to ephemeral DB, run unit/integration tests, and upload migration artifacts. Document raw SQL index requirements and local setup in README.
+

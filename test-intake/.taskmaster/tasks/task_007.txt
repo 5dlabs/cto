@@ -1,0 +1,139 @@
+# Task ID: 7
+# Title: Collaboration: Comments, Mentions, Document Sharing & Versioning
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Implement threaded comments with @mentions, document upload with version control, and basic project chat channel scaffolding.
+# Details:
+Features:
+- Comments: support JSON content (rich), store mentions (resolved to user IDs), notify mentioned users
+- Threads: parentCommentId nullable on Comment; fetch threads
+- Documents: use Attachment model for project-level files; version increment when same filename uploaded for same scope
+- Basic chat: reuse comments with type='chat' for project channel; WebSocket broadcast to project room
+
+Implementation details:
+- Mentions parsing: regex on content or TipTap marks; resolve to users
+- Access: ensure only team members can access project docs/comments
+- Virus scanning hook (optional): clamav container or external service; at least MIME/type whitelist
+
+Pseudo-code (versioning):
+const existing = await prisma.attachment.findFirst({ where: { projectId, filename }, orderBy: { version: 'desc' } });
+const version = (existing?.version ?? 0) + 1;
+await prisma.attachment.create({ data: { projectId, filename, version, storageKey, mimeType, size, uploadedBy } });
+
+
+# Test Strategy:
+- Unit tests: mention extraction and notification creation.
+- Integration: upload doc v1, v2; list shows versions; access control enforced.
+- WebSocket test: chat message appears for project subscribers and persists.
+
+# Subtasks:
+## 1. Database schema updates for comments and document versioning [pending]
+### Dependencies: None
+### Description: Extend Comment and Attachment models to support threads, mentions, chat type, and versioning.
+### Details:
+- Comment model: id, projectId, authorId, content (JSON), mentions (string[] of userIds), type ('comment' | 'chat'), parentCommentId (nullable), createdAt, updatedAt.
+- Indexes: (projectId, createdAt), (parentCommentId, createdAt), (projectId, type, createdAt), GIN on mentions if supported.
+- Attachment model: ensure fields projectId, filename, version (int), storageKey, mimeType, size, uploadedBy, createdAt; unique composite (projectId, filename, version).
+- Prisma migration with referential integrity (parentCommentId self-reference), onDelete SET NULL for parentCommentId.
+- Backfill/defaults for existing rows if needed.
+
+## 2. Project-level RBAC and access control guards [pending]
+### Dependencies: 7.1
+### Description: Implement policy checks ensuring only team members can access project comments, chat, and documents.
+### Details:
+- Policy helpers: canReadProject, canWriteProjectComment, canUploadProjectDocument; verify membership via TeamMember or ProjectMember tables.
+- NestJS Guard/middleware to enforce on routes and WS handshakes.
+- Deny access with 403, avoid leaking existence of resources.
+- Audit log hook for denied attempts (optional).
+
+## 3. Mentions parsing and resolution utility [pending]
+### Dependencies: 7.1, 7.2
+### Description: Parse TipTap JSON or plain text for @mentions and resolve to user IDs within project scope.
+### Details:
+- Inputs: { projectId, contentJson | plainText }.
+- Extraction order: TipTap marks of type 'mention' (attrs: id/email/username), fallback regex /@([A-Za-z0-9._-]+)/.
+- Resolve candidates to users; filter to project team members; dedupe; exclude author.
+- Outputs: { sanitizedContentJson, resolvedUserIds, rawMentions }.
+- Enforce content size and sanitize unknown nodes/marks.
+- Error if mentions exceed limit (e.g., 50).
+
+## 4. Mention notifications and delivery pipeline [pending]
+### Dependencies: 7.3
+### Description: Create mention notifications and deliver via WebSocket; email hook stub for future.
+### Details:
+- On comment/chat creation, for each resolved mention: create Notification { type: 'mention', userId, actorId, projectId, resourceType: 'comment', resourceId, readAt: null } with idempotency key (resourceId:userId).
+- Publish WS event to each mentioned user's personal channel.
+- Do not notify the author about self-mentions.
+- Background job stub for email; feature flag to enable/disable.
+
+## 5. WebSocket project room scaffolding [pending]
+### Dependencies: 7.1, 7.2
+### Description: Establish WS namespaces/rooms per project and event contracts.
+### Details:
+- Namespace/room: projects:{projectId}; join after auth guard validates membership.
+- Events: comment.created, chat.message, document.uploaded, document.versioned.
+- Payloads include ids, author summary, content excerpt, timestamps.
+- Rate limiting and basic throttling for senders.
+- Heartbeat/ping handling and reconnection guidance.
+
+## 6. Threaded comments API (list/create) [pending]
+### Dependencies: 7.1, 7.2, 7.3, 7.4, 7.5
+### Description: Implement endpoints to create and fetch threaded comments with mentions and notifications.
+### Details:
+- POST /projects/:projectId/comments { contentJson, parentCommentId? } => create type='comment'; parse mentions; persist mentions []; notify and WS broadcast comment.created.
+- GET /projects/:projectId/comments?parentId=null|id => paginated list of top-level or replies; include reply counts.
+- Optional: GET /projects/:projectId/threads to fetch top-level with first N replies.
+- Thread id convention: parentCommentId ?? id.
+- Validate parent belongs to same project; depth limited to 1 (thread + replies).
+- Response includes resolved mentions as user summaries.
+
+## 7. Project chat using comments (type='chat') [pending]
+### Dependencies: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
+### Description: Provide basic project chat endpoints reusing Comment model and WS broadcasting.
+### Details:
+- POST /projects/:projectId/chat { contentJson } => creates Comment with type='chat', parentCommentId=null; reuse mentions parsing and notifications; broadcast chat.message to project room.
+- GET /projects/:projectId/chat?cursor=&limit= => paginated reverse-chronological list; supports since/after for live scroll.
+- Content sanitization identical to comments; store mentions.
+- Optional: soft-delete endpoint for sender/admins.
+
+## 8. Document upload endpoints with versioning and validation [pending]
+### Dependencies: 7.1, 7.2, 7.5
+### Description: Implement project document endpoints using Attachment model with version control, MIME whitelist, and size limits.
+### Details:
+- POST /projects/:projectId/documents/initiate { filename, mimeType, size } => validate MIME whitelist and size; compute storageKey; return presigned PUT URL.
+- POST /projects/:projectId/documents/complete { filename, storageKey, mimeType, size } => compute version then persist and broadcast document.versioned.
+- Versioning pseudocode:
+  const existing = await prisma.attachment.findFirst({ where: { projectId, filename }, orderBy: { version: 'desc' } });
+  const version = (existing?.version ?? 0) + 1;
+  await prisma.attachment.create({ data: { projectId, filename, version, storageKey, mimeType, size, uploadedBy } });
+- GET /projects/:projectId/documents lists latest per filename with latestVersion; optional GET /projects/:projectId/documents/:filename/versions.
+- Reject disallowed types and oversize uploads with 400.
+
+## 9. Optional virus scanning hook abstraction [pending]
+### Dependencies: 7.8, 7.2
+### Description: Introduce a pluggable scanner (e.g., ClamAV) to scan uploaded objects before/after persistence.
+### Details:
+- Interface: Scanner.scanObject(storageKey, mimeType) => { status: 'clean'|'infected'|'error', signature? }.
+- Implementation: stub no-op by default; optional ClamAV via TCP; configurable timeouts and max size.
+- Flow: run scan after upload initiate/complete; if infected, mark attachment quarantined or block create; emit alert and skip WS broadcast.
+- Feature flag: SCAN_UPLOADS=true|false.
+
+## 10. Unit tests for mentions and versioning [pending]
+### Dependencies: 7.3, 7.4, 7.8
+### Description: Cover mention extraction/resolution, notification dedupe, MIME whitelist, and version increment logic.
+### Details:
+- Mentions: TipTap marks and regex; dedupe; membership filtering; self-mention ignored.
+- Notifications: idempotency on same commentId/userId.
+- Versioning: v1 -> v2 on same filename; independent filenames unaffected; concurrency test with transactional lock or retry.
+- Validation: reject disallowed MIME; enforce size limit boundaries.
+
+## 11. Integration and WebSocket tests [pending]
+### Dependencies: 7.2, 7.5, 7.6, 7.7, 7.8
+### Description: End-to-end tests for access control, thread retrieval, document versions listing, and WS chat/comment flow.
+### Details:
+- Access control: non-member gets 403 on comments/chat/documents; member succeeds.
+- Threads: create thread and replies; list returns correct structure and counts.
+- Documents: upload v1 then v2; list shows both versions and latest flag.
+- WS: subscribers in project room receive chat.message and comment.created; outsiders do not; message payloads match contract.
+
