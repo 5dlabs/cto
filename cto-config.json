@@ -18,6 +18,10 @@
       "docsProjectDirectory": "docs",
       "service": "cto"
     },
+    "intake": {
+      "model": "opus",
+      "githubApp": "5DLabs-Morgan"
+    },
     "play": {
       "model": "claude-sonnet-4-20250514",
       "implementationAgent": "5DLabs-Rex",

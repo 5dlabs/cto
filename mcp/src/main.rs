@@ -1192,15 +1192,15 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let branch = get_git_current_branch_in_dir(Some(&workspace_dir))?;
     eprintln!("🎯 Using branch: {branch}");
 
-    // Use client-provided parameters (no defaults - client controls intake config)
+    // Use configuration values with defaults (client can override via MCP JSON)
     let github_app = arguments
         .get("github_app")
         .and_then(|v| v.as_str())
-        .ok_or(anyhow!("github_app parameter required (specify in MCP JSON client config)"))?;
+        .unwrap_or(&config.defaults.intake.github_app);
     let model = arguments
         .get("model")
         .and_then(|v| v.as_str())
-        .ok_or(anyhow!("model parameter required (specify in MCP JSON client config)"))?;
+        .unwrap_or(&config.defaults.intake.model);
     let num_tasks = 50; // Standard task count
     let expand_tasks = true; // Always expand for detailed planning
     let analyze_complexity = true; // Always analyze for better breakdown
