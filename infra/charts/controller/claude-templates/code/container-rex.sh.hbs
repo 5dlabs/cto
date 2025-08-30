@@ -858,10 +858,23 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
   - `cargo test --workspace --all-features` and high coverage (aim ≥95%, target ~100% on critical paths)
-- **GitHub workflow**: Read @github-guidelines.md for commit standards and **🚨 MANDATORY: CREATE A PULL REQUEST USING `gh pr create` - THE TASK IS NOT COMPLETE WITHOUT THIS STEP 🚨**
+- **GitHub workflow**: Read @github-guidelines.md for commit standards
 - **Verify continuously**: Run tests and checks after each significant change
 - **Commit incrementally**: Don'\''t save all changes for the end
 - **Test thoroughly**: Validate against acceptance criteria before completion
+
+## 🚨 NON-NEGOTIABLE PULL REQUEST REQUIREMENT 🚨
+
+**⛔ CRITICAL: YOU MUST CREATE A PULL REQUEST - NO EXCEPTIONS ⛔**
+
+**MANDATORY FINAL STEP:**
+- **MUST** create a pull request using `gh pr create` command
+- **MUST** include proper labels (task-{{task_id}}, run-{{workflow.name}}, service-{{service}})
+- **MUST** verify PR creation succeeded before claiming task completion
+- **THE TASK IS INCOMPLETE AND FAILED IF NO PR IS CREATED**
+
+**YOU CANNOT COMPLETE THIS TASK WITHOUT CREATING A PULL REQUEST.**
+**IF YOU DO NOT CREATE A PR, YOU HAVE FAILED THE TASK COMPLETELY.**
 
 **Remember**: Focus on thorough implementation and verification.'
 
