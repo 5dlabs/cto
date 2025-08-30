@@ -22,7 +22,7 @@
 //! ```rust
 //! // Using the convenience function
 //! let comment_body = "# Issue: Bug Report\n\n## Description\nSomething is broken";
-//! let result = parse_feedback_comment(
+//! let result = crate::remediation::parse_feedback_comment(
 //!     comment_body,
 //!     "5DLabs-Tess",
 //!     12345,
