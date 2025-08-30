@@ -224,7 +224,7 @@ impl LabelOrchestrator {
     }
 
     /// Evaluate iteration-based conditions
-    #[allow(unused_self)]
+    #[allow(clippy::unused_self)]
     fn evaluate_iteration_condition(
         &self,
         condition: &str,
@@ -441,7 +441,7 @@ impl LabelOrchestrator {
     }
 
     /// Calculate operations needed to force a state
-    #[allow(unused_self)]
+    #[allow(clippy::unused_self)]
     fn calculate_force_operations(
         &self,
         current_labels: &[String],
