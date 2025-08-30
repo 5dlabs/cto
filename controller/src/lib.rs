@@ -22,10 +22,10 @@
 //! including Kubernetes client wrapper, job orchestration, and request handling.
 
 pub mod crds;
-pub mod tasks;
 pub mod remediation;
+pub mod tasks;
 
 // Re-export commonly used types
 pub use crds::{CodeRun, CodeRunSpec, CodeRunStatus, DocsRun, DocsRunSpec, DocsRunStatus};
-pub use tasks::config::ControllerConfig;
 pub use remediation::parse_feedback_comment;
+pub use tasks::config::ControllerConfig;

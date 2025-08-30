@@ -383,9 +383,9 @@ fn extract_pr_number_from_url(url: &str) -> Result<u32> {
             }
         }
     }
-    Err(crate::tasks::types::Error::UrlParsingError(
-        format!("Could not extract PR number from URL: {url}")
-    ))
+    Err(crate::tasks::types::Error::UrlParsingError(format!(
+        "Could not extract PR number from URL: {url}"
+    )))
 }
 
 /// Clear stale work_completed status
@@ -399,12 +399,17 @@ async fn clear_work_completed_status(docs_run: &crate::crds::DocsRun, ctx: &Cont
         }
     });
 
-    docs_runs.patch(
-        &docs_run.name_any(),
-        &PatchParams::default(),
-        &Patch::Merge(&patch),
-    ).await?;
+    docs_runs
+        .patch(
+            &docs_run.name_any(),
+            &PatchParams::default(),
+            &Patch::Merge(&patch),
+        )
+        .await?;
 
-    info!("Cleared work_completed status for DocsRun {}", docs_run.name_any());
+    info!(
+        "Cleared work_completed status for DocsRun {}",
+        docs_run.name_any()
+    );
     Ok(())
 }

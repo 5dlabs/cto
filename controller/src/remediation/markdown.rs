@@ -1,6 +1,6 @@
-use anyhow::{Result, Context};
-use regex::Regex;
 use crate::remediation::types::CriteriaStatus;
+use anyhow::{Context, Result};
+use regex::Regex;
 
 /// Markdown parser for extracting structured content from QA feedback comments
 pub struct MarkdownParser;
@@ -115,10 +115,7 @@ impl MarkdownParser {
     pub fn extract_all_criteria_descriptions(body: &str) -> Result<Vec<String>> {
         let criteria = Self::extract_criteria_checkboxes(body)?;
 
-        Ok(criteria
-            .into_iter()
-            .map(|c| c.description)
-            .collect())
+        Ok(criteria.into_iter().map(|c| c.description).collect())
     }
 
     /// Get completion statistics for criteria
@@ -154,8 +151,8 @@ impl MarkdownParser {
 
         // Handle different checkbox formats
         let patterns = [
-            (r"^\s*-\s*\[([ x])\]\s*(.+)$", 1, 2), // - [ ] description
-            (r"^\s*\*\s*\[([ x])\]\s*(.+)$", 1, 2), // * [ ] description
+            (r"^\s*-\s*\[([ x])\]\s*(.+)$", 1, 2),     // - [ ] description
+            (r"^\s*\*\s*\[([ x])\]\s*(.+)$", 1, 2),    // * [ ] description
             (r"^\s*\d+\.\s*\[([ x])\]\s*(.+)$", 1, 2), // 1. [ ] description
         ];
 
@@ -216,11 +213,17 @@ Some other content"#;
         assert_eq!(criteria.len(), 4);
 
         // Check first criterion (uncompleted)
-        assert_eq!(criteria[0].description, "User authentication works properly");
+        assert_eq!(
+            criteria[0].description,
+            "User authentication works properly"
+        );
         assert!(!criteria[0].completed);
 
         // Check second criterion (completed)
-        assert_eq!(criteria[1].description, "Password reset functionality is implemented");
+        assert_eq!(
+            criteria[1].description,
+            "Password reset functionality is implemented"
+        );
         assert!(criteria[1].completed);
 
         // Check third criterion (uncompleted)
@@ -228,7 +231,10 @@ Some other content"#;
         assert!(!criteria[2].completed);
 
         // Check fourth criterion (uncompleted)
-        assert_eq!(criteria[3].description, "Form validation prevents invalid inputs");
+        assert_eq!(
+            criteria[3].description,
+            "Form validation prevents invalid inputs"
+        );
         assert!(!criteria[3].completed);
     }
 
@@ -293,11 +299,15 @@ Some other content"#;
         assert_eq!(criteria.len(), 4);
 
         // Check specific criteria
-        let auth_criterion = criteria.iter().find(|(desc, _)| desc == "User authentication works properly");
+        let auth_criterion = criteria
+            .iter()
+            .find(|(desc, _)| desc == "User authentication works properly");
         assert!(auth_criterion.is_some());
         assert!(!auth_criterion.unwrap().1); // Should be uncompleted
 
-        let password_criterion = criteria.iter().find(|(desc, _)| desc == "Password reset functionality is implemented");
+        let password_criterion = criteria
+            .iter()
+            .find(|(desc, _)| desc == "Password reset functionality is implemented");
         assert!(password_criterion.is_some());
         assert!(password_criterion.unwrap().1); // Should be completed
     }
@@ -342,7 +352,10 @@ Some other content"#;
         );
 
         // Test invalid syntax
-        assert_eq!(MarkdownParser::normalize_checkbox_syntax("Just some text"), None);
+        assert_eq!(
+            MarkdownParser::normalize_checkbox_syntax("Just some text"),
+            None
+        );
         assert_eq!(MarkdownParser::normalize_checkbox_syntax("- [ ] "), None); // Empty description
     }
 
@@ -351,7 +364,10 @@ Some other content"#;
         let comment = "Some comment without criteria section";
         let result = MarkdownParser::extract_criteria_checkboxes(comment);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("section not found"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("section not found"));
     }
 
     #[test]
@@ -361,6 +377,9 @@ Some other content"#;
 ### Next Section"#;
         let result = MarkdownParser::extract_criteria_checkboxes(comment);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No checkboxes found"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No checkboxes found"));
     }
 }

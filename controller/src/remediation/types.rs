@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Main structured feedback container representing parsed QA feedback
@@ -239,12 +239,8 @@ mod tests {
 
     #[test]
     fn test_feedback_metadata_creation() {
-        let metadata = FeedbackMetadata::new(
-            "test-author".to_string(),
-            12345,
-            678,
-            "task-1".to_string(),
-        );
+        let metadata =
+            FeedbackMetadata::new("test-author".to_string(), 12345, 678, "task-1".to_string());
 
         assert_eq!(metadata.author, "test-author");
         assert_eq!(metadata.comment_id, 12345);
@@ -268,12 +264,8 @@ mod tests {
 
     #[test]
     fn test_structured_feedback_creation() {
-        let metadata = FeedbackMetadata::new(
-            "5DLabs-Tess".to_string(),
-            12345,
-            678,
-            "task-2".to_string(),
-        );
+        let metadata =
+            FeedbackMetadata::new("5DLabs-Tess".to_string(), 12345, 678, "task-2".to_string());
 
         let criteria = vec![
             CriteriaStatus::new("User authentication works".to_string()),
@@ -285,7 +277,10 @@ mod tests {
             severity: Severity::High,
             description: "Login button not working".to_string(),
             criteria_not_met: criteria,
-            reproduction_steps: Some(vec!["Click login".to_string(), "Enter credentials".to_string()]),
+            reproduction_steps: Some(vec![
+                "Click login".to_string(),
+                "Enter credentials".to_string(),
+            ]),
             expected_behavior: Some("User should be logged in".to_string()),
             actual_behavior: Some("Page refreshes without login".to_string()),
             metadata,
