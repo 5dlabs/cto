@@ -407,7 +407,7 @@ impl StateAwareCancellation {
     }
 
     /// Mark cancellation as failed in state
-    #[allow(unused_async)]
+    #[allow(clippy::unused_async)]
     async fn mark_cancellation_failed(
         &self,
         task_id: &str,

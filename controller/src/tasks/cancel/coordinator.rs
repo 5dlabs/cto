@@ -31,7 +31,7 @@ impl CancellationCoordinator {
         Self {}
     }
 
-    #[allow(unused_async)]
+    #[allow(clippy::unused_async)]
     pub async fn request_cancellation(&self, _task_id: &str) -> Result<(), String> {
         // Placeholder implementation
         Ok(())

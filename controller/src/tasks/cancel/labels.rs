@@ -31,7 +31,7 @@ impl AtomicLabelManager {
         Self {}
     }
 
-    #[allow(unused_async)]
+    #[allow(clippy::unused_async)]
     pub async fn atomic_label_transition(
         &self,
         _pr_number: i32,
