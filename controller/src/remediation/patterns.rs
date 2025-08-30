@@ -1,7 +1,7 @@
-use anyhow::{Result, Context};
+use crate::remediation::types::{IssueType, Severity};
+use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
-use crate::remediation::types::{IssueType, Severity};
 
 /// Pattern extractor for parsing structured feedback from QA comments
 pub struct PatternExtractor;
@@ -359,14 +359,19 @@ The login button is not working properly when users click it.
     #[test]
     fn test_is_actionable_feedback() {
         assert!(PatternExtractor::is_actionable_feedback(SAMPLE_COMMENT));
-        assert!(!PatternExtractor::is_actionable_feedback("Just a regular comment"));
+        assert!(!PatternExtractor::is_actionable_feedback(
+            "Just a regular comment"
+        ));
     }
 
     #[test]
     fn test_parse_issue_type_invalid() {
         let result = PatternExtractor::parse_issue_type("InvalidType");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown issue type"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown issue type"));
     }
 
     #[test]
@@ -380,7 +385,10 @@ The login button is not working properly when users click it.
     fn test_parse_steps_empty() {
         let result = PatternExtractor::parse_steps("");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No reproduction steps"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No reproduction steps"));
     }
 
     #[test]

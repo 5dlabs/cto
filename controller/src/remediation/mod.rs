@@ -117,44 +117,28 @@
 //! - Memory exhaustion prevention: Large inputs don't cause OOM
 
 // Public module exports
-pub mod types;
-pub mod patterns;
-pub mod markdown;
 pub mod auth;
-pub mod parser;
 pub mod error;
+pub mod markdown;
+pub mod parser;
+pub mod patterns;
 pub mod state;
+pub mod types;
 
 // Re-export key types for convenience
 pub use types::{
+    CriteriaStatus, FeedbackMetadata, IssueType, OptionalBehavior, OptionalSteps, Severity,
     StructuredFeedback,
-    IssueType,
-    Severity,
-    CriteriaStatus,
-    FeedbackMetadata,
-    OptionalSteps,
-    OptionalBehavior,
 };
 
-pub use parser::{
-    FeedbackParser,
-    ParserConfig,
-    parse_feedback_comment,
-};
+pub use parser::{parse_feedback_comment, FeedbackParser, ParserConfig};
 
-pub use error::{
-    ParseError,
-    ParseResult,
-    ErrorContext,
-};
+pub use error::{ErrorContext, ParseError, ParseResult};
 
-pub use auth::{
-    AuthorValidator,
-    SharedAuthorValidator,
-};
+pub use auth::{AuthorValidator, SharedAuthorValidator};
 
-pub use patterns::PatternExtractor;
 pub use markdown::MarkdownParser;
+pub use patterns::PatternExtractor;
 pub use state::{RemediationState, RemediationStateManager, RemediationStatus, RemediationStatistics};
 
 /// Create a new feedback parser with default configuration
@@ -190,13 +174,7 @@ Test feedback for parsing functionality.
 
     #[test]
     fn test_public_api() {
-        let result = parse_feedback_comment(
-            TEST_COMMENT,
-            "5DLabs-Tess",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parse_feedback_comment(TEST_COMMENT, "5DLabs-Tess", 12345, 678, "task-2");
 
         assert!(result.is_ok());
         let feedback = result.unwrap();
@@ -211,13 +189,7 @@ Test feedback for parsing functionality.
     fn test_new_parser() {
         let parser = new_parser();
 
-        let result = parser.parse_comment(
-            TEST_COMMENT,
-            "5DLabs-Tess",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parser.parse_comment(TEST_COMMENT, "5DLabs-Tess", 12345, 678, "task-2");
 
         assert!(result.is_ok());
     }
@@ -225,18 +197,13 @@ Test feedback for parsing functionality.
     #[test]
     fn test_parser_with_custom_validator() {
         let mut validator = AuthorValidator::new();
-        validator.add_approved_author("custom-user".to_string())
+        validator
+            .add_approved_author("custom-user".to_string())
             .expect("Failed to add author");
 
         let parser = parser_with_validator(validator);
 
-        let result = parser.parse_comment(
-            TEST_COMMENT,
-            "custom-user",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parser.parse_comment(TEST_COMMENT, "custom-user", 12345, 678, "task-2");
 
         assert!(result.is_ok());
     }

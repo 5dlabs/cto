@@ -112,7 +112,10 @@ impl ParseError {
 
     /// Check if error indicates authorization failure
     pub fn is_authorization_error(&self) -> bool {
-        matches!(self, ParseError::UnauthorizedAuthor { .. } | ParseError::AuthorValidationError { .. })
+        matches!(
+            self,
+            ParseError::UnauthorizedAuthor { .. } | ParseError::AuthorValidationError { .. }
+        )
     }
 
     /// Check if error indicates malformed input
@@ -241,17 +244,31 @@ impl ParseError {
     /// Get suggested remediation action
     pub fn suggested_action(&self) -> &'static str {
         match self {
-            ParseError::NotActionableFeedback => "Add '🔴 Required Changes' marker to make this actionable feedback",
-            ParseError::UnauthorizedAuthor { .. } => "Contact administrator to be added to approved reviewers list",
-            ParseError::MissingRequiredField { .. } => "Add the missing required field to your comment",
-            ParseError::InvalidFieldValue { .. } => "Correct the field value to match expected format",
+            ParseError::NotActionableFeedback => {
+                "Add '🔴 Required Changes' marker to make this actionable feedback"
+            }
+            ParseError::UnauthorizedAuthor { .. } => {
+                "Contact administrator to be added to approved reviewers list"
+            }
+            ParseError::MissingRequiredField { .. } => {
+                "Add the missing required field to your comment"
+            }
+            ParseError::InvalidFieldValue { .. } => {
+                "Correct the field value to match expected format"
+            }
             ParseError::MalformedComment { .. } => "Fix the comment structure and formatting",
             ParseError::NoCriteriaFound => "Add acceptance criteria checkboxes in proper format",
             ParseError::AllCriteriaMet => "Review if remediation is actually needed",
-            ParseError::IssueTypeError { .. } => "Use correct issue type format with square brackets",
+            ParseError::IssueTypeError { .. } => {
+                "Use correct issue type format with square brackets"
+            }
             ParseError::SeverityError { .. } => "Use correct severity format with square brackets",
-            ParseError::DescriptionError { .. } => "Add ### Description section with clear issue description",
-            ParseError::ReproductionStepsError { .. } => "Add ### Steps to Reproduce section with numbered steps",
+            ParseError::DescriptionError { .. } => {
+                "Add ### Description section with clear issue description"
+            }
+            ParseError::ReproductionStepsError { .. } => {
+                "Add ### Steps to Reproduce section with numbered steps"
+            }
             ParseError::ExpectedActualError { .. } => "Add ### Expected vs Actual section",
             ParseError::MarkdownParseError { .. } => "Fix markdown syntax and formatting",
             ParseError::RegexError { .. } => "Report to system administrator",
@@ -368,22 +385,55 @@ mod tests {
         let error = ParseError::NotActionableFeedback;
         assert!(error.to_string().contains("not actionable feedback"));
 
-        let error = ParseError::UnauthorizedAuthor { author: "test-user".to_string() };
+        let error = ParseError::UnauthorizedAuthor {
+            author: "test-user".to_string(),
+        };
         assert!(error.to_string().contains("test-user"));
         assert!(error.to_string().contains("not authorized"));
 
-        let error = ParseError::MissingRequiredField { field: "description".to_string() };
+        let error = ParseError::MissingRequiredField {
+            field: "description".to_string(),
+        };
         assert!(error.to_string().contains("description"));
         assert!(error.to_string().contains("missing"));
     }
 
     #[test]
     fn test_error_categories() {
-        assert_eq!(ParseError::NotActionableFeedback.category(), "not_actionable");
-        assert_eq!(ParseError::UnauthorizedAuthor { author: "".to_string() }.category(), "authorization");
-        assert_eq!(ParseError::MissingRequiredField { field: "".to_string() }.category(), "missing_data");
-        assert_eq!(ParseError::InvalidFieldValue { field: "".to_string(), value: "".to_string(), expected: "".to_string() }.category(), "invalid_data");
-        assert_eq!(ParseError::MalformedComment { reason: "".to_string() }.category(), "malformed_input");
+        assert_eq!(
+            ParseError::NotActionableFeedback.category(),
+            "not_actionable"
+        );
+        assert_eq!(
+            ParseError::UnauthorizedAuthor {
+                author: "".to_string()
+            }
+            .category(),
+            "authorization"
+        );
+        assert_eq!(
+            ParseError::MissingRequiredField {
+                field: "".to_string()
+            }
+            .category(),
+            "missing_data"
+        );
+        assert_eq!(
+            ParseError::InvalidFieldValue {
+                field: "".to_string(),
+                value: "".to_string(),
+                expected: "".to_string()
+            }
+            .category(),
+            "invalid_data"
+        );
+        assert_eq!(
+            ParseError::MalformedComment {
+                reason: "".to_string()
+            }
+            .category(),
+            "malformed_input"
+        );
         assert_eq!(ParseError::NoCriteriaFound.category(), "missing_data");
         assert_eq!(ParseError::AllCriteriaMet.category(), "no_action_needed");
     }
@@ -391,27 +441,63 @@ mod tests {
     #[test]
     fn test_error_classification() {
         // Recoverable errors
-        assert!(ParseError::ExternalServiceError { service: "".to_string(), details: "".to_string() }.is_recoverable());
-        assert!(ParseError::TimeoutError { operation: "".to_string() }.is_recoverable());
-        assert!(ParseError::CacheError { details: "".to_string() }.is_recoverable());
+        assert!(ParseError::ExternalServiceError {
+            service: "".to_string(),
+            details: "".to_string()
+        }
+        .is_recoverable());
+        assert!(ParseError::TimeoutError {
+            operation: "".to_string()
+        }
+        .is_recoverable());
+        assert!(ParseError::CacheError {
+            details: "".to_string()
+        }
+        .is_recoverable());
 
         // Non-recoverable errors
         assert!(!ParseError::NotActionableFeedback.is_recoverable());
-        assert!(!ParseError::MalformedComment { reason: "".to_string() }.is_recoverable());
+        assert!(!ParseError::MalformedComment {
+            reason: "".to_string()
+        }
+        .is_recoverable());
 
         // Authorization errors
-        assert!(ParseError::UnauthorizedAuthor { author: "".to_string() }.is_authorization_error());
-        assert!(ParseError::AuthorValidationError { details: "".to_string() }.is_authorization_error());
+        assert!(ParseError::UnauthorizedAuthor {
+            author: "".to_string()
+        }
+        .is_authorization_error());
+        assert!(ParseError::AuthorValidationError {
+            details: "".to_string()
+        }
+        .is_authorization_error());
 
         // Malformed input errors
-        assert!(ParseError::MalformedComment { reason: "".to_string() }.is_malformed_input());
-        assert!(ParseError::InvalidFieldValue { field: "".to_string(), value: "".to_string(), expected: "".to_string() }.is_malformed_input());
-        assert!(ParseError::RegexError { details: "".to_string() }.is_malformed_input());
+        assert!(ParseError::MalformedComment {
+            reason: "".to_string()
+        }
+        .is_malformed_input());
+        assert!(ParseError::InvalidFieldValue {
+            field: "".to_string(),
+            value: "".to_string(),
+            expected: "".to_string()
+        }
+        .is_malformed_input());
+        assert!(ParseError::RegexError {
+            details: "".to_string()
+        }
+        .is_malformed_input());
 
         // Missing data errors
-        assert!(ParseError::MissingRequiredField { field: "".to_string() }.is_missing_data());
+        assert!(ParseError::MissingRequiredField {
+            field: "".to_string()
+        }
+        .is_missing_data());
         assert!(ParseError::NoCriteriaFound.is_missing_data());
-        assert!(ParseError::IssueTypeError { details: "".to_string() }.is_missing_data());
+        assert!(ParseError::IssueTypeError {
+            details: "".to_string()
+        }
+        .is_missing_data());
     }
 
     #[test]
@@ -420,7 +506,9 @@ mod tests {
         let message = error.user_message();
         assert!(message.contains("🔴 Required Changes"));
 
-        let error = ParseError::UnauthorizedAuthor { author: "bad-user".to_string() };
+        let error = ParseError::UnauthorizedAuthor {
+            author: "bad-user".to_string(),
+        };
         let message = error.user_message();
         assert!(message.contains("bad-user"));
         assert!(message.contains("administrator"));
@@ -435,16 +523,22 @@ mod tests {
         let error = ParseError::NotActionableFeedback;
         assert!(error.suggested_action().contains("🔴 Required Changes"));
 
-        let error = ParseError::UnauthorizedAuthor { author: "".to_string() };
+        let error = ParseError::UnauthorizedAuthor {
+            author: "".to_string(),
+        };
         assert!(error.suggested_action().contains("administrator"));
 
-        let error = ParseError::MissingRequiredField { field: "severity".to_string() };
+        let error = ParseError::MissingRequiredField {
+            field: "severity".to_string(),
+        };
         assert!(error.suggested_action().contains("Add the missing"));
     }
 
     #[test]
     fn test_error_context() {
-        let error = ParseError::UnauthorizedAuthor { author: "test-user".to_string() };
+        let error = ParseError::UnauthorizedAuthor {
+            author: "test-user".to_string(),
+        };
         let context = ErrorContext::new(error)
             .with_comment(12345, 678, "test-author".to_string())
             .with_info("extra", "additional info".to_string());
@@ -457,7 +551,10 @@ mod tests {
         assert_eq!(context.comment_id, Some(12345));
         assert_eq!(context.pr_number, Some(678));
         assert_eq!(context.author, Some("test-author".to_string()));
-        assert_eq!(context.additional_info.get("extra"), Some(&"additional info".to_string()));
+        assert_eq!(
+            context.additional_info.get("extra"),
+            Some(&"additional info".to_string())
+        );
     }
 
     #[test]

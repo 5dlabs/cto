@@ -1,13 +1,13 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use chrono::Utc;
 use tracing::info;
 
 use crate::remediation::{
-    types::{StructuredFeedback, FeedbackMetadata, IssueType, Severity, CriteriaStatus},
-    patterns::PatternExtractor,
-    markdown::MarkdownParser,
     auth::AuthorValidator,
-    error::{ParseError, ParseResult, ErrorContext},
+    error::{ErrorContext, ParseError, ParseResult},
+    markdown::MarkdownParser,
+    patterns::PatternExtractor,
+    types::{CriteriaStatus, FeedbackMetadata, IssueType, Severity, StructuredFeedback},
 };
 
 /// Main feedback parser that orchestrates all parsing components
@@ -65,7 +65,10 @@ impl FeedbackParser {
         let start_time = std::time::Instant::now();
 
         if self.detailed_logging {
-            info!("Starting feedback parsing for comment {} from author '{}'", comment_id, author);
+            info!(
+                "Starting feedback parsing for comment {} from author '{}'",
+                comment_id, author
+            );
         }
 
         // Validate input size
@@ -74,8 +77,11 @@ impl FeedbackParser {
         // Step 1: Check if this is actionable feedback
         if !PatternExtractor::is_actionable_feedback(comment_body) {
             let error = ParseError::NotActionableFeedback;
-            self.log_error(&ErrorContext::new(error.clone())
-                .with_comment(comment_id, pr_number, author.to_string()));
+            self.log_error(&ErrorContext::new(error.clone()).with_comment(
+                comment_id,
+                pr_number,
+                author.to_string(),
+            ));
             return Err(error);
         }
 
@@ -84,9 +90,11 @@ impl FeedbackParser {
             let error = ParseError::UnauthorizedAuthor {
                 author: author.to_string(),
             };
-            self.log_error(&ErrorContext::new(error.clone())
-                .with_comment(comment_id, pr_number, author.to_string())
-                .with_info("auth_error", auth_error.to_string()));
+            self.log_error(
+                &ErrorContext::new(error.clone())
+                    .with_comment(comment_id, pr_number, author.to_string())
+                    .with_info("auth_error", auth_error.to_string()),
+            );
             return Err(error);
         }
 
@@ -96,11 +104,13 @@ impl FeedbackParser {
         let description = self.extract_description(comment_body, comment_id, pr_number, author)?;
 
         // Step 4: Extract acceptance criteria
-        let criteria_not_met = self.extract_criteria(comment_body, comment_id, pr_number, author)?;
+        let criteria_not_met =
+            self.extract_criteria(comment_body, comment_id, pr_number, author)?;
 
         // Step 5: Extract optional sections
         let reproduction_steps = self.extract_reproduction_steps_optional(comment_body);
-        let (expected_behavior, actual_behavior) = self.extract_expected_actual_optional(comment_body);
+        let (expected_behavior, actual_behavior) =
+            self.extract_expected_actual_optional(comment_body);
 
         // Step 6: Build metadata
         let metadata = FeedbackMetadata {
@@ -153,14 +163,19 @@ impl FeedbackParser {
                 let context = ErrorContext::new(parse_error.clone())
                     .with_comment(comment_id, pr_number, author.to_string())
                     .with_info("comment_length", comment_body.len().to_string())
-                    .with_info("has_actionable_marker",
-                        PatternExtractor::is_actionable_feedback(comment_body).to_string());
+                    .with_info(
+                        "has_actionable_marker",
+                        PatternExtractor::is_actionable_feedback(comment_body).to_string(),
+                    );
 
                 context.log();
 
                 // Convert to anyhow error for external usage
-                Err(anyhow::anyhow!("Feedback parsing failed: {}", parse_error.user_message()))
-                    .context(parse_error.suggested_action())
+                Err(anyhow::anyhow!(
+                    "Feedback parsing failed: {}",
+                    parse_error.user_message()
+                ))
+                .context(parse_error.suggested_action())
             }
         }
     }
@@ -216,9 +231,11 @@ impl FeedbackParser {
             let error = ParseError::IssueTypeError {
                 details: e.to_string(),
             };
-            self.log_error(&ErrorContext::new(error.clone())
-                .with_comment(comment_id, pr_number, author.to_string())
-                .with_info("extraction_error", e.to_string()));
+            self.log_error(
+                &ErrorContext::new(error.clone())
+                    .with_comment(comment_id, pr_number, author.to_string())
+                    .with_info("extraction_error", e.to_string()),
+            );
             error
         })
     }
@@ -235,9 +252,11 @@ impl FeedbackParser {
             let error = ParseError::SeverityError {
                 details: e.to_string(),
             };
-            self.log_error(&ErrorContext::new(error.clone())
-                .with_comment(comment_id, pr_number, author.to_string())
-                .with_info("extraction_error", e.to_string()));
+            self.log_error(
+                &ErrorContext::new(error.clone())
+                    .with_comment(comment_id, pr_number, author.to_string())
+                    .with_info("extraction_error", e.to_string()),
+            );
             error
         })
     }
@@ -254,9 +273,11 @@ impl FeedbackParser {
             let error = ParseError::DescriptionError {
                 details: e.to_string(),
             };
-            self.log_error(&ErrorContext::new(error.clone())
-                .with_comment(comment_id, pr_number, author.to_string())
-                .with_info("extraction_error", e.to_string()));
+            self.log_error(
+                &ErrorContext::new(error.clone())
+                    .with_comment(comment_id, pr_number, author.to_string())
+                    .with_info("extraction_error", e.to_string()),
+            );
             error
         })
     }
@@ -273,9 +294,11 @@ impl FeedbackParser {
             let error = ParseError::MarkdownParseError {
                 details: e.to_string(),
             };
-            self.log_error(&ErrorContext::new(error.clone())
-                .with_comment(comment_id, pr_number, author.to_string())
-                .with_info("extraction_error", e.to_string()));
+            self.log_error(
+                &ErrorContext::new(error.clone())
+                    .with_comment(comment_id, pr_number, author.to_string())
+                    .with_info("extraction_error", e.to_string()),
+            );
             error
         })
     }
@@ -296,7 +319,10 @@ impl FeedbackParser {
         if size > self.max_comment_size {
             return Err(ParseError::ResourceExhausted {
                 resource: "comment_size".to_string(),
-                details: format!("Comment size {} exceeds maximum {}", size, self.max_comment_size),
+                details: format!(
+                    "Comment size {} exceeds maximum {}",
+                    size, self.max_comment_size
+                ),
             });
         }
         Ok(())
@@ -394,13 +420,7 @@ The login button is not working properly when users click it.
     #[test]
     fn test_parse_complete_feedback() {
         let parser = FeedbackParser::new();
-        let result = parser.parse_comment(
-            SAMPLE_COMMENT,
-            "5DLabs-Tess",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parser.parse_comment(SAMPLE_COMMENT, "5DLabs-Tess", 12345, 678, "task-2");
 
         assert!(result.is_ok());
         let feedback = result.unwrap();
@@ -431,19 +451,17 @@ The login button is not working properly when users click it.
         );
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParseError::NotActionableFeedback));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParseError::NotActionableFeedback
+        ));
     }
 
     #[test]
     fn test_parse_unauthorized_author() {
         let parser = FeedbackParser::new();
-        let result = parser.parse_comment(
-            SAMPLE_COMMENT,
-            "unauthorized-user",
-            12345,
-            678,
-            "task-2",
-        );
+        let result =
+            parser.parse_comment(SAMPLE_COMMENT, "unauthorized-user", 12345, 678, "task-2");
 
         assert!(result.is_err());
         if let ParseError::UnauthorizedAuthor { author } = result.unwrap_err() {
@@ -458,10 +476,14 @@ The login button is not working properly when users click it.
         let parser = FeedbackParser::new();
 
         // Valid comment
-        assert!(parser.validate_comment(SAMPLE_COMMENT, "5DLabs-Tess").is_ok());
+        assert!(parser
+            .validate_comment(SAMPLE_COMMENT, "5DLabs-Tess")
+            .is_ok());
 
         // Non-actionable
-        assert!(parser.validate_comment("regular comment", "5DLabs-Tess").is_err());
+        assert!(parser
+            .validate_comment("regular comment", "5DLabs-Tess")
+            .is_err());
 
         // Unauthorized author
         assert!(parser.validate_comment(SAMPLE_COMMENT, "bad-user").is_err());
@@ -473,13 +495,7 @@ The login button is not working properly when users click it.
         parser.set_max_comment_size(100);
 
         let large_comment = "x".repeat(200);
-        let result = parser.parse_comment(
-            &large_comment,
-            "5DLabs-Tess",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parser.parse_comment(&large_comment, "5DLabs-Tess", 12345, 678, "task-2");
 
         assert!(result.is_err());
         if let ParseError::ResourceExhausted { resource, .. } = result.unwrap_err() {
@@ -502,13 +518,7 @@ Minimal test case.
 - [ ] Test criterion"#;
 
         let parser = FeedbackParser::new();
-        let result = parser.parse_comment(
-            minimal_comment,
-            "5DLabs-Tess",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parser.parse_comment(minimal_comment, "5DLabs-Tess", 12345, 678, "task-2");
 
         assert!(result.is_ok());
         let feedback = result.unwrap();
@@ -535,13 +545,7 @@ Minimal test case.
 
     #[test]
     fn test_convenience_function() {
-        let result = parse_feedback_comment(
-            SAMPLE_COMMENT,
-            "5DLabs-Tess",
-            12345,
-            678,
-            "task-2",
-        );
+        let result = parse_feedback_comment(SAMPLE_COMMENT, "5DLabs-Tess", 12345, 678, "task-2");
 
         assert!(result.is_ok());
         let feedback = result.unwrap();

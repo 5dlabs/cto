@@ -613,12 +613,17 @@ async fn clear_work_completed_status(code_run: &CodeRun, ctx: &Context) -> Resul
         }
     });
 
-    code_runs.patch(
-        &code_run.name_any(),
-        &PatchParams::default(),
-        &Patch::Merge(&patch),
-    ).await?;
+    code_runs
+        .patch(
+            &code_run.name_any(),
+            &PatchParams::default(),
+            &Patch::Merge(&patch),
+        )
+        .await?;
 
-    info!("Cleared work_completed status for CodeRun {}", code_run.name_any());
+    info!(
+        "Cleared work_completed status for CodeRun {}",
+        code_run.name_any()
+    );
     Ok(())
 }
