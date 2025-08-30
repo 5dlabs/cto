@@ -370,7 +370,7 @@ spec:
 #         jitter: 0.1
 
 ---
-# Sensor for Implementation Agent Remediation - Cancel outdated work
+# Enhanced Sensor for Implementation Agent Remediation - Cancel outdated work with advanced concurrency control
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -385,6 +385,14 @@ spec:
       maxUnavailable: 0
   template:
     serviceAccountName: argo-events-sa
+    container:
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "300m"
   dependencies:
     - name: github-rex-push
       eventSourceName: github
@@ -398,9 +406,28 @@ spec:
           - path: body.pusher.name
             type: string
             value: ["rex-5dlabs[bot]"]
+          # Enhanced filtering for concurrent push events
+          - path: body.ref
+            type: string
+            comparator: "~"
+            value: ["refs/heads/feature/.*", "refs/heads/task-.*"]
+        exprs:
+          # Additional validation for concurrent push events
+          - expr: 'body.commits | length > 0'
+            fields:
+              - name: has_commits
+                path: body.commits
+          - expr: 'body.repository.name != ""'
+            fields:
+              - name: repo_name
+                path: body.repository.name
+          - expr: 'body.head_commit.message != ""'
+            fields:
+              - name: commit_message
+                path: body.head_commit.message
   triggers:
     - template:
-        name: cancel-outdated-agents
+        name: enhanced-agent-cancellation
         conditions: "github-rex-push"
         k8s:
           operation: create
@@ -409,13 +436,14 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: cancel-outdated-
+                generateName: enhanced-cancellation-
                 namespace: agent-platform
                 labels:
-                  type: remediation
+                  type: enhanced-remediation
+                  version: v2
               spec:
-                entrypoint: cancel-outdated-workflows
-                serviceAccountName: argo-workflow
+                entrypoint: enhanced-cancellation-workflow
+                serviceAccountName: agent-cancellation-sa
                 arguments:
                   parameters:
                     - name: pusher-name
@@ -424,49 +452,107 @@ spec:
                       value: "{{ .Input.body.ref }}"
                     - name: head-commit
                       value: "{{ .Input.body.head_commit.id }}"
+                    - name: commit-message
+                      value: "{{ .Input.body.head_commit.message }}"
+                    - name: repo-name
+                      value: "{{ .Input.body.repository.name }}"
+                    - name: correlation-id
+                      value: "{{ uuidv4() }}"
                 templates:
-                  - name: cancel-outdated-workflows
+                  - name: enhanced-cancellation-workflow
                     script:
-                      image: alpine/k8s:1.31.0
+                      image: agent-cancellation:latest
                       command: [bash]
                       source: |
                         #!/bin/bash
-                        set -e
+                        set -euo pipefail
 
-                        echo "=== Implementation Agent Remediation ==="
-                        echo "Pusher: {{workflow.parameters.pusher-name}}"
-                        echo "Ref: {{workflow.parameters.ref}}"
-                        echo "Head Commit: {{workflow.parameters.head-commit}}"
+                        echo "=== Enhanced Agent Cancellation System ==="
+                        echo "🔧 Version: 2.0 - Concurrent Safe"
+                        echo "📊 Correlation ID: {{workflow.parameters.correlation-id}}"
+                        echo "🤖 Pusher: {{workflow.parameters.pusher-name}}"
+                        echo "📋 Ref: {{workflow.parameters.ref}}"
+                        echo "💾 Head Commit: {{workflow.parameters.head-commit}}"
+                        echo "📝 Message: {{workflow.parameters.commit-message}}"
 
-                        # Extract branch name
-                        BRANCH_NAME=$(echo "{{workflow.parameters.ref}}" | sed 's|refs/heads/||')
-                        echo "Branch: $BRANCH_NAME"
+                        # Enhanced environment setup
+                        export CORRELATION_ID="{{workflow.parameters.correlation-id}}"
+                        export REPO_NAME="{{workflow.parameters.repo-name}}"
+                        export PUSH_REF="{{workflow.parameters.ref}}"
+                        export HEAD_COMMIT="{{workflow.parameters.head-commit}}"
+                        export COMMIT_MESSAGE="{{workflow.parameters.commit-message}}"
 
-                        # Extract task ID from branch name
+                        # Extract and validate task information
+                        BRANCH_NAME=$(echo "$PUSH_REF" | sed 's|refs/heads/||')
+                        echo "🌿 Branch: $BRANCH_NAME"
+
+                        # Enhanced task ID extraction with validation
                         TASK_ID=$(echo "$BRANCH_NAME" | grep -oE 'task-?([0-9]+)' | head -1 | sed 's/task-\?//')
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "No task ID found in branch name, skipping remediation"
+                          echo "⚠️  No task ID found in branch name, skipping enhanced cancellation"
+                          echo "📝 Branch name: $BRANCH_NAME"
                           exit 0
                         fi
 
-                        echo "Task ID: $TASK_ID"
+                        echo "🎯 Task ID: $TASK_ID"
 
-                        # Find CodeRuns for quality and testing agents on this task
-                        echo "Looking for outdated CodeRuns to cancel..."
-                        kubectl get coderuns -n agent-platform \
-                          -l task-id=$TASK_ID \
-                          -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.agent-type}{"\n"}{end}' | \
-                        while read coderun_name agent_type; do
-                          if [ "$agent_type" = "cleo" ] || [ "$agent_type" = "tess" ]; then
-                            echo "Cancelling outdated CodeRun: $coderun_name (agent: $agent_type)"
-                            kubectl patch coderun $coderun_name -n agent-platform --type='merge' -p '{"spec":{"suspend":true}}'
-                          fi
-                        done
+                        # Enhanced PR number extraction from commit message
+                        PR_NUMBER=""
+                        if echo "$COMMIT_MESSAGE" | grep -qE '\(\#[0-9]+\)'; then
+                          PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oE '\(#[0-9]+\)' | sed 's/[#(]//g')
+                        elif echo "$COMMIT_MESSAGE" | grep -qE '#[0-9]+'; then
+                          PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oE '#[0-9]+' | sed 's/#//')
+                        fi
 
-                        echo "✅ Remediation completed"
+                        if [ -n "$PR_NUMBER" ]; then
+                          echo "🔗 Associated PR: #$PR_NUMBER"
+                          export PR_NUMBER="$PR_NUMBER"
+                        else
+                          echo "ℹ️  No PR number found in commit message"
+                        fi
+
+                        # Enhanced state-aware cancellation with distributed locking
+                        echo ""
+                        echo "🔐 Initializing Enhanced Cancellation System..."
+
+                        # Check if enhanced cancellation controller is available
+                        if command -v enhanced-cancellation-controller >/dev/null 2>&1; then
+                          echo "✅ Enhanced cancellation controller found"
+                          exec enhanced-cancellation-controller
+                        else
+                          echo "⚠️  Enhanced controller not available, falling back to basic cancellation"
+
+                          # Fallback to basic cancellation logic
+                          echo ""
+                          echo "🔄 Executing Basic Cancellation Fallback..."
+
+                          # Find CodeRuns for quality and testing agents on this task
+                          echo "Looking for outdated CodeRuns to cancel..."
+                          kubectl get coderuns -n agent-platform \
+                            -l task-id=$TASK_ID \
+                            -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.agent-type}{"\t"}{.status.phase}{"\n"}{end}' | \
+                          while read coderun_name agent_type phase; do
+                            if [ "$agent_type" = "cleo" ] || [ "$agent_type" = "tess" ]; then
+                              echo "📋 Found CodeRun: $coderun_name (agent: $agent_type, phase: $phase)"
+
+                              # Enhanced phase checking
+                              if [ "$phase" = "Running" ] || [ "$phase" = "Pending" ]; then
+                                echo "🛑 Cancelling outdated CodeRun: $coderun_name (agent: $agent_type)"
+                                kubectl delete coderun $coderun_name -n agent-platform --ignore-not-found=true
+                              elif [ "$phase" = "Succeeded" ] || [ "$phase" = "Failed" ]; then
+                                echo "✅ CodeRun $coderun_name already completed (phase: $phase), skipping"
+                              else
+                                echo "❓ CodeRun $coderun_name in unknown phase: $phase, attempting cancellation"
+                                kubectl delete coderun $coderun_name -n agent-platform --ignore-not-found=true --timeout=30s
+                              fi
+                            fi
+                          done
+
+                          echo "✅ Basic remediation completed"
+                        fi
       retryStrategy:
-        steps: 2  # Minimal retries for reliability
-        duration: "5s"
+        steps: 3  # Enhanced retries for reliability
+        duration: "10s"
         factor: 2
         jitter: 0.1
