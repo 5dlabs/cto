@@ -52,7 +52,7 @@ tracing-opentelemetry = { workspace = true }
 reqwest = { workspace = true }
 
 # GitHub API
-octocrab = "0.38"
+octocrab = "0.44.1"
 
 # Time utilities
 chrono = { version = "0.4", features = ["serde"] }
@@ -66,15 +66,18 @@ async-trait = { workspace = true }
 # Text processing
 regex = { workspace = true }
 handlebars = { workspace = true }
-lazy_static = "1.4"
-pulldown-cmark = "0.9"
-dashmap = "5.4"
+lazy_static = "1.5.0"
+pulldown-cmark = "0.13.0"
+dashmap = "6.1.0"
 
 # Encoding
 base64 = "0.22"
 
 # File system
 tempfile = "3.8"
+
+# UUID generation
+uuid = { version = "1.10", features = ["v4", "serde"] }
 
 # Binary configurations with proper naming
 [[bin]]

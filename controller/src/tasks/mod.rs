@@ -17,6 +17,9 @@ pub mod config;
 pub mod docs;
 pub mod github;
 pub mod label;
+pub mod escalation;
+pub mod monitor;
+pub mod security;
 pub mod types;
 pub mod workflow;
 

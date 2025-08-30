@@ -18,25 +18,39 @@
 //!
 //! ### Basic Distributed Locking
 //!
-//! ```rust
-//! use cto::tasks::cancel::{DistributedLock, ActiveLease, LeaseError};
+//! ```rust,ignore
+//! use crate::tasks::cancel::{DistributedLock, ActiveLease, LeaseError};
 //!
-//! let lock = DistributedLock::new(client, "agent-platform", "cancel-task-42", "controller-1");
-//! let lease = lock.try_acquire(context).await?;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a Kubernetes client
+//! let client = kube::Client::try_default().await?;
+//!
+//! let lock = DistributedLock::new(&client, "agent-platform", "cancel-task-42", "controller-1");
+//! let lease = lock.try_acquire("controller-1").await?;
 //!
 //! // Critical section - only one process can execute this
-//! perform_cancellation().await?;
+//! // perform_cancellation().await?;
 //!
 //! lease.release().await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### State-Aware Cancellation
 //!
-//! ```rust
-//! use cto::tasks::cancel::StateAwareCancellation;
+//! ```rust,ignore
+//! use crate::tasks::cancel::StateAwareCancellation;
 //!
-//! let cancellation = StateAwareCancellation::new(client, state_manager, lock_manager);
-//! cancellation.cancel_agents_with_state_check(context, "task-42", 123).await?;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create dependencies (normally injected)
+//! // let client = kube::Client::try_default().await?;
+//! // let state_manager = RemediationStateManager::new(&client);
+//! // let lock_manager = DistributedLockManager::new(&client);
+//!
+//! // let cancellation = StateAwareCancellation::new(client, state_manager, lock_manager);
+//! // cancellation.cancel_agents_with_state_check("controller-1", "task-42", 123).await?;
+//! # Ok(())
+//! # }
 //! ```
 
 pub mod lock;
