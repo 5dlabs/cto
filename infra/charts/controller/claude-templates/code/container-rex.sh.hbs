@@ -44,6 +44,13 @@ echo "📚 Focus: Documentation-first implementation approach"
 echo "📋 Task ID: {{task_id}}"
 echo "⛔ CRITICAL: You must ONLY work on Task {{task_id}} - ignore ALL other tasks"
 
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f /workspace/.agent_done ]; then
+    echo "🧹 Cleaning up sentinel file from previous run"
+    rm -f /workspace/.agent_done
+fi
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
