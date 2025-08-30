@@ -11,7 +11,9 @@ use tracing::{debug, info};
 
 /// Label cleanup manager for automated cleanup operations
 pub struct LabelCleanupManager {
+    #[allow(dead_code)]
     label_client: GitHubLabelClient,
+    #[allow(dead_code)]
     state_manager: Arc<RemediationStateManager>,
 }
 

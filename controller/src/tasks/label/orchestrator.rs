@@ -15,6 +15,7 @@ use tracing::{debug, error, info, instrument, warn};
 pub struct LabelOrchestrator {
     label_client: GitHubLabelClient,
     label_schema: LabelSchema,
+    #[allow(dead_code)]
     state_manager: Arc<RemediationStateManager>,
     override_detector: OverrideDetector,
 }
@@ -186,7 +187,7 @@ impl LabelOrchestrator {
     }
 
     /// Evaluate iteration-based conditions
-    #[allow(unused_self)]
+    #[allow(clippy::unused_self)]
     fn evaluate_iteration_condition(&self, condition: &str, current_iteration: i32) -> Result<bool, OrchestratorError> {
         let pattern = regex::Regex::new(r"iteration\s*(>=|<=|>|<|==)\s*(\d+)")
             .map_err(|e| OrchestratorError::ConditionError(
@@ -387,7 +388,7 @@ impl LabelOrchestrator {
     }
 
     /// Calculate operations needed to force a state
-    #[allow(unused_self)]
+    #[allow(clippy::unused_self)]
     fn calculate_force_operations(&self, current_labels: &[String], target_state: &WorkflowState) -> Vec<LabelOperation> {
         let mut operations = Vec::new();
 

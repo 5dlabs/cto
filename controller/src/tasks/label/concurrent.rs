@@ -13,7 +13,9 @@ use tracing::{debug, info};
 
 /// Concurrent label manager for handling race conditions
 pub struct ConcurrentLabelManager {
+    #[allow(dead_code)]
     label_client: GitHubLabelClient,
+    #[allow(dead_code)]
     locks: Arc<Mutex<HashMap<i32, Arc<Mutex<()>>>>>,
 }
 

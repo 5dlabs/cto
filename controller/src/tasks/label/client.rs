@@ -74,6 +74,7 @@ struct GitHubPR {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct UpdateLabelsRequest {
     labels: Vec<String>,
 }
