@@ -467,8 +467,7 @@ impl GitHubLabelClient {
         {
             let now = chrono::Utc::now().timestamp();
             let seconds_until_reset = (reset - now).max(0) as u64;
-            let reset_instant = Instant::now() + Duration::from_secs(seconds_until_reset);
-            self.rate_limit_reset = Some(reset_instant);
+            self.rate_limit_reset = Some(Instant::now() + Duration::from_secs(seconds_until_reset));
         }
     }
 
