@@ -794,7 +794,8 @@ else
 fi
 
 # Prepare initial guidance for Tess
-INITIAL_GUIDANCE="🧪 **TESS ULTRA-STRICT QA TESTING WORKFLOW**
+INITIAL_GUIDANCE=$(cat <<TESS_EOF
+🧪 **TESS ULTRA-STRICT QA TESTING WORKFLOW**
 
 You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to validate THIS SPECIFIC TASK, not the entire project.
 
@@ -1179,7 +1180,9 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 - You are NOT DONE until you can post an APPROVE review
 - NEVER exit with a REQUEST CHANGES review - keep working until it's fixed
 - Your success is measured by getting to APPROVED status
-- **IF YOU APPROVE WITH FAILING CI, YOU HAVE FAILED YOUR MISSION**"
+- **IF YOU APPROVE WITH FAILING CI, YOU HAVE FAILED YOUR MISSION**
+TESS_EOF
+)
 
 # Set trap to ensure sidecar shutdown on exit (set here after all functions are defined)
 # Using explicit function call for compatibility with /bin/sh
