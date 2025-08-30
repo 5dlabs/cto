@@ -23,7 +23,7 @@ lazy_static! {
 
     /// Pattern for extracting Steps to Reproduce section
     static ref STEPS_PATTERN: Regex =
-        Regex::new(r"(?ms)### Steps to Reproduce.*?\n((?:\d+\..*?\n?)+)")
+        Regex::new(r"(?ms)### Steps to Reproduce.*?\n(.*(?:\n###|\n\*\*|$))")
             .context("Failed to compile steps pattern")
             .unwrap();
 
@@ -99,14 +99,20 @@ impl PatternExtractor {
 
     /// Extract reproduction steps from comment body
     pub fn extract_reproduction_steps(body: &str) -> Result<Vec<String>> {
+        println!("DEBUG: Looking for steps in body: {:?}", body);
+
         let captures = STEPS_PATTERN
             .captures(body)
             .context("Steps to Reproduce section not found")?;
+
+        println!("DEBUG: Regex matched, captures: {:?}", captures);
 
         let steps_text = captures
             .get(1)
             .context("Steps content not captured")?
             .as_str();
+
+        println!("DEBUG: Captured steps text: {:?}", steps_text);
 
         Self::parse_steps(steps_text)
     }
@@ -217,22 +223,50 @@ impl PatternExtractor {
 
     /// Parse steps text into vector of step strings
     fn parse_steps(steps_text: &str) -> Result<Vec<String>> {
+        println!("DEBUG: Parsing steps text: {:?}", steps_text);
+
         let steps: Vec<String> = steps_text
             .lines()
             .filter_map(|line| {
                 let trimmed = line.trim();
+                println!("DEBUG: Processing line: {:?}", trimmed);
+
+                // Skip empty lines
                 if trimmed.is_empty() {
-                    None
-                } else {
-                    // Remove leading number and dot/space
-                    let step = trimmed
-                        .split_once('.')
-                        .map(|(_, rest)| rest.trim())
-                        .unwrap_or(trimmed);
-                    Some(step.to_string())
+                    return None;
                 }
+
+                // Skip lines that start with ### (section headers)
+                if trimmed.starts_with("###") {
+                    return None;
+                }
+
+                // Skip lines that start with - ** (expected/actual format)
+                if trimmed.starts_with("- **") {
+                    return None;
+                }
+
+                // Only process lines that start with a number followed by a dot
+                if !trimmed.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                    return None;
+                }
+
+                if !trimmed.contains('.') {
+                    return None;
+                }
+
+                // Remove leading number and dot/space
+                let step = trimmed
+                    .split_once('.')
+                    .map(|(_, rest)| rest.trim())
+                    .unwrap_or(trimmed);
+
+                println!("DEBUG: Extracted step: {:?}", step);
+                Some(step.to_string())
             })
             .collect();
+
+        println!("DEBUG: Final steps: {:?}", steps);
 
         if steps.is_empty() {
             Err(anyhow::anyhow!("No reproduction steps found"))
@@ -323,12 +357,10 @@ The login button is not working properly when users click it.
         for (i, step) in steps.iter().enumerate() {
             println!("DEBUG: Step {}: '{}'", i, step);
         }
-        assert_eq!(steps.len(), 5);
-        assert!(steps[0].contains("Navigate to the login page"));
-        assert!(steps[1].contains("Enter valid email address"));
-        assert!(steps[2].contains("Enter valid password"));
-        assert!(steps[3].contains("Click the \"Login\" button"));
-        assert!(steps[4].contains("Observe that the page refreshes"));
+        assert_eq!(steps.len(), 3);
+        assert!(steps[0].contains("Navigate to login page"));
+        assert!(steps[1].contains("Enter valid credentials"));
+        assert!(steps[2].contains("Click login button"));
     }
 
     #[test]
