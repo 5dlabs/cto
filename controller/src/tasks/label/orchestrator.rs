@@ -17,6 +17,7 @@ use tracing::{debug, error, info, instrument, warn};
 pub struct LabelOrchestrator {
     label_client: GitHubLabelClient,
     label_schema: LabelSchema,
+    #[allow(dead_code)]
     state_manager: Arc<RemediationStateManager>,
     override_detector: OverrideDetector,
 }
@@ -78,7 +79,7 @@ impl LabelOrchestrator {
         );
 
         // Get current labels and check for overrides
-        let current_labels = self.label_client.get_labels(pr_number as i32).await?;
+        let current_labels = self.label_client.get_labels(pr_number).await?;
         debug!("Current labels: {:?}", current_labels);
 
         // Check for override labels first
@@ -103,8 +104,7 @@ impl LabelOrchestrator {
             .find_transition(&current_state, trigger)
             .ok_or_else(|| {
                 OrchestratorError::InvalidTransition(format!(
-                    "No valid transition from {:?} with trigger '{}'",
-                    current_state, trigger
+                    "No valid transition from {current_state:?} with trigger '{trigger}'"
                 ))
             })?;
 

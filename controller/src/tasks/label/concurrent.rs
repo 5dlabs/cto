@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 /// Concurrent label manager for handling race conditions
+#[allow(dead_code)]
 pub struct ConcurrentLabelManager {
     label_client: GitHubLabelClient,
     locks: Arc<Mutex<HashMap<i32, Arc<Mutex<()>>>>>,
