@@ -7,8 +7,8 @@ use crate::tasks::label::client::GitHubLabelClient;
 use crate::tasks::label::schema::LabelOperation;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 /// Concurrent label manager for handling race conditions
@@ -68,8 +68,11 @@ impl ConcurrentLabelManager {
         pr_number: i32,
         operations: &[LabelOperation],
     ) -> Result<(), ConcurrentError> {
-        info!("Executing {} operations on PR #{} with locking",
-              operations.len(), pr_number);
+        info!(
+            "Executing {} operations on PR #{} with locking",
+            operations.len(),
+            pr_number
+        );
 
         // TODO: Implement locking mechanism
         debug!("Locking mechanism placeholder");

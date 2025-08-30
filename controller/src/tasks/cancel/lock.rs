@@ -4,16 +4,16 @@
 //! The implementation ensures mutual exclusion across multiple controller instances for critical
 //! cancellation operations, preventing race conditions during concurrent remediation workflows.
 
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
 use k8s_openapi::api::coordination::v1::{Lease as K8sLease, LeaseSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::MicroTime;
-use kube::api::{Api, PostParams, DeleteParams, PatchParams, Patch};
+use kube::api::{Api, DeleteParams, Patch, PatchParams, PostParams};
 use kube::core::ObjectMeta;
 use kube::{Client, Error as KubeError};
 use thiserror::Error;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 /// Errors that can occur during distributed lock operations
 #[derive(Error, Debug)]
@@ -50,12 +50,7 @@ pub struct DistributedLock {
 
 impl DistributedLock {
     /// Create a new distributed lock
-    pub fn new(
-        client: Client,
-        namespace: &str,
-        lock_name: &str,
-        holder_name: &str,
-    ) -> Self {
+    pub fn new(client: Client, namespace: &str, lock_name: &str, holder_name: &str) -> Self {
         Self {
             client,
             namespace: namespace.to_string(),
@@ -98,7 +93,12 @@ impl DistributedLock {
                     holder = %self.holder_name,
                     "Successfully acquired distributed lock"
                 );
-                Ok(ActiveLease::new(created_lease, self.client.clone(), &self.namespace, self.renewal_interval))
+                Ok(ActiveLease::new(
+                    created_lease,
+                    self.client.clone(),
+                    &self.namespace,
+                    self.renewal_interval,
+                ))
             }
             Err(KubeError::Api(err)) if err.code == 409 => {
                 // Lease already exists, try to acquire it
@@ -117,7 +117,10 @@ impl DistributedLock {
     }
 
     /// Try to acquire an existing lease
-    async fn try_acquire_existing_lease(&self, lease_api: &Api<K8sLease>) -> Result<ActiveLease, LeaseError> {
+    async fn try_acquire_existing_lease(
+        &self,
+        lease_api: &Api<K8sLease>,
+    ) -> Result<ActiveLease, LeaseError> {
         let existing_lease = lease_api.get(&self.lock_name).await?;
 
         // Check if the lease is expired
@@ -133,14 +136,22 @@ impl DistributedLock {
             updated_lease.spec = Some(self.create_lease_spec()?);
             updated_lease.metadata.annotations = Some(self.create_annotations());
 
-            match lease_api.replace(&self.lock_name, &PostParams::default(), &updated_lease).await {
+            match lease_api
+                .replace(&self.lock_name, &PostParams::default(), &updated_lease)
+                .await
+            {
                 Ok(acquired_lease) => {
                     info!(
                         lock_name = %self.lock_name,
                         holder = %self.holder_name,
                         "Successfully acquired expired distributed lock"
                     );
-                    Ok(ActiveLease::new(acquired_lease, self.client.clone(), &self.namespace, self.renewal_interval))
+                    Ok(ActiveLease::new(
+                        acquired_lease,
+                        self.client.clone(),
+                        &self.namespace,
+                        self.renewal_interval,
+                    ))
                 }
                 Err(e) => {
                     warn!(
@@ -154,7 +165,8 @@ impl DistributedLock {
             }
         } else {
             // Lease is still valid and held by someone else
-            let holder = existing_lease.spec
+            let holder = existing_lease
+                .spec
                 .as_ref()
                 .and_then(|spec| spec.holder_identity.as_ref())
                 .map(|s| s.as_str())
@@ -221,10 +233,22 @@ impl DistributedLock {
     /// Create lease annotations
     fn create_annotations(&self) -> BTreeMap<String, String> {
         let mut annotations = BTreeMap::new();
-        annotations.insert("cancellation.5dlabs.com/holder".to_string(), self.holder_name.clone());
-        annotations.insert("cancellation.5dlabs.com/acquired".to_string(), chrono::Utc::now().to_rfc3339());
-        annotations.insert("cancellation.5dlabs.com/operation".to_string(), "agent-cancellation".to_string());
-        annotations.insert("cancellation.5dlabs.com/lock-name".to_string(), self.lock_name.clone());
+        annotations.insert(
+            "cancellation.5dlabs.com/holder".to_string(),
+            self.holder_name.clone(),
+        );
+        annotations.insert(
+            "cancellation.5dlabs.com/acquired".to_string(),
+            chrono::Utc::now().to_rfc3339(),
+        );
+        annotations.insert(
+            "cancellation.5dlabs.com/operation".to_string(),
+            "agent-cancellation".to_string(),
+        );
+        annotations.insert(
+            "cancellation.5dlabs.com/lock-name".to_string(),
+            self.lock_name.clone(),
+        );
         annotations
     }
 }
@@ -240,12 +264,7 @@ pub struct ActiveLease {
 
 impl ActiveLease {
     /// Create a new lease instance
-    fn new(
-        lease: K8sLease,
-        client: Client,
-        namespace: &str,
-        renewal_interval: Duration,
-    ) -> Self {
+    fn new(lease: K8sLease, client: Client, namespace: &str, renewal_interval: Duration) -> Self {
         let mut lease_instance = Self {
             lease,
             client,
@@ -294,13 +313,20 @@ impl ActiveLease {
     /// Renew the lease
     async fn renew_lease(lease_api: &Api<K8sLease>, lease_name: &str) -> Result<(), LeaseError> {
         let mut patch = HashMap::new();
-        patch.insert("spec", HashMap::from([("renewTime", chrono::Utc::now().to_rfc3339())]));
+        patch.insert(
+            "spec",
+            HashMap::from([("renewTime", chrono::Utc::now().to_rfc3339())]),
+        );
 
         let patch_data = serde_json::to_vec(&patch)
             .map_err(|e| LeaseError::ValidationError(format!("Failed to serialize patch: {e}")))?;
 
         lease_api
-            .patch(lease_name, &PatchParams::apply("cancellation-controller"), &Patch::Apply(&patch_data))
+            .patch(
+                lease_name,
+                &PatchParams::apply("cancellation-controller"),
+                &Patch::Apply(&patch_data),
+            )
             .await?;
 
         Ok(())
@@ -314,7 +340,11 @@ impl ActiveLease {
         }
 
         let lease_api: Api<K8sLease> = Api::namespaced(self.client.clone(), &self.namespace);
-        let lease_name = self.lease.metadata.name.as_ref()
+        let lease_name = self
+            .lease
+            .metadata
+            .name
+            .as_ref()
             .ok_or_else(|| LeaseError::ValidationError("Lease name is missing".to_string()))?;
 
         lease_api
@@ -333,7 +363,9 @@ impl ActiveLease {
 
     /// Get the holder identity
     pub fn holder(&self) -> &str {
-        self.lease.spec.as_ref()
+        self.lease
+            .spec
+            .as_ref()
             .and_then(|spec| spec.holder_identity.as_ref())
             .map(|s| s.as_str())
             .unwrap_or("")
@@ -394,10 +426,22 @@ mod tests {
         let holder_name = "test-holder";
 
         let mut annotations = BTreeMap::new();
-        annotations.insert("cancellation.5dlabs.com/holder".to_string(), holder_name.to_string());
-        annotations.insert("cancellation.5dlabs.com/acquired".to_string(), chrono::Utc::now().to_rfc3339());
-        annotations.insert("cancellation.5dlabs.com/operation".to_string(), "agent-cancellation".to_string());
-        annotations.insert("cancellation.5dlabs.com/lock-name".to_string(), lock_name.to_string());
+        annotations.insert(
+            "cancellation.5dlabs.com/holder".to_string(),
+            holder_name.to_string(),
+        );
+        annotations.insert(
+            "cancellation.5dlabs.com/acquired".to_string(),
+            chrono::Utc::now().to_rfc3339(),
+        );
+        annotations.insert(
+            "cancellation.5dlabs.com/operation".to_string(),
+            "agent-cancellation".to_string(),
+        );
+        annotations.insert(
+            "cancellation.5dlabs.com/lock-name".to_string(),
+            lock_name.to_string(),
+        );
 
         assert!(annotations.contains_key("cancellation.5dlabs.com/holder"));
         assert!(annotations.contains_key("cancellation.5dlabs.com/acquired"));
@@ -405,7 +449,13 @@ mod tests {
         assert!(annotations.contains_key("cancellation.5dlabs.com/lock-name"));
 
         assert_eq!(annotations["cancellation.5dlabs.com/holder"], "test-holder");
-        assert_eq!(annotations["cancellation.5dlabs.com/operation"], "agent-cancellation");
-        assert_eq!(annotations["cancellation.5dlabs.com/lock-name"], "test-lock");
+        assert_eq!(
+            annotations["cancellation.5dlabs.com/operation"],
+            "agent-cancellation"
+        );
+        assert_eq!(
+            annotations["cancellation.5dlabs.com/lock-name"],
+            "test-lock"
+        );
     }
 }

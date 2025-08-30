@@ -3,8 +3,8 @@
 //! This module handles automated cleanup of obsolete workflow labels
 //! after task completion or abandonment.
 
-use crate::tasks::label::client::GitHubLabelClient;
 use crate::remediation::RemediationStateManager;
+use crate::tasks::label::client::GitHubLabelClient;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{debug, info};
@@ -64,7 +64,10 @@ impl LabelCleanupManager {
         pr_number: i32,
         task_id: &str,
     ) -> Result<(), CleanupError> {
-        info!("Cleaning up completed task {} on PR #{}", task_id, pr_number);
+        info!(
+            "Cleaning up completed task {} on PR #{}",
+            task_id, pr_number
+        );
 
         // TODO: Implement cleanup logic
         debug!("Cleanup logic placeholder for completed task");
@@ -84,8 +87,10 @@ impl LabelCleanupManager {
         task_id: &str,
         ttl_days: u32,
     ) -> Result<(), CleanupError> {
-        info!("Cleaning up abandoned task {} on PR #{} (TTL: {} days)",
-              task_id, pr_number, ttl_days);
+        info!(
+            "Cleaning up abandoned task {} on PR #{} (TTL: {} days)",
+            task_id, pr_number, ttl_days
+        );
 
         // TODO: Implement abandonment cleanup logic
         debug!("Abandonment cleanup logic placeholder");

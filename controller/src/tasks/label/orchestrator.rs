@@ -3,10 +3,12 @@
 //! This module implements the core state machine for workflow transitions,
 //! managing the complex logic of moving between remediation states based on events.
 
-use crate::tasks::label::schema::{LabelSchema, WorkflowState, StateTransition, LabelOperation, LabelOperationType};
+use crate::remediation::RemediationStateManager;
 use crate::tasks::label::client::{GitHubLabelClient, GitHubLabelError};
 use crate::tasks::label::override_detector::{OverrideDetector, OverrideError};
-use crate::remediation::RemediationStateManager;
+use crate::tasks::label::schema::{
+    LabelOperation, LabelOperationType, LabelSchema, StateTransition, WorkflowState,
+};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{debug, error, info, instrument, warn};
@@ -70,17 +72,25 @@ impl LabelOrchestrator {
         trigger: &str,
         context: Option<serde_json::Value>,
     ) -> Result<(), OrchestratorError> {
-        info!("Processing state transition for PR #{} with trigger '{}'", pr_number, trigger);
+        info!(
+            "Processing state transition for PR #{} with trigger '{}'",
+            pr_number, trigger
+        );
 
         // Get current labels and check for overrides
         let current_labels = self.label_client.get_labels(pr_number as i32).await?;
         debug!("Current labels: {:?}", current_labels);
 
         // Check for override labels first
-        let override_status = self.override_detector.check_override_status(pr_number, task_id).await?;
+        let override_status = self
+            .override_detector
+            .check_override_status(pr_number, task_id)
+            .await?;
         if override_status.has_override {
             return Err(OrchestratorError::OverrideDetected(
-                override_status.message.unwrap_or_else(|| "Automation override active".to_string())
+                override_status
+                    .message
+                    .unwrap_or_else(|| "Automation override active".to_string()),
             ));
         }
 
@@ -89,25 +99,36 @@ impl LabelOrchestrator {
         debug!("Current workflow state: {:?}", current_state);
 
         // Find valid transition
-        let transition = self.find_transition(&current_state, trigger)
-            .ok_or_else(|| OrchestratorError::InvalidTransition(
-                format!("No valid transition from {:?} with trigger '{}'", current_state, trigger)
-            ))?;
+        let transition = self
+            .find_transition(&current_state, trigger)
+            .ok_or_else(|| {
+                OrchestratorError::InvalidTransition(format!(
+                    "No valid transition from {:?} with trigger '{}'",
+                    current_state, trigger
+                ))
+            })?;
 
         // Validate transition conditions
-        self.validate_transition_conditions(&transition, task_id).await?;
+        self.validate_transition_conditions(&transition, task_id)
+            .await?;
 
         // Execute the transition
-        self.execute_transition(pr_number, task_id, transition.clone(), context).await?;
+        self.execute_transition(pr_number, task_id, transition.clone(), context)
+            .await?;
 
-        info!("Successfully completed state transition: {:?} -> {:?}",
-              transition.from, transition.to);
+        info!(
+            "Successfully completed state transition: {:?} -> {:?}",
+            transition.from, transition.to
+        );
 
         Ok(())
     }
 
     /// Get the current workflow state for a PR
-    pub async fn get_current_state(&mut self, pr_number: i32) -> Result<WorkflowState, OrchestratorError> {
+    pub async fn get_current_state(
+        &mut self,
+        pr_number: i32,
+    ) -> Result<WorkflowState, OrchestratorError> {
         let labels = self.label_client.get_labels(pr_number).await?;
         Ok(self.label_schema.determine_workflow_state(&labels))
     }
@@ -122,20 +143,29 @@ impl LabelOrchestrator {
         trigger: &str,
     ) -> Result<bool, OrchestratorError> {
         // Check for overrides
-        let override_status = self.override_detector.check_override_status(pr_number, task_id).await?;
+        let override_status = self
+            .override_detector
+            .check_override_status(pr_number, task_id)
+            .await?;
         if override_status.has_override {
             return Ok(false);
         }
 
         // Check if transition exists
-        let transition_exists = self.label_schema.is_valid_transition(from_state, to_state, trigger);
+        let transition_exists = self
+            .label_schema
+            .is_valid_transition(from_state, to_state, trigger);
         if !transition_exists {
             return Ok(false);
         }
 
         // Get transition and validate conditions
-        if let Some(transition) = self.label_schema.get_transition(from_state, to_state, trigger) {
-            self.validate_transition_conditions(transition, task_id).await?;
+        if let Some(transition) = self
+            .label_schema
+            .get_transition(from_state, to_state, trigger)
+        {
+            self.validate_transition_conditions(transition, task_id)
+                .await?;
             Ok(true)
         } else {
             Ok(false)
@@ -143,11 +173,15 @@ impl LabelOrchestrator {
     }
 
     /// Find a valid transition for the given state and trigger
-    fn find_transition(&self, current_state: &WorkflowState, trigger: &str) -> Option<StateTransition> {
-        self.label_schema.state_transitions.iter()
-            .find(|transition| {
-                &transition.from == current_state && transition.trigger == trigger
-            })
+    fn find_transition(
+        &self,
+        current_state: &WorkflowState,
+        trigger: &str,
+    ) -> Option<StateTransition> {
+        self.label_schema
+            .state_transitions
+            .iter()
+            .find(|transition| &transition.from == current_state && transition.trigger == trigger)
             .cloned()
     }
 
@@ -159,16 +193,20 @@ impl LabelOrchestrator {
     ) -> Result<(), OrchestratorError> {
         for condition in &transition.conditions {
             if !self.evaluate_condition(condition, task_id).await? {
-                return Err(OrchestratorError::ConditionError(
-                    format!("Condition '{condition}' not satisfied for task {task_id}")
-                ));
+                return Err(OrchestratorError::ConditionError(format!(
+                    "Condition '{condition}' not satisfied for task {task_id}"
+                )));
             }
         }
         Ok(())
     }
 
     /// Evaluate a single condition
-    async fn evaluate_condition(&self, condition: &str, task_id: &str) -> Result<bool, OrchestratorError> {
+    async fn evaluate_condition(
+        &self,
+        condition: &str,
+        task_id: &str,
+    ) -> Result<bool, OrchestratorError> {
         if condition.starts_with("iteration ") {
             let current_iteration = self.get_current_iteration(task_id).await?;
             self.evaluate_iteration_condition(condition, current_iteration)
@@ -187,18 +225,22 @@ impl LabelOrchestrator {
 
     /// Evaluate iteration-based conditions
     #[allow(unused_self)]
-    fn evaluate_iteration_condition(&self, condition: &str, current_iteration: i32) -> Result<bool, OrchestratorError> {
-        let pattern = regex::Regex::new(r"iteration\s*(>=|<=|>|<|==)\s*(\d+)")
-            .map_err(|e| OrchestratorError::ConditionError(
-                format!("Invalid iteration condition pattern: {e}")
-            ))?;
+    fn evaluate_iteration_condition(
+        &self,
+        condition: &str,
+        current_iteration: i32,
+    ) -> Result<bool, OrchestratorError> {
+        let pattern = regex::Regex::new(r"iteration\s*(>=|<=|>|<|==)\s*(\d+)").map_err(|e| {
+            OrchestratorError::ConditionError(format!("Invalid iteration condition pattern: {e}"))
+        })?;
 
         if let Some(captures) = pattern.captures(condition) {
             let operator = &captures[1];
-            let value: i32 = captures[2].parse()
-                .map_err(|_| OrchestratorError::ConditionError(
-                    format!("Invalid iteration value in condition: {condition}")
-                ))?;
+            let value: i32 = captures[2].parse().map_err(|_| {
+                OrchestratorError::ConditionError(format!(
+                    "Invalid iteration value in condition: {condition}"
+                ))
+            })?;
 
             match operator {
                 ">=" => Ok(current_iteration >= value),
@@ -209,9 +251,9 @@ impl LabelOrchestrator {
                 _ => Ok(false),
             }
         } else {
-            Err(OrchestratorError::ConditionError(
-                format!("Invalid iteration condition: {condition}")
-            ))
+            Err(OrchestratorError::ConditionError(format!(
+                "Invalid iteration condition: {condition}"
+            )))
         }
     }
 
@@ -230,17 +272,21 @@ impl LabelOrchestrator {
 
         // Process each action
         for action in &transition.actions {
-            self.process_action(action, task_id, &mut operations, &mut iteration_update).await?;
+            self.process_action(action, task_id, &mut operations, &mut iteration_update)
+                .await?;
         }
 
         // Execute label operations atomically
         if !operations.is_empty() {
             debug!("Executing {} label operations", operations.len());
-            self.label_client.update_labels_atomic(pr_number, &operations).await?;
+            self.label_client
+                .update_labels_atomic(pr_number, &operations)
+                .await?;
         }
 
         // Log the transition
-        self.log_transition(pr_number, task_id, &transition, iteration_update, context).await;
+        self.log_transition(pr_number, task_id, &transition, iteration_update, context)
+            .await;
 
         Ok(())
     }
@@ -368,7 +414,10 @@ impl LabelOrchestrator {
         task_id: &str,
         target_state: WorkflowState,
     ) -> Result<(), OrchestratorError> {
-        info!("Forcing PR #{} to state {:?} for task {}", pr_number, target_state, task_id);
+        info!(
+            "Forcing PR #{} to state {:?} for task {}",
+            pr_number, target_state, task_id
+        );
 
         // Get current labels
         let current_labels = self.label_client.get_labels(pr_number).await?;
@@ -379,16 +428,25 @@ impl LabelOrchestrator {
 
         // Execute operations
         if !operations.is_empty() {
-            self.label_client.update_labels_atomic(pr_number, &operations).await?;
+            self.label_client
+                .update_labels_atomic(pr_number, &operations)
+                .await?;
         }
 
-        info!("Successfully forced PR #{} to state {:?}", pr_number, target_state);
+        info!(
+            "Successfully forced PR #{} to state {:?}",
+            pr_number, target_state
+        );
         Ok(())
     }
 
     /// Calculate operations needed to force a state
     #[allow(unused_self)]
-    fn calculate_force_operations(&self, current_labels: &[String], target_state: &WorkflowState) -> Vec<LabelOperation> {
+    fn calculate_force_operations(
+        &self,
+        current_labels: &[String],
+        target_state: &WorkflowState,
+    ) -> Vec<LabelOperation> {
         let mut operations = Vec::new();
 
         // Remove all status labels first
@@ -400,7 +458,8 @@ impl LabelOrchestrator {
             "failed-remediation",
         ];
 
-        let labels_to_remove: Vec<String> = current_labels.iter()
+        let labels_to_remove: Vec<String> = current_labels
+            .iter()
             .filter(|label| status_labels.contains(&label.as_str()))
             .cloned()
             .collect();

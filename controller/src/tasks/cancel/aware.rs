@@ -9,7 +9,7 @@ use kube::api::{Api, DeleteParams, ListParams};
 use kube::{Client, Error as KubeError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use crate::crds::CodeRun;
 use crate::remediation::{RemediationState, RemediationStateManager};
@@ -63,11 +63,7 @@ pub struct StateAwareCancellation {
 
 impl StateAwareCancellation {
     /// Create a new state-aware cancellation manager
-    pub fn new(
-        client: Client,
-        namespace: &str,
-        state_manager: RemediationStateManager,
-    ) -> Self {
+    pub fn new(client: Client, namespace: &str, state_manager: RemediationStateManager) -> Self {
         let lock_manager = DistributedLock::new(
             client.clone(),
             namespace,
@@ -81,7 +77,7 @@ impl StateAwareCancellation {
             state_manager,
             lock_manager,
             cancellation_timeout: Duration::from_secs(300), // 5 minutes
-            grace_period: Duration::from_secs(30), // 30 seconds
+            grace_period: Duration::from_secs(30),          // 30 seconds
         }
     }
 
@@ -91,7 +87,14 @@ impl StateAwareCancellation {
         task_id: &str,
         pr_number: i32,
     ) -> Result<CancellationResult, CancellationError> {
-        let correlation_id = format!("cancel-{}-{}", task_id, SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos());
+        let correlation_id = format!(
+            "cancel-{}-{}",
+            task_id,
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
 
         debug!(
             task_id = %task_id,
@@ -141,12 +144,18 @@ impl StateAwareCancellation {
         let _lease_guard = lease;
 
         // Check current remediation state
-        let state_result = self.state_manager.load_state(pr_number as u32, task_id).await;
+        let state_result = self
+            .state_manager
+            .load_state(pr_number as u32, task_id)
+            .await;
 
         match state_result {
             Ok(Some(state)) => {
                 // Check if remediation is in progress (which would indicate cancellation is happening)
-                if matches!(state.status, crate::remediation::RemediationStatus::InProgress) {
+                if matches!(
+                    state.status,
+                    crate::remediation::RemediationStatus::InProgress
+                ) {
                     info!(
                         task_id = %task_id,
                         status = ?state.status,
@@ -197,12 +206,15 @@ impl StateAwareCancellation {
         }
 
         // Perform the actual cancellation
-        let result = self.perform_cancellation(task_id, pr_number, &correlation_id).await;
+        let result = self
+            .perform_cancellation(task_id, pr_number, &correlation_id)
+            .await;
 
         // Update state after cancellation
         match &result {
             Ok(cancellation_result) => {
-                self.mark_cancellation_completed(task_id, cancellation_result).await?;
+                self.mark_cancellation_completed(task_id, cancellation_result)
+                    .await?;
                 info!(
                     task_id = %task_id,
                     cancelled = cancellation_result.cancelled_agents.len(),
@@ -231,7 +243,9 @@ impl StateAwareCancellation {
         let label_selector = format!("task-id={}", state.task_id);
         let lp = ListParams::default().labels(&label_selector);
 
-        let coderuns = coderun_api.list(&lp).await
+        let coderuns = coderun_api
+            .list(&lp)
+            .await
             .map_err(CancellationError::KubeError)?;
 
         if coderuns.items.is_empty() {
@@ -242,8 +256,7 @@ impl StateAwareCancellation {
         // Check if any CodeRuns are still running
         for coderun in &coderuns.items {
             if let Some(status) = &coderun.status {
-                if status.phase == "Running" ||
-                   status.phase == "Pending" {
+                if status.phase == "Running" || status.phase == "Pending" {
                     debug!(
                         task_id = %state.task_id,
                         coderun_name = %coderun.metadata.name.as_ref().unwrap_or(&"unknown".to_string()),
@@ -287,25 +300,28 @@ impl StateAwareCancellation {
         let label_selector = format!("task-id={task_id}");
         let lp = ListParams::default().labels(&label_selector);
 
-        let coderuns = coderun_api.list(&lp).await
+        let coderuns = coderun_api
+            .list(&lp)
+            .await
             .map_err(CancellationError::KubeError)?;
 
         for coderun in coderuns.items {
-            let coderun_name = coderun.metadata.name.as_ref()
-                .ok_or_else(|| CancellationError::ResourceNotFound {
-                    resource: "CodeRun without name".to_string()
-                })?;
+            let coderun_name = coderun.metadata.name.as_ref().ok_or_else(|| {
+                CancellationError::ResourceNotFound {
+                    resource: "CodeRun without name".to_string(),
+                }
+            })?;
 
-            let agent_type = coderun.metadata.labels
+            let agent_type = coderun
+                .metadata
+                .labels
                 .as_ref()
                 .and_then(|labels| labels.get("agent-type"))
                 .map_or("unknown", |s| s.as_str());
 
             // Check current phase
             let should_cancel = if let Some(status) = &coderun.status {
-                matches!(status.phase.as_str(),
-                    "Running" | "Pending"
-                )
+                matches!(status.phase.as_str(), "Running" | "Pending")
             } else {
                 true // Cancel if no status available
             };
@@ -368,10 +384,14 @@ impl StateAwareCancellation {
 
     /// Cancel a single CodeRun with proper error handling
     async fn cancel_single_coderun(&self, coderun: CodeRun) -> Result<(), CancellationError> {
-        let coderun_name = coderun.metadata.name.as_ref()
-            .ok_or_else(|| CancellationError::ResourceNotFound {
-                resource: "CodeRun without name".to_string()
-            })?;
+        let coderun_name =
+            coderun
+                .metadata
+                .name
+                .as_ref()
+                .ok_or_else(|| CancellationError::ResourceNotFound {
+                    resource: "CodeRun without name".to_string(),
+                })?;
 
         let coderun_api: Api<CodeRun> = Api::namespaced(self.client.clone(), &self.namespace);
 
@@ -381,9 +401,7 @@ impl StateAwareCancellation {
             ..Default::default()
         };
 
-        coderun_api
-            .delete(coderun_name, &dp)
-            .await?;
+        coderun_api.delete(coderun_name, &dp).await?;
 
         Ok(())
     }
@@ -453,13 +471,11 @@ mod tests {
         let result = CancellationResult {
             task_id: "test-task".to_string(),
             pr_number: 123,
-            cancelled_agents: vec![
-                AgentInfo {
-                    name: "coderun-1".to_string(),
-                    agent_type: "cleo".to_string(),
-                    reason: "Successfully cancelled".to_string(),
-                }
-            ],
+            cancelled_agents: vec![AgentInfo {
+                name: "coderun-1".to_string(),
+                agent_type: "cleo".to_string(),
+                reason: "Successfully cancelled".to_string(),
+            }],
             skipped_agents: vec![],
             reason: "Test cancellation".to_string(),
             correlation_id: "test-correlation".to_string(),
@@ -470,6 +486,9 @@ mod tests {
 
         assert_eq!(result.task_id, deserialized.task_id);
         assert_eq!(result.pr_number, deserialized.pr_number);
-        assert_eq!(result.cancelled_agents.len(), deserialized.cancelled_agents.len());
+        assert_eq!(
+            result.cancelled_agents.len(),
+            deserialized.cancelled_agents.len()
+        );
     }
 }

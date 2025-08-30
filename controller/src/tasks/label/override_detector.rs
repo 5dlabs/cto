@@ -124,7 +124,10 @@ impl OverrideDetector {
 
     /// Set the notification service
     #[must_use]
-    pub fn with_notification_service<T: NotificationService + 'static>(mut self, service: T) -> Self {
+    pub fn with_notification_service<T: NotificationService + 'static>(
+        mut self,
+        service: T,
+    ) -> Self {
         self.notification_service = Some(Box::new(service));
         self
     }
@@ -138,12 +141,15 @@ impl OverrideDetector {
         pr_number: i32,
         task_id: &str,
     ) -> Result<OverrideStatus, OverrideError> {
-        debug!("Checking for override labels on PR #{} for task {}", pr_number, task_id);
+        debug!(
+            "Checking for override labels on PR #{} for task {}",
+            pr_number, task_id
+        );
 
-        let labels = self.label_client.get_labels(pr_number).await
-            .map_err(|e| OverrideError::ProcessingError(
-                format!("Failed to get labels: {e}")
-            ))?;
+        let labels =
+            self.label_client.get_labels(pr_number).await.map_err(|e| {
+                OverrideError::ProcessingError(format!("Failed to get labels: {e}"))
+            })?;
 
         let overrides = self.detect_overrides(&labels);
 
@@ -157,8 +163,10 @@ impl OverrideDetector {
             })
         } else {
             let primary_override = &overrides[0];
-            info!("Override detected on PR #{}: {} ({})",
-                  pr_number, primary_override.override_type, primary_override.severity);
+            info!(
+                "Override detected on PR #{}: {} ({})",
+                pr_number, primary_override.override_type, primary_override.severity
+            );
 
             // Send notification if service is configured
             if let Some(service) = &self.notification_service {
@@ -191,25 +199,35 @@ impl OverrideDetector {
 
         // Define override label mappings
         let override_definitions: HashMap<&str, Override> = [
-            ("skip-automation", Override {
-                override_type: "skip-automation".to_string(),
-                message: "All automated workflows disabled by human override".to_string(),
-                severity: "high".to_string(),
-                action: "halt_all_automation".to_string(),
-            }),
-            ("manual-review-required", Override {
-                override_type: "manual-review-required".to_string(),
-                message: "Manual review required before automation continues".to_string(),
-                severity: "medium".to_string(),
-                action: "pause_until_review".to_string(),
-            }),
-            ("pause-remediation", Override {
-                override_type: "pause-remediation".to_string(),
-                message: "Remediation temporarily paused".to_string(),
-                severity: "low".to_string(),
-                action: "pause_remediation_only".to_string(),
-            }),
-        ].into();
+            (
+                "skip-automation",
+                Override {
+                    override_type: "skip-automation".to_string(),
+                    message: "All automated workflows disabled by human override".to_string(),
+                    severity: "high".to_string(),
+                    action: "halt_all_automation".to_string(),
+                },
+            ),
+            (
+                "manual-review-required",
+                Override {
+                    override_type: "manual-review-required".to_string(),
+                    message: "Manual review required before automation continues".to_string(),
+                    severity: "medium".to_string(),
+                    action: "pause_until_review".to_string(),
+                },
+            ),
+            (
+                "pause-remediation",
+                Override {
+                    override_type: "pause-remediation".to_string(),
+                    message: "Remediation temporarily paused".to_string(),
+                    severity: "low".to_string(),
+                    action: "pause_remediation_only".to_string(),
+                },
+            ),
+        ]
+        .into();
 
         for label in labels {
             if let Some(override_info) = override_definitions.get(label.as_str()) {
@@ -231,7 +249,10 @@ impl OverrideDetector {
         reason: &str,
         requester: &str,
     ) -> Result<BypassRequest, OverrideError> {
-        info!("Creating bypass request for PR #{} by {}", pr_number, requester);
+        info!(
+            "Creating bypass request for PR #{} by {}",
+            pr_number, requester
+        );
 
         let request = BypassRequest {
             id: format!("bypass-{}-{}", pr_number, chrono::Utc::now().timestamp()),
@@ -268,15 +289,15 @@ impl OverrideDetector {
     ) -> Result<(), OverrideError> {
         info!("Approving bypass request {} by {}", request_id, approver);
 
-        let mut request = self.get_bypass_request(request_id).await?
-            .ok_or_else(|| OverrideError::BypassError(
-                format!("Bypass request {request_id} not found")
-            ))?;
+        let mut request = self.get_bypass_request(request_id).await?.ok_or_else(|| {
+            OverrideError::BypassError(format!("Bypass request {request_id} not found"))
+        })?;
 
         if !matches!(request.status, BypassStatus::Pending) {
-            return Err(OverrideError::BypassError(
-                format!("Cannot approve request with status {:?}", request.status)
-            ));
+            return Err(OverrideError::BypassError(format!(
+                "Cannot approve request with status {:?}",
+                request.status
+            )));
         }
 
         request.approvers.push(approver.to_string());
@@ -299,15 +320,15 @@ impl OverrideDetector {
     ) -> Result<(), OverrideError> {
         info!("Denying bypass request {} by {}", request_id, approver);
 
-        let mut request = self.get_bypass_request(request_id).await?
-            .ok_or_else(|| OverrideError::BypassError(
-                format!("Bypass request {request_id} not found")
-            ))?;
+        let mut request = self.get_bypass_request(request_id).await?.ok_or_else(|| {
+            OverrideError::BypassError(format!("Bypass request {request_id} not found"))
+        })?;
 
         if !matches!(request.status, BypassStatus::Pending) {
-            return Err(OverrideError::BypassError(
-                format!("Cannot deny request with status {:?}", request.status)
-            ));
+            return Err(OverrideError::BypassError(format!(
+                "Cannot deny request with status {:?}",
+                request.status
+            )));
         }
 
         request.approvers.push(approver.to_string());
@@ -323,7 +344,10 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request status cannot be retrieved
-    pub async fn get_bypass_status(&mut self, request_id: &str) -> Result<Option<BypassStatus>, OverrideError> {
+    pub async fn get_bypass_status(
+        &mut self,
+        request_id: &str,
+    ) -> Result<Option<BypassStatus>, OverrideError> {
         let request = self.get_bypass_request(request_id).await?;
         Ok(request.map(|r| r.status))
     }
@@ -336,7 +360,10 @@ impl OverrideDetector {
     }
 
     /// Retrieve a bypass request (placeholder implementation)
-    async fn get_bypass_request(&self, _request_id: &str) -> Result<Option<BypassRequest>, OverrideError> {
+    async fn get_bypass_request(
+        &self,
+        _request_id: &str,
+    ) -> Result<Option<BypassRequest>, OverrideError> {
         // TODO: Implement retrieval mechanism
         debug!("Retrieving bypass request (placeholder implementation)");
         Ok(None)
@@ -356,14 +383,18 @@ pub struct LoggingNotificationService;
 #[async_trait::async_trait]
 impl NotificationService for LoggingNotificationService {
     async fn send_override_alert(&self, alert: OverrideAlert) -> Result<(), OverrideError> {
-        info!("OVERRIDE ALERT: PR #{} - {} ({}) - {}",
-              alert.pr_number, alert.override_type, alert.severity, alert.message);
+        info!(
+            "OVERRIDE ALERT: PR #{} - {} ({}) - {}",
+            alert.pr_number, alert.override_type, alert.severity, alert.message
+        );
         Ok(())
     }
 
     async fn send_bypass_request(&self, request: BypassRequest) -> Result<(), OverrideError> {
-        info!("BYPASS REQUEST: {} for PR #{} by {} - {}",
-              request.id, request.pr_number, request.requester, request.reason);
+        info!(
+            "BYPASS REQUEST: {} for PR #{} by {} - {}",
+            request.id, request.pr_number, request.requester, request.reason
+        );
         Ok(())
     }
 }

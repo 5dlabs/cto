@@ -22,16 +22,16 @@
 //! - **LabelCleanupManager**: Automated cleanup of obsolete labels
 //! - **ConcurrentLabelManager**: Race condition prevention and conflict resolution
 
-pub mod schema;
+pub mod cleanup;
 pub mod client;
+pub mod concurrent;
 pub mod orchestrator;
 pub mod override_detector;
-pub mod cleanup;
-pub mod concurrent;
+pub mod schema;
 
-pub use schema::{LabelSchema, LabelType, WorkflowState, StateTransition, LabelOperation};
+pub use cleanup::LabelCleanupManager;
 pub use client::GitHubLabelClient;
+pub use concurrent::ConcurrentLabelManager;
 pub use orchestrator::LabelOrchestrator;
 pub use override_detector::OverrideDetector;
-pub use cleanup::LabelCleanupManager;
-pub use concurrent::ConcurrentLabelManager;
+pub use schema::{LabelOperation, LabelSchema, LabelType, StateTransition, WorkflowState};

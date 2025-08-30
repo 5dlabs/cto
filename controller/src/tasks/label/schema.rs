@@ -204,7 +204,10 @@ impl Default for LabelSchema {
                 to: WorkflowState::NeedsRemediation,
                 trigger: "tess_feedback_received".to_string(),
                 conditions: vec![],
-                actions: vec!["add_needs_remediation".to_string(), "increment_iteration".to_string()],
+                actions: vec![
+                    "add_needs_remediation".to_string(),
+                    "increment_iteration".to_string(),
+                ],
             },
             StateTransition {
                 from: WorkflowState::NeedsRemediation,
@@ -260,11 +263,26 @@ impl Default for LabelSchema {
         ];
 
         let mut status_labels = HashMap::new();
-        status_labels.insert("needs-remediation".to_string(), "Tess identified issues requiring remediation".to_string());
-        status_labels.insert("remediation-in-progress".to_string(), "Rex is actively working on fixes".to_string());
-        status_labels.insert("ready-for-qa".to_string(), "Rex completed fixes, waiting for QA".to_string());
-        status_labels.insert("approved".to_string(), "Tess approved the changes".to_string());
-        status_labels.insert("failed-remediation".to_string(), "Max iterations reached, remediation failed".to_string());
+        status_labels.insert(
+            "needs-remediation".to_string(),
+            "Tess identified issues requiring remediation".to_string(),
+        );
+        status_labels.insert(
+            "remediation-in-progress".to_string(),
+            "Rex is actively working on fixes".to_string(),
+        );
+        status_labels.insert(
+            "ready-for-qa".to_string(),
+            "Rex completed fixes, waiting for QA".to_string(),
+        );
+        status_labels.insert(
+            "approved".to_string(),
+            "Tess approved the changes".to_string(),
+        );
+        status_labels.insert(
+            "failed-remediation".to_string(),
+            "Max iterations reached, remediation failed".to_string(),
+        );
 
         let mut override_labels = HashMap::new();
         override_labels.insert(
@@ -354,21 +372,27 @@ impl LabelSchema {
     }
 
     /// Check if a state transition is valid
-    pub fn is_valid_transition(&self, from: &WorkflowState, to: &WorkflowState, trigger: &str) -> bool {
-        self.state_transitions.iter().any(|transition|
-            &transition.from == from &&
-            &transition.to == to &&
-            transition.trigger == trigger
-        )
+    pub fn is_valid_transition(
+        &self,
+        from: &WorkflowState,
+        to: &WorkflowState,
+        trigger: &str,
+    ) -> bool {
+        self.state_transitions.iter().any(|transition| {
+            &transition.from == from && &transition.to == to && transition.trigger == trigger
+        })
     }
 
     /// Get the transition definition for a specific transition
-    pub fn get_transition(&self, from: &WorkflowState, to: &WorkflowState, trigger: &str) -> Option<&StateTransition> {
-        self.state_transitions.iter().find(|transition|
-            &transition.from == from &&
-            &transition.to == to &&
-            transition.trigger == trigger
-        )
+    pub fn get_transition(
+        &self,
+        from: &WorkflowState,
+        to: &WorkflowState,
+        trigger: &str,
+    ) -> Option<&StateTransition> {
+        self.state_transitions.iter().find(|transition| {
+            &transition.from == from && &transition.to == to && transition.trigger == trigger
+        })
     }
 
     /// Check if a workflow state is terminal (end state)
