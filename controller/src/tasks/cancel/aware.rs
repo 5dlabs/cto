@@ -13,8 +13,8 @@ use tracing::{debug, info, warn, error};
 
 use crate::crds::CodeRun;
 use crate::remediation::{RemediationState, RemediationStateManager};
-use crate::tasks::cancellation::distributed_lock::DistributedLock;
-use crate::tasks::cancellation::LeaseError;
+use crate::tasks::cancel::lock::DistributedLock;
+use crate::tasks::cancel::lock::LeaseError;
 
 /// Errors that can occur during state-aware cancellation operations
 #[derive(Error, Debug)]

@@ -19,7 +19,7 @@
 //! ### Basic Distributed Locking
 //!
 //! ```rust
-//! use cto::tasks::cancellation::{DistributedLock, Lease};
+//! use cto::tasks::cancel::{DistributedLock, ActiveLease, LeaseError};
 //!
 //! let lock = DistributedLock::new(client, "agent-platform", "cancel-task-42", "controller-1");
 //! let lease = lock.try_acquire(context).await?;
@@ -33,7 +33,7 @@
 //! ### State-Aware Cancellation
 //!
 //! ```rust
-//! use cto::tasks::cancellation::StateAwareCancellation;
+//! use cto::tasks::cancel::StateAwareCancellation;
 //!
 //! let cancellation = StateAwareCancellation::new(client, state_manager, lock_manager);
 //! cancellation.cancel_agents_with_state_check(context, "task-42", 123).await?;
