@@ -41,8 +41,8 @@ spec:
           # Filter for comments containing '🔴 Required Changes' pattern
           - path: body.comment.body
             type: string
-            comparator: "~"
-            value: [".*🔴 Required Changes.*"]
+            comparator: "in"
+            value: ["🔴 Required Changes"]
           # Ensure comment is on a pull request (not issue)
           - path: body.issue.pull_request.url
             type: string
