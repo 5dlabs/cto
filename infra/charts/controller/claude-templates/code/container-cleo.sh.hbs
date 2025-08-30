@@ -142,6 +142,7 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
     
     GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+    TOKEN_GENERATED_AT=$(date +%s)  # Track when token was generated for refresh logic
     
     if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
         echo "❌ Failed to get installation access token"
@@ -164,6 +165,87 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     
     # Also authenticate gh CLI with the token
     echo "$GITHUB_TOKEN" | gh auth login --with-token
+    
+    # Token refresh functions for long-running jobs
+    refresh_github_token() {
+        echo "🔄 Refreshing GitHub App token..."
+        
+        # Create temporary key file
+        TEMP_KEY_FILE="/tmp/github-app-key-$$"
+        echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+        chmod 600 "$TEMP_KEY_FILE"
+        
+        # Generate new JWT
+        JWT_TOKEN=$(ruby -r openssl -r json -r base64 -e "
+        key = OpenSSL::PKey::RSA.new(File.read('$TEMP_KEY_FILE'))
+        payload = {
+            iat: Time.now.to_i - 60,
+            exp: Time.now.to_i + (10 * 60),
+            iss: '$GITHUB_APP_ID'
+        }
+        header = { alg: 'RS256', typ: 'JWT' }
+        
+        header_enc = Base64.urlsafe_encode64(header.to_json).gsub('=', '')
+        payload_enc = Base64.urlsafe_encode64(payload.to_json).gsub('=', '')
+        signature = Base64.urlsafe_encode64(key.sign(OpenSSL::Digest::SHA256.new, \"#{header_enc}.#{payload_enc}\")).gsub('=', '')
+        
+        puts \"#{header_enc}.#{payload_enc}.#{signature}\"
+        ")
+        
+        # Get installation ID (reuse logic from initial auth)
+        INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+        
+        if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+            INSTALLATION_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+        fi
+        
+        # Get new installation token
+        TOKEN_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+        
+        NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+        
+        if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+            export GITHUB_TOKEN="$NEW_TOKEN"
+            export TOKEN_GENERATED_AT=$(date +%s)
+            
+            # Update git credentials
+            echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+            echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null
+            
+            echo "✅ Token refreshed successfully"
+            rm -f "$TEMP_KEY_FILE"
+            return 0
+        else
+            echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+            rm -f "$TEMP_KEY_FILE"
+            return 1
+        fi
+    }
+    
+    # Check if token needs refresh (call before git operations)
+    refresh_token_if_needed() {
+        if [ -z "$TOKEN_GENERATED_AT" ]; then
+            echo "⚠️ No token timestamp found, refreshing token..."
+            refresh_github_token
+            return
+        fi
+        
+        NOW=$(date +%s)
+        TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+        
+        # Refresh if token is older than 50 minutes (tokens last 1 hour, refresh at 50 min to be safe)
+        if [ $TOKEN_AGE -gt 3000 ]; then
+            echo "🔄 Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+            refresh_github_token
+        fi
+    }
     
 else
     echo "❌ GitHub App credentials not found"
@@ -820,6 +902,25 @@ chmod 666 "$FIFO_PATH" || true
 $CLAUDE_CMD < "$FIFO_PATH" &
 CLAUDE_PID=$!
 
+# Start background token refresh for long-running jobs
+(
+    while kill -0 $CLAUDE_PID 2>/dev/null; do
+        sleep 2700  # Check every 45 minutes
+        
+        if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
+            NOW=$(date +%s)
+            TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+            
+            if [ $TOKEN_AGE -gt 2700 ]; then
+                echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+                refresh_github_token
+            fi
+        fi
+    done
+) &
+TOKEN_REFRESH_PID=$!
+echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
+
 # Compose initial user turn with the static prompt
 USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
 
@@ -839,6 +940,12 @@ fi
 # Wait for Claude process to complete
 wait "$CLAUDE_PID"
 CLAUDE_EXIT_CODE=$?
+
+# Stop token refresh background process
+if [ -n "$TOKEN_REFRESH_PID" ]; then
+    kill $TOKEN_REFRESH_PID 2>/dev/null || true
+    echo "✓ Stopped token refresh process"
+fi
 
 # Always attempt to complete quality review - don't exit on Claude failures
 echo "🔄 Processing quality review results..."
