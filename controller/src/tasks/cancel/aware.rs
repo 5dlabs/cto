@@ -55,7 +55,9 @@ pub struct StateAwareCancellation {
     namespace: String,
     state_manager: RemediationStateManager,
     lock_manager: DistributedLock,
+    #[allow(dead_code)]
     cancellation_timeout: Duration, // For future use
+    #[allow(dead_code)]
     grace_period: Duration, // For future use
 }
 
@@ -258,6 +260,7 @@ impl StateAwareCancellation {
     }
 
     /// Mark cancellation as started in state
+    #[allow(clippy::unused_async)]
     async fn mark_cancellation_started(&self, task_id: &str) -> Result<(), CancellationError> {
         // For now, we'll create a simple state update
         // In a full implementation, this would load and update the existing state
@@ -386,6 +389,7 @@ impl StateAwareCancellation {
     }
 
     /// Mark cancellation as completed in state
+    #[allow(clippy::unused_async)]
     async fn mark_cancellation_completed(
         &self,
         task_id: &str,
@@ -403,6 +407,7 @@ impl StateAwareCancellation {
     }
 
     /// Mark cancellation as failed in state
+    #[allow(unused_async)]
     async fn mark_cancellation_failed(
         &self,
         task_id: &str,

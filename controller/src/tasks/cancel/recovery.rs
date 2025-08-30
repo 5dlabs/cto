@@ -20,11 +20,13 @@ impl RecoveryManager {
         Self {}
     }
 
+    #[allow(unused_async)]
     pub async fn start_reconciliation(&self) {
         // Placeholder implementation
         // Would run every 30 seconds to detect and repair inconsistencies
     }
 
+    #[allow(unused_async)]
     pub async fn reconcile(&self) -> Result<(), String> {
         // Placeholder implementation
         Ok(())
