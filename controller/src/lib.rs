@@ -23,7 +23,9 @@
 
 pub mod crds;
 pub mod tasks;
+pub mod remediation;
 
 // Re-export commonly used types
 pub use crds::{CodeRun, CodeRunSpec, CodeRunStatus, DocsRun, DocsRunSpec, DocsRunStatus};
 pub use tasks::config::ControllerConfig;
+pub use remediation::parse_feedback_comment;

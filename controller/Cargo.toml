@@ -66,6 +66,9 @@ async-trait = { workspace = true }
 # Text processing
 regex = { workspace = true }
 handlebars = { workspace = true }
+lazy_static = "1.4"
+pulldown-cmark = "0.9"
+dashmap = "5.4"
 
 # Encoding
 base64 = "0.22"
