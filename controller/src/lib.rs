@@ -29,3 +29,6 @@ pub mod tasks;
 pub use crds::{CodeRun, CodeRunSpec, CodeRunStatus, DocsRun, DocsRunSpec, DocsRunStatus};
 pub use remediation::parse_feedback_comment;
 pub use tasks::config::ControllerConfig;
+
+// Re-export cancellation system for enhanced agent cancellation
+pub use tasks::cancellation;
