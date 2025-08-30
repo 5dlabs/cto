@@ -1,0 +1,180 @@
+---
+# Sensor for PR Comment Remediation - Triggers CodeRun for feedback comments
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: remediation-feedback-sensor
+  namespace: argo
+  labels:
+    app: remediation-loop
+    component: feedback-sensor
+spec:
+  replicas: 1
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    serviceAccountName: argo-events-sa
+    container:
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "128Mi"
+          cpu: "200m"
+  dependencies:
+    - name: feedback-comment
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for issue_comment events with created action
+          - path: headers.X-Github-Event
+            type: string
+            value: ["issue_comment"]
+          - path: body.action
+            type: string
+            value: ["created"]
+          # Filter for comments containing '🔴 Required Changes' pattern
+          - path: body.comment.body
+            type: string
+            comparator: "~"
+            value: ".*🔴 Required Changes.*"
+          # Ensure comment is on a pull request (not issue)
+          - path: body.issue.pull_request.url
+            type: string
+            comparator: "!="
+            value: [""]
+          # Optional: Filter for authorized comment authors
+          - path: body.comment.user.login
+            type: string
+            value: ["5DLabs-Tess", "5DLabs-Tess[bot]"]
+  triggers:
+    - template:
+        name: trigger-remediation-coderun
+        conditions: "feedback-comment"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: remediation-feedback-
+                namespace: agent-platform
+                labels:
+                  type: remediation-workflow
+                  trigger-type: "comment-feedback"
+              spec:
+                entrypoint: handle-feedback-remediation
+                serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: pr-number
+                      value: "{{.prNumber}}"
+                    - name: comment-id
+                      value: "{{.commentId}}"
+                    - name: comment-author
+                      value: "{{.commentAuthor}}"
+                    - name: pr-labels
+                      value: "{{.prLabels}}"
+                    - name: iteration
+                      value: "{{.iteration}}"
+                templates:
+                  - name: handle-feedback-remediation
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
+
+                        echo "=== Feedback Remediation Handler ==="
+                        echo "PR Number: {{workflow.parameters.pr-number}}"
+                        echo "Comment ID: {{workflow.parameters.comment-id}}"
+                        echo "Comment Author: {{workflow.parameters.comment-author}}"
+                        echo "Iteration: {{workflow.parameters.iteration}}"
+
+                        # Extract task ID from PR labels
+                        PR_LABELS="{{workflow.parameters.pr-labels}}"
+                        echo "PR Labels: $PR_LABELS"
+
+                        # Extract task ID from labels (find first label starting with "task-")
+                        TASK_ID=$(echo "$PR_LABELS" | jq -r '.[]? | select(.name | startswith("task-")) | .name | sub("task-"; "")' | head -1)
+
+                        if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "null" ]; then
+                          echo "❌ ERROR: No task-* label found on PR"
+                          echo "Available labels: $PR_LABELS"
+                          exit 1
+                        fi
+
+                        echo "✅ Extracted Task ID: $TASK_ID"
+
+                        # Create CodeRun for Rex remediation agent
+                        echo "Creating CodeRun for task $TASK_ID remediation..."
+                        cat <<EOF | kubectl apply -f -
+                        apiVersion: agents.platform/v1
+                        kind: CodeRun
+                        metadata:
+                          generateName: rex-remediation-
+                          namespace: agent-platform
+                          labels:
+                            task-id: "$TASK_ID"
+                            pr-number: "{{workflow.parameters.pr-number}}"
+                            trigger-type: "comment-feedback"
+                            remediation-iteration: "{{workflow.parameters.iteration}}"
+                        spec:
+                          taskId: $TASK_ID
+                          service: "task$TASK_ID"
+                          repositoryUrl: "https://github.com/5dlabs/cto"
+                          docsRepositoryUrl: "https://github.com/5dlabs/docs"
+                          docsProjectDirectory: "agent-remediation-loop"
+                          model: "sonnet"
+                          githubApp: "5DLabs-Rex"
+                          contextVersion: 1
+                          docsBranch: "main"
+                          continueSession: true
+                          overwriteMemory: false
+                          env:
+                            REMEDIATION_MODE: "true"
+                            FEEDBACK_COMMENT_ID: "{{workflow.parameters.comment-id}}"
+                            ITERATION_COUNT: "{{workflow.parameters.iteration}}"
+                            FEEDBACK_AUTHOR: "{{workflow.parameters.comment-author}}"
+                            PR_NUMBER: "{{workflow.parameters.pr-number}}"
+                        EOF
+
+                        echo "✅ CodeRun created successfully for task $TASK_ID"
+          parameters:
+            # Extract PR number
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.issue.number
+              dest: prNumber
+            # Extract comment ID
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.comment.id
+              dest: commentId
+            # Extract comment author
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.comment.user.login
+              dest: commentAuthor
+            # Pass PR labels for task ID extraction in workflow
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.issue.labels
+              dest: prLabels
+            # Set iteration (always starts at 1 for new feedback cycles)
+            - src:
+                dependencyName: feedback-comment
+                dataTemplate: "1"
+              dest: iteration
+        retryStrategy:
+          steps: 2  # Minimal retries for reliability
+          duration: "5s"
+          factor: 2
+          jitter: 0.1
