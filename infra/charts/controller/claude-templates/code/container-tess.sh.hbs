@@ -1194,6 +1194,13 @@ echo "════════════════════════�
 echo "║                    STARTING TESS QA EXECUTION                 ║"
 echo "════════════════════════════════════════════════════════════════"
 
+# Clean up any leftover completion marker from previous runs
+# This prevents issues with sequential task executions on the same PVC
+if [ -f /workspace/.tess-complete ]; then
+    echo "🧹 Cleaning up completion marker from previous run"
+    rm -f /workspace/.tess-complete
+fi
+
 # Seed initial user turn via a FIFO with timeout protection
 FIFO_PATH="/workspace/agent-input.jsonl"
 rm -f "$FIFO_PATH" 2>/dev/null || true
