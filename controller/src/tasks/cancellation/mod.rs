@@ -45,7 +45,7 @@ pub mod atomic_labels;
 pub mod coordinator;
 pub mod recovery;
 
-pub use distributed_lock::{DistributedLock, Lease, LeaseError};
+pub use distributed_lock::{DistributedLock, ActiveLease, LeaseError};
 pub use state_aware::{StateAwareCancellation, CancellationRequest};
 pub use atomic_labels::{AtomicLabelManager, LabelTransition, ConcurrentModificationError};
 pub use coordinator::{CancellationCoordinator, CancellationStatus};

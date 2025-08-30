@@ -8,6 +8,12 @@ pub struct RecoveryManager {
     // Placeholder for recovery logic
 }
 
+impl Default for RecoveryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecoveryManager {
     pub fn new() -> Self {
         // Placeholder implementation

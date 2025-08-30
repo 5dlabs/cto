@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, instrument, Instrument};
 
+pub mod cancellation;
 pub mod code;
 pub mod config;
 pub mod docs;

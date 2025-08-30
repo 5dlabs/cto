@@ -19,6 +19,12 @@ pub struct CancellationCoordinator {
     // Placeholder for coordination logic
 }
 
+impl Default for CancellationCoordinator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CancellationCoordinator {
     pub fn new() -> Self {
         // Placeholder implementation
