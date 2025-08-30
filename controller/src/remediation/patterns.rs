@@ -99,20 +99,14 @@ impl PatternExtractor {
 
     /// Extract reproduction steps from comment body
     pub fn extract_reproduction_steps(body: &str) -> Result<Vec<String>> {
-        println!("DEBUG: Looking for steps in body: {:?}", body);
-
         let captures = STEPS_PATTERN
             .captures(body)
             .context("Steps to Reproduce section not found")?;
-
-        println!("DEBUG: Regex matched, captures: {:?}", captures);
 
         let steps_text = captures
             .get(1)
             .context("Steps content not captured")?
             .as_str();
-
-        println!("DEBUG: Captured steps text: {:?}", steps_text);
 
         Self::parse_steps(steps_text)
     }
@@ -223,13 +217,10 @@ impl PatternExtractor {
 
     /// Parse steps text into vector of step strings
     fn parse_steps(steps_text: &str) -> Result<Vec<String>> {
-        println!("DEBUG: Parsing steps text: {:?}", steps_text);
-
         let steps: Vec<String> = steps_text
             .lines()
             .filter_map(|line| {
                 let trimmed = line.trim();
-                println!("DEBUG: Processing line: {:?}", trimmed);
 
                 // Skip empty lines
                 if trimmed.is_empty() {
@@ -261,12 +252,9 @@ impl PatternExtractor {
                     .map(|(_, rest)| rest.trim())
                     .unwrap_or(trimmed);
 
-                println!("DEBUG: Extracted step: {:?}", step);
                 Some(step.to_string())
             })
             .collect();
-
-        println!("DEBUG: Final steps: {:?}", steps);
 
         if steps.is_empty() {
             Err(anyhow::anyhow!("No reproduction steps found"))
@@ -353,10 +341,6 @@ The login button is not working properly when users click it.
         let result = PatternExtractor::extract_reproduction_steps(SAMPLE_COMMENT);
         assert!(result.is_ok());
         let steps = result.unwrap();
-        println!("DEBUG: Found {} steps", steps.len());
-        for (i, step) in steps.iter().enumerate() {
-            println!("DEBUG: Step {}: '{}'", i, step);
-        }
         assert_eq!(steps.len(), 3);
         assert!(steps[0].contains("Navigate to login page"));
         assert!(steps[1].contains("Enter valid credentials"));
