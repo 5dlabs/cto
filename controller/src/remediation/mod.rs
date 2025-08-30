@@ -139,7 +139,9 @@ pub use auth::{AuthorValidator, SharedAuthorValidator};
 
 pub use markdown::MarkdownParser;
 pub use patterns::PatternExtractor;
-pub use state::{RemediationState, RemediationStateManager, RemediationStatus, RemediationStatistics};
+pub use state::{
+    RemediationState, RemediationStateManager, RemediationStatistics, RemediationStatus,
+};
 
 /// Create a new feedback parser with default configuration
 ///
