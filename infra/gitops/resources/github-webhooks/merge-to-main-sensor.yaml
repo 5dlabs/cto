@@ -324,7 +324,16 @@ spec:
                                 git config user.name "Task Orchestrator (Morgan)"
                                 git config user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
                                 git add -A
-                                git commit -m "chore: move task-${TASK_ID} to .completed/" || \
+                                git commit -m |
+                                  chore: complete task ${TASK_ID}
+
+                                  - Task implementation merged to main
+                                  - Moved task-${TASK_ID} to .completed/
+                                  - Triggered by PR merge event
+                                  - Ready for next task progression
+
+                                  🤖 Auto-completed by merge-to-main sensor
+                                || \
                                   echo "No changes to commit"
 
                                 if ! git push origin main 2>/dev/null; then

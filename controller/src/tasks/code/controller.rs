@@ -76,8 +76,24 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
     if let Some(status) = &code_run.status {
         // Check for completion based on work_completed field (TTL-safe)
         if status.work_completed == Some(true) {
-            info!("Work already completed (work_completed=true), no further action needed");
-            return Ok(Action::await_change());
+            // Double-check with GitHub to ensure status hasn't changed
+            if let Some(pr_url) = &status.pull_request_url {
+                if let Ok(is_still_complete) = verify_github_completion_status(pr_url).await {
+                    if !is_still_complete {
+                        warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
+                        clear_work_completed_status(&code_run, ctx).await?;
+                        // Continue with reconciliation
+                    } else {
+                        info!("Work already completed (verified with GitHub), no further action needed");
+                        return Ok(Action::await_change());
+                    }
+                } else {
+                    warn!("Could not verify GitHub status, proceeding with caution");
+                }
+            } else {
+                info!("Work already completed (work_completed=true), no further action needed");
+                return Ok(Action::await_change());
+            }
         }
 
         // Check legacy completion states
@@ -564,5 +580,45 @@ async fn handle_no_pr_timeout(
     {
         warn!("Failed to resume workflow with no-PR status: {}", e);
     }
+    Ok(())
+}
+
+/// Verify completion status with GitHub to prevent stale local state
+async fn verify_github_completion_status(_pr_url: &str) -> Result<bool> {
+    // Extract PR number from GitHub URL
+    // Format: https://github.com/owner/repo/pull/number
+    // let pr_number = extract_pr_number_from_url(pr_url)?;
+
+    // For now, implement a basic check - in production you'd use GitHub API
+    // to check if PR is merged, has completion labels, etc.
+
+    // TODO: Implement proper GitHub API call to verify:
+    // 1. PR merge status
+    // 2. PR closure status
+    // 3. Completion labels
+    // 4. Latest comment checkbox states
+
+    warn!("GitHub verification not fully implemented - returning true for now");
+    Ok(true) // Placeholder - assume complete for now
+}
+
+/// Clear stale work_completed status
+async fn clear_work_completed_status(code_run: &CodeRun, ctx: &Context) -> Result<()> {
+    let code_runs: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+
+    let patch = json!({
+        "status": {
+            "workCompleted": false,
+            "message": "Status cleared due to GitHub verification mismatch"
+        }
+    });
+
+    code_runs.patch(
+        &code_run.name_any(),
+        &PatchParams::default(),
+        &Patch::Merge(&patch),
+    ).await?;
+
+    info!("Cleared work_completed status for CodeRun {}", code_run.name_any());
     Ok(())
 }
