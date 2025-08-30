@@ -168,10 +168,10 @@ spec:
                 dependencyName: feedback-comment
                 dataKey: body.issue.labels
               dest: prLabels
-            # Set iteration (can be incremented for future retries)
+            # Set iteration (always starts at 1 for new feedback cycles)
             - src:
                 dependencyName: feedback-comment
-                dataTemplate: '{{ .iteration | default "1" }}'
+                dataTemplate: "1"
               dest: iteration
         retryStrategy:
           steps: 2  # Minimal retries for reliability
