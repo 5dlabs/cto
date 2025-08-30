@@ -1,0 +1,147 @@
+---
+# Sensor for PR Comment Remediation - Detect QA feedback and trigger remediation
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: pr-comment-remediation
+  namespace: argo
+  labels:
+    app: remediation-loop
+    component: feedback-sensor
+spec:
+  replicas: 1
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    serviceAccountName: argo-events-sa
+    container:
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "128Mi"
+          cpu: "200m"
+  dependencies:
+    - name: feedback-comment
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Filter for issue_comment events
+          - path: headers.X-Github-Event
+            type: string
+            value: ["issue_comment"]
+          # Filter for created action only
+          - path: body.action
+            type: string
+            value: ["created"]
+          # Must be on a pull request (not just an issue)
+          - path: body.issue.pull_request
+            type: string
+            comparator: "!="
+            value: ["null"]
+          # Filter for authorized comment authors
+          - path: body.comment.user.login
+            type: string
+            value: ["5DLabs-Tess", "5DLabs-Tess[bot]"]
+        exprs:
+          # Ensure issue is still open and comment contains feedback marker
+          - expr: "issue.state == 'open' && comment.body =~ '.*🔴 Required Changes.*'"
+            fields:
+              - name: issue.state
+                path: body.issue.state
+              - name: comment.body
+                path: body.comment.body
+  triggers:
+    - template:
+        name: trigger-remediation
+        conditions: "feedback-comment"
+        k8s:
+          operation: create
+          source:
+            resource: |
+              apiVersion: agents.platform/v1
+              kind: CodeRun
+              metadata:
+                generateName: rex-remediation-
+                namespace: agent-platform
+                labels:
+                  task-id: "{{.taskId}}"
+                  pr-number: "{{.prNumber}}"
+                  trigger-type: "comment-feedback"
+                  remediation-iteration: "{{.iteration}}"
+                  github-app: "5DLabs-Rex"
+              spec:
+                taskId: {{.taskIdInt}}
+                service: "task{{.taskId}}"
+                repositoryUrl: "{{.repositoryUrl}}"
+                docsRepositoryUrl: "https://github.com/5dlabs/cto.git"
+                workingDirectory: "."
+                model: "claude-3-5-sonnet-20241022"
+                githubApp: "5DLabs-Rex"
+                continueSession: true
+                env:
+                  REMEDIATION_MODE: "true"
+                  FEEDBACK_COMMENT_ID: "{{.commentId}}"
+                  ITERATION_COUNT: "{{.iteration}}"
+                  FEEDBACK_AUTHOR: "{{.commentAuthor}}"
+                  PR_NUMBER: "{{.prNumber}}"
+          parameters:
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.issue.number
+              dest: prNumber
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.comment.id
+              dest: commentId
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.comment.user.login
+              dest: commentAuthor
+            - src:
+                dependencyName: feedback-comment
+                dataKey: body.repository.clone_url
+              dest: repositoryUrl
+            - src:
+                dependencyName: feedback-comment
+                dataTemplate: |
+                  {{ $taskId := "" }}
+                  {{ range $label := .body.issue.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $taskId = (trimPrefix "task-" $label.name) }}
+                    {{ end }}
+                  {{ end }}
+                  {{ $taskId }}
+              dest: taskId
+            - src:
+                dependencyName: feedback-comment
+                dataTemplate: |
+                  {{ $taskId := 0 }}
+                  {{ range $label := .body.issue.labels }}
+                    {{ if hasPrefix "task-" $label.name }}
+                      {{ $taskId = (trimPrefix "task-" $label.name | int) }}
+                    {{ end }}
+                  {{ end }}
+                  {{ $taskId }}
+              dest: taskIdInt
+            - src:
+                dependencyName: feedback-comment
+                dataTemplate: |
+                  {{ $iteration := 1 }}
+                  {{ range $label := .body.issue.labels }}
+                    {{ if hasPrefix "iteration-" $label.name }}
+                      {{ $iteration = (add (trimPrefix "iteration-" $label.name | int) 1) }}
+                    {{ end }}
+                  {{ end }}
+                  {{ $iteration }}
+              dest: iteration
+      retryStrategy:
+        steps: 2
+        duration: "5s"
+        factor: 2
+        jitter: 0.1
