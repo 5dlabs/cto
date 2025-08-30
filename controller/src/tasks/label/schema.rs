@@ -335,7 +335,7 @@ impl LabelSchema {
 
     /// Determine the type of a label based on its pattern
     pub fn classify_label(&self, label: &str) -> Option<LabelType> {
-        for (label_type, _schema) in &self.type_schemas {
+        for label_type in self.type_schemas.keys() {
             if self.validate_label(label, label_type) {
                 return Some(label_type.clone());
             }

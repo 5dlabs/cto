@@ -193,7 +193,7 @@ impl OverrideDetector {
     }
 
     /// Detect all override labels in a set of labels
-    #[allow(unused_self)]
+    #[allow(clippy::unused_self)]
     fn detect_overrides(&self, labels: &[String]) -> Vec<Override> {
         let mut overrides = Vec::new();
 

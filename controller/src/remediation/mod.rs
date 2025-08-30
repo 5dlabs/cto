@@ -20,10 +20,9 @@
 //! ### Basic Usage
 //!
 //! ```rust
-//! use cto::remediation::{FeedbackParser, parse_feedback_comment};
-//!
 //! // Using the convenience function
-//! let result = parse_feedback_comment(
+//! let comment_body = "# Issue: Bug Report\n\n## Description\nSomething is broken";
+//! let result = controller::remediation::parse_feedback_comment(
 //!     comment_body,
 //!     "5DLabs-Tess",
 //!     12345,
@@ -45,14 +44,19 @@
 //!
 //! ### Advanced Usage with Custom Configuration
 //!
-//! ```rust
-//! use cto::remediation::{FeedbackParser, AuthorValidator};
-//!
-//! let mut validator = AuthorValidator::new();
+//! ```rust,ignore
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut validator = controller::remediation::AuthorValidator::new();
 //! validator.add_approved_author("custom-reviewer".to_string())
 //!     .expect("Failed to add author");
 //!
-//! let parser = FeedbackParser::with_validator(validator);
+//! let parser = controller::remediation::FeedbackParser::with_validator(validator);
+//!
+//! let comment_body = "# Issue: Bug Report\n\n## Description\nSomething is broken";
+//! let author = "custom-reviewer";
+//! let comment_id = 12345;
+//! let pr_number = 678;
+//! let task_id = "task-2";
 //!
 //! let feedback = parser.parse_comment(
 //!     comment_body,
@@ -61,6 +65,8 @@
 //!     pr_number,
 //!     task_id
 //! )?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Expected Comment Format

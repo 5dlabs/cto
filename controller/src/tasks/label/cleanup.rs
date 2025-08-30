@@ -10,6 +10,7 @@ use thiserror::Error;
 use tracing::{debug, info};
 
 /// Label cleanup manager for automated cleanup operations
+#[allow(dead_code)]
 pub struct LabelCleanupManager {
     label_client: GitHubLabelClient,
     state_manager: Arc<RemediationStateManager>,

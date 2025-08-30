@@ -51,12 +51,14 @@ pub enum GitHubLabelError {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GitHubError {
     message: String,
     documentation_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GitHubRateLimit {
     limit: i32,
     remaining: i32,
@@ -74,6 +76,7 @@ struct GitHubPR {
 }
 
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 struct UpdateLabelsRequest {
     labels: Vec<String>,
 }
@@ -90,7 +93,7 @@ impl GitHubLabelClient {
         let secrets: Api<Secret> = Api::namespaced(client, namespace);
 
         let secret = secrets.get(secret_name).await.map_err(|e| {
-            GitHubLabelError::OperationFailed(format!("Failed to get GitHub token secret: {}", e))
+            GitHubLabelError::OperationFailed(format!("Failed to get GitHub token secret: {e}"))
         })?;
 
         let token_data = secret

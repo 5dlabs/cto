@@ -205,7 +205,7 @@ Some other content"#;
 
     #[test]
     fn test_extract_criteria_checkboxes() {
-        let comment = format!("Some header\n\n{}", SAMPLE_CRITERIA_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_CRITERIA_SECTION}");
         let result = MarkdownParser::extract_criteria_checkboxes(&comment);
 
         assert!(result.is_ok());
@@ -240,7 +240,7 @@ Some other content"#;
 
     #[test]
     fn test_extract_unmet_criteria() {
-        let comment = format!("Some header\n\n{}", SAMPLE_CRITERIA_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_CRITERIA_SECTION}");
         let result = MarkdownParser::extract_unmet_criteria(&comment);
 
         assert!(result.is_ok());
@@ -254,7 +254,7 @@ Some other content"#;
 
     #[test]
     fn test_extract_all_criteria_descriptions() {
-        let comment = format!("Some header\n\n{}", SAMPLE_CRITERIA_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_CRITERIA_SECTION}");
         let result = MarkdownParser::extract_all_criteria_descriptions(&comment);
 
         assert!(result.is_ok());
@@ -266,7 +266,7 @@ Some other content"#;
 
     #[test]
     fn test_get_criteria_stats() {
-        let comment = format!("Some header\n\n{}", SAMPLE_CRITERIA_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_CRITERIA_SECTION}");
         let result = MarkdownParser::get_criteria_stats(&comment);
 
         assert!(result.is_ok());
@@ -278,20 +278,20 @@ Some other content"#;
 
     #[test]
     fn test_are_all_criteria_met() {
-        let comment = format!("Some header\n\n{}", SAMPLE_CRITERIA_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_CRITERIA_SECTION}");
         assert!(!MarkdownParser::are_all_criteria_met(&comment));
 
         // Create a comment with all criteria met
         let all_met_comment = r#"### Acceptance Criteria Not Met
 - [x] User authentication works properly
 - [x] Password reset functionality is implemented"#;
-        let full_comment = format!("Some header\n\n{}", all_met_comment);
+        let full_comment = format!("Some header\n\n{all_met_comment}");
         assert!(MarkdownParser::are_all_criteria_met(&full_comment));
     }
 
     #[test]
     fn test_extract_criteria_with_status() {
-        let comment = format!("Some header\n\n{}", SAMPLE_CRITERIA_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_CRITERIA_SECTION}");
         let result = MarkdownParser::extract_criteria_with_status(&comment);
 
         assert!(result.is_ok());
@@ -314,7 +314,7 @@ Some other content"#;
 
     #[test]
     fn test_complex_nested_criteria() {
-        let comment = format!("Some header\n\n{}", SAMPLE_COMPLEX_SECTION);
+        let comment = format!("Some header\n\n{SAMPLE_COMPLEX_SECTION}");
         let result = MarkdownParser::extract_criteria_checkboxes(&comment);
 
         assert!(result.is_ok());
