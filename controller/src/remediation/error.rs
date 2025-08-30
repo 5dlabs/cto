@@ -173,16 +173,16 @@ impl ParseError {
                 "This comment doesn't contain actionable feedback. Make sure it includes '🔴 Required Changes'.".to_string()
             }
             ParseError::UnauthorizedAuthor { author } => {
-                format!("Author '{}' is not authorized to provide feedback. Contact an administrator.", author)
+                format!("Author '{author}' is not authorized to provide feedback. Contact an administrator.")
             }
             ParseError::MissingRequiredField { field } => {
-                format!("Required field '{}' is missing from the comment.", field)
+                format!("Required field '{field}' is missing from the comment.")
             }
             ParseError::InvalidFieldValue { field, value, expected } => {
-                format!("Invalid value '{}' for field '{}'. Expected: {}", value, field, expected)
+                format!("Invalid value '{value}' for field '{field}'. Expected: {expected}")
             }
             ParseError::MalformedComment { reason } => {
-                format!("Comment structure is malformed: {}", reason)
+                format!("Comment structure is malformed: {reason}")
             }
             ParseError::NoCriteriaFound => {
                 "No acceptance criteria checkboxes found. Make sure to include a checklist in the 'Acceptance Criteria Not Met' section.".to_string()
@@ -206,34 +206,34 @@ impl ParseError {
                 "Could not extract expected vs actual behavior.".to_string()
             }
             ParseError::MarkdownParseError { details } => {
-                format!("Failed to parse markdown content: {}", details)
+                format!("Failed to parse markdown content: {details}")
             }
             ParseError::RegexError { details } => {
-                format!("Pattern matching failed: {}", details)
+                format!("Pattern matching failed: {details}")
             }
             ParseError::AuthorValidationError { details } => {
-                format!("Author validation failed: {}", details)
+                format!("Author validation failed: {details}")
             }
             ParseError::CacheError { details } => {
-                format!("System cache error: {}", details)
+                format!("System cache error: {details}")
             }
             ParseError::SerializationError { details } => {
-                format!("Data serialization error: {}", details)
+                format!("Data serialization error: {details}")
             }
             ParseError::Generic { message } => {
-                format!("Parsing failed: {}", message)
+                format!("Parsing failed: {message}")
             }
             ParseError::ExternalServiceError { service, details } => {
-                format!("External service '{}' error: {}", service, details)
+                format!("External service '{service}' error: {details}")
             }
             ParseError::ConfigurationError { details } => {
-                format!("Configuration error: {}", details)
+                format!("Configuration error: {details}")
             }
             ParseError::TimeoutError { operation } => {
-                format!("Operation '{}' timed out", operation)
+                format!("Operation '{operation}' timed out")
             }
             ParseError::ResourceExhausted { resource, details } => {
-                format!("Resource '{}' exhausted: {}", resource, details)
+                format!("Resource '{resource}' exhausted: {details}")
             }
         }
     }
@@ -310,11 +310,11 @@ impl ErrorContext {
         let mut message = self.error.user_message();
 
         if let Some(pr_number) = self.pr_number {
-            message.push_str(&format!(" (PR #{})", pr_number));
+            message.push_str(&format!(" (PR #{pr_number})"));
         }
 
         if let Some(author) = self.author.as_ref() {
-            message.push_str(&format!(" (Author: {})", author));
+            message.push_str(&format!(" (Author: {author})"));
         }
 
         message

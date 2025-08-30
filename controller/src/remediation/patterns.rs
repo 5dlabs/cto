@@ -142,8 +142,8 @@ impl PatternExtractor {
                 let trimmed = line.trim();
                 if trimmed.starts_with("- **Expected**:") || trimmed.starts_with("**Expected**:") {
                     let value = trimmed
-                        .splitn(2, ':')
-                        .nth(1)
+                        .split_once(':')
+                        .map(|x| x.1)
                         .map(|s| s.trim().to_string())
                         .filter(|s| !s.is_empty());
                     if value.is_some() {
@@ -179,8 +179,8 @@ impl PatternExtractor {
                 let trimmed = line.trim();
                 if trimmed.starts_with("- **Actual**:") || trimmed.starts_with("**Actual**:") {
                     let value = trimmed
-                        .splitn(2, ':')
-                        .nth(1)
+                        .split_once(':')
+                        .map(|x| x.1)
                         .map(|s| s.trim().to_string())
                         .filter(|s| !s.is_empty());
                     if value.is_some() {
@@ -238,7 +238,7 @@ impl PatternExtractor {
                 }
 
                 // Only process lines that start with a number followed by a dot
-                if !trimmed.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                if !trimmed.chars().next().is_some_and(|c| c.is_ascii_digit()) {
                     return None;
                 }
 
