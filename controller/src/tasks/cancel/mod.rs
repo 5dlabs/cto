@@ -39,14 +39,14 @@
 //! cancellation.cancel_agents_with_state_check(context, "task-42", 123).await?;
 //! ```
 
-pub mod distributed_lock;
-pub mod state_aware;
-pub mod atomic_labels;
+pub mod lock;
+pub mod aware;
+pub mod labels;
 pub mod coordinator;
 pub mod recovery;
 
-pub use distributed_lock::{DistributedLock, ActiveLease, LeaseError};
-pub use state_aware::{StateAwareCancellation, CancellationRequest};
-pub use atomic_labels::{AtomicLabelManager, LabelTransition, ConcurrentModificationError};
+pub use lock::{DistributedLock, ActiveLease, LeaseError};
+pub use aware::{StateAwareCancellation, CancellationRequest};
+pub use labels::{AtomicLabelManager, LabelTransition, ConcurrentModificationError};
 pub use coordinator::{CancellationCoordinator, CancellationStatus};
 pub use recovery::RecoveryManager;
