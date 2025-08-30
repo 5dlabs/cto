@@ -38,11 +38,11 @@
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
       "testingAgent": "5DLabs-Tess",
-      "repository": "5dlabs/cto-play-test",
-      "service": "cto-play-test",
-      "docsRepository": "5dlabs/cto-play-test",
-      "docsProjectDirectory": "docs",
-      "workingDirectory": "/Users/jonathonfritz/cto-play-test"
+      "repository": "5dlabs/cto",
+      "service": "cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "agent-remediation-loop",
+      "workingDirectory": "/Users/jonathonfritz/cto"
     }
   },
   "agents": {
