@@ -43,6 +43,13 @@ echo "🔍 Focus: Code quality, CI/CD setup, and Docker image building"
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: Perfect code quality AND working CI/CD pipeline with Docker builds"
 
+# Clean up any leftover completion marker from previous runs
+# This prevents issues with sequential task executions on the same PVC
+if [ -f /workspace/.cleo-complete ]; then
+    echo "🧹 Cleaning up completion marker from previous run"
+    rm -f /workspace/.cleo-complete
+fi
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
