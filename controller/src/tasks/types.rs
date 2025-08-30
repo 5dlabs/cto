@@ -20,6 +20,9 @@ pub enum Error {
 
     #[error("URL parsing error: {0}")]
     UrlParsingError(String),
+
+    #[error("General error: {0}")]
+    GenericError(#[from] anyhow::Error),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

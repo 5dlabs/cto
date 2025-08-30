@@ -123,6 +123,7 @@ pub mod markdown;
 pub mod auth;
 pub mod parser;
 pub mod error;
+pub mod state;
 
 // Re-export key types for convenience
 pub use types::{
@@ -154,6 +155,7 @@ pub use auth::{
 
 pub use patterns::PatternExtractor;
 pub use markdown::MarkdownParser;
+pub use state::{RemediationState, RemediationStateManager, RemediationStatus, RemediationStatistics};
 
 /// Create a new feedback parser with default configuration
 ///
