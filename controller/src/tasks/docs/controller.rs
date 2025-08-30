@@ -8,7 +8,7 @@ use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
 use kube::{Api, ResourceExt};
 use serde_json::json;
 use std::sync::Arc;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 #[instrument(skip(ctx), fields(docs_run_name = %docs_run.name_any(), namespace = %ctx.namespace))]
 pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Result<Action> {
@@ -72,8 +72,24 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
     if let Some(status) = &docs_run.status {
         // Check for completion based on work_completed field (TTL-safe)
         if status.work_completed == Some(true) {
-            info!("Work already completed (work_completed=true), no further action needed");
-            return Ok(Action::await_change());
+            // Double-check with GitHub to ensure status hasn't changed
+            if let Some(pr_url) = &status.pull_request_url {
+                if let Ok(is_still_complete) = verify_github_completion_status(pr_url).await {
+                    if !is_still_complete {
+                        warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
+                        clear_work_completed_status(&docs_run, ctx).await?;
+                        // Continue with reconciliation
+                    } else {
+                        info!("Work already completed (verified with GitHub), no further action needed");
+                        return Ok(Action::await_change());
+                    }
+                } else {
+                    warn!("Could not verify GitHub status, proceeding with caution");
+                }
+            } else {
+                info!("Work already completed (work_completed=true), no further action needed");
+                return Ok(Action::await_change());
+            }
         }
 
         // Check legacy completion states
@@ -335,5 +351,60 @@ async fn update_docs_status_with_completion(
         "Status updated successfully to '{}' with work_completed={}",
         new_phase, work_completed
     );
+    Ok(())
+}
+
+/// Verify completion status with GitHub to prevent stale local state
+async fn verify_github_completion_status(pr_url: &str) -> Result<bool> {
+    // Extract PR number from GitHub URL
+    // Format: https://github.com/owner/repo/pull/number
+    let _pr_number = extract_pr_number_from_url(pr_url)?;
+
+    // For now, implement a basic check - in production you'd use GitHub API
+    // to check if PR is merged, has completion labels, etc.
+
+    // TODO: Implement proper GitHub API call to verify:
+    // 1. PR merge status
+    // 2. PR closure status
+    // 3. Completion labels
+    // 4. Latest comment checkbox states
+
+    warn!("GitHub verification not fully implemented - returning true for now");
+    Ok(true) // Placeholder - assume complete for now
+}
+
+/// Extract PR number from GitHub URL
+fn extract_pr_number_from_url(url: &str) -> Result<u32> {
+    // Parse GitHub PR URL format: https://github.com/owner/repo/pull/number
+    if let Some(pr_part) = url.split("/pull/").nth(1) {
+        if let Some(number_str) = pr_part.split('/').next() {
+            if let Ok(number) = number_str.parse::<u32>() {
+                return Ok(number);
+            }
+        }
+    }
+    Err(crate::tasks::types::Error::UrlParsingError(
+        format!("Could not extract PR number from URL: {}", url)
+    ))
+}
+
+/// Clear stale work_completed status
+async fn clear_work_completed_status(docs_run: &crate::crds::DocsRun, ctx: &Context) -> Result<()> {
+    let docs_runs: Api<crate::crds::DocsRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+
+    let patch = json!({
+        "status": {
+            "workCompleted": false,
+            "message": "Status cleared due to GitHub verification mismatch"
+        }
+    });
+
+    docs_runs.patch(
+        &docs_run.name_any(),
+        &PatchParams::default(),
+        &Patch::Merge(&patch),
+    ).await?;
+
+    info!("Cleared work_completed status for DocsRun {}", docs_run.name_any());
     Ok(())
 }

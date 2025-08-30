@@ -17,6 +17,9 @@ pub enum Error {
 
     #[error("Task configuration error: {0}")]
     ConfigError(String),
+
+    #[error("URL parsing error: {0}")]
+    UrlParsingError(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
