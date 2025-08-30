@@ -44,10 +44,10 @@ spec:
             comparator: "~"
             value: ".*🔴 Required Changes.*"
           # Ensure comment is on a pull request (not issue)
-          - path: body.issue.pull_request
+          - path: body.issue.pull_request.url
             type: string
             comparator: "!="
-            value: ["null"]
+            value: [""]
           # Optional: Filter for authorized comment authors
           - path: body.comment.user.login
             type: string
