@@ -465,7 +465,9 @@ impl GitHubLabelClient {
             .and_then(|h| h.to_str().ok())
             .and_then(|s| s.parse::<i64>().ok())
         {
-            let reset_instant = Instant::now() + Duration::from_secs((reset - chrono::Utc::now().timestamp()) as u64);
+            let now = chrono::Utc::now().timestamp();
+            let seconds_until_reset = (reset - now).max(0) as u64;
+            let reset_instant = Instant::now() + Duration::from_secs(seconds_until_reset);
             self.rate_limit_reset = Some(reset_instant);
         }
     }
