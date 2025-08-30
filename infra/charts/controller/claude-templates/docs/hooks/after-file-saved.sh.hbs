@@ -66,7 +66,14 @@ if git diff --cached --quiet; then
 fi
 
 # Commit the task
-if ! git commit -m "docs: auto-save $TASK_NUM documentation" -m "Incremental backup to prevent work loss" 2>/dev/null; then
+if ! git commit -m "docs: auto-save task $TASK_NUM documentation
+
+- Incremental backup to prevent work loss
+- Auto-saved during documentation editing
+- Task: $TASK_NUM
+- Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+🤖 Auto-saved by docs agent" 2>/dev/null; then
     echo "[Auto-save] Failed to commit $TASK_NUM"
     rm -f "$LOCK_FILE"
     exit 1
