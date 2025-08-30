@@ -22,7 +22,7 @@
 //! ```rust
 //! // Using the convenience function
 //! let comment_body = "# Issue: Bug Report\n\n## Description\nSomething is broken";
-//! let result = crate::remediation::parse_feedback_comment(
+//! let result = controller::remediation::parse_feedback_comment(
 //!     comment_body,
 //!     "5DLabs-Tess",
 //!     12345,
@@ -46,11 +46,11 @@
 //!
 //! ```rust,ignore
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut validator = AuthorValidator::new();
+//! let mut validator = controller::remediation::AuthorValidator::new();
 //! validator.add_approved_author("custom-reviewer".to_string())
 //!     .expect("Failed to add author");
 //!
-//! let parser = FeedbackParser::with_validator(validator);
+//! let parser = controller::remediation::FeedbackParser::with_validator(validator);
 //!
 //! let comment_body = "# Issue: Bug Report\n\n## Description\nSomething is broken";
 //! let author = "custom-reviewer";
