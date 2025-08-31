@@ -104,22 +104,22 @@ REPO_URL="{{repository_url}}"
 # GitHub App authentication is configured via environment variables
 echo "Using GitHub App authentication for testing workflow"
 
-# Function to ensure sidecar shutdown
+# Function to ensure MCP server shutdown
 shutdown_sidecar() {
-  echo "🔧 Signaling sidecar to shutdown..."
+  echo "🔧 Signaling MCP server to shutdown..."
   touch /workspace/.agent_done 2>/dev/null || true
 
-  echo "🔧 Attempting sidecar shutdown..."
+  echo "🔧 Attempting MCP server shutdown..."
   local shutdown_attempts=0
   local max_shutdown_attempts=3
 
   while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+    if timeout 5 curl -fsS -X POST http://k8s-mcp-k8s-mcp-server.mcp.svc.cluster.local:8080/shutdown >/dev/null 2>&1; then
+      echo "✓ MCP server shutdown request successful (attempt $((shutdown_attempts + 1)))"
       break
     else
       shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+      echo "⚠️ MCP server shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
       if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
         echo "Retrying in 2 seconds..."
         sleep 2
@@ -128,9 +128,9 @@ shutdown_sidecar() {
   done
 
   if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-    echo "⚠️ Cannot force terminate sidecar from this container (PID namespace isolation)"
-    echo "📝 Sidecar may still be running - Kubernetes will handle cleanup on pod termination"
+    echo "❌ Failed to shutdown MCP server after $max_shutdown_attempts attempts"
+    echo "⚠️ Cannot force terminate MCP server from this container (different namespace)"
+    echo "📝 MCP server may still be running - this is normal for multi-tenant setup"
   fi
 }
 
@@ -1152,7 +1152,7 @@ Use GitHub CLI to create a PROPER REVIEW with formal review status:
 # gh pr review {{pr_number}} --comment --body \"Some feedback\"
 
 # CORRECT - Submit a proper REQUEST CHANGES review:
-gh pr review $PR_NUM --request-changes --body \"### 🔍 QA Review for Task $TASK_ID - Changes Required
+gh pr review $PR_NUM --request-changes --body \"### 🔴 Required Changes
 
 ## CI Status
 ✅ **GitHub Actions CI**: All checks passing
@@ -1203,7 +1203,7 @@ if [ "\$CI_FAILED" -gt 0 ]; then
   # Don't exit, continue working
 fi
 
-# ONLY IF ALL CHECKS PASS:
+# APPROVE REVIEW FORMAT:
 gh pr review $PR_NUM --approve --body \"### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
@@ -1358,13 +1358,13 @@ INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/
 echo "✅ Cleaned INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE_CLEAN} characters"
 echo "✅ Cleaned INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE_CLEAN:0:100}..."
 
-# Wait for sidecar to be ready (simple check like Cleo)
-echo "⏳ Waiting for sidecar to be ready..."
+# Wait for MCP server to be ready (connect to k8s-mcp service in mcp namespace)
+echo "⏳ Waiting for MCP server to be ready..."
 MAX_RETRIES=10
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
-        echo "✓ Sidecar is ready"
+    if curl -fsS http://k8s-mcp-k8s-mcp-server.mcp.svc.cluster.local:8080/health >/dev/null 2>&1; then
+        echo "✓ MCP server is ready"
         break
     fi
     sleep 1
@@ -1372,7 +1372,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "⚠️ Sidecar not ready after ${MAX_RETRIES}s, proceeding with fallback"
+    echo "⚠️ MCP server not ready after ${MAX_RETRIES}s, proceeding with fallback"
 fi
 
 # =============================================================================
@@ -1387,15 +1387,15 @@ echo "📤 Sidecar JSON payload preview: ${SIDECAR_JSON:0:200}..."
 echo "🔍 Full sidecar JSON structure:"
 echo "$SIDECAR_JSON" | jq . 2>/dev/null || echo "❌ Sidecar JSON parsing failed: $SIDECAR_JSON"
 
-# Send via sidecar HTTP endpoint - use raw text to avoid JSON formatting issues
-echo "📡 Sending to sidecar /input endpoint..."
+# Send via MCP server HTTP endpoint - use raw text to avoid JSON formatting issues
+echo "📡 Sending to MCP server /input endpoint..."
 if printf '%s\n' "$SIDECAR_JSON" | \
-     curl -fsS -X POST http://127.0.0.1:8080/input \
+     curl -fsS -X POST http://k8s-mcp-k8s-mcp-server.mcp.svc.cluster.local:8080/input \
        -H 'Content-Type: application/json' \
        --data-binary @- >/dev/null 2>&1; then
-  echo "✅ Initial QA guidance sent via sidecar /input"
+  echo "✅ Initial QA guidance sent via MCP server /input"
 else
-  echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+  echo "⚠️ MCP server /input failed, falling back to direct FIFO write"
   # Fallback: construct JSON properly to avoid cache_control errors
   echo "🔧 Constructing FIFO JSON payload..."
   FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
@@ -1568,7 +1568,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   2)
     echo "⚠️ PR not found - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **PR Not Found**: Pull request #$PR_NUM does not exist
@@ -1583,7 +1583,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   3)
     echo "⚠️ Network error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Network Error**: Unable to connect to GitHub API
@@ -1598,7 +1598,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   4)
     echo "⚠️ Authentication error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Authentication Error**: GitHub token permissions insufficient
@@ -1614,7 +1614,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   5)
     echo "⚠️ Repository access error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Repository Access Error**: Repository not found or not accessible
@@ -1634,7 +1634,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
   if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
     echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
     # Post REQUEST CHANGES review for missing CI
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Missing CI Setup**: No GitHub Actions workflows detected
@@ -1736,7 +1736,7 @@ else
       FAILED_DETAILS=$(extract_check_details "$CI_JSON" "failed")
     fi
 
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **CI Failures Detected**: $FAILED_CHECKS out of $TOTAL_CHECKS check(s) failing
@@ -1761,7 +1761,7 @@ $FAILED_DETAILS
       PENDING_DETAILS=$(extract_check_details "$CI_JSON" "pending")
     fi
 
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ⏳ **CI Checks Pending**: $PENDING_CHECKS out of $TOTAL_CHECKS check(s) still running
@@ -1808,7 +1808,7 @@ $SUCCESS_DETAILS
 **APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔍 QA Review for Task $TASK_ID - Changes Required
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ⚠️ **Unexpected CI State**: Unable to determine final CI status

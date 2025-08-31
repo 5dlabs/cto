@@ -26,6 +26,7 @@ spec:
           memory: "128Mi"
           cpu: "200m"
   dependencies:
+    # PR Comment Remediation (original functionality)
     - name: feedback-comment
       eventSourceName: github
       eventName: org
@@ -38,24 +39,80 @@ spec:
           - path: body.action
             type: string
             value: ["created"]
-          # Filter for comments containing '🔴 Required Changes' pattern
+          # Filter for comments containing remediation patterns
           - path: body.comment.body
             type: string
-            comparator: "in"
-            value: ["🔴 Required Changes"]
+            comparator: "regex"
+            value: ["(?i)(🔴.*required changes|fix required|needs changes|remediate|changes requested)"]
           # Ensure comment is on a pull request (not issue)
           - path: body.issue.pull_request.url
             type: string
             comparator: "!="
             value: [""]
-          # Optional: Filter for authorized comment authors
+
+    # PR Review Remediation (NEW - Critical Fix)
+    - name: pr-review-feedback
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request_review"]
+          - path: body.action
+            type: string
+            value: ["submitted"]
+          - path: body.review.state
+            type: string
+            value: ["changes_requested"]
+          - path: body.review.body
+            type: string
+            comparator: "regex"
+            value: ["(?i)(🔴|required changes|fix required|changes requested|needs work)"]
+
+    # Check Run Remediation (NEW - For Tess check runs)
+    - name: check-run-feedback
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["check_run"]
+          - path: body.action
+            type: string
+            value: ["completed"]
+          - path: body.check_run.app.slug
+            type: string
+            value: ["5dlabs-tess"]
+          - path: body.check_run.conclusion
+            type: string
+            value: ["action_required", "failure"]
+
+    # Manual Remediation Trigger (NEW - For human reviewers)
+    - name: manual-remediation-trigger
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["issue_comment", "pull_request_review_comment"]
+          - path: body.action
+            type: string
+            value: ["created"]
+          - path: body.comment.body
+            type: string
+            comparator: "regex"
+            value: ["(?i)(@5dlabs-rex.*remediate|@rex.*remediate|/remediate|🔧.*fix|🛠️.*fix)"]
           - path: body.comment.user.login
             type: string
-            value: ["5DLabs-Tess", "5DLabs-Tess[bot]"]
+            comparator: "not in"
+            value: ["5DLabs-Rex", "5DLabs-Rex[bot]"]
   triggers:
     - template:
         name: trigger-remediation-coderun
-        conditions: "feedback-comment"
+        conditions: "feedback-comment || pr-review-feedback || check-run-feedback || manual-remediation-trigger"
         k8s:
           operation: create
           source:
@@ -94,8 +151,9 @@ spec:
 
                         echo "=== Feedback Remediation Handler ==="
                         echo "PR Number: {{workflow.parameters.pr-number}}"
-                        echo "Comment ID: {{workflow.parameters.comment-id}}"
-                        echo "Comment Author: {{workflow.parameters.comment-author}}"
+                        echo "Feedback ID: {{workflow.parameters.feedback-id}}"
+                        echo "Feedback Author: {{workflow.parameters.feedback-author}}"
+                        echo "Feedback Type: {{workflow.parameters.feedback-type}}"
                         echo "Iteration: {{workflow.parameters.iteration}}"
 
                         # Extract task ID from PR labels
@@ -124,8 +182,10 @@ spec:
                           labels:
                             task-id: "$TASK_ID"
                             pr-number: "{{workflow.parameters.pr-number}}"
-                            trigger-type: "comment-feedback"
+                            trigger-type: "{{workflow.parameters.feedback-type}}"
+                            feedback-author: "{{workflow.parameters.feedback-author}}"
                             remediation-iteration: "{{workflow.parameters.iteration}}"
+                            remediation-state: "in-progress"
                         spec:
                           taskId: $TASK_ID
                           service: "task$TASK_ID"
@@ -140,37 +200,136 @@ spec:
                           overwriteMemory: false
                           env:
                             REMEDIATION_MODE: "true"
-                            FEEDBACK_COMMENT_ID: "{{workflow.parameters.comment-id}}"
+                            FEEDBACK_ID: "{{workflow.parameters.feedback-id}}"
+                            FEEDBACK_TYPE: "{{workflow.parameters.feedback-type}}"
                             ITERATION_COUNT: "{{workflow.parameters.iteration}}"
-                            FEEDBACK_AUTHOR: "{{workflow.parameters.comment-author}}"
+                            FEEDBACK_AUTHOR: "{{workflow.parameters.feedback-author}}"
                             PR_NUMBER: "{{workflow.parameters.pr-number}}"
                         EOF
 
                         echo "✅ CodeRun created successfully for task $TASK_ID"
           parameters:
-            # Extract PR number
+            # Extract PR number (handle different event types)
             - src:
                 dependencyName: feedback-comment
                 dataKey: body.issue.number
-              dest: prNumber
-            # Extract comment ID
+                dataTemplate: "{{ .Input }}"
+              dest: pr-number
+            - src:
+                dependencyName: pr-review-feedback
+                dataKey: body.pull_request.number
+                dataTemplate: "{{ .Input }}"
+              dest: pr-number
+            - src:
+                dependencyName: check-run-feedback
+                dataKey: body.check_run.pull_requests[0].number
+                dataTemplate: "{{ .Input }}"
+              dest: pr-number
+            - src:
+                dependencyName: manual-remediation-trigger
+                dataKey: body.issue.number
+                dataTemplate: "{{ .Input }}"
+              dest: pr-number
+
+            # Extract comment/review/check ID
             - src:
                 dependencyName: feedback-comment
                 dataKey: body.comment.id
-              dest: commentId
-            # Extract comment author
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-id
+            - src:
+                dependencyName: pr-review-feedback
+                dataKey: body.review.id
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-id
+            - src:
+                dependencyName: check-run-feedback
+                dataKey: body.check_run.id
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-id
+            - src:
+                dependencyName: manual-remediation-trigger
+                dataKey: body.comment.id
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-id
+
+            # Extract feedback author
             - src:
                 dependencyName: feedback-comment
                 dataKey: body.comment.user.login
-              dest: commentAuthor
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-author
+            - src:
+                dependencyName: pr-review-feedback
+                dataKey: body.review.user.login
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-author
+            - src:
+                dependencyName: check-run-feedback
+                dataKey: body.sender.login
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-author
+            - src:
+                dependencyName: manual-remediation-trigger
+                dataKey: body.comment.user.login
+                dataTemplate: "{{ .Input }}"
+              dest: feedback-author
+
+            # Extract feedback type
+            - src:
+                dependencyName: feedback-comment
+                dataTemplate: "comment"
+              dest: feedback-type
+            - src:
+                dependencyName: pr-review-feedback
+                dataTemplate: "review"
+              dest: feedback-type
+            - src:
+                dependencyName: check-run-feedback
+                dataTemplate: "check_run"
+              dest: feedback-type
+            - src:
+                dependencyName: manual-remediation-trigger
+                dataTemplate: "manual"
+              dest: feedback-type
+
             # Pass PR labels for task ID extraction in workflow
             - src:
                 dependencyName: feedback-comment
                 dataKey: body.issue.labels
-              dest: prLabels
+                dataTemplate: "{{ .Input }}"
+              dest: pr-labels
+            - src:
+                dependencyName: pr-review-feedback
+                dataKey: body.pull_request.labels
+                dataTemplate: "{{ .Input }}"
+              dest: pr-labels
+            - src:
+                dependencyName: check-run-feedback
+                dataKey: body.check_run.pull_requests[0].labels
+                dataTemplate: "{{ .Input }}"
+              dest: pr-labels
+            - src:
+                dependencyName: manual-remediation-trigger
+                dataKey: body.issue.labels
+                dataTemplate: "{{ .Input }}"
+              dest: pr-labels
+
             # Set iteration (always starts at 1 for new feedback cycles)
             - src:
                 dependencyName: feedback-comment
+                dataTemplate: "1"
+              dest: iteration
+            - src:
+                dependencyName: pr-review-feedback
+                dataTemplate: "1"
+              dest: iteration
+            - src:
+                dependencyName: check-run-feedback
+                dataTemplate: "1"
+              dest: iteration
+            - src:
+                dependencyName: manual-remediation-trigger
                 dataTemplate: "1"
               dest: iteration
         retryStrategy:
