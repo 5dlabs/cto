@@ -38,14 +38,15 @@ for file in claude-templates/**/*.hbs claude-templates/**/*.sh claude-templates/
     key=$(echo "$file" | sed 's/claude-templates\///' | sed 's/\//_/g')
     
     echo "  Processing: $file -> $key"
+    
+    # Use the pipe literal style with proper indentation
     echo "  $key: |" >> "$OUTPUT_FILE"
     
-    # Add 4-space indentation and properly escape for Helm
-    # Use printf with %q to quote special characters, then indent
-    while IFS= read -r line; do
-      # Replace {{ with {{"{{" and }} with "}}"}} for proper Helm escaping
-      escaped_line=$(echo "$line" | sed 's/{{/{{"{{"/g' | sed 's/}}/"}}"}/g')
-      echo "    $escaped_line" >> "$OUTPUT_FILE"
+    # Process the file line by line to add proper indentation and escaping
+    while IFS= read -r line || [ -n "$line" ]; do
+      # For Helm to not interpret the content, wrap entire value in quotes and escape
+      # Actually, just add 4 spaces indentation - ConfigMap data values are strings
+      echo "    $line" >> "$OUTPUT_FILE"
     done < "$file"
   fi
 done
