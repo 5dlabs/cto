@@ -57,21 +57,8 @@ subjects:
 {{- end }}
 {{- end }}
 
-{{/* Workflow RBAC */}}
-{{- if .Values.rbac.workflow }}
 ---
-# ServiceAccount for workflows
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: argo-workflow
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "controller.labels" . | nindent 4 }}
-    app.kubernetes.io/component: workflow-rbac
-
----
-# High-privilege ServiceAccount for CodeRun jobs
+# High-privilege ServiceAccount for CodeRun jobs  
 {{- if .Values.rbac.submitter.clusterAdminServiceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
@@ -98,6 +85,20 @@ subjects:
     name: {{ .Values.rbac.submitter.clusterAdminServiceAccount.name }}
     namespace: {{ .Release.Namespace }}
 {{- end }}
+
+{{/* Workflow RBAC */}}
+{{- if .Values.rbac.workflow }}
+---
+# ServiceAccount for workflows
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-workflow
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: workflow-rbac
+
 
 ---
 {{- if .Values.rbac.workflow.namespaced }}
