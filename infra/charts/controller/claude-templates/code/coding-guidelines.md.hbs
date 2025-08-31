@@ -99,19 +99,19 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_function_name() {
         // Given
         let input = setup_test_data();
-        
+
         // When
         let result = function_under_test(input);
-        
+
         // Then
         assert_eq!(result, expected_value);
     }
-    
+
     #[test]
     #[should_panic(expected = "specific error message")]
     fn test_error_conditions() {
@@ -206,17 +206,17 @@ impl ConfigBuilder {
     pub fn new() -> Self {
         Self { host: None, port: None }
     }
-    
+
     pub fn host(mut self, host: impl Into<String>) -> Self {
         self.host = Some(host.into());
         self
     }
-    
+
     pub fn port(mut self, port: u16) -> Self {
         self.port = Some(port);
         self
     }
-    
+
     pub fn build(self) -> Result<Config> {
         Ok(Config {
             host: self.host.unwrap_or_else(|| "localhost".to_string()),

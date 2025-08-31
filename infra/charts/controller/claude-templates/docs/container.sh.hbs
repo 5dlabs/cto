@@ -16,49 +16,49 @@ echo "Using GitHub App authentication (SSH not required)"
 # Function to generate fresh GitHub App token (defined globally for reuse)
 generate_github_token() {
     echo "Generating fresh GitHub App token..."
-    
+
     # Check if credentials are available
     if [ -z "$GITHUB_APP_PRIVATE_KEY" ] || [ -z "$GITHUB_APP_ID" ]; then
         echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
         return 1
     fi
-    
+
     # Create temporary private key file from environment variable
     TEMP_KEY_FILE="/tmp/github-app-key.pem"
     echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
     chmod 600 "$TEMP_KEY_FILE"
-    
+
     echo "Using private key from environment variable"
-    
+
     # Generate JWT token for GitHub App (fixed JWT generation for Linux containers)
     # JWT header
     JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    
+
     # JWT payload with current time and expiration (10 minutes)
     NOW=$(date +%s)
     EXP=$((NOW + 600))
     JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    
+
     # Sign the JWT
     JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
     JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-    
+
     if [ -z "$JWT_TOKEN" ]; then
         echo "❌ Failed to generate JWT token"
         exit 1
     fi
-    
+
     # Get installation ID for the repository
     REPO_OWNER=$(echo "{{repository_url}}" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
     REPO_NAME=$(echo "{{repository_url}}" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
-    
+
     echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
-    
+
     # Try repository installation first (follow redirects)
     INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
-    
+
     INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
 
     # Fallback: try organization installation if repo lookup failed
@@ -69,7 +69,7 @@ generate_github_token() {
             "https://api.github.com/orgs/$REPO_OWNER/installation")
         INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
     fi
-    
+
     if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
         echo "❌ Failed to get installation ID for repository"
         echo "Response (repo): $INSTALLATION_RESPONSE"
@@ -77,43 +77,43 @@ generate_github_token() {
         rm -f "$TEMP_KEY_FILE"
         exit 1
     fi
-    
+
     echo "Installation ID: $INSTALLATION_ID"
-    
+
     # Export for use by hooks
     export INSTALLATION_ID
-    
+
     # Get installation access token
     TOKEN_RESPONSE=$(curl -s -X POST \
         -H "Authorization: Bearer $JWT_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-    
+
     GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-    
+
     if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
         echo "❌ Failed to get installation access token"
         echo "Response: $TOKEN_RESPONSE"
         rm -f "$TEMP_KEY_FILE"
         exit 1
     fi
-    
+
     # Clean up temporary key file
     rm -f "$TEMP_KEY_FILE"
-    
+
     # Export the token for git to use
     export GITHUB_TOKEN
-    
+
     # Store token generation time for refresh checks
     export TOKEN_GENERATED_AT=$(date +%s)
-    
+
     # Configure git to use the token (use --replace-all to handle multiple existing helpers)
     git config --global --replace-all credential.helper store
     echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-    
+
     # Also authenticate gh CLI with the token
     echo "$GITHUB_TOKEN" | gh auth login --with-token
-    
+
     echo "✓ GitHub App authenticated successfully"
 }
 
@@ -124,7 +124,7 @@ refresh_token_if_needed() {
         generate_github_token
         return
     fi
-    
+
     NOW=$(date +%s)
     TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
     # Refresh if token is older than 50 minutes (GitHub tokens last 1 hour, refresh at 50 min to be safe)
@@ -138,12 +138,12 @@ refresh_token_if_needed() {
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     # Initial authentication
     generate_github_token
-    
+
     # Validate authentication by testing actual GitHub operations we'll need
     echo "🔍 Validating GitHub authentication with actual operations..."
     REPO_OWNER=$(echo "$REPO_URL" | sed 's|https://github.com/||' | sed 's|/.*||')
     REPO_NAME=$(echo "$REPO_URL" | sed 's|.*/||')
-    
+
     # Test 1: Can we access the repository?
     if gh api "repos/$REPO_OWNER/$REPO_NAME" > /tmp/repo_test.json 2>&1; then
         echo "✅ Repository access confirmed"
@@ -152,7 +152,7 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         echo "Error: $(cat /tmp/repo_test.json)"
         exit 1
     fi
-    
+
     # Test 2: Can we list branches (needed for PR creation)?
     if gh api "repos/$REPO_OWNER/$REPO_NAME/branches" > /tmp/branches_test.json 2>&1; then
         echo "✅ Can list branches"
@@ -161,7 +161,7 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         echo "Error: $(cat /tmp/branches_test.json)"
         exit 1
     fi
-    
+
     # Test 3: Can we get app info (GitHub Apps can't access user endpoint)?
     if gh api app > /tmp/app_test.json 2>&1; then
         APP_NAME=$(jq -r '.name' /tmp/app_test.json 2>/dev/null || echo "unknown")
@@ -169,9 +169,9 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     else
         echo "✅ App endpoint not accessible (normal for GitHub Apps) - using repo access as confirmation"
     fi
-    
+
     echo "✅ All GitHub authentication tests passed - proceeding with confidence"
-    
+
 else
     echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
     exit 1
@@ -335,7 +335,7 @@ $details
 ## Test Strategy
 $test_strategy
 EOF
-      
+
       # Generate XML format optimized for LLM consumption with enhanced structure
       # Extract additional fields for XML structure
       priority=$(_decode '.priority // "medium"')
@@ -432,7 +432,7 @@ EOF
     </instructions>
 </prompt>
 XML_EOF
-      
+
       gen_count=$((gen_count+1))
       echo "✓ Generated docs/task-$task_id/task.txt"
       echo "✓ Generated docs/task-$task_id/task.xml (XML format for LLM consumption)"
@@ -440,7 +440,7 @@ XML_EOF
   echo "Generated $gen_count task directories with txt and xml files from tasks.json"
 elif [ -d "$CLAUDE_WORK_DIR/.taskmaster/tasks" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/.taskmaster/tasks" 2>/dev/null)" ]; then
   echo "📋 Found individual task files, copying to docs directory..."
-  
+
   # Copy individual task files from tasks/ to docs/ directory
   for task_dir in "$CLAUDE_WORK_DIR/.taskmaster/tasks"/task-*; do
     if [ -d "$task_dir" ]; then
@@ -548,7 +548,7 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       wait $CLAUDE_PID
       CLAUDE_EXIT_CODE=$?
     echo "Safe mode test completed with exit code: $CLAUDE_EXIT_CODE"
-    
+
     # Exit successfully to prevent PR creation in safe mode
     echo "✅ Safe mode test complete, exiting without changes"
     exit 0
@@ -630,7 +630,7 @@ else
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     RANDOM_ID=$(date +%s | tail -c 6)
     PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
-    
+
     echo "Creating branch: $PR_BRANCH"
     if ! git checkout -b "$PR_BRANCH"; then
         echo "❌ Failed to create branch"
@@ -647,7 +647,7 @@ STAGED_FILES=$(git status --porcelain | grep "^[AM]" | wc -l)
 if [ "$STAGED_FILES" -gt 0 ]; then
     echo "Showing what will be committed:"
     git status --porcelain
-    
+
     echo "Committing changes..."
     if ! git commit -m "docs: generate Task Master documentation{{#if task_id}} (task {{task_id}}){{/if}}
 
@@ -684,7 +684,7 @@ echo "✓ Branch pushed successfully"
 # Create PR
 if command -v gh >/dev/null 2>&1; then
     # GitHub CLI should already be authenticated from the beginning of the script
-    
+
     PR_TITLE="docs: auto-generate Task Master documentation{{#if task_id}} for task {{task_id}}{{/if}}"
     PR_BODY="Auto-generated Task Master documentation by orchestrator container script.
 
@@ -714,7 +714,7 @@ if command -v gh >/dev/null 2>&1; then
             fi
         fi
     done
-    
+
     if [ "$PR_CREATED" = false ]; then
         echo "❌ Failed to create pull request after 3 attempts"
         echo "⚠️ Branch has been pushed, but PR creation failed"

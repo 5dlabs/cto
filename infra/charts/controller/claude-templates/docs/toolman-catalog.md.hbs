@@ -1,4 +1,4 @@
-{{!-- 
+{{!--
 Toolman Catalog Markdown Template for Docs Agent
 ================================================
 
@@ -14,7 +14,7 @@ Template Variables:
 
 # Available Tools Catalog
 
-**Total Tools Available**: {{total_tool_count}}  
+**Total Tools Available**: {{total_tool_count}}
 **Generated**: {{generated_timestamp}}
 
 Use this catalog to select appropriate tools for each task based on implementation requirements.
@@ -26,9 +26,9 @@ Local servers run within the agent's environment and provide file system and loc
 {{#each toolman_catalog.local}}
 ### {{@key}} Server
 
-**Description**: {{this.description}}  
-**Command**: `{{this.command}}`  
-**Arguments**: {{#each this.args}}`{{this}}`{{#unless @last}} {{/unless}}{{/each}}  
+**Description**: {{this.description}}
+**Command**: `{{this.command}}`
+**Arguments**: {{#each this.args}}`{{this}}`{{#unless @last}} {{/unless}}{{/each}}
 **Working Directory**: {{this.working_directory}}
 
 **Available Tools**:
@@ -47,7 +47,7 @@ Remote tools are available via MCP servers running in the cluster.
 {{#each toolman_catalog.remote}}
 ### {{@key}} Server
 
-**Description**: {{this.description}}  
+**Description**: {{this.description}}
 **Endpoint**: {{this.endpoint}}
 
 **Available Tools**:

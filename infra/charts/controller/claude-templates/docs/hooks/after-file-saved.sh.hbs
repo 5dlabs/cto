@@ -47,7 +47,7 @@ if [ -z "$DOCS_AUTO_SAVE_BRANCH" ]; then
     # Create branch name similar to container script pattern
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
     export DOCS_AUTO_SAVE_BRANCH="docs/auto-save-${TIMESTAMP}"
-    
+
     # Create or switch to branch
     if ! git checkout -b "$DOCS_AUTO_SAVE_BRANCH" 2>/dev/null; then
         git checkout "$DOCS_AUTO_SAVE_BRANCH"
@@ -87,29 +87,29 @@ refresh_github_token_if_needed() {
     if [ -n "$TOKEN_GENERATED_AT" ]; then
         NOW=$(date +%s)
         TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
-        
+
         # Refresh if token is older than 50 minutes (tokens last 1 hour, refresh early to be safe)
         if [ $TOKEN_AGE -lt 3000 ]; then
             echo "[Auto-save] Token is still valid ($(($TOKEN_AGE / 60)) minutes old)"
             return 0
         fi
-        
+
         echo "[Auto-save] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
     else
         echo "[Auto-save] No token timestamp found, attempting refresh..."
     fi
-    
+
     # Check we have required credentials
     if [ -z "$GITHUB_APP_PRIVATE_KEY" ] || [ -z "$GITHUB_APP_ID" ]; then
         echo "[Auto-save] ⚠️ Missing GitHub App credentials, cannot refresh token"
         return 1
     fi
-    
+
     # Create temporary key file
     TEMP_KEY="/tmp/github-key-$$"
     echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
     chmod 600 "$TEMP_KEY"
-    
+
     # Generate JWT token
     JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
     NOW=$(date +%s)
@@ -117,18 +117,18 @@ refresh_github_token_if_needed() {
     JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
     JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
     JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-    
+
     # Get installation ID if not already set
     if [ -z "$INSTALLATION_ID" ]; then
         echo "[Auto-save] Getting installation ID..."
         REPO_URL="{{repository_url}}"
         REPO_OWNER=$(echo "$REPO_URL" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
         REPO_NAME=$(echo "$REPO_URL" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
-        
+
         INSTALLATION_RESPONSE=$(curl -s -L -H "Authorization: Bearer $JWT_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
-        
+
         INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
 
         if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
@@ -148,15 +148,15 @@ refresh_github_token_if_needed() {
         fi
         export INSTALLATION_ID
     fi
-    
+
     # Get new access token
     TOKEN_RESPONSE=$(curl -s -X POST \
         -H "Authorization: Bearer $JWT_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-    
+
     NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-    
+
     if [ -n "$NEW_TOKEN" ] && [ "$NEW_TOKEN" != "null" ]; then
         export GITHUB_TOKEN="$NEW_TOKEN"
         export TOKEN_GENERATED_AT=$(date +%s)
@@ -189,11 +189,11 @@ refresh_github_token_if_needed
             fi
         fi
     done
-    
+
     if [ "$PUSHED" = false ]; then
         echo "[Auto-save] ⚠️ Failed to push $TASK_NUM after 3 attempts - changes saved locally"
     fi
-    
+
     # Release lock
     rm -f "$LOCK_FILE"
 ) &

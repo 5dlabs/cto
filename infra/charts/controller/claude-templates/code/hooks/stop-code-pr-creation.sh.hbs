@@ -7,11 +7,11 @@ HOOK_LOG="/workspace/hook-execution.log"
 # Use bash process substitution (now we know bash is available)
 exec > >(tee -a "$HOOK_LOG") 2>&1
 
-echo "=== STOP HOOK DEBUG START ===" 
-echo "Hook called at: $(date)" 
-echo "PWD: $(pwd)" 
-echo "USER: $(whoami)" 
-echo "ENV PATH: $PATH" 
+echo "=== STOP HOOK DEBUG START ==="
+echo "Hook called at: $(date)"
+echo "PWD: $(pwd)"
+echo "USER: $(whoami)"
+echo "ENV PATH: $PATH"
 echo "=== END DEBUG ==="
 
 echo "🔗 STOP HOOK - Starting code implementation PR creation..."
@@ -112,7 +112,7 @@ echo "=== GitHub CLI Check ==="
 if command -v gh >/dev/null 2>&1; then
     echo "✅ gh CLI is available"
     gh version
-    
+
     # Check authentication
     if gh auth status 2>&1 | grep -q "Logged in"; then
         echo "✅ gh CLI is authenticated"
@@ -228,7 +228,7 @@ The Claude agent has completed the implementation and addressed all acceptance c
     echo "Title: $PR_TITLE"
     echo "Base: main"
     echo "Head: $CURRENT_BRANCH"
-    
+
     if gh pr create \
         --title "$PR_TITLE" \
         --body "$PR_BODY" \
@@ -237,7 +237,7 @@ The Claude agent has completed the implementation and addressed all acceptance c
         echo "✅ Pull request created successfully"
         echo "📝 PR: $PR_TITLE"
         echo "🔗 From: $CURRENT_BRANCH → main"
-        
+
         # Save PR URL if possible
         PR_URL=$(gh pr view --json url -q .url 2>/dev/null || echo "")
         if [ -n "$PR_URL" ]; then
