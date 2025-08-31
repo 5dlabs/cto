@@ -1,5 +1,18 @@
 #!/bin/sh
 
+# CRITICAL: Clean up sentinel file IMMEDIATELY to prevent sidecar from shutting down
+# This MUST happen before anything else, as the sidecar starts before our script
+if [ -f /workspace/.agent_done ]; then
+    echo "🧹 URGENT: Removing leftover sentinel file from previous run"
+    rm -f /workspace/.agent_done
+fi
+
+# Also clean up Tess completion marker if present
+if [ -f /workspace/.tess-complete ]; then
+    echo "🧹 Removing Tess completion marker from previous run"
+    rm -f /workspace/.tess-complete
+fi
+
 # Ensure Rust environment is always properly set up
 echo "🔧 Setting up Rust environment..."
 
@@ -914,6 +927,7 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
    - **If no workflows**: Skip CI validation and proceed to testing requirements
    - If ANY CI check is failing: DO NOT EXIT
    - Instead: Write tests to fix the failures
+   - Format Rust code: \`cargo fmt --all\` (if Rust project)
    - Push your changes: \`git add . && git commit -m "test: fix failing tests" && git push\`
    - Wait for CI (when workflows exist): \`sleep 60\` then check again
    - KEEP ITERATING until CI is GREEN (when workflows exist)
@@ -974,6 +988,7 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 9. **ITERATE UNTIL APPROVED**:
    - After posting REQUEST CHANGES, DO NOT STOP
    - Fix the issues yourself by writing tests
+   - Format Rust code if needed: \`cargo fmt --all\` (for Rust projects)
    - Push your fixes and wait for CI
    - **If workflows exist**: Check \`gh pr checks $PR_NUM\` again
    - If still failing, keep fixing and pushing
@@ -1247,10 +1262,11 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 
 - If ANY of these are not met:
   1. Write/fix tests as needed
-  2. Push your changes
-  3. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-$PR_NUM})
-  4. Check status again
-  5. KEEP ITERATING until everything passes
+  2. Format Rust code: \`cargo fmt --all\` (if Rust project)
+  3. Push your changes
+  4. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-$PR_NUM})
+  5. Check status again
+  6. KEEP ITERATING until everything passes
 
 - **APPROVAL GATES** (You CANNOT approve if ANY of these are true):
   * Any CI check is failing or pending
@@ -1276,12 +1292,7 @@ echo "════════════════════════�
 echo "║                    STARTING TESS QA EXECUTION                 ║"
 echo "════════════════════════════════════════════════════════════════"
 
-# Clean up any leftover completion marker from previous runs
-# This prevents issues with sequential task executions on the same PVC
-if [ -f /workspace/.tess-complete ]; then
-    echo "🧹 Cleaning up completion marker from previous run"
-    rm -f /workspace/.tess-complete
-fi
+# Sentinel and completion marker cleanup already done at script start
 
 # Seed initial user turn via a FIFO with timeout protection
 FIFO_PATH="/workspace/agent-input.jsonl"
