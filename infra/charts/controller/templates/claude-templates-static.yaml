@@ -9,25 +9,25 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
   annotations:
-    generated-at: "2025-08-31T03:55:56Z"
+    generated-at: "2025-08-31T03:58:20Z"
 data:
   agents_system-prompt.md.hbs: |
     ---
-    name: {{`{{`{{`}}`}}agent_name{{`}}`}}
-    description: {{`{{`{{`}}`}}agent_description{{`}}`}}
+    name: {{agent_name}}
+    description: {{agent_description}}
     # tools: omitted to inherit all available tools
     ---
     
-    {{`{{`{{`}}`}}system_prompt{{`}}`}}
+    {{system_prompt}}
   code_claude.md.hbs: |
     # Claude Code Project Memory
     
     ## Project Information
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Source Branch**: {{`{{`{{`}}`}}docs_branch{{`}}`}}
-    - **GitHub App**: {{`{{`{{`}}`}}github_app{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
-    - **Implementation Target**: task {{`{{`{{`}}`}}task_id{{`}}`}}
+    - **Repository**: {{repository_url}}
+    - **Source Branch**: {{docs_branch}}
+    - **GitHub App**: {{github_app}}
+    - **Working Directory**: {{working_directory}}
+    - **Implementation Target**: task {{task_id}}
     
     ## Tool Capabilities
     
@@ -49,26 +49,26 @@ data:
     
     ## Current Task Documentation
     
-    {{`{{`{{`}}`}}#if task_id{{`}}`}}
-    **Your current task ({{`{{`{{`}}`}}task_id{{`}}`}}) documentation:**
+    {{#if task_id}}
+    **Your current task ({{task_id}}) documentation:**
     - See @task/task.md for requirements and description
     - See @task/acceptance-criteria.md for success criteria
     - See @task/architecture.md for technical approach and guidance
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     **General project documentation:**
     - See @README.md for project overview and setup instructions
     - See @.taskmaster/docs/architecture.md for system design patterns
     - See @.taskmaster/docs/prd.txt for product requirements
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     ## System Architecture & Context
     
     See @.taskmaster/docs/architecture.md for system design patterns and architectural decisions
-    {{`{{`{{`}}`}}#if docsRepositoryUrl{{`}}`}}See @.taskmaster/docs/prd.txt for complete product requirements{{`{{`{{`}}`}}/if{{`}}`}}
+    {{#if docsRepositoryUrl}}See @.taskmaster/docs/prd.txt for complete product requirements{{/if}}
     
     ## Implementation Workflow
     
-    {{`{{`{{`}}`}}#if task_id{{`}}`}}
+    {{#if task_id}}
     ### Current Task Process
     1. **Understand**: Read @task/task.md for requirements
     2. **Plan**: Review @task/architecture.md for technical approach
@@ -78,18 +78,18 @@ data:
     6. **Test**: Verify all acceptance criteria are met
     
     ### Task Context
-    - **Task ID**: {{`{{`{{`}}`}}task_id{{`}}`}}
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Branch**: {{`{{`{{`}}`}}docs_branch{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
-    {{`{{`{{`}}`}}else{{`}}`}}
+    - **Task ID**: {{task_id}}
+    - **Repository**: {{repository_url}}
+    - **Branch**: {{docs_branch}}
+    - **Working Directory**: {{working_directory}}
+    {{else}}
     ### General Development Process
     1. **Explore**: Understand existing codebase structure
     2. **Plan**: Follow established patterns and conventions
     3. **Implement**: Adhere to @coding-guidelines.md standards
     4. **Test**: Ensure changes meet project quality standards
     5. **Commit**: Follow @github-guidelines.md workflow
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     ## Quick Command Reference
     
@@ -114,17 +114,17 @@ data:
     
     ### Git Workflow
     ```bash
-    {{`{{`{{`}}`}}#if task_id{{`}}`}}
+    {{#if task_id}}
     # Commit with task-specific message (see @github-guidelines.md for details)
-    git commit -m "feat(task-{{`{{`{{`}}`}}task_id{{`}}`}}): implement [brief description]
+    git commit -m "feat(task-{{task_id}}): implement [brief description]
     
     - [specific changes made]
     - [tests added/updated]
     - [meets acceptance criteria: X, Y, Z]"
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     # Standard commit message (see @github-guidelines.md for format)
     git commit -m "feat: implement [brief description]"
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     ```
     
     ## Pull Request Requirements
@@ -140,7 +140,7 @@ data:
     
     **IMPORTANT PR HANDLING**:
     - Always check if a PR already exists for this task before creating PR_DESCRIPTION.md
-    - Use `gh pr list --state all --label "task-{{`{{`{{`}}`}}task_id{{`}}`}}"` to find existing PRs for your task
+    - Use `gh pr list --state all --label "task-{{task_id}}"` to find existing PRs for your task
     - If a PR exists and is OPEN: do NOT create PR_DESCRIPTION.md (continue working on the existing PR)
     - If a PR exists and is MERGED: the task is complete - do NOT create a new PR
     - If a PR exists and is CLOSED (not merged): create a new PR with PR_DESCRIPTION.md
@@ -160,38 +160,38 @@ data:
     - Validate with `Bash` commands after each change
     
     ### Implementation Guidelines
-    {{`{{`{{`}}`}}#if task_id{{`}}`}}
+    {{#if task_id}}
     - Focus on current task requirements in `task/` directory
     - Follow architectural guidance provided in @task/architecture.md
     - Ensure all acceptance criteria are met before completion
     - Use established patterns from @coding-guidelines.md
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     - Explore existing codebase structure before making changes
     - Follow established patterns and conventions
     - Ensure changes align with project architecture
     - Maintain backward compatibility unless explicitly changing interfaces
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     ---
     
     *All referenced files (@filename) are automatically imported into Claude's context. For detailed information on any topic, refer to the specific imported files above.*  code_client-config.json.hbs: |
     {
-      {{`{{`{{`}}`}}#if remote_tools{{`}}`}}
+      {{#if remote_tools}}
       "remoteTools": [
-        {{`{{`{{`}}`}}#each remote_tools{{`}}`}}
-        "{{`{{`{{`}}`}}this{{`}}`}}"{{`{{`{{`}}`}}#unless @last{{`}}`}},{{`{{`{{`}}`}}/unless{{`}}`}}
-        {{`{{`{{`}}`}}/each{{`}}`}}
-      ]{{`{{`{{`}}`}}#if (eq tool_config "advanced"){{`}}`}},{{`{{`{{`}}`}}/if{{`}}`}}
-      {{`{{`{{`}}`}}else{{`}}`}}
-      {{`{{`{{`}}`}}#if (eq tool_config "minimal"){{`}}`}}
-      "remoteTools": []{{`{{`{{`}}`}}#if (eq tool_config "advanced"){{`}}`}},{{`{{`{{`}}`}}/if{{`}}`}}
-      {{`{{`{{`}}`}}else if (eq tool_config "default"){{`}}`}}
+        {{#each remote_tools}}
+        "{{this}}"{{#unless @last}},{{/unless}}
+        {{/each}}
+      ]{{#if (eq tool_config "advanced")}},{{/if}}
+      {{else}}
+      {{#if (eq tool_config "minimal")}}
+      "remoteTools": []{{#if (eq tool_config "advanced")}},{{/if}}
+      {{else if (eq tool_config "default")}}
       "remoteTools": [
         "brave-search_brave_web_search",
         "memory_create_entities",
         "rustdocs_query_rust_docs"
-      ]{{`{{`{{`}}`}}#if (eq tool_config "advanced"){{`}}`}},{{`{{`{{`}}`}}/if{{`}}`}}
-      {{`{{`{{`}}`}}else if (eq tool_config "advanced"){{`}}`}}
+      ]{{#if (eq tool_config "advanced")}},{{/if}}
+      {{else if (eq tool_config "advanced")}}
       "remoteTools": [
         "brave-search_brave_web_search",
         "memory_create_entities",
@@ -200,35 +200,35 @@ data:
         "kubernetes_listResources",
         "terraform_list_providers"
       ],
-      {{`{{`{{`}}`}}else{{`}}`}}
+      {{else}}
       "remoteTools": [
         "brave-search_brave_web_search",
         "memory_create_entities",
         "rustdocs_query_rust_docs"
-      ]{{`{{`{{`}}`}}#if (eq tool_config "advanced"){{`}}`}},{{`{{`{{`}}`}}/if{{`}}`}}
-      {{`{{`{{`}}`}}/if{{`}}`}}
-      {{`{{`{{`}}`}}/if{{`}}`}}
-      {{`{{`{{`}}`}}#if (eq tool_config "advanced"){{`}}`}}
+      ]{{#if (eq tool_config "advanced")}},{{/if}}
+      {{/if}}
+      {{/if}}
+      {{#if (eq tool_config "advanced")}}
       "localServers": {
         "filesystem": {
           "command": "npx",
           "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
           "tools": [
-            {{`{{`{{`}}`}}#if local_tools{{`}}`}}
-            {{`{{`{{`}}`}}#each local_tools{{`}}`}}
-            "{{`{{`{{`}}`}}this{{`}}`}}"{{`{{`{{`}}`}}#unless @last{{`}}`}},{{`{{`{{`}}`}}/unless{{`}}`}}
-            {{`{{`{{`}}`}}/each{{`}}`}}
-            {{`{{`{{`}}`}}else{{`}}`}}
+            {{#if local_tools}}
+            {{#each local_tools}}
+            "{{this}}"{{#unless @last}},{{/unless}}
+            {{/each}}
+            {{else}}
             "read_file",
             "write_file",
             "list_directory",
             "create_directory"
-            {{`{{`{{`}}`}}/if{{`}}`}}
+            {{/if}}
           ],
           "workingDirectory": "project_root"
         }
       }
-      {{`{{`{{`}}`}}/if{{`}}`}}
+      {{/if}}
     }  code_coding-guidelines.md.hbs: |
     # Rust Coding Guidelines
     
@@ -530,9 +530,9 @@ data:
     echo '║              CLEO CODE QUALITY WORKFLOW STARTING             ║'
     echo '║     Code Quality & CI/CD Pipeline Enforcement Agent          ║'
     echo '════════════════════════════════════════════════════════════════'
-    echo "🎯 Agent: {{`{{`{{`}}`}}github_app{{`}}`}}"
+    echo "🎯 Agent: {{github_app}}"
     echo "🔍 Focus: Code quality, CI/CD setup, and Docker image building"
-    echo "📋 Task ID: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "📋 Task ID: {{task_id}}"
     echo "✅ Mission: Perfect code quality AND working CI/CD pipeline with Docker builds"
     
     # Clean up any leftover completion marker from previous runs
@@ -548,7 +548,7 @@ data:
     export SSH_ASKPASS=/bin/true
     
     # Repository URL
-    REPO_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_URL="{{repository_url}}"
     
     # GitHub App authentication is configured via environment variables
     echo "Using GitHub App authentication for code quality checks"
@@ -576,7 +576,7 @@ data:
         JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
     
         # Get installation ID for the repository (robust parsing of owner/repo)
-        INPUT_REPO="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+        INPUT_REPO="{{repository_url}}"
         REPO_OWNER=""
         REPO_NAME=""
     
@@ -745,7 +745,7 @@ data:
     fi
     
     # Target repository directory name - this is where the git repo will be
-    TARGET_REPO_DIR="{{`{{`{{`}}`}}#if working_directory{{`}}`}}{{`{{`{{`}}`}}working_directory{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}{{`{{`{{`}}`}}service{{`}}`}}{{`{{`{{`}}`}}/if{{`}}`}}"
+    TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
     
     # Set working directory for the agent - should match the repository location
     CLAUDE_WORK_DIR="/workspace/$TARGET_REPO_DIR"
@@ -774,35 +774,35 @@ data:
     
     # Repository URLs - Handle both full URLs and org/repo format
     # Check if repository_url already contains https://github.com/
-    if echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        REPO_HTTP_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+        REPO_HTTP_URL="{{repository_url}}"
+        if ! echo "{{repository_url}}" | grep -q "\.git$"; then
             REPO_HTTP_URL="${REPO_HTTP_URL}.git"
         fi
     else
-        REPO_HTTP_URL="https://github.com/{{`{{`{{`}}`}}repository_url{{`}}`}}.git"
+        REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
     fi
     
     # Same for docs repository
-    if echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        DOCS_HTTP_URL="{{`{{`{{`}}`}}docs_repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+        DOCS_HTTP_URL="{{docs_repository_url}}"
+        if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
             DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
         fi
     else
-        DOCS_HTTP_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}.git"
+        DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
     fi
     
     # DEBUG: Show what URLs are being constructed
     echo "🔍 DEBUG: URL Construction & Parameters"
-    echo "  Input repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  Input docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  Input docs_project_directory: '{{`{{`{{`}}`}}docs_project_directory{{`}}`}}'"
-    echo "  Input working_directory: '{{`{{`{{`}}`}}working_directory{{`}}`}}'"
-    echo "  Input docs_branch: '{{`{{`{{`}}`}}docs_branch{{`}}`}}'"
-    echo "  Input github_app: '{{`{{`{{`}}`}}github_app{{`}}`}}'"
-    echo "  Input task_id: '{{`{{`{{`}}`}}task_id{{`}}`}}'"
-    echo "  Input service: '{{`{{`{{`}}`}}service{{`}}`}}'"
+    echo "  Input repository_url: '{{repository_url}}'"
+    echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+    echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+    echo "  Input working_directory: '{{working_directory}}'"
+    echo "  Input docs_branch: '{{docs_branch}}'"
+    echo "  Input github_app: '{{github_app}}'"
+    echo "  Input task_id: '{{task_id}}'"
+    echo "  Input service: '{{service}}'"
     echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
     echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
     echo "  Current working directory: $(pwd)"
@@ -814,11 +814,11 @@ data:
     echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
     if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
       echo "✓ HTTPS repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Output: $(cat /tmp/repo_test.out | head -1)"
     else
       echo "❌ HTTPS repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Error output: $(cat /tmp/repo_test.out)"
       echo "  Git credential helper status:"
       git config --list | grep credential || echo "  No credential helpers configured"
@@ -832,11 +832,11 @@ data:
     echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
     if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
       echo "✓ Docs repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Output: $(cat /tmp/docs_test.out | head -1)"
     else
       echo "❌ Docs repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Error output: $(cat /tmp/docs_test.out)"
       echo ""
       echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
@@ -927,18 +927,18 @@ data:
     echo "✓ Working directly in git repository at: $CLAUDE_WORK_DIR"
     
     # Check if we should continue previous session
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     echo "📂 Continuing from previous session..."
     # Preserve existing CLAUDE.md if it exists
     if [ -f "/workspace/CLAUDE.md" ]; then
         echo "✓ Found existing CLAUDE.md, preserving session memory"
     fi
-    {{`{{`{{`}}`}}else{{`}}`}}
-    {{`{{`{{`}}`}}#if overwrite_memory{{`}}`}}
+    {{else}}
+    {{#if overwrite_memory}}
     echo "🔄 Overwriting session memory as requested..."
     rm -f /workspace/CLAUDE.md
-    {{`{{`{{`}}`}}/if{{`}}`}}
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
+    {{/if}}
     
     # Generate configuration files from templates
     echo "🔧 Generating Cleo-specific configuration files..."
@@ -1099,12 +1099,12 @@ data:
     echo "🔧 Setting up Cleo-specific hook scripts..."
     mkdir -p "$CLAUDE_WORK_DIR/hooks"
     
-    {{`{{`{{`}}`}}#each hook_scripts{{`}}`}}
-    cat > "$CLAUDE_WORK_DIR/hooks/{{`{{`{{`}}`}}@key{{`}}`}}" << 'EOF'
-    {{`{{`{{`}}`}}{this{{`}}`}}}
+    {{#each hook_scripts}}
+    cat > "$CLAUDE_WORK_DIR/hooks/{{@key}}" << 'EOF'
+    {{{this}}}
     EOF
-    chmod +x "$CLAUDE_WORK_DIR/hooks/{{`{{`{{`}}`}}@key{{`}}`}}"
-    {{`{{`{{`}}`}}/each{{`}}`}}
+    chmod +x "$CLAUDE_WORK_DIR/hooks/{{@key}}"
+    {{/each}}
     
     # Export environment for Claude
     export CLAUDE_WORK_DIR
@@ -1118,15 +1118,15 @@ data:
     echo "════════════════════════════════════════════════════════════════"
     echo "📁 Working Directory: $CLAUDE_WORK_DIR"
     echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
-    echo "📋 Task: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "📋 Task: {{task_id}}"
     echo "🎯 Focus: Rigorous code quality enforcement"
     echo "⚠️  CRITICAL: Must pass all quality checks before adding 'ready-for-qa' label"
     echo "════════════════════════════════════════════════════════════════"
     
     # Export necessary variables for Claude execution
-    export SERVICE_NAME="{{`{{`{{`}}`}}service{{`}}`}}"
-    export TASK_ID="{{`{{`{{`}}`}}task_id{{`}}`}}"
-    export GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    export SERVICE_NAME="{{service}}"
+    export TASK_ID="{{task_id}}"
+    export GITHUB_APP="{{github_app}}"
     
     # Start Claude with Cleo-specific configuration
     cd "$CLAUDE_WORK_DIR"
@@ -1263,7 +1263,7 @@ data:
     
        env:
          REGISTRY: ghcr.io
-         IMAGE_BASE: ${{`{{`{{`}}`}} github.repository_owner {{`}}`}}
+         IMAGE_BASE: ${{ github.repository_owner }}
     
        jobs:
          build:
@@ -1284,8 +1284,8 @@ data:
              - uses: docker/login-action@v3
                with:
                  registry: ghcr.io
-                 username: ${{`{{`{{`}}`}} github.actor {{`}}`}}
-                 password: ${{`{{`{{`}}`}} secrets.GITHUB_TOKEN {{`}}`}}
+                 username: ${{ github.actor }}
+                 password: ${{ secrets.GITHUB_TOKEN }}
              - uses: docker/build-push-action@v5
                with:
                  context: .
@@ -1293,8 +1293,8 @@ data:
                  platforms: linux/amd64,linux/arm64
                  push: true
                  tags: |
-                   ghcr.io/${{`{{`{{`}}`}} github.repository {{`}}`}}:latest
-                   ghcr.io/${{`{{`{{`}}`}} github.repository {{`}}`}}:${{`{{`{{`}}`}} github.sha {{`}}`}}
+                   ghcr.io/${{ github.repository }}:latest
+                   ghcr.io/${{ github.repository }}:${{ github.sha }}
                  cache-from: type=gha
                  cache-to: type=gha,mode=max
        \\\`\\\`\\\`
@@ -1309,11 +1309,11 @@ data:
          * Fix any workflow configuration issues
        - KEEP ITERATING: Fix issues, push, check CI, repeat until ALL JOBS RUN AND PASS
     5. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
-       - **If repository has workflows**: Use 'gh pr checks {{`{{`{{`}}`}}pr_number{{`}}`}}' to confirm ALL checks are passing
+       - **If repository has workflows**: Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
        - **If no workflows**: Skip CI validation and proceed to code quality checks
        - **CRITICAL: Check for stuck/pending jobs** (only if workflows exist):
          * Look for jobs showing "Waiting" or "Pending" for > 2 minutes
-         * Check 'gh run list --branch=$(gh pr view {{`{{`{{`}}`}}pr_number{{`}}`}} --json headRefName -q .headRefName)' for workflow status
+         * Check 'gh run list --branch=$(gh pr view {{pr_number}} --json headRefName -q .headRefName)' for workflow status
          * If jobs aren't starting, investigate:
            - Missing runner labels? Check 'runs-on:' in workflow
            - Workflow syntax errors? Validate with 'actionlint' or GitHub UI
@@ -1425,7 +1425,7 @@ data:
     else
       echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
       exec 9>"$FIFO_PATH"
-      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]{{`}}`}}\n' "$USER_COMBINED" >&9
+      printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
       exec 9>&- 2>/dev/null || true  # Close immediately
     fi
     
@@ -1447,7 +1447,7 @@ data:
     
     # Always attempt to post PR comment and add label regardless of Claude exit status
     # Determine OWNER/REPO slug for gh -R
-    REPO_INPUT="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_INPUT="{{repository_url}}"
     if echo "$REPO_INPUT" | grep -q "^https://github.com/"; then
       REPO_SLUG=$(echo "$REPO_INPUT" | sed -E 's|https://github.com/([^/]+/[^/.]+)(\.git)?$|\1|')
     else
@@ -1614,7 +1614,7 @@ data:
     echo "════════════════════════════════════════════════════════════════"
     echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
     echo "════════════════════════════════════════════════════════════════"
-    echo "📋 Task: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "📋 Task: {{task_id}}"
     echo "✅ Code quality checks completed"
     echo "════════════════════════════════════════════════════════════════"
     
@@ -1678,9 +1678,9 @@ data:
     echo '║                  Remediation Agent Active                      ║'
     echo '║            ⚠️  FIXING FEEDBACK - NO NEW IMPLEMENTATION ⚠️         ║'
     echo '════════════════════════════════════════════════════════════════'
-    echo "🎯 Agent: {{`{{`{{`}}`}}github_app{{`}}`}}"
+    echo "🎯 Agent: {{github_app}}"
     echo "🔧 Mode: Remediation - Fix Only"
-    echo "📋 Task ID: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "📋 Task ID: {{task_id}}"
     echo "🚨 CRITICAL: ONLY fix the issues identified in feedback"
     
     # Disable interactive Git prompts globally
@@ -1689,7 +1689,7 @@ data:
     export SSH_ASKPASS=/bin/true
     
     # Repository URL
-    REPO_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_URL="{{repository_url}}"
     
     # GitHub App authentication is configured via environment variables
     echo "Using GitHub App authentication"
@@ -1717,7 +1717,7 @@ data:
         JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
     
         # Get installation ID for the repository (robust parsing of owner/repo)
-        INPUT_REPO="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+        INPUT_REPO="{{repository_url}}"
         REPO_OWNER=""
         REPO_NAME=""
     
@@ -1807,7 +1807,7 @@ data:
     git config --global --add safe.directory /workspace
     
     # Set GitHub App attribution - use generic format for all agents
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    GITHUB_APP="{{github_app}}"
     # Generic attribution that works for any agent
     GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
     GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
@@ -1906,7 +1906,7 @@ data:
     FEEDBACK_COMMENT=""
     
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        if FEEDBACK_COMMENT=$(gh api "/repos/{{`{{`{{`}}`}}repository_url{{`}}`}}/issues/comments/${FEEDBACK_COMMENT_ID}" --jq '.body' 2>/dev/null); then
+        if FEEDBACK_COMMENT=$(gh api "/repos/{{repository_url}}/issues/comments/${FEEDBACK_COMMENT_ID}" --jq '.body' 2>/dev/null); then
             echo "✅ Feedback comment fetched successfully (${#FEEDBACK_COMMENT} characters)"
             break
         else
@@ -1968,7 +1968,7 @@ data:
     echo "📋 Fetching original task context..."
     TASK_CONTENT=""
     
-    TASK_FILE="/tmp/docs-repo/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster/docs/task-${TASK_ID}/task.md"
+    TASK_FILE="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster/docs/task-${TASK_ID}/task.md"
     if [ -f "${TASK_FILE}" ]; then
         TASK_CONTENT=$(cat "${TASK_FILE}")
         echo "✅ Found task file: ${TASK_FILE}"
@@ -2078,35 +2078,35 @@ data:
     
     # Repository URLs - Handle both full URLs and org/repo format
     # Check if repository_url already contains https://github.com/
-    if echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        REPO_HTTP_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+        REPO_HTTP_URL="{{repository_url}}"
+        if ! echo "{{repository_url}}" | grep -q "\.git$"; then
             REPO_HTTP_URL="${REPO_HTTP_URL}.git"
         fi
     else
-        REPO_HTTP_URL="https://github.com/{{`{{`{{`}}`}}repository_url{{`}}`}}.git"
+        REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
     fi
     
     # Same for docs repository
-    if echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        DOCS_HTTP_URL="{{`{{`{{`}}`}}docs_repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+        DOCS_HTTP_URL="{{docs_repository_url}}"
+        if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
             DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
         fi
     else
-        DOCS_HTTP_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}.git"
+        DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
     fi
     
     # DEBUG: Show what URLs are being constructed
     echo "🔍 DEBUG: URL Construction & Parameters"
-    echo "  Input repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  Input docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  Input docs_project_directory: '{{`{{`{{`}}`}}docs_project_directory{{`}}`}}'"
-    echo "  Input working_directory: '{{`{{`{{`}}`}}working_directory{{`}}`}}'"
-    echo "  Input docs_branch: '{{`{{`{{`}}`}}docs_branch{{`}}`}}'"
-    echo "  Input github_app: '{{`{{`{{`}}`}}github_app{{`}}`}}'"
-    echo "  Input task_id: '{{`{{`{{`}}`}}task_id{{`}}`}}'"
-    echo "  Input service: '{{`{{`{{`}}`}}service{{`}}`}}'"
+    echo "  Input repository_url: '{{repository_url}}'"
+    echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+    echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+    echo "  Input working_directory: '{{working_directory}}'"
+    echo "  Input docs_branch: '{{docs_branch}}'"
+    echo "  Input github_app: '{{github_app}}'"
+    echo "  Input task_id: '{{task_id}}'"
+    echo "  Input service: '{{service}}'"
     echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
     echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
     echo "  Current working directory: $(pwd)"
@@ -2118,11 +2118,11 @@ data:
     echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
     if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
       echo "✓ HTTPS repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Output: $(cat /tmp/repo_test.out | head -1)"
     else
       echo "❌ HTTPS repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Error output: $(cat /tmp/repo_test.out)"
       echo "  Git credential helper status:"
       git config --list | grep credential || echo "  No credential helpers configured"
@@ -2136,11 +2136,11 @@ data:
     echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
     if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
       echo "✓ Docs repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Output: $(cat /tmp/docs_test.out | head -1)"
     else
       echo "❌ Docs repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Error output: $(cat /tmp/docs_test.out)"
       echo ""
       echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
@@ -2154,8 +2154,8 @@ data:
     echo "═══════════════════════════════════════════════════════════════"
     
     # Repository Information
-    DOCS_BRANCH="{{`{{`{{`}}`}}docs_branch{{`}}`}}"
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    DOCS_BRANCH="{{docs_branch}}"
+    GITHUB_APP="{{github_app}}"
     
     # Helper: derive safe workspace directory name from repo input (URL, SSH, or slug)
     sanitize_repo_dir() {
@@ -2176,12 +2176,12 @@ data:
     }
     
     # Derive workspace directory names (owner-repo)
-    DOCS_REPO_DIR=$(sanitize_repo_dir "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}")
-    TARGET_REPO_DIR=$(sanitize_repo_dir "{{`{{`{{`}}`}}repository_url{{`}}`}}")
+    DOCS_REPO_DIR=$(sanitize_repo_dir "{{docs_repository_url}}")
+    TARGET_REPO_DIR=$(sanitize_repo_dir "{{repository_url}}")
     
     echo "=== REPOSITORY SETUP ==="
-    echo "Docs repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
-    echo "Target repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+    echo "Docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+    echo "Target repository: {{repository_url}} ($REPO_HTTP_URL)"
     echo "Docs branch: $DOCS_BRANCH"
     echo "GitHub App: $GITHUB_APP"
     
@@ -2189,9 +2189,9 @@ data:
     # Even if docs and target are the same repo, we clone them separately
     # This avoids complex branch switching and file preservation issues
     echo "=== UNIFIED WORKFLOW APPROACH ==="
-    echo "  docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  └─ TaskMaster files will be copied from docs repo at: {{`{{`{{`}}`}}docs_project_directory{{`}}`}}"
+    echo "  docs_repository_url: '{{docs_repository_url}}'"
+    echo "  repository_url: '{{repository_url}}'"
+    echo "  └─ TaskMaster files will be copied from docs repo at: {{docs_project_directory}}"
     
     # Repository Setup - Always use consistent approach
     echo "=== REPOSITORY SETUP ==="
@@ -2208,7 +2208,7 @@ data:
     else
         echo "📥 DOCS REPOSITORY: CLONING - extracting task files"
         if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo; then
-            echo "❌ Failed to clone docs repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+            echo "❌ Failed to clone docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
             exit 1
         fi
         cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd /workspace
@@ -2227,7 +2227,7 @@ data:
     else
         echo "📥 TARGET REPOSITORY: CLONING - first time setup"
         if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
-            echo "❌ Failed to clone target repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+            echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
             exit 1
         fi
         echo "✓ Target repository cloned successfully"
@@ -2238,18 +2238,18 @@ data:
     mkdir -p "/workspace/$TARGET_REPO_DIR/task"
     
     # Determine docs project directory path
-    {{`{{`{{`}}`}}#if docs_project_directory{{`}}`}}
-    if [ "{{`{{`{{`}}`}}docs_project_directory{{`}}`}}" = "." ]; then
+    {{#if docs_project_directory}}
+    if [ "{{docs_project_directory}}" = "." ]; then
         DOCS_PATH="/tmp/docs-repo/.taskmaster"
     else
-        DOCS_PATH="/tmp/docs-repo/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster"
+        DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
     fi
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     DOCS_PATH="/tmp/docs-repo/.taskmaster"
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     # Copy specific task files
-    TASK_DIR="$DOCS_PATH/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
+    TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
     echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
     echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
     echo "🔍 DEBUG: Contents of docs temp directory:"
@@ -2284,9 +2284,9 @@ data:
             echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
         fi
     
-        echo "✓ Task {{`{{`{{`}}`}}task_id{{`}}`}} files copied from $TASK_DIR"
+        echo "✓ Task {{task_id}} files copied from $TASK_DIR"
     else
-        echo "❌ CRITICAL: Task {{`{{`{{`}}`}}task_id{{`}}`}} directory not found at: $TASK_DIR"
+        echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
         echo "🔍 DEBUG: Available directories in docs:"
         find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
     fi
@@ -2324,7 +2324,7 @@ data:
     echo "✓ Working directory: /workspace/$REPO_NAME"
     
     # Set Claude working directory early (needed for client-config.json copy)
-    WORK_DIR="{{`{{`{{`}}`}}working_directory{{`}}`}}"
+    WORK_DIR="{{working_directory}}"
     if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
       CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
     else
@@ -2342,7 +2342,7 @@ data:
     git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || echo "⚠️ Could not fetch main/master branch"
     
     # Create or checkout feature branch (with conflict-safe fallback)
-    FEATURE_BRANCH="feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation"
+    FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
     BRANCH_EXISTS="false"
     
     if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
@@ -2410,7 +2410,7 @@ data:
       echo "Copying ConfigMap files to working directory..."
     
       # CLAUDE.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
-            OVERWRITE_MEMORY="{{`{{`{{`}}`}}overwrite_memory{{`}}`}}"
+            OVERWRITE_MEMORY="{{overwrite_memory}}"
     
       # Handle CLAUDE.md based on overwriteMemory setting
             if [ "$OVERWRITE_MEMORY" = "true" ]; then
@@ -2587,9 +2587,9 @@ data:
     echo '=== CLAUDE EXECUTION ==='
     
     # Export necessary variables
-    export SERVICE_NAME="{{`{{`{{`}}`}}service{{`}}`}}"
-    export TASK_ID="{{`{{`{{`}}`}}task_id{{`}}`}}"
-    export GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    export SERVICE_NAME="{{service}}"
+    export TASK_ID="{{task_id}}"
+    export GITHUB_APP="{{github_app}}"
     
     # Change to project directory before running Claude
     cd "$CLAUDE_WORK_DIR"
@@ -2634,34 +2634,34 @@ data:
     
     # Look for agent-specific system prompt file from agents ConfigMap
     # The system prompt should be in the agents ConfigMap if configured
-    if [ -f "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
-        echo "✓ Found system prompt file for {{`{{`{{`}}`}}github_app{{`}}`}}, adding to Claude command"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+    if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+        echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
-    elif [ -f "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
+    elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
         # Fallback to task-files if included inline
-        echo "✓ Found system prompt in task ConfigMap for {{`{{`{{`}}`}}github_app{{`}}`}}"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+        echo "✓ Found system prompt in task ConfigMap for {{github_app}}"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /task-files/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
     else
-        echo "ℹ️ No system prompt file found for agent {{`{{`{{`}}`}}github_app{{`}}`}}, using defaults"
+        echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
     fi
     
     # Model is set via settings.json template, not CLI flag
     
     # Add continue flag if this is a retry attempt or user requested continuation
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     CLAUDE_CMD="$CLAUDE_CMD --continue"
-    echo 'Adding --continue flag (attempt {{`{{`{{`}}`}}attempts{{`}}`}}{{`{{`{{`}}`}}#if user_requested{{`}}`}} - user requested{{`{{`{{`}}`}}/if{{`}}`}})'
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
+    {{/if}}
     
     echo "════════════════════════════════════════════════════════════════"
     echo "║                    STARTING CLAUDE EXECUTION                  ║"
@@ -2695,14 +2695,14 @@ data:
     
     ## 🔧 ORCHESTRATOR EXECUTION CONTEXT
     
-    - **Service**: {{`{{`{{`}}`}}service{{`}}`}}
-    - **Task ID**: {{`{{`{{`}}`}}task_id{{`}}`}}
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Docs Repository**: {{`{{`{{`}}`}}docs_repository_url{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
-    - **GitHub App**: {{`{{`{{`}}`}}github_app{{`}}`}}
+    - **Service**: {{service}}
+    - **Task ID**: {{task_id}}
+    - **Repository**: {{repository_url}}
+    - **Docs Repository**: {{docs_repository_url}}
+    - **Working Directory**: {{working_directory}}
+    - **GitHub App**: {{github_app}}
     
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     ## 🔄 CONTINUE SESSION - PR COMMENT RESOLUTION PRIORITY
     
     **⚠️ MANDATORY FIRST STEP: Before proceeding with any other work, you MUST:**
@@ -2714,7 +2714,7 @@ data:
     
     **This ensures reviewer feedback takes priority and maintains collaborative workflow quality.**
     
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     ## ⚠️ EXECUTION REQUIREMENTS
     
     - **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
@@ -2733,7 +2733,7 @@ data:
     
     **MANDATORY FINAL STEP:**
     - **MUST** create a pull request using `gh pr create` command
-    - **MUST** include proper labels (task-{{`{{`{{`}}`}}task_id{{`}}`}}, run-{{`{{`{{`}}`}}workflow.name{{`}}`}}, service-{{`{{`{{`}}`}}service{{`}}`}})
+    - **MUST** include proper labels (task-{{task_id}}, run-{{workflow.name}}, service-{{service}})
     - **MUST** verify PR creation succeeded before claiming task completion
     - **THE TASK IS INCOMPLETE AND FAILED IF NO PR IS CREATED**
     
@@ -2758,7 +2758,7 @@ data:
         exec 9>"$FIFO_PATH"
         $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]{{`}}`}}\n' >&9
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
         # Close writer so reader can exit cleanly
         exec 9>&-
         wait $CLAUDE_PID
@@ -2767,7 +2767,7 @@ data:
         # No need to read prompt.md - remediation context is already prepared
         echo "✓ Using remediation context from CLAUDE.md"
     
-        echo "startingRemediation:{{`{{`{{`}}`}}task_id{{`}}`}}"
+        echo "startingRemediation:{{task_id}}"
         echo ""
     
             # DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
@@ -2813,7 +2813,7 @@ data:
               echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
               # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
               exec 9>"$FIFO_PATH"
-              printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]{{`}}`}}\n' "$(printf '%s' "$USER_MESSAGE" | jq -Rs .)" >&9
+              printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$(printf '%s' "$USER_MESSAGE" | jq -Rs .)" >&9
               exec 9>&-  # Close immediately to send EOF to Claude
             fi
     
@@ -2947,13 +2947,13 @@ data:
     
       # First, try to find PR by task label (Claude should have added task-N label)
       TASK_LABEL="task-${TASK_ID}"
-      PR_NUMBER=$(gh pr list -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+      PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
     
       # If not found by label, try by branch name (current branch)
       if [ -z "$PR_NUMBER" ]; then
         CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
         if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-          PR_NUMBER=$(gh pr list -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+          PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
         fi
       fi
     
@@ -2961,7 +2961,7 @@ data:
         echo "✅ Found PR #${PR_NUMBER}"
     
         # Get the PR URL
-        PR_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}/pull/${PR_NUMBER}"
+        PR_URL="https://github.com/{{docs_repository_url}}/pull/${PR_NUMBER}"
         echo "📝 PR URL: $PR_URL"
     
         # Update CodeRun status with PR URL via Kubernetes API
@@ -3043,7 +3043,7 @@ data:
     
         # Try to add labels with detailed error capture
         echo "🔍 DEBUG: Attempting to add labels to PR..."
-        LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
+        LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
         LABEL_EXIT_CODE=$?
     
         if [ $LABEL_EXIT_CODE -eq 0 ]; then
@@ -3055,7 +3055,7 @@ data:
           # Check if labels exist
           echo "🔍 DEBUG: Checking which labels exist..."
           for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
-            if gh label list -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --search "$label" | grep -q "^$label"; then
+            if gh label list -R "{{docs_repository_url}}" --search "$label" | grep -q "^$label"; then
               echo "   ✓ Label '$label' exists"
             else
               echo "   ✗ Label '$label' does not exist"
@@ -3068,7 +3068,7 @@ data:
                 *) COLOR="ededed"; DESC="Unknown label type" ;;
               esac
     
-              CREATE_ERROR=$(gh label create "$label" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --color "$COLOR" --description "$DESC" 2>&1)
+              CREATE_ERROR=$(gh label create "$label" -R "{{docs_repository_url}}" --color "$COLOR" --description "$DESC" 2>&1)
               CREATE_EXIT=$?
               if [ $CREATE_EXIT -eq 0 ]; then
                 echo "   ✅ Created label '$label'"
@@ -3082,7 +3082,7 @@ data:
           echo "🔍 DEBUG: Retrying label addition individually..."
           LABELS_ADDED=0
           for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
-            RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --add-label "$label" 2>&1)
+            RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "$label" 2>&1)
             RETRY_EXIT=$?
             if [ $RETRY_EXIT -eq 0 ]; then
               echo "   ✅ Added label '$label'"
@@ -3099,7 +3099,7 @@ data:
           else
             echo "❌ CRITICAL: Could not add any labels to PR"
             echo "🔍 DEBUG: Checking PR state..."
-            PR_STATE=$(gh pr view "$PR_NUMBER" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+            PR_STATE=$(gh pr view "$PR_NUMBER" -R "{{docs_repository_url}}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
             echo "   PR State: $PR_STATE"
             if [ "$PR_STATE" = "CLOSED" ] || [ "$PR_STATE" = "MERGED" ]; then
               echo "❌ PR is $PR_STATE - cannot add labels to closed/merged PRs"
@@ -3169,12 +3169,12 @@ data:
     echo '════════════════════════════════════════════════════════════════'
     echo '║           REX/BLAZE DOCUMENTATION WORKFLOW STARTING          ║'
     echo '║                  Implementation Agent Active                  ║'
-    echo '║            ⚠️  TASK {{`{{`{{`}}`}}task_id{{`}}`}} ONLY - NO OTHER TASKS ⚠️             ║'
+    echo '║            ⚠️  TASK {{task_id}} ONLY - NO OTHER TASKS ⚠️             ║'
     echo '════════════════════════════════════════════════════════════════'
-    echo "🎯 Agent: {{`{{`{{`}}`}}github_app{{`}}`}}"
+    echo "🎯 Agent: {{github_app}}"
     echo "📚 Focus: Documentation-first implementation approach"
-    echo "📋 Task ID: {{`{{`{{`}}`}}task_id{{`}}`}}"
-    echo "⛔ CRITICAL: You must ONLY work on Task {{`{{`{{`}}`}}task_id{{`}}`}} - ignore ALL other tasks"
+    echo "📋 Task ID: {{task_id}}"
+    echo "⛔ CRITICAL: You must ONLY work on Task {{task_id}} - ignore ALL other tasks"
     
     # Clean up any leftover sentinel file from previous runs
     # This prevents premature sidecar shutdown on sequential task executions
@@ -3189,7 +3189,7 @@ data:
     export SSH_ASKPASS=/bin/true
     
     # Repository URL
-    REPO_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_URL="{{repository_url}}"
     
     # GitHub App authentication is configured via environment variables
     echo "Using GitHub App authentication"
@@ -3217,7 +3217,7 @@ data:
         JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
     
         # Get installation ID for the repository (robust parsing of owner/repo)
-        INPUT_REPO="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+        INPUT_REPO="{{repository_url}}"
         REPO_OWNER=""
         REPO_NAME=""
     
@@ -3389,7 +3389,7 @@ data:
     git config --global --add safe.directory /workspace
     
     # Set GitHub App attribution - use generic format for all agents
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    GITHUB_APP="{{github_app}}"
     # Generic attribution that works for any agent
     GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
     GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
@@ -3416,35 +3416,35 @@ data:
     
     # Repository URLs - Handle both full URLs and org/repo format
     # Check if repository_url already contains https://github.com/
-    if echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        REPO_HTTP_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+        REPO_HTTP_URL="{{repository_url}}"
+        if ! echo "{{repository_url}}" | grep -q "\.git$"; then
             REPO_HTTP_URL="${REPO_HTTP_URL}.git"
         fi
     else
-        REPO_HTTP_URL="https://github.com/{{`{{`{{`}}`}}repository_url{{`}}`}}.git"
+        REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
     fi
     
     # Same for docs repository
-    if echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        DOCS_HTTP_URL="{{`{{`{{`}}`}}docs_repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+        DOCS_HTTP_URL="{{docs_repository_url}}"
+        if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
             DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
         fi
     else
-        DOCS_HTTP_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}.git"
+        DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
     fi
     
     # DEBUG: Show what URLs are being constructed
     echo "🔍 DEBUG: URL Construction & Parameters"
-    echo "  Input repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  Input docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  Input docs_project_directory: '{{`{{`{{`}}`}}docs_project_directory{{`}}`}}'"
-    echo "  Input working_directory: '{{`{{`{{`}}`}}working_directory{{`}}`}}'"
-    echo "  Input docs_branch: '{{`{{`{{`}}`}}docs_branch{{`}}`}}'"
-    echo "  Input github_app: '{{`{{`{{`}}`}}github_app{{`}}`}}'"
-    echo "  Input task_id: '{{`{{`{{`}}`}}task_id{{`}}`}}'"
-    echo "  Input service: '{{`{{`{{`}}`}}service{{`}}`}}'"
+    echo "  Input repository_url: '{{repository_url}}'"
+    echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+    echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+    echo "  Input working_directory: '{{working_directory}}'"
+    echo "  Input docs_branch: '{{docs_branch}}'"
+    echo "  Input github_app: '{{github_app}}'"
+    echo "  Input task_id: '{{task_id}}'"
+    echo "  Input service: '{{service}}'"
     echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
     echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
     echo "  Current working directory: $(pwd)"
@@ -3456,11 +3456,11 @@ data:
     echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
     if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
       echo "✓ HTTPS repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Output: $(cat /tmp/repo_test.out | head -1)"
     else
       echo "❌ HTTPS repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Error output: $(cat /tmp/repo_test.out)"
       echo "  Git credential helper status:"
       git config --list | grep credential || echo "  No credential helpers configured"
@@ -3474,11 +3474,11 @@ data:
     echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
     if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
       echo "✓ Docs repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Output: $(cat /tmp/docs_test.out | head -1)"
     else
       echo "❌ Docs repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Error output: $(cat /tmp/docs_test.out)"
       echo ""
       echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
@@ -3492,8 +3492,8 @@ data:
     echo "═══════════════════════════════════════════════════════════════"
     
     # Repository Information
-    DOCS_BRANCH="{{`{{`{{`}}`}}docs_branch{{`}}`}}"
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    DOCS_BRANCH="{{docs_branch}}"
+    GITHUB_APP="{{github_app}}"
     
     # Helper: derive safe workspace directory name from repo input (URL, SSH, or slug)
     sanitize_repo_dir() {
@@ -3514,12 +3514,12 @@ data:
     }
     
     # Derive workspace directory names (owner-repo)
-    DOCS_REPO_DIR=$(sanitize_repo_dir "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}")
-    TARGET_REPO_DIR=$(sanitize_repo_dir "{{`{{`{{`}}`}}repository_url{{`}}`}}")
+    DOCS_REPO_DIR=$(sanitize_repo_dir "{{docs_repository_url}}")
+    TARGET_REPO_DIR=$(sanitize_repo_dir "{{repository_url}}")
     
     echo "=== REPOSITORY SETUP ==="
-    echo "Docs repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
-    echo "Target repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+    echo "Docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+    echo "Target repository: {{repository_url}} ($REPO_HTTP_URL)"
     echo "Docs branch: $DOCS_BRANCH"
     echo "GitHub App: $GITHUB_APP"
     
@@ -3527,9 +3527,9 @@ data:
     # Even if docs and target are the same repo, we clone them separately
     # This avoids complex branch switching and file preservation issues
     echo "=== UNIFIED WORKFLOW APPROACH ==="
-    echo "  docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  └─ TaskMaster files will be copied from docs repo at: {{`{{`{{`}}`}}docs_project_directory{{`}}`}}"
+    echo "  docs_repository_url: '{{docs_repository_url}}'"
+    echo "  repository_url: '{{repository_url}}'"
+    echo "  └─ TaskMaster files will be copied from docs repo at: {{docs_project_directory}}"
     
     # Repository Setup - Always use consistent approach
     echo "=== REPOSITORY SETUP ==="
@@ -3546,7 +3546,7 @@ data:
     else
         echo "📥 DOCS REPOSITORY: CLONING - extracting task files"
         if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo; then
-            echo "❌ Failed to clone docs repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+            echo "❌ Failed to clone docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
             exit 1
         fi
         cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd /workspace
@@ -3565,7 +3565,7 @@ data:
     else
         echo "📥 TARGET REPOSITORY: CLONING - first time setup"
         if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
-            echo "❌ Failed to clone target repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+            echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
             exit 1
         fi
         echo "✓ Target repository cloned successfully"
@@ -3576,18 +3576,18 @@ data:
     mkdir -p "/workspace/$TARGET_REPO_DIR/task"
     
     # Determine docs project directory path
-    {{`{{`{{`}}`}}#if docs_project_directory{{`}}`}}
-    if [ "{{`{{`{{`}}`}}docs_project_directory{{`}}`}}" = "." ]; then
+    {{#if docs_project_directory}}
+    if [ "{{docs_project_directory}}" = "." ]; then
         DOCS_PATH="/tmp/docs-repo/.taskmaster"
     else
-        DOCS_PATH="/tmp/docs-repo/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster"
+        DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
     fi
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     DOCS_PATH="/tmp/docs-repo/.taskmaster"
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     # Copy specific task files
-    TASK_DIR="$DOCS_PATH/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
+    TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
     echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
     echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
     echo "🔍 DEBUG: Contents of docs temp directory:"
@@ -3622,9 +3622,9 @@ data:
             echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
         fi
     
-        echo "✓ Task {{`{{`{{`}}`}}task_id{{`}}`}} files copied from $TASK_DIR"
+        echo "✓ Task {{task_id}} files copied from $TASK_DIR"
     else
-        echo "❌ CRITICAL: Task {{`{{`{{`}}`}}task_id{{`}}`}} directory not found at: $TASK_DIR"
+        echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
         echo "🔍 DEBUG: Available directories in docs:"
         find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
     fi
@@ -3662,7 +3662,7 @@ data:
     echo "✓ Working directory: /workspace/$REPO_NAME"
     
     # Set Claude working directory early (needed for client-config.json copy)
-    WORK_DIR="{{`{{`{{`}}`}}working_directory{{`}}`}}"
+    WORK_DIR="{{working_directory}}"
     if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
       CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
     else
@@ -3680,7 +3680,7 @@ data:
     git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || echo "⚠️ Could not fetch main/master branch"
     
     # Create or checkout feature branch (with conflict-safe fallback)
-    FEATURE_BRANCH="feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation"
+    FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
     BRANCH_EXISTS="false"
     
     if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
@@ -3748,7 +3748,7 @@ data:
       echo "Copying ConfigMap files to working directory..."
     
       # CLAUDE.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
-            OVERWRITE_MEMORY="{{`{{`{{`}}`}}overwrite_memory{{`}}`}}"
+            OVERWRITE_MEMORY="{{overwrite_memory}}"
     
       # Handle CLAUDE.md based on overwriteMemory setting
             if [ "$OVERWRITE_MEMORY" = "true" ]; then
@@ -3840,7 +3840,7 @@ data:
     echo "=== TASK DOCUMENTATION SETUP ==="
     echo "🔍 DEBUG: REPO_NAME is: $REPO_NAME"
     echo "🔍 DEBUG: CLAUDE_WORK_DIR is: $CLAUDE_WORK_DIR"
-    echo "🔍 DEBUG: Task ID is: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "🔍 DEBUG: Task ID is: {{task_id}}"
     
     # Task directory should already exist from multi-repo workflow or be created as needed
     mkdir -p "$CLAUDE_WORK_DIR/task"
@@ -3944,9 +3944,9 @@ data:
     echo '=== CLAUDE EXECUTION ==='
     
     # Export necessary variables
-    export SERVICE_NAME="{{`{{`{{`}}`}}service{{`}}`}}"
-    export TASK_ID="{{`{{`{{`}}`}}task_id{{`}}`}}"
-    export GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    export SERVICE_NAME="{{service}}"
+    export TASK_ID="{{task_id}}"
+    export GITHUB_APP="{{github_app}}"
     
     # Change to project directory before running Claude
     cd "$CLAUDE_WORK_DIR"
@@ -3991,34 +3991,34 @@ data:
     
     # Look for agent-specific system prompt file from agents ConfigMap
     # The system prompt should be in the agents ConfigMap if configured
-    if [ -f "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
-        echo "✓ Found system prompt file for {{`{{`{{`}}`}}github_app{{`}}`}}, adding to Claude command"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+    if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+        echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
-    elif [ -f "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
+    elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
         # Fallback to task-files if included inline
-        echo "✓ Found system prompt in task ConfigMap for {{`{{`{{`}}`}}github_app{{`}}`}}"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+        echo "✓ Found system prompt in task ConfigMap for {{github_app}}"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /task-files/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
     else
-        echo "ℹ️ No system prompt file found for agent {{`{{`{{`}}`}}github_app{{`}}`}}, using defaults"
+        echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
     fi
     
     # Model is set via settings.json template, not CLI flag
     
     # Add continue flag if this is a retry attempt or user requested continuation
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     CLAUDE_CMD="$CLAUDE_CMD --continue"
-    echo 'Adding --continue flag (attempt {{`{{`{{`}}`}}attempts{{`}}`}}{{`{{`{{`}}`}}#if user_requested{{`}}`}} - user requested{{`{{`{{`}}`}}/if{{`}}`}})'
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
+    {{/if}}
     
     echo "════════════════════════════════════════════════════════════════"
     echo "║                    STARTING CLAUDE EXECUTION                  ║"
@@ -4052,14 +4052,14 @@ data:
     
     ## 🔧 ORCHESTRATOR EXECUTION CONTEXT
     
-    - **Service**: {{`{{`{{`}}`}}service{{`}}`}}
-    - **Task ID**: {{`{{`{{`}}`}}task_id{{`}}`}}
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Docs Repository**: {{`{{`{{`}}`}}docs_repository_url{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
-    - **GitHub App**: {{`{{`{{`}}`}}github_app{{`}}`}}
+    - **Service**: {{service}}
+    - **Task ID**: {{task_id}}
+    - **Repository**: {{repository_url}}
+    - **Docs Repository**: {{docs_repository_url}}
+    - **Working Directory**: {{working_directory}}
+    - **GitHub App**: {{github_app}}
     
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     ## 🔄 CONTINUE SESSION - PR COMMENT RESOLUTION PRIORITY
     
     **⚠️ MANDATORY FIRST STEP: Before proceeding with any other work, you MUST:**
@@ -4071,7 +4071,7 @@ data:
     
     **This ensures reviewer feedback takes priority and maintains collaborative workflow quality.**
     
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     ## ⚠️ EXECUTION REQUIREMENTS
     
     - **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
@@ -4090,7 +4090,7 @@ data:
     
     **MANDATORY FINAL STEP:**
     - **MUST** create a pull request using `gh pr create` command
-    - **MUST** include proper labels (task-{{`{{`{{`}}`}}task_id{{`}}`}}, run-{{`{{`{{`}}`}}workflow.name{{`}}`}}, service-{{`{{`{{`}}`}}service{{`}}`}})
+    - **MUST** include proper labels (task-{{task_id}}, run-{{workflow.name}}, service-{{service}})
     - **MUST** verify PR creation succeeded before claiming task completion
     - **THE TASK IS INCOMPLETE AND FAILED IF NO PR IS CREATED**
     
@@ -4115,7 +4115,7 @@ data:
         exec 9>"$FIFO_PATH"
         $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]{{`}}`}}\n' >&9
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
         # Close writer so reader can exit cleanly
         exec 9>&-
         wait $CLAUDE_PID
@@ -4131,7 +4131,7 @@ data:
         if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
             echo "✓ Using task-specific prompt from docs service: task/prompt.md"
     
-            echo "startingTask:{{`{{`{{`}}`}}task_id{{`}}`}}"
+            echo "startingTask:{{task_id}}"
             echo ""
     
             # DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
@@ -4148,17 +4148,17 @@ data:
             # Prepare prompt prefix with CRITICAL task isolation instruction
             PROMPT_PREFIX="⛔ **CRITICAL TASK ISOLATION REQUIREMENT** ⛔
     
-    You are assigned to work on **TASK {{`{{`{{`}}`}}task_id{{`}}`}} ONLY**.
+    You are assigned to work on **TASK {{task_id}} ONLY**.
     
     **STRICT RULES:**
-    1. You MUST ONLY implement Task {{`{{`{{`}}`}}task_id{{`}}`}} - ignore ALL other tasks
+    1. You MUST ONLY implement Task {{task_id}} - ignore ALL other tasks
     2. DO NOT skip ahead to other tasks, even if you see evidence of previous work
-    3. DO NOT implement task-2, task-3, task-4, etc. - ONLY Task {{`{{`{{`}}`}}task_id{{`}}`}}
+    3. DO NOT implement task-2, task-3, task-4, etc. - ONLY Task {{task_id}}
     4. If you see existing code from other tasks, IGNORE IT
     5. If your memory (CLAUDE.md) mentions other tasks, IGNORE those parts
-    6. Focus SOLELY on the requirements in task/prompt.md for Task {{`{{`{{`}}`}}task_id{{`}}`}}
+    6. Focus SOLELY on the requirements in task/prompt.md for Task {{task_id}}
     
-    **TASK VERIFICATION:** Before starting, confirm you are working on Task {{`{{`{{`}}`}}task_id{{`}}`}} by stating: \"Starting implementation of Task {{`{{`{{`}}`}}task_id{{`}}`}} only.\"
+    **TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
     
     ---
     
@@ -4228,7 +4228,7 @@ data:
               echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
               # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
               exec 9>"$FIFO_PATH"
-              printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]{{`}}`}}\n' "$USER_COMBINED" >&9
+              printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
               exec 9>&-  # Close immediately to send EOF to Claude
               FIFO_OPENED=false  # Mark as already closed
             fi
@@ -4375,13 +4375,13 @@ data:
     
       # First, try to find PR by task label (Claude should have added task-N label)
       TASK_LABEL="task-${TASK_ID}"
-      PR_NUMBER=$(gh pr list -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+      PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
     
       # If not found by label, try by branch name (current branch)
       if [ -z "$PR_NUMBER" ]; then
         CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
         if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-          PR_NUMBER=$(gh pr list -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+          PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
         fi
       fi
     
@@ -4389,7 +4389,7 @@ data:
         echo "✅ Found PR #${PR_NUMBER}"
     
         # Get the PR URL
-        PR_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}/pull/${PR_NUMBER}"
+        PR_URL="https://github.com/{{docs_repository_url}}/pull/${PR_NUMBER}"
         echo "📝 PR URL: $PR_URL"
     
         # Update CodeRun status with PR URL via Kubernetes API
@@ -4471,7 +4471,7 @@ data:
     
         # Try to add labels with detailed error capture
         echo "🔍 DEBUG: Attempting to add labels to PR..."
-        LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
+        LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
         LABEL_EXIT_CODE=$?
     
         if [ $LABEL_EXIT_CODE -eq 0 ]; then
@@ -4483,7 +4483,7 @@ data:
           # Check if labels exist
           echo "🔍 DEBUG: Checking which labels exist..."
           for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
-            if gh label list -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --search "$label" | grep -q "^$label"; then
+            if gh label list -R "{{docs_repository_url}}" --search "$label" | grep -q "^$label"; then
               echo "   ✓ Label '$label' exists"
             else
               echo "   ✗ Label '$label' does not exist"
@@ -4496,7 +4496,7 @@ data:
                 *) COLOR="ededed"; DESC="Unknown label type" ;;
               esac
     
-              CREATE_ERROR=$(gh label create "$label" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --color "$COLOR" --description "$DESC" 2>&1)
+              CREATE_ERROR=$(gh label create "$label" -R "{{docs_repository_url}}" --color "$COLOR" --description "$DESC" 2>&1)
               CREATE_EXIT=$?
               if [ $CREATE_EXIT -eq 0 ]; then
                 echo "   ✅ Created label '$label'"
@@ -4510,7 +4510,7 @@ data:
           echo "🔍 DEBUG: Retrying label addition individually..."
           LABELS_ADDED=0
           for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
-            RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --add-label "$label" 2>&1)
+            RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "$label" 2>&1)
             RETRY_EXIT=$?
             if [ $RETRY_EXIT -eq 0 ]; then
               echo "   ✅ Added label '$label'"
@@ -4527,7 +4527,7 @@ data:
           else
             echo "❌ CRITICAL: Could not add any labels to PR"
             echo "🔍 DEBUG: Checking PR state..."
-            PR_STATE=$(gh pr view "$PR_NUMBER" -R "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+            PR_STATE=$(gh pr view "$PR_NUMBER" -R "{{docs_repository_url}}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
             echo "   PR State: $PR_STATE"
             if [ "$PR_STATE" = "CLOSED" ] || [ "$PR_STATE" = "MERGED" ]; then
               echo "❌ PR is $PR_STATE - cannot add labels to closed/merged PRs"
@@ -4646,9 +4646,9 @@ data:
     echo '║              TESS TESTING WORKFLOW STARTING                  ║'
     echo '║         Quality Assurance & Deployment Testing Agent         ║'
     echo '════════════════════════════════════════════════════════════════'
-    echo "🎯 Agent: {{`{{`{{`}}`}}github_app{{`}}`}}"
+    echo "🎯 Agent: {{github_app}}"
     echo "🧪 Focus: Comprehensive testing, deployment validation, test coverage"
-    echo "📋 Task ID: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "📋 Task ID: {{task_id}}"
     echo "✅ Mission: 120% satisfaction through exhaustive testing"
     echo "🔍 Debug Session: $(date '+%Y-%m-%d %H:%M:%S') - PID: $$"
     echo "📊 Log Level: DEBUG (showing JSON construction details)"
@@ -4659,7 +4659,7 @@ data:
     export SSH_ASKPASS=/bin/true
     
     # Repository URL
-    REPO_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_URL="{{repository_url}}"
     
     # GitHub App authentication is configured via environment variables
     echo "Using GitHub App authentication for testing workflow"
@@ -4717,7 +4717,7 @@ data:
         JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
     
         # Get installation ID for the repository (robust parsing of owner/repo)
-        INPUT_REPO="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+        INPUT_REPO="{{repository_url}}"
         REPO_OWNER=""
         REPO_NAME=""
     
@@ -4887,7 +4887,7 @@ data:
     
     # Set working directory for the agent
     # Set Working Directory (Critical for Claude Execution) - Match Rex pattern
-    WORK_DIR="{{`{{`{{`}}`}}working_directory{{`}}`}}"
+    WORK_DIR="{{working_directory}}"
     if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
       CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
     else
@@ -4905,7 +4905,7 @@ data:
     git config --global --add safe.directory /workspace
     
     # Set GitHub App attribution - use generic format for all agents
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    GITHUB_APP="{{github_app}}"
     # Generic attribution that works for any agent
     GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
     GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
@@ -4932,35 +4932,35 @@ data:
     
     # Repository URLs - Handle both full URLs and org/repo format
     # Check if repository_url already contains https://github.com/
-    if echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        REPO_HTTP_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+        REPO_HTTP_URL="{{repository_url}}"
+        if ! echo "{{repository_url}}" | grep -q "\.git$"; then
             REPO_HTTP_URL="${REPO_HTTP_URL}.git"
         fi
     else
-        REPO_HTTP_URL="https://github.com/{{`{{`{{`}}`}}repository_url{{`}}`}}.git"
+        REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
     fi
     
     # Same for docs repository
-    if echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        DOCS_HTTP_URL="{{`{{`{{`}}`}}docs_repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+        DOCS_HTTP_URL="{{docs_repository_url}}"
+        if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
             DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
         fi
     else
-        DOCS_HTTP_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}.git"
+        DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
     fi
     
     # DEBUG: Show what URLs are being constructed
     echo "🔍 DEBUG: URL Construction & Parameters"
-    echo "  Input repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  Input docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  Input docs_project_directory: '{{`{{`{{`}}`}}docs_project_directory{{`}}`}}'"
-    echo "  Input working_directory: '{{`{{`{{`}}`}}working_directory{{`}}`}}'"
-    echo "  Input docs_branch: '{{`{{`{{`}}`}}docs_branch{{`}}`}}'"
-    echo "  Input github_app: '{{`{{`{{`}}`}}github_app{{`}}`}}'"
-    echo "  Input task_id: '{{`{{`{{`}}`}}task_id{{`}}`}}'"
-    echo "  Input service: '{{`{{`{{`}}`}}service{{`}}`}}'"
+    echo "  Input repository_url: '{{repository_url}}'"
+    echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+    echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+    echo "  Input working_directory: '{{working_directory}}'"
+    echo "  Input docs_branch: '{{docs_branch}}'"
+    echo "  Input github_app: '{{github_app}}'"
+    echo "  Input task_id: '{{task_id}}'"
+    echo "  Input service: '{{service}}'"
     echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
     echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
     echo "  Current working directory: $(pwd)"
@@ -4972,11 +4972,11 @@ data:
     echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
     if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
       echo "✓ HTTPS repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Output: $(cat /tmp/repo_test.out | head -1)"
     else
       echo "❌ HTTPS repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Error output: $(cat /tmp/repo_test.out)"
       echo "  Git credential helper status:"
       git config --list | grep credential || echo "  No credential helpers configured"
@@ -4990,11 +4990,11 @@ data:
     echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
     if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
       echo "✓ Docs repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Output: $(cat /tmp/docs_test.out | head -1)"
     else
       echo "❌ Docs repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Error output: $(cat /tmp/docs_test.out)"
       echo ""
       echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
@@ -5166,10 +5166,10 @@ data:
     echo "════════════════════════════════════════════════════════════════"
     
     # Copy task files if docs repository is specified
-    {{`{{`{{`}}`}}#if docs_repository_url{{`}}`}}
+    {{#if docs_repository_url}}
     echo "📋 Copying task files from documentation repository..."
-    DOCS_REPO_URL="{{`{{`{{`}}`}}docs_repository_url{{`}}`}}"
-    DOCS_BRANCH="{{`{{`{{`}}`}}#if docs_branch{{`}}`}}{{`{{`{{`}}`}}docs_branch{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}main{{`{{`{{`}}`}}/if{{`}}`}}"
+    DOCS_REPO_URL="{{docs_repository_url}}"
+    DOCS_BRANCH="{{#if docs_branch}}{{docs_branch}}{{else}}main{{/if}}"
     DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:${GITHUB_TOKEN}@github.com/|")
     
     if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo 2>/dev/null; then
@@ -5195,23 +5195,23 @@ data:
     
     # Copy task files
     mkdir -p "$CLAUDE_WORK_DIR/task"
-    {{`{{`{{`}}`}}#if docs_project_directory{{`}}`}}
-    if [ "{{`{{`{{`}}`}}docs_project_directory{{`}}`}}" = "." ]; then
+    {{#if docs_project_directory}}
+    if [ "{{docs_project_directory}}" = "." ]; then
         DOCS_PATH="/tmp/docs-repo/.taskmaster"
     else
-        DOCS_PATH="/tmp/docs-repo/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster"
+        DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
     fi
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     DOCS_PATH="/tmp/docs-repo/.taskmaster"
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
-    TASK_DIR="$DOCS_PATH/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
+    TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
     if [ -d "$TASK_DIR" ]; then
         cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
         cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
         cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
         cp "$TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" 2>/dev/null || true
-        echo "✓ Task {{`{{`{{`}}`}}task_id{{`}}`}} files copied"
+        echo "✓ Task {{task_id}} files copied"
     fi
     
     # Copy architecture.md
@@ -5221,24 +5221,24 @@ data:
     
     # Clean up docs repo
     rm -rf /tmp/docs-repo
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     # Repository is now cloned directly to Claude working directory - no copy needed
     echo "✓ Repository cloned directly to working directory"
     
     # Check if we should continue previous session
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     echo "📂 Continuing from previous session..."
     # Preserve existing CLAUDE.md if it exists
     if [ -f "/workspace/CLAUDE.md" ]; then
         echo "✓ Found existing CLAUDE.md, preserving session memory"
     fi
-    {{`{{`{{`}}`}}else{{`}}`}}
-    {{`{{`{{`}}`}}#if overwrite_memory{{`}}`}}
+    {{else}}
+    {{#if overwrite_memory}}
     echo "🔄 Overwriting session memory as requested..."
     rm -f /workspace/CLAUDE.md
-    {{`{{`{{`}}`}}/if{{`}}`}}
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
+    {{/if}}
     
     # Generate configuration files from templates
     echo "🔧 Generating Tess-specific configuration files..."
@@ -5259,11 +5259,11 @@ data:
     fi
     
     # Create initial CLAUDE.md if needed
-    if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{`{{`{{`}}`}}overwrite_memory{{`}}`}}" = "true" ]; then
+    if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
         # Use PR_NUMBER from environment if available, otherwise use template value
-        PR_NUM="${PR_NUMBER:-{{`{{`{{`}}`}}pr_number{{`}}`}}}"
+        PR_NUM="${PR_NUMBER:-{{pr_number}}}"
         # Extract template variables for use in heredoc
-        TASK_ID="{{`{{`{{`}}`}}task_id{{`}}`}}"
+        TASK_ID="{{task_id}}"
         cat > /workspace/CLAUDE.md << EOF
     # TESS - ULTRA-STRICT Quality Assurance Agent
     
@@ -5392,12 +5392,12 @@ data:
     echo "🔧 Setting up Tess-specific hook scripts..."
     mkdir -p "$CLAUDE_WORK_DIR/hooks"
     
-    {{`{{`{{`}}`}}#each hook_scripts{{`}}`}}
-    cat > "$CLAUDE_WORK_DIR/hooks/{{`{{`{{`}}`}}@key{{`}}`}}" << 'EOF'
-    {{`{{`{{`}}`}}{this{{`}}`}}}
+    {{#each hook_scripts}}
+    cat > "$CLAUDE_WORK_DIR/hooks/{{@key}}" << 'EOF'
+    {{{this}}}
     EOF
-    chmod +x "$CLAUDE_WORK_DIR/hooks/{{`{{`{{`}}`}}@key{{`}}`}}"
-    {{`{{`{{`}}`}}/each{{`}}`}}
+    chmod +x "$CLAUDE_WORK_DIR/hooks/{{@key}}"
+    {{/each}}
     
     # Export environment for Claude
     export CLAUDE_WORK_DIR
@@ -5411,7 +5411,7 @@ data:
     echo "════════════════════════════════════════════════════════════════"
     echo "📁 Working Directory: $CLAUDE_WORK_DIR"
     echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
-    echo "📋 Task: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "📋 Task: {{task_id}}"
     echo "🧪 Focus: Comprehensive testing & deployment validation"
     echo "⚠️  CRITICAL: Must be 120% satisfied before approval"
     echo "════════════════════════════════════════════════════════════════"
@@ -5423,11 +5423,11 @@ data:
     CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
     
     # Look for agent-specific system prompt file from agents ConfigMap
-    if [ -f "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
-        echo "✓ Found system prompt file for {{`{{`{{`}}`}}github_app{{`}}`}}, adding to Claude command"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+    if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+        echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
     else
-        echo "ℹ️ No system prompt file found for agent {{`{{`{{`}}`}}github_app{{`}}`}}, using defaults"
+        echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
     fi
     
     # Continue flag disabled due to cache_control API bug - removed conditional logic
@@ -5709,7 +5709,7 @@ data:
     Use GitHub CLI to create a PROPER REVIEW with formal review status:
     \`\`\`bash
     # WRONG - Don't do this (creates regular comments, not a review):
-    # gh pr review {{`{{`{{`}}`}}pr_number{{`}}`}} --comment --body \"Some feedback\"
+    # gh pr review {{pr_number}} --comment --body \"Some feedback\"
     
     # CORRECT - Submit a proper REQUEST CHANGES review:
     gh pr review $PR_NUM --request-changes --body \"### 🔍 QA Review for Task $TASK_ID - Changes Required
@@ -5728,22 +5728,22 @@ data:
     ✅ **Unit Tests**: 42/42 passing for this task's code
     
     ## Kubernetes Deployment
-    ✅ **Deployment**: Successfully deployed to test-{{`{{`{{`}}`}}task_id{{`}}`}} namespace
+    ✅ **Deployment**: Successfully deployed to test-{{task_id}} namespace
     ✅ **Pods**: All pods running (1/1 ready)
     ❌ **Health Check**: /health endpoint returning 404
     
-    ## Issues Found IN TASK {{`{{`{{`}}`}}task_id{{`}}`}}
+    ## Issues Found IN TASK {{task_id}}
     1. **Critical**: Health endpoint not implemented
     2. **Critical**: Task acceptance criterion #1 not met
     3. **Major**: Test coverage below 95% requirement
     
-    ## Required Actions FOR TASK {{`{{`{{`}}`}}task_id{{`}}`}}
+    ## Required Actions FOR TASK {{task_id}}
     - [ ] Implement /health and /ready endpoints
     - [ ] Complete acceptance criterion #1
     - [ ] Add tests to reach 95% coverage
     - [ ] Fix health check endpoints for K8s deployment
     
-    Note: Only reviewing Task {{`{{`{{`}}`}}task_id{{`}}`}} implementation, not the entire project.\"
+    Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
     
     # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
     # FIRST: Verify you can approve
@@ -5800,7 +5800,7 @@ data:
     - Code quality meets all standards
     
     ## Conclusion
-    Task {{`{{`{{`}}`}}task_id{{`}}`}} implementation meets all requirements and is ready for the next task in the sequence.\"
+    Task {{task_id}} implementation meets all requirements and is ready for the next task in the sequence.\"
     \`\`\`
     
     **IMPORTANT RULES**:
@@ -5958,7 +5958,7 @@ data:
       echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
       # Fallback: construct JSON properly to avoid cache_control errors
       echo "🔧 Constructing FIFO JSON payload..."
-      FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]{{`}}`}}' \
+      FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
                   "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
       echo "📤 FIFO JSON payload length: ${#FIFO_JSON} characters"
       echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
@@ -6007,15 +6007,15 @@ data:
     echo "🔍 Posting PR review based on testing results..."
     
     # Use PR_NUMBER from environment if available, otherwise use template value
-    PR_NUM="${PR_NUMBER:-{{`{{`{{`}}`}}pr_number{{`}}`}}}"
-    TASK_ID="{{`{{`{{`}}`}}task_id{{`}}`}}"
+    PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+    TASK_ID="{{task_id}}"
     
     # Debug: Show what we got for PR_NUM
-    echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}', pr_number template='{{`{{`{{`}}`}}pr_number{{`}}`}}'"
+    echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}', pr_number template='{{pr_number}}'"
     echo "🔍 DEBUG: Resolved PR_NUM='$PR_NUM'"
     
     # Handle case where PR_NUM is empty - skip PR review entirely
-    if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{`{{`{{`}}`}}pr_number{{`}}`}}" ]; then
+    if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
       echo "ℹ️ No PR number available - skipping PR review posting"
       echo "🔍 This is normal for non-PR workflows or when PR context is not provided"
       echo "✅ Tess QA workflow completed successfully"
@@ -6504,7 +6504,7 @@ data:
     export SSH_ASKPASS=/bin/true
     
     # Repository URL
-    REPO_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_URL="{{repository_url}}"
     
     # GitHub App authentication is configured via environment variables
     echo "Using GitHub App authentication"
@@ -6532,7 +6532,7 @@ data:
         JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
     
         # Get installation ID for the repository (robust parsing of owner/repo)
-        INPUT_REPO="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+        INPUT_REPO="{{repository_url}}"
         REPO_OWNER=""
         REPO_NAME=""
     
@@ -6622,7 +6622,7 @@ data:
     git config --global --add safe.directory /workspace
     
     # Set GitHub App attribution - use generic format for all agents
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    GITHUB_APP="{{github_app}}"
     # Generic attribution that works for any agent
     GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
     GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
@@ -6649,35 +6649,35 @@ data:
     
     # Repository URLs - Handle both full URLs and org/repo format
     # Check if repository_url already contains https://github.com/
-    if echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        REPO_HTTP_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{repository_url}}" | grep -q "^https://github.com/"; then
+        REPO_HTTP_URL="{{repository_url}}"
+        if ! echo "{{repository_url}}" | grep -q "\.git$"; then
             REPO_HTTP_URL="${REPO_HTTP_URL}.git"
         fi
     else
-        REPO_HTTP_URL="https://github.com/{{`{{`{{`}}`}}repository_url{{`}}`}}.git"
+        REPO_HTTP_URL="https://github.com/{{repository_url}}.git"
     fi
     
     # Same for docs repository
-    if echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "^https://github.com/"; then
-        DOCS_HTTP_URL="{{`{{`{{`}}`}}docs_repository_url{{`}}`}}"
-        if ! echo "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" | grep -q "\.git$"; then
+    if echo "{{docs_repository_url}}" | grep -q "^https://github.com/"; then
+        DOCS_HTTP_URL="{{docs_repository_url}}"
+        if ! echo "{{docs_repository_url}}" | grep -q "\.git$"; then
             DOCS_HTTP_URL="${DOCS_HTTP_URL}.git"
         fi
     else
-        DOCS_HTTP_URL="https://github.com/{{`{{`{{`}}`}}docs_repository_url{{`}}`}}.git"
+        DOCS_HTTP_URL="https://github.com/{{docs_repository_url}}.git"
     fi
     
     # DEBUG: Show what URLs are being constructed
     echo "🔍 DEBUG: URL Construction & Parameters"
-    echo "  Input repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  Input docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  Input docs_project_directory: '{{`{{`{{`}}`}}docs_project_directory{{`}}`}}'"
-    echo "  Input working_directory: '{{`{{`{{`}}`}}working_directory{{`}}`}}'"
-    echo "  Input docs_branch: '{{`{{`{{`}}`}}docs_branch{{`}}`}}'"
-    echo "  Input github_app: '{{`{{`{{`}}`}}github_app{{`}}`}}'"
-    echo "  Input task_id: '{{`{{`{{`}}`}}task_id{{`}}`}}'"
-    echo "  Input service: '{{`{{`{{`}}`}}service{{`}}`}}'"
+    echo "  Input repository_url: '{{repository_url}}'"
+    echo "  Input docs_repository_url: '{{docs_repository_url}}'"
+    echo "  Input docs_project_directory: '{{docs_project_directory}}'"
+    echo "  Input working_directory: '{{working_directory}}'"
+    echo "  Input docs_branch: '{{docs_branch}}'"
+    echo "  Input github_app: '{{github_app}}'"
+    echo "  Input task_id: '{{task_id}}'"
+    echo "  Input service: '{{service}}'"
     echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
     echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
     echo "  Current working directory: $(pwd)"
@@ -6689,11 +6689,11 @@ data:
     echo "  Command: git ls-remote \"$REPO_HTTP_URL\" HEAD"
     if git ls-remote "$REPO_HTTP_URL" HEAD > /tmp/repo_test.out 2>&1; then
       echo "✓ HTTPS repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Output: $(cat /tmp/repo_test.out | head -1)"
     else
       echo "❌ HTTPS repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+      echo "  Repository: {{repository_url}} ($REPO_HTTP_URL)"
       echo "  Error output: $(cat /tmp/repo_test.out)"
       echo "  Git credential helper status:"
       git config --list | grep credential || echo "  No credential helpers configured"
@@ -6707,11 +6707,11 @@ data:
     echo "  Command: git ls-remote \"$DOCS_HTTP_URL\" HEAD"
     if git ls-remote "$DOCS_HTTP_URL" HEAD > /tmp/docs_test.out 2>&1; then
       echo "✓ Docs repository access successful"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Output: $(cat /tmp/docs_test.out | head -1)"
     else
       echo "❌ Docs repository access failed"
-      echo "  Repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+      echo "  Repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
       echo "  Error output: $(cat /tmp/docs_test.out)"
       echo ""
       echo "🚫 ABORTING: Cannot access docs repository via HTTPS"
@@ -6725,8 +6725,8 @@ data:
     echo "═══════════════════════════════════════════════════════════════"
     
     # Repository Information
-    DOCS_BRANCH="{{`{{`{{`}}`}}docs_branch{{`}}`}}"
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    DOCS_BRANCH="{{docs_branch}}"
+    GITHUB_APP="{{github_app}}"
     
     # Helper: derive safe workspace directory name from repo input (URL, SSH, or slug)
     sanitize_repo_dir() {
@@ -6747,29 +6747,29 @@ data:
     }
     
     # Derive workspace directory names (owner-repo)
-    DOCS_REPO_DIR=$(sanitize_repo_dir "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}")
-    TARGET_REPO_DIR=$(sanitize_repo_dir "{{`{{`{{`}}`}}repository_url{{`}}`}}")
+    DOCS_REPO_DIR=$(sanitize_repo_dir "{{docs_repository_url}}")
+    TARGET_REPO_DIR=$(sanitize_repo_dir "{{repository_url}}")
     
     echo "=== REPOSITORY SETUP ==="
-    echo "Docs repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
-    echo "Target repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+    echo "Docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
+    echo "Target repository: {{repository_url}} ($REPO_HTTP_URL)"
     echo "Docs branch: $DOCS_BRANCH"
     echo "GitHub App: $GITHUB_APP"
     
     # Determine workflow type
     echo "🔍 DEBUG: Workflow type detection"
-    echo "  docs_repository_url: '{{`{{`{{`}}`}}docs_repository_url{{`}}`}}'"
-    echo "  repository_url: '{{`{{`{{`}}`}}repository_url{{`}}`}}'"
-    echo "  Comparison result: $( [ "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" = "{{`{{`{{`}}`}}repository_url{{`}}`}}" ] && echo 'EQUAL' || echo 'DIFFERENT' )"
+    echo "  docs_repository_url: '{{docs_repository_url}}'"
+    echo "  repository_url: '{{repository_url}}'"
+    echo "  Comparison result: $( [ "{{docs_repository_url}}" = "{{repository_url}}" ] && echo 'EQUAL' || echo 'DIFFERENT' )"
     
-    if [ "{{`{{`{{`}}`}}docs_repository_url{{`}}`}}" = "{{`{{`{{`}}`}}repository_url{{`}}`}}" ]; then
+    if [ "{{docs_repository_url}}" = "{{repository_url}}" ]; then
         echo "✓ Single-repo workflow detected (same repository for docs and implementation)"
         WORKFLOW_TYPE="single-repo"
         echo "  └─ TaskMaster files expected at repository root"
     else
         echo "✓ Multi-repo workflow detected (separate docs and target repositories)"
         WORKFLOW_TYPE="multi-repo"
-        echo "  └─ TaskMaster files expected in docs repo at: {{`{{`{{`}}`}}docs_project_directory{{`}}`}}"
+        echo "  └─ TaskMaster files expected in docs repo at: {{docs_project_directory}}"
     fi
     echo "🔍 DEBUG: WORKFLOW_TYPE set to: $WORKFLOW_TYPE"
     
@@ -6796,7 +6796,7 @@ data:
             echo "📥 REPOSITORY: CLONING - first time setup"
             echo "  Clone command: git clone \"$REPO_HTTP_URL\" \"$TARGET_REPO_DIR\""
             if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
-                echo "❌ Failed to clone repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+                echo "❌ Failed to clone repository: {{repository_url}} ($REPO_HTTP_URL)"
                 echo "  Last git error: $(git config --get-regexp 'credential|remote')"
                 exit 1
             fi
@@ -6814,22 +6814,22 @@ data:
     
         cd "/workspace/$TARGET_REPO_DIR"
         echo "🔍 DEBUG: TaskMaster file preservation"
-        echo "  docs_project_directory: '{{`{{`{{`}}`}}docs_project_directory{{`}}`}}'"
-        echo "  task_id: '{{`{{`{{`}}`}}task_id{{`}}`}}'"
+        echo "  docs_project_directory: '{{docs_project_directory}}'"
+        echo "  task_id: '{{task_id}}'"
     
         # Copy Task Master files from docs branch to temporary location
-        {{`{{`{{`}}`}}#if docs_project_directory{{`}}`}}
-        if [ "{{`{{`{{`}}`}}docs_project_directory{{`}}`}}" = "." ]; then
-            PRESERVE_FROM="/workspace/$TARGET_REPO_DIR/.taskmaster/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
+        {{#if docs_project_directory}}
+        if [ "{{docs_project_directory}}" = "." ]; then
+            PRESERVE_FROM="/workspace/$TARGET_REPO_DIR/.taskmaster/docs/task-{{task_id}}"
             echo "  └─ Using root taskmaster path (docs_project_directory='.')"
         else
-            PRESERVE_FROM="/workspace/$TARGET_REPO_DIR/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
-            echo "  └─ Using project subdirectory: {{`{{`{{`}}`}}docs_project_directory{{`}}`}}"
+            PRESERVE_FROM="/workspace/$TARGET_REPO_DIR/{{docs_project_directory}}/.taskmaster/docs/task-{{task_id}}"
+            echo "  └─ Using project subdirectory: {{docs_project_directory}}"
         fi
-        {{`{{`{{`}}`}}else{{`}}`}}
-        PRESERVE_FROM="/workspace/$TARGET_REPO_DIR/.taskmaster/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
+        {{else}}
+        PRESERVE_FROM="/workspace/$TARGET_REPO_DIR/.taskmaster/docs/task-{{task_id}}"
         echo "  └─ Using default root taskmaster path (no docs_project_directory)"
-        {{`{{`{{`}}`}}/if{{`}}`}}
+        {{/if}}
     
         echo "  PRESERVE_FROM resolved to: $PRESERVE_FROM"
     
@@ -6842,15 +6842,15 @@ data:
             cp -r "$PRESERVE_FROM"/* "$TEMP_TASK_DIR/" 2>/dev/null && echo "✓ Task Master files preserved to temporary location" || echo "⚠️ Some files may not have been preserved"
     
             # Also preserve architecture.md from docs directory (one level up from task directory)
-            {{`{{`{{`}}`}}#if docs_project_directory{{`}}`}}
-            if [ "{{`{{`{{`}}`}}docs_project_directory{{`}}`}}" = "." ]; then
+            {{#if docs_project_directory}}
+            if [ "{{docs_project_directory}}" = "." ]; then
                 ARCH_SOURCE="/workspace/$TARGET_REPO_DIR/.taskmaster/docs/architecture.md"
             else
-                ARCH_SOURCE="/workspace/$TARGET_REPO_DIR/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster/docs/architecture.md"
+                ARCH_SOURCE="/workspace/$TARGET_REPO_DIR/{{docs_project_directory}}/.taskmaster/docs/architecture.md"
             fi
-            {{`{{`{{`}}`}}else{{`}}`}}
+            {{else}}
             ARCH_SOURCE="/workspace/$TARGET_REPO_DIR/.taskmaster/docs/architecture.md"
-            {{`{{`{{`}}`}}/if{{`}}`}}
+            {{/if}}
     
             if [ -f "$ARCH_SOURCE" ]; then
                 cp "$ARCH_SOURCE" "$TEMP_TASK_DIR/" && echo "✓ architecture.md preserved from docs branch" || echo "⚠️ Failed to preserve architecture.md"
@@ -6893,7 +6893,7 @@ data:
         else
             echo "📥 DOCS REPOSITORY: CLONING - extracting task files"
             if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo; then
-                echo "❌ Failed to clone docs repository: {{`{{`{{`}}`}}docs_repository_url{{`}}`}} ($DOCS_HTTP_URL)"
+                echo "❌ Failed to clone docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
                 exit 1
             fi
             cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd /workspace
@@ -6912,7 +6912,7 @@ data:
         else
             echo "📥 TARGET REPOSITORY: CLONING - first time setup"
             if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
-                echo "❌ Failed to clone target repository: {{`{{`{{`}}`}}repository_url{{`}}`}} ($REPO_HTTP_URL)"
+                echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
                 exit 1
             fi
             echo "✓ Target repository cloned successfully"
@@ -6923,18 +6923,18 @@ data:
         mkdir -p "/workspace/$TARGET_REPO_DIR/task"
     
         # Determine docs project directory path
-        {{`{{`{{`}}`}}#if docs_project_directory{{`}}`}}
-        if [ "{{`{{`{{`}}`}}docs_project_directory{{`}}`}}" = "." ]; then
+        {{#if docs_project_directory}}
+        if [ "{{docs_project_directory}}" = "." ]; then
             DOCS_PATH="/tmp/docs-repo/.taskmaster"
         else
-            DOCS_PATH="/tmp/docs-repo/{{`{{`{{`}}`}}docs_project_directory{{`}}`}}/.taskmaster"
+            DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
         fi
-        {{`{{`{{`}}`}}else{{`}}`}}
+        {{else}}
         DOCS_PATH="/tmp/docs-repo/.taskmaster"
-        {{`{{`{{`}}`}}/if{{`}}`}}
+        {{/if}}
     
         # Copy specific task files
-        TASK_DIR="$DOCS_PATH/docs/task-{{`{{`{{`}}`}}task_id{{`}}`}}"
+        TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
         echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
         echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
         echo "🔍 DEBUG: Contents of docs temp directory:"
@@ -6969,9 +6969,9 @@ data:
                 echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
             fi
     
-            echo "✓ Task {{`{{`{{`}}`}}task_id{{`}}`}} files copied from $TASK_DIR"
+            echo "✓ Task {{task_id}} files copied from $TASK_DIR"
         else
-            echo "❌ CRITICAL: Task {{`{{`{{`}}`}}task_id{{`}}`}} directory not found at: $TASK_DIR"
+            echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
             echo "🔍 DEBUG: Available directories in docs:"
             find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
         fi
@@ -7018,7 +7018,7 @@ data:
     git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || echo "⚠️ Could not fetch main/master branch"
     
     # Create or checkout feature branch
-    FEATURE_BRANCH="feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation"
+    FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
     BRANCH_EXISTS="false"
     
         if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
@@ -7047,7 +7047,7 @@ data:
         fi
     
     # 5. Set Working Directory (Critical for Claude Execution)
-    WORK_DIR="{{`{{`{{`}}`}}working_directory{{`}}`}}"
+    WORK_DIR="{{working_directory}}"
     if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
       CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
     else
@@ -7091,7 +7091,7 @@ data:
       echo "Copying ConfigMap files to working directory..."
     
       # CLAUDE.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
-            OVERWRITE_MEMORY="{{`{{`{{`}}`}}overwrite_memory{{`}}`}}"
+            OVERWRITE_MEMORY="{{overwrite_memory}}"
     
       # Handle CLAUDE.md based on overwriteMemory setting
             if [ "$OVERWRITE_MEMORY" = "true" ]; then
@@ -7184,7 +7184,7 @@ data:
     echo "🔍 DEBUG: WORKFLOW_TYPE is: $WORKFLOW_TYPE"
     echo "🔍 DEBUG: REPO_NAME is: $REPO_NAME"
     echo "🔍 DEBUG: CLAUDE_WORK_DIR is: $CLAUDE_WORK_DIR"
-    echo "🔍 DEBUG: Task ID is: {{`{{`{{`}}`}}task_id{{`}}`}}"
+    echo "🔍 DEBUG: Task ID is: {{task_id}}"
     
     # Task directory should already exist from multi-repo workflow or be created as needed
     mkdir -p "$CLAUDE_WORK_DIR/task"
@@ -7225,7 +7225,7 @@ data:
                 echo "⚠️ client-config.json not found - MCP client may not be configured"
             fi
     
-            echo "✓ Task {{`{{`{{`}}`}}task_id{{`}}`}} files copied from preserved temporary location"
+            echo "✓ Task {{task_id}} files copied from preserved temporary location"
     
             # Clean up temporary directory
             rm -rf "$TEMP_TASK_DIR"
@@ -7233,7 +7233,7 @@ data:
         else
             echo "❌ CRITICAL: No preserved Task Master files found at: $TEMP_TASK_DIR"
             echo "🔍 DEBUG: This indicates the Task Master preservation step failed earlier"
-            echo "❌ Task {{`{{`{{`}}`}}task_id{{`}}`}} files are not available for this job"
+            echo "❌ Task {{task_id}} files are not available for this job"
             exit 1
         fi
     
@@ -7331,9 +7331,9 @@ data:
     echo '=== CLAUDE EXECUTION ==='
     
     # Export necessary variables
-    export SERVICE_NAME="{{`{{`{{`}}`}}service{{`}}`}}"
-    export TASK_ID="{{`{{`{{`}}`}}task_id{{`}}`}}"
-    export GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    export SERVICE_NAME="{{service}}"
+    export TASK_ID="{{task_id}}"
+    export GITHUB_APP="{{github_app}}"
     
     # Change to project directory before running Claude
     cd "$CLAUDE_WORK_DIR"
@@ -7358,34 +7358,34 @@ data:
     
     # Look for agent-specific system prompt file from agents ConfigMap
     # The system prompt should be in the agents ConfigMap if configured
-    if [ -f "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
-        echo "✓ Found system prompt file for {{`{{`{{`}}`}}github_app{{`}}`}}, adding to Claude command"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+    if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+        echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
-    elif [ -f "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
+    elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
         # Fallback to task-files if included inline
-        echo "✓ Found system prompt in task ConfigMap for {{`{{`{{`}}`}}github_app{{`}}`}}"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+        echo "✓ Found system prompt in task ConfigMap for {{github_app}}"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /task-files/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
     else
-        echo "ℹ️ No system prompt file found for agent {{`{{`{{`}}`}}github_app{{`}}`}}, using defaults"
+        echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
     fi
     
     # Model is set via settings.json template, not CLI flag
     
     # Add continue flag if this is a retry attempt or user requested continuation
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     CLAUDE_CMD="$CLAUDE_CMD --continue"
-    echo 'Adding --continue flag (attempt {{`{{`{{`}}`}}attempts{{`}}`}}{{`{{`{{`}}`}}#if user_requested{{`}}`}} - user requested{{`{{`{{`}}`}}/if{{`}}`}})'
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    echo 'Adding --continue flag (attempt {{attempts}}{{#if user_requested}} - user requested{{/if}})'
+    {{/if}}
     
     echo "════════════════════════════════════════════════════════════════"
     echo "║                    STARTING CLAUDE EXECUTION                  ║"
@@ -7419,14 +7419,14 @@ data:
     
     ## 🔧 ORCHESTRATOR EXECUTION CONTEXT
     
-    - **Service**: {{`{{`{{`}}`}}service{{`}}`}}
-    - **Task ID**: {{`{{`{{`}}`}}task_id{{`}}`}}
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Docs Repository**: {{`{{`{{`}}`}}docs_repository_url{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
-    - **GitHub App**: {{`{{`{{`}}`}}github_app{{`}}`}}
+    - **Service**: {{service}}
+    - **Task ID**: {{task_id}}
+    - **Repository**: {{repository_url}}
+    - **Docs Repository**: {{docs_repository_url}}
+    - **Working Directory**: {{working_directory}}
+    - **GitHub App**: {{github_app}}
     
-    {{`{{`{{`}}`}}#if continue_session{{`}}`}}
+    {{#if continue_session}}
     ## 🔄 CONTINUE SESSION - PR COMMENT RESOLUTION PRIORITY
     
     **⚠️ MANDATORY FIRST STEP: Before proceeding with any other work, you MUST:**
@@ -7438,7 +7438,7 @@ data:
     
     **This ensures reviewer feedback takes priority and maintains collaborative workflow quality.**
     
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     ## ⚠️ EXECUTION REQUIREMENTS
     
     - **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
@@ -7469,7 +7469,7 @@ data:
         exec 9>"$FIFO_PATH"
         $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]{{`}}`}}\n' >&9
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
         # Close writer so reader can exit cleanly
         exec 9>&-
         wait $CLAUDE_PID
@@ -7485,7 +7485,7 @@ data:
         if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
             echo "✓ Using task-specific prompt from docs service: task/prompt.md"
     
-            echo "startingTask:{{`{{`{{`}}`}}task_id{{`}}`}}"
+            echo "startingTask:{{task_id}}"
             echo ""
     
             # DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
@@ -7544,7 +7544,7 @@ data:
               echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
               # Fallback: open FIFO writer and keep it open until Claude exits
               exec 9>"$FIFO_PATH"
-              printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]{{`}}`}}\n' "$USER_COMBINED" >&9
+              printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
             fi
     
             # Optional debug: dump FIFO holders if requested
@@ -7628,10 +7628,10 @@ data:
     ## Git Workflow
     
     ### Your Current Context
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Feature Branch**: feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation
+    - **Repository**: {{repository_url}}
+    - **Feature Branch**: feature/task-{{task_id}}-implementation
     - **Target Branch**: main (never push directly to this)
-    - **Authentication**: GitHub App ({{`{{`{{`}}`}}github_app{{`}}`}} - pre-configured)
+    - **Authentication**: GitHub App ({{github_app}} - pre-configured)
     
     ### **Required Git Pattern:**
     
@@ -7639,7 +7639,7 @@ data:
     # After making changes, always commit and push to feature branch:
     git add .
     git commit -m "feat: implement [specific change made]"
-    git push origin feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation
+    git push origin feature/task-{{task_id}}-implementation
     ```
     
     ### **When to Commit & Push:**
@@ -7698,7 +7698,7 @@ data:
        ```bash
        git add .                           # Stage resolved files
        git commit -m "Resolve merge conflicts with main"
-       git push origin feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation          # Push resolution
+       git push origin feature/task-{{task_id}}-implementation          # Push resolution
        ```
     
     ### **Best Practices:**
@@ -7753,7 +7753,7 @@ data:
     ```
     
     ### **✅ PR Requirements:**
-    - Create PR from your feature branch (feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation) to main
+    - Create PR from your feature branch (feature/task-{{task_id}}-implementation) to main
     - Use descriptive title starting with feat:, fix:, etc.
     - Include comprehensive PR description with all sections above
     - **CRITICAL**: You MUST run the `gh pr create` command - just pushing is not enough
@@ -7761,15 +7761,15 @@ data:
     ### **❌ NEVER Push to Main:**
     - ❌ **DO NOT** push directly to main branch
     - ❌ **DO NOT** merge your own PR
-    - ✅ **ONLY** work on feature branch feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation
+    - ✅ **ONLY** work on feature branch feature/task-{{task_id}}-implementation
     
     ## Authentication
     
     ### GitHub App Configuration
     - GitHub App authentication is pre-configured in the container
     - All git operations use GitHub App tokens automatically
-    - Repository access: `{{`{{`{{`}}`}}repository_url{{`}}`}}`
-    - GitHub App: `{{`{{`{{`}}`}}github_app{{`}}`}}`
+    - Repository access: `{{repository_url}}`
+    - GitHub App: `{{github_app}}`
     
     ### Git Commands (GitHub App-based)
     ```bash
@@ -7783,7 +7783,7 @@ data:
     git commit -m "feat: describe your change"
     
     # Push to feature branch (GitHub App authentication automatic)
-    git push origin feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation
+    git push origin feature/task-{{task_id}}-implementation
     
     # Create pull request (when implementation complete)
     gh pr create --title "feat: [summary]" --body "[detailed description]"
@@ -7817,7 +7817,7 @@ data:
     
     1. ✅ Implementation meets all acceptance criteria
     2. ✅ Final commit with all changes: `git add . && git commit -m "..."`
-    3. ✅ Push to feature branch: `git push origin feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation`
+    3. ✅ Push to feature branch: `git push origin feature/task-{{task_id}}-implementation`
     4. 🚨 **MANDATORY**: Create pull request: `gh pr create --title "..." --body "..."`
     5. ❌ **NEVER** push to main branch
     
@@ -7849,7 +7849,7 @@ data:
     
     ---
     
-    **Remember: Your feature branch (feature/task-{{`{{`{{`}}`}}task_id{{`}}`}}-implementation) is your workspace. Keep it updated with regular commits, then submit a comprehensive PR when implementation is complete!**
+    **Remember: Your feature branch (feature/task-{{task_id}}-implementation) is your workspace. Keep it updated with regular commits, then submit a comprehensive PR when implementation is complete!**
   code_mcp.json.hbs: |
     {
       "mcpServers": {
@@ -7869,11 +7869,11 @@ data:
       "enableAllProjectMcpServers": true,
       "permissions": {
         "allow": [
-          {{`{{`{{`}}`}}#if agent_tools_override{{`}}`}}
-          {{`{{`{{`}}`}}#each permissions.allow{{`}}`}}
-          "{{`{{`{{`}}`}}this{{`}}`}}"{{`{{`{{`}}`}}#unless @last{{`}}`}},{{`{{`{{`}}`}}/unless{{`}}`}}
-          {{`{{`{{`}}`}}/each{{`}}`}}
-          {{`{{`{{`}}`}}else{{`}}`}}
+          {{#if agent_tools_override}}
+          {{#each permissions.allow}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+          {{else}}
           "Bash",
           "Edit",
           "Read",
@@ -7890,15 +7890,15 @@ data:
           "WebSearch",
           "TodoRead",
           "TodoWrite"
-          {{`{{`{{`}}`}}/if{{`}}`}}
+          {{/if}}
         ],
         "deny": [
-          {{`{{`{{`}}`}}#if agent_tools_override{{`}}`}}
-          {{`{{`{{`}}`}}#each permissions.deny{{`}}`}}
-          "{{`{{`{{`}}`}}this{{`}}`}}"{{`{{`{{`}}`}}#unless @last{{`}}`}},{{`{{`{{`}}`}}/unless{{`}}`}}
-          {{`{{`{{`}}`}}/each{{`}}`}}
-          {{`{{`{{`}}`}}else{{`}}`}}
-          {{`{{`{{`}}`}}/if{{`}}`}}
+          {{#if agent_tools_override}}
+          {{#each permissions.deny}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+          {{else}}
+          {{/if}}
         ],
         "defaultMode": "acceptEdits"
       },
@@ -7908,17 +7908,17 @@ data:
         "DISABLE_COST_WARNINGS": "0",
         "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "0",
         "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true",
-        "CLAUDE_CODE_ENABLE_TELEMETRY": "{{`{{`{{`}}`}}#if telemetry.enabled{{`}}`}}1{{`{{`{{`}}`}}else{{`}}`}}0{{`{{`{{`}}`}}/if{{`}}`}}"{{`{{`{{`}}`}}#if telemetry.enabled{{`}}`}},
+        "CLAUDE_CODE_ENABLE_TELEMETRY": "{{#if telemetry.enabled}}1{{else}}0{{/if}}"{{#if telemetry.enabled}},
         "OTEL_METRICS_EXPORTER": "otlp",
         "OTEL_LOGS_EXPORTER": "otlp",
         "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:4317",
         "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL": "grpc",
         "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "otel-collector-opentelemetry-collector.telemetry.svc.cluster.local:4317",
-        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "grpc"{{`{{`{{`}}`}}/if{{`}}`}}{{`{{`{{`}}`}}#if retry.is_retry{{`}}`}},
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "grpc"{{/if}}{{#if retry.is_retry}},
         "BASH_DEFAULT_TIMEOUT_MS": "30000",
-        "BASH_MAX_TIMEOUT_MS": "300000"{{`{{`{{`}}`}}/if{{`}}`}}
+        "BASH_MAX_TIMEOUT_MS": "300000"{{/if}}
       },
-      "model": "{{`{{`{{`}}`}}model{{`}}`}}",
+      "model": "{{model}}",
       "cleanupPeriodDays": 7,
       "includeCoAuthoredBy": false
     }  docs_claude.md.hbs: |
@@ -7926,11 +7926,11 @@ data:
     
     You are working on Task Master documentation generation.
     
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Source Branch**: {{`{{`{{`}}`}}source_branch{{`}}`}}
-    - **GitHub App**: {{`{{`{{`}}`}}github_app{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
-    - **Documentation Target**: {{`{{`{{`}}`}}#if task_id{{`}}`}}task {{`{{`{{`}}`}}task_id{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}all tasks{{`{{`{{`}}`}}/if{{`}}`}}
+    - **Repository**: {{repository_url}}
+    - **Source Branch**: {{source_branch}}
+    - **GitHub App**: {{github_app}}
+    - **Working Directory**: {{working_directory}}
+    - **Documentation Target**: {{#if task_id}}task {{task_id}}{{else}}all tasks{{/if}}
     
     ## Task Master Documentation Generation
     
@@ -7978,9 +7978,9 @@ data:
     ## Repository Context
     
     This documentation generation is working with:
-    - **Repository**: {{`{{`{{`}}`}}repository_url{{`}}`}}
-    - **Branch**: {{`{{`{{`}}`}}source_branch{{`}}`}}
-    - **Working Directory**: {{`{{`{{`}}`}}working_directory{{`}}`}}
+    - **Repository**: {{repository_url}}
+    - **Branch**: {{source_branch}}
+    - **Working Directory**: {{working_directory}}
     
     Ensure all file paths and references are relative to the working directory.  docs_container.sh.hbs: |
     #!/bin/sh
@@ -7993,7 +7993,7 @@ data:
     export SSH_ASKPASS=/bin/true
     
     # Repository URL
-    REPO_URL="{{`{{`{{`}}`}}repository_url{{`}}`}}"
+    REPO_URL="{{repository_url}}"
     
     # GitHub App authentication is configured via environment variables
     echo "Using GitHub App authentication (SSH not required)"
@@ -8034,8 +8034,8 @@ data:
         fi
     
         # Get installation ID for the repository
-        REPO_OWNER=$(echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
-        REPO_NAME=$(echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+        REPO_OWNER=$(echo "{{repository_url}}" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "{{repository_url}}" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
     
         echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
     
@@ -8167,7 +8167,7 @@ data:
     git config --global --add safe.directory /workspace
     
     # Set GitHub App attribution - use generic format for all agents
-    GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    GITHUB_APP="{{github_app}}"
     # Generic attribution that works for any agent
     GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
     GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
@@ -8185,7 +8185,7 @@ data:
     echo "✓ Git configured"
     
     # Repository setup
-    REPO_BRANCH="{{`{{`{{`}}`}}source_branch{{`}}`}}"
+    REPO_BRANCH="{{source_branch}}"
     echo "Repository: $REPO_URL"
     echo "Branch: $REPO_BRANCH"
     
@@ -8217,7 +8217,7 @@ data:
     echo "✓ Repository ready"
     
     # Working directory setup
-    WORKING_DIR="{{`{{`{{`}}`}}working_directory{{`}}`}}"
+    WORKING_DIR="{{working_directory}}"
     if [ -n "$WORKING_DIR" ] && [ "$WORKING_DIR" != "." ]; then
       CLAUDE_WORK_DIR="/workspace/$WORKING_DIR"
       cd "$CLAUDE_WORK_DIR" || exit 1
@@ -8452,11 +8452,11 @@ data:
     echo "✓ Workspace validated"
     
     # Environment setup
-    export SERVICE_NAME="{{`{{`{{`}}`}}service_name{{`}}`}}"
-    export SOURCE_BRANCH="{{`{{`{{`}}`}}source_branch{{`}}`}}"
-    export WORKING_DIR="{{`{{`{{`}}`}}working_directory{{`}}`}}"
-    export GITHUB_USER="{{`{{`{{`}}`}}github_app{{`}}`}}"
-    export GITHUB_APP="{{`{{`{{`}}`}}github_app{{`}}`}}"
+    export SERVICE_NAME="{{service_name}}"
+    export SOURCE_BRANCH="{{source_branch}}"
+    export WORKING_DIR="{{working_directory}}"
+    export GITHUB_USER="{{github_app}}"
+    export GITHUB_APP="{{github_app}}"
     
     # Start background token refresh process (every 45 minutes to stay ahead of 1-hour expiry)
     (
@@ -8490,25 +8490,25 @@ data:
     
     # Look for agent-specific system prompt file from agents ConfigMap
     # The system prompt should be in the agents ConfigMap if configured
-    if [ -f "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
-        echo "✓ Found system prompt file for {{`{{`{{`}}`}}github_app{{`}}`}}, adding to Claude command"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+    if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+        echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
-    elif [ -f "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" ]; then
+    elif [ -f "/task-files/{{github_app}}_system-prompt.md" ]; then
         # Fallback to task-files if included inline
-        echo "✓ Found system prompt in task ConfigMap for {{`{{`{{`}}`}}github_app{{`}}`}}"
-        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
+        echo "✓ Found system prompt in task ConfigMap for {{github_app}}"
+        CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/{{github_app}}_system-prompt.md"
         if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-            echo "[DEBUG] System prompt path: /task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md"
-            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{`{{`{{`}}`}}github_app{{`}}`}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+            echo "[DEBUG] System prompt path: /task-files/{{github_app}}_system-prompt.md"
+            echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
             echo "[DEBUG] ----"
         fi
     else
-        echo "ℹ️ No system prompt file found for agent {{`{{`{{`}}`}}github_app{{`}}`}}, using defaults"
+        echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
     fi
     
     # Model is set via settings.json template, not CLI flag
@@ -8527,7 +8527,7 @@ data:
           CLAUDE_PID=$!
           # Now open persistent writer and send one message
           exec 9>"$FIFO_PATH"
-          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]{{`}}`}}\n' >&9
+          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
           # Close writer so reader gets EOF and exits
           exec 9>&-
           wait $CLAUDE_PID
@@ -8556,7 +8556,7 @@ data:
               else
                 echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
                 exec 9>"$FIFO_PATH"
-                printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]{{`}}`}}\n' "$INITIAL_TEXT" >&9
+                printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
               fi
     
               # Wait for Claude to complete, then close any fallback writer and request sidecar shutdown
@@ -8579,7 +8579,7 @@ data:
     echo "Creating pull request..."
     
     # Ensure we're in the correct working directory for git operations
-    cd /workspace/{{`{{`{{`}}`}}working_directory{{`}}`}}
+    cd /workspace/{{working_directory}}
     
     # Check for documentation changes (including untracked files)
     echo "Checking for documentation changes..."
@@ -8614,7 +8614,7 @@ data:
         SOURCE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         RANDOM_ID=$(date +%s | tail -c 6)
-        PR_BRANCH="docs/{{`{{`{{`}}`}}#if task_id{{`}}`}}task-{{`{{`{{`}}`}}task_id{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}auto-gen{{`{{`{{`}}`}}/if{{`}}`}}-${TIMESTAMP}-${RANDOM_ID}"
+        PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
     
         echo "Creating branch: $PR_BRANCH"
         if ! git checkout -b "$PR_BRANCH"; then
@@ -8634,7 +8634,7 @@ data:
         git status --porcelain
     
         echo "Committing changes..."
-        if ! git commit -m "docs: generate Task Master documentation{{`{{`{{`}}`}}#if task_id{{`}}`}} (task {{`{{`{{`}}`}}task_id{{`}}`}}){{`{{`{{`}}`}}/if{{`}}`}}
+        if ! git commit -m "docs: generate Task Master documentation{{#if task_id}} (task {{task_id}}){{/if}}
     
     - Auto-generated comprehensive task documentation
     - Updated task breakdowns and implementation details
@@ -8670,13 +8670,13 @@ data:
     if command -v gh >/dev/null 2>&1; then
         # GitHub CLI should already be authenticated from the beginning of the script
     
-        PR_TITLE="docs: auto-generate Task Master documentation{{`{{`{{`}}`}}#if task_id{{`}}`}} for task {{`{{`{{`}}`}}task_id{{`}}`}}{{`{{`{{`}}`}}/if{{`}}`}}"
+        PR_TITLE="docs: auto-generate Task Master documentation{{#if task_id}} for task {{task_id}}{{/if}}"
         PR_BODY="Auto-generated Task Master documentation by orchestrator container script.
     
-    **Working Directory:** {{`{{`{{`}}`}}working_dir{{`}}`}}
+    **Working Directory:** {{working_dir}}
     **Branch:** \`$PR_BRANCH\` → \`$SOURCE_BRANCH\`
     **Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-    {{`{{`{{`}}`}}#if task_id{{`}}`}}**Target Task:** {{`{{`{{`}}`}}task_id{{`}}`}}{{`{{`{{`}}`}}/if{{`}}`}}
+    {{#if task_id}}**Target Task:** {{task_id}}{{/if}}
     
     🤖 Auto-generated by Container Script"
     
@@ -8704,7 +8704,7 @@ data:
             echo "❌ Failed to create pull request after 3 attempts"
             echo "⚠️ Branch has been pushed, but PR creation failed"
             # Extract owner/repo from repository URL
-            REPO_PATH=$(echo "{{`{{`{{`}}`}}repository_url{{`}}`}}" | sed -E 's|https://github.com/||' | sed 's|\.git$||')
+            REPO_PATH=$(echo "{{repository_url}}" | sed -E 's|https://github.com/||' | sed 's|\.git$||')
             echo "💡 You can manually create a PR at: https://github.com/$REPO_PATH/pull/new/$PR_BRANCH"
             exit 1
         fi
@@ -8715,14 +8715,14 @@ data:
     echo "Documentation generation completed successfully!"  docs_prompt.md.hbs: |
     # CRITICAL: Complete Documentation Generation Task
     
-    {{`{{`{{`}}`}}!-- Safety toggle: set to false to run safe test mode --{{`}}`}}
-    {{`{{`{{`}}`}}#unless (eq "false" "true"){{`}}`}}
+    {{!-- Safety toggle: set to false to run safe test mode --}}
+    {{#unless (eq "false" "true")}}
     
     **🚨 MANDATORY COMPLETION REQUIREMENT 🚨**
     You MUST complete ALL steps in this process. Partial completion is not acceptable. This is especially critical for large projects with many tasks.
     
     ## Task Overview
-    Generate comprehensive documentation for {{`{{`{{`}}`}}#if task_id{{`}}`}}task {{`{{`{{`}}`}}task_id{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}**ALL Task Master tasks**{{`{{`{{`}}`}}/if{{`}}`}}.
+    Generate comprehensive documentation for {{#if task_id}}task {{task_id}}{{else}}**ALL Task Master tasks**{{/if}}.
     
     **If this is a large project with many tasks (10+ tasks), you MUST:**
     - Process ALL tasks without stopping
@@ -8738,7 +8738,7 @@ data:
        - Individual task files have been pre-copied to `.taskmaster/docs/task-{id}/task.txt`
        - Each `task.txt` contains complete task information including subtasks and implementation details
     3. Review architecture.md and prd.txt for context
-    {{`{{`{{`}}`}}#if include_codebase{{`}}`}}
+    {{#if include_codebase}}
     4. **EXISTING PROJECT CONTEXT:**
        - **READ `.taskmaster/docs/codebase.md`** - This contains the complete existing codebase
        - Understand the current implementation state and architecture
@@ -8746,9 +8746,9 @@ data:
        - Focus on building upon existing patterns and code structure
        - Consider what's already implemented vs. what needs to be added
     5. **For large projects: Announce total task count and confirm you will process ALL of them**
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     4. **For large projects: Announce total task count and confirm you will process ALL of them**
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     
     **🎯 IMPORTANT: Use individual `task.txt` files for each task**
     - Individual task files are available at: `.taskmaster/docs/task-{id}/task.txt`
@@ -8757,9 +8757,9 @@ data:
     - This approach allows efficient processing of large projects with many tasks
     
     ### Step 2: Documentation Generation (MANDATORY FOR ALL TASKS)
-    {{`{{`{{`}}`}}#if task_id{{`}}`}}
-    Focus specifically on task {{`{{`{{`}}`}}task_id{{`}}`}} and create:
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{#if task_id}}
+    Focus specifically on task {{task_id}} and create:
+    {{else}}
     **IMPORTANT: SKIP TASKS THAT ALREADY HAVE COMPLETE DOCUMENTATION**
     
     Before processing any task, check if ALL required files already exist:
@@ -8773,7 +8773,7 @@ data:
     **YOU MUST CREATE DOCUMENTATION FOR EVERY TASK THAT NEEDS IT. DO NOT SKIP ANY INCOMPLETE TASKS.**
     
     For each task that needs documentation (process ALL incomplete tasks, no exceptions):
-    {{`{{`{{`}}`}}/if{{`}}`}}
+    {{/if}}
     - `task.md` - Comprehensive task overview and implementation guide
     - `prompt.md` - Autonomous prompt for AI agents
     - `acceptance-criteria.md` - Clear acceptance criteria and test cases
@@ -8849,11 +8849,11 @@ data:
     **⚠️ CRITICAL: You MUST generate ALL documentation files as specified above.**
     
     **Git Workflow:** The orchestrator post-completion hook will automatically handle:
-    - Creating and checking out the feature branch: `docs-gen-{{`{{`{{`}}`}}source_branch{{`}}`}}`
+    - Creating and checking out the feature branch: `docs-gen-{{source_branch}}`
     - Staging all documentation files
     - Committing with proper message
     - Pushing to origin
-    - Creating pull request to target branch: `{{`{{`{{`}}`}}source_branch{{`}}`}}`
+    - Creating pull request to target branch: `{{source_branch}}`
     
     **Your Job:** Focus ONLY on generating the documentation files. Do NOT run any git commands.
     
@@ -8877,7 +8877,7 @@ data:
     **YOU MUST END WITH THIS EXACT MESSAGE:**
     ```
     🎉 DOCUMENTATION GENERATION COMPLETE 🎉
-    ✅ Generated documentation for {{`{{`{{`}}`}}#if task_id{{`}}`}}task {{`{{`{{`}}`}}task_id{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}ALL tasks{{`{{`{{`}}`}}/if{{`}}`}}
+    ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
     ✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, task.xml)
     📋 Total files created: [COUNT]
     🔧 Generated XML-structured prompts optimized for LLM consumption
@@ -8886,21 +8886,21 @@ data:
     
     **If you cannot provide this final confirmation, the task is NOT complete and you must continue working until it is done.**
     
-    {{`{{`{{`}}`}}else{{`}}`}}
+    {{else}}
     
     ## Safe Test Mode
     
     What time is it? Please answer this simple question and exit immediately.
     
-    {{`{{`{{`}}`}}/unless{{`}}`}}  docs_settings.json.hbs: |
+    {{/unless}}  docs_settings.json.hbs: |
     {
       "permissions": {
         "allow": [
-          {{`{{`{{`}}`}}#if agent_tools_override{{`}}`}}
-          {{`{{`{{`}}`}}#each permissions.allow{{`}}`}}
-          "{{`{{`{{`}}`}}this{{`}}`}}"{{`{{`{{`}}`}}#unless @last{{`}}`}},{{`{{`{{`}}`}}/unless{{`}}`}}
-          {{`{{`{{`}}`}}/each{{`}}`}}
-          {{`{{`{{`}}`}}else{{`}}`}}
+          {{#if agent_tools_override}}
+          {{#each permissions.allow}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+          {{else}}
           "Bash",
           "Edit",
           "Read",
@@ -8915,15 +8915,15 @@ data:
           "ExitPlanMode",
           "TodoRead",
           "TodoWrite"
-          {{`{{`{{`}}`}}/if{{`}}`}}
+          {{/if}}
         ],
         "deny": [
-          {{`{{`{{`}}`}}#if agent_tools_override{{`}}`}}
-          {{`{{`{{`}}`}}#each permissions.deny{{`}}`}}
-          "{{`{{`{{`}}`}}this{{`}}`}}"{{`{{`{{`}}`}}#unless @last{{`}}`}},{{`{{`{{`}}`}}/unless{{`}}`}}
-          {{`{{`{{`}}`}}/each{{`}}`}}
-          {{`{{`{{`}}`}}else{{`}}`}}
-          {{`{{`{{`}}`}}/if{{`}}`}}
+          {{#if agent_tools_override}}
+          {{#each permissions.deny}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+          {{else}}
+          {{/if}}
         ],
         "defaultMode": "acceptEdits"
       },
@@ -8933,15 +8933,15 @@ data:
         "DISABLE_COST_WARNINGS": "1",
         "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
         "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true",
-        "CLAUDE_CODE_ENABLE_TELEMETRY": "{{`{{`{{`}}`}}#if telemetry.enabled{{`}}`}}1{{`{{`{{`}}`}}else{{`}}`}}0{{`{{`{{`}}`}}/if{{`}}`}}"{{`{{`{{`}}`}}#if telemetry.enabled{{`}}`}},
+        "CLAUDE_CODE_ENABLE_TELEMETRY": "{{#if telemetry.enabled}}1{{else}}0{{/if}}"{{#if telemetry.enabled}},
         "OTEL_METRICS_EXPORTER": "otlp",
         "OTEL_LOGS_EXPORTER": "otlp",
-        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "{{`{{`{{`}}`}}telemetry.otlpEndpoint{{`}}`}}",
-        "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL": "{{`{{`{{`}}`}}telemetry.otlpProtocol{{`}}`}}",
-        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "{{`{{`{{`}}`}}telemetry.otlpEndpoint{{`}}`}}",
-        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "{{`{{`{{`}}`}}telemetry.otlpProtocol{{`}}`}}"{{`{{`{{`}}`}}/if{{`}}`}}
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "{{telemetry.otlpEndpoint}}",
+        "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL": "{{telemetry.otlpProtocol}}",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "{{telemetry.otlpEndpoint}}",
+        "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL": "{{telemetry.otlpProtocol}}"{{/if}}
       },
-      "model": "{{`{{`{{`}}`}}model{{`}}`}}",
+      "model": "{{model}}",
       "cleanupPeriodDays": 3,
       "includeCoAuthoredBy": false,
       "hooks": {
@@ -8951,7 +8951,7 @@ data:
             "hooks": [
               {
                 "type": "command",
-                "command": "/workspace/{{`{{`{{`}}`}}#if working_directory{{`}}`}}{{`{{`{{`}}`}}working_directory{{`}}`}}{{`{{`{{`}}`}}else{{`}}`}}.{{`{{`{{`}}`}}/if{{`}}`}}/after-file-saved.sh"
+                "command": "/workspace/{{#if working_directory}}{{working_directory}}{{else}}.{{/if}}/after-file-saved.sh"
               }
             ]
           }
@@ -8959,7 +8959,7 @@ data:
       }
     }
   docs_toolman-catalog.md.hbs: |
-    {{`{{`{{`}}`}}!--
+    {{!--
     Toolman Catalog Markdown Template for Docs Agent
     ================================================
     
@@ -8971,12 +8971,12 @@ data:
     - toolman_catalog: Complete tool catalog from toolman-tool-catalog ConfigMap
     - total_tool_count: Total number of available tools
     - generated_timestamp: Unix timestamp of generation
-    --{{`}}`}}
+    --}}
     
     # Available Tools Catalog
     
-    **Total Tools Available**: {{`{{`{{`}}`}}total_tool_count{{`}}`}}
-    **Generated**: {{`{{`{{`}}`}}generated_timestamp{{`}}`}}
+    **Total Tools Available**: {{total_tool_count}}
+    **Generated**: {{generated_timestamp}}
     
     Use this catalog to select appropriate tools for each task based on implementation requirements.
     
@@ -8984,41 +8984,41 @@ data:
     
     Local servers run within the agent's environment and provide file system and local operations.
     
-    {{`{{`{{`}}`}}#each toolman_catalog.local{{`}}`}}
-    ### {{`{{`{{`}}`}}@key{{`}}`}} Server
+    {{#each toolman_catalog.local}}
+    ### {{@key}} Server
     
-    **Description**: {{`{{`{{`}}`}}this.description{{`}}`}}
-    **Command**: `{{`{{`{{`}}`}}this.command{{`}}`}}`
-    **Arguments**: {{`{{`{{`}}`}}#each this.args{{`}}`}}`{{`{{`{{`}}`}}this{{`}}`}}`{{`{{`{{`}}`}}#unless @last{{`}}`}} {{`{{`{{`}}`}}/unless{{`}}`}}{{`{{`{{`}}`}}/each{{`}}`}}
-    **Working Directory**: {{`{{`{{`}}`}}this.working_directory{{`}}`}}
+    **Description**: {{this.description}}
+    **Command**: `{{this.command}}`
+    **Arguments**: {{#each this.args}}`{{this}}`{{#unless @last}} {{/unless}}{{/each}}
+    **Working Directory**: {{this.working_directory}}
     
     **Available Tools**:
-    {{`{{`{{`}}`}}#each this.tools{{`}}`}}
-    - **`{{`{{`{{`}}`}}this.name{{`}}`}}`** ({{`{{`{{`}}`}}this.category{{`}}`}})
-      - **Description**: {{`{{`{{`}}`}}this.description{{`}}`}}
-      - **Use Cases**: {{`{{`{{`}}`}}#each this.use_cases{{`}}`}}{{`{{`{{`}}`}}this{{`}}`}}{{`{{`{{`}}`}}#unless @last{{`}}`}}, {{`{{`{{`}}`}}/unless{{`}}`}}{{`{{`{{`}}`}}/each{{`}}`}}
-    {{`{{`{{`}}`}}/each{{`}}`}}
+    {{#each this.tools}}
+    - **`{{this.name}}`** ({{this.category}})
+      - **Description**: {{this.description}}
+      - **Use Cases**: {{#each this.use_cases}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+    {{/each}}
     
-    {{`{{`{{`}}`}}/each{{`}}`}}
+    {{/each}}
     
     ## Remote Tools
     
     Remote tools are available via MCP servers running in the cluster.
     
-    {{`{{`{{`}}`}}#each toolman_catalog.remote{{`}}`}}
-    ### {{`{{`{{`}}`}}@key{{`}}`}} Server
+    {{#each toolman_catalog.remote}}
+    ### {{@key}} Server
     
-    **Description**: {{`{{`{{`}}`}}this.description{{`}}`}}
-    **Endpoint**: {{`{{`{{`}}`}}this.endpoint{{`}}`}}
+    **Description**: {{this.description}}
+    **Endpoint**: {{this.endpoint}}
     
     **Available Tools**:
-    {{`{{`{{`}}`}}#each this.tools{{`}}`}}
-    - **`{{`{{`{{`}}`}}this.name{{`}}`}}`** ({{`{{`{{`}}`}}this.category{{`}}`}})
-      - **Description**: {{`{{`{{`}}`}}this.description{{`}}`}}
-      - **Use Cases**: {{`{{`{{`}}`}}#each this.use_cases{{`}}`}}{{`{{`{{`}}`}}this{{`}}`}}{{`{{`{{`}}`}}#unless @last{{`}}`}}, {{`{{`{{`}}`}}/unless{{`}}`}}{{`{{`{{`}}`}}/each{{`}}`}}
-    {{`{{`{{`}}`}}/each{{`}}`}}
+    {{#each this.tools}}
+    - **`{{this.name}}`** ({{this.category}})
+      - **Description**: {{this.description}}
+      - **Use Cases**: {{#each this.use_cases}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+    {{/each}}
     
-    {{`{{`{{`}}`}}/each{{`}}`}}
+    {{/each}}
     
     ## Tool Selection Guidelines
     
@@ -9026,16 +9026,16 @@ data:
     
     1. **Analyze Task Requirements**: Read the task description and implementation details carefully
     2. **Match Categories**: Look for tools whose categories align with your task needs:
-       {{`{{`{{`}}`}}#each toolman_catalog.local{{`}}`}}
-         {{`{{`{{`}}`}}#each this.tools{{`}}`}}
-       - **{{`{{`{{`}}`}}this.category{{`}}`}}**: {{`{{`{{`}}`}}this.description{{`}}`}}
-         {{`{{`{{`}}`}}/each{{`}}`}}
-       {{`{{`{{`}}`}}/each{{`}}`}}
-       {{`{{`{{`}}`}}#each toolman_catalog.remote{{`}}`}}
-         {{`{{`{{`}}`}}#each this.tools{{`}}`}}
-       - **{{`{{`{{`}}`}}this.category{{`}}`}}**: {{`{{`{{`}}`}}this.description{{`}}`}}
-         {{`{{`{{`}}`}}/each{{`}}`}}
-       {{`{{`{{`}}`}}/each{{`}}`}}
+       {{#each toolman_catalog.local}}
+         {{#each this.tools}}
+       - **{{this.category}}**: {{this.description}}
+         {{/each}}
+       {{/each}}
+       {{#each toolman_catalog.remote}}
+         {{#each this.tools}}
+       - **{{this.category}}**: {{this.description}}
+         {{/each}}
+       {{/each}}
     3. **Check Use Cases**: Match tool use cases to your specific task requirements
     4. **Be Selective**: Only include tools relevant to the specific task
     

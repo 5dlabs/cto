@@ -40,11 +40,13 @@ for file in claude-templates/**/*.hbs claude-templates/**/*.sh claude-templates/
     echo "  Processing: $file -> $key"
     echo "  $key: |" >> "$OUTPUT_FILE"
     
-    # Escape any Helm template syntax in the content
-    # This preserves Handlebars templates while making them safe for Helm
-    sed 's/^/    /' "$file" | \
-      sed 's/{{/{{`{{`}}/g' | \
-      sed 's/}}/{{`}}`}}/g' >> "$OUTPUT_FILE"
+    # Add 4-space indentation and escape template syntax for Helm
+    # We need to escape {{ and }} to prevent Helm from trying to parse them
+    while IFS= read -r line; do
+      # Escape the line for Helm by replacing {{ with {{` {{ `}} and }} with {{` }} `}}
+      escaped_line=$(echo "$line" | sed 's/{{/{{`{{`}}/g' | sed 's/}}/{{`}}`}}/g')
+      echo "    $escaped_line" >> "$OUTPUT_FILE"
+    done < "$file"
   fi
 done
 
