@@ -16,9 +16,9 @@ metadata:
 data:
 {{- range $path, $content := .Files.Glob "claude-templates/**/*.hbs" }}
   {{ $path | trimPrefix "claude-templates/" | replace "/" "_" }}: |
-{{ $.Files.Get $path | nindent 4 }}
+{{- $.Files.Get $path | indent 4 | regexReplaceAll "(?m)^    $" "" }}
 {{- end }}
 {{- range $path, $content := .Files.Glob "claude-templates/**/*.sh" }}
   {{ $path | trimPrefix "claude-templates/" | replace "/" "_" }}: |
-{{ $.Files.Get $path | nindent 4 }}
+{{- $.Files.Get $path | indent 4 | regexReplaceAll "(?m)^    $" "" }}
 {{- end }}
