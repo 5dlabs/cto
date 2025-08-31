@@ -58,25 +58,25 @@ echo "Using GitHub App authentication"
 # Authenticate with GitHub App
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     echo "Authenticating with GitHub App..."
-    
+
     # Create temporary private key file (support escaped newlines)
     TEMP_KEY_FILE="/tmp/github-app-key.pem"
     printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
     chmod 600 "$TEMP_KEY_FILE"
-    
+
     # Generate JWT token for GitHub App (fixed JWT generation for Linux containers)
     # JWT header
     JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    
+
     # JWT payload with current time and expiration (10 minutes)
     NOW=$(date +%s)
     EXP=$((NOW + 600))
     JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    
+
     # Sign the JWT
     JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
     JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-    
+
     # Get installation ID for the repository (robust parsing of owner/repo)
     INPUT_REPO="{{repository_url}}"
     REPO_OWNER=""
@@ -97,9 +97,9 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
     fi
 
     echo "DEBUG: Parsed repository - Owner: '$REPO_OWNER', Name: '$REPO_NAME'"
-    
+
     echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
-    
+
     # Get the installation ID (retry and follow redirects). Fallback to org installation.
     INSTALLATION_RESPONSE=$(curl -s -L --retry 5 --retry-delay 2 --retry-connrefused \
         --connect-timeout 5 --max-time 12 \
@@ -126,39 +126,39 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
         rm -f "$TEMP_KEY_FILE"
         exit 1
     fi
-    
+
     echo "Installation ID: $INSTALLATION_ID"
-    
+
     # Get installation access token
     TOKEN_RESPONSE=$(curl -s -X POST \
         -H "Authorization: Bearer $JWT_TOKEN" \
         -H "Accept: application/vnd.github+json" \
         "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-    
+
     GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-    
+
     if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
         echo "❌ Failed to get installation access token"
         echo "Response: $TOKEN_RESPONSE"
         rm -f "$TEMP_KEY_FILE"
         exit 1
     fi
-    
+
     # Clean up temporary key file
     rm -f "$TEMP_KEY_FILE"
-    
+
     # Export the token for git to use
     export GITHUB_TOKEN
-    
+
     # Configure git to use the token (use --replace-all to handle multiple existing helpers)
     git config --global --replace-all credential.helper store
     echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-    
+
     # Also authenticate gh CLI with the token
     echo "$GITHUB_TOKEN" | gh auth login --with-token
-    
+
     echo "✓ GitHub App authenticated successfully"
-    
+
 else
     echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
     exit 1
@@ -562,7 +562,7 @@ if [ -d "/tmp/docs-repo" ]; then
     echo "🔄 DOCS REPOSITORY: UPDATE - temporary directory exists"
     cd /tmp/docs-repo
     git fetch origin
-    git checkout "$DOCS_BRANCH" 
+    git checkout "$DOCS_BRANCH"
     git reset --hard "origin/$DOCS_BRANCH"
     cd /workspace
     echo "✓ Docs repository updated"
@@ -576,7 +576,7 @@ else
     echo "✓ Docs repository cloned to temporary location"
 fi
 
-# Step 2: Clone or update target repository  
+# Step 2: Clone or update target repository
 if [ -d "$TARGET_REPO_DIR" ]; then
     echo "🔄 TARGET REPOSITORY: UPDATE - directory already exists"
     echo "📁 Found existing target repository '$TARGET_REPO_DIR', updating..."
@@ -621,30 +621,30 @@ ls -la /tmp/docs-repo/.taskmaster/docs/ || echo "No docs directory found"
 if [ -d "$TASK_DIR" ]; then
     echo "🔍 DEBUG: Task directory found, contents:"
     ls -la "$TASK_DIR"
-    
+
     echo "✅ Copying task.md..."
     cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
-    
+
     echo "✅ Copying acceptance-criteria.md..."
     cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
-    
+
     echo "✅ Copying prompt.md..."
     cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
-    
+
     echo "✅ Copying client-config.json..."
     if [ -f "$TASK_DIR/client-config.json" ]; then
         cp "$TASK_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
     else
         echo "⚠️ client-config.json not found - MCP client may not be configured"
     fi
-    
+
     echo "✅ Copying toolman-guide.md..."
     if [ -f "$TASK_DIR/toolman-guide.md" ]; then
         cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
     else
         echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
-    
+
     echo "✓ Task {{task_id}} files copied from $TASK_DIR"
 else
     echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
@@ -847,8 +847,8 @@ if [ -d "/task-files" ]; then
   else
     echo "⚠️  mcp.json template not found"
   fi
-  
-  # Enterprise managed settings are mounted directly from ConfigMap  
+
+  # Enterprise managed settings are mounted directly from ConfigMap
   echo "=== ENTERPRISE MANAGED SETTINGS ==="
   echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
   echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
@@ -1130,7 +1130,7 @@ else
 
     echo "startingRemediation:{{task_id}}"
     echo ""
-        
+
         # DEBUG: Print MCP_CLIENT_CONFIG for troubleshooting client config issues
         echo "🔍 DEBUG: MCP_CLIENT_CONFIG is set to: '$MCP_CLIENT_CONFIG'"
         if [ -f "$MCP_CLIENT_CONFIG" ]; then
@@ -1213,23 +1213,23 @@ Please review the CLAUDE.md file for complete context and instructions. You are 
 
         # Wait for Claude process to complete naturally
         echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
-        
+
         # Simple wait - Claude should exit naturally when done
         wait "$CLAUDE_PID"
         CLAUDE_EXIT_CODE=$?
-        
+
         if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
           echo "✅ Claude process completed successfully"
         else
           echo "⚠️ Claude process exited with code: $CLAUDE_EXIT_CODE"
         fi
-        
+
         # Stop diagnostics if running
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
-        
+
         # Ensure FIFO cleanup happens regardless of how Claude exited
         echo "🔧 Performing FIFO cleanup..."
-        
+
         # Close FIFO writer if it was opened (in fallback)
         if [ "$FIFO_OPENED" = "true" ]; then
           echo "🔧 Closing FIFO file descriptor..."
@@ -1243,13 +1243,13 @@ Please review the CLAUDE.md file for complete context and instructions. You are 
         else
           echo "ℹ️ FIFO was not opened via fallback, checking sidecar"
         fi
-        
+
         # Clean up FIFO file to ensure no processes are blocked
         if [ -p "$FIFO_PATH" ]; then
           echo "🔧 Removing FIFO to ensure clean shutdown"
           rm -f "$FIFO_PATH" 2>/dev/null || echo "⚠️ Could not remove FIFO"
         fi
-        
+
         # Gracefully stop sidecar to allow Job to complete (all containers must exit)
         echo "🔧 Attempting sidecar shutdown..."
         shutdown_attempts=0
@@ -1275,7 +1275,7 @@ Please review the CLAUDE.md file for complete context and instructions. You are 
           pkill -f "sidecar" || echo "No sidecar processes found to kill"
         fi
 
-        # Wait for sidecar to actually terminate  
+        # Wait for sidecar to actually terminate
         echo "⏳ Waiting for sidecar termination..."
         timeout=10
         while [ $timeout -gt 0 ]; do
@@ -1305,11 +1305,11 @@ echo "Claude has completed successfully."
 # After Claude completes, check if a PR was created and apply correlation labels
 if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   echo "🔍 Checking for PRs created by this task..."
-  
+
   # First, try to find PR by task label (Claude should have added task-N label)
   TASK_LABEL="task-${TASK_ID}"
   PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
-  
+
   # If not found by label, try by branch name (current branch)
   if [ -z "$PR_NUMBER" ]; then
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
@@ -1317,14 +1317,14 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
     fi
   fi
-  
+
   if [ -n "$PR_NUMBER" ]; then
     echo "✅ Found PR #${PR_NUMBER}"
-    
+
     # Get the PR URL
     PR_URL="https://github.com/{{docs_repository_url}}/pull/${PR_NUMBER}"
     echo "📝 PR URL: $PR_URL"
-    
+
     # Update CodeRun status with PR URL via Kubernetes API
     echo "🔄 Updating CodeRun status with PR URL..."
     if command -v kubectl >/dev/null 2>&1; then
@@ -1338,7 +1338,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
 }
 EOF
 )
-      
+
       # Apply the patch to update CodeRun status
       if kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$PATCH_JSON" 2>/dev/null; then
         echo "✅ Updated CodeRun status with PR URL"
@@ -1348,10 +1348,10 @@ EOF
     else
       echo "⚠️ kubectl not available, cannot update CodeRun status"
     fi
-    
+
     # Apply correlation labels with comprehensive debugging
     echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
-    
+
     # Debug: Check environment variables
     echo "🔍 DEBUG: Environment check for label creation:"
     echo "   TASK_ID: '${TASK_ID}'"
@@ -1359,7 +1359,7 @@ EOF
     echo "   SERVICE_NAME: '${SERVICE_NAME}'"
     echo "   CODERUN_NAME: '${CODERUN_NAME}'"
     echo "   GitHub Token: $([ -n "$GITHUB_TOKEN" ] && echo 'Present' || echo 'Missing')"
-    
+
     # Validate required variables
     if [ -z "$WORKFLOW_NAME" ]; then
       echo "❌ ERROR: WORKFLOW_NAME is not set!"
@@ -1369,7 +1369,7 @@ EOF
         # Pattern: service-t{task}-stage-{hash} created by workflow
         echo "   CODERUN_NAME format: $CODERUN_NAME"
       fi
-      
+
       # Check if we can get it from Kubernetes labels
       if command -v kubectl >/dev/null 2>&1 && [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
         echo "🔍 DEBUG: Trying to get workflow name from CodeRun labels..."
@@ -1381,7 +1381,7 @@ EOF
           echo "❌ Could not retrieve workflow name from CodeRun labels"
         fi
       fi
-      
+
       # Final check - if still no workflow name, fail loudly
       if [ -z "$WORKFLOW_NAME" ]; then
         echo "❌ CRITICAL: Cannot determine WORKFLOW_NAME - this will cause correlation issues!"
@@ -1392,27 +1392,27 @@ EOF
         exit 1
       fi
     fi
-    
+
     TASK_LABEL="task-${TASK_ID}"
     RUN_LABEL="run-${WORKFLOW_NAME}"
     SERVICE_LABEL="service-${SERVICE_NAME}"
-    
+
     echo "📋 Labels to apply:"
     echo "   Task: $TASK_LABEL"
     echo "   Run: $RUN_LABEL"
     echo "   Service: $SERVICE_LABEL"
-    
+
     # Try to add labels with detailed error capture
     echo "🔍 DEBUG: Attempting to add labels to PR..."
     LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
     LABEL_EXIT_CODE=$?
-    
+
     if [ $LABEL_EXIT_CODE -eq 0 ]; then
       echo "✅ Added correlation labels successfully"
     else
       echo "⚠️ Failed to add labels (exit code: $LABEL_EXIT_CODE)"
       echo "🔍 DEBUG: Error output: $LABEL_ERROR"
-      
+
       # Check if labels exist
       echo "🔍 DEBUG: Checking which labels exist..."
       for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
@@ -1428,7 +1428,7 @@ EOF
             service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
             *) COLOR="ededed"; DESC="Unknown label type" ;;
           esac
-          
+
           CREATE_ERROR=$(gh label create "$label" -R "{{docs_repository_url}}" --color "$COLOR" --description "$DESC" 2>&1)
           CREATE_EXIT=$?
           if [ $CREATE_EXIT -eq 0 ]; then
@@ -1438,7 +1438,7 @@ EOF
           fi
         fi
       done
-      
+
       # Retry adding labels with individual attempts
       echo "🔍 DEBUG: Retrying label addition individually..."
       LABELS_ADDED=0
@@ -1452,7 +1452,7 @@ EOF
           echo "   ❌ Failed to add label '$label': $RETRY_ERROR"
         fi
       done
-      
+
       if [ $LABELS_ADDED -eq 3 ]; then
         echo "✅ All labels added successfully after retry"
       elif [ $LABELS_ADDED -gt 0 ]; then

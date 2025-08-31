@@ -93,7 +93,7 @@ spec:
       - name: merge-sha
         description: "Merge commit SHA (populated after PR merge)"
         value: ""
-      
+
       # Task requirements (secrets and environment variables)
       - name: task-requirements
         description: "Base64-encoded requirements.yaml content for all agents"
@@ -321,11 +321,11 @@ spec:
           LABEL="task-${TASK_ID}"
           RUN_LABEL="run-{{`{{workflow.name}}`}}"
           SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
-          
+
           # For single-repo setups, we need to find PRs from previous workflow runs
           # Check if we're in a subsequent stage (quality/testing) by checking input parameters
           STAGE="{{`{{inputs.parameters.stage}}`}}"
-          
+
           if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
             echo "🔎 Stage $STAGE: Looking for existing PR with label ${LABEL} in ${REPO}"
           else
@@ -393,7 +393,7 @@ spec:
             else
               resp=$(curl -sL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
             fi
-            
+
             # Different search logic based on stage
             if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
               # For quality/testing stages, just look for the task label (PR already exists)

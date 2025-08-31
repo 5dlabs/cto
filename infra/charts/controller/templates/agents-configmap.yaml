@@ -34,8 +34,13 @@ data:
     description: {{ $agent.description }}
     # tools: omitted to inherit all available tools
     ---
+{{- range $line := splitList "\n" $agent.systemPrompt }}
+{{- if $line }}
+    {{ $line }}
+{{- else }}
 
-{{ $agent.systemPrompt | nindent 4 }}
+{{- end }}
+{{- end }}
   {{- end }}
   {{- end }}
 {{- end }}
