@@ -1,0 +1,19 @@
+---
+# Static ConfigMap for claude-templates
+# This is a workaround for ArgoCD's inability to access .Files content
+apiVersion: v1
+kind: ConfigMap  
+metadata:
+  name: {{ include "controller.fullname" . }}-claude-templates
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+binaryData:
+  # Using binaryData to avoid Helm template parsing issues
+  # The controller will need to base64 decode these values
+  {{- range $path, $_ := .Files.Glob "claude-templates/**/*" }}
+  {{- $content := $.Files.Get $path }}
+  {{- if $content }}
+  {{ $path | trimPrefix "claude-templates/" | replace "/" "_" }}: {{ $content | b64enc }}
+  {{- end }}
+  {{- end }}

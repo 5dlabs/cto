@@ -16,7 +16,7 @@ spec:
     metadata:
       annotations:
         # Force pod restart when claude-templates ConfigMap changes
-        claude-templates/checksum: {{ include (print $.Template.BasePath "/claude-templates-configmap.yaml") . | sha256sum }}
+        claude-templates/checksum: {{ include (print $.Template.BasePath "/claude-templates-fixed.yaml") . | sha256sum }}
         # Force pod restart when controller config changes
         controller-config/checksum: {{ include (print $.Template.BasePath "/task-controller-config.yaml") . | sha256sum }}
         # Force pod restart when main config changes
