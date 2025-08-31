@@ -40,11 +40,11 @@ for file in claude-templates/**/*.hbs claude-templates/**/*.sh claude-templates/
     echo "  Processing: $file -> $key"
     echo "  $key: |" >> "$OUTPUT_FILE"
     
-    # Add 4-space indentation and escape template syntax for Helm
-    # We need to escape {{ and }} to prevent Helm from trying to parse them
+    # Add 4-space indentation and properly escape for Helm
+    # Use printf with %q to quote special characters, then indent
     while IFS= read -r line; do
-      # Escape the line for Helm by replacing {{ with {{` {{ `}} and }} with {{` }} `}}
-      escaped_line=$(echo "$line" | sed 's/{{/{{`{{`}}/g' | sed 's/}}/{{`}}`}}/g')
+      # Replace {{ with {{"{{" and }} with "}}"}} for proper Helm escaping
+      escaped_line=$(echo "$line" | sed 's/{{/{{"{{"/g' | sed 's/}}/"}}"}/g')
       echo "    $escaped_line" >> "$OUTPUT_FILE"
     done < "$file"
   fi
