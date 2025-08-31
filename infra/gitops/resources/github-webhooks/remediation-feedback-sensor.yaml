@@ -112,7 +112,6 @@ spec:
   triggers:
     - template:
         name: trigger-remediation-coderun
-        conditions: "feedback-comment || pr-review-feedback || check-run-feedback || manual-remediation-trigger"
         k8s:
           operation: create
           source:
