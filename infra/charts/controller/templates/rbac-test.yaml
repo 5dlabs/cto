@@ -1,0 +1,10 @@
+{{- if .Values.rbac.create -}}
+---
+# Test
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-rbac
+data:
+  test: "value"
+{{- end -}}

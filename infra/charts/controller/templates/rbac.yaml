@@ -3,6 +3,7 @@
 {{/* Controller RBAC */}}
 {{- if .Values.rbac.controller }}
 {{- if .Values.rbac.controller.namespaced }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -10,7 +11,7 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller-rbac
-  rules:
+rules:
 {{- toYaml .Values.rbac.controller.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -36,7 +37,7 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller-rbac
-  rules:
+rules:
 {{- toYaml .Values.rbac.controller.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -109,7 +110,7 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: workflow-rbac
-  rules:
+rules:
 {{- toYaml .Values.rbac.workflow.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -135,7 +136,7 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: workflow-rbac
-  rules:
+rules:
 {{- toYaml .Values.rbac.workflow.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -167,7 +168,7 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: submitter-rbac
-  rules:
+rules:
 {{- toYaml .Values.rbac.submitter.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -193,7 +194,7 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: submitter-rbac
-  rules:
+rules:
 {{- toYaml .Values.rbac.submitter.rules | nindent 2 }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
