@@ -118,12 +118,12 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: workflow-rbac
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
     kind: Role
     name: {{ include "controller.fullname" . }}-workflow
-  subjects:
-    - kind: ServiceAccount
+subjects:
+  - kind: ServiceAccount
       name: argo-workflow
       namespace: {{ .Release.Namespace }}
 {{- else }}
@@ -144,12 +144,12 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
     app.kubernetes.io/component: workflow-rbac
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
     name: {{ include "controller.fullname" . }}-workflow
-  subjects:
-    - kind: ServiceAccount
+subjects:
+  - kind: ServiceAccount
       name: argo-workflow
       namespace: {{ .Release.Namespace }}
 {{- end }}
