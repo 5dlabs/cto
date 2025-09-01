@@ -52,6 +52,8 @@ pub struct AgentConfig {
     #[serde(default)]
     pub cli_images: HashMap<String, ImageConfig>,
 
+
+
     /// Image pull secrets for private registries
     #[serde(default, rename = "imagePullSecrets")]
     pub image_pull_secrets: Vec<String>,

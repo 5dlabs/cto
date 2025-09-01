@@ -17,6 +17,21 @@ agent:
     repository: ghcr.io/5dlabs/claude
     tag: "latest"
     pullPolicy: Always
+
+  # CLI-specific image configurations (maps CLI types to Docker images)
+  cliImages:
+    codex:
+      repository: ghcr.io/5dlabs/codex
+      tag: "latest"
+    opencode:
+      repository: ghcr.io/5dlabs/opencode
+      tag: "latest"
+    claude:
+      repository: ghcr.io/5dlabs/claude
+      tag: "latest"
+
+
+
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
@@ -67,6 +82,8 @@ agents:
     role: "Product Manager & Documentation Specialist"
     expertise: ["documentation", "requirements", "planning", "task-management"]
     description: "AI Documentation Specialist | Product Manager at 5D Labs | Transforms ideas into actionable plans | Expert in Task Master workflows"
+    cliType: "claude"
+    model: "opus"
     systemPrompt: |
       You are Morgan, a meticulous AI Product Manager and Documentation Specialist at 5D Labs.
 
@@ -88,6 +105,8 @@ agents:
     role: "Senior Backend Architect & Systems Engineer"
     expertise: ["backend", "architecture", "systems", "apis", "databases"]
     description: "Senior Backend Architect & Systems Engineer"
+    cliType: "claude"
+    model: "sonnet"
     systemPrompt: |
       You are Rex, a Senior Backend Architect & Systems Engineer at 5D Labs.
 
@@ -103,6 +122,8 @@ agents:
     role: "Performance Engineer & Optimization Specialist"
     expertise: ["performance", "optimization", "profiling", "caching"]
     description: "Performance Engineer & Optimization Specialist"
+    cliType: "codex"
+    model: "gpt-4"
     systemPrompt: |
       You are Blaze, a Performance Engineer & Optimization Specialist at 5D Labs.
 
@@ -118,6 +139,8 @@ agents:
     role: "Security Engineer & Code Analysis Specialist"
     expertise: ["security", "analysis", "authentication", "compliance"]
     description: "Security Engineer & Code Analysis Specialist"
+    cliType: "codex"
+    model: "gpt-4"
     systemPrompt: |
       You are Cipher, a Security Engineer & Code Analysis Specialist at 5D Labs.
 
@@ -133,6 +156,8 @@ agents:
     role: "Formatting & Code Quality Specialist"
     expertise: ["formatting", "linting", "code-style", "clippy"]
     description: "Rust formatting and code quality specialist. Ensures zero Clippy warnings and perfect rustfmt compliance. Use for all formatting and lint fixes."
+    cliType: "claude"
+    model: "haiku"
     systemPrompt: |
       You are Cleo, a meticulous Rust code quality specialist with a maniacal focus on achieving ZERO Clippy warnings.
 
@@ -160,6 +185,8 @@ agents:
     role: "Quality Assurance & Testing Specialist"
     expertise: ["testing", "quality-assurance", "validation", "kubernetes"]
     description: "Quality assurance and testing specialist. Writes comprehensive tests and validates acceptance criteria. Never modifies implementation code."
+    cliType: "claude"
+    model: "sonnet"
     systemPrompt: |
       You are Tess, a rigorous QA specialist who ONLY adds tests and test scaffolding. You never modify implementation code.
 
@@ -198,6 +225,8 @@ agents:
     role: "CI/CD Triage & Remediation Specialist"
     expertise: ["ci-cd", "triage", "debugging", "remediation"]
     description: "CI/CD triage and remediation specialist. Fixes failing builds with minimal, surgical changes. Focus on turning red tests green."
+    cliType: "codex"
+    model: "gpt-4"
     systemPrompt: |
       You are Stitch, a CI/CD triage specialist focused on fixing failures with surgical precision.
 

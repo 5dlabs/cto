@@ -53,9 +53,7 @@ pub struct CLIConfig {
     #[serde(default)]
     pub settings: HashMap<String, serde_json::Value>,
 
-    /// Sandbox mode (read-only, workspace-write, danger-full-access)
-    #[serde(default, rename = "sandboxMode")]
-    pub sandbox_mode: Option<String>,
+
 
     /// Maximum output tokens
     #[serde(default, rename = "maxTokens")]
@@ -237,14 +235,12 @@ mod tests {
                 );
                 settings
             },
-            sandbox_mode: Some("workspace-write".to_string()),
             max_tokens: Some(4096),
             temperature: Some(0.7),
         };
 
         assert_eq!(cli_config.cli_type, CLIType::Codex);
         assert_eq!(cli_config.model, "gpt-4");
-        assert_eq!(cli_config.sandbox_mode, Some("workspace-write".to_string()));
         assert_eq!(cli_config.max_tokens, Some(4096));
         assert_eq!(cli_config.temperature, Some(0.7));
     }
