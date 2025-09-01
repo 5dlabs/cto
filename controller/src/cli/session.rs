@@ -396,6 +396,7 @@ mod tests {
                 capabilities: vec![],
                 instructions: "Test instructions".to_string(),
             },
+            mcp_config: None,
         };
 
         let session_id = manager
@@ -432,6 +433,7 @@ mod tests {
                 capabilities: vec![],
                 instructions: "Test instructions".to_string(),
             },
+            mcp_config: None,
         };
 
         let session_id = manager
@@ -472,6 +474,7 @@ mod tests {
                 capabilities: vec![],
                 instructions: "Test instructions".to_string(),
             },
+            mcp_config: None,
         };
 
         let session_id = manager

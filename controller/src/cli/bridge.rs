@@ -120,6 +120,32 @@ impl CLIAdapter for TomlCLIAdapter {
             // 32KB
         }
 
+        // MCP server configuration
+        if let Some(mcp_config) = &universal.mcp_config {
+            toml_config.push('\n');
+            toml_config.push_str("# MCP Server Configuration\n");
+
+            for server in &mcp_config.servers {
+                toml_config.push_str(&format!("[mcp_servers.{}]\n", server.name));
+                toml_config.push_str(&format!("command = \"{}\"\n", server.command));
+
+                if !server.args.is_empty() {
+                    toml_config.push_str(&format!("args = {:?}\n", server.args));
+                }
+
+                if !server.env.is_empty() {
+                    // Convert HashMap to TOML inline table format
+                    let env_pairs: Vec<String> = server.env
+                        .iter()
+                        .map(|(k, v)| format!("\"{}\" = \"{}\"", k, v))
+                        .collect();
+                    toml_config.push_str(&format!("env = {{{}}}\n", env_pairs.join(", ")));
+                }
+
+                toml_config.push('\n');
+            }
+        }
+
         Ok(TranslationResult {
             content: toml_config.clone(),
             config_files: vec![
@@ -135,7 +161,22 @@ impl CLIAdapter for TomlCLIAdapter {
                     permissions: Some("0644".to_string()),
                 },
             ],
-            env_vars: vec!["OPENAI_API_KEY".to_string()],
+            env_vars: {
+                let mut env_vars = vec!["OPENAI_API_KEY".to_string()];
+
+                // Add MCP server environment variables
+                if let Some(mcp_config) = &universal.mcp_config {
+                    for server in &mcp_config.servers {
+                        for env_var in server.env.keys() {
+                            if !env_vars.contains(env_var) {
+                                env_vars.push(env_var.clone());
+                            }
+                        }
+                    }
+                }
+
+                env_vars
+            },
         })
     }
 
@@ -335,6 +376,7 @@ mod tests {
                 capabilities: vec!["coding".to_string()],
                 instructions: "Write clean, well-documented code.".to_string(),
             },
+            mcp_config: None,
         };
 
         let result = adapter.to_cli_config(&universal).await.unwrap();
@@ -367,6 +409,7 @@ mod tests {
                 capabilities: vec!["coding".to_string()],
                 instructions: "Write clean code.".to_string(),
             },
+            mcp_config: None,
         };
 
         let result = adapter.to_cli_config(&universal).await.unwrap();
@@ -376,5 +419,61 @@ mod tests {
             .contains("sandbox_mode = \"workspace-write\""));
         assert!(result.config_files.len() == 2); // config.toml + AGENTS.md
         assert!(result.env_vars.contains(&"OPENAI_API_KEY".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_codex_adapter_with_mcp_servers() {
+        let adapter = TomlCLIAdapter;
+
+        // Create test MCP server configuration
+        let mut toolman_env = std::collections::HashMap::new();
+        toolman_env.insert(
+            "TOOLMAN_SERVER_URL".to_string(),
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string(),
+        );
+
+        let universal = UniversalConfig {
+            context: ContextConfig {
+                project_name: "Test Project".to_string(),
+                project_description: "A test project".to_string(),
+                architecture_notes: "".to_string(),
+                constraints: vec![],
+            },
+            tools: vec![],
+            settings: SettingsConfig {
+                model: "gpt-4".to_string(),
+                temperature: 0.7,
+                max_tokens: 4000,
+                timeout: 300,
+                sandbox_mode: "workspace-write".to_string(),
+            },
+            agent: AgentConfig {
+                role: "developer".to_string(),
+                capabilities: vec!["coding".to_string()],
+                instructions: "Write clean code.".to_string(),
+            },
+            mcp_config: Some(UniversalMCPConfig {
+                servers: vec![
+                    MCPServer {
+                        name: "toolman".to_string(),
+                        command: "toolman".to_string(),
+                        args: vec!["--working-dir".to_string(), "/workspace".to_string()],
+                        env: toolman_env,
+                    }
+                ],
+            }),
+        };
+
+        let result = adapter.to_cli_config(&universal).await.unwrap();
+
+        // Check that MCP server configuration is included in TOML format
+        assert!(result.content.contains("[mcp_servers.toolman]"));
+        assert!(result.content.contains("command = \"toolman\""));
+        assert!(result.content.contains("args = [\"--working-dir\", \"/workspace\"]"));
+        assert!(result.content.contains("TOOLMAN_SERVER_URL"));
+
+        // Check that MCP server environment variables are included
+        assert!(result.env_vars.contains(&"OPENAI_API_KEY".to_string()));
+        assert!(result.env_vars.contains(&"TOOLMAN_SERVER_URL".to_string()));
     }
 }

@@ -139,6 +139,8 @@ pub struct UniversalConfig {
     pub settings: SettingsConfig,
     /// Agent-specific configuration
     pub agent: AgentConfig,
+    /// MCP server configuration
+    pub mcp_config: Option<UniversalMCPConfig>,
 }
 
 /// Project context configuration
