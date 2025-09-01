@@ -39,7 +39,7 @@ impl CLIExecutionAdapter {
 
         // Execute the command
         let output = command.output().await.map_err(|e| {
-            AdapterError::ExecutionFailed(format!("Failed to execute command: {}", e))
+            AdapterError::ExecutionFailed(format!("Failed to execute command: {e}"))
         })?;
 
         let duration = start_time.elapsed();

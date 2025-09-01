@@ -33,6 +33,12 @@ pub struct CLIRouter {
     default_fallback_chain: Vec<CLIType>,
 }
 
+impl Default for CLIRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CLIRouter {
     /// Create a new CLI router
     pub fn new() -> Self {
@@ -126,10 +132,10 @@ impl CLIRouter {
         criteria: &CLISelectionCriteria,
     ) -> bool {
         // Discover CLI if we haven't already
-        if self.discovery.get_profile(cli_type).is_none() {
-            if let Err(_) = self.discovery.discover_cli(cli_type).await {
-                return false; // Can't discover = not available
-            }
+        if self.discovery.get_profile(cli_type).is_none()
+            && self.discovery.discover_cli(cli_type).await.is_err()
+        {
+            return false; // Can't discover = not available
         }
 
         let profile = match self.discovery.get_profile(cli_type) {

@@ -6,11 +6,18 @@
 use crate::cli::types::*;
 use std::collections::HashMap;
 use tokio::process::Command;
+use tracing::info;
 
 /// Discovery service for profiling CLI tools
 pub struct DiscoveryService {
     /// Cache of discovered CLI profiles
     discovered_profiles: HashMap<CLIType, CLIProfile>,
+}
+
+impl Default for DiscoveryService {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DiscoveryService {
@@ -23,7 +30,7 @@ impl DiscoveryService {
 
     /// Discover a CLI's capabilities and create a profile
     pub async fn discover_cli(&mut self, cli_type: CLIType) -> Result<CLIProfile> {
-        println!("🔍 Starting discovery for {:?}", cli_type);
+        info!("🔍 Starting discovery for {cli_type:?}");
 
         // Phase 1: Basic availability check
         let _availability = self.check_availability(cli_type).await?;
@@ -49,7 +56,7 @@ impl DiscoveryService {
         // Cache the profile
         self.discovered_profiles.insert(cli_type, profile.clone());
 
-        println!("✅ Discovery complete for {:?}", cli_type);
+        info!("✅ Discovery complete for {cli_type:?}");
         Ok(profile)
     }
 
@@ -61,9 +68,7 @@ impl DiscoveryService {
             .args(&args)
             .output()
             .await
-            .map_err(|e| {
-                DiscoveryError::CommandFailed(format!("Failed to run {}: {}", command, e))
-            })?;
+            .map_err(|e| DiscoveryError::CommandFailed(format!("Failed to run {command}: {e}")))?;
 
         Ok(CLIAvailability {
             available: output.status.success(),

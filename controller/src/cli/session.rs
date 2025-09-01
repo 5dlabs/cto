@@ -94,6 +94,12 @@ pub struct MemorySessionPersistence {
     sessions: Arc<RwLock<HashMap<String, SessionState>>>,
 }
 
+impl Default for MemorySessionPersistence {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemorySessionPersistence {
     pub fn new() -> Self {
         Self {
@@ -143,6 +149,12 @@ pub struct SessionManager {
     persistence: Box<dyn SessionPersistence>,
     /// Active sessions cache
     active_sessions: Arc<RwLock<HashMap<String, SessionState>>>,
+}
+
+impl Default for SessionManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SessionManager {

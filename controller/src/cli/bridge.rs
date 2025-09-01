@@ -49,9 +49,9 @@ impl CLIAdapter for MarkdownCLIAdapter {
         if !universal.context.constraints.is_empty() {
             claude_md.push_str("# Constraints\n\n");
             for constraint in &universal.context.constraints {
-                claude_md.push_str(&format!("- {}\n", constraint));
+                claude_md.push_str(&format!("- {constraint}\n"));
             }
-            claude_md.push_str("\n");
+            claude_md.push('\n');
         }
 
         // Agent instructions
@@ -112,7 +112,7 @@ impl CLIAdapter for TomlCLIAdapter {
             "workspace-write" => "on-failure",
             _ => "never",
         };
-        toml_config.push_str(&format!("approval_policy = \"{}\"\n", approval_policy));
+        toml_config.push_str(&format!("approval_policy = \"{approval_policy}\"\n"));
 
         // Agent instructions as project doc
         if !universal.agent.instructions.is_empty() {
@@ -240,7 +240,7 @@ impl ConfigurationBridge {
         let adapter = self
             .adapters
             .get(&cli_type)
-            .ok_or_else(|| BridgeError::UnsupportedCLI(cli_type))?;
+            .ok_or(BridgeError::UnsupportedCLI(cli_type))?;
 
         adapter.to_cli_config(universal).await
     }
@@ -255,7 +255,7 @@ impl ConfigurationBridge {
         let adapter = self
             .adapters
             .get(&cli_type)
-            .ok_or_else(|| BridgeError::UnsupportedCLI(cli_type))?;
+            .ok_or(BridgeError::UnsupportedCLI(cli_type))?;
 
         adapter.generate_command(task, config).await
     }
@@ -265,7 +265,7 @@ impl ConfigurationBridge {
         let adapter = self
             .adapters
             .get(&cli_type)
-            .ok_or_else(|| BridgeError::UnsupportedCLI(cli_type))?;
+            .ok_or(BridgeError::UnsupportedCLI(cli_type))?;
 
         Ok(adapter.required_env_vars())
     }
