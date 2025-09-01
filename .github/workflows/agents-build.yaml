@@ -166,8 +166,8 @@ jobs:
             image: codex
             context: ./infra/images/codex
             file: ./infra/images/codex/Dockerfile
-            version_type: pip
-            version_pkg: "openai"
+            version_type: npm
+            version_pkg: "@openai/codex"
     steps:
       - uses: actions/checkout@v4
 

@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=ghcr.io/5dlabs/runtime:latest
-FROM ${BASE_IMAGE}
+FROM node:18-slim
 
 ARG TZ
 ENV TZ="$TZ"
