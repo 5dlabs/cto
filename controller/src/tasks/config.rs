@@ -286,6 +286,7 @@ impl Default for ControllerConfig {
                     tag: "MISSING_IMAGE_CONFIG".to_string(),
                 },
                 cli_images: HashMap::new(),
+                agent_cli_configs: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
                 input_bridge: InputBridgeConfig {
                     enabled: true,

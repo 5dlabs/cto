@@ -135,7 +135,8 @@ impl CLIAdapter for TomlCLIAdapter {
 
                 if !server.env.is_empty() {
                     // Convert HashMap to TOML inline table format
-                    let env_pairs: Vec<String> = server.env
+                    let env_pairs: Vec<String> = server
+                        .env
                         .iter()
                         .map(|(k, v)| format!("\"{}\" = \"{}\"", k, v))
                         .collect();
@@ -453,14 +454,12 @@ mod tests {
                 instructions: "Write clean code.".to_string(),
             },
             mcp_config: Some(UniversalMCPConfig {
-                servers: vec![
-                    MCPServer {
-                        name: "toolman".to_string(),
-                        command: "toolman".to_string(),
-                        args: vec!["--working-dir".to_string(), "/workspace".to_string()],
-                        env: toolman_env,
-                    }
-                ],
+                servers: vec![MCPServer {
+                    name: "toolman".to_string(),
+                    command: "toolman".to_string(),
+                    args: vec!["--working-dir".to_string(), "/workspace".to_string()],
+                    env: toolman_env,
+                }],
             }),
         };
 
@@ -469,7 +468,9 @@ mod tests {
         // Check that MCP server configuration is included in TOML format
         assert!(result.content.contains("[mcp_servers.toolman]"));
         assert!(result.content.contains("command = \"toolman\""));
-        assert!(result.content.contains("args = [\"--working-dir\", \"/workspace\"]"));
+        assert!(result
+            .content
+            .contains("args = [\"--working-dir\", \"/workspace\"]"));
         assert!(result.content.contains("TOOLMAN_SERVER_URL"));
 
         // Check that MCP server environment variables are included

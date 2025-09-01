@@ -88,8 +88,12 @@ impl<'a> CodeResourceManager<'a> {
         };
 
         info!("📦 Ensuring PVC exists: {}", pvc_name);
-        self.ensure_pvc_exists(&pvc_name, service_name, code_run_ref.spec.github_app.as_deref())
-            .await?;
+        self.ensure_pvc_exists(
+            &pvc_name,
+            service_name,
+            code_run_ref.spec.github_app.as_deref(),
+        )
+        .await?;
         info!("✅ PVC check completed");
 
         // Don't cleanup resources at start - let idempotent creation handle it
@@ -1225,83 +1229,39 @@ impl<'a> CodeResourceManager<'a> {
             }
         };
 
-        // Extract agent name from GitHub app
+        // Extract agent name from GitHub app (for future use if needed)
         let classifier = AgentClassifier::new();
-        let agent_name = match classifier.extract_agent_name(github_app) {
+        let _agent_name = match classifier.extract_agent_name(github_app) {
             Ok(name) => name.to_lowercase(),
             Err(_) => {
-                info!("Could not extract agent name from {}, using defaults", github_app);
+                info!(
+                    "Could not extract agent name from {}, using defaults",
+                    github_app
+                );
                 return Ok(code_run.clone());
             }
         };
 
-        // Look up CLI config based on agent name
-        let cli_config = match agent_name.as_str() {
-            "morgan" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Claude,
-                model: "claude-3-opus-20240229".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(8192),
-                temperature: Some(0.8),
-            }),
-            "rex" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Claude,
-                model: "claude-3-5-sonnet-20241022".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(4096),
-                temperature: Some(0.7),
-            }),
-            "blaze" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Codex,
-                model: "gpt-4".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(4096),
-                temperature: Some(0.6),
-            }),
-            "cipher" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Codex,
-                model: "gpt-4".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(2048),
-                temperature: Some(0.5),
-            }),
-            "cleo" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Claude,
-                model: "claude-3-haiku-20240307".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(2048),
-                temperature: Some(0.3),
-            }),
-            "tess" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Claude,
-                model: "claude-3-5-sonnet-20241022".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(4096),
-                temperature: Some(0.7),
-            }),
-            "stitch" => Some(crate::crds::CLIConfig {
-                cli_type: crate::cli::types::CLIType::Codex,
-                model: "gpt-4".to_string(),
-                settings: std::collections::HashMap::new(),
-                max_tokens: Some(2048),
-                temperature: Some(0.5),
-            }),
-            _ => None,
-        };
-
-        if let Some(cli_config) = cli_config {
-            info!("🔧 Auto-populating CLI config for agent {}: {} ({})", github_app, cli_config.cli_type, cli_config.model);
+        // Look up CLI config from loaded configuration (no hardcoded values)
+        if let Some(agent_cli_config) = self.config.agent.agent_cli_configs.get(github_app) {
+            info!(
+                "🔧 Auto-populating CLI config for agent {}: {} ({})",
+                github_app, agent_cli_config.cli_type, agent_cli_config.model
+            );
 
             // Create a new CodeRun with the CLI config populated
             let mut new_spec = code_run.spec.clone();
-            new_spec.cli_config = Some(cli_config);
+            new_spec.cli_config = Some(agent_cli_config.clone());
 
             let mut new_code_run = (**code_run).clone();
             new_code_run.spec = new_spec;
 
             Ok(Arc::new(new_code_run))
         } else {
-            info!("No CLI config found for agent {}, using defaults", github_app);
+            info!(
+                "No CLI config found for agent {} in configuration, using defaults",
+                github_app
+            );
             Ok(code_run.clone())
         }
     }

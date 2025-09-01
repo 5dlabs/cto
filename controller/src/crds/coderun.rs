@@ -53,8 +53,6 @@ pub struct CLIConfig {
     #[serde(default)]
     pub settings: HashMap<String, serde_json::Value>,
 
-
-
     /// Maximum output tokens
     #[serde(default, rename = "maxTokens")]
     pub max_tokens: Option<u32>,
