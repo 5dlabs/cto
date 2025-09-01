@@ -1,10 +1,11 @@
 //! Core types for CLI-agnostic platform
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Supported CLI types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum CLIType {
     /// Anthropic Claude Code CLI
     Claude,

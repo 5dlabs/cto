@@ -4,9 +4,7 @@
 //! their capabilities, configuration requirements, and compatibility.
 
 use crate::cli::types::*;
-use async_trait::async_trait;
 use std::collections::HashMap;
-use std::process::Stdio;
 use tokio::process::Command;
 
 /// Discovery service for profiling CLI tools
@@ -28,7 +26,7 @@ impl DiscoveryService {
         println!("🔍 Starting discovery for {:?}", cli_type);
 
         // Phase 1: Basic availability check
-        let availability = self.check_availability(cli_type).await?;
+        let _availability = self.check_availability(cli_type).await?;
 
         // Phase 2: Configuration format discovery
         let configuration = self.discover_configuration(cli_type).await?;
@@ -118,8 +116,8 @@ impl DiscoveryService {
     async fn assess_capabilities(&self, cli_type: CLIType) -> Result<CLICapabilities> {
         // For now, return known capabilities based on our research
         match cli_type {
-            CLIType::Claude => Ok(CLICapabilities {
-                max_context_window: 200000,
+            CLIType::Claude => Ok(            CLICapabilities {
+                max_context_window: 200_000,
                 supports_tools: true,
                 supports_vision: false,
                 supports_web_search: false,
@@ -128,7 +126,7 @@ impl DiscoveryService {
                 session_persistence: SessionType::Persistent,
             }),
             CLIType::Codex => Ok(CLICapabilities {
-                max_context_window: 128000,
+                max_context_window: 128_000,
                 supports_tools: true,
                 supports_vision: false,
                 supports_web_search: true,
@@ -137,7 +135,7 @@ impl DiscoveryService {
                 session_persistence: SessionType::Persistent,
             }),
             CLIType::OpenCode => Ok(CLICapabilities {
-                max_context_window: 128000,
+                max_context_window: 128_000,
                 supports_tools: true,
                 supports_vision: true,
                 supports_web_search: true,

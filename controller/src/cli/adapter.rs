@@ -4,7 +4,6 @@
 //! Manages the actual execution of CLI commands and result processing.
 
 use crate::cli::types::*;
-use async_trait::async_trait;
 use std::process::Stdio;
 use tokio::process::Command;
 
@@ -104,7 +103,7 @@ impl CLIExecutionAdapter {
             return Err(AdapterError::MissingEnvironmentVariables(missing));
         }
 
-        Ok(required_vars.clone())
+        Ok(required_vars.to_vec())
     }
 
     /// Get CLI-specific execution hints
@@ -313,6 +312,9 @@ pub enum AdapterError {
 
     #[error("CLI validation failed: {0}")]
     ValidationError(String),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, AdapterError>;
@@ -355,8 +357,8 @@ mod tests {
     async fn test_environment_validation() {
         let adapter = CLIExecutionAdapter::new(CLIType::Codex);
 
-        // This will fail because OPENAI_API_KEY is not set in test environment
-        let result = adapter.validate_environment(&["OPENAI_API_KEY".to_string()]).await;
+        // This will fail because NON_EXISTENT_TEST_VAR is definitely not set
+        let result = adapter.validate_environment(&["NON_EXISTENT_TEST_VAR".to_string()]).await;
         assert!(result.is_err());
 
         // This should pass

@@ -6,7 +6,6 @@
 use crate::cli::types::*;
 use crate::cli::bridge::ConfigurationBridge;
 use crate::cli::discovery::DiscoveryService;
-use async_trait::async_trait;
 use std::collections::HashMap;
 
 /// CLI selection preferences

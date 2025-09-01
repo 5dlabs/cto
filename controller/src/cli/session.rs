@@ -5,6 +5,7 @@
 
 use crate::cli::types::*;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -55,7 +56,7 @@ pub struct ExecutionResult {
 }
 
 /// Session status
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SessionStatus {
     /// Session is active and ready
     Active,

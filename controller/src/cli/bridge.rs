@@ -22,11 +22,11 @@ pub trait CLIAdapter: Send + Sync {
     fn cli_type(&self) -> CLIType;
 }
 
-/// Claude Code adapter
-pub struct ClaudeAdapter;
+/// Markdown format CLI adapter (Claude, Cursor)
+pub struct MarkdownCLIAdapter;
 
 #[async_trait]
-impl CLIAdapter for ClaudeAdapter {
+impl CLIAdapter for MarkdownCLIAdapter {
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
         // Generate CLAUDE.md content
         let mut claude_md = String::new();
@@ -84,11 +84,11 @@ impl CLIAdapter for ClaudeAdapter {
     }
 }
 
-/// Codex CLI adapter
-pub struct CodexAdapter;
+/// TOML format CLI adapter (Codex)
+pub struct TomlCLIAdapter;
 
 #[async_trait]
-impl CLIAdapter for CodexAdapter {
+impl CLIAdapter for TomlCLIAdapter {
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
         // Generate TOML config for Codex
         let mut toml_config = String::new();
@@ -152,11 +152,11 @@ impl CLIAdapter for CodexAdapter {
     }
 }
 
-/// OpenCode adapter
-pub struct OpenCodeAdapter;
+/// JSON format CLI adapter (OpenCode)
+pub struct JsonCLIAdapter;
 
 #[async_trait]
-impl CLIAdapter for OpenCodeAdapter {
+impl CLIAdapter for JsonCLIAdapter {
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
         // Generate JSON config for OpenCode
         let config = serde_json::json!({
@@ -215,9 +215,9 @@ impl ConfigurationBridge {
     pub fn new() -> Self {
         let mut adapters = std::collections::HashMap::new();
 
-        adapters.insert(CLIType::Claude, Box::new(ClaudeAdapter) as Box<dyn CLIAdapter>);
-        adapters.insert(CLIType::Codex, Box::new(CodexAdapter) as Box<dyn CLIAdapter>);
-        adapters.insert(CLIType::OpenCode, Box::new(OpenCodeAdapter) as Box<dyn CLIAdapter>);
+        adapters.insert(CLIType::Claude, Box::new(MarkdownCLIAdapter) as Box<dyn CLIAdapter>);
+        adapters.insert(CLIType::Codex, Box::new(TomlCLIAdapter) as Box<dyn CLIAdapter>);
+        adapters.insert(CLIType::OpenCode, Box::new(JsonCLIAdapter) as Box<dyn CLIAdapter>);
 
         Self { adapters }
     }
@@ -290,7 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_claude_adapter() {
-        let adapter = ClaudeAdapter;
+        let adapter = MarkdownCLIAdapter;
         let universal = UniversalConfig {
             context: ContextConfig {
                 project_name: "Test Project".to_string(),
@@ -322,7 +322,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_codex_adapter() {
-        let adapter = CodexAdapter;
+        let adapter = TomlCLIAdapter;
         let universal = UniversalConfig {
             context: ContextConfig {
                 project_name: "Test Project".to_string(),
