@@ -52,7 +52,9 @@ pub struct AgentConfig {
     #[serde(default)]
     pub cli_images: HashMap<String, ImageConfig>,
 
-
+    /// Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
+    #[serde(default, rename = "agentCliConfigs")]
+    pub agent_cli_configs: HashMap<String, crate::crds::CLIConfig>,
 
     /// Image pull secrets for private registries
     #[serde(default, rename = "imagePullSecrets")]
