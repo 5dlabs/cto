@@ -616,10 +616,8 @@ impl<'a> CodeResourceManager<'a> {
             github_app
         );
 
-        let image = format!(
-            "{}:{}",
-            self.config.agent.image.repository, self.config.agent.image.tag
-        );
+        // Select image based on CLI type (if specified) or fallback to default
+        let image = self.select_image_for_cli(code_run);
 
         // Build environment variables for code tasks
         // Note: Critical system vars (CODERUN_NAME, WORKFLOW_NAME, NAMESPACE) are added
@@ -1204,5 +1202,29 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         sanitized
+    }
+
+    /// Select the appropriate Docker image based on the CLI type specified in the CodeRun
+    fn select_image_for_cli(&self, code_run: &CodeRun) -> String {
+        // Check if CLI config is specified
+        if let Some(cli_config) = &code_run.spec.cli_config {
+            // Try to get CLI-specific image configuration
+            let cli_key = cli_config.cli_type.to_string().to_lowercase();
+            if let Some(cli_image) = self.config.agent.cli_images.get(&cli_key) {
+                return format!("{}:{}", cli_image.repository, cli_image.tag);
+            }
+
+            // Fallback: construct image name from CLI type
+            let default_registry = "ghcr.io/5dlabs";
+            let image_name = cli_key;
+            let tag = &self.config.agent.image.tag;
+            return format!("{}/{}:{}", default_registry, image_name, tag);
+        }
+
+        // No CLI config specified - use default image (backward compatibility)
+        format!(
+            "{}:{}",
+            self.config.agent.image.repository, self.config.agent.image.tag
+        )
     }
 }

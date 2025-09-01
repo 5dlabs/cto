@@ -6,6 +6,7 @@
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{api::Api, Client};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Main controller configuration structure
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -44,8 +45,12 @@ pub struct JobConfig {
 /// Agent configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentConfig {
-    /// Container image configuration
+    /// Default container image configuration (for backward compatibility)
     pub image: ImageConfig,
+
+    /// CLI-specific image configurations
+    #[serde(default)]
+    pub cli_images: HashMap<String, ImageConfig>,
 
     /// Image pull secrets for private registries
     #[serde(default, rename = "imagePullSecrets")]
@@ -276,6 +281,7 @@ impl Default for ControllerConfig {
                     repository: "MISSING_IMAGE_CONFIG".to_string(),
                     tag: "MISSING_IMAGE_CONFIG".to_string(),
                 },
+                cli_images: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
                 input_bridge: InputBridgeConfig {
                     enabled: true,
