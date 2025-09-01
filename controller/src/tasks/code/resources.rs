@@ -1239,14 +1239,14 @@ impl<'a> CodeResourceManager<'a> {
         let cli_config = match agent_name.as_str() {
             "morgan" => Some(crate::crds::CLIConfig {
                 cli_type: crate::cli::types::CLIType::Claude,
-                model: "opus".to_string(),
+                model: "claude-3-opus-20240229".to_string(),
                 settings: std::collections::HashMap::new(),
                 max_tokens: Some(8192),
                 temperature: Some(0.8),
             }),
             "rex" => Some(crate::crds::CLIConfig {
                 cli_type: crate::cli::types::CLIType::Claude,
-                model: "sonnet".to_string(),
+                model: "claude-3-5-sonnet-20241022".to_string(),
                 settings: std::collections::HashMap::new(),
                 max_tokens: Some(4096),
                 temperature: Some(0.7),
@@ -1267,14 +1267,14 @@ impl<'a> CodeResourceManager<'a> {
             }),
             "cleo" => Some(crate::crds::CLIConfig {
                 cli_type: crate::cli::types::CLIType::Claude,
-                model: "haiku".to_string(),
+                model: "claude-3-haiku-20240307".to_string(),
                 settings: std::collections::HashMap::new(),
                 max_tokens: Some(2048),
                 temperature: Some(0.3),
             }),
             "tess" => Some(crate::crds::CLIConfig {
                 cli_type: crate::cli::types::CLIType::Claude,
-                model: "sonnet".to_string(),
+                model: "claude-3-5-sonnet-20241022".to_string(),
                 settings: std::collections::HashMap::new(),
                 max_tokens: Some(4096),
                 temperature: Some(0.7),
