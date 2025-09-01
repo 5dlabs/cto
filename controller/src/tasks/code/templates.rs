@@ -396,6 +396,7 @@ mod tests {
                 ..Default::default()
             },
             spec: CodeRunSpec {
+                cli_config: None,
                 task_id: 1,
                 service: "test-service".to_string(),
                 repository_url: "https://github.com/test/repo".to_string(),

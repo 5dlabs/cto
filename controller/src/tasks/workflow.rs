@@ -292,6 +292,7 @@ mod tests {
                 ..Default::default()
             },
             spec: crate::crds::coderun::CodeRunSpec {
+                cli_config: None,
                 task_id: 5,
                 service: "test".to_string(),
                 repository_url: "test".to_string(),
@@ -327,6 +328,7 @@ mod tests {
                 ..Default::default()
             },
             spec: crate::crds::coderun::CodeRunSpec {
+                cli_config: None,
                 task_id: 5,
                 service: "test".to_string(),
                 repository_url: "test".to_string(),

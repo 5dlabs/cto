@@ -17,6 +17,59 @@ agent:
     repository: ghcr.io/5dlabs/claude
     tag: "latest"
     pullPolicy: Always
+
+  # CLI-specific image configurations (maps CLI types to Docker images)
+  cliImages:
+    codex:
+      repository: ghcr.io/5dlabs/codex
+      tag: "latest"
+    opencode:
+      repository: ghcr.io/5dlabs/opencode
+      tag: "latest"
+    claude:
+      repository: ghcr.io/5dlabs/claude
+      tag: "latest"
+
+  # Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
+  agentCliConfigs:
+    "5DLabs-Morgan":
+      cliType: "claude"
+      model: "claude-3-opus-20240229"
+      maxTokens: 8192
+      temperature: 0.8
+    "5DLabs-Rex":
+      cliType: "claude"
+      model: "claude-3-5-sonnet-20241022"
+      maxTokens: 4096
+      temperature: 0.7
+    "5DLabs-Blaze":
+      cliType: "codex"
+      model: "gpt-4"
+      maxTokens: 4096
+      temperature: 0.6
+    "5DLabs-Cipher":
+      cliType: "codex"
+      model: "gpt-4"
+      maxTokens: 2048
+      temperature: 0.5
+    "5DLabs-Cleo":
+      cliType: "claude"
+      model: "claude-3-haiku-20240307"
+      maxTokens: 2048
+      temperature: 0.3
+    "5DLabs-Tess":
+      cliType: "claude"
+      model: "claude-3-5-sonnet-20241022"
+      maxTokens: 4096
+      temperature: 0.7
+    "5DLabs-Stitch":
+      cliType: "codex"
+      model: "gpt-4"
+      maxTokens: 2048
+      temperature: 0.5
+
+
+
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 

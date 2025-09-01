@@ -1,5 +1,6 @@
 //! `CodeRun` Custom Resource Definition for code implementation tasks
 
+use crate::cli::types::CLIType;
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -36,6 +37,29 @@ fn default_continue_session() -> bool {
 /// Default function for `overwrite_memory` field
 fn default_overwrite_memory() -> bool {
     false
+}
+
+/// CLI-specific configuration
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct CLIConfig {
+    /// CLI type to use (claude, codex, opencode, cursor, etc.)
+    #[serde(rename = "cliType")]
+    pub cli_type: CLIType,
+
+    /// Model identifier (CLI-specific, e.g., "sonnet", "gpt-4", "claude-3-5-sonnet-20241022")
+    pub model: String,
+
+    /// CLI-specific settings (key-value pairs)
+    #[serde(default)]
+    pub settings: HashMap<String, serde_json::Value>,
+
+    /// Maximum output tokens
+    #[serde(default, rename = "maxTokens")]
+    pub max_tokens: Option<u32>,
+
+    /// Temperature setting
+    #[serde(default)]
+    pub temperature: Option<f32>,
 }
 
 /// `CodeRun` CRD for code implementation tasks
@@ -118,6 +142,10 @@ pub struct CodeRunSpec {
     /// Kubernetes ServiceAccount name for the Job pods created to execute this CodeRun
     #[serde(default, rename = "serviceAccountName")]
     pub service_account_name: Option<String>,
+
+    /// CLI configuration for CLI-agnostic operation (optional)
+    #[serde(default, rename = "cliConfig")]
+    pub cli_config: Option<CLIConfig>,
 }
 
 /// Status of the `CodeRun`
@@ -186,4 +214,32 @@ pub struct CodeRunCondition {
     /// Human-readable message about the condition
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cli_config_creation() {
+        let cli_config = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "gpt-4".to_string(),
+            settings: {
+                let mut settings = HashMap::new();
+                settings.insert(
+                    "approval_policy".to_string(),
+                    serde_json::json!("on-failure"),
+                );
+                settings
+            },
+            max_tokens: Some(4096),
+            temperature: Some(0.7),
+        };
+
+        assert_eq!(cli_config.cli_type, CLIType::Codex);
+        assert_eq!(cli_config.model, "gpt-4");
+        assert_eq!(cli_config.max_tokens, Some(4096));
+        assert_eq!(cli_config.temperature, Some(0.7));
+    }
 }

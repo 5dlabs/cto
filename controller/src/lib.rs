@@ -21,6 +21,7 @@
 //! This crate provides the core functionality for the unified orchestration service,
 //! including Kubernetes client wrapper, job orchestration, and request handling.
 
+pub mod cli;
 pub mod crds;
 pub mod remediation;
 pub mod tasks;
