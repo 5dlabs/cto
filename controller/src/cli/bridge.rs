@@ -34,7 +34,10 @@ impl CLIAdapter for MarkdownCLIAdapter {
         // Project context
         claude_md.push_str("# Project Context\n\n");
         claude_md.push_str(&format!("Project: {}\n", universal.context.project_name));
-        claude_md.push_str(&format!("Description: {}\n\n", universal.context.project_description));
+        claude_md.push_str(&format!(
+            "Description: {}\n\n",
+            universal.context.project_description
+        ));
 
         // Architecture notes
         if !universal.context.architecture_notes.is_empty() {
@@ -57,22 +60,17 @@ impl CLIAdapter for MarkdownCLIAdapter {
 
         Ok(TranslationResult {
             content: claude_md.clone(),
-            config_files: vec![
-                ConfigFile {
-                    path: "/workspace/CLAUDE.md".to_string(),
-                    content: claude_md,
-                    permissions: Some("0644".to_string()),
-                }
-            ],
+            config_files: vec![ConfigFile {
+                path: "/workspace/CLAUDE.md".to_string(),
+                content: claude_md,
+                permissions: Some("0644".to_string()),
+            }],
             env_vars: vec![], // Claude doesn't require specific env vars
         })
     }
 
     async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
-        Ok(vec![
-            "claude-code".to_string(),
-            task.to_string(),
-        ])
+        Ok(vec!["claude-code".to_string(), task.to_string()])
     }
 
     fn required_env_vars(&self) -> Vec<String> {
@@ -95,11 +93,17 @@ impl CLIAdapter for TomlCLIAdapter {
 
         // Basic settings
         toml_config.push_str(&format!("model = \"{}\"\n", universal.settings.model));
-        toml_config.push_str(&format!("sandbox_mode = \"{}\"\n", universal.settings.sandbox_mode));
+        toml_config.push_str(&format!(
+            "sandbox_mode = \"{}\"\n",
+            universal.settings.sandbox_mode
+        ));
 
         // Model constraints
         if universal.settings.max_tokens > 0 {
-            toml_config.push_str(&format!("model_max_output_tokens = {}\n", universal.settings.max_tokens));
+            toml_config.push_str(&format!(
+                "model_max_output_tokens = {}\n",
+                universal.settings.max_tokens
+            ));
         }
 
         // Approval policy based on sandbox mode
@@ -112,7 +116,8 @@ impl CLIAdapter for TomlCLIAdapter {
 
         // Agent instructions as project doc
         if !universal.agent.instructions.is_empty() {
-            toml_config.push_str(&format!("project_doc_max_bytes = {}\n", 32768)); // 32KB
+            toml_config.push_str(&format!("project_doc_max_bytes = {}\n", 32768));
+            // 32KB
         }
 
         Ok(TranslationResult {
@@ -128,7 +133,7 @@ impl CLIAdapter for TomlCLIAdapter {
                     path: "/workspace/AGENTS.md".to_string(),
                     content: universal.agent.instructions.clone(),
                     permissions: Some("0644".to_string()),
-                }
+                },
             ],
             env_vars: vec!["OPENAI_API_KEY".to_string()],
         })
@@ -178,22 +183,17 @@ impl CLIAdapter for JsonCLIAdapter {
 
         Ok(TranslationResult {
             content: json_config.clone(),
-            config_files: vec![
-                ConfigFile {
-                    path: "/home/node/.config/opencode/config.json".to_string(),
-                    content: json_config,
-                    permissions: Some("0644".to_string()),
-                }
-            ],
+            config_files: vec![ConfigFile {
+                path: "/home/node/.config/opencode/config.json".to_string(),
+                content: json_config,
+                permissions: Some("0644".to_string()),
+            }],
             env_vars: vec![], // OpenCode uses its own auth
         })
     }
 
     async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
-        Ok(vec![
-            "opencode".to_string(),
-            task.to_string(),
-        ])
+        Ok(vec!["opencode".to_string(), task.to_string()])
     }
 
     fn required_env_vars(&self) -> Vec<String> {
@@ -215,24 +215,46 @@ impl ConfigurationBridge {
     pub fn new() -> Self {
         let mut adapters = std::collections::HashMap::new();
 
-        adapters.insert(CLIType::Claude, Box::new(MarkdownCLIAdapter) as Box<dyn CLIAdapter>);
-        adapters.insert(CLIType::Codex, Box::new(TomlCLIAdapter) as Box<dyn CLIAdapter>);
-        adapters.insert(CLIType::OpenCode, Box::new(JsonCLIAdapter) as Box<dyn CLIAdapter>);
+        adapters.insert(
+            CLIType::Claude,
+            Box::new(MarkdownCLIAdapter) as Box<dyn CLIAdapter>,
+        );
+        adapters.insert(
+            CLIType::Codex,
+            Box::new(TomlCLIAdapter) as Box<dyn CLIAdapter>,
+        );
+        adapters.insert(
+            CLIType::OpenCode,
+            Box::new(JsonCLIAdapter) as Box<dyn CLIAdapter>,
+        );
 
         Self { adapters }
     }
 
     /// Translate universal config to CLI-specific format
-    pub async fn translate(&self, universal: &UniversalConfig, cli_type: CLIType) -> Result<TranslationResult> {
-        let adapter = self.adapters.get(&cli_type)
+    pub async fn translate(
+        &self,
+        universal: &UniversalConfig,
+        cli_type: CLIType,
+    ) -> Result<TranslationResult> {
+        let adapter = self
+            .adapters
+            .get(&cli_type)
             .ok_or_else(|| BridgeError::UnsupportedCLI(cli_type))?;
 
         adapter.to_cli_config(universal).await
     }
 
     /// Generate CLI-specific command
-    pub async fn generate_command(&self, task: &str, config: &UniversalConfig, cli_type: CLIType) -> Result<Vec<String>> {
-        let adapter = self.adapters.get(&cli_type)
+    pub async fn generate_command(
+        &self,
+        task: &str,
+        config: &UniversalConfig,
+        cli_type: CLIType,
+    ) -> Result<Vec<String>> {
+        let adapter = self
+            .adapters
+            .get(&cli_type)
             .ok_or_else(|| BridgeError::UnsupportedCLI(cli_type))?;
 
         adapter.generate_command(task, config).await
@@ -240,7 +262,9 @@ impl ConfigurationBridge {
 
     /// Get required environment variables for a CLI
     pub fn required_env_vars(&self, cli_type: CLIType) -> Result<Vec<String>> {
-        let adapter = self.adapters.get(&cli_type)
+        let adapter = self
+            .adapters
+            .get(&cli_type)
             .ok_or_else(|| BridgeError::UnsupportedCLI(cli_type))?;
 
         Ok(adapter.required_env_vars())
@@ -347,7 +371,9 @@ mod tests {
 
         let result = adapter.to_cli_config(&universal).await.unwrap();
         assert!(result.content.contains("model = \"gpt-4\""));
-        assert!(result.content.contains("sandbox_mode = \"workspace-write\""));
+        assert!(result
+            .content
+            .contains("sandbox_mode = \"workspace-write\""));
         assert!(result.config_files.len() == 2); // config.toml + AGENTS.md
         assert!(result.env_vars.contains(&"OPENAI_API_KEY".to_string()));
     }

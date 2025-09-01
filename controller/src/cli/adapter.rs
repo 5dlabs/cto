@@ -38,8 +38,9 @@ impl CLIExecutionAdapter {
         }
 
         // Execute the command
-        let output = command.output().await
-            .map_err(|e| AdapterError::ExecutionFailed(format!("Failed to execute command: {}", e)))?;
+        let output = command.output().await.map_err(|e| {
+            AdapterError::ExecutionFailed(format!("Failed to execute command: {}", e))
+        })?;
 
         let duration = start_time.elapsed();
 
@@ -60,17 +61,24 @@ impl CLIExecutionAdapter {
         for config_file in config_files {
             // Ensure parent directory exists
             if let Some(parent) = std::path::Path::new(&config_file.path).parent() {
-                tokio::fs::create_dir_all(parent).await
-                    .map_err(|e| AdapterError::FilePreparationError(format!(
-                        "Failed to create directory {}: {}", parent.display(), e
-                    )))?;
+                tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                    AdapterError::FilePreparationError(format!(
+                        "Failed to create directory {}: {}",
+                        parent.display(),
+                        e
+                    ))
+                })?;
             }
 
             // Write the file
-            tokio::fs::write(&config_file.path, &config_file.content).await
-                .map_err(|e| AdapterError::FilePreparationError(format!(
-                    "Failed to write file {}: {}", config_file.path, e
-                )))?;
+            tokio::fs::write(&config_file.path, &config_file.content)
+                .await
+                .map_err(|e| {
+                    AdapterError::FilePreparationError(format!(
+                        "Failed to write file {}: {}",
+                        config_file.path, e
+                    ))
+                })?;
 
             // Set permissions if specified
             if let Some(perms) = &config_file.permissions {
@@ -78,7 +86,8 @@ impl CLIExecutionAdapter {
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
-                        let mut permissions = tokio::fs::metadata(&config_file.path).await?.permissions();
+                        let mut permissions =
+                            tokio::fs::metadata(&config_file.path).await?.permissions();
                         permissions.set_mode(mode);
                         tokio::fs::set_permissions(&config_file.path, permissions).await?;
                     }
@@ -124,9 +133,7 @@ impl CLIExecutionAdapter {
                 "Supports multiple AI providers".to_string(),
                 "Uses Bun runtime for execution".to_string(),
             ],
-            _ => vec![
-                "CLI execution will use default settings".to_string(),
-            ],
+            _ => vec!["CLI execution will use default settings".to_string()],
         }
     }
 }
@@ -149,7 +156,12 @@ impl CommandBuilder {
             }
             CLIType::Codex => {
                 if auto_mode {
-                    vec!["codex".to_string(), "exec".to_string(), "--full-auto".to_string(), task.to_string()]
+                    vec![
+                        "codex".to_string(),
+                        "exec".to_string(),
+                        "--full-auto".to_string(),
+                        task.to_string(),
+                    ]
                 } else {
                     vec!["codex".to_string(), task.to_string()]
                 }
@@ -240,7 +252,9 @@ impl ResultProcessor {
     fn process_codex_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
         // Look for config file creation
         if result.stdout.contains("config.toml") {
-            processed.files_modified.push("~/.codex/config.toml".to_string());
+            processed
+                .files_modified
+                .push("~/.codex/config.toml".to_string());
         }
         if result.stdout.contains("AGENTS.md") {
             processed.files_modified.push("AGENTS.md".to_string());
@@ -248,28 +262,29 @@ impl ResultProcessor {
 
         // Extract execution information
         if result.stdout.contains("codex exec") {
-            processed.cli_specific_info.insert(
-                "execution_mode".to_string(),
-                "non-interactive".to_string()
-            );
+            processed
+                .cli_specific_info
+                .insert("execution_mode".to_string(), "non-interactive".to_string());
         }
     }
 
-    fn process_opencode_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+    fn process_opencode_output(
+        &self,
+        result: &CLIExecutionResult,
+        processed: &mut ProcessedResult,
+    ) {
         // Look for cache directory usage
         if result.stdout.contains(".cache/opencode") {
-            processed.cli_specific_info.insert(
-                "cache_used".to_string(),
-                "~/.cache/opencode".to_string()
-            );
+            processed
+                .cli_specific_info
+                .insert("cache_used".to_string(), "~/.cache/opencode".to_string());
         }
 
         // Extract provider information if mentioned
         if result.stdout.contains("provider") {
-            processed.cli_specific_info.insert(
-                "provider_info".to_string(),
-                "multi-provider".to_string()
-            );
+            processed
+                .cli_specific_info
+                .insert("provider_info".to_string(), "multi-provider".to_string());
         }
     }
 
@@ -281,7 +296,9 @@ impl ResultProcessor {
 
         // Basic success indicators
         if result.stdout.contains("success") || result.stdout.contains("complete") {
-            processed.key_outputs.push("Task completed successfully".to_string());
+            processed
+                .key_outputs
+                .push("Task completed successfully".to_string());
         }
     }
 }
@@ -349,8 +366,14 @@ mod tests {
         let claude_builder = CommandBuilder::new(CLIType::Claude);
         let codex_builder = CommandBuilder::new(CLIType::Codex);
 
-        assert_eq!(claude_builder.build_version_command(), vec!["claude-code", "--version"]);
-        assert_eq!(codex_builder.build_version_command(), vec!["codex", "--version"]);
+        assert_eq!(
+            claude_builder.build_version_command(),
+            vec!["claude-code", "--version"]
+        );
+        assert_eq!(
+            codex_builder.build_version_command(),
+            vec!["codex", "--version"]
+        );
     }
 
     #[tokio::test]
@@ -358,7 +381,9 @@ mod tests {
         let adapter = CLIExecutionAdapter::new(CLIType::Codex);
 
         // This will fail because NON_EXISTENT_TEST_VAR is definitely not set
-        let result = adapter.validate_environment(&["NON_EXISTENT_TEST_VAR".to_string()]).await;
+        let result = adapter
+            .validate_environment(&["NON_EXISTENT_TEST_VAR".to_string()])
+            .await;
         assert!(result.is_err());
 
         // This should pass
@@ -383,7 +408,9 @@ mod tests {
 
         assert!(processed.success);
         assert_eq!(processed.files_modified.len(), 2);
-        assert!(processed.files_modified.contains(&"~/.codex/config.toml".to_string()));
+        assert!(processed
+            .files_modified
+            .contains(&"~/.codex/config.toml".to_string()));
         assert!(processed.files_modified.contains(&"AGENTS.md".to_string()));
     }
 }

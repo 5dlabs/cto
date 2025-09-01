@@ -231,7 +231,10 @@ mod tests {
             model: "gpt-4".to_string(),
             settings: {
                 let mut settings = HashMap::new();
-                settings.insert("approval_policy".to_string(), serde_json::json!("on-failure"));
+                settings.insert(
+                    "approval_policy".to_string(),
+                    serde_json::json!("on-failure"),
+                );
                 settings
             },
             sandbox_mode: Some("workspace-write".to_string()),

@@ -13,7 +13,9 @@ pub mod types;
 
 // Re-export commonly used types and structs
 pub use adapter::{CLIExecutionAdapter, CommandBuilder, ResultProcessor};
-pub use bridge::{ConfigurationBridge, CLIAdapter, MarkdownCLIAdapter, TomlCLIAdapter, JsonCLIAdapter};
+pub use bridge::{
+    CLIAdapter, ConfigurationBridge, JsonCLIAdapter, MarkdownCLIAdapter, TomlCLIAdapter,
+};
 pub use discovery::DiscoveryService;
 pub use router::CLIRouter;
 pub use session::{SessionManager, SessionState};

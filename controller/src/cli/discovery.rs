@@ -61,7 +61,9 @@ impl DiscoveryService {
             .args(&args)
             .output()
             .await
-            .map_err(|e| DiscoveryError::CommandFailed(format!("Failed to run {}: {}", command, e)))?;
+            .map_err(|e| {
+                DiscoveryError::CommandFailed(format!("Failed to run {}: {}", command, e))
+            })?;
 
         Ok(CLIAvailability {
             available: output.status.success(),
@@ -116,7 +118,7 @@ impl DiscoveryService {
     async fn assess_capabilities(&self, cli_type: CLIType) -> Result<CLICapabilities> {
         // For now, return known capabilities based on our research
         match cli_type {
-            CLIType::Claude => Ok(            CLICapabilities {
+            CLIType::Claude => Ok(CLICapabilities {
                 max_context_window: 200_000,
                 supports_tools: true,
                 supports_vision: false,
@@ -189,7 +191,10 @@ impl DiscoveryService {
             CLIType::Codex => ("codex", vec!["--version"]),
             CLIType::OpenCode => ("opencode", vec!["--version"]),
             CLIType::Cursor => ("cursor-agent", vec!["--version"]),
-            CLIType::OpenHands => ("python3", vec!["-c", "import openhands; print(openhands.__version__)"]),
+            CLIType::OpenHands => (
+                "python3",
+                vec!["-c", "import openhands; print(openhands.__version__)"],
+            ),
             CLIType::Grok => ("grok-cli", vec!["--version"]),
             CLIType::Gemini => ("gemini-cli", vec!["--version"]),
             CLIType::Qwen => ("qwen-cli", vec!["--version"]),
@@ -203,7 +208,8 @@ impl DiscoveryService {
 
     /// Check if a CLI is available
     pub async fn is_available(&self, cli_type: CLIType) -> bool {
-        self.check_availability(cli_type).await
+        self.check_availability(cli_type)
+            .await
             .map(|avail| avail.available)
             .unwrap_or(false)
     }

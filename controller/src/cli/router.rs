@@ -3,9 +3,9 @@
 //! Handles CLI selection, fallback logic, and execution context preparation.
 //! This component decides which CLI to use and prepares the execution environment.
 
-use crate::cli::types::*;
 use crate::cli::bridge::ConfigurationBridge;
 use crate::cli::discovery::DiscoveryService;
+use crate::cli::types::*;
 use std::collections::HashMap;
 
 /// CLI selection preferences
@@ -54,10 +54,16 @@ impl CLIRouter {
         let selected_cli = self.select_cli(criteria).await?;
 
         // 2. Translate configuration to CLI-specific format
-        let translation = self.bridge.translate(universal_config, selected_cli).await?;
+        let translation = self
+            .bridge
+            .translate(universal_config, selected_cli)
+            .await?;
 
         // 3. Generate CLI-specific command
-        let command = self.bridge.generate_command(task, universal_config, selected_cli).await?;
+        let command = self
+            .bridge
+            .generate_command(task, universal_config, selected_cli)
+            .await?;
 
         // 4. Prepare execution context
         let context = CLIExecutionContext {
@@ -86,7 +92,9 @@ impl CLIRouter {
         }
 
         // If no candidates work, return the most compatible fallback
-        Err(RouterError::NoSuitableCLI("No suitable CLI available".to_string()))
+        Err(RouterError::NoSuitableCLI(
+            "No suitable CLI available".to_string(),
+        ))
     }
 
     /// Build ordered list of CLI candidates based on criteria
@@ -112,7 +120,11 @@ impl CLIRouter {
     }
 
     /// Check if a CLI meets the selection criteria
-    async fn meets_requirements(&mut self, cli_type: CLIType, criteria: &CLISelectionCriteria) -> bool {
+    async fn meets_requirements(
+        &mut self,
+        cli_type: CLIType,
+        criteria: &CLISelectionCriteria,
+    ) -> bool {
         // Discover CLI if we haven't already
         if self.discovery.get_profile(cli_type).is_none() {
             if let Err(_) = self.discovery.discover_cli(cli_type).await {
@@ -148,13 +160,20 @@ impl CLIRouter {
             "web_search" => profile.capabilities.supports_web_search,
             "code_execution" => profile.capabilities.supports_code_execution,
             "file_operations" => profile.capabilities.supports_file_operations,
-            "persistent_sessions" => matches!(profile.capabilities.session_persistence, SessionType::Persistent),
+            "persistent_sessions" => matches!(
+                profile.capabilities.session_persistence,
+                SessionType::Persistent
+            ),
             _ => false,
         }
     }
 
     /// Prepare environment variables for CLI execution
-    fn prepare_environment(&self, cli_type: CLIType, required_vars: &[String]) -> HashMap<String, String> {
+    fn prepare_environment(
+        &self,
+        cli_type: CLIType,
+        required_vars: &[String],
+    ) -> HashMap<String, String> {
         let mut env = HashMap::new();
 
         // Add CLI-specific environment setup

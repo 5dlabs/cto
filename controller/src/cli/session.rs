@@ -206,8 +206,13 @@ impl SessionManager {
     }
 
     /// Update session status
-    pub async fn update_session_status(&self, session_id: &str, status: SessionStatus) -> Result<()> {
-        let mut session = self.get_session(session_id)
+    pub async fn update_session_status(
+        &self,
+        session_id: &str,
+        status: SessionStatus,
+    ) -> Result<()> {
+        let mut session = self
+            .get_session(session_id)
             .await?
             .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
@@ -228,7 +233,8 @@ impl SessionManager {
         result: ExecutionResult,
         duration_ms: u64,
     ) -> Result<()> {
-        let mut session = self.get_session(session_id)
+        let mut session = self
+            .get_session(session_id)
             .await?
             .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
@@ -250,7 +256,8 @@ impl SessionManager {
 
     /// Update CLI-specific state
     pub async fn update_cli_state(&self, session_id: &str, state: serde_json::Value) -> Result<()> {
-        let mut session = self.get_session(session_id)
+        let mut session = self
+            .get_session(session_id)
             .await?
             .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
@@ -265,18 +272,25 @@ impl SessionManager {
 
     /// Transition session to different CLI type
     pub async fn transition_cli(&self, session_id: &str, new_cli_type: CLIType) -> Result<()> {
-        let mut session = self.get_session(session_id)
+        let mut session = self
+            .get_session(session_id)
             .await?
             .ok_or_else(|| SessionError::SessionNotFound(session_id.to_string()))?;
 
         // Record the transition in history
         let transition_record = ExecutionRecord {
             timestamp: chrono::Utc::now(),
-            task: format!("CLI transition: {:?} → {:?}", session.cli_type, new_cli_type),
+            task: format!(
+                "CLI transition: {:?} → {:?}",
+                session.cli_type, new_cli_type
+            ),
             result: ExecutionResult {
                 success: true,
                 exit_code: None,
-                key_messages: vec![format!("Transitioned from {:?} to {:?}", session.cli_type, new_cli_type)],
+                key_messages: vec![format!(
+                    "Transitioned from {:?} to {:?}",
+                    session.cli_type, new_cli_type
+                )],
             },
             duration_ms: 0,
         };
@@ -372,7 +386,10 @@ mod tests {
             },
         };
 
-        let session_id = manager.create_session(CLIType::Codex, config).await.unwrap();
+        let session_id = manager
+            .create_session(CLIType::Codex, config)
+            .await
+            .unwrap();
 
         let session = manager.get_session(&session_id).await.unwrap().unwrap();
         assert_eq!(session.cli_type, CLIType::Codex);
@@ -405,9 +422,15 @@ mod tests {
             },
         };
 
-        let session_id = manager.create_session(CLIType::Claude, config).await.unwrap();
+        let session_id = manager
+            .create_session(CLIType::Claude, config)
+            .await
+            .unwrap();
 
-        manager.update_session_status(&session_id, SessionStatus::Executing).await.unwrap();
+        manager
+            .update_session_status(&session_id, SessionStatus::Executing)
+            .await
+            .unwrap();
 
         let session = manager.get_session(&session_id).await.unwrap().unwrap();
         assert_eq!(session.status, SessionStatus::Executing);
@@ -439,9 +462,15 @@ mod tests {
             },
         };
 
-        let session_id = manager.create_session(CLIType::Claude, config).await.unwrap();
+        let session_id = manager
+            .create_session(CLIType::Claude, config)
+            .await
+            .unwrap();
 
-        manager.transition_cli(&session_id, CLIType::Codex).await.unwrap();
+        manager
+            .transition_cli(&session_id, CLIType::Codex)
+            .await
+            .unwrap();
 
         let session = manager.get_session(&session_id).await.unwrap().unwrap();
         assert_eq!(session.cli_type, CLIType::Codex);
