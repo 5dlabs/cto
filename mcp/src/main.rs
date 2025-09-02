@@ -29,6 +29,7 @@ struct AgentConfig {
 struct AgentTools {
     #[allow(dead_code)]
     remote: Vec<String>,
+    #[serde(rename = "localServers")]
     #[allow(dead_code)]
     local_servers: LocalServerConfig,
 }
@@ -59,6 +60,7 @@ struct CtoConfig {
 #[derive(Debug, Deserialize, Clone)]
 struct WorkflowDefaults {
     docs: DocsDefaults,
+    #[allow(dead_code)]
     code: CodeDefaults,
     #[serde(default)]
     intake: IntakeDefaults,
@@ -79,20 +81,29 @@ struct DocsDefaults {
 
 #[derive(Debug, Deserialize, Clone)]
 struct CodeDefaults {
+    #[allow(dead_code)]
     model: String,
     #[serde(rename = "githubApp")]
+    #[allow(dead_code)]
     github_app: String,
     #[serde(rename = "continueSession")]
+    #[allow(dead_code)]
     continue_session: bool,
     #[serde(rename = "workingDirectory")]
+    #[allow(dead_code)]
     working_directory: String,
     #[serde(rename = "overwriteMemory")]
+    #[allow(dead_code)]
     overwrite_memory: bool,
+    #[allow(dead_code)]
     repository: Option<String>,
     #[serde(rename = "docsRepository")]
+    #[allow(dead_code)]
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
+    #[allow(dead_code)]
     docs_project_directory: Option<String>,
+    #[allow(dead_code)]
     service: Option<String>,
 }
 
@@ -699,241 +710,6 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 }
 
 #[allow(clippy::disallowed_macros)]
-fn handle_code_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
-    let task_id = arguments
-        .get("task_id")
-        .and_then(|v| v.as_u64())
-        .ok_or(anyhow!("Missing required parameter: task_id"))?;
-
-    let config = CTO_CONFIG.get().unwrap();
-
-    // Get workspace directory from Cursor environment
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            std::path::PathBuf::from(first_path)
-        })
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-
-    let service = arguments
-        .get("service")
-        .and_then(|v| v.as_str())
-        .or(config.defaults.code.service.as_deref())
-        .ok_or(anyhow!("Missing required parameter: service. Please provide it or set defaults.code.service in config"))?;
-
-    // Handle repository - use provided value or config default
-    let repository = arguments
-        .get("repository")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .or_else(|| config.defaults.code.repository.clone())
-        .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.code.repository in config"))?;
-
-    let docs_project_directory = arguments
-        .get("docs_project_directory")
-        .and_then(|v| v.as_str())
-        .or(config.defaults.code.docs_project_directory.as_deref())
-        .ok_or(anyhow!("Missing required parameter: docs_project_directory. Please provide it or set defaults.code.docsProjectDirectory in config"))?;
-
-    // Validate repository URL
-    validate_repository_url(&repository)?;
-
-    // Validate service name (must be valid for PVC naming)
-    if !service
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        return Err(anyhow!(
-            "Invalid service name '{}'. Must contain only lowercase letters, numbers, and hyphens",
-            service
-        ));
-    }
-
-    // Handle docs repository - use provided value, config default, or error
-    let docs_repository = arguments.get("docs_repository")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .or_else(|| config.defaults.code.docs_repository.clone())
-        .ok_or(anyhow!("No docs_repository specified. Please provide a 'docs_repository' parameter or set defaults.code.docsRepository in config"))?;
-
-    validate_repository_url(&docs_repository)?;
-
-    // Handle working directory - use provided value or config default
-    let working_directory = arguments
-        .get("working_directory")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.code.working_directory);
-
-    // Handle agent name resolution with validation
-    let agent_name = arguments.get("agent").and_then(|v| v.as_str());
-    let github_app = if let Some(agent) = agent_name {
-        // Validate agent name exists in config
-        if !config.agents.contains_key(agent) {
-            let available_agents: Vec<&String> = config.agents.keys().collect();
-            return Err(anyhow!(
-                "Unknown agent '{}'. Available agents: {:?}",
-                agent,
-                available_agents
-            ));
-        }
-        config.agents[agent].github_app.clone()
-    } else {
-        // Use default from config
-        config.defaults.code.github_app.clone()
-    };
-
-    // Handle model - use provided value or config default
-    let model = arguments
-        .get("model")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| {
-            eprintln!(
-                "🐛 DEBUG: Using code default model: {}",
-                config.defaults.code.model
-            );
-            config.defaults.code.model.clone()
-        });
-
-    // Validate model name (support both Claude API and CLAUDE code formats)
-    validate_model_name(&model)?;
-
-    // Auto-detect docs branch (fail if not available, using workspace directory)
-    let docs_branch = get_git_current_branch_in_dir(Some(&workspace_dir))
-        .context("Failed to auto-detect git branch. Ensure you're in a git repository.")?;
-
-    // Handle continue session - use provided value or config default
-    let continue_session = arguments
-        .get("continue_session")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(config.defaults.code.continue_session);
-
-    // Handle overwrite memory - use provided value or config default
-    let overwrite_memory = arguments
-        .get("overwrite_memory")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(config.defaults.code.overwrite_memory);
-
-    eprintln!("🐛 DEBUG: Task workflow working directory: {working_directory}");
-
-    let mut params = vec![
-        format!("task-id={task_id}"),
-        format!("service-id={service}"),
-        format!("repository-url={repository}"),
-        format!("docs-repository-url={docs_repository}"),
-        format!("docs-project-directory={docs_project_directory}"),
-        format!("working-directory={working_directory}"),
-        format!("github-app={github_app}"),
-        format!("model={model}"),
-        format!("continue-session={continue_session}"),
-        format!("overwrite-memory={overwrite_memory}"),
-        format!("docs-branch={docs_branch}"),
-        format!("context-version=0"), // Auto-assign by controller
-    ];
-
-    // Check for requirements.yaml file - resolve relative to the effective working directory
-    // Build effective base directory: join WORKSPACE root with working_directory (unless absolute)
-    let working_path = std::path::PathBuf::from(working_directory);
-    let base_dir = if working_path.is_absolute() {
-        working_path.clone()
-    } else {
-        workspace_dir.join(working_directory)
-    };
-    let docs_dir = base_dir.join(docs_project_directory);
-    let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
-    let project_requirements_path = docs_dir.join("requirements.yaml");
-    let taskmaster_requirements_path = docs_dir.join(".taskmaster/requirements.yaml");
-
-    eprintln!(
-        "🔍 Resolving requirements.yaml under: {} (docs_project_directory='{}')",
-        docs_dir.display(),
-        docs_project_directory
-    );
-
-    let requirements_path = if task_requirements_path.exists() {
-        eprintln!("📋 Found task-specific requirements.yaml for task {task_id}");
-        task_requirements_path.to_string_lossy().to_string()
-    } else if project_requirements_path.exists() {
-        eprintln!("📋 Found project-level requirements.yaml for task {task_id}");
-        project_requirements_path.to_string_lossy().to_string()
-    } else if taskmaster_requirements_path.exists() {
-        eprintln!("📋 Found TaskMaster requirements.yaml for task {task_id}");
-        taskmaster_requirements_path.to_string_lossy().to_string()
-    } else {
-        String::new() // No requirements file found
-    };
-
-    if !requirements_path.is_empty() {
-        let requirements_content = std::fs::read_to_string(&requirements_path).context(format!(
-            "Failed to read requirements file: {requirements_path}"
-        ))?;
-
-        // Base64 encode the requirements YAML
-        use base64::{engine::general_purpose, Engine as _};
-        let encoded_requirements =
-            general_purpose::STANDARD.encode(requirements_content.as_bytes());
-        params.push(format!("task-requirements={encoded_requirements}"));
-
-        eprintln!("✓ Task requirements encoded and added to workflow parameters");
-    } else {
-        // Always provide task-requirements parameter, even if empty (Argo requires it)
-        params.push("task-requirements=".to_string());
-        eprintln!("ℹ️ No requirements.yaml found, using empty task-requirements");
-
-        // Fall back to old env/env_from_secrets parameters if provided
-        // Handle env object - convert to JSON string for workflow parameter
-        if let Some(env) = arguments.get("env").and_then(|v| v.as_object()) {
-            let env_json = serde_json::to_string(env)?;
-            params.push(format!("env={env_json}"));
-        }
-
-        // Handle env_from_secrets array - convert to JSON string for workflow parameter
-        if let Some(env_from_secrets) = arguments.get("env_from_secrets").and_then(|v| v.as_array())
-        {
-            let env_from_secrets_json = serde_json::to_string(env_from_secrets)?;
-            params.push(format!("envFromSecrets={env_from_secrets_json}"));
-        }
-    }
-
-    let mut args = vec![
-        "submit",
-        "--from",
-        "workflowtemplate/coderun-template",
-        "-n",
-        "agent-platform",
-    ];
-
-    // Add all parameters to the command
-    for param in &params {
-        args.push("-p");
-        args.push(param);
-    }
-
-    match run_argo_cli(&args) {
-        Ok(output) => Ok(json!({
-            "success": true,
-            "message": "Task implementation workflow submitted successfully",
-            "output": output,
-            "task_id": task_id,
-            "service": service,
-            "repository": repository,
-            "docs_repository": docs_repository,
-            "docs_project_directory": docs_project_directory,
-            "working_directory": working_directory,
-            "github_app": github_app,
-            "agent": agent_name.unwrap_or("default"),
-            "model": model,
-            "continue_session": continue_session,
-            "overwrite_memory": overwrite_memory,
-            "docs_branch": docs_branch,
-            "context_version": 0,
-            "parameters": params
-        })),
-        Err(e) => Err(anyhow!("Failed to submit task workflow: {}", e)),
-    }
-}
-
-#[allow(clippy::disallowed_macros)]
 fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let task_id = arguments
         .get("task_id")
@@ -1473,7 +1249,6 @@ fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         }
     }
 }
-
 fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
     match method {
         "tools/call" => {
@@ -1489,60 +1264,48 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                 .unwrap_or_default();
 
             match name {
-                Ok("docs") => Some(handle_docs_workflow(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("code") => Some(handle_code_workflow(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("play") => Some(handle_play_workflow(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("export") => Some(handle_export_workflow().map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": result
-                    }]
-                }))),
-                Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("jobs") => Some(handle_jobs_tool(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("stop_job") => Some(handle_stop_job_tool(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({
-                    "content": [{
-                        "type": "text",
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
-                    }]
-                }))),
-                Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))),
-                Err(e) => Some(Err(e)),
-            }
-        }
-        _ => None,
-    }
+                Ok("docs") => Some(handle_docs_workflow(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
+                    }] 
+                }))), 
+                Ok("play") => Some(handle_play_workflow(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
+                    }] 
+                }))), 
+                Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
+                    }] 
+                }))), 
+                Ok("jobs") => Some(handle_jobs_tool(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
+                    }] 
+                }))), 
+                Ok("stop_job") => Some(handle_stop_job_tool(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
+                    }] 
+                }))), 
+                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
+                    }] 
+                }))), 
+                Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))), 
+                Err(e) => Some(Err(e)), 
+            } 
+        } 
+        _ => None, 
+    } 
 }
 
 fn handle_method(method: &str, params: Option<&Value>) -> Option<Result<Value>> {
@@ -1585,16 +1348,11 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
         .unwrap_or("agent-platform");
 
     let include = arguments.get("include").and_then(|v| v.as_array());
-    let include_code = include.is_none()
+    let include_play = include.is_none()
         || include
             .unwrap()
             .iter()
-            .any(|x| x.as_str() == Some("code"));
-    let include_docs = include.is_none()
-        || include
-            .unwrap()
-            .iter()
-            .any(|x| x.as_str() == Some("docs"));
+            .any(|x| x.as_str() == Some("play"));
     let include_intake = include.is_none()
         || include
             .unwrap()
@@ -1603,60 +1361,37 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
 
     let mut jobs: Vec<Value> = Vec::new();
 
-    if include_code {
-        if let Ok(list) = run_kubectl_json(&["get", "coderuns.agents.platform", "-n", namespace, "-o", "json"]) {
-            if let Some(items) = list.get("items").and_then(|v| v.as_array()) {
+    // List all Argo workflows
+    if let Ok(list_str) = run_argo_cli(&["list", "-n", namespace, "-o", "json"]) {
+        if let Ok(v) = serde_json::from_str::<Value>(&list_str) {
+            if let Some(items) = v.get("items").and_then(|v| v.as_array()) {
                 for item in items {
                     let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
                     let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
-                    let message = item.get("status").and_then(|s| s.get("message")).and_then(|p| p.as_str());
-                    let job_name = item.get("status").and_then(|s| s.get("jobName")).and_then(|p| p.as_str());
-                    jobs.push(json!({
-                        "type": "code",
-                        "name": name,
-                        "namespace": namespace,
-                        "phase": phase,
-                        "message": message,
-                        "jobName": job_name
-                    }));
-                }
-            }
-        }
-    }
 
-    if include_docs {
-        if let Ok(list) = run_kubectl_json(&["get", "docsruns.agents.platform", "-n", namespace, "-o", "json"]) {
-            if let Some(items) = list.get("items").and_then(|v| v.as_array()) {
-                for item in items {
-                    let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-                    let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
-                    let message = item.get("status").and_then(|s| s.get("message")).and_then(|p| p.as_str());
-                    let job_name = item.get("status").and_then(|s| s.get("jobName")).and_then(|p| p.as_str());
-                    jobs.push(json!({
-                        "type": "docs",
-                        "name": name,
-                        "namespace": namespace,
-                        "phase": phase,
-                        "message": message,
-                        "jobName": job_name
-                    }));
-                }
-            }
-        }
-    }
+                    // Determine workflow type based on name pattern
+                    let workflow_type = if name.contains("play-workflow") {
+                        "play"
+                    } else if name.contains("intake") {
+                        "intake"
+                    } else {
+                        "workflow"
+                    };
 
-    if include_intake {
-        if let Ok(list_str) = run_argo_cli(&["list", "-n", namespace, "-o", "json"]) {
-            if let Ok(v) = serde_json::from_str::<Value>(&list_str) {
-                if let Some(items) = v.get("items").and_then(|v| v.as_array()) {
-                    for item in items {
-                        let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-                        let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
+                    // Only include if the type is requested
+                    let should_include = match workflow_type {
+                        "play" => include_play,
+                        "intake" => include_intake,
+                        _ => true, // Include other workflows by default
+                    };
+
+                    if should_include {
                         jobs.push(json!({
-                            "type": "intake",
+                            "type": workflow_type,
                             "name": name,
                             "namespace": namespace,
-                            "phase": phase
+                            "phase": phase,
+                            "status": item.get("status")
                         }));
                     }
                 }
@@ -1687,46 +1422,29 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
         .unwrap_or("agent-platform");
 
     match job_type {
-        "code" => {
-            // Use plural, group-qualified CRD to avoid alias issues
-            let out = std::process::Command::new("kubectl")
-                .args(["delete", "coderuns.agents.platform", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
-                .output()
-                .context("Failed to execute kubectl delete coderuns.agents.platform")?;
-            if out.status.success() {
-                Ok(json!({"success": true, "message": format!("Deleted CodeRun {name}"), "namespace": namespace}))
-            } else {
-                Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
-            }
-        }
-        "docs" => {
-            // Use plural, group-qualified CRD to avoid alias issues
-            let out = std::process::Command::new("kubectl")
-                .args(["delete", "docsruns.agents.platform", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
-                .output()
-                .context("Failed to execute kubectl delete docsruns.agents.platform")?;
-            if out.status.success() {
-                Ok(json!({"success": true, "message": format!("Deleted DocsRun {name}"), "namespace": namespace}))
-            } else {
-                Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
-            }
-        }
         "intake" => {
-            // Try to terminate first, then delete
+            // Terminate and delete intake workflow
             let _ = run_argo_cli(&["terminate", name, "-n", namespace]);
             match run_argo_cli(&["delete", name, "-n", namespace]) {
-                Ok(msg) => Ok(json!({"success": true, "message": msg, "namespace": namespace})),
-                Err(e) => Err(anyhow!(format!("Failed to delete workflow {name}: {e}")))
+                Ok(msg) => Ok(json!({"success": true, "message": format!("Deleted intake workflow {name}: {msg}"), "namespace": namespace})),
+                Err(e) => Err(anyhow!(format!("Failed to delete intake workflow {name}: {e}")))
             }
         }
         "play" => {
             // Stop play workflow using Argo CLI
             match run_argo_cli(&["stop", name, "-n", namespace]) {
-                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped Play workflow {name}"), "namespace": namespace})),
+                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped play workflow {name}"), "namespace": namespace})),
                 Err(e) => Err(anyhow!(format!("Failed to stop play workflow {name}: {e}")))
             }
         }
-        other => Err(anyhow!(format!("Unsupported job_type: {other}"))),
+        "workflow" => {
+            // Stop generic workflow using Argo CLI
+            match run_argo_cli(&["stop", name, "-n", namespace]) {
+                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped workflow {name}"), "namespace": namespace})),
+                Err(e) => Err(anyhow!(format!("Failed to stop workflow {name}: {e}")))
+            }
+        }
+        other => Err(anyhow!(format!("Unsupported job_type: {other}. Supported types: intake, play, workflow"))),
     }
 }
 
@@ -1973,150 +1691,6 @@ async fn rpc_loop() -> Result<()> {
     Ok(())
 }
 
-/// Handle export workflow - convert current directory's Rust code to markdown
-#[allow(clippy::disallowed_macros)]
-fn handle_export_workflow() -> Result<String> {
-    // Use WORKSPACE_FOLDER_PATHS to get the actual workspace directory
-    let project_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            // WORKSPACE_FOLDER_PATHS might contain multiple paths separated by some delimiter
-            // For now, take the first one (or the only one)
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            first_path.to_string()
-        })
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
-
-    eprintln!("🔍 Using workspace directory: {}", project_dir.display());
-
-    // Create .taskmaster/docs directory if it doesn't exist
-    let taskmaster_dir = project_dir.join(".taskmaster");
-    let docs_dir = taskmaster_dir.join("docs");
-
-    eprintln!("📁 Creating directory: {}", docs_dir.display());
-    eprintln!("📁 Project dir exists: {}", project_dir.exists());
-    eprintln!("📁 Project dir is_dir: {}", project_dir.is_dir());
-
-    std::fs::create_dir_all(&docs_dir).with_context(|| {
-        format!(
-            "Failed to create .taskmaster/docs directory at: {}",
-            docs_dir.display()
-        )
-    })?;
-
-    let output_file = docs_dir.join("codebase.md");
-
-    // Generate markdown content
-    let markdown_content =
-        generate_codebase_markdown(&project_dir).context("Failed to generate codebase markdown")?;
-
-    // Write to file
-    std::fs::write(&output_file, &markdown_content).context("Failed to write codebase.md")?;
-
-    Ok(format!(
-        "✅ Exported codebase to: {}",
-        output_file.display()
-    ))
-}
-
-/// Generate markdown representation of Rust codebase
-fn generate_codebase_markdown(project_dir: &std::path::Path) -> Result<String> {
-    let mut markdown = String::new();
-
-    // Add header
-    let project_name = project_dir
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("Unknown Project");
-
-    markdown.push_str(&format!("# Project: {project_name}\n\n"));
-
-    // Read Cargo.toml if it exists
-    let cargo_toml_path = project_dir.join("Cargo.toml");
-    if cargo_toml_path.exists() {
-        if let Ok(cargo_content) = std::fs::read_to_string(&cargo_toml_path) {
-            markdown.push_str("## Cargo.toml\n\n```toml\n");
-            markdown.push_str(&cargo_content);
-            markdown.push_str("\n```\n\n");
-        }
-    }
-
-    // Find and process all relevant source files
-    markdown.push_str("## Source Files\n\n");
-
-    process_source_files(&mut markdown, project_dir, project_dir)?;
-
-    Ok(markdown)
-}
-
-/// Recursively process source files
-fn process_source_files(
-    markdown: &mut String,
-    current_dir: &std::path::Path,
-    project_root: &std::path::Path,
-) -> Result<()> {
-    let entries = std::fs::read_dir(current_dir).context("Failed to read directory")?;
-
-    for entry in entries {
-        let entry = entry.context("Failed to read directory entry")?;
-        let path = entry.path();
-
-        // Skip target directory and hidden directories
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name == "target" || name.starts_with('.') {
-                continue;
-            }
-        }
-
-        if path.is_dir() {
-            process_source_files(markdown, &path, project_root)?;
-        } else if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-            // Include multiple file types beyond just .rs
-            let (language, should_include) = match ext {
-                "rs" => ("rust", true),
-                "py" => ("python", true),
-                "sql" => ("sql", true),
-                "toml" => ("toml", true),
-                "yml" | "yaml" => ("yaml", true),
-                "json" => ("json", true),
-                "md" => ("markdown", true),
-                "txt" => ("text", true),
-                "sh" => ("bash", true),
-                "dockerfile" => ("dockerfile", true),
-                _ => ("text", false),
-            };
-
-            // Also include files without extensions but with specific names
-            let should_include = should_include
-                || matches!(
-                    path.file_name().and_then(|n| n.to_str()),
-                    Some("Dockerfile") | Some("README") | Some("LICENSE")
-                );
-
-            if should_include {
-                // Get relative path from project root
-                let relative_path = path
-                    .strip_prefix(project_root)
-                    .context("Failed to get relative path")?;
-
-                markdown.push_str(&format!("### {}\n\n", relative_path.display()));
-
-                match std::fs::read_to_string(&path) {
-                    Ok(content) => {
-                        markdown.push_str(&format!("```{language}\n"));
-                        markdown.push_str(&content);
-                        markdown.push_str("\n```\n\n");
-                    }
-                    Err(e) => {
-                        markdown.push_str(&format!("*Error reading file: {e}*\n\n"));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
 
 #[allow(clippy::disallowed_macros)]
 fn main() -> Result<()> {

@@ -6,9 +6,7 @@ pub fn get_tool_schemas() -> Value {
     json!({
         "tools": [
             get_docs_schema(),
-            get_code_schema(&HashMap::new()),
             get_play_schema(&HashMap::new()),
-            get_export_schema(),
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
@@ -22,9 +20,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
     json!({
         "tools": [
             get_docs_schema(),
-            get_code_schema(agents),
             get_play_schema(agents),
-            get_export_schema(),
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
@@ -62,94 +58,6 @@ fn get_docs_schema() -> Value {
     })
 }
 
-fn get_code_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
-    json!({
-        "name": "code",
-        "description": "Submit a Task Master task for implementation using Claude with persistent workspace",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "task_id": {
-                    "type": "integer",
-                    "description": "Task ID to implement from task files",
-                    "minimum": 1
-                },
-                "service": {
-                    "type": "string",
-                    "description": "Target service name (creates workspace-{service} PVC). Optional if defaults.code.service is set in config.",
-                    "pattern": "^[a-z0-9-]+$"
-                },
-                "repository": {
-                    "type": "string",
-                    "description": "Target repository URL (e.g., https://github.com/5dlabs/cto). Optional if defaults.code.repository is set in config."
-                },
-                "docs_project_directory": {
-                    "type": "string",
-                    "description": "Project directory within docs repository (e.g., projects/market-research). Optional if defaults.code.docsProjectDirectory is set in config."
-                },
-                "docs_repository": {
-                    "type": "string",
-                    "description": "Documentation repository URL. Optional if defaults.code.docsRepository is set in config."
-                },
-                "agent": {
-                    "type": "string",
-                    "description": if agents.is_empty() {
-                        "Agent name for task assignment".to_string()
-                    } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                        format!("Agent name for task assignment. Available agents: {agent_list}")
-                    }
-                },
-                "working_directory": {
-                    "type": "string",
-                    "description": "Working directory within target repository (optional, defaults to '.')"
-                },
-                "model": {
-                    "type": "string",
-                    "description": "Claude model to use (optional, defaults to configuration)"
-                },
-                "continue_session": {
-                    "type": "boolean",
-                    "description": "Whether to continue a previous session (optional, defaults to false)"
-                },
-                "overwrite_memory": {
-                    "type": "boolean",
-                    "description": "Whether to overwrite CLAUDE.md memory file (optional, defaults to false)"
-                },
-                "env": {
-                    "type": "object",
-                    "description": "Environment variables to set in the container (optional)",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "env_from_secrets": {
-                    "type": "array",
-                    "description": "Environment variables from secrets (optional)",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Name of the environment variable"
-                            },
-                            "secretName": {
-                                "type": "string",
-                                "description": "Name of the secret"
-                            },
-                            "secretKey": {
-                                "type": "string",
-                                "description": "Key within the secret"
-                            }
-                        },
-                        "required": ["name", "secretName", "secretKey"]
-                    }
-                }
-            },
-            "required": ["task_id"]
-        }
-    })
-}
 
 fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
@@ -221,17 +129,6 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     })
 }
 
-fn get_export_schema() -> Value {
-    json!({
-        "name": "export",
-        "description": "Export Rust codebase to markdown for documentation context",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    })
-}
 
 fn get_intake_schema() -> Value {
     json!({
@@ -289,12 +186,12 @@ fn get_intake_schema() -> Value {
 fn get_jobs_schema() -> Value {
     json!({
         "name": "jobs",
-        "description": "List running jobs across platform CRDs (CodeRun, DocsRun) and Argo Workflows (intake). Returns simplified status info.",
+        "description": "List running Argo workflows (play, intake, and other workflows). Returns simplified status info.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"},
-                "include": {"type": "array", "items": {"type": "string", "enum": ["code", "docs", "intake"]}, "description": "Filter which job types to include (default: all)"}
+                "include": {"type": "array", "items": {"type": "string", "enum": ["play", "intake", "workflow"]}, "description": "Filter which workflow types to include (default: all)"}
             }
         }
     })
@@ -303,12 +200,12 @@ fn get_jobs_schema() -> Value {
 fn get_stop_job_schema() -> Value {
     json!({
         "name": "stop_job",
-        "description": "Stop a running job: CodeRun (code), DocsRun (docs), Argo intake workflow (intake), or Play workflow (play).",
+        "description": "Stop a running Argo workflow (intake, play, or generic workflow).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "job_type": {"type": "string", "enum": ["code", "docs", "intake", "play"], "description": "Type of job to stop"},
-                "name": {"type": "string", "description": "Resource/workflow name"},
+                "job_type": {"type": "string", "enum": ["intake", "play", "workflow"], "description": "Type of workflow to stop"},
+                "name": {"type": "string", "description": "Workflow name"},
                 "namespace": {"type": "string", "description": "Kubernetes namespace (default: agent-platform)"}
             },
             "required": ["job_type", "name"]
