@@ -103,6 +103,14 @@ spec:
               args: ["-y", "@upstash/context7-mcp"]
               workingDirectory: "/tmp"
 
+            agent-docs:
+              name: "Agent Docs"
+              description: "Agent documentation and knowledge base server"
+              transport: "docker"
+              command: "docker"
+              args: ["run", "-i", "--rm", "ghcr.io/5dlabs/agent-docs/server"]
+              workingDirectory: "/tmp"
+
         # Local tools configuration for client-side operations
         localTools:
           servers:
