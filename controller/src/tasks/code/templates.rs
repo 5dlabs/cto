@@ -9,8 +9,6 @@ use std::fs;
 use std::path::Path;
 use tracing::debug;
 
-
-
 // Template base path (mounted from ConfigMap)
 const CLAUDE_TEMPLATES_PATH: &str = "/claude-templates";
 
@@ -428,7 +426,7 @@ impl CodeTemplateGenerator {
     fn extract_agent_name_from_github_app(github_app: &str) -> Result<String> {
         if github_app.is_empty() {
             return Err(crate::tasks::types::Error::ConfigError(
-                "No GitHub app specified for agent identification".to_string()
+                "No GitHub app specified for agent identification".to_string(),
             ));
         }
 
@@ -451,23 +449,30 @@ impl CodeTemplateGenerator {
     }
 
     /// Get agent tool configuration from controller config
-    fn get_agent_tools(agent_name: &str, config: &ControllerConfig) -> Result<crate::tasks::config::AgentTools> {
-        use crate::tasks::config::{AgentTools, LocalServerConfigs, LocalServerConfig};
+    fn get_agent_tools(
+        agent_name: &str,
+        config: &ControllerConfig,
+    ) -> Result<crate::tasks::config::AgentTools> {
+        use crate::tasks::config::{AgentTools, LocalServerConfig, LocalServerConfigs};
 
         // Try to get agent tools from controller config
         if let Some(agent_config) = config.agents.get(agent_name) {
             if let Some(tools) = &agent_config.tools {
                 let remote_tools = tools.remote.clone();
-                let local_servers = tools.local_servers.as_ref().map(|local_servers_config| LocalServerConfigs {
-                    filesystem: LocalServerConfig {
-                        enabled: local_servers_config.filesystem.enabled,
-                        tools: local_servers_config.filesystem.tools.clone(),
-                    },
-                    git: LocalServerConfig {
-                        enabled: local_servers_config.git.enabled,
-                        tools: local_servers_config.git.tools.clone(),
-                    },
-                });
+                let local_servers =
+                    tools
+                        .local_servers
+                        .as_ref()
+                        .map(|local_servers_config| LocalServerConfigs {
+                            filesystem: LocalServerConfig {
+                                enabled: local_servers_config.filesystem.enabled,
+                                tools: local_servers_config.filesystem.tools.clone(),
+                            },
+                            git: LocalServerConfig {
+                                enabled: local_servers_config.git.enabled,
+                                tools: local_servers_config.git.tools.clone(),
+                            },
+                        });
 
                 return Ok(AgentTools {
                     remote: remote_tools,
@@ -477,7 +482,10 @@ impl CodeTemplateGenerator {
         }
 
         // Fallback to default configuration if agent not found or no tools configured
-        debug!("No agent-specific tools found for '{}', using defaults", agent_name);
+        debug!(
+            "No agent-specific tools found for '{}', using defaults",
+            agent_name
+        );
         Ok(AgentTools {
             remote: vec![
                 "memory_create_entities".to_string(),
@@ -597,8 +605,9 @@ mod tests {
     fn test_extract_agent_name_from_github_app() {
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let agent_name = CodeTemplateGenerator::extract_agent_name_from_github_app(
-            code_run.spec.github_app.as_deref().unwrap()
-        ).unwrap();
+            code_run.spec.github_app.as_deref().unwrap(),
+        )
+        .unwrap();
         assert_eq!(agent_name, "rex");
     }
 
@@ -606,23 +615,34 @@ mod tests {
     fn test_extract_agent_name_unknown_app() {
         let result = CodeTemplateGenerator::extract_agent_name_from_github_app("Unknown-App");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown GitHub app"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown GitHub app"));
     }
 
     #[test]
     fn test_extract_agent_name_empty_app() {
         let result = CodeTemplateGenerator::extract_agent_name_from_github_app("");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("No GitHub app specified"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No GitHub app specified"));
     }
 
     #[test]
     fn test_get_agent_tools_with_config() {
-        use crate::tasks::config::{ControllerConfig, AgentDefinition, AgentTools, LocalServerConfigs, LocalServerConfig};
+        use crate::tasks::config::{
+            AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig, LocalServerConfigs,
+        };
 
         let mut config = ControllerConfig::default();
         let agent_tools = AgentTools {
-            remote: vec!["memory_create_entities".to_string(), "brave_web_search".to_string()],
+            remote: vec![
+                "memory_create_entities".to_string(),
+                "brave_web_search".to_string(),
+            ],
             local_servers: Some(LocalServerConfigs {
                 filesystem: LocalServerConfig {
                     enabled: true,
@@ -635,10 +655,13 @@ mod tests {
             }),
         };
 
-        config.agents.insert("test-agent".to_string(), AgentDefinition {
-            github_app: "Test-App".to_string(),
-            tools: Some(agent_tools.clone()),
-        });
+        config.agents.insert(
+            "test-agent".to_string(),
+            AgentDefinition {
+                github_app: "Test-App".to_string(),
+                tools: Some(agent_tools.clone()),
+            },
+        );
 
         let code_run = create_test_code_run(Some("Test-App".to_string()));
         let _result = CodeTemplateGenerator::generate_client_config(&code_run, &config);
@@ -648,10 +671,13 @@ mod tests {
         let known_code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
 
         // Add rex agent to config
-        config.agents.insert("rex".to_string(), AgentDefinition {
-            github_app: "5DLabs-Rex".to_string(),
-            tools: Some(agent_tools),
-        });
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                tools: Some(agent_tools),
+            },
+        );
 
         let result = CodeTemplateGenerator::generate_client_config(&known_code_run, &config);
         assert!(result.is_ok());
