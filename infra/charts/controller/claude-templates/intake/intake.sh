@@ -532,6 +532,40 @@ echo "🔧 Configuring Claude Code authentication..."
 # Export it to ensure it's available to child processes
 export ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
 
+# Claude Code Workaround: Fix path resolution issue in @anthropic-ai/claude-code package
+# The package looks for entrypoints/cli.js but the actual file is cli.js
+fix_claude_code_path() {
+    echo "🔧 Checking Claude Code path resolution..."
+
+    # Find the claude-code package directory
+    CLAUDE_CODE_DIR=$(find /usr/local/lib/node_modules -name "@anthropic-ai" -type d 2>/dev/null | head -1)
+    if [ -z "$CLAUDE_CODE_DIR" ]; then
+        CLAUDE_CODE_DIR=$(find /opt/homebrew/lib/node_modules -name "@anthropic-ai" -type d 2>/dev/null | head -1)
+    fi
+
+    if [ -n "$CLAUDE_CODE_DIR" ] && [ -d "$CLAUDE_CODE_DIR/claude-code" ]; then
+        CLAUDE_PACKAGE_DIR="$CLAUDE_CODE_DIR/claude-code"
+        echo "📍 Found Claude Code package at: $CLAUDE_PACKAGE_DIR"
+
+        # Check if cli.js exists and entrypoints/cli.js is missing
+        if [ -f "$CLAUDE_PACKAGE_DIR/cli.js" ] && [ ! -f "$CLAUDE_PACKAGE_DIR/entrypoints/cli.js" ]; then
+            echo "🔧 Applying Claude Code path workaround..."
+            mkdir -p "$CLAUDE_PACKAGE_DIR/entrypoints"
+            cp "$CLAUDE_PACKAGE_DIR/cli.js" "$CLAUDE_PACKAGE_DIR/entrypoints/cli.js"
+            echo "✅ Created symlink workaround for Claude Code CLI path"
+        elif [ -f "$CLAUDE_PACKAGE_DIR/entrypoints/cli.js" ]; then
+            echo "✅ Claude Code path already correct"
+        else
+            echo "⚠️ Claude Code CLI file not found at expected locations"
+        fi
+    else
+        echo "⚠️ Claude Code package directory not found"
+    fi
+}
+
+# Apply Claude Code path fix
+fix_claude_code_path
+
 # Also try to set up Claude Code config in case it's needed
 # Try to create config directory, fallback to /tmp if permission denied
 if mkdir -p ~/.config/claude-code 2>/dev/null; then
@@ -553,6 +587,91 @@ EOF
 
 # Debug: Verify API key is set
 echo "🔍 DEBUG: ANTHROPIC_API_KEY is ${ANTHROPIC_API_KEY:+[SET]}${ANTHROPIC_API_KEY:-[NOT SET]}"
+
+# Claude Code Workaround: Smart provider selection based on available API keys
+select_smart_providers() {
+    echo "🧠 Selecting optimal providers based on available API keys..."
+
+    # Check which API keys are available
+    local anthropic_available=false
+    local openai_available=false
+    local perplexity_available=false
+
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        # Test Anthropic API key validity
+        if curl -s -H "x-api-key: $ANTHROPIC_API_KEY" \
+                -H "Content-Type: application/json" \
+                "https://api.anthropic.com/v1/messages" \
+                -d '{"model": "claude-3-haiku-20240307", "max_tokens": 1, "messages": [{"role": "user", "content": "test"}]}' > /dev/null 2>&1; then
+            anthropic_available=true
+            echo "✅ Anthropic API key is valid"
+        else
+            echo "⚠️ Anthropic API key present but invalid"
+        fi
+    fi
+
+    if [ -n "$OPENAI_API_KEY" ]; then
+        # Test OpenAI API key validity
+        if curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
+                -H "Content-Type: application/json" \
+                "https://api.openai.com/v1/models" > /dev/null 2>&1; then
+            openai_available=true
+            echo "✅ OpenAI API key is valid"
+        else
+            echo "⚠️ OpenAI API key present but invalid"
+        fi
+    fi
+
+    if [ -n "$PERPLEXITY_API_KEY" ]; then
+        perplexity_available=true
+        echo "✅ Perplexity API key is available"
+    fi
+
+    # Set smart defaults prioritizing API-based providers over claude-code
+    if [ "$anthropic_available" = true ]; then
+        export PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-anthropic}"
+        export PRIMARY_MODEL="${PRIMARY_MODEL:-claude-3-5-sonnet-20241022}"
+    elif [ "$openai_available" = true ]; then
+        export PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-openai}"
+        export PRIMARY_MODEL="${PRIMARY_MODEL:-gpt-4o-mini}"
+    else
+        export PRIMARY_PROVIDER="${PRIMARY_PROVIDER:-claude-code}"
+        export PRIMARY_MODEL="${PRIMARY_MODEL:-opus}"
+        echo "⚠️ No valid API keys found, falling back to claude-code"
+    fi
+
+    # Research model - prefer OpenAI for research, fallback to Anthropic
+    if [ "$openai_available" = true ]; then
+        export RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-openai}"
+        export RESEARCH_MODEL="${RESEARCH_MODEL:-gpt-4o-mini}"
+    elif [ "$anthropic_available" = true ]; then
+        export RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-anthropic}"
+        export RESEARCH_MODEL="${RESEARCH_MODEL:-claude-3-5-sonnet-20241022}"
+    else
+        export RESEARCH_PROVIDER="${RESEARCH_PROVIDER:-claude-code}"
+        export RESEARCH_MODEL="${RESEARCH_MODEL:-opus}"
+    fi
+
+    # Fallback model - use whatever is available
+    if [ "$openai_available" = true ] && [ "$PRIMARY_PROVIDER" != "openai" ]; then
+        export FALLBACK_PROVIDER="${FALLBACK_PROVIDER:-openai}"
+        export FALLBACK_MODEL="${FALLBACK_MODEL:-gpt-4o-mini}"
+    elif [ "$anthropic_available" = true ] && [ "$PRIMARY_PROVIDER" != "anthropic" ]; then
+        export FALLBACK_PROVIDER="${FALLBACK_PROVIDER:-anthropic}"
+        export FALLBACK_MODEL="${FALLBACK_MODEL:-claude-3-haiku-20240307}"
+    else
+        export FALLBACK_PROVIDER="${FALLBACK_PROVIDER:-claude-code}"
+        export FALLBACK_MODEL="${FALLBACK_MODEL:-sonnet}"
+    fi
+
+    echo "🎯 Smart provider selection complete:"
+    echo "  Primary: $PRIMARY_PROVIDER ($PRIMARY_MODEL)"
+    echo "  Research: $RESEARCH_PROVIDER ($RESEARCH_MODEL)"
+    echo "  Fallback: $FALLBACK_PROVIDER ($FALLBACK_MODEL)"
+}
+
+# Apply smart provider selection
+select_smart_providers
 
 # Set up dynamic provider selection for different operations
 echo "✅ Configuring TaskMaster models: Primary=$PRIMARY_MODEL, Research=$RESEARCH_MODEL, Fallback=$FALLBACK_MODEL"
@@ -644,14 +763,129 @@ if [ "$PRIMARY_PROVIDER" = "claude-code" ] || [ "$RESEARCH_PROVIDER" = "claude-c
     which claude || echo "⚠️ claude command not found in PATH"
     echo "🔍 DEBUG: PATH=$PATH"
 fi
+# Claude Code Workaround: Enhanced error detection and logging
+detect_claude_code_error() {
+    local error_output="$1"
+    local operation="$2"
+
+    echo "🔍 Analyzing error for $operation..."
+
+    # Check for known Claude Code error patterns
+    if echo "$error_output" | grep -q "Claude Code executable not found"; then
+        echo "🚨 Detected: Claude Code executable path issue"
+        echo "   This is a known issue with @anthropic-ai/claude-code package"
+        return 1
+    elif echo "$error_output" | grep -q "entrypoints/cli.js"; then
+        echo "🚨 Detected: Claude Code path resolution bug"
+        echo "   Package is looking for entrypoints/cli.js instead of cli.js"
+        return 2
+    elif echo "$error_output" | grep -q "claude-code.*API.*error"; then
+        echo "🚨 Detected: Claude Code API integration error"
+        return 3
+    elif echo "$error_output" | grep -q "ANTHROPIC_API_KEY"; then
+        echo "🚨 Detected: Missing or invalid Anthropic API key"
+        return 4
+    else
+        echo "🤔 Error pattern not recognized as Claude Code specific"
+        return 0
+    fi
+}
+
+# Log Claude Code diagnostics for troubleshooting
+log_claude_code_diagnostics() {
+    echo "🔍 Claude Code Diagnostics:"
+    echo "  Node version: $(node --version 2>/dev/null || echo 'not found')"
+    echo "  NPM version: $(npm --version 2>/dev/null || echo 'not found')"
+    echo "  Claude command available: $(which claude 2>/dev/null || echo 'not found')"
+    echo "  Claude Code package location: $(find /usr/local/lib/node_modules -name "@anthropic-ai" 2>/dev/null | head -1 || find /opt/homebrew/lib/node_modules -name "@anthropic-ai" 2>/dev/null | head -1 || echo 'not found')"
+    echo "  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:+[SET]}${ANTHROPIC_API_KEY:-[NOT SET]}"
+    echo "  CLAUDE_CONFIG_DIR: ${CLAUDE_CONFIG_DIR:-[NOT SET]}"
+}
+
+# Claude Code Workaround: Helper functions for provider fallback
+get_provider_fallback() {
+    local provider="$1"
+    case "$provider" in
+        "claude-code") echo "anthropic" ;;
+        "anthropic") echo "openai" ;;
+        "openai") echo "anthropic" ;;
+        *) echo "$provider" ;;
+    esac
+}
+
+get_model_fallback() {
+    local provider="$1"
+    case "$provider" in
+        "claude-code"|"anthropic") echo "claude-3-5-sonnet-20241022" ;;
+        "openai") echo "gpt-4o-mini" ;;
+        *) echo "claude-3-5-sonnet-20241022" ;;
+    esac
+}
+
+# Claude Code Workaround: Add fallback mechanism for failed operations
+configure_provider_fallback() {
+    local operation="$1"
+    local current_config="$2"
+
+    echo "🔄 Attempting provider fallback for $operation..."
+
+    # Extract current providers from config
+    local main_provider=$(jq -r '.models.main.provider // "unknown"' "$current_config" 2>/dev/null)
+    local research_provider=$(jq -r '.models.research.provider // "unknown"' "$current_config" 2>/dev/null)
+    local fallback_provider=$(jq -r '.models.fallback.provider // "unknown"' "$current_config" 2>/dev/null)
+
+    # Create new config with fallback providers
+    local main_fallback_provider=$(get_provider_fallback "$main_provider")
+    local main_fallback_model=$(get_model_fallback "$main_provider")
+    local research_fallback_provider=$(get_provider_fallback "$research_provider")
+    local research_fallback_model=$(get_model_fallback "$research_provider")
+    local fallback_fallback_provider=$(get_provider_fallback "$fallback_provider")
+    local fallback_fallback_model=$(get_model_fallback "$fallback_provider")
+
+    local new_config=$(jq \
+        --arg main_provider "${main_fallback_provider:-$main_provider}" \
+        --arg main_model "${main_fallback_model:-claude-3-5-sonnet-20241022}" \
+        --arg research_provider "${research_fallback_provider:-$research_provider}" \
+        --arg research_model "${research_fallback_model:-claude-3-5-sonnet-20241022}" \
+        --arg fallback_provider "${fallback_fallback_provider:-$fallback_provider}" \
+        --arg fallback_model "${fallback_fallback_model:-gpt-4o-mini}" \
+        '.models.main.provider = $main_provider |
+         .models.main.modelId = $main_model |
+         .models.research.provider = $research_provider |
+         .models.research.modelId = $research_model |
+         .models.fallback.provider = $fallback_provider |
+         .models.fallback.modelId = $fallback_model' "$current_config")
+
+    echo "$new_config" > "$current_config.tmp" && mv "$current_config.tmp" "$current_config"
+    echo "✅ Applied provider fallback configuration"
+}
+
 # Use --research flag to use the configured research model
-task-master parse-prd \
+if ! task-master parse-prd \
     --input ".taskmaster/docs/prd.txt" \
     --force \
-    --research || {
-    echo "❌ Failed to parse PRD"
-    exit 1
-}
+    --research 2>&1; then
+    echo "❌ Failed to parse PRD with current configuration"
+
+    # Log diagnostics for troubleshooting
+    log_claude_code_diagnostics
+
+    # Try fallback configuration
+    configure_provider_fallback "PRD parsing" ".taskmaster/config.json"
+
+    # Retry with fallback configuration
+    if ! task-master parse-prd \
+        --input ".taskmaster/docs/prd.txt" \
+        --force \
+        --research 2>&1; then
+        echo "❌ PRD parsing failed even with fallback configuration"
+        echo "📋 Final diagnostics before exit:"
+        log_claude_code_diagnostics
+        exit 1
+    fi
+
+    echo "✅ PRD parsing succeeded with fallback configuration"
+fi
 
 # Resolve tasks.json path (use default, fallback to discovery)
 TASKS_FILE=".taskmaster/tasks/tasks.json"
@@ -669,10 +903,25 @@ fi
 if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
     echo "🔍 Analyzing task complexity..."
     mkdir -p .taskmaster/reports
-    task-master analyze-complexity --file "$TASKS_FILE" || {
-        echo "❌ analyze-complexity failed"
-        exit 1
-    }
+    if ! task-master analyze-complexity --file "$TASKS_FILE" 2>&1; then
+        echo "❌ analyze-complexity failed with current configuration"
+
+        # Log diagnostics for troubleshooting
+        log_claude_code_diagnostics
+
+        # Try fallback configuration
+        configure_provider_fallback "complexity analysis" ".taskmaster/config.json"
+
+        # Retry with fallback configuration
+        if ! task-master analyze-complexity --file "$TASKS_FILE" 2>&1; then
+            echo "❌ Complexity analysis failed even with fallback configuration"
+            echo "📋 Final diagnostics before exit:"
+            log_claude_code_diagnostics
+            exit 1
+        fi
+
+        echo "✅ Complexity analysis succeeded with fallback configuration"
+    fi
 fi
 
 # Expand tasks if requested (switch to regular Claude API for faster expansion)
@@ -729,10 +978,25 @@ EOF
         fi
     fi
 
-    task-master expand --all --force --file "$TASKS_FILE" || {
-        echo "❌ expand failed"
-        exit 1
-    }
+    if ! task-master expand --all --force --file "$TASKS_FILE" 2>&1; then
+        echo "❌ expand failed with current configuration"
+
+        # Log diagnostics for troubleshooting
+        log_claude_code_diagnostics
+
+        # Try fallback configuration
+        configure_provider_fallback "task expansion" ".taskmaster/config.json"
+
+        # Retry with fallback configuration
+        if ! task-master expand --all --force --file "$TASKS_FILE" 2>&1; then
+            echo "❌ Task expansion failed even with fallback configuration"
+            echo "📋 Final diagnostics before exit:"
+            log_claude_code_diagnostics
+            exit 1
+        fi
+
+        echo "✅ Task expansion succeeded with fallback configuration"
+    fi
 fi
 
 # Review and align tasks with architecture using Claude
@@ -815,9 +1079,9 @@ Auto-generated project from intake pipeline.
 
 ## Getting Started
 
-1. Review the generated tasks in \`.taskmaster/tasks/tasks.json\`
-2. Use \`task-master list\` to view all tasks
-3. Use \`task-master next\` to get the next task to work on
+1. Review the generated tasks in .taskmaster/tasks/tasks.json
+2. Use task-master list to view all tasks
+3. Use task-master next to get the next task to work on
 4. Implement tasks using the orchestrator workflow
 
 ## Generated Statistics
@@ -861,22 +1125,44 @@ git push -u origin "$BRANCH_NAME"
 
 # Create pull request
 echo "🔀 Creating pull request..."
-PR_BODY="## 🎉 Project Intake: $PROJECT_NAME
+
+# Build PR body inline to avoid function issues
+ARCH_INCLUDED=""
+if [ -f "$PROJECT_DIR/.taskmaster/docs/architecture.md" ]; then
+    ARCH_INCLUDED="- ✅ Architecture document included"
+fi
+
+COMPLEXITY_DONE=""
+if [ "$ANALYZE_COMPLEXITY" = "true" ]; then
+    COMPLEXITY_DONE="- ✅ Complexity analysis performed"
+fi
+
+EXPANSION_DONE=""
+if [ "$EXPAND_TASKS" = "true" ]; then
+    EXPANSION_DONE="- ✅ Tasks expanded with subtasks"
+fi
+
+TASK_COUNT=$(jq '.tasks | length' "$PROJECT_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || echo "N/A")
+
+# Build PR body using a temporary file to avoid bash interpretation issues
+PR_BODY_FILE="/tmp/pr_body_$$.txt"
+cat > "$PR_BODY_FILE" << 'EOF'
+## 🎉 Project Intake: PROJECT_NAME_PLACEHOLDER
 
 This PR contains the auto-generated project structure and tasks.
 
 ### 📋 What was processed:
 - ✅ PRD document parsed
-$([ -f "$PROJECT_DIR/.taskmaster/docs/architecture.md" ] && echo "- ✅ Architecture document included")
+ARCH_INCLUDED_PLACEHOLDER
 - ✅ TaskMaster initialized
-- ✅ Tasks generated (target: $NUM_TASKS)
-$([ "$ANALYZE_COMPLEXITY" = "true" ] && echo "- ✅ Complexity analysis performed")
-$([ "$EXPAND_TASKS" = "true" ] && echo "- ✅ Tasks expanded with subtasks")
+- ✅ Tasks generated (target: NUM_TASKS_PLACEHOLDER)
+COMPLEXITY_DONE_PLACEHOLDER
+EXPANSION_DONE_PLACEHOLDER
 - ✅ Project structure created
 
 ### 🏗️ Generated Structure:
-\`\`\`
-$PROJECT_DIR/
+```
+PROJECT_DIR_PLACEHOLDER/
 ├── .taskmaster/
 │   ├── docs/
 │   │   ├── prd.txt
@@ -889,19 +1175,35 @@ $PROJECT_DIR/
 │   │   └── task.md
 │   └── ...
 └── README.md
-\`\`\`
+```
 
 ### 🤖 Configuration:
-- **Model**: $MODEL
-- **Tasks Generated**: $(jq '.tasks | length' "$PROJECT_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || echo "N/A")
-- **Complexity Analysis**: $ANALYZE_COMPLEXITY
-- **Task Expansion**: $EXPAND_TASKS
+- **Model**: MODEL_PLACEHOLDER
+- **Tasks Generated**: TASK_COUNT_PLACEHOLDER
+- **Complexity Analysis**: ANALYZE_COMPLEXITY_PLACEHOLDER
+- **Task Expansion**: EXPAND_TASKS_PLACEHOLDER
 
 ### 🎯 Next Steps:
 1. Review the generated tasks
 2. Merge this PR to add the project
 3. Use orchestrator workflows to implement tasks
-"
+EOF
+
+# Replace placeholders with actual values using sed
+sed -i "s/PROJECT_NAME_PLACEHOLDER/$PROJECT_NAME/g" "$PR_BODY_FILE"
+sed -i "s/ARCH_INCLUDED_PLACEHOLDER/$ARCH_INCLUDED/g" "$PR_BODY_FILE"
+sed -i "s/NUM_TASKS_PLACEHOLDER/$NUM_TASKS/g" "$PR_BODY_FILE"
+sed -i "s/COMPLEXITY_DONE_PLACEHOLDER/$COMPLEXITY_DONE/g" "$PR_BODY_FILE"
+sed -i "s/EXPANSION_DONE_PLACEHOLDER/$EXPANSION_DONE/g" "$PR_BODY_FILE"
+sed -i "s/PROJECT_DIR_PLACEHOLDER/$PROJECT_DIR/g" "$PR_BODY_FILE"
+sed -i "s/MODEL_PLACEHOLDER/$MODEL/g" "$PR_BODY_FILE"
+sed -i "s/TASK_COUNT_PLACEHOLDER/$TASK_COUNT/g" "$PR_BODY_FILE"
+sed -i "s/ANALYZE_COMPLEXITY_PLACEHOLDER/$ANALYZE_COMPLEXITY/g" "$PR_BODY_FILE"
+sed -i "s/EXPAND_TASKS_PLACEHOLDER/$EXPAND_TASKS/g" "$PR_BODY_FILE"
+
+# Read the final PR body
+PR_BODY=$(cat "$PR_BODY_FILE")
+rm -f "$PR_BODY_FILE"
 
 # Refresh GitHub token before PR creation
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
