@@ -35,6 +35,7 @@
     },
     "play": {
       "model": "claude-sonnet-4-20250514",
+      "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
       "testingAgent": "5DLabs-Tess",
@@ -48,6 +49,8 @@
   "agents": {
     "morgan": {
       "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"],
         "localServers": {
@@ -64,6 +67,8 @@
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
         "localServers": {
@@ -80,6 +85,8 @@
     },
     "cleo": {
       "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
         "localServers": {
@@ -96,6 +103,8 @@
     },
     "tess": {
       "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": ["memory_create_entities", "memory_add_observations"],
         "localServers": {
@@ -112,6 +121,8 @@
     },
     "blaze": {
       "githubApp": "5DLabs-Blaze",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
         "localServers": {
@@ -128,6 +139,8 @@
     },
     "cipher": {
       "githubApp": "5DLabs-Cipher",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
         "localServers": {
