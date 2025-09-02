@@ -1279,7 +1279,7 @@ impl<'a> CodeResourceManager<'a> {
             let default_registry = "ghcr.io/5dlabs";
             let image_name = cli_key;
             let tag = &self.config.agent.image.tag;
-            return format!("{}/{}:{}", default_registry, image_name, tag);
+            return format!("{default_registry}/{image_name}:{tag}");
         }
 
         // No CLI config specified - use default image (backward compatibility)
