@@ -442,7 +442,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Tess" => "tess",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
-                    "Unknown GitHub app '{}' - no corresponding agent found", github_app
+                    "Unknown GitHub app '{github_app}' - no corresponding agent found"
                 )));
             }
         };
@@ -458,20 +458,16 @@ impl CodeTemplateGenerator {
         if let Some(agent_config) = config.agents.get(agent_name) {
             if let Some(tools) = &agent_config.tools {
                 let remote_tools = tools.remote.clone();
-                let local_servers = if let Some(local_servers_config) = &tools.local_servers {
-                    Some(LocalServerConfigs {
-                        filesystem: LocalServerConfig {
-                            enabled: local_servers_config.filesystem.enabled,
-                            tools: local_servers_config.filesystem.tools.clone(),
-                        },
-                        git: LocalServerConfig {
-                            enabled: local_servers_config.git.enabled,
-                            tools: local_servers_config.git.tools.clone(),
-                        },
-                    })
-                } else {
-                    None
-                };
+                let local_servers = tools.local_servers.as_ref().map(|local_servers_config| LocalServerConfigs {
+                    filesystem: LocalServerConfig {
+                        enabled: local_servers_config.filesystem.enabled,
+                        tools: local_servers_config.filesystem.tools.clone(),
+                    },
+                    git: LocalServerConfig {
+                        enabled: local_servers_config.git.enabled,
+                        tools: local_servers_config.git.tools.clone(),
+                    },
+                });
 
                 return Ok(AgentTools {
                     remote: remote_tools,

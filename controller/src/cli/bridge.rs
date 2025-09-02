@@ -138,7 +138,7 @@ impl CLIAdapter for TomlCLIAdapter {
                     let env_pairs: Vec<String> = server
                         .env
                         .iter()
-                        .map(|(k, v)| format!("\"{}\" = \"{}\"", k, v))
+                        .map(|(k, v)| format!("\"{k}\" = \"{v}\""))
                         .collect();
                     toml_config.push_str(&format!("env = {{{}}}\n", env_pairs.join(", ")));
                 }
