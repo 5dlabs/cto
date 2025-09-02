@@ -229,7 +229,7 @@ pub struct AgentTools {
     pub remote: Vec<String>,
 
     /// Local server configurations
-    #[serde(default)]
+    #[serde(default, rename = "localServers")]
     pub local_servers: Option<LocalServerConfigs>,
 }
 
