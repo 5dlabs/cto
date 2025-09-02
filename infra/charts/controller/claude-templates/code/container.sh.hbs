@@ -656,6 +656,14 @@ if [ -d "/task-files" ]; then
           fi
         fi
 
+  # Copy client-config.json to workspace root for MCP configuration
+  if [ -f "/task-files/client-config.json" ]; then
+    cp "/task-files/client-config.json" "/workspace/client-config.json"
+    echo "✓ Copied client-config.json to workspace root for MCP configuration"
+  else
+    echo "⚠️ client-config.json not found in task-files, using defaults"
+  fi
+
   # Copy all other markdown files (excluding CLAUDE.md)
   for md_file in /task-files/*.md; do
     if [ -f "$md_file" ]; then

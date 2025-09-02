@@ -46,11 +46,101 @@
     }
   },
   "agents": {
-    "morgan": "5DLabs-Morgan",
-    "rex": "5DLabs-Rex",
-    "blaze": "5DLabs-Blaze",
-    "cipher": "5DLabs-Cipher",
-    "cleo": "5DLabs-Cleo",
-    "tess": "5DLabs-Tess"
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff"]
+          }
+        }
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_log"]
+          }
+        }
+      }
+    },
+    "cipher": {
+      "githubApp": "5DLabs-Cipher",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "localServers": {
+          "filesystem": {
+            "enabled": false,
+            "tools": []
+          },
+          "git": {
+            "enabled": false,
+            "tools": []
+          }
+        }
+      }
+    }
   }
 }

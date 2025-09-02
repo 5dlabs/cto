@@ -17,6 +17,10 @@ pub struct ControllerConfig {
     /// Agent configuration
     pub agent: AgentConfig,
 
+    /// Individual agent configurations (GitHub apps, tools, etc.)
+    #[serde(default)]
+    pub agents: HashMap<String, AgentDefinition>,
+
     /// Secrets configuration
     pub secrets: SecretsConfig,
 
@@ -205,6 +209,52 @@ fn default_delete_configmap() -> bool {
     true
 }
 
+/// Individual agent definition
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentDefinition {
+    /// GitHub app name for this agent
+    #[serde(rename = "githubApp")]
+    pub github_app: String,
+
+    /// Tool configuration for this agent
+    #[serde(default)]
+    pub tools: Option<AgentTools>,
+}
+
+/// Tool configuration for an agent
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentTools {
+    /// Remote tools available to this agent
+    #[serde(default)]
+    pub remote: Vec<String>,
+
+    /// Local server configurations
+    #[serde(default)]
+    pub local_servers: Option<LocalServerConfigs>,
+}
+
+/// Local server configurations
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LocalServerConfigs {
+    /// Filesystem server configuration
+    pub filesystem: LocalServerConfig,
+
+    /// Git server configuration
+    pub git: LocalServerConfig,
+}
+
+/// Configuration for a local MCP server
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LocalServerConfig {
+    /// Whether this server is enabled
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Tools available from this server
+    #[serde(default)]
+    pub tools: Vec<String>,
+}
+
 impl Default for CleanupConfig {
     fn default() -> Self {
         CleanupConfig {
@@ -298,6 +348,7 @@ impl Default for ControllerConfig {
                 },
                 service_account_name: None,
             },
+            agents: HashMap::new(),
             secrets: SecretsConfig {
                 api_key_secret_name: "orchestrator-secrets".to_string(),
                 api_key_secret_key: "ANTHROPIC_API_KEY".to_string(),

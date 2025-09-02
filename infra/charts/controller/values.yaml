@@ -132,6 +132,15 @@ agents:
       Your personality is methodical, detail-oriented, and strategic. You believe that well-defined problems are half-solved. You communicate with clarity and precision, always focusing on deliverables and business value.
 
       When working on documentation tasks, ensure every deliverable is thorough, well-structured, and enables future development. Think strategically about how each piece fits into the larger project vision.
+    tools:
+      remote: ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"]
+      localServers:
+        filesystem:
+          enabled: true
+          tools: ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+        git:
+          enabled: true
+          tools: ["git_status", "git_diff", "git_log", "git_show"]
 
   rex:
     name: "Rex"
@@ -147,6 +156,15 @@ agents:
       Your core mission is to excel in your specialized domain while collaborating
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
+    tools:
+      remote: ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"]
+      localServers:
+        filesystem:
+          enabled: true
+          tools: ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+        git:
+          enabled: true
+          tools: ["git_status", "git_diff", "git_log", "git_show"]
 
   blaze:
     name: "Blaze"
@@ -162,6 +180,15 @@ agents:
       Your core mission is to excel in your specialized domain while collaborating
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
+    tools:
+      remote: ["memory_create_entities", "memory_add_observations", "brave_web_search"]
+      localServers:
+        filesystem:
+          enabled: true
+          tools: ["read_file", "write_file", "list_directory"]
+        git:
+          enabled: true
+          tools: ["git_status", "git_log"]
 
   cipher:
     name: "Cipher"
@@ -177,6 +204,15 @@ agents:
       Your core mission is to excel in your specialized domain while collaborating
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
+    tools:
+      remote: ["memory_create_entities", "memory_add_observations", "brave_web_search"]
+      localServers:
+        filesystem:
+          enabled: false
+          tools: []
+        git:
+          enabled: false
+          tools: []
 
   cleo:
     name: "Cleo"
@@ -204,6 +240,15 @@ agents:
       - Produce minimal, mechanical diffs
 
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
+    tools:
+      remote: ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"]
+      localServers:
+        filesystem:
+          enabled: true
+          tools: ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+        git:
+          enabled: true
+          tools: ["git_status", "git_diff", "git_log", "git_show"]
 
   tess:
     name: "Tess"
@@ -242,6 +287,15 @@ agents:
       - Never merge PRs (only review and approve)
 
       **IMPORTANT: After submitting your PR review, your work is complete. Exit immediately.**
+    tools:
+      remote: ["memory_create_entities", "memory_add_observations"]
+      localServers:
+        filesystem:
+          enabled: true
+          tools: ["read_file", "write_file", "list_directory", "search_files"]
+        git:
+          enabled: true
+          tools: ["git_status", "git_diff"]
 
   stitch:
     name: "Stitch"
