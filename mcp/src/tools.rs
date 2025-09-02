@@ -18,7 +18,7 @@ pub fn get_tool_schemas() -> Value {
 }
 
 /// Get tool schemas with config-based agent descriptions
-pub fn get_tool_schemas_with_config(agents: &HashMap<String, String>) -> Value {
+pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "tools": [
             get_docs_schema(),
@@ -62,7 +62,7 @@ fn get_docs_schema() -> Value {
     })
 }
 
-fn get_code_schema(agents: &HashMap<String, String>) -> Value {
+fn get_code_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "code",
         "description": "Submit a Task Master task for implementation using Claude with persistent workspace",
@@ -151,7 +151,7 @@ fn get_code_schema(agents: &HashMap<String, String>) -> Value {
     })
 }
 
-fn get_play_schema(agents: &HashMap<String, String>) -> Value {
+fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "play",
         "description": "Submit a Play workflow for multi-agent orchestration (Rex/Blaze → Cleo → Tess) with event-driven coordination",
@@ -210,6 +210,10 @@ fn get_play_schema(agents: &HashMap<String, String>) -> Value {
                 "model": {
                     "type": "string",
                     "description": "Claude model to use for all agents (optional, defaults to configuration)"
+                },
+                "cli": {
+                    "type": "string",
+                    "description": "CLI tool to use for all agents (optional, defaults to configuration)"
                 }
             },
             "required": ["task_id"]

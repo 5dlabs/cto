@@ -1,0 +1,159 @@
+{
+  "version": "1.0",
+  "defaults": {
+    "docs": {
+      "model": "claude-opus-4-1-20250805",
+      "githubApp": "5DLabs-Morgan",
+      "includeCodebase": false,
+      "sourceBranch": "main"
+    },
+    "code": {
+      "model": "claude-opus-4-1-20250805",
+      "githubApp": "5DLabs-Rex",
+      "continueSession": false,
+      "workingDirectory": ".",
+      "overwriteMemory": false,
+      "repository": "5dlabs/cto",
+      "docsRepository": "5dlabs/cto",
+      "docsProjectDirectory": "docs",
+      "service": "cto"
+    },
+    "intake": {
+      "githubApp": "5DLabs-Morgan",
+      "primary": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "research": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "fallback": {
+        "model": "gpt-5",
+        "provider": "openai"
+      }
+    },
+    "play": {
+      "model": "claude-sonnet-4-20250514",
+      "cli": "claude",
+      "implementationAgent": "5DLabs-Rex",
+      "qualityAgent": "5DLabs-Cleo",
+      "testingAgent": "5DLabs-Tess",
+      "repository": "5dlabs/cto-play-test",
+      "service": "cto-play-test",
+      "docsRepository": "5dlabs/cto-play-test",
+      "docsProjectDirectory": "docs",
+      "workingDirectory": "/Users/jonathonfritz/cto-play-test"
+    }
+  },
+  "agents": {
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+ "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff"]
+          }
+        }
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_log"]
+          }
+        }
+      }
+    },
+    "cipher": {
+      "githubApp": "5DLabs-Cipher",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "localServers": {
+          "filesystem": {
+            "enabled": false,
+            "tools": []
+          },
+          "git": {
+            "enabled": false,
+            "tools": []
+          }
+        }
+      }
+    }
+  }
+}
