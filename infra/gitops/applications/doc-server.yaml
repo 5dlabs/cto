@@ -40,86 +40,168 @@ spec:
           args: ["--migrate-only"]
         # Tools configuration - managed by CTO
         # This will be mounted as /app/tools.json via ConfigMap
+        # Note: This is plain JSON in an ArgoCD YAML, not a Helm template
         toolsConfig: |
-          {{
+          {
             "tools": [
-              {{
+              {
+                "name": "birdeye_query",
+                "docType": "birdeye",
+                "title": "BirdEye API Documentation Query",
+                "description": "Search and retrieve information from BirdEye blockchain API documentation. Query across 600+ API endpoints with filtering by version, method, and parameters.",
+                "enabled": true,
+                "metadataHints": {
+                  "supported_formats": ["json", "yaml"],
+                  "supported_complexity_levels": [],
+                  "supported_categories": ["defi", "pricing", "token", "portfolio"],
+                  "supported_topics": ["api", "endpoints", "parameters", "responses"],
+                  "supports_api_version": true
+                }
+              },
+              {
+                "name": "solana_query",
+                "docType": "solana",
+                "title": "Solana Documentation Query",
+                "description": "Search Solana core documentation, architecture diagrams, ZK cryptography specifications, and development guides.",
+                "enabled": true,
+                "metadataHints": {
+                  "supported_formats": ["markdown", "pdf", "bob", "msc"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["core", "architecture-diagrams", "sequence-diagrams", "zk-cryptography"],
+                  "supported_topics": ["consensus", "networking", "validators", "cryptography", "development"],
+                  "supports_api_version": false
+                }
+              },
+              {
                 "name": "jupiter_query",
                 "docType": "jupiter",
                 "title": "Jupiter Protocol Documentation Query",
                 "description": "Search Jupiter DeFi protocol documentation for DEX aggregation, swap APIs, and Solana-based trading infrastructure.",
                 "enabled": true,
-                "metadataHints": {{
+                "metadataHints": {
                   "supported_formats": ["markdown", "json", "typescript"],
                   "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": [
-                    "swap-api",
-                    "token-api",
-                    "price-api",
-                    "dex-integration",
-                    "wallet-integration"
-                  ],
-                  "supported_topics": [
-                    "trading",
-                    "liquidity",
-                    "apis",
-                    "integration",
-                    "development"
-                  ],
+                  "supported_categories": ["swap-api", "token-api", "price-api", "dex-integration", "wallet-integration"],
+                  "supported_topics": ["trading", "liquidity", "apis", "integration", "development"],
                   "supports_api_version": true
-                }}
-              }},
-              {{
+                }
+              },
+              {
+                "name": "ethereum_query",
+                "docType": "ethereum",
+                "title": "Ethereum Documentation Query",
+                "description": "Search Ethereum blockchain documentation for smart contracts, DeFi protocols, and development resources.",
+                "enabled": true,
+                "metadataHints": {
+                  "supported_formats": ["markdown", "solidity", "json"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["smart-contracts", "defi", "layer-2", "consensus", "development"],
+                  "supported_topics": ["solidity", "web3", "gas-optimization", "security", "deployment"],
+                  "supports_api_version": true
+                }
+              },
+              {
+                "name": "cilium_query",
+                "docType": "cilium",
+                "title": "Cilium Documentation Query",
+                "description": "Search Cilium networking and security documentation for Kubernetes and cloud-native environments.",
+                "enabled": true
+              },
+              {
+                "name": "talos_query",
+                "docType": "talos",
+                "title": "Talos OS Documentation Query",
+                "description": "Search Talos OS documentation for minimal, secure, and immutable Linux distribution designed for Kubernetes.",
+                "enabled": true
+              },
+              {
+                "name": "meteora_query",
+                "docType": "meteora",
+                "title": "Meteora Protocol Documentation Query",
+                "description": "Search Meteora DeFi protocol documentation including liquidity pools, farming, and yield strategies.",
+                "enabled": true
+              },
+              {
+                "name": "raydium_query",
+                "docType": "raydium",
+                "title": "Raydium Protocol Documentation Query",
+                "description": "Search Raydium DEX and AMM documentation for Solana-based trading and liquidity provision.",
+                "enabled": true
+              },
+              {
+                "name": "ebpf_query",
+                "docType": "ebpf",
+                "title": "eBPF Documentation Query",
+                "description": "Search eBPF (extended Berkeley Packet Filter) documentation for kernel programming and observability.",
+                "enabled": true
+              },
+              {
+                "name": "rust_best_practices_query",
+                "docType": "rust_best_practices",
+                "title": "Rust Best Practices Query",
+                "description": "Search curated Rust best practices, patterns, and guidelines for idiomatic and performant code.",
+                "enabled": true
+              },
+              {
                 "name": "rust_query",
                 "docType": "rust",
                 "title": "Rust Documentation Query",
-                "description": "Search and retrieve information from Rust crate documentation.",
+                "description": "Search and retrieve information from Rust crate documentation. Query across 40+ popular Rust crates.",
                 "enabled": true
-              }},
-              {{
-                "name": "birdeye_query",
-                "docType": "birdeye",
-                "title": "BirdEye API Documentation Query",
-                "description": "Search and retrieve information from BirdEye blockchain API documentation.",
-                "enabled": true
-              }},
-              {{
-                "name": "solana_query",
-                "docType": "solana",
-                "title": "Solana Documentation Query",
-                "description": "Search Solana core documentation and development guides.",
-                "enabled": true
-              }},
-              {{
+              },
+              {
                 "name": "add_rust_crate",
                 "docType": "rust",
                 "title": "Add Rust Crate",
-                "description": "Add a new Rust crate to the documentation system.",
-                "enabled": true
-              }},
-              {{
+                "description": "Add a new Rust crate to the documentation system with automatic docs.rs ingestion.",
+                "enabled": true,
+                "metadataHints": {
+                  "supports_version_selection": true,
+                  "supports_feature_selection": true,
+                  "supports_rollback": true,
+                  "batch_processing": true
+                }
+              },
+              {
                 "name": "remove_rust_crate",
                 "docType": "rust",
                 "title": "Remove Rust Crate",
-                "description": "Remove a Rust crate from the documentation system.",
-                "enabled": true
-              }},
-              {{
+                "description": "Remove a Rust crate from the documentation system with cascade deletion and cleanup verification.",
+                "enabled": true,
+                "metadataHints": {
+                  "supports_soft_delete": true,
+                  "supports_cascade_delete": true,
+                  "cleanup_verification": true
+                }
+              },
+              {
                 "name": "list_rust_crates",
                 "docType": "rust",
                 "title": "List Rust Crates",
-                "description": "List all Rust crates in the documentation system.",
-                "enabled": true
-              }},
-              {{
+                "description": "List all Rust crates in the documentation system with pagination, filtering, and statistics.",
+                "enabled": true,
+                "metadataHints": {
+                  "supports_pagination": true,
+                  "supports_filtering": true,
+                  "supports_statistics": true,
+                  "status_filtering": ["active", "inactive", "updating", "failed"]
+                }
+              },
+              {
                 "name": "check_rust_status",
                 "docType": "rust",
                 "title": "Check Rust System Status",
-                "description": "Check system health and get statistics about Rust crate management.",
-                "enabled": true
-              }}
+                "description": "Check system health and get comprehensive statistics about Rust crate management.",
+                "enabled": true,
+                "metadataHints": {
+                  "health_monitoring": true,
+                  "job_tracking": true,
+                  "performance_metrics": true,
+                  "storage_analysis": true
+                }
+              }
             ]
-          }}
+          }
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
