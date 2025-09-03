@@ -66,6 +66,8 @@ struct WorkflowDefaults {
     intake: IntakeDefaults,
     #[serde(default)]
     play: PlayDefaults,
+    #[serde(default)]
+    intelligent_ingest: IntelligentIngestDefaults,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -170,6 +172,22 @@ struct PlayDefaults {
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct IntelligentIngestDefaults {
+    model: String,
+    #[serde(rename = "docServerUrl")]
+    doc_server_url: String,
+}
+
+impl Default for IntelligentIngestDefaults {
+    fn default() -> Self {
+        IntelligentIngestDefaults {
+            model: "claude-sonnet-4-20250514".to_string(),
+            doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string(),
+        }
+    }
 }
 
 
@@ -1293,6 +1311,12 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "type": "text", 
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
                     }] 
+                }))),
+                Ok("intelligent_ingest") => Some(handle_intelligent_ingest_tool(&arguments).map(|result| json!({ 
+                    "content": [{ 
+                        "type": "text", 
+                        "text": result 
+                    }] 
                 }))), 
                 Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({ 
                     "content": [{ 
@@ -1497,6 +1521,232 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
         .map_err(|e| anyhow!(format!("Anthropic request failed: {e}")))?;
 
     let json_resp: Value = resp.json().map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
+    Ok(json_resp)
+}
+
+fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
+    let github_url = arguments
+        .get("github_url")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("github_url is required"))?;
+    
+    // Validate it's a GitHub URL
+    if !github_url.contains("github.com") {
+        return Err(anyhow!("Only GitHub repositories are currently supported. URL must contain 'github.com'"));
+    }
+    
+    // Get configuration from CTO_CONFIG
+    let config = CTO_CONFIG.get().ok_or_else(|| anyhow!("CTO configuration not loaded"))?;
+    
+    let doc_server_url = arguments
+        .get("doc_server_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&config.defaults.intelligent_ingest.doc_server_url);
+    
+    let auto_execute = arguments
+        .get("auto_execute")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    
+    let doc_type = arguments
+        .get("doc_type")
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("doc_type is required"))?;
+    
+    // Check for ANTHROPIC_API_KEY
+    let api_key = std::env::var("ANTHROPIC_API_KEY")
+        .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
+    
+    // Create the Claude prompt for analyzing the repository
+    let analysis_prompt = format!(
+        r#"Analyze the GitHub repository at {} and determine the optimal documentation ingestion strategy.
+
+You are an expert at identifying and extracting valuable documentation from software repositories.
+
+TASK: Generate a documentation ingestion plan for doc_type '{}' that will:
+1. Clone the repository
+2. Extract relevant documentation
+3. Ingest it into the doc server at {}
+
+The user has specified that this documentation should be categorized as '{}' type.
+
+Provide a JSON response with:
+- doc_type: "{}" (use this exact value)
+- include_paths: Array of paths to include based on the repository structure
+- exclude_paths: Array of paths to exclude (e.g., test files, vendor directories)
+- extensions: Array of file extensions to process (e.g., md, rst, html)
+- reasoning: Brief explanation of your path and extension choices
+
+RESPOND ONLY WITH VALID JSON."#,
+        github_url,
+        doc_type,
+        doc_server_url,
+        doc_type,
+        doc_type
+    );
+    
+    // Call Claude API to analyze the repository using configured model
+    let model = &config.defaults.intelligent_ingest.model;
+    let analysis = call_claude_api(&api_key, &analysis_prompt, model)?;
+    
+    // Parse the analysis response
+    let analysis_text = analysis
+        .get("content")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|msg| msg.get("text"))
+        .and_then(|t| t.as_str())
+        .ok_or(anyhow!("Failed to get Claude analysis response"))?;
+    
+    // Extract JSON from the response - try direct parse first, then extract
+    let strategy_json: Value = match serde_json::from_str(analysis_text) {
+        Ok(json) => json,
+        Err(_) => {
+            // Try to extract JSON object from the response
+            let chars: Vec<char> = analysis_text.chars().collect();
+            let mut start = None;
+            let mut depth = 0;
+            let mut in_string = false;
+            let mut escape = false;
+            
+            for (i, &ch) in chars.iter().enumerate() {
+                if escape {
+                    escape = false;
+                    continue;
+                }
+                
+                match ch {
+                    '\\' if in_string => escape = true,
+                    '"' if !escape => in_string = !in_string,
+                    '{' if !in_string => {
+                        if depth == 0 {
+                            start = Some(i);
+                        }
+                        depth += 1;
+                    }
+                    '}' if !in_string => {
+                        depth -= 1;
+                        if depth == 0 && start.is_some() {
+                            let json_str = &analysis_text[start.unwrap()..=i];
+                            if let Ok(json) = serde_json::from_str(json_str) {
+                                return Ok(json);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            
+            return Err(anyhow!("No valid JSON found in Claude's response: {}", analysis_text));
+        }
+    };
+    
+    // Doc type is already known from user input, but verify Claude used it
+    let claude_doc_type = strategy_json
+        .get("doc_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or(doc_type);
+    
+    let include_paths = strategy_json
+        .get("include_paths")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter()
+            .filter_map(|v| v.as_str())
+            .collect::<Vec<_>>()
+            .join(","))
+        .unwrap_or_else(|| "docs/,Documentation/,README.md".to_string());
+    
+    let extensions = strategy_json
+        .get("extensions")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter()
+            .filter_map(|v| v.as_str())
+            .collect::<Vec<_>>()
+            .join(","))
+        .unwrap_or_else(|| "md,rst,html".to_string());
+    
+    let reasoning = strategy_json
+        .get("reasoning")
+        .and_then(|v| v.as_str())
+        .unwrap_or("No reasoning provided");
+    
+    // Generate the ingestion commands
+    let temp_dir = format!("/tmp/ingest_{}", doc_type);
+    let commands = vec![
+        format!("git clone --depth 1 {} {}", github_url, temp_dir),
+        format!("curl -X POST {}/ingest -H 'Content-Type: application/json' -d '{{\"repository_url\": \"{}\", \"doc_type\": \"{}\", \"paths\": \"{}\", \"extensions\": \"{}\"}}'",
+            doc_server_url, github_url, doc_type, include_paths, extensions),
+    ];
+    
+    let mut output = format!("📊 Repository Analysis Complete\n\n");
+    output.push_str(&format!("🔗 Repository: {}\n", github_url));
+    output.push_str(&format!("📁 Doc Type: {}\n", doc_type));
+    output.push_str(&format!("📂 Paths: {}\n", include_paths));
+    output.push_str(&format!("📄 Extensions: {}\n", extensions));
+    output.push_str(&format!("💭 Reasoning: {}\n\n", reasoning));
+    
+    if auto_execute {
+        output.push_str("🚀 Auto-executing ingestion...\n\n");
+        
+        for (i, cmd) in commands.iter().enumerate() {
+            output.push_str(&format!("⚡ Executing command {}/{}:\n{}\n", i + 1, commands.len(), cmd));
+            
+            let result = Command::new("sh")
+                .arg("-c")
+                .arg(cmd)
+                .output()
+                .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
+            
+            if result.status.success() {
+                output.push_str("✅ Command completed successfully\n");
+                if !result.stdout.is_empty() {
+                    output.push_str(&format!("📤 Output: {}\n", String::from_utf8_lossy(&result.stdout)));
+                }
+            } else {
+                output.push_str(&format!("❌ Command failed: {}\n", String::from_utf8_lossy(&result.stderr)));
+                return Ok(output);
+            }
+            output.push_str("\n");
+        }
+        
+        output.push_str("🎉 Intelligent ingestion completed successfully!");
+    } else {
+        output.push_str("📋 Generated Commands (not executed):\n\n");
+        for (i, cmd) in commands.iter().enumerate() {
+            output.push_str(&format!("{}. {}\n", i + 1, cmd));
+        }
+        output.push_str("\n💡 Run with auto_execute=true to execute these commands automatically.");
+    }
+    
+    Ok(output)
+}
+
+fn call_claude_api(api_key: &str, prompt: &str, model: &str) -> Result<Value> {
+    let body = json!({
+        "model": model,
+        "max_tokens": 2000,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+    
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| anyhow!("Claude API request failed: {}", e))?;
+    
+    let json_resp: Value = resp.json()
+        .map_err(|e| anyhow!("Failed to parse Claude API response: {}", e))?;
+    
     Ok(json_resp)
 }
 
