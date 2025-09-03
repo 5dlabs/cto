@@ -38,6 +38,88 @@ spec:
           # Ensure chart uses correct binary path and migrate-only args
           command: ["/app/http_server"]
           args: ["--migrate-only"]
+        # Tools configuration - managed by CTO
+        # This will be mounted as /app/tools.json via ConfigMap
+        toolsConfig: |
+          {{
+            "tools": [
+              {{
+                "name": "jupiter_query",
+                "docType": "jupiter",
+                "title": "Jupiter Protocol Documentation Query",
+                "description": "Search Jupiter DeFi protocol documentation for DEX aggregation, swap APIs, and Solana-based trading infrastructure.",
+                "enabled": true,
+                "metadataHints": {{
+                  "supported_formats": ["markdown", "json", "typescript"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": [
+                    "swap-api",
+                    "token-api",
+                    "price-api",
+                    "dex-integration",
+                    "wallet-integration"
+                  ],
+                  "supported_topics": [
+                    "trading",
+                    "liquidity",
+                    "apis",
+                    "integration",
+                    "development"
+                  ],
+                  "supports_api_version": true
+                }}
+              }},
+              {{
+                "name": "rust_query",
+                "docType": "rust",
+                "title": "Rust Documentation Query",
+                "description": "Search and retrieve information from Rust crate documentation.",
+                "enabled": true
+              }},
+              {{
+                "name": "birdeye_query",
+                "docType": "birdeye",
+                "title": "BirdEye API Documentation Query",
+                "description": "Search and retrieve information from BirdEye blockchain API documentation.",
+                "enabled": true
+              }},
+              {{
+                "name": "solana_query",
+                "docType": "solana",
+                "title": "Solana Documentation Query",
+                "description": "Search Solana core documentation and development guides.",
+                "enabled": true
+              }},
+              {{
+                "name": "add_rust_crate",
+                "docType": "rust",
+                "title": "Add Rust Crate",
+                "description": "Add a new Rust crate to the documentation system.",
+                "enabled": true
+              }},
+              {{
+                "name": "remove_rust_crate",
+                "docType": "rust",
+                "title": "Remove Rust Crate",
+                "description": "Remove a Rust crate from the documentation system.",
+                "enabled": true
+              }},
+              {{
+                "name": "list_rust_crates",
+                "docType": "rust",
+                "title": "List Rust Crates",
+                "description": "List all Rust crates in the documentation system.",
+                "enabled": true
+              }},
+              {{
+                "name": "check_rust_status",
+                "docType": "rust",
+                "title": "Check Rust System Status",
+                "description": "Check system health and get statistics about Rust crate management.",
+                "enabled": true
+              }}
+            ]
+          }}
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
