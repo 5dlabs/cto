@@ -10,7 +10,8 @@ pub fn get_tool_schemas() -> Value {
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_input_schema()
+            get_input_schema(),
+            get_intelligent_ingest_schema()
         ]
     })
 }
@@ -24,7 +25,8 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_intake_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
-            get_input_schema()
+            get_input_schema(),
+            get_intelligent_ingest_schema()
         ]
     })
 }
@@ -228,6 +230,35 @@ fn get_input_schema() -> Value {
                 "user": {"type": "string", "description": "Optional user label (agents.platform/user) to route to active job"}
             },
             "required": ["text"]
+        }
+    })
+}
+
+fn get_intelligent_ingest_schema() -> Value {
+    json!({
+        "name": "intelligent_ingest",
+        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "github_url": {
+                    "type": "string",
+                    "description": "GitHub repository URL to analyze and ingest (e.g., https://github.com/cilium/cilium)"
+                },
+                "doc_type": {
+                    "type": "string",
+                    "description": "Documentation type/category for storage (e.g., cilium, solana, rust). If not specified, Claude will determine it."
+                },
+                "doc_server_url": {
+                    "type": "string",
+                    "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80)"
+                },
+                "auto_execute": {
+                    "type": "boolean",
+                    "description": "Automatically execute the ingestion strategy without confirmation (default: false)"
+                }
+            },
+            "required": ["github_url"]
         }
     })
 }
