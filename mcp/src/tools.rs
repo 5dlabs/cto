@@ -237,7 +237,7 @@ fn get_input_schema() -> Value {
 fn get_intelligent_ingest_schema() -> Value {
     json!({
         "name": "intelligent_ingest",
-        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy",
+        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Uses model configured in cto-config.json (defaults.intelligent_ingest.model)",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -251,7 +251,7 @@ fn get_intelligent_ingest_schema() -> Value {
                 },
                 "doc_server_url": {
                     "type": "string",
-                    "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80)"
+                    "description": "Doc server URL for ingestion (default from config or http://doc-server-agent-docs-server.mcp.svc.cluster.local:80)"
                 },
                 "auto_execute": {
                     "type": "boolean",

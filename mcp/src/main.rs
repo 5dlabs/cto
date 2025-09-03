@@ -66,6 +66,8 @@ struct WorkflowDefaults {
     intake: IntakeDefaults,
     #[serde(default)]
     play: PlayDefaults,
+    #[serde(default)]
+    intelligent_ingest: IntelligentIngestDefaults,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -170,6 +172,22 @@ struct PlayDefaults {
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct IntelligentIngestDefaults {
+    model: String,
+    #[serde(rename = "docServerUrl")]
+    doc_server_url: String,
+}
+
+impl Default for IntelligentIngestDefaults {
+    fn default() -> Self {
+        IntelligentIngestDefaults {
+            model: "claude-sonnet-4-20250514".to_string(),
+            doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string(),
+        }
+    }
 }
 
 
@@ -1512,10 +1530,13 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("github_url is required"))?;
     
+    // Get configuration from CTO_CONFIG
+    let config = CTO_CONFIG.get().ok_or_else(|| anyhow!("CTO configuration not loaded"))?;
+    
     let doc_server_url = arguments
         .get("doc_server_url")
         .and_then(|v| v.as_str())
-        .unwrap_or("http://doc-server-agent-docs-server.mcp.svc.cluster.local:80");
+        .unwrap_or(&config.defaults.intelligent_ingest.doc_server_url);
     
     let auto_execute = arguments
         .get("auto_execute")
@@ -1560,8 +1581,9 @@ RESPOND ONLY WITH VALID JSON."#,
         }
     );
     
-    // Call Claude API to analyze the repository
-    let analysis = call_claude_api(&api_key, &analysis_prompt)?;
+    // Call Claude API to analyze the repository using configured model
+    let model = &config.defaults.intelligent_ingest.model;
+    let analysis = call_claude_api(&api_key, &analysis_prompt, model)?;
     
     // Parse the analysis response
     let analysis_text = analysis
@@ -1657,9 +1679,9 @@ RESPOND ONLY WITH VALID JSON."#,
     Ok(output)
 }
 
-fn call_claude_api(api_key: &str, prompt: &str) -> Result<Value> {
+fn call_claude_api(api_key: &str, prompt: &str, model: &str) -> Result<Value> {
     let body = json!({
-        "model": "claude-3-5-sonnet-20241022",
+        "model": model,
         "max_tokens": 2000,
         "messages": [
             {
