@@ -1598,11 +1598,48 @@ RESPOND ONLY WITH VALID JSON."#,
         .and_then(|t| t.as_str())
         .ok_or(anyhow!("Failed to get Claude analysis response"))?;
     
-    // Extract JSON from the response
-    let json_start = analysis_text.find('{').unwrap_or(0);
-    let json_end = analysis_text.rfind('}').map(|i| i + 1).unwrap_or(analysis_text.len());
-    let strategy_json: Value = serde_json::from_str(&analysis_text[json_start..json_end])
-        .map_err(|e| anyhow!("Failed to parse strategy JSON: {}", e))?;
+    // Extract JSON from the response - try direct parse first, then extract
+    let strategy_json: Value = match serde_json::from_str(analysis_text) {
+        Ok(json) => json,
+        Err(_) => {
+            // Try to extract JSON object from the response
+            let chars: Vec<char> = analysis_text.chars().collect();
+            let mut start = None;
+            let mut depth = 0;
+            let mut in_string = false;
+            let mut escape = false;
+            
+            for (i, &ch) in chars.iter().enumerate() {
+                if escape {
+                    escape = false;
+                    continue;
+                }
+                
+                match ch {
+                    '\\' if in_string => escape = true,
+                    '"' if !escape => in_string = !in_string,
+                    '{' if !in_string => {
+                        if depth == 0 {
+                            start = Some(i);
+                        }
+                        depth += 1;
+                    }
+                    '}' if !in_string => {
+                        depth -= 1;
+                        if depth == 0 && start.is_some() {
+                            let json_str = &analysis_text[start.unwrap()..=i];
+                            if let Ok(json) = serde_json::from_str(json_str) {
+                                return Ok(json);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            
+            return Err(anyhow!("No valid JSON found in Claude's response: {}", analysis_text));
+        }
+    };
     
     // Doc type is already known from user input, but verify Claude used it
     let claude_doc_type = strategy_json
