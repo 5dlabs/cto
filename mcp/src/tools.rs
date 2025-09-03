@@ -237,7 +237,7 @@ fn get_input_schema() -> Value {
 fn get_intelligent_ingest_schema() -> Value {
     json!({
         "name": "intelligent_ingest",
-        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Uses model configured in cto-config.json (defaults.intelligent_ingest.model)",
+        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.intelligent_ingest.model)",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -247,7 +247,7 @@ fn get_intelligent_ingest_schema() -> Value {
                 },
                 "doc_type": {
                     "type": "string",
-                    "description": "Documentation type/category for storage (e.g., cilium, solana, rust). If not specified, Claude will determine it."
+                    "description": "Documentation type/category for storage (e.g., cilium, solana, rust, ethereum, jupiter, meteora, raydium, ebpf, rust_best_practices, birdeye, talos)"
                 },
                 "doc_server_url": {
                     "type": "string",
@@ -258,7 +258,7 @@ fn get_intelligent_ingest_schema() -> Value {
                     "description": "Automatically execute the ingestion strategy without confirmation (default: false)"
                 }
             },
-            "required": ["github_url"]
+            "required": ["github_url", "doc_type"]
         }
     })
 }

@@ -1530,6 +1530,11 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("github_url is required"))?;
     
+    // Validate it's a GitHub URL
+    if !github_url.contains("github.com") {
+        return Err(anyhow!("Only GitHub repositories are currently supported. URL must contain 'github.com'"));
+    }
+    
     // Get configuration from CTO_CONFIG
     let config = CTO_CONFIG.get().ok_or_else(|| anyhow!("CTO configuration not loaded"))?;
     
@@ -1543,9 +1548,10 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     
-    let doc_type_hint = arguments
+    let doc_type = arguments
         .get("doc_type")
-        .and_then(|v| v.as_str());
+        .and_then(|v| v.as_str())
+        .ok_or(anyhow!("doc_type is required"))?;
     
     // Check for ANTHROPIC_API_KEY
     let api_key = std::env::var("ANTHROPIC_API_KEY")
@@ -1557,28 +1563,26 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
 
 You are an expert at identifying and extracting valuable documentation from software repositories.
 
-TASK: Generate a documentation ingestion plan that will:
+TASK: Generate a documentation ingestion plan for doc_type '{}' that will:
 1. Clone the repository
 2. Extract relevant documentation
 3. Ingest it into the doc server at {}
 
-{}
+The user has specified that this documentation should be categorized as '{}' type.
 
 Provide a JSON response with:
-- doc_type: The category for this documentation (e.g., "cilium", "solana", "rust")
-- include_paths: Array of paths to include
-- exclude_paths: Array of paths to exclude
-- extensions: Array of file extensions to process
-- reasoning: Brief explanation of your decisions
+- doc_type: "{}" (use this exact value)
+- include_paths: Array of paths to include based on the repository structure
+- exclude_paths: Array of paths to exclude (e.g., test files, vendor directories)
+- extensions: Array of file extensions to process (e.g., md, rst, html)
+- reasoning: Brief explanation of your path and extension choices
 
 RESPOND ONLY WITH VALID JSON."#,
         github_url,
+        doc_type,
         doc_server_url,
-        if let Some(hint) = doc_type_hint {
-            format!("Use doc_type: '{}' as suggested by the user.", hint)
-        } else {
-            "Determine the most appropriate doc_type based on the repository content.".to_string()
-        }
+        doc_type,
+        doc_type
     );
     
     // Call Claude API to analyze the repository using configured model
@@ -1600,10 +1604,11 @@ RESPOND ONLY WITH VALID JSON."#,
     let strategy_json: Value = serde_json::from_str(&analysis_text[json_start..json_end])
         .map_err(|e| anyhow!("Failed to parse strategy JSON: {}", e))?;
     
-    let doc_type = strategy_json
+    // Doc type is already known from user input, but verify Claude used it
+    let claude_doc_type = strategy_json
         .get("doc_type")
         .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
+        .unwrap_or(doc_type);
     
     let include_paths = strategy_json
         .get("include_paths")
