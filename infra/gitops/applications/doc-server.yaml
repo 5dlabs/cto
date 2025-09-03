@@ -40,6 +40,7 @@ spec:
           args: ["--migrate-only"]
         # Tools configuration - managed by CTO
         # This will be mounted as /app/tools.json via ConfigMap
+        # Single source of truth - edit this inline configuration directly
         # Note: This is plain JSON in an ArgoCD YAML, not a Helm template
         toolsConfig: |
           {
