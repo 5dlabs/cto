@@ -1589,6 +1589,7 @@ IMPORTANT:
         doc_type,
         doc_server_url,
         doc_type,
+        doc_type,
         doc_type
     );
     
