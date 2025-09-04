@@ -1570,14 +1570,20 @@ TASK: Generate a documentation ingestion plan for doc_type '{}' that will:
 
 The user has specified that this documentation should be categorized as '{}' type.
 
-Provide a JSON response with:
-- doc_type: "{}" (use this exact value)
-- include_paths: Array of paths to include based on the repository structure
-- exclude_paths: Array of paths to exclude (e.g., test files, vendor directories)
-- extensions: Array of file extensions to process (e.g., md, rst, html)
-- reasoning: Brief explanation of your path and extension choices
+Your response must be a valid JSON object with this exact structure:
+{{
+  "doc_type": "{}",
+  "include_paths": ["path1", "path2"],
+  "exclude_paths": ["test", "vendor"],
+  "extensions": ["md", "rst", "html"],
+  "reasoning": "Brief explanation here"
+}}
 
-RESPOND ONLY WITH VALID JSON."#,
+IMPORTANT:
+- Respond ONLY with the JSON object
+- Do not include any text before or after the JSON
+- Use the exact doc_type value provided: "{}"
+- Include reasonable defaults if repository structure is unclear"#,
         github_url,
         doc_type,
         doc_server_url,
@@ -1596,7 +1602,10 @@ RESPOND ONLY WITH VALID JSON."#,
         .and_then(|arr| arr.first())
         .and_then(|msg| msg.get("text"))
         .and_then(|t| t.as_str())
-        .ok_or(anyhow!("Failed to get Claude analysis response"))?;
+        .ok_or_else(|| {
+            eprintln!("DEBUG: Full Claude API response: {:?}", analysis);
+            anyhow!("Failed to get Claude analysis response text")
+        })?;
     
     // Extract JSON from the response - try direct parse first, then extract
     let strategy_json: Value = match serde_json::from_str(analysis_text) {
@@ -1608,6 +1617,7 @@ RESPOND ONLY WITH VALID JSON."#,
             let mut depth = 0;
             let mut in_string = false;
             let mut escape = false;
+            let mut json_result = None;
             
             for (i, &ch) in chars.iter().enumerate() {
                 if escape {
@@ -1628,8 +1638,9 @@ RESPOND ONLY WITH VALID JSON."#,
                         depth -= 1;
                         if depth == 0 && start.is_some() {
                             let json_str = &analysis_text[start.unwrap()..=i];
-                            if let Ok(json) = serde_json::from_str(json_str) {
-                                return Ok(json);
+                            if let Ok(json) = serde_json::from_str::<Value>(json_str) {
+                                json_result = Some(json);
+                                break;
                             }
                         }
                     }
@@ -1637,7 +1648,12 @@ RESPOND ONLY WITH VALID JSON."#,
                 }
             }
             
-            return Err(anyhow!("No valid JSON found in Claude's response: {}", analysis_text));
+            json_result.ok_or_else(|| {
+                eprintln!("DEBUG: Could not extract JSON from Claude's response. Full text:");
+                eprintln!("{}", analysis_text);
+                eprintln!("---");
+                anyhow!("No valid JSON found in Claude's response. Response length: {} chars", analysis_text.len())
+            })?
         }
     };
     
