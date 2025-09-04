@@ -1560,20 +1560,20 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
     
     // Create the Claude prompt for analyzing the repository
     let analysis_prompt = format!(
-        r#"Analyze the GitHub repository at {} and determine the optimal documentation ingestion strategy.
+        r#"Analyze the GitHub repository at {github_url} and determine the optimal documentation ingestion strategy.
 
 You are an expert at identifying and extracting valuable documentation from software repositories.
 
-TASK: Generate a documentation ingestion plan for doc_type '{}' that will:
+TASK: Generate a documentation ingestion plan for doc_type '{doc_type}' that will:
 1. Clone the repository
 2. Extract relevant documentation
-3. Ingest it into the doc server at {}
+3. Ingest it into the doc server at {doc_server_url}
 
-The user has specified that this documentation should be categorized as '{}' type.
+The user has specified that this documentation should be categorized as '{doc_type}' type.
 
 Your response must be a valid JSON object with this exact structure:
 {{
-  "doc_type": "{}",
+  "doc_type": "{doc_type}",
   "include_paths": ["path1", "path2"],
   "exclude_paths": ["test", "vendor"],
   "extensions": ["md", "rst", "html"],
@@ -1583,14 +1583,11 @@ Your response must be a valid JSON object with this exact structure:
 IMPORTANT:
 - Respond ONLY with the JSON object
 - Do not include any text before or after the JSON
-- Use the exact doc_type value provided: "{}"
+- Use the exact doc_type value provided: "{doc_type}"
 - Include reasonable defaults if repository structure is unclear"#,
-        github_url,
-        doc_type,
-        doc_server_url,
-        doc_type,
-        doc_type,
-        doc_type
+        github_url = github_url,
+        doc_type = doc_type,
+        doc_server_url = doc_server_url
     );
     
     // Call Claude API to analyze the repository using configured model
