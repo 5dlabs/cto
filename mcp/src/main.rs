@@ -67,7 +67,7 @@ struct WorkflowDefaults {
     #[serde(default)]
     play: PlayDefaults,
     #[serde(default)]
-    intelligent_ingest: IntelligentIngestDefaults,
+    docs_ingest: DocsIngestDefaults,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -175,15 +175,15 @@ struct PlayDefaults {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct IntelligentIngestDefaults {
+struct DocsIngestDefaults {
     model: String,
     #[serde(rename = "docServerUrl")]
     doc_server_url: String,
 }
 
-impl Default for IntelligentIngestDefaults {
+impl Default for DocsIngestDefaults {
     fn default() -> Self {
-        IntelligentIngestDefaults {
+        DocsIngestDefaults {
             model: "claude-sonnet-4-20250514".to_string(),
             // Use the internal Kubernetes service URL - accessible via Twingate
             doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string(),
@@ -984,7 +984,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 }
 
 #[allow(clippy::disallowed_macros)]
-fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🚀 Processing project intake request");
 
     // Get workspace directory from Cursor environment
@@ -1295,7 +1295,7 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
                     }] 
                 }))), 
-                Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({ 
+                Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({ 
                     "content": [{ 
                         "type": "text", 
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
@@ -1313,11 +1313,11 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
                     }] 
                 }))),
-                Ok("intelligent_ingest") => Some(handle_intelligent_ingest_tool(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": result 
-                    }] 
+                Ok("docs_ingest") => Some(handle_docs_ingest_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": result
+                    }]
                 }))), 
                 Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({ 
                     "content": [{ 
@@ -1525,7 +1525,7 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
     Ok(json_resp)
 }
 
-fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
+fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
     let github_url = arguments
         .get("github_url")
         .and_then(|v| v.as_str())
@@ -1542,7 +1542,7 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
     let doc_server_url = arguments
         .get("doc_server_url")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intelligent_ingest.doc_server_url);
+        .unwrap_or(&config.defaults.docs_ingest.doc_server_url);
     
     let auto_execute = arguments
         .get("auto_execute")
@@ -1591,7 +1591,7 @@ IMPORTANT:
     );
     
     // Call Claude API to analyze the repository using configured model
-    let model = &config.defaults.intelligent_ingest.model;
+    let model = &config.defaults.docs_ingest.model;
     let analysis = call_claude_api(&api_key, &analysis_prompt, model)?;
     
     // Parse the analysis response
