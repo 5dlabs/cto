@@ -251,7 +251,7 @@ fn get_intelligent_ingest_schema() -> Value {
                 },
                 "doc_server_url": {
                     "type": "string",
-                    "description": "Doc server URL for ingestion (default from config or http://doc-server-agent-docs-server.mcp.svc.cluster.local:80)"
+                    "description": "Doc server URL for ingestion (defaults to localhost:8080 when running locally, or internal k8s service when in-cluster. For local use, run: kubectl port-forward -n mcp svc/doc-server-agent-docs-server 8080:80)"
                 },
                 "auto_execute": {
                     "type": "boolean",
