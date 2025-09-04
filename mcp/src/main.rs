@@ -1589,6 +1589,7 @@ IMPORTANT:
         doc_type,
         doc_server_url,
         doc_type,
+        doc_type,
         doc_type
     );
     
@@ -1659,7 +1660,7 @@ IMPORTANT:
     };
     
     // Doc type is already known from user input, but verify Claude used it
-    let claude_doc_type = strategy_json
+    let _claude_doc_type = strategy_json
         .get("doc_type")
         .and_then(|v| v.as_str())
         .unwrap_or(doc_type);
