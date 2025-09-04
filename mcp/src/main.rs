@@ -183,19 +183,10 @@ struct IntelligentIngestDefaults {
 
 impl Default for IntelligentIngestDefaults {
     fn default() -> Self {
-        // Check if we're running in-cluster or locally
-        // When running locally, assume port-forward is set up on localhost:8080
-        // When in cluster, use the internal service name
-        let doc_server_url = if std::path::Path::new("/var/run/secrets/kubernetes.io").exists() {
-            "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string()
-        } else {
-            // For local development, assume port-forward: kubectl port-forward -n mcp svc/doc-server-agent-docs-server 8080:80
-            "http://localhost:8080".to_string()
-        };
-        
         IntelligentIngestDefaults {
             model: "claude-sonnet-4-20250514".to_string(),
-            doc_server_url,
+            // Use the internal Kubernetes service URL - accessible via Twingate
+            doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string(),
         }
     }
 }
