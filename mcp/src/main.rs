@@ -984,7 +984,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 }
 
 #[allow(clippy::disallowed_macros)]
-fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🚀 Processing project intake request");
 
     // Get workspace directory from Cursor environment
@@ -1295,7 +1295,7 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
                     }] 
                 }))), 
-                Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({ 
+                Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({ 
                     "content": [{ 
                         "type": "text", 
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
