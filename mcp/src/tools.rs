@@ -11,7 +11,7 @@ pub fn get_tool_schemas() -> Value {
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_intelligent_ingest_schema()
+            get_docs_ingest_schema()
         ]
     })
 }
@@ -26,7 +26,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_intelligent_ingest_schema()
+            get_docs_ingest_schema()
         ]
     })
 }
@@ -234,10 +234,10 @@ fn get_input_schema() -> Value {
     })
 }
 
-fn get_intelligent_ingest_schema() -> Value {
+fn get_docs_ingest_schema() -> Value {
     json!({
-        "name": "intelligent_ingest",
-        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.intelligent_ingest.model)",
+        "name": "docs_ingest",
+        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.docs_ingest.model)",
         "inputSchema": {
             "type": "object",
             "properties": {

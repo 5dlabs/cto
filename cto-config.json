@@ -44,6 +44,10 @@
       "docsRepository": "5dlabs/cto-play-test",
       "docsProjectDirectory": "docs",
       "workingDirectory": "/Users/jonathonfritz/cto-play-test"
+    },
+    "docs_ingest": {
+      "model": "claude-sonnet-4-20250514",
+      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
     }
   },
   "agents": {
@@ -110,7 +114,7 @@
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files"]
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
           },
           "git": {
             "enabled": true,
@@ -145,12 +149,12 @@
         "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
         "localServers": {
           "filesystem": {
-            "enabled": false,
-            "tools": []
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
           },
           "git": {
-            "enabled": false,
-            "tools": []
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
           }
         }
       }
