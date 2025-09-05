@@ -1686,10 +1686,21 @@ IMPORTANT:
         .and_then(|v| v.as_str())
         .unwrap_or("No reasoning provided");
     
+    // Build the JSON payload with analysis results
+    let payload = json!({
+        "url": github_url,
+        "doc_type": doc_type,
+        "include_paths": include_paths,
+        "extensions": extensions,
+        "yes": true
+    });
+
     // Generate the ingestion command (asynchronous; returns job_id)
+    // Use jq to safely encode the JSON payload to avoid shell injection
     let commands = vec![format!(
-        "curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d '{{\\\"url\\\": \\\"{}\\\", \\\"doc_type\\\": \\\"{}\\\", \\\"yes\\\": true}}'",
-        doc_server_url, github_url, doc_type
+        "curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d '{}'",
+        doc_server_url,
+        serde_json::to_string(&payload)?
     )];
     
     let mut output = format!("📊 Repository Analysis Complete\n\n");
