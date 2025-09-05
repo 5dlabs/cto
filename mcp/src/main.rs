@@ -1527,9 +1527,10 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
 
 fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
     let github_url = arguments
-        .get("github_url")
+        .get("repository_url")
         .and_then(|v| v.as_str())
-        .ok_or(anyhow!("github_url is required"))?;
+        .or_else(|| arguments.get("github_url").and_then(|v| v.as_str()))
+        .ok_or(anyhow!("repository_url is required"))?;
     
     // Validate it's a GitHub URL
     if !github_url.contains("github.com") {
@@ -1685,12 +1686,26 @@ IMPORTANT:
         .and_then(|v| v.as_str())
         .unwrap_or("No reasoning provided");
     
-    // Generate the ingestion commands
-    let temp_dir = format!("/tmp/ingest_{}", doc_type);
+    // Build the JSON payload with analysis results
+    let payload = json!({
+        "url": github_url,
+        "doc_type": doc_type,
+        "include_paths": include_paths,
+        "extensions": extensions,
+        "yes": true
+    });
+
+    // Generate the ingestion command (asynchronous; returns job_id)
+    // Create a temporary file to safely pass JSON payload and avoid shell injection
+    let temp_file = format!("/tmp/docs_ingest_{}_{}.json", doc_type.replace(['/', '\\', ':'], "_"), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    let json_payload = serde_json::to_string(&payload)?;
+
+    // Write JSON to temporary file using Rust (safer than shell commands)
+    std::fs::write(&temp_file, &json_payload)
+        .with_context(|| format!("Failed to write JSON payload to temporary file: {}", temp_file))?;
+
     let commands = vec![
-        format!("git clone --depth 1 {} {}", github_url, temp_dir),
-        format!("curl -X POST {}/ingest -H 'Content-Type: application/json' -d '{{\"repository_url\": \"{}\", \"doc_type\": \"{}\", \"paths\": \"{}\", \"extensions\": \"{}\"}}'",
-            doc_server_url, github_url, doc_type, include_paths, extensions),
+        format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{} && rm {}", doc_server_url, temp_file, temp_file),
     ];
     
     let mut output = format!("📊 Repository Analysis Complete\n\n");
@@ -1702,35 +1717,49 @@ IMPORTANT:
     
     if auto_execute {
         output.push_str("🚀 Auto-executing ingestion...\n\n");
-        
-        for (i, cmd) in commands.iter().enumerate() {
-            output.push_str(&format!("⚡ Executing command {}/{}:\n{}\n", i + 1, commands.len(), cmd));
-            
-            let result = Command::new("sh")
-                .arg("-c")
-                .arg(cmd)
-                .output()
-                .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
-            
-            if result.status.success() {
-                output.push_str("✅ Command completed successfully\n");
-                if !result.stdout.is_empty() {
-                    output.push_str(&format!("📤 Output: {}\n", String::from_utf8_lossy(&result.stdout)));
+
+        // Only one command in this mode
+        let cmd = &commands[0];
+        output.push_str(&format!("⚡ Executing:\n{}\n", cmd));
+
+        let result = Command::new("sh")
+            .arg("-c")
+            .arg(cmd)
+            .output()
+            .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
+
+        if result.status.success() {
+            let stdout = String::from_utf8_lossy(&result.stdout).to_string();
+            output.push_str("✅ Request submitted\n");
+            if !stdout.trim().is_empty() {
+                // Try to parse job_id for convenience
+                if let Ok(val) = serde_json::from_str::<Value>(&stdout) {
+                    if let Some(job_id) = val.get("job_id").and_then(|v| v.as_str()) {
+                        output.push_str(&format!(
+                            "🆔 Job ID: {}\n🔍 Check status: {}/ingest/jobs/{}\n",
+                            job_id, doc_server_url, job_id
+                        ));
+                    } else {
+                        output.push_str(&format!("📤 Response: {}\n", stdout.trim()));
+                    }
+                } else {
+                    output.push_str(&format!("📤 Response: {}\n", stdout.trim()));
                 }
-            } else {
-                output.push_str(&format!("❌ Command failed: {}\n", String::from_utf8_lossy(&result.stderr)));
-                return Ok(output);
             }
-            output.push_str("\n");
+        } else {
+            output.push_str(&format!(
+                "❌ Request failed: {}\n",
+                String::from_utf8_lossy(&result.stderr)
+            ));
+            return Ok(output);
         }
-        
-        output.push_str("🎉 Intelligent ingestion completed successfully!");
+        output.push_str("\n📡 Ingestion running asynchronously. Use the status URL to monitor progress.");
     } else {
         output.push_str("📋 Generated Commands (not executed):\n\n");
         for (i, cmd) in commands.iter().enumerate() {
             output.push_str(&format!("{}. {}\n", i + 1, cmd));
         }
-        output.push_str("\n💡 Run with auto_execute=true to execute these commands automatically.");
+        output.push_str("\n💡 Run with auto_execute=true to execute this command automatically.");
     }
     
     Ok(output)
