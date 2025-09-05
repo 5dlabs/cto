@@ -1562,6 +1562,7 @@ fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>)
         .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
     
     // Create the Claude prompt for analyzing the repository
+    #[allow(clippy::uninlined_format_args)]
     let analysis_prompt = format!(
         r#"Analyze the GitHub repository at {github_url} and determine the optimal documentation ingestion strategy.
 
@@ -1605,7 +1606,7 @@ IMPORTANT:
         .and_then(|msg| msg.get("text"))
         .and_then(|t| t.as_str())
         .ok_or_else(|| {
-            eprintln!("DEBUG: Full Claude API response: {:?}", analysis);
+            eprintln!("DEBUG: Full Claude API response: {analysis:?}");
             anyhow!("Failed to get Claude analysis response text")
         })?;
     
@@ -1652,7 +1653,7 @@ IMPORTANT:
             
             json_result.ok_or_else(|| {
                 eprintln!("DEBUG: Could not extract JSON from Claude's response. Full text:");
-                eprintln!("{}", analysis_text);
+                eprintln!("{analysis_text}");
                 eprintln!("---");
                 anyhow!("No valid JSON found in Claude's response. Response length: {} chars", analysis_text.len())
             })?
@@ -1701,37 +1702,67 @@ IMPORTANT:
     // Create a temporary file to safely pass JSON payload and avoid shell injection
     let json_payload = serde_json::to_string(&payload)?;
 
-    // Create a temporary file that will be automatically cleaned up when it goes out of scope
-    let mut temp_file = NamedTempFile::new()
-        .with_context(|| "Failed to create temporary file for JSON payload")?;
-    temp_file.write_all(json_payload.as_bytes())
-        .with_context(|| "Failed to write JSON payload to temporary file")?;
-    temp_file.flush()
-        .with_context(|| "Failed to flush temporary file")?;
+    let (temp_file_path, _temp_file_guard) = if auto_execute {
+        // When auto-executing, use NamedTempFile for automatic cleanup
+        let mut temp_file = NamedTempFile::new()
+            .with_context(|| "Failed to create temporary file for JSON payload")?;
+        temp_file.write_all(json_payload.as_bytes())
+            .with_context(|| "Failed to write JSON payload to temporary file")?;
+        temp_file.flush()
+            .with_context(|| "Failed to flush temporary file")?;
 
-    // Get the path for the curl command
-    let temp_file_path = temp_file.path().to_string_lossy().to_string();
+        let temp_file_path = temp_file.path().to_string_lossy().to_string();
+        let temp_file_guard = temp_file; // Keep alive during execution
 
-    // Keep the temp file alive during execution and prevent early cleanup
-    let _temp_file_guard = temp_file;
+        (temp_file_path, Some(temp_file_guard))
+    } else {
+        // When not auto-executing, create a persistent temporary file
+        // Use a more unique name to avoid collisions
+        let temp_filename = format!(
+            "docs_ingest_{}_{}_{}.json",
+            doc_type.replace(['/', '\\', ':', ' '], "_"),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            std::process::id() // Add process ID for uniqueness
+        );
 
-    let commands = vec![
-        format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{}", doc_server_url, temp_file_path),
-    ];
+        let temp_dir = std::env::temp_dir();
+        let temp_file_path = temp_dir.join(temp_filename).to_string_lossy().to_string();
+
+        // Write JSON to file using Rust (safer than shell commands)
+        std::fs::write(&temp_file_path, &json_payload)
+            .with_context(|| format!("Failed to write JSON payload to temporary file: {temp_file_path}"))?;
+
+        (temp_file_path, None)
+    };
+
+    let commands = if auto_execute {
+        // Auto-execute: file will be cleaned up automatically by NamedTempFile
+        vec![
+            format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{}", doc_server_url, temp_file_path),
+        ]
+    } else {
+        // Manual execution: include cleanup in the command
+        vec![
+            format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{} && rm {}", doc_server_url, temp_file_path, temp_file_path),
+        ]
+    };
     
-    let mut output = format!("📊 Repository Analysis Complete\n\n");
-    output.push_str(&format!("🔗 Repository: {}\n", github_url));
-    output.push_str(&format!("📁 Doc Type: {}\n", doc_type));
-    output.push_str(&format!("📂 Paths: {}\n", include_paths));
-    output.push_str(&format!("📄 Extensions: {}\n", extensions));
-    output.push_str(&format!("💭 Reasoning: {}\n\n", reasoning));
+    let mut output = "📊 Repository Analysis Complete\n\n".to_string();
+    output.push_str(&format!("🔗 Repository: {github_url}\n"));
+    output.push_str(&format!("📁 Doc Type: {doc_type}\n"));
+    output.push_str(&format!("📂 Paths: {include_paths}\n"));
+    output.push_str(&format!("📄 Extensions: {extensions}\n"));
+    output.push_str(&format!("💭 Reasoning: {reasoning}\n\n"));
     
     if auto_execute {
         output.push_str("🚀 Auto-executing ingestion...\n\n");
 
         // Only one command in this mode
         let cmd = &commands[0];
-        output.push_str(&format!("⚡ Executing:\n{}\n", cmd));
+        output.push_str(&format!("⚡ Executing:\n{cmd}\n"));
 
         let result = Command::new("sh")
             .arg("-c")
@@ -1747,14 +1778,15 @@ IMPORTANT:
                 if let Ok(val) = serde_json::from_str::<Value>(&stdout) {
                     if let Some(job_id) = val.get("job_id").and_then(|v| v.as_str()) {
                         output.push_str(&format!(
-                            "🆔 Job ID: {}\n🔍 Check status: {}/ingest/jobs/{}\n",
-                            job_id, doc_server_url, job_id
+                            "🆔 Job ID: {job_id}\n🔍 Check status: {doc_server_url}/ingest/jobs/{job_id}\n"
                         ));
                     } else {
-                        output.push_str(&format!("📤 Response: {}\n", stdout.trim()));
+                        let trimmed_stdout = stdout.trim();
+                        output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
                     }
                 } else {
-                    output.push_str(&format!("📤 Response: {}\n", stdout.trim()));
+                    let trimmed_stdout = stdout.trim();
+                    output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
                 }
             }
         } else {
