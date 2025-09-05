@@ -1696,12 +1696,17 @@ IMPORTANT:
     });
 
     // Generate the ingestion command (asynchronous; returns job_id)
-    // Use jq to safely encode the JSON payload to avoid shell injection
-    let commands = vec![format!(
-        "curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d '{}'",
-        doc_server_url,
-        serde_json::to_string(&payload)?
-    )];
+    // Create a temporary file to safely pass JSON payload and avoid shell injection
+    let temp_file = format!("/tmp/docs_ingest_{}_{}.json", doc_type.replace(['/', '\\', ':'], "_"), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    let json_payload = serde_json::to_string(&payload)?;
+
+    // Write JSON to temporary file using Rust (safer than shell commands)
+    std::fs::write(&temp_file, &json_payload)
+        .with_context(|| format!("Failed to write JSON payload to temporary file: {}", temp_file))?;
+
+    let commands = vec![
+        format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{} && rm {}", doc_server_url, temp_file, temp_file),
+    ];
     
     let mut output = format!("📊 Repository Analysis Complete\n\n");
     output.push_str(&format!("🔗 Repository: {}\n", github_url));
