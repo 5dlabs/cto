@@ -33,6 +33,16 @@ spec:
           MCP_HOST: "0.0.0.0"
         secret:
           existingSecret: doc-server-secrets
+          # Explicitly mount API keys for documentation processing
+          env:
+            ANTHROPIC_API_KEY:
+              secretKeyRef:
+                name: doc-server-secrets
+                key: ANTHROPIC_API_KEY
+            OPENAI_API_KEY:
+              secretKeyRef:
+                name: doc-server-secrets
+                key: OPENAI_API_KEY
         migrations:
           serviceAccountName: default
           # Ensure chart uses correct binary path and migrate-only args
