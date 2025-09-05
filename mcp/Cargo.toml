@@ -34,6 +34,9 @@ chrono = { version = "0.4", features = ["serde"] }
 base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
+# Temporary files
+tempfile = "3.0"
+
 # Cargo dist configuration for distribution
 [package.metadata.dist]
 dist = true

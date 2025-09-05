@@ -2,9 +2,11 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::sync::OnceLock;
+use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::runtime::Runtime;
 use tokio::signal;
@@ -1697,15 +1699,24 @@ IMPORTANT:
 
     // Generate the ingestion command (asynchronous; returns job_id)
     // Create a temporary file to safely pass JSON payload and avoid shell injection
-    let temp_file = format!("/tmp/docs_ingest_{}_{}.json", doc_type.replace(['/', '\\', ':'], "_"), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
     let json_payload = serde_json::to_string(&payload)?;
 
-    // Write JSON to temporary file using Rust (safer than shell commands)
-    std::fs::write(&temp_file, &json_payload)
-        .with_context(|| format!("Failed to write JSON payload to temporary file: {}", temp_file))?;
+    // Create a temporary file that will be automatically cleaned up when it goes out of scope
+    let mut temp_file = NamedTempFile::new()
+        .with_context(|| "Failed to create temporary file for JSON payload")?;
+    temp_file.write_all(json_payload.as_bytes())
+        .with_context(|| "Failed to write JSON payload to temporary file")?;
+    temp_file.flush()
+        .with_context(|| "Failed to flush temporary file")?;
+
+    // Get the path for the curl command
+    let temp_file_path = temp_file.path().to_string_lossy().to_string();
+
+    // Keep the temp file alive during execution and prevent early cleanup
+    let _temp_file_guard = temp_file;
 
     let commands = vec![
-        format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{} && rm {}", doc_server_url, temp_file, temp_file),
+        format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{}", doc_server_url, temp_file_path),
     ];
     
     let mut output = format!("📊 Repository Analysis Complete\n\n");
