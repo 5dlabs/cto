@@ -34,12 +34,12 @@ agent:
   agentCliConfigs:
     "5DLabs-Morgan":
       cliType: "claude"
-      model: "claude-3-opus-20240229"
+      model: "claude-opus-4-1-20250805"
       maxTokens: 8192
       temperature: 0.8
     "5DLabs-Rex":
       cliType: "claude"
-      model: "claude-3-5-sonnet-20241022"
+      model: "claude-sonnet-4-20250514"
       maxTokens: 4096
       temperature: 0.7
     "5DLabs-Blaze":
@@ -54,12 +54,12 @@ agent:
       temperature: 0.5
     "5DLabs-Cleo":
       cliType: "claude"
-      model: "claude-3-haiku-20240307"
+      model: "claude-sonnet-4-20250514"
       maxTokens: 2048
       temperature: 0.3
     "5DLabs-Tess":
       cliType: "claude"
-      model: "claude-3-5-sonnet-20241022"
+      model: "claude-sonnet-4-20250514"
       maxTokens: 4096
       temperature: 0.7
     "5DLabs-Stitch":

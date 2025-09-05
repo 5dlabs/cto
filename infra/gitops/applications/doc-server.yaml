@@ -88,20 +88,6 @@ spec:
                 }
               },
               {
-                "name": "ethereum_query",
-                "docType": "ethereum",
-                "title": "Ethereum Documentation Query",
-                "description": "Search Ethereum blockchain documentation for smart contracts, DeFi protocols, and development resources.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "solidity", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["smart-contracts", "defi", "layer-2", "consensus", "development"],
-                  "supported_topics": ["solidity", "web3", "gas-optimization", "security", "deployment"],
-                  "supports_api_version": true
-                }
-              },
-              {
                 "name": "cilium_query",
                 "docType": "cilium",
                 "title": "Cilium Documentation Query",

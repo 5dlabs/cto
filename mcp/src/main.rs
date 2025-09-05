@@ -67,7 +67,7 @@ struct WorkflowDefaults {
     #[serde(default)]
     play: PlayDefaults,
     #[serde(default)]
-    intelligent_ingest: IntelligentIngestDefaults,
+    docs_ingest: DocsIngestDefaults,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -175,15 +175,15 @@ struct PlayDefaults {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct IntelligentIngestDefaults {
+struct DocsIngestDefaults {
     model: String,
     #[serde(rename = "docServerUrl")]
     doc_server_url: String,
 }
 
-impl Default for IntelligentIngestDefaults {
+impl Default for DocsIngestDefaults {
     fn default() -> Self {
-        IntelligentIngestDefaults {
+        DocsIngestDefaults {
             model: "claude-sonnet-4-20250514".to_string(),
             // Use the internal Kubernetes service URL - accessible via Twingate
             doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string(),
@@ -984,7 +984,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 }
 
 #[allow(clippy::disallowed_macros)]
-fn handle_intake_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
+fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🚀 Processing project intake request");
 
     // Get workspace directory from Cursor environment
@@ -1295,7 +1295,7 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
                     }] 
                 }))), 
-                Ok("intake") => Some(handle_intake_workflow(&arguments).map(|result| json!({ 
+                Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({ 
                     "content": [{ 
                         "type": "text", 
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
@@ -1313,11 +1313,11 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
                     }] 
                 }))),
-                Ok("intelligent_ingest") => Some(handle_intelligent_ingest_tool(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": result 
-                    }] 
+                Ok("docs_ingest") => Some(handle_docs_ingest_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": result
+                    }]
                 }))), 
                 Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({ 
                     "content": [{ 
@@ -1525,8 +1525,7 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
     Ok(json_resp)
 }
 
-fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
-    // Accept either `repository_url` (preferred) or legacy `github_url`
+fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
     let github_url = arguments
         .get("repository_url")
         .and_then(|v| v.as_str())
@@ -1544,7 +1543,7 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
     let doc_server_url = arguments
         .get("doc_server_url")
         .and_then(|v| v.as_str())
-        .unwrap_or(&config.defaults.intelligent_ingest.doc_server_url);
+        .unwrap_or(&config.defaults.docs_ingest.doc_server_url);
     
     let auto_execute = arguments
         .get("auto_execute")
@@ -1562,20 +1561,20 @@ fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, 
     
     // Create the Claude prompt for analyzing the repository
     let analysis_prompt = format!(
-        r#"Analyze the GitHub repository at {} and determine the optimal documentation ingestion strategy.
+        r#"Analyze the GitHub repository at {github_url} and determine the optimal documentation ingestion strategy.
 
 You are an expert at identifying and extracting valuable documentation from software repositories.
 
-TASK: Generate a documentation ingestion plan for doc_type '{}' that will:
+TASK: Generate a documentation ingestion plan for doc_type '{doc_type}' that will:
 1. Clone the repository
 2. Extract relevant documentation
-3. Ingest it into the doc server at {}
+3. Ingest it into the doc server at {doc_server_url}
 
-The user has specified that this documentation should be categorized as '{}' type.
+The user has specified that this documentation should be categorized as '{doc_type}' type.
 
 Your response must be a valid JSON object with this exact structure:
 {{
-  "doc_type": "{}",
+  "doc_type": "{doc_type}",
   "include_paths": ["path1", "path2"],
   "exclude_paths": ["test", "vendor"],
   "extensions": ["md", "rst", "html"],
@@ -1585,18 +1584,15 @@ Your response must be a valid JSON object with this exact structure:
 IMPORTANT:
 - Respond ONLY with the JSON object
 - Do not include any text before or after the JSON
-- Use the exact doc_type value provided: "{}"
+- Use the exact doc_type value provided: "{doc_type}"
 - Include reasonable defaults if repository structure is unclear"#,
-        github_url,
-        doc_type,
-        doc_server_url,
-        doc_type,
-        doc_type,
-        doc_type
+        github_url = github_url,
+        doc_type = doc_type,
+        doc_server_url = doc_server_url
     );
     
     // Call Claude API to analyze the repository using configured model
-    let model = &config.defaults.intelligent_ingest.model;
+    let model = &config.defaults.docs_ingest.model;
     let analysis = call_claude_api(&api_key, &analysis_prompt, model)?;
     
     // Parse the analysis response
