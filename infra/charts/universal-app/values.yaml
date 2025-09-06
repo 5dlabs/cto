@@ -148,6 +148,8 @@ env:
     value: "info"
   - name: ENVIRONMENT
     value: "production"
+  - name: CLAUDE_CONFIG_DIR
+    value: "/tmp/claude-code-config"
 
 # Additional environment variables from secrets/configmaps
 envFrom: []

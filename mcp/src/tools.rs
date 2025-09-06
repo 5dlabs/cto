@@ -7,11 +7,11 @@ pub fn get_tool_schemas() -> Value {
         "tools": [
             get_docs_schema(),
             get_play_schema(&HashMap::new()),
-            get_intake_schema(),
+            get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_intelligent_ingest_schema()
+            get_docs_ingest_schema()
         ]
     })
 }
@@ -22,11 +22,11 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
         "tools": [
             get_docs_schema(),
             get_play_schema(agents),
-            get_intake_schema(),
+            get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
             get_input_schema(),
-            get_intelligent_ingest_schema()
+            get_docs_ingest_schema()
         ]
     })
 }
@@ -132,9 +132,9 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
 }
 
 
-fn get_intake_schema() -> Value {
+fn get_intake_prd_schema() -> Value {
     json!({
-        "name": "intake",
+        "name": "intake_prd",
         "description": "Process a new project intake. Reads PRD from {project_name}/intake/prd.txt and optional architecture from {project_name}/intake/architecture.md. Auto-detects repository and branch from git. Creates TaskMaster structure in project subdirectory and submits PR.",
         "inputSchema": {
             "type": "object",
@@ -234,10 +234,10 @@ fn get_input_schema() -> Value {
     })
 }
 
-fn get_intelligent_ingest_schema() -> Value {
+fn get_docs_ingest_schema() -> Value {
     json!({
-        "name": "intelligent_ingest",
-        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.intelligent_ingest.model)",
+        "name": "docs_ingest",
+        "description": "Intelligently analyze a GitHub repository and ingest its documentation using Claude to determine optimal ingestion strategy. Currently supports GitHub repositories only. Uses model configured in cto-config.json (defaults.docs_ingest.model)",
         "inputSchema": {
             "type": "object",
             "properties": {

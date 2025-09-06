@@ -6,7 +6,7 @@
   "defaults": {
     "_comment_docs": "Default values for docs() tool - documentation generation workflows",
     "docs": {
-      "model": "claude-opus-4-20250514",
+      "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
@@ -14,7 +14,7 @@
     
     "_comment_code": "Default values for task() tool - code implementation workflows",
     "code": {
-      "model": "claude-opus-4-20250514",
+      "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -27,28 +27,163 @@
     
     "_comment_intake": "Default values for intake() tool - project intake workflows",
     "intake": {
-      "model": "opus",
-      "githubApp": "5DLabs-Morgan"
+      "githubApp": "5DLabs-Morgan",
+      "primary": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "research": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "fallback": {
+        "model": "gpt-5",
+        "provider": "openai"
+      }
+    },
+
+    "_comment_play": "Default values for play() tool - playground test workflows",
+    "play": {
+      "model": "claude-sonnet-4-20250514",
+      "cli": "claude",
+      "implementationAgent": "5DLabs-Rex",
+      "qualityAgent": "5DLabs-Cleo",
+      "testingAgent": "5DLabs-Tess",
+      "repository": "your-org/your-test-repo",
+      "service": "your-test-service",
+      "docsRepository": "your-org/your-test-repo",
+      "docsProjectDirectory": "docs",
+      "workingDirectory": "/path/to/your/test/workspace"
+    },
+
+    "_comment_docs_ingest": "Default values for docs ingest workflows",
+    "docs_ingest": {
+      "model": "claude-sonnet-4-20250514",
+      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
     }
   },
   
-  "_comment_agents": "Agent name mappings - friendly names to GitHub App names",
+  "_comment_agents": "Agent configurations with tool profiles",
   "agents": {
-    "morgan": "5DLabs-Morgan",
-    "rex": "5DLabs-Rex",
-    "blaze": "5DLabs-Blaze",
-    "cipher": "5DLabs-Cipher"
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff"]
+          }
+        }
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_log"]
+          }
+        }
+      }
+    },
+    "cipher": {
+      "githubApp": "5DLabs-Cipher",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    }
   },
 
   "_field_documentation": {
     "version": "Config file format version",
     
-    "defaults.docs.model": "Claude model for documentation generation (e.g., claude-opus-4-20250514, claude-3-5-sonnet-20241022, or opus/sonnet for CLAUDE code)",
+    "defaults.docs.model": "Claude model for documentation generation (e.g., claude-opus-4-1-20250805, claude-sonnet-4-20250514, or opus/sonnet for CLAUDE code)",
     "defaults.docs.githubApp": "Default GitHub App for docs workflows",
     "defaults.docs.includeCodebase": "Whether to include existing codebase as markdown context",
     "defaults.docs.sourceBranch": "Default source branch to work from",
     
-    "defaults.code.model": "Claude model for code implementation (e.g., claude-opus-4-20250514, claude-3-5-sonnet-20241022, or opus/sonnet for CLAUDE code)",
+    "defaults.code.model": "Claude model for code implementation (e.g., claude-opus-4-1-20250805, claude-sonnet-4-20250514, or opus/sonnet for CLAUDE code)",
     "defaults.code.githubApp": "Default GitHub App for code workflows", 
     "defaults.code.continueSession": "Whether to continue previous Claude session by default",
     "defaults.code.workingDirectory": "Default working directory within repository (. for root)",
@@ -58,13 +193,30 @@
     "defaults.code.docsProjectDirectory": "Default project directory within docs repository",
     "defaults.code.service": "Default service name for workspace isolation (creates workspace-{service} PVC)",
     
-    "agents": "Mapping of friendly agent names to GitHub App names for easy reference"
+    "defaults.intake.primary": "Primary model configuration for intake workflows",
+    "defaults.intake.research": "Research model configuration for intake workflows", 
+    "defaults.intake.fallback": "Fallback model configuration for intake workflows",
+    
+    "defaults.play.model": "Default model for play workflows",
+    "defaults.play.implementationAgent": "Default GitHub App for implementation in play workflows",
+    "defaults.play.qualityAgent": "Default GitHub App for quality checks in play workflows",
+    "defaults.play.testingAgent": "Default GitHub App for testing in play workflows",
+    "defaults.play.repository": "Default repository for play workspace",
+    "defaults.play.service": "Default service name for play workspace isolation",
+    
+    "defaults.docs_ingest.model": "Model for docs ingestion workflows",
+    "defaults.docs_ingest.docServerUrl": "URL of the documentation server for docs ingest",
+    
+    "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access"
   },
 
   "_usage_examples": {
     "minimal_task_call": "task(task_id=1, repository='https://github.com/org/repo')",
     "minimal_docs_call": "docs(working_directory='projects/my-project')",
+    "minimal_intake_call": "intake(project_name='My Project')",
+    "minimal_play_call": "play(task_id=1)",
     "with_agent_override": "task(task_id=1, repository='https://github.com/org/repo', agent='blaze')",
-    "with_model_override": "docs(working_directory='projects/my-project', model='claude-3-5-sonnet-20241022')"
+    "with_model_override": "docs(working_directory='projects/my-project', model='claude-sonnet-4-20250514')",
+    "play_with_overrides": "play(task_id=1, implementationAgent='rex', qualityAgent='cleo', testingAgent='tess')"
   }
 }
