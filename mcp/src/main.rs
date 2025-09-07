@@ -1525,12 +1525,8 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
     Ok(json_resp)
 }
 
-<<<<<<< HEAD
-fn handle_intelligent_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
-    // Accept either `repository_url` (preferred) or legacy `github_url`
-=======
 fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
->>>>>>> origin/main
+    // Accept either `repository_url` (preferred) or legacy `github_url`
     let github_url = arguments
         .get("repository_url")
         .and_then(|v| v.as_str())
@@ -1549,11 +1545,6 @@ fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>)
         .get("doc_server_url")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.docs_ingest.doc_server_url);
-    
-    let auto_execute = arguments
-        .get("auto_execute")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
     
     let doc_type = arguments
         .get("doc_type")
@@ -1591,18 +1582,9 @@ IMPORTANT:
 - Do not include any text before or after the JSON
 - Use the exact doc_type value provided: "{doc_type}"
 - Include reasonable defaults if repository structure is unclear"#,
-<<<<<<< HEAD
-        github_url,
-        doc_type,
-        doc_server_url,
-        doc_type,
-        doc_type,
-        doc_type
-=======
         github_url = github_url,
         doc_type = doc_type,
         doc_server_url = doc_server_url
->>>>>>> origin/main
     );
     
     // Call Claude API to analyze the repository using configured model
@@ -1700,66 +1682,39 @@ IMPORTANT:
         .and_then(|v| v.as_str())
         .unwrap_or("No reasoning provided");
     
-    // Generate the ingestion command (asynchronous; returns job_id)
-    let commands = vec![format!(
-        "curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d '{{\\\"url\\\": \\\"{}\\\", \\\"doc_type\\\": \\\"{}\\\", \\\"yes\\\": true}}'",
-        doc_server_url, github_url, doc_type
-    )];
-    
     let mut output = format!("📊 Repository Analysis Complete\n\n");
     output.push_str(&format!("🔗 Repository: {}\n", github_url));
     output.push_str(&format!("📁 Doc Type: {}\n", doc_type));
     output.push_str(&format!("📂 Paths: {}\n", include_paths));
     output.push_str(&format!("📄 Extensions: {}\n", extensions));
     output.push_str(&format!("💭 Reasoning: {}\n\n", reasoning));
-    
-    if auto_execute {
-        output.push_str("🚀 Auto-executing ingestion...\n\n");
+    // Always execute ingestion request immediately
+    output.push_str("🚀 Submitting ingestion request...\n\n");
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .post(format!("{}/ingest/intelligent", doc_server_url))
+        .header("Content-Type", "application/json")
+        .json(&json!({ "url": github_url, "doc_type": doc_type }))
+        .send()
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| anyhow!(format!("Failed to submit ingestion: {e}")))?;
 
-        // Only one command in this mode
-        let cmd = &commands[0];
-        output.push_str(&format!("⚡ Executing:\n{}\n", cmd));
+    let resp_json: Value = resp
+        .json()
+        .map_err(|e| anyhow!(format!("Failed to parse ingestion response: {e}")))?;
 
-        let result = Command::new("sh")
-            .arg("-c")
-            .arg(cmd)
-            .output()
-            .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
-
-        if result.status.success() {
-            let stdout = String::from_utf8_lossy(&result.stdout).to_string();
-            output.push_str("✅ Request submitted\n");
-            if !stdout.trim().is_empty() {
-                // Try to parse job_id for convenience
-                if let Ok(val) = serde_json::from_str::<Value>(&stdout) {
-                    if let Some(job_id) = val.get("job_id").and_then(|v| v.as_str()) {
-                        output.push_str(&format!(
-                            "🆔 Job ID: {}\n🔍 Check status: {}/ingest/jobs/{}\n",
-                            job_id, doc_server_url, job_id
-                        ));
-                    } else {
-                        output.push_str(&format!("📤 Response: {}\n", stdout.trim()));
-                    }
-                } else {
-                    output.push_str(&format!("📤 Response: {}\n", stdout.trim()));
-                }
-            }
-        } else {
-            output.push_str(&format!(
-                "❌ Request failed: {}\n",
-                String::from_utf8_lossy(&result.stderr)
-            ));
-            return Ok(output);
-        }
+    output.push_str("✅ Request submitted\n");
+    if let Some(job_id) = resp_json.get("job_id").and_then(|v| v.as_str()) {
+        output.push_str(&format!(
+            "🆔 Job ID: {}\n🔍 Check status: {}/ingest/jobs/{}\n",
+            job_id, doc_server_url, job_id
+        ));
         output.push_str("\n📡 Ingestion running asynchronously. Use the status URL to monitor progress.");
     } else {
-        output.push_str("📋 Generated Commands (not executed):\n\n");
-        for (i, cmd) in commands.iter().enumerate() {
-            output.push_str(&format!("{}. {}\n", i + 1, cmd));
-        }
-        output.push_str("\n💡 Run with auto_execute=true to execute this command automatically.");
+        // Fall back to printing raw response
+        output.push_str(&format!("📤 Response: {}\n", resp_json));
     }
-    
+
     Ok(output)
 }
 
