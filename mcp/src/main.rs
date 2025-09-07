@@ -1528,11 +1528,9 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
 }
 
 fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<String> {
-    // Accept either `repository_url` (preferred) or legacy `github_url`
     let github_url = arguments
         .get("repository_url")
         .and_then(|v| v.as_str())
-        .or_else(|| arguments.get("github_url").and_then(|v| v.as_str()))
         .ok_or(anyhow!("repository_url is required"))?;
     
     // Validate it's a GitHub URL
