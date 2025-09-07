@@ -31,6 +31,8 @@ spec:
           RUST_LOG: "info,doc_server=debug"
           PORT: "3001"
           MCP_HOST: "0.0.0.0"
+          # Redis configuration - point to Redis master, not Sentinel
+          REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
           # Embeddings configuration (env-based)
           OPENAI_BASE_URL: "https://api.openai.com/v1"
           OPENAI_EMBEDDING_MODEL: "text-embedding-3-large"
