@@ -51,6 +51,8 @@ spec:
       - "tcp-keepalive 60"
       - "databases 16"
       - "timeout 300"
+      - "user worker -@all +@list +@string +@connection +@generic on >workerpass"
+      - "user sentinel -@all +ping +sentinel +info +publish +subscribe on >sentinelpass"
 
   auth:
     secretPath: redis-auth
