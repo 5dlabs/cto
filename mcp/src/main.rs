@@ -1694,63 +1694,22 @@ IMPORTANT:
         "yes": true
     });
 
-    // Check for auto_execute parameter
-    let auto_execute = arguments
-        .get("auto_execute")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    // Generate the ingestion command (asynchronous; returns job_id)
+    // Always execute ingestion automatically
     // Create a temporary file to safely pass JSON payload and avoid shell injection
     let json_payload = serde_json::to_string(&payload)?;
 
-    let (temp_file_path, _temp_file_guard) = if auto_execute {
-        // When auto-executing, use NamedTempFile for automatic cleanup
-        let mut temp_file = NamedTempFile::new()
-            .with_context(|| "Failed to create temporary file for JSON payload")?;
-        temp_file.write_all(json_payload.as_bytes())
-            .with_context(|| "Failed to write JSON payload to temporary file")?;
-        temp_file.flush()
-            .with_context(|| "Failed to flush temporary file")?;
+    // Use NamedTempFile for automatic cleanup
+    let mut temp_file = NamedTempFile::new()
+        .with_context(|| "Failed to create temporary file for JSON payload")?;
+    temp_file.write_all(json_payload.as_bytes())
+        .with_context(|| "Failed to write JSON payload to temporary file")?;
+    temp_file.flush()
+        .with_context(|| "Failed to flush temporary file")?;
 
-        let temp_file_path = temp_file.path().to_string_lossy().to_string();
-        let temp_file_guard = temp_file; // Keep alive during execution
+    let temp_file_path = temp_file.path().to_string_lossy().to_string();
+    let _temp_file_guard = temp_file; // Keep alive during execution
 
-        (temp_file_path, Some(temp_file_guard))
-    } else {
-        // When not auto-executing, create a persistent temporary file
-        // Use a more unique name to avoid collisions
-        let temp_filename = format!(
-            "docs_ingest_{}_{}_{}.json",
-            doc_type.replace(['/', '\\', ':', ' '], "_"),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            std::process::id() // Add process ID for uniqueness
-        );
-
-        let temp_dir = std::env::temp_dir();
-        let temp_file_path = temp_dir.join(temp_filename).to_string_lossy().to_string();
-
-        // Write JSON to file using Rust (safer than shell commands)
-        std::fs::write(&temp_file_path, &json_payload)
-            .with_context(|| format!("Failed to write JSON payload to temporary file: {temp_file_path}"))?;
-
-        (temp_file_path, None)
-    };
-
-    let commands = if auto_execute {
-        // Auto-execute: file will be cleaned up automatically by NamedTempFile
-        vec![
-            format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{}", doc_server_url, temp_file_path),
-        ]
-    } else {
-        // Manual execution: include cleanup in the command
-        vec![
-            format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{} && rm {}", doc_server_url, temp_file_path, temp_file_path),
-        ]
-    };
+    let cmd = format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{}", doc_server_url, temp_file_path);
     
     let mut output = "📊 Repository Analysis Complete\n\n".to_string();
     output.push_str(&format!("🔗 Repository: {github_url}\n"));
@@ -1759,53 +1718,41 @@ IMPORTANT:
     output.push_str(&format!("📄 Extensions: {extensions}\n"));
     output.push_str(&format!("💭 Reasoning: {reasoning}\n\n"));
     
-    if auto_execute {
-        output.push_str("🚀 Auto-executing ingestion...\n\n");
+    output.push_str("🚀 Executing ingestion...\n\n");
+    output.push_str(&format!("⚡ Executing:\n{cmd}\n"));
 
-        // Only one command in this mode
-        let cmd = &commands[0];
-        output.push_str(&format!("⚡ Executing:\n{cmd}\n"));
+    let result = Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .output()
+        .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
 
-        let result = Command::new("sh")
-            .arg("-c")
-            .arg(cmd)
-            .output()
-            .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
-
-        if result.status.success() {
-            let stdout = String::from_utf8_lossy(&result.stdout).to_string();
-            output.push_str("✅ Request submitted\n");
-            if !stdout.trim().is_empty() {
-                // Try to parse job_id for convenience
-                if let Ok(val) = serde_json::from_str::<Value>(&stdout) {
-                    if let Some(job_id) = val.get("job_id").and_then(|v| v.as_str()) {
-                        output.push_str(&format!(
-                            "🆔 Job ID: {job_id}\n🔍 Check status: {doc_server_url}/ingest/jobs/{job_id}\n"
-                        ));
-                    } else {
-                        let trimmed_stdout = stdout.trim();
-                        output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
-                    }
+    if result.status.success() {
+        let stdout = String::from_utf8_lossy(&result.stdout).to_string();
+        output.push_str("✅ Request submitted\n");
+        if !stdout.trim().is_empty() {
+            // Try to parse job_id for convenience
+            if let Ok(val) = serde_json::from_str::<Value>(&stdout) {
+                if let Some(job_id) = val.get("job_id").and_then(|v| v.as_str()) {
+                    output.push_str(&format!(
+                        "🆔 Job ID: {job_id}\n🔍 Check status: {doc_server_url}/ingest/jobs/{job_id}\n"
+                    ));
                 } else {
                     let trimmed_stdout = stdout.trim();
                     output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
                 }
+            } else {
+                let trimmed_stdout = stdout.trim();
+                output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
             }
-        } else {
-            output.push_str(&format!(
-                "❌ Request failed: {}\n",
-                String::from_utf8_lossy(&result.stderr)
-            ));
-            return Ok(output);
         }
         output.push_str("\n📡 Ingestion running asynchronously. Use the status URL to monitor progress.");
     } else {
-        // Show manual command
-        output.push_str("📋 Manual execution commands:\n");
-        for cmd in &commands {
-            output.push_str(&format!("{cmd}\n"));
-        }
-        output.push_str("\n📡 Run the command above to execute ingestion asynchronously.");
+        output.push_str(&format!(
+            "❌ Request failed: {}\n",
+            String::from_utf8_lossy(&result.stderr)
+        ));
+        return Ok(output);
     }
 
     Ok(output)
