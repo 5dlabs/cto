@@ -241,7 +241,7 @@ fn get_docs_ingest_schema() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "github_url": {
+                "repository_url": {
                     "type": "string",
                     "description": "GitHub repository URL to analyze and ingest (e.g., https://github.com/cilium/cilium)"
                 },
@@ -252,13 +252,9 @@ fn get_docs_ingest_schema() -> Value {
                 "doc_server_url": {
                     "type": "string",
                     "description": "Doc server URL for ingestion (default: http://doc-server-agent-docs-server.mcp.svc.cluster.local:80 - accessible via Twingate)"
-                },
-                "auto_execute": {
-                    "type": "boolean",
-                    "description": "Automatically execute the ingestion strategy without confirmation (default: false)"
                 }
             },
-            "required": ["github_url", "doc_type"]
+            "required": ["repository_url", "doc_type"]
         }
     })
 }

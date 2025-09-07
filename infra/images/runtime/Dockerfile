@@ -11,7 +11,7 @@ ENV TZ="$TZ"
 # Core tools and CLIs (cache apt metadata)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+    apt-get -o Acquire::ForceIPv4=true update && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends \
   # Version control and development
   git procps sudo fzf zsh man-db unzip gnupg2 \
   # Networking tools
@@ -78,7 +78,7 @@ RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
 # Install Node.js directly (not via nvm) for better compatibility
 RUN --mount=type=cache,target=/root/.cache \
   curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
-  && apt-get install -y nodejs \
+  && apt-get -o Acquire::ForceIPv4=true install -y nodejs \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
 
@@ -103,7 +103,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
   if [ -z "$GO_URL" ] || [ "$GO_URL" = "null" ]; then GO_URL="https://go.dev/dl/${GO_VER}.linux-${GO_ARCH}.tar.gz"; fi; \
   curl -fsSL "$GO_URL" -o /tmp/go.tgz; \
   rm -rf /usr/local/go; \
-  (tar -C /usr/local -xzf /tmp/go.tgz || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends golang-go && ln -sfn /usr/lib/go /usr/local/go)); \
+  (tar -C /usr/local -xzf /tmp/go.tgz || (apt-get -o Acquire::ForceIPv4=true update && DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::ForceIPv4=true install -y --no-install-recommends golang-go && ln -sfn /usr/lib/go /usr/local/go)); \
   rm -f /tmp/go.tgz
 ENV GOROOT=/usr/local/go
 ENV PATH=$GOROOT/bin:/usr/lib/go/bin:$PATH
@@ -113,7 +113,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
   && echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list \
-  && apt-get update && apt-get install -y kubectl && rm -rf /var/lib/apt/lists/*
+  && apt-get -o Acquire::ForceIPv4=true update && apt-get -o Acquire::ForceIPv4=true install -y kubectl && rm -rf /var/lib/apt/lists/*
 
 # Install Helm via direct download (script was failing on arm64)
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -190,7 +190,7 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     for i in 1 2 3; do \
         curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
         echo "deb [arch=${DL_ARCH} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
-        apt-get update && apt-get install -y gh && break || \
+        apt-get -o Acquire::ForceIPv4=true update && apt-get -o Acquire::ForceIPv4=true install -y gh && break || \
         (echo "Attempt $i failed, retrying..." && sleep 5); \
     done
 
@@ -423,5 +423,4 @@ RUN printf '%s\n' '# Add Cargo bin to PATH for interactive shells' 'if [ -d "$HO
 # Create a global Rust environment setup script
 RUN echo '#!/bin/sh\n# Ensure Rust environment is always available\nif [ -f "$HOME/.cargo/env" ]; then\n    . "$HOME/.cargo/env"\nfi\nif [ -f "/root/.cargo/env" ]; then\n    . "/root/.cargo/env"\nfi\nrustup default stable 2>/dev/null || true' > /usr/local/bin/setup-rust-env \
   && chmod +x /usr/local/bin/setup-rust-env
-
 
