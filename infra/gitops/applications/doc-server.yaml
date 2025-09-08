@@ -29,6 +29,10 @@ spec:
         # Global Redis configuration
         redis:
           url: "redis://redis.databases.svc.cluster.local:6379"
+        # Try extraEnv for worker
+        extraEnv:
+          - name: REDIS_URL
+            value: "redis://redis.databases.svc.cluster.local:6379"
         env:
           # Keep chart defaults for non-secret settings
           RUST_LOG: "info,doc_server=debug"
