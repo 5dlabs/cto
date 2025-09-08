@@ -1,0 +1,66 @@
+---
+# ServiceAccount with permissions to patch deployments
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker-patcher
+  namespace: mcp
+---
+# Role to patch deployments
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: worker-patcher
+  namespace: mcp
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "patch"]
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: worker-patcher
+  namespace: mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: worker-patcher
+subjects:
+- kind: ServiceAccount
+  name: worker-patcher
+  namespace: mcp
+---
+# CronJob to patch the deployment every 5 minutes
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: doc-server-worker-redis-patcher
+  namespace: mcp
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: worker-patcher
+          restartPolicy: OnFailure
+          containers:
+          - name: patcher
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking doc-server worker Redis URL..."
+              CURRENT_URL=$(kubectl get deployment doc-server-agent-docs-server-worker -n mcp -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="REDIS_URL")].value}')
+              if [ "$CURRENT_URL" != "redis://redis.databases.svc.cluster.local:6379" ]; then
+                echo "Patching doc-server worker deployment with correct Redis URL..."
+                kubectl patch deployment doc-server-agent-docs-server-worker -n mcp \
+                  --type='json' \
+                  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env/3/value", "value": "redis://redis.databases.svc.cluster.local:6379"}]'
+                echo "Patch applied successfully"
+              else
+                echo "Redis URL is already correct"
+              fi

@@ -262,7 +262,7 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      selfHeal: true
+      selfHeal: false  # Disabled to allow worker Redis URL patch
       allowEmpty: false
     syncOptions:
       - CreateNamespace=true
