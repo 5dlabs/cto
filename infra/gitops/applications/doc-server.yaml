@@ -26,6 +26,9 @@ spec:
         image:
           repository: ghcr.io/5dlabs/agent-docs/server
           tag: latest
+        # Global Redis configuration
+        redis:
+          url: "redis://redis.databases.svc.cluster.local:6379"
         env:
           # Keep chart defaults for non-secret settings
           RUST_LOG: "info,doc_server=debug"
@@ -33,6 +36,14 @@ spec:
           MCP_HOST: "0.0.0.0"
           # Redis configuration - point to Redis master, not Sentinel
           REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
+          # Explicitly disable Sentinel usage in any client code
+          REDIS_USE_SENTINEL: "false"
+          USE_SENTINEL: "false"
+          REDIS_SENTINEL_ENABLED: "false"
+          SENTINEL_ENABLED: "false"
+          REDIS_SENTINEL_SERVICE: ""
+          REDIS_HOST: "redis.databases.svc.cluster.local"
+          REDIS_PORT: "6379"
           # Embeddings configuration (env-based)
           OPENAI_BASE_URL: "https://api.openai.com/v1"
           OPENAI_EMBEDDING_MODEL: "text-embedding-3-large"
@@ -45,8 +56,34 @@ spec:
           enabled: true
           env:
             REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
+            # Explicitly disable Sentinel usage in any client code
+            REDIS_USE_SENTINEL: "false"
+            USE_SENTINEL: "false"
+            REDIS_SENTINEL_ENABLED: "false"
+            SENTINEL_ENABLED: "false"
+            REDIS_SENTINEL_SERVICE: ""
+            REDIS_HOST: "redis.databases.svc.cluster.local"
+            REDIS_PORT: "6379"
             RUST_LOG: "info,mcp=info"
             WORKER_JOB_TYPES: "ingest,crate_add"
+          # Provide extraEnv for charts that consume env as arrays
+          extraEnv:
+            - name: REDIS_URL
+              value: "redis://redis.databases.svc.cluster.local:6379"
+            - name: REDIS_USE_SENTINEL
+              value: "false"
+            - name: USE_SENTINEL
+              value: "false"
+            - name: REDIS_SENTINEL_ENABLED
+              value: "false"
+            - name: SENTINEL_ENABLED
+              value: "false"
+            - name: REDIS_SENTINEL_SERVICE
+              value: ""
+            - name: REDIS_HOST
+              value: "redis.databases.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
         secret:
           existingSecret: doc-server-secrets
           # Explicitly mount API keys for documentation processing
