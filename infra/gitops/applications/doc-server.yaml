@@ -26,6 +26,9 @@ spec:
         image:
           repository: ghcr.io/5dlabs/agent-docs/server
           tag: latest
+        # Global Redis configuration
+        redis:
+          url: "redis://redis.databases.svc.cluster.local:6379"
         env:
           # Keep chart defaults for non-secret settings
           RUST_LOG: "info,doc_server=debug"
