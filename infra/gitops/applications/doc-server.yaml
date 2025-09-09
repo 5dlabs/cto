@@ -6,8 +6,8 @@ metadata:
   name: doc-server
   namespace: argocd
   labels:
-    app.kubernetes.io/name: doc-server
-    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/name: "doc-server"
+    app.kubernetes.io/part-of: "platform"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
