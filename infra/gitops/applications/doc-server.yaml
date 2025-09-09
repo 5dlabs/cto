@@ -6,8 +6,8 @@ metadata:
   name: doc-server
   namespace: argocd
   labels:
-    app.kubernetes.io/name: doc-server
-    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/name: "doc-server"
+    app.kubernetes.io/part-of: "platform"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -123,7 +123,19 @@ spec:
                   "supported_complexity_levels": [],
                   "supported_categories": ["defi", "pricing", "token", "portfolio"],
                   "supported_topics": ["api", "endpoints", "parameters", "responses"],
-                  "supports_api_version": true
+                  "supports_api_version": true,
+                  "topic_keywords": {
+                    "api": ["api", "endpoint", "request", "response", "rest"],
+                    "endpoints": ["endpoint", "route", "path", "url"],
+                    "parameters": ["parameter", "param", "arg", "input"],
+                    "responses": ["response", "output", "result", "data"]
+                  },
+                  "category_keywords": {
+                    "defi": ["defi", "decentralized", "finance", "yield"],
+                    "pricing": ["price", "pricing", "rate", "cost"],
+                    "token": ["token", "asset", "mint", "coin"],
+                    "portfolio": ["portfolio", "balance", "holding", "asset"]
+                  }
                 }
               },
               {
@@ -137,7 +149,20 @@ spec:
                   "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
                   "supported_categories": ["core", "architecture-diagrams", "sequence-diagrams", "zk-cryptography"],
                   "supported_topics": ["consensus", "networking", "validators", "cryptography", "development"],
-                  "supports_api_version": false
+                  "supports_api_version": false,
+                  "topic_keywords": {
+                    "consensus": ["consensus", "proof of stake", "validator", "block", "epoch"],
+                    "networking": ["network", "rpc", "peer", "connection", "protocol", "gossip"],
+                    "validators": ["validator", "staking", "delegation", "rewards", "slashing"],
+                    "cryptography": ["crypto", "hash", "signature", "encrypt", "key", "ed25519"],
+                    "development": ["development", "dev", "build", "setup", "sdk", "client"]
+                  },
+                  "category_keywords": {
+                    "core": ["core", "fundamental", "basic", "overview", "architecture"],
+                    "architecture-diagrams": ["diagram", "architecture", "flow", "design", "structure"],
+                    "sequence-diagrams": ["sequence", "flow", "step", "process", "workflow"],
+                    "zk-cryptography": ["zk", "zero", "knowledge", "proof", "snark", "stark"]
+                  }
                 }
               },
               {
@@ -151,7 +176,21 @@ spec:
                   "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
                   "supported_categories": ["swap-api", "token-api", "price-api", "dex-integration", "wallet-integration"],
                   "supported_topics": ["trading", "liquidity", "apis", "integration", "development"],
-                  "supports_api_version": true
+                  "supports_api_version": true,
+                  "topic_keywords": {
+                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                    "apis": ["api", "endpoint", "request", "response", "rest"],
+                    "integration": ["integration", "connect", "setup", "config", "webhook"],
+                    "development": ["development", "dev", "build", "sdk", "client"]
+                  },
+                  "category_keywords": {
+                    "swap-api": ["swap", "trade", "exchange", "dex", "amm"],
+                    "token-api": ["token", "asset", "mint", "coin", "currency"],
+                    "price-api": ["price", "pricing", "rate", "cost", "value"],
+                    "dex-integration": ["dex", "integration", "connect", "setup", "config"],
+                    "wallet-integration": ["wallet", "connect", "sign", "transaction", "web3"]
+                  }
                 }
               },
               {
@@ -159,49 +198,161 @@ spec:
                 "docType": "cilium",
                 "title": "Cilium Documentation Query",
                 "description": "Search Cilium networking and security documentation for Kubernetes and cloud-native environments.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "networking": ["network", "networking", "connectivity", "routing", "policy"],
+                    "security": ["security", "policy", "access", "firewall", "encryption"],
+                    "kubernetes": ["kubernetes", "k8s", "pod", "service", "deployment"],
+                    "observability": ["observability", "monitoring", "metrics", "tracing", "logs"],
+                    "ebpf": ["ebpf", "bpf", "kernel", "performance", "filtering"]
+                  },
+                  "category_keywords": {
+                    "networking": ["network", "networking", "connectivity", "routing", "policy"],
+                    "security": ["security", "policy", "access", "firewall", "encryption"],
+                    "observability": ["observability", "monitoring", "metrics", "tracing", "logs"],
+                    "performance": ["performance", "optimization", "scaling", "efficiency"],
+                    "integration": ["integration", "kubernetes", "istio", "service mesh"]
+                  }
+                }
               },
               {
                 "name": "talos_query",
                 "docType": "talos",
                 "title": "Talos OS Documentation Query",
                 "description": "Search Talos OS documentation for minimal, secure, and immutable Linux distribution designed for Kubernetes.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "kubernetes": ["kubernetes", "k8s", "cluster", "node", "control plane"],
+                    "security": ["security", "immutable", "minimal", "secure", "hardening"],
+                    "boot": ["boot", "bootloader", "pxe", "iso", "installation"],
+                    "configuration": ["configuration", "config", "patch", "machine config"],
+                    "maintenance": ["maintenance", "upgrade", "backup", "recovery"]
+                  },
+                  "category_keywords": {
+                    "installation": ["installation", "install", "setup", "deploy", "bootstrap"],
+                    "configuration": ["configuration", "config", "patch", "machine config"],
+                    "operations": ["operations", "maintenance", "upgrade", "backup", "recovery"],
+                    "security": ["security", "hardening", "compliance", "audit"],
+                    "troubleshooting": ["troubleshooting", "debug", "logs", "diagnostics"]
+                  }
+                }
               },
               {
                 "name": "meteora_query",
                 "docType": "meteora",
                 "title": "Meteora Protocol Documentation Query",
                 "description": "Search Meteora DeFi protocol documentation including liquidity pools, farming, and yield strategies.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                    "farming": ["farming", "yield", "staking", "reward", "incentive"],
+                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                    "vaults": ["vault", "strategy", "yield", "auto-compound"],
+                    "governance": ["governance", "vote", "proposal", "dao", "token"]
+                  },
+                  "category_keywords": {
+                    "defi": ["defi", "decentralized", "finance", "yield", "liquidity"],
+                    "liquidity-pools": ["pool", "liquidity", "amm", "market", "depth"],
+                    "yield-farming": ["yield", "farming", "staking", "reward", "incentive"],
+                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                    "vaults": ["vault", "strategy", "auto-compound", "yield"]
+                  }
+                }
               },
               {
                 "name": "raydium_query",
                 "docType": "raydium",
                 "title": "Raydium Protocol Documentation Query",
                 "description": "Search Raydium DEX and AMM documentation for Solana-based trading and liquidity provision.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "trading": ["trading", "trade", "swap", "exchange", "dex"],
+                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                    "farming": ["farming", "yield", "staking", "reward", "incentive"],
+                    "amm": ["amm", "automated", "market", "maker", "liquidity"],
+                    "solana": ["solana", "blockchain", "program", "instruction", "account"]
+                  },
+                  "category_keywords": {
+                    "dex": ["dex", "exchange", "trading", "swap", "amm"],
+                    "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
+                    "yield": ["yield", "farming", "staking", "reward", "incentive"],
+                    "defi": ["defi", "decentralized", "finance", "yield", "liquidity"],
+                    "solana": ["solana", "blockchain", "program", "instruction", "account"]
+                  }
+                }
               },
               {
                 "name": "ebpf_query",
                 "docType": "ebpf",
                 "title": "eBPF Documentation Query",
                 "description": "Search eBPF (extended Berkeley Packet Filter) documentation for kernel programming and observability.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "kernel": ["kernel", "linux", "system", "syscall", "module"],
+                    "programming": ["programming", "code", "development", "c", "clang"],
+                    "observability": ["observability", "monitoring", "tracing", "metrics", "debug"],
+                    "networking": ["network", "packet", "socket", "firewall", "filter"],
+                    "security": ["security", "seccomp", "lsm", "access", "audit"]
+                  },
+                  "category_keywords": {
+                    "kernel-programming": ["kernel", "programming", "c", "clang", "bcc"],
+                    "observability": ["observability", "monitoring", "tracing", "metrics", "debug"],
+                    "networking": ["network", "packet", "socket", "firewall", "filter"],
+                    "security": ["security", "seccomp", "lsm", "access", "audit"],
+                    "performance": ["performance", "optimization", "profiling", "tracing"]
+                  }
+                }
               },
               {
                 "name": "rust_best_practices_query",
                 "docType": "rust_best_practices",
                 "title": "Rust Best Practices Query",
                 "description": "Search curated Rust best practices, patterns, and guidelines for idiomatic and performant code.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "ownership": ["ownership", "borrow", "lifetime", "move", "reference"],
+                    "async": ["async", "await", "future", "tokio", "concurrency"],
+                    "error-handling": ["error", "result", "option", "panic", "unwrap"],
+                    "performance": ["performance", "optimization", "memory", "zero-cost", "allocation"],
+                    "patterns": ["pattern", "trait", "generic", "macro", "idiom"]
+                  },
+                  "category_keywords": {
+                    "idiomatic-rust": ["idiomatic", "pattern", "best practice", "convention", "style"],
+                    "performance": ["performance", "optimization", "memory", "speed", "efficient"],
+                    "safety": ["safety", "memory safety", "borrow checker", "lifetime"],
+                    "concurrency": ["concurrency", "async", "parallel", "thread", "mutex"],
+                    "error-handling": ["error", "error handling", "result", "option", "panic"]
+                  }
+                }
               },
               {
                 "name": "rust_query",
                 "docType": "rust",
                 "title": "Rust Documentation Query",
                 "description": "Search and retrieve information from Rust crate documentation. Query across 40+ popular Rust crates.",
-                "enabled": true
+                "enabled": true,
+                "metadataHints": {
+                  "topic_keywords": {
+                    "web": ["web", "http", "server", "client", "api", "rest"],
+                    "async": ["async", "await", "future", "tokio", "runtime"],
+                    "data": ["data", "database", "sql", "orm", "serde", "json"],
+                    "crypto": ["crypto", "encryption", "hash", "signature", "security"],
+                    "cli": ["cli", "command", "args", "clap", "terminal", "shell"]
+                  },
+                  "category_keywords": {
+                    "web-frameworks": ["web", "framework", "server", "http", "axum", "warp"],
+                    "async-runtime": ["async", "runtime", "tokio", "async-std", "smol"],
+                    "data-processing": ["data", "database", "sql", "postgres", "mongodb"],
+                    "cryptography": ["crypto", "encryption", "security", "tls", "ssl"],
+                    "command-line": ["cli", "command", "terminal", "shell", "tool"]
+                  }
+                }
               },
               {
                 "name": "add_rust_crate",
