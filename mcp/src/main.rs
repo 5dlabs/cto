@@ -188,12 +188,11 @@ impl Default for DocsIngestDefaults {
         DocsIngestDefaults {
             model: "claude-sonnet-4-20250514".to_string(),
             // Use the internal Kubernetes service URL - accessible via Twingate
-            doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80".to_string(),
+            doc_server_url: "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
+                .to_string(),
         }
     }
 }
-
-
 
 /// Load configuration from cto-config.json file
 /// Looks in current directory, workspace root, or WORKSPACE_FOLDER_PATHS for cto-config.json
@@ -818,15 +817,24 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.implementation_agent.clone());
 
     // Resolve agent name and extract CLI/model if it's a short alias
-    let (implementation_agent, implementation_cli, implementation_model) = if let Some(agent_config) = config.agents.get(&implementation_agent_input) {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() { cli.clone() } else { agent_config.cli.clone() };
-        let agent_model = if agent_config.model.is_empty() { model.clone() } else { agent_config.model.clone() };
-        (agent_config.github_app.clone(), agent_cli, agent_model)
-    } else {
-        // Not a configured agent, use provided name with defaults
-        (implementation_agent_input, cli.clone(), model.clone())
-    };
+    let (implementation_agent, implementation_cli, implementation_model) =
+        if let Some(agent_config) = config.agents.get(&implementation_agent_input) {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            (agent_config.github_app.clone(), agent_cli, agent_model)
+        } else {
+            // Not a configured agent, use provided name with defaults
+            (implementation_agent_input, cli.clone(), model.clone())
+        };
 
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
@@ -836,15 +844,24 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
 
     // Resolve agent name and extract CLI/model if it's a short alias
-    let (quality_agent, quality_cli, quality_model) = if let Some(agent_config) = config.agents.get(&quality_agent_input) {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() { cli.clone() } else { agent_config.cli.clone() };
-        let agent_model = if agent_config.model.is_empty() { model.clone() } else { agent_config.model.clone() };
-        (agent_config.github_app.clone(), agent_cli, agent_model)
-    } else {
-        // Not a configured agent, use provided name with defaults
-        (quality_agent_input, cli.clone(), model.clone())
-    };
+    let (quality_agent, quality_cli, quality_model) =
+        if let Some(agent_config) = config.agents.get(&quality_agent_input) {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            (agent_config.github_app.clone(), agent_cli, agent_model)
+        } else {
+            // Not a configured agent, use provided name with defaults
+            (quality_agent_input, cli.clone(), model.clone())
+        };
 
     // Handle testing agent - use provided value or config default
     let testing_agent_input = arguments
@@ -854,15 +871,24 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
 
     // Resolve agent name and extract CLI/model if it's a short alias
-    let (testing_agent, testing_cli, testing_model) = if let Some(agent_config) = config.agents.get(&testing_agent_input) {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() { cli.clone() } else { agent_config.cli.clone() };
-        let agent_model = if agent_config.model.is_empty() { model.clone() } else { agent_config.model.clone() };
-        (agent_config.github_app.clone(), agent_cli, agent_model)
-    } else {
-        // Not a configured agent, use provided name with defaults
-        (testing_agent_input, cli.clone(), model.clone())
-    };
+    let (testing_agent, testing_cli, testing_model) =
+        if let Some(agent_config) = config.agents.get(&testing_agent_input) {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            (agent_config.github_app.clone(), agent_cli, agent_model)
+        } else {
+            // Not a configured agent, use provided name with defaults
+            (testing_agent_input, cli.clone(), model.clone())
+        };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
@@ -879,8 +905,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
     eprintln!("🐛 DEBUG: Play workflow service: {service}");
     eprintln!("🐛 DEBUG: Implementation agent: {implementation_agent} (CLI: {implementation_cli}, Model: {implementation_model})");
-    eprintln!("🐛 DEBUG: Quality agent: {quality_agent} (CLI: {quality_cli}, Model: {quality_model})");
-    eprintln!("🐛 DEBUG: Testing agent: {testing_agent} (CLI: {testing_cli}, Model: {testing_model})");
+    eprintln!(
+        "🐛 DEBUG: Quality agent: {quality_agent} (CLI: {quality_cli}, Model: {quality_model})"
+    );
+    eprintln!(
+        "🐛 DEBUG: Testing agent: {testing_agent} (CLI: {testing_cli}, Model: {testing_model})"
+    );
 
     // Check for requirements.yaml file
     // Try to determine workspace directory, but don't fail if we can't
@@ -890,19 +920,19 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             std::path::PathBuf::from(first_path)
         })
         .or_else(|_| std::env::current_dir());
-    
+
     // Only check for requirements if we have a valid workspace directory
     let requirements_path = if let Ok(workspace_dir) = workspace_dir_result {
         let docs_dir = workspace_dir.join(docs_project_directory);
         let task_requirements_path = docs_dir.join(format!("task-{task_id}/requirements.yaml"));
         let project_requirements_path = docs_dir.join("requirements.yaml");
-        
+
         eprintln!(
             "🔍 Checking for requirements.yaml in: {} (docs_project_directory='{}')",
             docs_dir.display(),
             docs_project_directory
         );
-        
+
         if task_requirements_path.exists() {
             eprintln!("📋 Found task-specific requirements.yaml for task {task_id}");
             Some(task_requirements_path)
@@ -917,7 +947,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("⚠️ Could not determine workspace directory, skipping requirements check");
         None
     };
-    
+
     let mut params = vec![
         format!("task-id={task_id}"),
         format!("repository={repository}"),
@@ -938,9 +968,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {
-        let requirements_content = std::fs::read_to_string(&path)
-            .context(format!("Failed to read requirements file: {}", path.display()))?;
-        
+        let requirements_content = std::fs::read_to_string(&path).context(format!(
+            "Failed to read requirements file: {}",
+            path.display()
+        ))?;
+
         // Base64 encode the requirements
         use base64::{engine::general_purpose, Engine as _};
         let encoded = general_purpose::STANDARD.encode(requirements_content);
@@ -1285,54 +1317,54 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                 .unwrap_or_default();
 
             match name {
-                Ok("docs") => Some(handle_docs_workflow(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
-                    }] 
-                }))), 
-                Ok("play") => Some(handle_play_workflow(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
-                    }] 
-                }))), 
-                Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
-                    }] 
-                }))), 
-                Ok("jobs") => Some(handle_jobs_tool(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
-                    }] 
-                }))), 
-                Ok("stop_job") => Some(handle_stop_job_tool(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
-                    }] 
+                Ok("docs") => Some(handle_docs_workflow(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("play") => Some(handle_play_workflow(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("intake_prd") => Some(handle_intake_prd_workflow(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("jobs") => Some(handle_jobs_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("stop_job") => Some(handle_stop_job_tool(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
                 }))),
                 Ok("docs_ingest") => Some(handle_docs_ingest_tool(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": result
                     }]
-                }))), 
-                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({ 
-                    "content": [{ 
-                        "type": "text", 
-                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string()) 
-                    }] 
-                }))), 
-                Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))), 
-                Err(e) => Some(Err(e)), 
-            } 
-        } 
-        _ => None, 
-    } 
+                }))),
+                Ok("input") => Some(handle_send_job_input(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok(unknown) => Some(Err(anyhow!("Unknown tool: {}", unknown))),
+                Err(e) => Some(Err(e)),
+            }
+        }
+        _ => None,
+    }
 }
 
 fn handle_method(method: &str, params: Option<&Value>) -> Option<Result<Value>> {
@@ -1375,11 +1407,8 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
         .unwrap_or("agent-platform");
 
     let include = arguments.get("include").and_then(|v| v.as_array());
-    let include_play = include.is_none()
-        || include
-            .unwrap()
-            .iter()
-            .any(|x| x.as_str() == Some("play"));
+    let include_play =
+        include.is_none() || include.unwrap().iter().any(|x| x.as_str() == Some("play"));
     let include_intake = include.is_none()
         || include
             .unwrap()
@@ -1393,8 +1422,16 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
         if let Ok(v) = serde_json::from_str::<Value>(&list_str) {
             if let Some(items) = v.get("items").and_then(|v| v.as_array()) {
                 for item in items {
-                    let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-                    let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
+                    let name = item
+                        .get("metadata")
+                        .and_then(|m| m.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    let phase = item
+                        .get("status")
+                        .and_then(|s| s.get("phase"))
+                        .and_then(|p| p.as_str())
+                        .unwrap_or("");
 
                     // Determine workflow type based on name pattern
                     let workflow_type = if name.contains("play-workflow") {
@@ -1453,30 +1490,42 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
             // Terminate and delete intake workflow
             let _ = run_argo_cli(&["terminate", name, "-n", namespace]);
             match run_argo_cli(&["delete", name, "-n", namespace]) {
-                Ok(msg) => Ok(json!({"success": true, "message": format!("Deleted intake workflow {name}: {msg}"), "namespace": namespace})),
-                Err(e) => Err(anyhow!(format!("Failed to delete intake workflow {name}: {e}")))
+                Ok(msg) => Ok(
+                    json!({"success": true, "message": format!("Deleted intake workflow {name}: {msg}"), "namespace": namespace}),
+                ),
+                Err(e) => Err(anyhow!(format!(
+                    "Failed to delete intake workflow {name}: {e}"
+                ))),
             }
         }
         "play" => {
             // Stop play workflow using Argo CLI
             match run_argo_cli(&["stop", name, "-n", namespace]) {
-                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped play workflow {name}"), "namespace": namespace})),
-                Err(e) => Err(anyhow!(format!("Failed to stop play workflow {name}: {e}")))
+                Ok(_msg) => Ok(
+                    json!({"success": true, "message": format!("Stopped play workflow {name}"), "namespace": namespace}),
+                ),
+                Err(e) => Err(anyhow!(format!("Failed to stop play workflow {name}: {e}"))),
             }
         }
         "workflow" => {
             // Stop generic workflow using Argo CLI
             match run_argo_cli(&["stop", name, "-n", namespace]) {
-                Ok(_msg) => Ok(json!({"success": true, "message": format!("Stopped workflow {name}"), "namespace": namespace})),
-                Err(e) => Err(anyhow!(format!("Failed to stop workflow {name}: {e}")))
+                Ok(_msg) => Ok(
+                    json!({"success": true, "message": format!("Stopped workflow {name}"), "namespace": namespace}),
+                ),
+                Err(e) => Err(anyhow!(format!("Failed to stop workflow {name}: {e}"))),
             }
         }
-        other => Err(anyhow!(format!("Unsupported job_type: {other}. Supported types: intake, play, workflow"))),
+        other => Err(anyhow!(format!(
+            "Unsupported job_type: {other}. Supported types: intake, play, workflow"
+        ))),
     }
 }
 
 #[allow(dead_code)]
-fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+fn handle_anthropic_message_tool(
+    arguments: &std::collections::HashMap<String, Value>,
+) -> Result<Value> {
     let api_key = std::env::var("ANTHROPIC_API_KEY")
         .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
     let model = arguments
@@ -1512,7 +1561,9 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
         "messages": messages,
         "max_tokens": max_tokens
     });
-    if let Some(s) = system { body["system"] = json!(s); }
+    if let Some(s) = system {
+        body["system"] = json!(s);
+    }
 
     let resp = client
         .post("https://api.anthropic.com/v1/messages")
@@ -1523,7 +1574,9 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
         .and_then(|r| r.error_for_status())
         .map_err(|e| anyhow!(format!("Anthropic request failed: {e}")))?;
 
-    let json_resp: Value = resp.json().map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
+    let json_resp: Value = resp
+        .json()
+        .map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
     Ok(json_resp)
 }
 
@@ -1532,29 +1585,33 @@ fn handle_docs_ingest_tool(arguments: &std::collections::HashMap<String, Value>)
         .get("repository_url")
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("repository_url is required"))?;
-    
+
     // Validate it's a GitHub URL
     if !github_url.contains("github.com") {
-        return Err(anyhow!("Only GitHub repositories are currently supported. URL must contain 'github.com'"));
+        return Err(anyhow!(
+            "Only GitHub repositories are currently supported. URL must contain 'github.com'"
+        ));
     }
-    
+
     // Get configuration from CTO_CONFIG
-    let config = CTO_CONFIG.get().ok_or_else(|| anyhow!("CTO configuration not loaded"))?;
-    
+    let config = CTO_CONFIG
+        .get()
+        .ok_or_else(|| anyhow!("CTO configuration not loaded"))?;
+
     let doc_server_url = arguments
         .get("doc_server_url")
         .and_then(|v| v.as_str())
         .unwrap_or(&config.defaults.docs_ingest.doc_server_url);
-    
+
     let doc_type = arguments
         .get("doc_type")
         .and_then(|v| v.as_str())
         .ok_or(anyhow!("doc_type is required"))?;
-    
+
     // Check for ANTHROPIC_API_KEY
     let api_key = std::env::var("ANTHROPIC_API_KEY")
         .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
-    
+
     // Create the Claude prompt for analyzing the repository
     #[allow(clippy::uninlined_format_args)]
     let analysis_prompt = format!(
@@ -1587,11 +1644,11 @@ IMPORTANT:
         doc_type = doc_type,
         doc_server_url = doc_server_url
     );
-    
+
     // Call Claude API to analyze the repository using configured model
     let model = &config.defaults.docs_ingest.model;
     let analysis = call_claude_api(&api_key, &analysis_prompt, model)?;
-    
+
     // Parse the analysis response
     let analysis_text = analysis
         .get("content")
@@ -1603,7 +1660,7 @@ IMPORTANT:
             eprintln!("DEBUG: Full Claude API response: {analysis:?}");
             anyhow!("Failed to get Claude analysis response text")
         })?;
-    
+
     // Extract JSON from the response - try direct parse first, then extract
     let strategy_json: Value = match serde_json::from_str(analysis_text) {
         Ok(json) => json,
@@ -1615,13 +1672,13 @@ IMPORTANT:
             let mut in_string = false;
             let mut escape = false;
             let mut json_result = None;
-            
+
             for (i, &ch) in chars.iter().enumerate() {
                 if escape {
                     escape = false;
                     continue;
                 }
-                
+
                 match ch {
                     '\\' if in_string => escape = true,
                     '"' if !escape => in_string = !in_string,
@@ -1644,45 +1701,52 @@ IMPORTANT:
                     _ => {}
                 }
             }
-            
+
             json_result.ok_or_else(|| {
                 eprintln!("DEBUG: Could not extract JSON from Claude's response. Full text:");
                 eprintln!("{analysis_text}");
                 eprintln!("---");
-                anyhow!("No valid JSON found in Claude's response. Response length: {} chars", analysis_text.len())
+                anyhow!(
+                    "No valid JSON found in Claude's response. Response length: {} chars",
+                    analysis_text.len()
+                )
             })?
         }
     };
-    
+
     // Doc type is already known from user input, but verify Claude used it
     let _claude_doc_type = strategy_json
         .get("doc_type")
         .and_then(|v| v.as_str())
         .unwrap_or(doc_type);
-    
+
     let include_paths = strategy_json
         .get("include_paths")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter()
-            .filter_map(|v| v.as_str())
-            .collect::<Vec<_>>()
-            .join(","))
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(",")
+        })
         .unwrap_or_else(|| "docs/,Documentation/,README.md".to_string());
-    
+
     let extensions = strategy_json
         .get("extensions")
         .and_then(|v| v.as_array())
-        .map(|arr| arr.iter()
-            .filter_map(|v| v.as_str())
-            .collect::<Vec<_>>()
-            .join(","))
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .collect::<Vec<_>>()
+                .join(",")
+        })
         .unwrap_or_else(|| "md,rst,html".to_string());
-    
+
     let reasoning = strategy_json
         .get("reasoning")
         .and_then(|v| v.as_str())
         .unwrap_or("No reasoning provided");
-    
+
     // Build the JSON payload with analysis results
     let payload = json!({
         "url": github_url,
@@ -1697,25 +1761,29 @@ IMPORTANT:
     let json_payload = serde_json::to_string(&payload)?;
 
     // Use NamedTempFile for automatic cleanup
-    let mut temp_file = NamedTempFile::new()
-        .with_context(|| "Failed to create temporary file for JSON payload")?;
-    temp_file.write_all(json_payload.as_bytes())
+    let mut temp_file =
+        NamedTempFile::new().with_context(|| "Failed to create temporary file for JSON payload")?;
+    temp_file
+        .write_all(json_payload.as_bytes())
         .with_context(|| "Failed to write JSON payload to temporary file")?;
-    temp_file.flush()
+    temp_file
+        .flush()
         .with_context(|| "Failed to flush temporary file")?;
 
     let temp_file_path = temp_file.path().to_string_lossy().to_string();
     let _temp_file_guard = temp_file; // Keep alive during execution
 
-    let cmd = format!("curl -s -X POST {}/ingest/intelligent -H 'Content-Type: application/json' -d @{}", doc_server_url, temp_file_path);
-    
+    let cmd = format!(
+        "curl -s -X POST {doc_server_url}/ingest/intelligent -H 'Content-Type: application/json' -d @{temp_file_path}"
+    );
+
     let mut output = "📊 Repository Analysis Complete\n\n".to_string();
     output.push_str(&format!("🔗 Repository: {github_url}\n"));
     output.push_str(&format!("📁 Doc Type: {doc_type}\n"));
     output.push_str(&format!("📂 Paths: {include_paths}\n"));
     output.push_str(&format!("📄 Extensions: {extensions}\n"));
     output.push_str(&format!("💭 Reasoning: {reasoning}\n\n"));
-    
+
     output.push_str("🚀 Executing ingestion...\n\n");
     output.push_str(&format!("⚡ Executing:\n{cmd}\n"));
 
@@ -1744,7 +1812,9 @@ IMPORTANT:
                 output.push_str(&format!("📤 Response: {trimmed_stdout}\n"));
             }
         }
-        output.push_str("\n📡 Ingestion running asynchronously. Use the status URL to monitor progress.");
+        output.push_str(
+            "\n📡 Ingestion running asynchronously. Use the status URL to monitor progress.",
+        );
     } else {
         output.push_str(&format!(
             "❌ Request failed: {}\n",
@@ -1767,7 +1837,7 @@ fn call_claude_api(api_key: &str, prompt: &str, model: &str) -> Result<Value> {
             }
         ]
     });
-    
+
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post("https://api.anthropic.com/v1/messages")
@@ -1778,10 +1848,11 @@ fn call_claude_api(api_key: &str, prompt: &str, model: &str) -> Result<Value> {
         .send()
         .and_then(|r| r.error_for_status())
         .map_err(|e| anyhow!("Claude API request failed: {}", e))?;
-    
-    let json_resp: Value = resp.json()
+
+    let json_resp: Value = resp
+        .json()
         .map_err(|e| anyhow!("Failed to parse Claude API response: {}", e))?;
-    
+
     Ok(json_resp)
 }
 
@@ -1821,7 +1892,10 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     let selector = label_selectors.join(",");
 
     // Find services (not pods) by labels
-    let services_json = run_kubectl_json(&["get", "services", "-n", namespace, "-l", &selector, "-o", "json"])?.to_string();
+    let services_json = run_kubectl_json(&[
+        "get", "services", "-n", namespace, "-l", &selector, "-o", "json",
+    ])?
+    .to_string();
     let services: Value = serde_json::from_str(&services_json)?;
     let service_items = services
         .get("items")
@@ -1853,7 +1927,8 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .ok_or(anyhow!("Service missing port"))?;
 
     // Construct the service URL
-    let service_url = format!("http://{service_name}.{namespace}.svc.cluster.local:{service_port}/input");
+    let service_url =
+        format!("http://{service_name}.{namespace}.svc.cluster.local:{service_port}/input");
 
     // Format the message as JSON
     let message_data = json!({
@@ -1871,7 +1946,7 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         .context("Failed to send HTTP request to input bridge")?;
 
     let status = response.status();
-    
+
     if status.is_success() {
         let response_text = response.text().unwrap_or_else(|_| "OK".to_string());
         Ok(json!({
@@ -1881,7 +1956,9 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
             "response": response_text
         }))
     } else {
-        let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+        let error_text = response
+            .text()
+            .unwrap_or_else(|_| "Unknown error".to_string());
         Err(anyhow!(
             "HTTP request failed with status {}: {}",
             status,
@@ -1975,7 +2052,6 @@ async fn rpc_loop() -> Result<()> {
     }
     Ok(())
 }
-
 
 #[allow(clippy::disallowed_macros)]
 fn main() -> Result<()> {

@@ -116,7 +116,7 @@ spec:
                 "name": "birdeye_query",
                 "docType": "birdeye",
                 "title": "BirdEye API Documentation Query",
-                "description": "Search and retrieve information from BirdEye blockchain API documentation. Query across 600+ API endpoints with filtering by version, method, and parameters.",
+                "description": "Search BirdEye blockchain API documentation. Query 600+ endpoints with version, method, and parameter filtering.",
                 "enabled": true,
                 "metadataHints": {
                   "supported_formats": ["json", "yaml"],
@@ -200,6 +200,10 @@ spec:
                 "description": "Search Cilium networking and security documentation for Kubernetes and cloud-native environments.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "yaml"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["networking", "security", "observability", "performance", "integration"],
+                  "supported_topics": ["networking", "security", "kubernetes", "observability", "ebpf"],
                   "topic_keywords": {
                     "networking": ["network", "networking", "connectivity", "routing", "policy"],
                     "security": ["security", "policy", "access", "firewall", "encryption"],
@@ -223,6 +227,10 @@ spec:
                 "description": "Search Talos OS documentation for minimal, secure, and immutable Linux distribution designed for Kubernetes.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "yaml"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["installation", "configuration", "operations", "security", "troubleshooting"],
+                  "supported_topics": ["kubernetes", "security", "boot", "configuration", "maintenance"],
                   "topic_keywords": {
                     "kubernetes": ["kubernetes", "k8s", "cluster", "node", "control plane"],
                     "security": ["security", "immutable", "minimal", "secure", "hardening"],
@@ -246,6 +254,10 @@ spec:
                 "description": "Search Meteora DeFi protocol documentation including liquidity pools, farming, and yield strategies.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "json"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["defi", "liquidity_pools", "yield_farming", "trading", "vaults"],
+                  "supported_topics": ["liquidity", "farming", "trading", "vaults", "governance"],
                   "topic_keywords": {
                     "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
                     "farming": ["farming", "yield", "staking", "reward", "incentive"],
@@ -269,6 +281,10 @@ spec:
                 "description": "Search Raydium DEX and AMM documentation for Solana-based trading and liquidity provision.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "json"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["dex", "liquidity", "yield", "defi", "solana"],
+                  "supported_topics": ["trading", "liquidity", "farming", "amm", "solana"],
                   "topic_keywords": {
                     "trading": ["trading", "trade", "swap", "exchange", "dex"],
                     "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
@@ -292,6 +308,10 @@ spec:
                 "description": "Search eBPF (extended Berkeley Packet Filter) documentation for kernel programming and observability.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "c"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["kernel_programming", "observability", "networking", "security", "performance"],
+                  "supported_topics": ["kernel", "programming", "observability", "networking", "security"],
                   "topic_keywords": {
                     "kernel": ["kernel", "linux", "system", "syscall", "module"],
                     "programming": ["programming", "code", "development", "c", "clang"],
@@ -315,6 +335,10 @@ spec:
                 "description": "Search curated Rust best practices, patterns, and guidelines for idiomatic and performant code.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "rust"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["idiomatic_rust", "performance", "safety", "concurrency", "error_handling"],
+                  "supported_topics": ["ownership", "async", "error_handling", "performance", "patterns"],
                   "topic_keywords": {
                     "ownership": ["ownership", "borrow", "lifetime", "move", "reference"],
                     "async": ["async", "await", "future", "tokio", "concurrency"],
@@ -338,6 +362,11 @@ spec:
                 "description": "Search and retrieve information from Rust crate documentation. Query across 40+ popular Rust crates.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["rust", "markdown", "toml"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["web-frameworks", "async-runtime", "data-processing", "cryptography", "command-line"],
+                  "supported_topics": ["web", "async", "data", "crypto", "cli"],
+                  "supports_api_version": true,
                   "topic_keywords": {
                     "web": ["web", "http", "server", "client", "api", "rest"],
                     "async": ["async", "await", "future", "tokio", "runtime"],

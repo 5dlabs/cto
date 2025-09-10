@@ -60,7 +60,6 @@ fn get_docs_schema() -> Value {
     })
 }
 
-
 fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "play",
@@ -130,7 +129,6 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
         }
     })
 }
-
 
 fn get_intake_prd_schema() -> Value {
     json!({
