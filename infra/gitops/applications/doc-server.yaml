@@ -35,9 +35,16 @@ spec:
             value: "redis://redis.databases.svc.cluster.local:6379"
         env:
           # Keep chart defaults for non-secret settings
-          RUST_LOG: "info,doc_server=debug"
+          RUST_LOG: "info,doc_server=debug,mcp=debug"
           PORT: "3001"
           MCP_HOST: "0.0.0.0"
+          MCP_PORT: "3001"
+          # MCP configuration
+          MCP_LOCALHOST_ONLY: "false"
+          MCP_STRICT_ORIGIN_VALIDATION: "false"
+          MCP_REQUIRE_ORIGIN_HEADER: "false"
+          MCP_ENABLE_SSE: "true"
+          MCP_ENABLE_SSE_MIRROR: "false"
           # Redis configuration - point to Redis master, not Sentinel
           REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
           # Explicitly disable Sentinel usage in any client code
