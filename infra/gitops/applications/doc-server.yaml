@@ -116,7 +116,7 @@ spec:
                 "name": "birdeye_query",
                 "docType": "birdeye",
                 "title": "BirdEye API Documentation Query",
-                "description": "Search and retrieve information from BirdEye blockchain API documentation. Query across 600+ API endpoints with filtering by version, method, and parameters.",
+                "description": "Search BirdEye blockchain API documentation. Query 600+ endpoints with version, method, and parameter filtering.",
                 "enabled": true,
                 "metadataHints": {
                   "supported_formats": ["json", "yaml"],
@@ -362,6 +362,11 @@ spec:
                 "description": "Search and retrieve information from Rust crate documentation. Query across 40+ popular Rust crates.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["rust", "markdown", "toml"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["web-frameworks", "async-runtime", "data-processing", "cryptography", "command-line"],
+                  "supported_topics": ["web", "async", "data", "crypto", "cli"],
+                  "supports_api_version": true,
                   "topic_keywords": {
                     "web": ["web", "http", "server", "client", "api", "rest"],
                     "async": ["async", "await", "future", "tokio", "runtime"],
