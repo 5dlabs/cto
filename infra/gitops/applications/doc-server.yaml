@@ -200,6 +200,10 @@ spec:
                 "description": "Search Cilium networking and security documentation for Kubernetes and cloud-native environments.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "yaml"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["networking", "security", "observability", "policy", "installation"],
+                  "supported_topics": ["ebpf", "network-policy", "service-mesh", "security", "monitoring"],
                   "topic_keywords": {
                     "networking": ["network", "networking", "connectivity", "routing", "policy"],
                     "security": ["security", "policy", "access", "firewall", "encryption"],
@@ -223,6 +227,10 @@ spec:
                 "description": "Search Talos OS documentation for minimal, secure, and immutable Linux distribution designed for Kubernetes.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "yaml"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["installation", "configuration", "networking", "security", "kubernetes"],
+                  "supported_topics": ["cluster-setup", "machine-config", "networking", "security", "troubleshooting"],
                   "topic_keywords": {
                     "kubernetes": ["kubernetes", "k8s", "cluster", "node", "control plane"],
                     "security": ["security", "immutable", "minimal", "secure", "hardening"],
@@ -246,6 +254,10 @@ spec:
                 "description": "Search Meteora DeFi protocol documentation including liquidity pools, farming, and yield strategies.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "json"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["liquidity-pools", "farming", "yield-strategies", "api", "integration"],
+                  "supported_topics": ["defi", "liquidity", "yield-farming", "trading", "solana"],
                   "topic_keywords": {
                     "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
                     "farming": ["farming", "yield", "staking", "reward", "incentive"],
@@ -269,6 +281,10 @@ spec:
                 "description": "Search Raydium DEX and AMM documentation for Solana-based trading and liquidity provision.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "json"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["dex", "amm", "trading", "liquidity", "api"],
+                  "supported_topics": ["swap", "liquidity-pools", "farming", "defi", "solana"],
                   "topic_keywords": {
                     "trading": ["trading", "trade", "swap", "exchange", "dex"],
                     "liquidity": ["liquidity", "pool", "amm", "market", "depth"],
@@ -292,6 +308,10 @@ spec:
                 "description": "Search eBPF (extended Berkeley Packet Filter) documentation for kernel programming and observability.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "c"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["kernel-programming", "observability", "networking", "security", "tracing"],
+                  "supported_topics": ["bpf-programs", "kernel-hooks", "observability", "performance", "security"],
                   "topic_keywords": {
                     "kernel": ["kernel", "linux", "system", "syscall", "module"],
                     "programming": ["programming", "code", "development", "c", "clang"],
@@ -315,6 +335,10 @@ spec:
                 "description": "Search curated Rust best practices, patterns, and guidelines for idiomatic and performant code.",
                 "enabled": true,
                 "metadataHints": {
+                  "supported_formats": ["markdown", "rust"],
+                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
+                  "supported_categories": ["performance", "safety", "patterns", "idioms", "architecture"],
+                  "supported_topics": ["ownership", "error-handling", "concurrency", "testing", "optimization"],
                   "topic_keywords": {
                     "ownership": ["ownership", "borrow", "lifetime", "move", "reference"],
                     "async": ["async", "await", "future", "tokio", "concurrency"],
