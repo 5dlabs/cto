@@ -45,6 +45,7 @@ spec:
           MCP_REQUIRE_ORIGIN_HEADER: "false"
           MCP_ENABLE_SSE: "true"
           MCP_ENABLE_SSE_MIRROR: "false"
+          MCP_SSE_KEEPALIVE_SECS: "10"
           # Redis configuration - point to Redis master, not Sentinel
           REDIS_URL: "redis://redis.databases.svc.cluster.local:6379"
           # Explicitly disable Sentinel usage in any client code
