@@ -113,6 +113,19 @@ spec:
           # Ensure chart uses correct binary path and migrate-only args
           command: ["/app/http_server"]
           args: ["--migrate-only"]
+        # Service configuration - exclude worker pods from service endpoints
+        service:
+          type: ClusterIP
+          port: 80
+          targetPort: 3001
+          # Override selector to only include server pods (exclude worker pods)
+          selector:
+            app.kubernetes.io/name: agent-docs-server
+            app.kubernetes.io/instance: doc-server
+            app.kubernetes.io/component: server
+        # Add component label to main server pods to distinguish from worker
+        podLabels:
+          app.kubernetes.io/component: server
         # Ingress configuration for SSE-optimized MCP access
         ingress:
           enabled: true
