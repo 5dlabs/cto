@@ -40,10 +40,7 @@ impl DocsTemplateGenerator {
         );
 
         // Add MCP servers config to enable Toolman (reuse code/mcp.json.hbs)
-        templates.insert(
-            "mcp.json".to_string(),
-            Self::generate_mcp_config()?,
-        );
+        templates.insert("mcp.json".to_string(), Self::generate_mcp_config()?);
 
         // Agent-centric ToolMan config for docs: generate base client-config.json
         // (Repo-specific cto-config.json can append at runtime in the container script.)
