@@ -96,3 +96,16 @@ data:
       completedJobDelayMinutes: {{ .Values.cleanup.completedJobDelayMinutes | default 5 }}
       failedJobDelayMinutes: {{ .Values.cleanup.failedJobDelayMinutes | default 60 }}
       deleteConfigMap: {{ .Values.cleanup.deleteConfigMap | default true }}
+
+    # Agent tool profiles (base configuration per agent)
+    {{- if .Values.agents }}
+    agents:
+      {{- range $key, $agent := .Values.agents }}
+      {{ $key }}:
+        githubApp: {{ $agent.githubApp | quote }}
+        {{- if $agent.clientConfig }}
+        clientConfig:
+{{ toYaml $agent.clientConfig | nindent 10 }}
+        {{- end }}
+      {{- end }}
+    {{- end }}

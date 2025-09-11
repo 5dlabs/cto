@@ -39,6 +39,13 @@ impl DocsTemplateGenerator {
             Self::generate_docs_prompt(docs_run)?,
         );
 
+        // Agent-centric ToolMan config for docs: generate base client-config.json
+        // (Repo-specific cto-config.json can append at runtime in the container script.)
+        templates.insert(
+            "client-config.json".to_string(),
+            Self::generate_client_config(docs_run, config)?,
+        );
+
         // Generate hook scripts
         let hook_scripts = Self::generate_hook_scripts(docs_run)?;
         for (filename, content) in hook_scripts {
@@ -162,16 +169,11 @@ impl DocsTemplateGenerator {
                 ))
             })?;
 
-        // Load toolman catalog for embedding in prompt
-        let catalog_data = Self::load_toolman_catalog_data()?;
-        let catalog_markdown = Self::render_toolman_catalog_markdown(&catalog_data)?;
-
         let context = json!({
             "repository_url": docs_run.spec.repository_url,
             "source_branch": docs_run.spec.source_branch,
             "working_directory": docs_run.spec.working_directory,
             "service_name": "docs-generator",
-            "toolman_catalog_markdown": catalog_markdown,
             "include_codebase": docs_run.spec.include_codebase.unwrap_or(false)
         });
 
@@ -180,110 +182,32 @@ impl DocsTemplateGenerator {
         })
     }
 
-    // Removed generate_toolman_catalog - catalog is now embedded as markdown in prompt
+    /// Generate agent-centric client-config.json for DocsRun from Helm (verbatim).
+    fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
+        use serde_json::to_string_pretty;
 
-    fn load_toolman_catalog_data() -> Result<serde_json::Value> {
-        const TOOLMAN_CATALOG_PATH: &str = "/toolman-catalog/tool-catalog.json";
-
-        match fs::read_to_string(TOOLMAN_CATALOG_PATH) {
-            Ok(catalog_json) => serde_json::from_str(&catalog_json).map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to parse toolman catalog JSON: {e}"
-                ))
-            }),
-            Err(e) => {
-                debug!(
-                    "Toolman catalog not found at {}: {}",
-                    TOOLMAN_CATALOG_PATH, e
-                );
-                // Return empty catalog structure if toolman ConfigMap is not available
-                Ok(json!({
-                    "local": {},
-                    "remote": {},
-                    "last_updated": std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs()
-                }))
-            }
-        }
-    }
-
-    fn count_total_tools(catalog_data: &serde_json::Value) -> u32 {
-        let mut count = 0;
-
-        if let Some(local) = catalog_data.get("local").and_then(|v| v.as_object()) {
-            for server in local.values() {
-                if let Some(tools) = server.get("tools").and_then(|v| v.as_array()) {
-                    count += tools.len() as u32;
-                }
-            }
-        }
-
-        if let Some(remote) = catalog_data.get("remote").and_then(|v| v.as_object()) {
-            for server in remote.values() {
-                if let Some(tools) = server.get("tools").and_then(|v| v.as_array()) {
-                    count += tools.len() as u32;
-                }
-            }
-        }
-
-        count
-    }
-
-    fn render_toolman_catalog_markdown(catalog_data: &serde_json::Value) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        // Register json helper for proper JSON serialization
-        handlebars.register_helper(
-            "json",
-            Box::new(
-                |h: &handlebars::Helper,
-                 _: &Handlebars,
-                 _: &handlebars::Context,
-                 _: &mut handlebars::RenderContext,
-                 out: &mut dyn handlebars::Output|
-                 -> handlebars::HelperResult {
-                    let param =
-                        h.param(0)
-                            .ok_or(handlebars::RenderErrorReason::ParamNotFoundForIndex(
-                                "json", 0,
-                            ))?;
-                    let json_str = serde_json::to_string(param.value())
-                        .map_err(|e| handlebars::RenderErrorReason::NestedError(Box::new(e)))?;
-                    out.write(&json_str)?;
-                    Ok(())
-                },
-            ),
-        );
-
-        let template = Self::load_template("docs/toolman-catalog.md.hbs")?;
-
-        handlebars
-            .register_template_string("toolman_catalog_markdown", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register toolman catalog markdown template: {e}"
-                ))
+        let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
+        let agent_cfg = config
+            .agents
+            .values()
+            .find(|a| a.github_app == github_app)
+            .ok_or_else(|| {
+                crate::tasks::types::Error::ConfigError(
+                    format!("Agent config not found for githubApp='{github_app}' in controller config."),
+                )
             })?;
 
-        let context = json!({
-            "toolman_catalog": catalog_data,
-            "generated_timestamp": std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-            "total_tool_count": Self::count_total_tools(catalog_data)
-        });
+        let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
+            crate::tasks::types::Error::ConfigError(
+                format!("Missing clientConfig for agent githubApp='{github_app}'. Define agents.<agent>.clientConfig in Helm values."),
+            )
+        })?;
 
-        handlebars
-            .render("toolman_catalog_markdown", &context)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to render toolman catalog markdown: {e}"
-                ))
-            })
+        to_string_pretty(client_cfg).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize clientConfig: {e}"
+            ))
+        })
     }
 
     fn generate_hook_scripts(docs_run: &DocsRun) -> Result<BTreeMap<String, String>> {

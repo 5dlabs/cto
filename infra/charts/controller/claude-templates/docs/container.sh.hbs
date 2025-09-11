@@ -276,7 +276,7 @@ if [ -d "/task-files" ]; then
       hook_name=$(basename "$hook_file" | sed 's/^hooks-//')
       cp "$hook_file" "$CLAUDE_WORK_DIR/$hook_name"
       chmod +x "$CLAUDE_WORK_DIR/$hook_name"
-      echo "✓ Copied hook: $hook_name"
+  echo "✓ Copied hook: $hook_name"
     fi
   done
 
@@ -472,6 +472,49 @@ export SOURCE_BRANCH="{{source_branch}}"
 export WORKING_DIR="{{working_directory}}"
 export GITHUB_USER="{{github_app}}"
 export GITHUB_APP="{{github_app}}"
+
+# Optional: copy agent-centric ToolMan client config (base from Helm/controller)
+if [ -f "/task-files/client-config.json" ]; then
+  cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy to working dir failed"
+  cp "/task-files/client-config.json" "/workspace/client-config.json" && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
+  export MCP_CLIENT_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
+else
+  echo "ℹ️ client-config.json not provided by controller; proceeding without MCP client config"
+fi
+
+# Append repo-level clientConfig from cto-config.json if present (append-only, generic)
+CTO_CANDIDATES=("$CLAUDE_WORK_DIR/cto-config.json" "/workspace/cto-config.json")
+for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
+  if [ -f "$CFG_PATH" ] && [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
+    echo "🔧 Merging repo cto-config.json clientConfig into client-config.json (append-only)"
+    AGENT_KEY=$(echo "{{github_app}}" | sed 's/^5DLabs-//' | tr 'A-Z' 'a-z')
+    TMP_MERGE="/tmp/client-config.merged.json"
+    if jq --arg ak "$AGENT_KEY" -s '
+      def append_only_merge(b; e):
+        if (b|type)=="object" and (e|type)=="object" then
+          (b + e | to_entries
+            | map({key: .key, value:
+                ( (b[.key] // empty) as $bv | (e[.key] // empty) as $ev
+                  | if ($bv|type)=="object" and ($ev|type)=="object" then append_only_merge($bv;$ev)
+                    elif ($bv|type)=="array" and ($ev|type)=="array" then ($bv + $ev | unique)
+                    elif ($bv|type)==($ev|type) then $bv
+                    else ($bv // $ev) end) })
+            | from_entries)
+        elif (b|type)=="array" and (e|type)=="array" then (b + e | unique)
+        else b end;
+      (.[0] as $base | .[1] as $repo |
+       ($repo.agents[$ak].clientConfig // {}) as $extra |
+       append_only_merge($base; $extra)
+      )' "$CLAUDE_WORK_DIR/client-config.json" "$CFG_PATH" > "$TMP_MERGE"; then
+      mv "$TMP_MERGE" "$CLAUDE_WORK_DIR/client-config.json"
+      cp "$CLAUDE_WORK_DIR/client-config.json" "/workspace/client-config.json" 2>/dev/null || true
+      echo "✓ Appended repo clientConfig for agent: $AGENT_KEY"
+    else
+      echo "⚠️ Failed to merge repo cto-config.json clientConfig into client-config.json"
+    fi
+    break
+  fi
+done
 
 # Start background token refresh process (every 45 minutes to stay ahead of 1-hour expiry)
 (

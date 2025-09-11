@@ -219,6 +219,11 @@ pub struct AgentDefinition {
     /// Tool configuration for this agent
     #[serde(default)]
     pub tools: Option<AgentTools>,
+
+    /// Optional fully-formed client-config.json content for this agent
+    /// If provided, controller will embed it verbatim (no server/tool inference in code)
+    #[serde(default, rename = "clientConfig")]
+    pub client_config: Option<serde_json::Value>,
 }
 
 /// Tool configuration for an agent
@@ -253,6 +258,18 @@ pub struct LocalServerConfig {
     /// Tools available from this server
     #[serde(default)]
     pub tools: Vec<String>,
+
+    /// Optional executable for this MCP server (e.g., "npx")
+    #[serde(default)]
+    pub command: Option<String>,
+
+    /// Optional args for the MCP server command
+    #[serde(default)]
+    pub args: Option<Vec<String>>,
+
+    /// Optional working directory hint for clients
+    #[serde(default, rename = "workingDirectory")]
+    pub working_directory: Option<String>,
 }
 
 impl Default for CleanupConfig {
