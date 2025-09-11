@@ -677,6 +677,17 @@ echo "Starting Claude execution (stream-json via FIFO)..."
 # Check if system prompt file exists and add to command if available
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
+# Add MCP configuration if available
+if [ -f "/workspace/.mcp.json" ]; then
+    echo "✓ Adding MCP configuration from /workspace/.mcp.json to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/.mcp.json"
+elif [ -f "/workspace/docs/.mcp.json" ]; then
+    echo "✓ Adding MCP configuration from /workspace/docs/.mcp.json to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/docs/.mcp.json"
+else
+    echo "⚠️ No MCP configuration file found, MCP servers will not be available"
+fi
+
 # Look for agent-specific system prompt file from agents ConfigMap
 # The system prompt should be in the agents ConfigMap if configured
 if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
