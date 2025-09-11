@@ -311,7 +311,7 @@ if [ -f "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" ]; then
 
   # Robust extraction: base64-encode each task to keep one line per task, then decode fields
   gen_count=0
-  jq -c '.tasks[]? | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" \
+  jq -c '.[].tasks[]? | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" \
     | while IFS= read -r row; do
       _decode() { printf '%s' "$row" | base64 -d | jq -r "$1"; }
       task_id=$(_decode '.id')
