@@ -473,8 +473,8 @@ if [ -f "/task-files/mcp.json" ]; then
   # Fix MCP configuration for container environment
   if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
     echo "🔧 Updating MCP configuration for container environment..."
-    # Update TASK_MASTER_PROJECT_ROOT to container path
-    sed -i 's|/Users/jonathonfritz/code/work-projects/5dlabs/cto/agent-remediation-loop|/workspace/docs|g' "$CLAUDE_WORK_DIR/.mcp.json"
+    # Update TASK_MASTER_PROJECT_ROOT to container path (generic replacement)
+    sed -i 's|"TASK_MASTER_PROJECT_ROOT"[[:space:]]*:[[:space:]]*"[^"]*"|"TASK_MASTER_PROJECT_ROOT": "/workspace/docs"|g' "$CLAUDE_WORK_DIR/.mcp.json"
     echo "✓ Updated MCP configuration paths for container environment"
   fi
 else
