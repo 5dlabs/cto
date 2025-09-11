@@ -133,14 +133,7 @@ agents:
 
       When working on documentation tasks, ensure every deliverable is thorough, well-structured, and enables future development. Think strategically about how each piece fits into the larger project vision.
     tools:
-      remote: ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"]
-      localServers:
-        filesystem:
-          enabled: true
-          tools: ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
-        git:
-          enabled: true
-          tools: ["git_status", "git_diff", "git_log", "git_show"]
+      remote: ["rustdocs_query_rust_docs"]
 
   rex:
     name: "Rex"
