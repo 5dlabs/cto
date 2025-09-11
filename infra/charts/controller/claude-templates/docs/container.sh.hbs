@@ -468,15 +468,19 @@ echo "✓ Workspace validated"
 
 # Copy MCP servers config for Toolman if provided
 if [ -f "/task-files/mcp.json" ]; then
-  cp "/task-files/mcp.json" "$CLAUDE_WORK_DIR/.mcp.json" && echo "✓ Copied mcp.json to .mcp.json (project scope)" || echo "⚠️ mcp.json copy failed"
+  # Copy to both working directory (project scope) and workspace root (local scope)
+  cp "/task-files/mcp.json" "$CLAUDE_WORK_DIR/.mcp.json" && echo "✓ Copied mcp.json to $CLAUDE_WORK_DIR/.mcp.json (project scope)" || echo "⚠️ mcp.json copy to working dir failed"
+  cp "/task-files/mcp.json" "/workspace/.mcp.json" && echo "✓ Copied mcp.json to /workspace/.mcp.json (local scope)" || echo "⚠️ mcp.json copy to workspace root failed"
 
-  # Fix MCP configuration for container environment
-  if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
-    echo "🔧 Updating MCP configuration for container environment..."
-    # Update TASK_MASTER_PROJECT_ROOT to container path (generic replacement)
-    sed -i 's|"TASK_MASTER_PROJECT_ROOT"[[:space:]]*:[[:space:]]*"[^"]*"|"TASK_MASTER_PROJECT_ROOT": "/workspace/docs"|g' "$CLAUDE_WORK_DIR/.mcp.json"
-    echo "✓ Updated MCP configuration paths for container environment"
-  fi
+  # Fix MCP configuration for container environment in both locations
+  for mcp_file in "$CLAUDE_WORK_DIR/.mcp.json" "/workspace/.mcp.json"; do
+    if [ -f "$mcp_file" ]; then
+      echo "🔧 Updating MCP configuration for container environment: $mcp_file"
+      # Update TASK_MASTER_PROJECT_ROOT to container path (generic replacement)
+      sed -i 's|"TASK_MASTER_PROJECT_ROOT"[[:space:]]*:[[:space:]]*"[^"]*"|"TASK_MASTER_PROJECT_ROOT": "/workspace/docs"|g' "$mcp_file"
+      echo "✓ Updated MCP configuration paths in $mcp_file"
+    fi
+  done
 else
   echo "ℹ️ No mcp.json provided; Toolman MCP may not be configured"
 fi
@@ -575,12 +579,26 @@ if [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
 else
   echo "[client-config] MISSING at $CLAUDE_WORK_DIR/client-config.json"
 fi
-if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
-  echo "[mcp] path: $CLAUDE_WORK_DIR/.mcp.json"
-  echo "[mcp] first lines:"; head -n 20 "$CLAUDE_WORK_DIR/.mcp.json" | sed 's/^/[mcp] /'
-else
-  echo "[mcp] MISSING at $CLAUDE_WORK_DIR/.mcp.json"
-fi
+# Check MCP files in both locations
+echo "[mcp] Checking MCP configuration files..."
+for mcp_location in "/workspace/.mcp.json" "$CLAUDE_WORK_DIR/.mcp.json"; do
+  if [ -f "$mcp_location" ]; then
+    echo "[mcp] ✓ FOUND: $mcp_location"
+    echo "[mcp] File size: $(wc -c < "$mcp_location") bytes"
+    echo "[mcp] First 10 lines:"; head -n 10 "$mcp_location" | sed 's/^/[mcp]   /'
+    echo "[mcp] Permissions: $(ls -la "$mcp_location")"
+  else
+    echo "[mcp] ✗ MISSING: $mcp_location"
+  fi
+done
+
+# Check current working directory for Claude execution
+echo "[mcp] Current working directory: $(pwd)"
+echo "[mcp] Claude will be launched from: $(pwd)"
+echo "[mcp] According to MCP scope hierarchy:"
+echo "[mcp]   1. Local scope (current dir): $(pwd)/.mcp.json"
+echo "[mcp]   2. Project scope (working dir): $CLAUDE_WORK_DIR/.mcp.json"
+echo "[mcp]   3. User scope: ~/.config/claude-code/.mcp.json"
 echo '=== END CONFIG DIAGNOSTICS ==='
 
 # Verify client-config.json is available in Claude's working directory
@@ -713,6 +731,12 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
       rm -f "$FIFO_PATH" 2>/dev/null || true
       mkfifo "$FIFO_PATH"
       chmod 666 "$FIFO_PATH" || true
+      
+      # Ensure Claude runs from workspace root for proper MCP scope resolution
+      cd /workspace
+      echo "🔍 DEBUG: Launching Claude from directory: $(pwd)"
+      echo "🔍 DEBUG: MCP file check: $([ -f '.mcp.json' ] && echo 'FOUND' || echo 'MISSING') at $(pwd)/.mcp.json"
+      
       # Start Claude (reader) first to avoid blocking on writer open
       $CLAUDE_CMD < "$FIFO_PATH" &
       CLAUDE_PID=$!
