@@ -214,44 +214,42 @@ impl DocsTemplateGenerator {
 
             // 2) Convert tools → client-config.json
             if let Some(tools) = &agent_cfg.tools {
-                // remoteTools
+                // remoteTools - tools.remote is Vec<String>, not Option
                 let remote_tools: Value = json!(tools.remote);
 
                 // localServers (generic: include only servers marked enabled)
                 let mut local_servers_obj = serde_json::Map::new();
-                if let Some(ls) = &tools.local_servers {
-                    // filesystem
-                    let fs = &ls.filesystem;
-                    if fs.enabled {
+                if let Some(ref ls) = tools.local_servers {
+                    // filesystem - check if enabled before accessing fields
+                    if ls.filesystem.enabled {
                         let mut fs_obj = serde_json::Map::new();
-                        if !fs.tools.is_empty() {
-                            fs_obj.insert("tools".to_string(), json!(fs.tools));
+                        if !ls.filesystem.tools.is_empty() {
+                            fs_obj.insert("tools".to_string(), json!(ls.filesystem.tools));
                         }
-                        if let Some(cmd) = &fs.command {
+                        if let Some(cmd) = &ls.filesystem.command {
                             fs_obj.insert("command".to_string(), json!(cmd));
                         }
-                        if let Some(args) = &fs.args {
+                        if let Some(args) = &ls.filesystem.args {
                             fs_obj.insert("args".to_string(), json!(args));
                         }
-                        if let Some(wd) = &fs.working_directory {
+                        if let Some(wd) = &ls.filesystem.working_directory {
                             fs_obj.insert("workingDirectory".to_string(), json!(wd));
                         }
                         local_servers_obj.insert("filesystem".to_string(), Value::Object(fs_obj));
                     }
-                    // git
-                    let g = &ls.git;
-                    if g.enabled {
+                    // git - check if enabled before accessing fields
+                    if ls.git.enabled {
                         let mut g_obj = serde_json::Map::new();
-                        if !g.tools.is_empty() {
-                            g_obj.insert("tools".to_string(), json!(g.tools));
+                        if !ls.git.tools.is_empty() {
+                            g_obj.insert("tools".to_string(), json!(ls.git.tools));
                         }
-                        if let Some(cmd) = &g.command {
+                        if let Some(cmd) = &ls.git.command {
                             g_obj.insert("command".to_string(), json!(cmd));
                         }
-                        if let Some(args) = &g.args {
+                        if let Some(args) = &ls.git.args {
                             g_obj.insert("args".to_string(), json!(args));
                         }
-                        if let Some(wd) = &g.working_directory {
+                        if let Some(wd) = &ls.git.working_directory {
                             g_obj.insert("workingDirectory".to_string(), json!(wd));
                         }
                         local_servers_obj.insert("git".to_string(), Value::Object(g_obj));
