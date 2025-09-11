@@ -496,16 +496,7 @@ else
   echo "⚠️ client-config.json not found - MCP client may not be configured"
 fi
 
-# Set up MCP configuration
-echo "Setting up MCP configuration..."
-
-# Copy MCP configuration from ConfigMap to project root (project scope)
-if [ -f "/task-files/mcp.json" ]; then
-  cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
-  echo "✓ Copied mcp.json to .mcp.json (project scope)"
-else
-  echo "⚠️  mcp.json template not found"
-fi
+# MCP configuration already handled above with path fixes
 
 # Enterprise managed settings are mounted directly from ConfigMap
 echo "=== ENTERPRISE MANAGED SETTINGS ==="
