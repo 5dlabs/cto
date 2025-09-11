@@ -39,6 +39,12 @@ impl DocsTemplateGenerator {
             Self::generate_docs_prompt(docs_run)?,
         );
 
+        // Add MCP servers config to enable Toolman (reuse code/mcp.json.hbs)
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config()?,
+        );
+
         // Agent-centric ToolMan config for docs: generate base client-config.json
         // (Repo-specific cto-config.json can append at runtime in the container script.)
         templates.insert(
@@ -180,6 +186,11 @@ impl DocsTemplateGenerator {
         handlebars.render("docs_prompt", &context).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!("Failed to render docs prompt: {e}"))
         })
+    }
+
+    fn generate_mcp_config() -> Result<String> {
+        // Reuse the code template to avoid duplication in the templates ConfigMap
+        Self::load_template("code/mcp.json.hbs")
     }
 
     /// Generate agent-centric client-config.json for DocsRun.
