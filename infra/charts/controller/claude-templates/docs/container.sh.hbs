@@ -482,9 +482,10 @@ export GITHUB_APP="{{github_app}}"
 
 # Optional: copy agent-centric ToolMan client config (base from Helm/controller)
 if [ -f "/task-files/client-config.json" ]; then
-  cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy to working dir failed"
-  cp "/task-files/client-config.json" "/workspace/client-config.json" && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
+  cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied → $CLAUDE_WORK_DIR/client-config.json" || echo "❌ client-config.json copy to working dir failed"
+  cp "/task-files/client-config.json" "/workspace/client-config.json" && echo "✓ client-config.json copied → /workspace/client-config.json" || echo "❌ client-config.json copy to workspace failed"
   export MCP_CLIENT_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
+  echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
 else
   echo "ℹ️ client-config.json not provided by controller; proceeding without MCP client config"
 fi
@@ -546,6 +547,26 @@ echo "✓ Started background token refresh process (PID: $TOKEN_REFRESH_PID)"
 
 # Ensure we kill the background process on exit
 trap "kill $TOKEN_REFRESH_PID 2>/dev/null || true" EXIT
+
+# Config diagnostics (visibility for MCP + client config)
+echo '=== CONFIG DIAGNOSTICS ==='
+echo "Working directory: $CLAUDE_WORK_DIR"
+echo "Listing /task-files (ConfigMap mount):"
+ls -la /task-files | sed 's/^/[task-files] /'
+echo "MCP_CLIENT_CONFIG: ${MCP_CLIENT_CONFIG:-<unset>}"
+if [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
+  echo "[client-config] path: $CLAUDE_WORK_DIR/client-config.json"
+  echo "[client-config] summary:"; jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers.keys=" + ((.localServers // {} | keys) | join(","))' "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null || echo "  (not valid JSON)"
+else
+  echo "[client-config] MISSING at $CLAUDE_WORK_DIR/client-config.json"
+fi
+if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
+  echo "[mcp] path: $CLAUDE_WORK_DIR/.mcp.json"
+  echo "[mcp] first lines:"; head -n 20 "$CLAUDE_WORK_DIR/.mcp.json" | sed 's/^/[mcp] /'
+else
+  echo "[mcp] MISSING at $CLAUDE_WORK_DIR/.mcp.json"
+fi
+echo '=== END CONFIG DIAGNOSTICS ==='
 
 # Claude execution
 echo "Starting Claude execution (stream-json via FIFO)..."
