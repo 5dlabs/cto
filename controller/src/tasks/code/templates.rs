@@ -190,15 +190,16 @@ impl CodeTemplateGenerator {
             .agents
             .values()
             .find(|a| a.github_app == github_app)
-            .ok_or_else(|| crate::tasks::types::Error::ConfigError(format!(
-                "Agent config not found for githubApp='{}' in controller config.", github_app
-            )))?;
+            .ok_or_else(|| {
+                crate::tasks::types::Error::ConfigError(
+                    format!("Agent config not found for githubApp='{github_app}' in controller config."),
+                )
+            })?;
 
         let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
-            crate::tasks::types::Error::ConfigError(format!(
-                "Missing clientConfig for agent githubApp='{}'. Define agents.<agent>.clientConfig in Helm values.",
-                github_app
-            ))
+            crate::tasks::types::Error::ConfigError(
+                format!("Missing clientConfig for agent githubApp='{github_app}'. Define agents.<agent>.clientConfig in Helm values."),
+            )
         })?;
 
         to_string_pretty(client_cfg).map_err(|e| {
@@ -396,6 +397,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Extract agent name from GitHub app identifier
+    #[allow(dead_code)]
     fn extract_agent_name_from_github_app(github_app: &str) -> Result<String> {
         if github_app.is_empty() {
             return Err(crate::tasks::types::Error::ConfigError(
@@ -422,6 +424,7 @@ impl CodeTemplateGenerator {
     }
 
     /// Get agent tool configuration from controller config
+    #[allow(dead_code)]
     fn get_agent_tools(
         agent_name: &str,
         config: &ControllerConfig,
@@ -440,10 +443,22 @@ impl CodeTemplateGenerator {
                             filesystem: LocalServerConfig {
                                 enabled: local_servers_config.filesystem.enabled,
                                 tools: local_servers_config.filesystem.tools.clone(),
+                                command: local_servers_config.filesystem.command.clone(),
+                                args: local_servers_config.filesystem.args.clone(),
+                                working_directory: local_servers_config
+                                    .filesystem
+                                    .working_directory
+                                    .clone(),
                             },
                             git: LocalServerConfig {
                                 enabled: local_servers_config.git.enabled,
                                 tools: local_servers_config.git.tools.clone(),
+                                command: local_servers_config.git.command.clone(),
+                                args: local_servers_config.git.args.clone(),
+                                working_directory: local_servers_config
+                                    .git
+                                    .working_directory
+                                    .clone(),
                             },
                         });
 
@@ -474,6 +489,9 @@ impl CodeTemplateGenerator {
                         "search_files".to_string(),
                         "directory_tree".to_string(),
                     ],
+                    command: None,
+                    args: None,
+                    working_directory: None,
                 },
                 git: LocalServerConfig {
                     enabled: true,
@@ -483,6 +501,9 @@ impl CodeTemplateGenerator {
                         "git_log".to_string(),
                         "git_show".to_string(),
                     ],
+                    command: None,
+                    args: None,
+                    working_directory: None,
                 },
             }),
         })
@@ -620,10 +641,16 @@ mod tests {
                 filesystem: LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
+                    command: None,
+                    args: None,
+                    working_directory: None,
                 },
                 git: LocalServerConfig {
                     enabled: false,
                     tools: vec![],
+                    command: None,
+                    args: None,
+                    working_directory: None,
                 },
             }),
         };
@@ -633,6 +660,7 @@ mod tests {
             AgentDefinition {
                 github_app: "Test-App".to_string(),
                 tools: Some(agent_tools.clone()),
+                client_config: None,
             },
         );
 
@@ -643,12 +671,22 @@ mod tests {
         // But we can test the logic by mocking or by using a known agent
         let known_code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
 
-        // Add rex agent to config
+        // Add rex agent to config with explicit clientConfig
         config.agents.insert(
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
                 tools: Some(agent_tools),
+                client_config: Some(serde_json::json!({
+                    "remoteTools": ["memory_create_entities", "brave_web_search"],
+                    "localServers": {
+                        "filesystem": {
+                            "command": "npx",
+                            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+                            "tools": ["read_file", "write_file"]
+                        }
+                    }
+                })),
             },
         );
 
@@ -670,7 +708,7 @@ mod tests {
         // Verify local servers
         let local_servers = client_config["localServers"].as_object().unwrap();
         assert!(local_servers.contains_key("filesystem"));
-        assert!(!local_servers.contains_key("git")); // git should be disabled
+        assert!(!local_servers.contains_key("git")); // git not provided in clientConfig
 
         let filesystem = &local_servers["filesystem"];
         assert_eq!(filesystem["command"], "npx");

@@ -191,15 +191,16 @@ impl DocsTemplateGenerator {
             .agents
             .values()
             .find(|a| a.github_app == github_app)
-            .ok_or_else(|| crate::tasks::types::Error::ConfigError(format!(
-                "Agent config not found for githubApp='{}' in controller config.", github_app
-            )))?;
+            .ok_or_else(|| {
+                crate::tasks::types::Error::ConfigError(
+                    format!("Agent config not found for githubApp='{github_app}' in controller config."),
+                )
+            })?;
 
         let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
-            crate::tasks::types::Error::ConfigError(format!(
-                "Missing clientConfig for agent githubApp='{}'. Define agents.<agent>.clientConfig in Helm values.",
-                github_app
-            ))
+            crate::tasks::types::Error::ConfigError(
+                format!("Missing clientConfig for agent githubApp='{github_app}'. Define agents.<agent>.clientConfig in Helm values."),
+            )
         })?;
 
         to_string_pretty(client_cfg).map_err(|e| {
