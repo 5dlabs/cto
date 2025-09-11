@@ -103,6 +103,10 @@ data:
       {{- range $key, $agent := .Values.agents }}
       {{ $key }}:
         githubApp: {{ $agent.githubApp | quote }}
+        {{- if $agent.tools }}
+        tools:
+{{ toYaml $agent.tools | nindent 10 }}
+        {{- end }}
         {{- if $agent.clientConfig }}
         clientConfig:
 {{ toYaml $agent.clientConfig | nindent 10 }}
