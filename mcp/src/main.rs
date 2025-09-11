@@ -23,25 +23,29 @@ struct AgentConfig {
     github_app: String,
     cli: String,
     model: String,
+    #[serde(default)]
     #[allow(dead_code)]
-    tools: AgentTools,
+    tools: Option<AgentTools>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 struct AgentTools {
+    #[serde(default)]
     #[allow(dead_code)]
-    remote: Vec<String>,
-    #[serde(rename = "localServers")]
+    remote: Option<Vec<String>>,
+    #[serde(default, rename = "localServers")]
     #[allow(dead_code)]
-    local_servers: LocalServerConfig,
+    local_servers: Option<LocalServerConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 struct LocalServerConfig {
+    #[serde(default)]
     #[allow(dead_code)]
-    filesystem: ServerConfig,
+    filesystem: Option<ServerConfig>,
+    #[serde(default)]
     #[allow(dead_code)]
-    git: ServerConfig,
+    git: Option<ServerConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -640,18 +644,42 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         config.defaults.docs.github_app.clone()
     };
 
-    // Handle model - use provided value or config default
-    let model = arguments
-        .get("model")
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .unwrap_or_else(|| {
+    // Resolve selected agent key for precedence decisions
+    let selected_agent_key: Option<String> = if let Some(agent) = agent_name {
+        Some(agent.to_string())
+    } else {
+        // Find agent whose github_app matches the docs default github app
+        config.agents.iter().find_map(|(k, v)| {
+            if v.github_app == github_app {
+                Some(k.clone())
+            } else {
+                None
+            }
+        })
+    };
+
+    // Handle model precedence: explicit arg > agent model > docs default model (deprecated)
+    let model = if let Some(m) = arguments.get("model").and_then(|v| v.as_str()) {
+        eprintln!("🐛 DEBUG: Using model from arguments: {m}");
+        m.to_string()
+    } else if let Some(agent_key) = &selected_agent_key {
+        let agent_model = &config.agents[agent_key].model;
+        if !agent_model.is_empty() {
+            eprintln!("🐛 DEBUG: Using agent-level model for {agent_key}: {agent_model}");
+            agent_model.clone()
+        } else {
             eprintln!(
-                "🐛 DEBUG: Using docs default model: {}",
-                config.defaults.docs.model
+                "⚠️ INFO: Agent '{agent_key}' has empty model; falling back to defaults.docs.model (deprecated)"
             );
             config.defaults.docs.model.clone()
-        });
+        }
+    } else {
+        eprintln!(
+            "⚠️ INFO: No agent resolved; using defaults.docs.model (deprecated): {}",
+            config.defaults.docs.model
+        );
+        config.defaults.docs.model.clone()
+    };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
