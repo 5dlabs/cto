@@ -96,3 +96,44 @@ data:
       completedJobDelayMinutes: {{ .Values.cleanup.completedJobDelayMinutes | default 5 }}
       failedJobDelayMinutes: {{ .Values.cleanup.failedJobDelayMinutes | default 60 }}
       deleteConfigMap: {{ .Values.cleanup.deleteConfigMap | default true }}
+
+    # Agent tool profiles (base configuration per agent)
+    {{- if .Values.agents }}
+    agents:
+      {{- range $key, $agent := .Values.agents }}
+      {{ $key }}:
+        githubApp: {{ $agent.githubApp | quote }}
+        {{- if $agent.tools }}
+        tools:
+          {{- if $agent.tools.remote }}
+          remote:
+          {{- range $tool := $agent.tools.remote }}
+            - {{ $tool | quote }}
+          {{- end }}
+          {{- else }}
+          remote: []
+          {{- end }}
+          localServers:
+            filesystem:
+              enabled: {{ $agent.tools.localServers.filesystem.enabled | default false }}
+              tools:
+              {{- if $agent.tools.localServers.filesystem.tools }}
+              {{- range $t := $agent.tools.localServers.filesystem.tools }}
+                - {{ $t | quote }}
+              {{- end }}
+              {{- else }}
+                []
+              {{- end }}
+            git:
+              enabled: {{ $agent.tools.localServers.git.enabled | default false }}
+              tools:
+              {{- if $agent.tools.localServers.git.tools }}
+              {{- range $t := $agent.tools.localServers.git.tools }}
+                - {{ $t | quote }}
+              {{- end }}
+              {{- else }}
+                []
+              {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
