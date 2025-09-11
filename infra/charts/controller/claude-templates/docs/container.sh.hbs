@@ -764,6 +764,8 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
         fi
         echo ""
 
+      # Change back to CLAUDE_WORK_DIR to find prompt.md
+      cd "$CLAUDE_WORK_DIR"
       if [ -f "prompt.md" ]; then
           INITIAL_TEXT=$(jq -Rs . < "prompt.md")
           if printf '{"text":%s}\n' "$INITIAL_TEXT" | \
