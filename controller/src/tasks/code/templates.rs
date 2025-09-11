@@ -191,9 +191,9 @@ impl CodeTemplateGenerator {
             .values()
             .find(|a| a.github_app == github_app)
             .ok_or_else(|| {
-                crate::tasks::types::Error::ConfigError(
-                    format!("Agent config not found for githubApp='{github_app}' in controller config."),
-                )
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Agent config not found for githubApp='{github_app}' in controller config."
+                ))
             })?;
 
         let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
