@@ -253,6 +253,18 @@ pub struct LocalServerConfig {
     /// Tools available from this server
     #[serde(default)]
     pub tools: Vec<String>,
+
+    /// Optional executable for this MCP server (e.g., "npx")
+    #[serde(default)]
+    pub command: Option<String>,
+
+    /// Optional args for the MCP server command
+    #[serde(default)]
+    pub args: Option<Vec<String>>,
+
+    /// Optional working directory hint for clients
+    #[serde(default, rename = "workingDirectory")]
+    pub working_directory: Option<String>,
 }
 
 impl Default for CleanupConfig {

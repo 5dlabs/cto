@@ -198,28 +198,60 @@ impl CodeTemplateGenerator {
             "localServers": {}
         });
 
-        // Add local servers based on agent configuration
+        // Add local servers based on agent configuration (prefer Helm-provided command/args)
         if let Some(local_servers) = agent_tools.local_servers {
             let mut local_servers_obj = serde_json::Map::new();
 
-            // Add filesystem server if enabled
+            // Filesystem server
             if local_servers.filesystem.enabled {
+                let fs_cmd = local_servers
+                    .filesystem
+                    .command
+                    .clone()
+                    .unwrap_or_else(|| "npx".to_string());
+                let fs_args = local_servers
+                    .filesystem
+                    .args
+                    .clone()
+                    .unwrap_or_else(|| vec![
+                        "-y".to_string(),
+                        "@modelcontextprotocol/server-filesystem".to_string(),
+                        "/workspace".to_string(),
+                    ]);
+                let fs_workdir = local_servers
+                    .filesystem
+                    .working_directory
+                    .clone()
+                    .unwrap_or_else(|| "project_root".to_string());
+
                 let filesystem_server = json!({
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+                    "command": fs_cmd,
+                    "args": fs_args,
                     "tools": local_servers.filesystem.tools,
-                    "workingDirectory": "project_root"
+                    "workingDirectory": fs_workdir
                 });
                 local_servers_obj.insert("filesystem".to_string(), filesystem_server);
             }
 
-            // Add git server if enabled
+            // Git server
             if local_servers.git.enabled {
+                let git_cmd = local_servers.git.command.clone().unwrap_or_else(|| "npx".to_string());
+                let git_args = local_servers.git.args.clone().unwrap_or_else(|| vec![
+                    "-y".to_string(),
+                    "@modelcontextprotocol/server-git".to_string(),
+                    "/workspace".to_string(),
+                ]);
+                let git_workdir = local_servers
+                    .git
+                    .working_directory
+                    .clone()
+                    .unwrap_or_else(|| "project_root".to_string());
+
                 let git_server = json!({
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-git", "/workspace"],
+                    "command": git_cmd,
+                    "args": git_args,
                     "tools": local_servers.git.tools,
-                    "workingDirectory": "project_root"
+                    "workingDirectory": git_workdir
                 });
                 local_servers_obj.insert("git".to_string(), git_server);
             }
