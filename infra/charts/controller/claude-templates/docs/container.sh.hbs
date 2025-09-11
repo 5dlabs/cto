@@ -466,6 +466,13 @@ fi
 
 echo "✓ Workspace validated"
 
+# Copy MCP servers config for Toolman if provided
+if [ -f "/task-files/mcp.json" ]; then
+  cp "/task-files/mcp.json" "$CLAUDE_WORK_DIR/.mcp.json" && echo "✓ Copied mcp.json to .mcp.json (project scope)" || echo "⚠️ mcp.json copy failed"
+else
+  echo "ℹ️ No mcp.json provided; Toolman MCP may not be configured"
+fi
+
 # Environment setup
 export SERVICE_NAME="{{service_name}}"
 export SOURCE_BRANCH="{{source_branch}}"

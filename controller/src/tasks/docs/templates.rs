@@ -39,6 +39,12 @@ impl DocsTemplateGenerator {
             Self::generate_docs_prompt(docs_run)?,
         );
 
+        // Add MCP servers config to enable Toolman (reuse code/mcp.json.hbs)
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config()?,
+        );
+
         // Agent-centric ToolMan config for docs: generate base client-config.json
         // (Repo-specific cto-config.json can append at runtime in the container script.)
         templates.insert(
@@ -182,30 +188,95 @@ impl DocsTemplateGenerator {
         })
     }
 
-    /// Generate agent-centric client-config.json for DocsRun from Helm (verbatim).
+    fn generate_mcp_config() -> Result<String> {
+        // Reuse the code template to avoid duplication in the templates ConfigMap
+        Self::load_template("code/mcp.json.hbs")
+    }
+
+    /// Generate agent-centric client-config.json for DocsRun.
+    /// Precedence:
+    /// 1) agents.<agent>.clientConfig (verbatim pass-through)
+    /// 2) agents.<agent>.tools (convert to client-config.json structure generically)
+    /// 3) fallback to empty object {}
     fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
-        use serde_json::to_string_pretty;
+        use serde_json::{json, to_string_pretty, Value};
 
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
-        let agent_cfg = config
-            .agents
-            .values()
-            .find(|a| a.github_app == github_app)
-            .ok_or_else(|| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Agent config not found for githubApp='{github_app}' in controller config."
-                ))
-            })?;
+        if let Some(agent_cfg) = config.agents.values().find(|a| a.github_app == github_app) {
+            // 1) Verbatim clientConfig
+            if let Some(client_cfg) = &agent_cfg.client_config {
+                return to_string_pretty(client_cfg).map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to serialize clientConfig: {e}"
+                    ))
+                });
+            }
 
-        let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
-            crate::tasks::types::Error::ConfigError(
-                format!("Missing clientConfig for agent githubApp='{github_app}'. Define agents.<agent>.clientConfig in Helm values."),
-            )
-        })?;
+            // 2) Convert tools → client-config.json
+            if let Some(tools) = &agent_cfg.tools {
+                // remoteTools - tools.remote is Vec<String>, not Option
+                let remote_tools: Value = json!(tools.remote);
 
-        to_string_pretty(client_cfg).map_err(|e| {
+                // localServers (generic: include only servers marked enabled)
+                let mut local_servers_obj = serde_json::Map::new();
+                if let Some(ref ls) = tools.local_servers {
+                    // filesystem - check if enabled before accessing fields
+                    if ls.filesystem.enabled {
+                        let mut fs_obj = serde_json::Map::new();
+                        if !ls.filesystem.tools.is_empty() {
+                            fs_obj.insert("tools".to_string(), json!(ls.filesystem.tools));
+                        }
+                        if let Some(cmd) = &ls.filesystem.command {
+                            fs_obj.insert("command".to_string(), json!(cmd));
+                        }
+                        if let Some(args) = &ls.filesystem.args {
+                            fs_obj.insert("args".to_string(), json!(args));
+                        }
+                        if let Some(wd) = &ls.filesystem.working_directory {
+                            fs_obj.insert("workingDirectory".to_string(), json!(wd));
+                        }
+                        local_servers_obj.insert("filesystem".to_string(), Value::Object(fs_obj));
+                    }
+                    // git - check if enabled before accessing fields
+                    if ls.git.enabled {
+                        let mut g_obj = serde_json::Map::new();
+                        if !ls.git.tools.is_empty() {
+                            g_obj.insert("tools".to_string(), json!(ls.git.tools));
+                        }
+                        if let Some(cmd) = &ls.git.command {
+                            g_obj.insert("command".to_string(), json!(cmd));
+                        }
+                        if let Some(args) = &ls.git.args {
+                            g_obj.insert("args".to_string(), json!(args));
+                        }
+                        if let Some(wd) = &ls.git.working_directory {
+                            g_obj.insert("workingDirectory".to_string(), json!(wd));
+                        }
+                        local_servers_obj.insert("git".to_string(), Value::Object(g_obj));
+                    }
+                }
+
+                let client = Value::Object(
+                    vec![
+                        ("remoteTools".to_string(), remote_tools),
+                        ("localServers".to_string(), Value::Object(local_servers_obj)),
+                    ]
+                    .into_iter()
+                    .collect(),
+                );
+
+                return to_string_pretty(&client).map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to serialize tools-based clientConfig: {e}"
+                    ))
+                });
+            }
+        }
+
+        // 3) No clientConfig/tools provided → minimal JSON object
+        to_string_pretty(&json!({})).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to serialize clientConfig: {e}"
+                "Failed to serialize empty clientConfig: {e}"
             ))
         })
     }
