@@ -183,86 +183,27 @@ impl CodeTemplateGenerator {
     }
 
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
-        use serde_json::{json, Value};
+        use serde_json::to_string_pretty;
 
-        // Extract agent name from GitHub app
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let agent_name = Self::extract_agent_name_from_github_app(github_app)?;
+        let agent_cfg = config
+            .agents
+            .values()
+            .find(|a| a.github_app == github_app)
+            .ok_or_else(|| crate::tasks::types::Error::ConfigError(format!(
+                "Agent config not found for githubApp='{}' in controller config.", github_app
+            )))?;
 
-        // Get agent tool configuration from controller config
-        let agent_tools = Self::get_agent_tools(&agent_name, config)?;
-
-        // Build the client-config.json structure
-        let mut client_config = json!({
-            "remoteTools": agent_tools.remote,
-            "localServers": {}
-        });
-
-        // Add local servers based on agent configuration (prefer Helm-provided command/args)
-        if let Some(local_servers) = agent_tools.local_servers {
-            let mut local_servers_obj = serde_json::Map::new();
-
-            // Filesystem server
-            if local_servers.filesystem.enabled {
-                let fs_cmd = local_servers
-                    .filesystem
-                    .command
-                    .clone()
-                    .unwrap_or_else(|| "npx".to_string());
-                let fs_args = local_servers
-                    .filesystem
-                    .args
-                    .clone()
-                    .unwrap_or_else(|| vec![
-                        "-y".to_string(),
-                        "@modelcontextprotocol/server-filesystem".to_string(),
-                        "/workspace".to_string(),
-                    ]);
-                let fs_workdir = local_servers
-                    .filesystem
-                    .working_directory
-                    .clone()
-                    .unwrap_or_else(|| "project_root".to_string());
-
-                let filesystem_server = json!({
-                    "command": fs_cmd,
-                    "args": fs_args,
-                    "tools": local_servers.filesystem.tools,
-                    "workingDirectory": fs_workdir
-                });
-                local_servers_obj.insert("filesystem".to_string(), filesystem_server);
-            }
-
-            // Git server
-            if local_servers.git.enabled {
-                let git_cmd = local_servers.git.command.clone().unwrap_or_else(|| "npx".to_string());
-                let git_args = local_servers.git.args.clone().unwrap_or_else(|| vec![
-                    "-y".to_string(),
-                    "@modelcontextprotocol/server-git".to_string(),
-                    "/workspace".to_string(),
-                ]);
-                let git_workdir = local_servers
-                    .git
-                    .working_directory
-                    .clone()
-                    .unwrap_or_else(|| "project_root".to_string());
-
-                let git_server = json!({
-                    "command": git_cmd,
-                    "args": git_args,
-                    "tools": local_servers.git.tools,
-                    "workingDirectory": git_workdir
-                });
-                local_servers_obj.insert("git".to_string(), git_server);
-            }
-
-            client_config["localServers"] = Value::Object(local_servers_obj);
-        }
-
-        // Serialize to pretty-printed JSON
-        serde_json::to_string_pretty(&client_config).map_err(|e| {
+        let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to serialize client-config.json: {e}"
+                "Missing clientConfig for agent githubApp='{}'. Define agents.<agent>.clientConfig in Helm values.",
+                github_app
+            ))
+        })?;
+
+        to_string_pretty(client_cfg).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize clientConfig: {e}"
             ))
         })
     }

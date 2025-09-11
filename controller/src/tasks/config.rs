@@ -219,6 +219,11 @@ pub struct AgentDefinition {
     /// Tool configuration for this agent
     #[serde(default)]
     pub tools: Option<AgentTools>,
+
+    /// Optional fully-formed client-config.json content for this agent
+    /// If provided, controller will embed it verbatim (no server/tool inference in code)
+    #[serde(default, rename = "clientConfig")]
+    pub client_config: Option<serde_json::Value>,
 }
 
 /// Tool configuration for an agent

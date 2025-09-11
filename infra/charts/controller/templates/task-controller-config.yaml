@@ -103,37 +103,9 @@ data:
       {{- range $key, $agent := .Values.agents }}
       {{ $key }}:
         githubApp: {{ $agent.githubApp | quote }}
-        {{- if $agent.tools }}
-        tools:
-          {{- if $agent.tools.remote }}
-          remote:
-          {{- range $tool := $agent.tools.remote }}
-            - {{ $tool | quote }}
-          {{- end }}
-          {{- else }}
-          remote: []
-          {{- end }}
-          localServers:
-            filesystem:
-              enabled: {{ $agent.tools.localServers.filesystem.enabled | default false }}
-              tools:
-              {{- if $agent.tools.localServers.filesystem.tools }}
-              {{- range $t := $agent.tools.localServers.filesystem.tools }}
-                - {{ $t | quote }}
-              {{- end }}
-              {{- else }}
-                []
-              {{- end }}
-            git:
-              enabled: {{ $agent.tools.localServers.git.enabled | default false }}
-              tools:
-              {{- if $agent.tools.localServers.git.tools }}
-              {{- range $t := $agent.tools.localServers.git.tools }}
-                - {{ $t | quote }}
-              {{- end }}
-              {{- else }}
-                []
-              {{- end }}
+        {{- if $agent.clientConfig }}
+        clientConfig:
+{{ toYaml $agent.clientConfig | nindent 10 }}
         {{- end }}
       {{- end }}
     {{- end }}

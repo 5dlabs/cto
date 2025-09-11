@@ -182,120 +182,29 @@ impl DocsTemplateGenerator {
         })
     }
 
-    /// Generate agent-centric client-config.json for DocsRun based on Helm (base) config.
+    /// Generate agent-centric client-config.json for DocsRun from Helm (verbatim).
     fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
-        use serde_json::{json, Value};
+        use serde_json::to_string_pretty;
 
-        // Find the matching agent definition by github_app (e.g., 5DLabs-Morgan)
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
-        let mut selected_tools: Option<crate::tasks::config::AgentTools> = None;
+        let agent_cfg = config
+            .agents
+            .values()
+            .find(|a| a.github_app == github_app)
+            .ok_or_else(|| crate::tasks::types::Error::ConfigError(format!(
+                "Agent config not found for githubApp='{}' in controller config.", github_app
+            )))?;
 
-        for (_name, def) in &config.agents {
-            if def.github_app == github_app {
-                if let Some(tools) = &def.tools {
-                    selected_tools = Some(crate::tasks::config::AgentTools {
-                        remote: tools.remote.clone(),
-                        local_servers: tools.local_servers.clone(),
-                    });
-                }
-                break;
-            }
-        }
-
-        // Fallback defaults if not configured
-        let agent_tools = selected_tools.unwrap_or_else(|| crate::tasks::config::AgentTools {
-            remote: vec![
-                "memory_create_entities".to_string(),
-                "memory_add_observations".to_string(),
-            ],
-            local_servers: Some(crate::tasks::config::LocalServerConfigs {
-                filesystem: crate::tasks::config::LocalServerConfig {
-                    enabled: true,
-                    tools: vec![
-                        "read_file".to_string(),
-                        "write_file".to_string(),
-                        "list_directory".to_string(),
-                        "search_files".to_string(),
-                        "directory_tree".to_string(),
-                    ],
-                },
-                git: crate::tasks::config::LocalServerConfig {
-                    enabled: true,
-                    tools: vec![
-                        "git_status".to_string(),
-                        "git_diff".to_string(),
-                        "git_log".to_string(),
-                        "git_show".to_string(),
-                    ],
-                },
-            }),
-        });
-
-        // Build the client-config.json structure
-        let mut client_config = json!({
-            "remoteTools": agent_tools.remote,
-            "localServers": {}
-        });
-
-        if let Some(local_servers) = agent_tools.local_servers {
-            let mut local_servers_obj = serde_json::Map::new();
-
-            if local_servers.filesystem.enabled {
-                let fs_cmd = local_servers
-                    .filesystem
-                    .command
-                    .clone()
-                    .unwrap_or_else(|| "npx".to_string());
-                let fs_args = local_servers
-                    .filesystem
-                    .args
-                    .clone()
-                    .unwrap_or_else(|| vec![
-                        "-y".to_string(),
-                        "@modelcontextprotocol/server-filesystem".to_string(),
-                        "/workspace".to_string(),
-                    ]);
-                let fs_workdir = local_servers
-                    .filesystem
-                    .working_directory
-                    .clone()
-                    .unwrap_or_else(|| "project_root".to_string());
-                let filesystem_server = json!({
-                    "command": fs_cmd,
-                    "args": fs_args,
-                    "tools": local_servers.filesystem.tools,
-                    "workingDirectory": fs_workdir
-                });
-                local_servers_obj.insert("filesystem".to_string(), filesystem_server);
-            }
-
-            if local_servers.git.enabled {
-                let git_cmd = local_servers.git.command.clone().unwrap_or_else(|| "npx".to_string());
-                let git_args = local_servers.git.args.clone().unwrap_or_else(|| vec![
-                    "-y".to_string(),
-                    "@modelcontextprotocol/server-git".to_string(),
-                    "/workspace".to_string(),
-                ]);
-                let git_workdir = local_servers
-                    .git
-                    .working_directory
-                    .clone()
-                    .unwrap_or_else(|| "project_root".to_string());
-                let git_server = json!({
-                    "command": git_cmd,
-                    "args": git_args,
-                    "tools": local_servers.git.tools,
-                    "workingDirectory": git_workdir
-                });
-                local_servers_obj.insert("git".to_string(), git_server);
-            }
-
-            client_config["localServers"] = Value::Object(local_servers_obj);
-        }
-
-        serde_json::to_string_pretty(&client_config).map_err(|e| {
+        let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to serialize client-config.json: {e}"
+                "Missing clientConfig for agent githubApp='{}'. Define agents.<agent>.clientConfig in Helm values.",
+                github_app
+            ))
+        })?;
+
+        to_string_pretty(client_cfg).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to serialize clientConfig: {e}"
             ))
         })
     }
