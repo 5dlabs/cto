@@ -469,6 +469,14 @@ echo "✓ Workspace validated"
 # Copy MCP servers config for Toolman if provided
 if [ -f "/task-files/mcp.json" ]; then
   cp "/task-files/mcp.json" "$CLAUDE_WORK_DIR/.mcp.json" && echo "✓ Copied mcp.json to .mcp.json (project scope)" || echo "⚠️ mcp.json copy failed"
+
+  # Fix MCP configuration for container environment
+  if [ -f "$CLAUDE_WORK_DIR/.mcp.json" ]; then
+    echo "🔧 Updating MCP configuration for container environment..."
+    # Update TASK_MASTER_PROJECT_ROOT to container path (generic replacement)
+    sed -i 's|"TASK_MASTER_PROJECT_ROOT"[[:space:]]*:[[:space:]]*"[^"]*"|"TASK_MASTER_PROJECT_ROOT": "/workspace/docs"|g' "$CLAUDE_WORK_DIR/.mcp.json"
+    echo "✓ Updated MCP configuration paths for container environment"
+  fi
 else
   echo "ℹ️ No mcp.json provided; Toolman MCP may not be configured"
 fi
