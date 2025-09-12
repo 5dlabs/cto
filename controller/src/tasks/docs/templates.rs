@@ -313,8 +313,7 @@ impl DocsTemplateGenerator {
                     // If a selection is provided, restrict baseline localServers to that subset.
                     if let Some(ls_value) = client.get_mut("localServers") {
                         if let Some(ls_obj) = ls_value.as_object_mut() {
-                            let requested: HashSet<String> =
-                                local_list.iter().cloned().collect();
+                            let requested: HashSet<String> = local_list.iter().cloned().collect();
 
                             // Build filtered map of only requested servers that exist in baseline
                             let mut filtered = serde_json::Map::new();
