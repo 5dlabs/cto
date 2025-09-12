@@ -183,9 +183,11 @@ impl CodeTemplateGenerator {
     }
 
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
-        use serde_json::to_string_pretty;
+        use serde_json::{json, to_string_pretty, Value};
 
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Locate agent config by githubApp
         let agent_cfg = config
             .agents
             .values()
@@ -196,15 +198,92 @@ impl CodeTemplateGenerator {
                 ))
             })?;
 
-        let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
-            crate::tasks::types::Error::ConfigError(
-                format!("Missing clientConfig for agent githubApp='{github_app}'. Define agents.<agent>.clientConfig in Helm values."),
+        // Base: clientConfig verbatim, else build from tools, else {}
+        let mut client: Value = if let Some(cc) = &agent_cfg.client_config {
+            cc.clone()
+        } else if let Some(tools) = &agent_cfg.tools {
+            // Build from tools
+            let remote = json!(tools.remote);
+            let mut local_servers_obj = serde_json::Map::new();
+            if let Some(ls) = &tools.local_servers {
+                if ls.filesystem.enabled {
+                    let mut fs = serde_json::Map::new();
+                    if !ls.filesystem.tools.is_empty() {
+                        fs.insert("tools".to_string(), json!(ls.filesystem.tools.clone()));
+                    }
+                    if let Some(cmd) = &ls.filesystem.command { fs.insert("command".to_string(), json!(cmd)); }
+                    if let Some(args) = &ls.filesystem.args { fs.insert("args".to_string(), json!(args)); }
+                    if let Some(wd) = &ls.filesystem.working_directory { fs.insert("workingDirectory".to_string(), json!(wd)); }
+                    local_servers_obj.insert("filesystem".to_string(), Value::Object(fs));
+                }
+                if ls.git.enabled {
+                    let mut g = serde_json::Map::new();
+                    if !ls.git.tools.is_empty() { g.insert("tools".to_string(), json!(ls.git.tools.clone())); }
+                    if let Some(cmd) = &ls.git.command { g.insert("command".to_string(), json!(cmd)); }
+                    if let Some(args) = &ls.git.args { g.insert("args".to_string(), json!(args)); }
+                    if let Some(wd) = &ls.git.working_directory { g.insert("workingDirectory".to_string(), json!(wd)); }
+                    local_servers_obj.insert("git".to_string(), Value::Object(g));
+                }
+            }
+            Value::Object(
+                vec![
+                    ("remoteTools".to_string(), remote),
+                    ("localServers".to_string(), Value::Object(local_servers_obj)),
+                ]
+                .into_iter()
+                .collect(),
             )
-        })?;
+        } else {
+            json!({})
+        };
 
-        to_string_pretty(client_cfg).map_err(|e| {
+        // Merge CRD-provided extras (comma-separated lists)
+        if let Some(r) = &code_run.spec.remote_tools {
+            let extras: Vec<String> = r
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !extras.is_empty() {
+                let mut base = client
+                    .get("remoteTools")
+                    .cloned()
+                    .unwrap_or_else(|| json!([]));
+                if let Some(arr) = base.as_array_mut() {
+                    for t in extras {
+                        if !arr.iter().any(|v| v == &json!(t)) {
+                            arr.push(json!(t));
+                        }
+                    }
+                }
+                client["remoteTools"] = base;
+            }
+        }
+
+        if let Some(local_str) = &code_run.spec.local_tools {
+            let requested: std::collections::HashSet<String> = local_str
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !requested.is_empty() {
+                if let Some(ls_value) = client.get_mut("localServers") {
+                    if let Some(ls_obj) = ls_value.as_object_mut() {
+                        let mut filtered = serde_json::Map::new();
+                        for (k, v) in ls_obj.iter() {
+                            if requested.contains(k) {
+                                filtered.insert(k.clone(), v.clone());
+                            }
+                        }
+                        *ls_obj = filtered;
+                    }
+                }
+            }
+        }
+
+        to_string_pretty(&client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to serialize clientConfig: {e}"
+                "Failed to serialize code clientConfig: {e}"
             ))
         })
     }

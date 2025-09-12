@@ -458,8 +458,62 @@ echo "✓ No copying needed - mount automatically reflects latest ConfigMap chan
 
 # Verify/Select client-config.json and preflight tools
 echo "=== TOOLMAN CONFIG SETUP ==="
-WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
+WORKSPACE_CFG="/workspace/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
+
+# Append repo-level clientConfig/tools from cto-config.json (append-only)
+CTO_CANDIDATES=("$CLAUDE_WORK_DIR/cto-config.json" "/workspace/cto-config.json")
+for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
+  if [ -f "$CFG_PATH" ] && [ -f "$WORKSPACE_CFG" ]; then
+    echo "🔧 Merging repo cto-config.json (clientConfig + tools) into client-config.json (append-only)"
+    AGENT_KEY=$(echo "${GITHUB_APP:-{{github_app}}}" | sed 's/^5DLabs-//' | tr 'A-Z' 'a-z')
+    TMP_MERGE="/tmp/client-config.merged.json"
+    if jq --arg ak "$AGENT_KEY" -s '
+      def append_only_merge(b; e):
+        if (b|type)=="object" and (e|type)=="object" then
+          (b + e | to_entries
+            | map({key: .key, value:
+                ( (b[.key] // empty) as $bv | (e[.key] // empty) as $ev
+                  | if ($bv|type)=="object" and ($ev|type)=="object" then append_only_merge($bv;$ev)
+                    elif ($bv|type)=="array" and ($ev|type)=="array" then ($bv + $ev | unique)
+                    elif ($bv|type)==($ev|type) then $bv
+                    else ($bv // $ev) end) })
+            | from_entries)
+        elif (b|type)=="array" and (e|type)=="array" then (b + e | unique)
+        else b end;
+      (.[0] as $base | .[1] as $repo |
+       ($repo.agents[$ak] // {}) as $agent |
+       ($agent.clientConfig // {}) as $ec |
+       ($agent.tools // {}) as $tools |
+       ({
+          "remoteTools": ($tools.remote // []),
+          "localServers": (
+            ($tools.localServers // {}) as $ls |
+            reduce ["filesystem","git"][] as $srv ({};
+              . + (
+                if ($ls[$srv].enabled == true) then
+                  { ($srv): (
+                      {}
+                      + (if ($ls[$srv].tools // []) != [] then {"tools": $ls[$srv].tools} else {} end)
+                      + (if $ls[$srv].command then {"command": $ls[$srv].command} else {} end)
+                      + (if $ls[$srv].args then {"args": $ls[$srv].args} else {} end)
+                      + (if $ls[$srv].workingDirectory then {"workingDirectory": $ls[$srv].workingDirectory} else {} end)
+                    )
+                  }
+                else {} end))
+          )
+        }) as $et |
+       (append_only_merge($ec; $et)) as $extra |
+       append_only_merge($base; $extra)
+      )' "$WORKSPACE_CFG" "$CFG_PATH" > "$TMP_MERGE"; then
+      mv "$TMP_MERGE" "$WORKSPACE_CFG"
+      echo "✓ Appended repo clientConfig/tools for agent: $AGENT_KEY"
+    else
+      echo "⚠️ Failed to merge repo cto-config.json into client-config.json"
+    fi
+    break
+  fi
+done
 
 is_valid_cfg() {
   local p="$1"
@@ -472,12 +526,12 @@ WS_OK=false
 if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
 if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
 
-if $SRC_OK; then
-  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
-  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
-elif $WS_OK; then
+if $WS_OK; then
   export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
   echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
+elif $SRC_OK; then
+  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
 else
   echo "❌ No valid client-config.json found (both source and workspace empty/invalid). Aborting."
   exit 1

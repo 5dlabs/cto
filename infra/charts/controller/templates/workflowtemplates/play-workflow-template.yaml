@@ -75,6 +75,26 @@ spec:
         description: "Claude model to use for all agents"
         value: ""  # Must be provided by MCP client
 
+      # Optional MCP tool parameters per agent (comma-separated lists)
+      - name: implementation-remote-tools
+        description: "Remote tools for implementation agent (comma-separated)"
+        value: ""
+      - name: implementation-local-tools
+        description: "Local servers for implementation agent (comma-separated: filesystem,git)"
+        value: ""
+      - name: quality-remote-tools
+        description: "Remote tools for quality agent (comma-separated)"
+        value: ""
+      - name: quality-local-tools
+        description: "Local servers for quality agent (comma-separated: filesystem,git)"
+        value: ""
+      - name: testing-remote-tools
+        description: "Remote tools for testing agent (comma-separated)"
+        value: ""
+      - name: testing-local-tools
+        description: "Local servers for testing agent (comma-separated: filesystem,git)"
+        value: ""
+
       # PR context (populated by suspend/resume)
       - name: pr-url
         description: "Pull request URL (populated after PR creation)"
@@ -139,6 +159,10 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "implementation"
+                - name: remote-tools
+                  value: "{{`{{workflow.parameters.implementation-remote-tools}}`}}"
+                - name: local-tools
+                  value: "{{`{{workflow.parameters.implementation-local-tools}}`}}"
 
           # Update stage after implementation cycle completes (PR created)
           - name: update-to-waiting-pr-created
@@ -163,6 +187,10 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "quality"
+                - name: remote-tools
+                  value: "{{`{{workflow.parameters.quality-remote-tools}}`}}"
+                - name: local-tools
+                  value: "{{`{{workflow.parameters.quality-local-tools}}`}}"
                 - name: pr-url
                   value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
@@ -202,6 +230,10 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "testing"
+                - name: remote-tools
+                  value: "{{`{{workflow.parameters.testing-remote-tools}}`}}"
+                - name: local-tools
+                  value: "{{`{{workflow.parameters.testing-local-tools}}`}}"
                 - name: pr-url
                   value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
@@ -451,6 +483,10 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: remote-tools
+            default: ""
+          - name: local-tools
+            default: ""
           - name: pr-url
             default: ""
           - name: pr-number
@@ -473,6 +509,10 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: remote-tools
+                  value: "{{`{{inputs.parameters.remote-tools}}`}}"
+                - name: local-tools
+                  value: "{{`{{inputs.parameters.local-tools}}`}}"
                 - name: pr-url
                   value: "{{`{{inputs.parameters.pr-url}}`}}"
                 - name: pr-number
@@ -503,6 +543,10 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: remote-tools
+            default: ""
+          - name: local-tools
+            default: ""
           - name: pr-url
             default: ""
           - name: pr-number
@@ -546,6 +590,9 @@ spec:
             overwriteMemory: false
             docsBranch: "main"
             contextVersion: 1
+            # Optional MCP tool hints (comma-separated lists)
+            remoteTools: "{{`{{inputs.parameters.remote-tools}}`}}"
+            localTools: "{{`{{inputs.parameters.local-tools}}`}}"
             # Pass task requirements if available
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             # Pass PR context as environment if available

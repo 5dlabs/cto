@@ -123,6 +123,14 @@ pub struct CodeRunSpec {
     #[serde(default = "default_overwrite_memory", rename = "overwriteMemory")]
     pub overwrite_memory: bool,
 
+    /// Optional: remote MCP tools to enable (comma-separated)
+    #[serde(default, rename = "remoteTools")]
+    pub remote_tools: Option<String>,
+
+    /// Optional: local MCP servers to enable (comma-separated: filesystem,git)
+    #[serde(default, rename = "localTools")]
+    pub local_tools: Option<String>,
+
     /// Environment variables to set in the container
     #[serde(default)]
     pub env: HashMap<String, String>,

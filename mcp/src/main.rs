@@ -1024,6 +1024,57 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("model={model}"),
     ];
 
+    // Helper to extract tools from cto-config for an agent key
+    let mut add_agent_tools = |prefix: &str, agent_key_or_github: &str| {
+        // Try direct key, else try to find by github_app
+        let (agent_key, agent_cfg_opt) = if let Some(cfg) = config.agents.get(agent_key_or_github) {
+            (agent_key_or_github.to_string(), Some(cfg))
+        } else {
+            let found = config
+                .agents
+                .iter()
+                .find(|(_, v)| v.github_app == agent_key_or_github)
+                .map(|(k, v)| (k.clone(), v));
+            match found {
+                Some((k, v)) => (k, Some(v)),
+                None => (agent_key_or_github.to_string(), None),
+            }
+        };
+
+        if let Some(agent_cfg) = agent_cfg_opt {
+            if let Some(tools) = &agent_cfg.tools {
+                // remote (comma-separated)
+                if let Some(remote) = &tools.remote {
+                    if !remote.is_empty() {
+                        let value = remote.join(",");
+                        params.push(format!("{prefix}-remote-tools={value}"));
+                    }
+                }
+                // local: include servers marked enabled
+                if let Some(ls) = &tools.local_servers {
+                    let mut local: Vec<&str> = Vec::new();
+                    if let Some(fs) = &ls.filesystem {
+                        if fs.enabled { local.push("filesystem"); }
+                    }
+                    if let Some(git) = &ls.git {
+                        if git.enabled { local.push("git"); }
+                    }
+                    if !local.is_empty() {
+                        let value = local.join(",");
+                        params.push(format!("{prefix}-local-tools={value}"));
+                    }
+                }
+            }
+        }
+
+        eprintln!("🐛 DEBUG: {prefix} tools params added for agent={agent_key}");
+    };
+
+    // Add per-agent tool params from cto-config
+    add_agent_tools("implementation", &implementation_agent_input);
+    add_agent_tools("quality", &quality_agent_input);
+    add_agent_tools("testing", &testing_agent_input);
+
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {
         let requirements_content = std::fs::read_to_string(&path).context(format!(
