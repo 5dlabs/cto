@@ -494,8 +494,24 @@ export GITHUB_APP="{{github_app}}"
 
 # Optional: copy agent-centric ToolMan client config (base from Helm/controller)
 if [ -f "/task-files/client-config.json" ]; then
-  cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
-  cp "/task-files/client-config.json" "/workspace/client-config.json" && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
+  echo "🔍 DEBUG: Source /task-files/client-config.json summary (pre-copy):"
+  (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
+     "/task-files/client-config.json" 2>/dev/null \
+   || { echo -n "raw="; head -c 200 "/task-files/client-config.json"; echo; })
+
+  cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" \
+    && echo "✓ client-config.json copied to Claude working directory" \
+    || echo "❌ client-config.json copy failed"
+  cp "/task-files/client-config.json" "/workspace/client-config.json" \
+    && echo "✓ client-config.json copied to workspace root" \
+    || echo "❌ client-config.json copy to workspace failed"
+
+  if [ -f "$CLAUDE_WORK_DIR/client-config.json" ]; then
+    echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/client-config.json summary (post-copy):"
+    (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
+       "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null \
+     || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/client-config.json"; echo; })
+  fi
 else
   echo "⚠️ client-config.json not found - MCP client may not be configured"
 fi
@@ -536,6 +552,10 @@ for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
       mv "$TMP_MERGE" "$CLAUDE_WORK_DIR/client-config.json"
       cp "$CLAUDE_WORK_DIR/client-config.json" "/workspace/client-config.json" 2>/dev/null || true
       echo "✓ Appended repo clientConfig for agent: $AGENT_KEY"
+      echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/client-config.json summary (post-merge):"
+      (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
+         "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null \
+       || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/client-config.json"; echo; })
     else
       echo "⚠️ Failed to merge repo cto-config.json clientConfig into client-config.json"
     fi
