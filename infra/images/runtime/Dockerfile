@@ -315,8 +315,8 @@ RUN curl --proto '=https' --tlsv1.2 -LsSf \
     TOOLMAN_NO_MODIFY_PATH=1 sh \
   && mv ~/.cargo/bin/toolman-client /usr/local/bin/toolman
 
-# Install TaskMaster globally (latest release candidate)
-RUN npm install -g task-master-ai@0.26.0-rc.1
+# Install TaskMaster globally (stable release)
+RUN npm install -g task-master-ai@0.26.0
 
 # Install git-delta
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
