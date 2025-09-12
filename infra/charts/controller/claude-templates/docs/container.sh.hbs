@@ -647,9 +647,16 @@ if [ -f "$CLAUDE_CONFIG" ]; then
     exit 1
   fi
 
-  # Set MCP_CLIENT_CONFIG environment variable for MCP server/bridge only after validation
-  export MCP_CLIENT_CONFIG="$CLAUDE_CONFIG"
-  echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
+  # Prefer immutable source from ConfigMap to avoid workspace overwrites
+  if [ -f "/task-files/client-config.json" ] && jq -e 'type=="object" and length>0' \
+       "/task-files/client-config.json" >/dev/null 2>&1; then
+    export MCP_CLIENT_CONFIG="/task-files/client-config.json"
+    echo "✓ MCP_CLIENT_CONFIG set to source (/task-files/client-config.json)"
+  else
+    # Fallback to workspace copy
+    export MCP_CLIENT_CONFIG="$CLAUDE_CONFIG"
+    echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
+  fi
 else
   echo "⚠️ client-config.json not found in Claude working directory - MCP client may not work correctly"
 fi
