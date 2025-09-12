@@ -30,6 +30,12 @@ spec:
         description: "Claude model to use for documentation generation"
       - name: include-codebase
         description: "Include existing codebase as markdown context for existing projects"
+      - name: remote-tools
+        description: "JSON array of extra remote tools to merge (e.g., [\"brave_web_search\"])"
+        default: "[]"
+      - name: local-tools
+        description: "JSON array of local servers to enable if available (e.g., [\"filesystem\",\"git\"])"
+        default: "[]"
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
@@ -78,6 +84,8 @@ spec:
             repositoryUrl: "{{`{{workflow.parameters.repository-url}}`}}"
             model: "{{`{{workflow.parameters.model}}`}}"
             includeCodebase: {{`{{workflow.parameters.include-codebase}}`}}
+            remoteTools: {{`{{workflow.parameters.remote-tools}}`}}
+            localTools: {{`{{workflow.parameters.local-tools}}`}}
 
     - name: wait-docsrun-completion
       inputs:

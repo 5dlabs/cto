@@ -25,6 +25,12 @@ pub struct DocsRunSpec {
     pub github_app: Option<String>,
     #[serde(rename = "includeCodebase", default)]
     pub include_codebase: Option<bool>,
+    /// Optional: additional remote MCP tools to merge into the baseline
+    #[serde(rename = "remoteTools", default)]
+    pub remote_tools: Option<Vec<String>>,
+    /// Optional: local MCP servers to enable if available in agent profile
+    #[serde(rename = "localTools", default)]
+    pub local_tools: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]

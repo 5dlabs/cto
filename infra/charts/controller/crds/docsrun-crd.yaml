@@ -58,6 +58,16 @@ spec:
               includeCodebase:
                 type: boolean
                 description: "Include existing codebase as markdown context for existing projects"
+              remoteTools:
+                type: array
+                description: "Additional remote MCP tools to merge (e.g., ['brave_web_search'])"
+                items:
+                  type: string
+              localTools:
+                type: array
+                description: "Local MCP servers to enable if available in agent profile (e.g., ['filesystem','git'])"
+                items:
+                  type: string
           status:
             type: object
             properties:

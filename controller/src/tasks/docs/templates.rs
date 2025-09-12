@@ -286,7 +286,7 @@ impl DocsTemplateGenerator {
                     }
                 }
 
-                let client = Value::Object(
+                let mut client = Value::Object(
                     vec![
                         ("remoteTools".to_string(), remote_tools),
                         ("localServers".to_string(), Value::Object(local_servers_obj)),
@@ -294,6 +294,39 @@ impl DocsTemplateGenerator {
                     .into_iter()
                     .collect(),
                 );
+                // 2b) Merge CRD-provided extras (remoteTools/localTools)
+                if let Some(extras) = &docs_run.spec.remote_tools {
+                    let mut base = client
+                        .get("remoteTools")
+                        .cloned()
+                        .unwrap_or_else(|| json!([]));
+                    if let Some(arr) = base.as_array_mut() {
+                        for t in extras {
+                            if !arr.iter().any(|v| v == t) {
+                                arr.push(json!(t));
+                            }
+                        }
+                    }
+                    client["remoteTools"] = base;
+                }
+                if let Some(local_list) = &docs_run.spec.local_tools {
+                    // Only enable servers already present in the baseline to avoid incomplete definitions
+                    let ls = client
+                        .get_mut("localServers")
+                        .and_then(|v| v.as_object_mut())
+                        .unwrap();
+                    for name in local_list {
+                        if ls.contains_key(name) {
+                            // keep as-is
+                        } else {
+                            debug!(
+                                "docs: requested localTool '{}' not present in agent baseline; skipping",
+                                name
+                            );
+                        }
+                    }
+                }
+
                 let rendered = to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize tools-based clientConfig: {e}"
@@ -308,12 +341,23 @@ impl DocsTemplateGenerator {
             }
         }
 
-        // 3) No clientConfig/tools provided → minimal JSON object
+        // 3) No clientConfig/tools provided → minimal JSON object (plus CRD extras if any)
         debug!(
             "docs: no matching agent or tools for githubApp='{}' → returning empty client-config",
             github_app
         );
-        to_string_pretty(&json!({})).map_err(|e| {
+        let mut client = json!({});
+        if let Some(extras) = &docs_run.spec.remote_tools {
+            client["remoteTools"] = json!(extras);
+        }
+        if let Some(local_list) = &docs_run.spec.local_tools {
+            let mut ls = serde_json::Map::new();
+            for name in local_list {
+                ls.insert(name.clone(), json!({}));
+            }
+            client["localServers"] = Value::Object(ls);
+        }
+        to_string_pretty(&client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
                 "Failed to serialize empty clientConfig: {e}"
             ))
