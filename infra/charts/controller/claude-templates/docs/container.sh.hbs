@@ -624,41 +624,42 @@ echo "[mcp]   2. Project scope (working dir): $CLAUDE_WORK_DIR/.mcp.json"
 echo "[mcp]   3. User scope: ~/.config/claude-code/.mcp.json"
 echo '=== END CONFIG DIAGNOSTICS ==='
 
-# Verify client-config.json is available in Claude's working directory
+# Verify/Select client-config.json for runtime
 echo "=== TOOLMAN CONFIG SETUP ==="
-CLAUDE_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
+SOURCE_CFG="/task-files/client-config.json"
 
-if [ -f "$CLAUDE_CONFIG" ]; then
-  echo "✓ client-config.json found in Claude working directory"
+# Helper to check non-empty JSON object
+is_valid_cfg() {
+  local p="$1"
+  [ -f "$p" ] || return 1
+  jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
+}
 
-  # Hard-stop safety: fail fast if file is empty object or invalid
-  SIZE_BYTES=$(wc -c < "$CLAUDE_CONFIG" 2>/dev/null || echo 0)
-  if [ "$SIZE_BYTES" -le 3 ]; then
-    echo "❌ client-config.json appears empty ($SIZE_BYTES bytes). Aborting to avoid running without tools."
-    echo "   Expected this file to contain at least remoteTools/localServers from Helm or repo cto-config.json."
-    echo "   Check /task-files/client-config.json and Helm agents.<agent>.tools values."
-    exit 1
-  fi
+SRC_OK=false
+WS_OK=false
+if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
+if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
 
-  if jq -e 'type=="object" and length==0' "$CLAUDE_CONFIG" >/dev/null 2>&1; then
-    echo "❌ client-config.json is an empty object {}. Aborting to avoid running without tools."
-    echo "   Source (/task-files/client-config.json) or a later process likely overwrote it."
-    echo "   Inspect logs above for pre/post copy summaries and ensure Helm agents.<agent>.tools are set."
-    exit 1
-  fi
-
-  # Prefer immutable source from ConfigMap to avoid workspace overwrites
-  if [ -f "/task-files/client-config.json" ] && jq -e 'type=="object" and length>0' \
-       "/task-files/client-config.json" >/dev/null 2>&1; then
-    export MCP_CLIENT_CONFIG="/task-files/client-config.json"
-    echo "✓ MCP_CLIENT_CONFIG set to source (/task-files/client-config.json)"
-  else
-    # Fallback to workspace copy
-    export MCP_CLIENT_CONFIG="$CLAUDE_CONFIG"
-    echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
-  fi
+if $SRC_OK; then
+  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
+elif $WS_OK; then
+  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
 else
-  echo "⚠️ client-config.json not found in Claude working directory - MCP client may not work correctly"
+  echo "❌ No valid client-config.json found (both source and workspace empty/invalid). Aborting."
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$SOURCE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$SOURCE_CFG"; echo; })
+  else
+    echo "   Source missing: $SOURCE_CFG"
+  fi
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace summary:"; (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' "$WORKSPACE_CFG" 2>/dev/null || { echo -n "   raw="; head -c 200 "$WORKSPACE_CFG"; echo; })
+  else
+    echo "   Workspace missing: $WORKSPACE_CFG"
+  fi
+  exit 1
 fi
 
 echo '=== WORKSPACE VALIDATION ==='
