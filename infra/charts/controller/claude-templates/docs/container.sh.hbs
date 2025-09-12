@@ -680,11 +680,14 @@ if [ -f "$MCP_FILE_WORKSPACE" ] || [ -f "$MCP_FILE_PROJECT" ]; then
   fi
   if [ -n "$TM_URL" ]; then
     echo "🔍 Checking Toolman endpoint: $TM_URL"
-    if ! curl -fsS --max-time 3 "$TM_URL" >/dev/null 2>&1; then
-      echo "❌ Cannot reach Toolman MCP endpoint: $TM_URL. Aborting."
+    # Treat any HTTP response as connectivity; only fail on DNS/connect/timeout errors
+    HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 3 "$TM_URL" 2>/dev/null)
+    CURL_RC=$?
+    if [ "$CURL_RC" -ne 0 ]; then
+      echo "❌ Network error reaching Toolman MCP endpoint (curl rc=$CURL_RC): $TM_URL. Aborting."
       exit 1
     fi
-    echo "✓ Toolman endpoint reachable"
+    echo "✓ Toolman endpoint reachable (HTTP ${HTTP_CODE:-unknown})"
   fi
 else
   echo "ℹ️ No .mcp.json found; skipping toolman connectivity check"
