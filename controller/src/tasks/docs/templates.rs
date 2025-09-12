@@ -199,14 +199,23 @@ impl DocsTemplateGenerator {
         use serde_json::{json, to_string_pretty, Value};
 
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
-        debug!("docs: generating client-config.json for githubApp='{}'", github_app);
+        debug!(
+            "docs: generating client-config.json for githubApp='{}'",
+            github_app
+        );
 
         // Helpful visibility: list known agents (names -> githubApp)
         if config.agents.is_empty() {
-            debug!("docs: config.agents is EMPTY; client-config will fall back to '{}'", "{}");
+            debug!(
+                "docs: config.agents is EMPTY; client-config will fall back to '{}'",
+                "{}"
+            );
         } else {
             for (k, a) in &config.agents {
-                debug!("docs: available agent entry key='{}' githubApp='{}'", k, a.github_app);
+                debug!(
+                    "docs: available agent entry key='{}' githubApp='{}'",
+                    k, a.github_app
+                );
             }
         }
 
