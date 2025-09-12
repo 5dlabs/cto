@@ -662,6 +662,57 @@ else
   exit 1
 fi
 
+# Pre-flight MCP tool checks (fail-fast)
+echo "=== PRE-FLIGHT MCP TOOL CHECKS ==="
+
+# 1) Ensure toolman client is available when mcpServers includes it
+MCP_FILE_PROJECT="$CLAUDE_WORK_DIR/.mcp.json"
+MCP_FILE_WORKSPACE="/workspace/.mcp.json"
+if [ -f "$MCP_FILE_WORKSPACE" ] || [ -f "$MCP_FILE_PROJECT" ]; then
+  if ! command -v toolman >/dev/null 2>&1; then
+    echo "❌ 'toolman' CLI not found in PATH but required by .mcp.json. Aborting."
+    exit 1
+  fi
+  # If TOOLMAN_SERVER_URL present, attempt quick connectivity check
+  TM_URL=$(jq -r '.mcpServers.toolman.env.TOOLMAN_SERVER_URL // empty' "$MCP_FILE_WORKSPACE" 2>/dev/null || true)
+  if [ -z "$TM_URL" ] && [ -f "$MCP_FILE_PROJECT" ]; then
+    TM_URL=$(jq -r '.mcpServers.toolman.env.TOOLMAN_SERVER_URL // empty' "$MCP_FILE_PROJECT" 2>/dev/null || true)
+  fi
+  if [ -n "$TM_URL" ]; then
+    echo "🔍 Checking Toolman endpoint: $TM_URL"
+    if ! curl -fsS --max-time 3 "$TM_URL" >/dev/null 2>&1; then
+      echo "❌ Cannot reach Toolman MCP endpoint: $TM_URL. Aborting."
+      exit 1
+    fi
+    echo "✓ Toolman endpoint reachable"
+  fi
+else
+  echo "ℹ️ No .mcp.json found; skipping toolman connectivity check"
+fi
+
+# 2) Validate local server commands defined in MCP client config
+if [ -f "$MCP_CLIENT_CONFIG" ]; then
+  # Iterate known local servers and ensure their commands exist (if specified)
+  for srv in filesystem git; do
+    CMD=$(jq -r --arg s "$srv" '.localServers[$s].command // empty' "$MCP_CLIENT_CONFIG" 2>/dev/null || true)
+    if [ -n "$CMD" ]; then
+      if ! command -v "$CMD" >/dev/null 2>&1; then
+        echo "❌ Local MCP server '$srv' requires command '$CMD' not found in PATH. Aborting."
+        exit 1
+      fi
+      echo "✓ Local server '$srv' command '$CMD' found"
+    fi
+  done
+else
+  echo "⚠️ MCP_CLIENT_CONFIG not found for local server validation"
+fi
+
+# 3) Announce remote tools list for visibility
+if [ -f "$MCP_CLIENT_CONFIG" ]; then
+  echo -n "🔧 Remote tools configured: "
+  jq -r '(.remoteTools // []) | join(", ")' "$MCP_CLIENT_CONFIG" 2>/dev/null | sed 's/^$/<none>/'
+fi
+
 echo '=== WORKSPACE VALIDATION ==='
 
 # Check for required files in Claude's working directory

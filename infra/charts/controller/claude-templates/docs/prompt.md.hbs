@@ -17,6 +17,16 @@ Generate comprehensive documentation for {{#if task_id}}task {{task_id}}{{else}}
 
 ## Required Process
 
+### Step 0: MCP Tool Discovery and Usage Plan (REQUIRED)
+Before reading project files, discover and plan how to use available MCP tools:
+- List available MCP tools/servers (e.g., via tools/list). Summarize what you have.
+- Form a brief plan mapping tools → actions during documentation:
+  - filesystem: read source files to extract accurate APIs, types, and code snippets. Always include file path(s) and concise snippets.
+  - git: inspect history/blame to explain design choices or provide commit references when helpful.
+  - rustdocs_query_rust_docs: fetch Rust API docs for referenced crates/modules; include short, relevant quotes and link/identifier names.
+  - brave_web_search: gather external references, standards, or examples; cite URLs and summarize key points.
+- Execute this plan throughout steps 1–3. Prefer primary sources (repo, Rust docs). Use web search when local sources are insufficient.
+
 ### Step 1: Context Analysis (REQUIRED)
 1. Read CLAUDE.md for project context and standards
 2. **Use individual task files:**
@@ -64,6 +74,12 @@ For each task that needs documentation (process ALL incomplete tasks, no excepti
 - `acceptance-criteria.md` - Clear acceptance criteria and test cases
 - `task.xml` - XML-structured prompt optimized for LLM consumption
 
+While generating documents, actively use MCP tools to deepen technical detail:
+- Use filesystem to open the most relevant files and include minimal, correct code excerpts (≤30 lines) with paths and brief explanations.
+- Use git to reference meaningful commits or evolution where it clarifies intent or constraints.
+- Use rustdocs_query_rust_docs for API semantics and correct type usage; include function/type names and brief quotes (≤25 words) with identifiers.
+- Use brave_web_search for specs and external references; list top 1–3 links with one‑line takeaways when relevant.
+
 **Progress Requirements:**
 - Announce each task as you start it: "📝 Processing Task [ID]: [Title]"
 - Confirm completion of each task: "✅ Completed Task [ID]"
@@ -109,6 +125,7 @@ For each task, you MUST create a `task.xml` file that combines all task informat
         Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns.
         Provide complete, production-ready code that follows best practices. Include necessary imports,
         error handling, and documentation. Test your solution thoroughly before finalizing.
+        Where appropriate, incorporate insights gathered via MCP tools (filesystem, git, rustdocs, web) to ensure correctness.
     </instructions>
 </prompt>
 ```
