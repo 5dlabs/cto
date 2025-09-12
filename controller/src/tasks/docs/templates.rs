@@ -3,7 +3,7 @@ use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::Result;
 use handlebars::Handlebars;
 use serde_json::json;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
 use tracing::debug;
@@ -301,19 +301,31 @@ impl DocsTemplateGenerator {
                     client["remoteTools"] = base;
                 }
                 if let Some(local_list) = &docs_run.spec.local_tools {
-                    // Only enable servers already present in the baseline to avoid incomplete definitions
-                    let ls = client
-                        .get_mut("localServers")
-                        .and_then(|v| v.as_object_mut())
-                        .unwrap();
-                    for name in local_list {
-                        if ls.contains_key(name) {
-                            // keep as-is
-                        } else {
-                            debug!(
-                                "docs: requested localTool '{}' not present in agent baseline; skipping",
-                                name
-                            );
+                    // If a selection is provided, restrict baseline localServers to that subset.
+                    if let Some(ls_value) = client.get_mut("localServers") {
+                        if let Some(ls_obj) = ls_value.as_object_mut() {
+                            let requested: HashSet<String> =
+                                local_list.iter().cloned().collect();
+
+                            // Build filtered map of only requested servers that exist in baseline
+                            let mut filtered = serde_json::Map::new();
+                            for (k, v) in ls_obj.iter() {
+                                if requested.contains(k) {
+                                    filtered.insert(k.clone(), v.clone());
+                                }
+                            }
+
+                            // Log any requested servers that do not exist in baseline
+                            for name in local_list {
+                                if !ls_obj.contains_key(name) {
+                                    debug!(
+                                        "docs: requested localTool '{}' not present in agent baseline; skipping",
+                                        name
+                                    );
+                                }
+                            }
+
+                            *ls_obj = filtered;
                         }
                     }
                 }
