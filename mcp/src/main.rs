@@ -723,6 +723,36 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Always add include_codebase parameter as boolean (required by workflow template)
     params.push(format!("include-codebase={include_codebase}"));
 
+    // New: pass agent-specific tool hints from cto-config.json via workflow params
+    // so the controller can merge them server-side into the ConfigMap.
+    if let Some(agent_key) = &selected_agent_key {
+        if let Some(agent_cfg) = config.agents.get(agent_key) {
+            if let Some(tools) = &agent_cfg.tools {
+                // remote-tools
+                if let Some(remote) = &tools.remote {
+                    if !remote.is_empty() {
+                        let json = serde_json::to_string(remote).unwrap_or_else(|_| "[]".to_string());
+                        params.push(format!("remote-tools={json}"));
+                    }
+                }
+                // local-tools: enable servers that are present and marked enabled
+                if let Some(ls) = &tools.local_servers {
+                    let mut local_list: Vec<&str> = Vec::new();
+                    if let Some(fs) = &ls.filesystem {
+                        if fs.enabled { local_list.push("filesystem"); }
+                    }
+                    if let Some(git) = &ls.git {
+                        if git.enabled { local_list.push("git"); }
+                    }
+                    if !local_list.is_empty() {
+                        let json = serde_json::to_string(&local_list).unwrap_or_else(|_| "[]".to_string());
+                        params.push(format!("local-tools={json}"));
+                    }
+                }
+            }
+        }
+    }
+
     eprintln!("🐛 DEBUG: Docs workflow submitting with model: {model}");
     eprintln!("🐛 DEBUG: Full Argo parameters: {params:?}");
 
