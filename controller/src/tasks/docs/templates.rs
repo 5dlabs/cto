@@ -199,9 +199,27 @@ impl DocsTemplateGenerator {
         use serde_json::{json, to_string_pretty, Value};
 
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
+        debug!("docs: generating client-config.json for githubApp='{}'", github_app);
+
+        // Helpful visibility: list known agents (names -> githubApp)
+        if config.agents.is_empty() {
+            debug!("docs: config.agents is EMPTY; client-config will fall back to '{}'", "{}");
+        } else {
+            for (k, a) in &config.agents {
+                debug!("docs: available agent entry key='{}' githubApp='{}'", k, a.github_app);
+            }
+        }
+
         if let Some(agent_cfg) = config.agents.values().find(|a| a.github_app == github_app) {
+            debug!(
+                "docs: matched agent config for githubApp='{}' (tools_present={}, clientConfig_present={})",
+                github_app,
+                agent_cfg.tools.is_some(),
+                agent_cfg.client_config.is_some()
+            );
             // 1) Verbatim clientConfig
             if let Some(client_cfg) = &agent_cfg.client_config {
+                debug!("docs: using verbatim clientConfig for '{}'", github_app);
                 return to_string_pretty(client_cfg).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize clientConfig: {e}"
@@ -211,6 +229,12 @@ impl DocsTemplateGenerator {
 
             // 2) Convert tools → client-config.json
             if let Some(tools) = &agent_cfg.tools {
+                debug!(
+                    "docs: building clientConfig from tools for '{}' (remote_count={}, local_present={})",
+                    github_app,
+                    tools.remote.len(),
+                    tools.local_servers.is_some()
+                );
                 // remoteTools - tools.remote is Vec<String>, not Option
                 let remote_tools: Value = json!(tools.remote);
 
@@ -261,16 +285,25 @@ impl DocsTemplateGenerator {
                     .into_iter()
                     .collect(),
                 );
-
-                return to_string_pretty(&client).map_err(|e| {
+                let rendered = to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize tools-based clientConfig: {e}"
                     ))
-                });
+                })?;
+                debug!(
+                    "docs: generated client-config.json ({} bytes) for '{}'",
+                    rendered.len(),
+                    github_app
+                );
+                return Ok(rendered);
             }
         }
 
         // 3) No clientConfig/tools provided → minimal JSON object
+        debug!(
+            "docs: no matching agent or tools for githubApp='{}' → returning empty client-config",
+            github_app
+        );
         to_string_pretty(&json!({})).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
                 "Failed to serialize empty clientConfig: {e}"
