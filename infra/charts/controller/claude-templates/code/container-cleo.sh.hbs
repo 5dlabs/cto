@@ -456,15 +456,69 @@ echo "=== ENTERPRISE MANAGED SETTINGS ==="
 echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
 echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
 
-# Copy MCP client configuration from task files
-if [ -f "/task-files/client-config.json" ]; then
-  cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-  cp /task-files/client-config.json "/workspace/client-config.json"
-  echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
-  export MCP_CLIENT_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
-  echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
+# Verify/Select client-config.json and preflight tools
+echo "=== TOOLMAN CONFIG SETUP ==="
+WORKSPACE_CFG="$CLAUDE_WORK_DIR/client-config.json"
+SOURCE_CFG="/task-files/client-config.json"
+
+is_valid_cfg() {
+  local p="$1"
+  [ -f "$p" ] || return 1
+  jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
+}
+
+SRC_OK=false
+WS_OK=false
+if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
+if is_valid_cfg "$WORKSPACE_CFG"; then WS_OK=true; fi
+
+if $SRC_OK; then
+  export MCP_CLIENT_CONFIG="$SOURCE_CFG"
+  echo "✓ Selected MCP_CLIENT_CONFIG from source ConfigMap: $MCP_CLIENT_CONFIG"
+elif $WS_OK; then
+  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Selected MCP_CLIENT_CONFIG from workspace copy: $MCP_CLIENT_CONFIG"
 else
-  echo "⚠️ client-config.json not found in task-files - MCP client may not work correctly"
+  echo "❌ No valid client-config.json found (both source and workspace empty/invalid). Aborting."
+  exit 1
+fi
+
+echo "=== PRE-FLIGHT MCP TOOL CHECKS ==="
+MCP_FILE_PROJECT="$CLAUDE_WORK_DIR/.mcp.json"
+MCP_FILE_WORKSPACE="/workspace/.mcp.json"
+if [ -f "$MCP_FILE_WORKSPACE" ] || [ -f "$MCP_FILE_PROJECT" ]; then
+  if ! command -v toolman >/dev/null 2>&1; then
+    echo "❌ 'toolman' CLI not found in PATH but required by .mcp.json. Aborting."
+    exit 1
+  fi
+  TM_URL=$(jq -r '.mcpServers.toolman.env.TOOLMAN_SERVER_URL // empty' "$MCP_FILE_WORKSPACE" 2>/dev/null || true)
+  if [ -z "$TM_URL" ] && [ -f "$MCP_FILE_PROJECT" ]; then
+    TM_URL=$(jq -r '.mcpServers.toolman.env.TOOLMAN_SERVER_URL // empty' "$MCP_FILE_PROJECT" 2>/dev/null || true)
+  fi
+  if [ -n "$TM_URL" ]; then
+    echo "🔍 Checking Toolman endpoint: $TM_URL"
+    HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 3 "$TM_URL" 2>/dev/null)
+    CURL_RC=$?
+    if [ "$CURL_RC" -ne 0 ]; then
+      echo "❌ Network error reaching Toolman MCP endpoint (curl rc=$CURL_RC): $TM_URL. Aborting."
+      exit 1
+    fi
+    echo "✓ Toolman endpoint reachable (HTTP ${HTTP_CODE:-unknown})"
+  fi
+fi
+
+if [ -f "$MCP_CLIENT_CONFIG" ]; then
+  for srv in filesystem git; do
+    CMD=$(jq -r --arg s "$srv" '.localServers[$s].command // empty' "$MCP_CLIENT_CONFIG" 2>/dev/null || true)
+    if [ -n "$CMD" ]; then
+      if ! command -v "$CMD" >/dev/null 2>&1; then
+        echo "❌ Local MCP server '$srv' requires command '$CMD' not found in PATH. Aborting."
+        exit 1
+      fi
+      echo "✓ Local server '$srv' command '$CMD' found"
+    fi
+  done
+  echo -n "🔧 Remote tools configured: "; jq -r '(.remoteTools // []) | join(", ")' "$MCP_CLIENT_CONFIG" 2>/dev/null | sed 's/^$/<none>/'
 fi
 
 # Check if CLAUDE.md already exists (created by controller)
