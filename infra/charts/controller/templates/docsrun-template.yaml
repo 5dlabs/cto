@@ -32,10 +32,10 @@ spec:
         description: "Include existing codebase as markdown context for existing projects"
       - name: remote-tools
         description: "JSON array of extra remote tools to merge (e.g., [\"brave_web_search\"])"
-        default: "[]"
+        value: "[]"
       - name: local-tools
         description: "JSON array of local servers to enable if available (e.g., [\"filesystem\",\"git\"])"
-        default: "[]"
+        value: "[]"
 
   # Service account for workflow execution
   serviceAccountName: argo-workflow
