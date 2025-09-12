@@ -29,7 +29,7 @@ spec:
       openAPIV3Schema:
         type: object
         required: ["spec"]
-          properties:
+        properties:
           spec:
             type: object
             required: ["repositoryUrl", "workingDirectory", "sourceBranch"]
