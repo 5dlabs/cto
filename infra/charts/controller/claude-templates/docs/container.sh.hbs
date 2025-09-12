@@ -511,6 +511,9 @@ if [ -f "/task-files/client-config.json" ]; then
     (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
        "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null \
      || { echo -n "raw="; head -c 200 "$CLAUDE_WORK_DIR/client-config.json"; echo; })
+    # Harden file to catch unexpected overwrites (diagnostic)
+    chmod a-w "$CLAUDE_WORK_DIR/client-config.json" 2>/dev/null || true
+    echo "🔒 DEBUG: Made $CLAUDE_WORK_DIR/client-config.json read-only to detect overwrites"
   fi
 else
   echo "⚠️ client-config.json not found - MCP client may not be configured"
@@ -627,7 +630,24 @@ CLAUDE_CONFIG="$CLAUDE_WORK_DIR/client-config.json"
 
 if [ -f "$CLAUDE_CONFIG" ]; then
   echo "✓ client-config.json found in Claude working directory"
-  # Set MCP_CLIENT_CONFIG environment variable for MCP server/bridge
+
+  # Hard-stop safety: fail fast if file is empty object or invalid
+  SIZE_BYTES=$(wc -c < "$CLAUDE_CONFIG" 2>/dev/null || echo 0)
+  if [ "$SIZE_BYTES" -le 3 ]; then
+    echo "❌ client-config.json appears empty ($SIZE_BYTES bytes). Aborting to avoid running without tools."
+    echo "   Expected this file to contain at least remoteTools/localServers from Helm or repo cto-config.json."
+    echo "   Check /task-files/client-config.json and Helm agents.<agent>.tools values."
+    exit 1
+  fi
+
+  if jq -e 'type=="object" and length==0' "$CLAUDE_CONFIG" >/dev/null 2>&1; then
+    echo "❌ client-config.json is an empty object {}. Aborting to avoid running without tools."
+    echo "   Source (/task-files/client-config.json) or a later process likely overwrote it."
+    echo "   Inspect logs above for pre/post copy summaries and ensure Helm agents.<agent>.tools are set."
+    exit 1
+  fi
+
+  # Set MCP_CLIENT_CONFIG environment variable for MCP server/bridge only after validation
   export MCP_CLIENT_CONFIG="$CLAUDE_CONFIG"
   echo "✓ MCP_CLIENT_CONFIG set to: $MCP_CLIENT_CONFIG"
 else
