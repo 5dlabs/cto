@@ -61,8 +61,9 @@ Before processing any task, check if ALL required files already exist:
 - `task.md`
 - `prompt.md`
 - `acceptance-criteria.md`
+- `task.xml`
 
-If ALL three files exist and have substantial content (not just stubs), SKIP that task to save tokens and time.
+If ALL four files exist and have substantial content (not just stubs), SKIP that task to save tokens and time.
 
 **YOU MUST CREATE DOCUMENTATION FOR EVERY TASK THAT NEEDS IT. DO NOT SKIP ANY INCOMPLETE TASKS.**
 
@@ -71,6 +72,7 @@ For each task that needs documentation (process ALL incomplete tasks, no excepti
 - `task.md` - Comprehensive task overview and implementation guide
 - `prompt.md` - Autonomous prompt for AI agents
 - `acceptance-criteria.md` - Clear acceptance criteria and test cases
+- `task.xml` - XML-structured prompt optimized for LLM consumption (agent-generated)
 
 While generating documents, actively use MCP tools to deepen technical detail:
 - Use filesystem to open the most relevant files and include minimal, correct code excerpts (≤30 lines) with paths and brief explanations.
@@ -85,6 +87,48 @@ While generating documents, actively use MCP tools to deepen technical detail:
 
 Place all documentation in `.taskmaster/docs/task-{id}/` directories.
 
+### Step 2.4: XML Prompt Generation (MANDATORY)
+
+**🔧 CRITICAL: Generate XML-Structured Prompt for LLM Consumption**
+
+For each task, you MUST create a `task.xml` file that combines all task information into an XML structure optimized for LLM processing. This single file will contain all the technical specifications, acceptance criteria, and implementation guidance needed for coding agents.
+
+**REQUIRED XML STRUCTURE:**
+```xml
+<prompt>
+    <role>You are a senior coding agent specializing in [technology stack from task].</role>
+    <task>
+        <id>[Task ID]</id>
+        <title>[Task Title]</title>
+        <description>[Complete task description]</description>
+        <priority>[high|medium|low]</priority>
+        <status>[pending|in-progress|done]</status>
+        <dependencies>[comma-separated dependency IDs]</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>[Technical requirement 1]</spec>
+        <spec>[Technical requirement 2]</spec>
+        <spec>[Technical requirement N]</spec>
+    </technical_specifications>
+    <implementation_details>
+        [Detailed implementation guidance from task.txt]
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>[Acceptance criterion 1]</criterion>
+        <criterion>[Acceptance criterion 2]</criterion>
+        <criterion>[Acceptance criterion N]</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        [Testing approach and requirements]
+    </test_strategy>
+    <instructions>
+        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns.
+        Provide complete, production-ready code that follows best practices. Include necessary imports,
+        error handling, and documentation. Test your solution thoroughly before finalizing.
+        Where appropriate, incorporate insights gathered via MCP tools (filesystem, git, rustdocs, web) to ensure correctness.
+    </instructions>
+</prompt>
+```
 
 ### Step 3: Complete Documentation Generation
 **⚠️ CRITICAL: You MUST generate ALL documentation files as specified above.**
@@ -119,7 +163,7 @@ Place all documentation in `.taskmaster/docs/task-{id}/` directories.
 ```
 🎉 DOCUMENTATION GENERATION COMPLETE 🎉
 ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
-✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md)
+✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, task.xml)
 📋 Total files created: [COUNT]
 🔧 Generated comprehensive markdown documentation
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook

@@ -893,32 +893,91 @@ SAFE_MODE="false"  # Set to "false" for full docs generation
 
       # Change back to CLAUDE_WORK_DIR to find prompt.md
       cd "$CLAUDE_WORK_DIR"
+      
+      # Get the initial prompt text (from prompt.md if available, fallback to default)
       if [ -f "prompt.md" ]; then
+          echo "✓ Found prompt.md, using as initial prompt"
           INITIAL_TEXT=$(jq -Rs . < "prompt.md")
-          if printf '{"text":%s}\n' "$INITIAL_TEXT" | \
-               curl -fsS -X POST http://127.0.0.1:8080/input \
-                 -H 'Content-Type: application/json' \
-                 --data-binary @- >/dev/null 2>&1; then
-            echo "✓ Initial prompt sent via sidecar /input"
-          else
-            echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-            exec 9>"$FIFO_PATH"
-            printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
-          fi
-
-          # Wait for Claude to complete, then close any fallback writer and request sidecar shutdown
-          wait $CLAUDE_PID
-          CLAUDE_EXIT_CODE=$?
-          echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
-          exec 9>&- 2>/dev/null || true
-          if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-            echo "✓ Requested sidecar shutdown"
-          else
-            echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
-          fi
       else
-          echo "❌ No prompt.md found"
-          exit 1
+          echo "ℹ️ No prompt.md found, using default documentation generation prompt"
+          INITIAL_TEXT=$(jq -Rs . << 'DEFAULT_PROMPT_EOF'
+# CRITICAL: Complete Documentation Generation Task
+
+**🚨 MANDATORY COMPLETION REQUIREMENT 🚨**
+You MUST complete ALL steps in this process. Partial completion is not acceptable. This is especially critical for large projects with many tasks.
+
+## Task Overview
+Generate comprehensive documentation for **ALL Task Master tasks**.
+
+**If this is a large project with many tasks (10+ tasks), you MUST:**
+- Process ALL tasks without stopping
+- Show progress updates as you work through each task
+- Complete the ENTIRE git workflow including PR creation
+- Do NOT stop partway through - finish everything
+
+## Required Process
+
+### Step 1: Context Analysis (REQUIRED)
+1. Read CLAUDE.md for project context and standards
+2. **Use individual task files:**
+   - Individual task files have been pre-copied to `.taskmaster/docs/task-{id}/task.txt`
+   - Each `task.txt` contains complete task information including subtasks and implementation details
+3. Review architecture.md and prd.txt for context
+4. **For large projects: Announce total task count and confirm you will process ALL of them**
+
+**🎯 IMPORTANT: Use individual `task.txt` files for each task**
+- Individual task files are available at: `.taskmaster/docs/task-{id}/task.txt`
+
+### Step 2: Documentation Generation (MANDATORY FOR ALL TASKS)
+**YOU MUST CREATE DOCUMENTATION FOR EVERY TASK THAT NEEDS IT. DO NOT SKIP ANY INCOMPLETE TASKS.**
+
+For each task that needs documentation (process ALL incomplete tasks, no exceptions):
+- `task.md` - Comprehensive task overview and implementation guide
+- `prompt.md` - Autonomous prompt for AI agents
+- `acceptance-criteria.md` - Clear acceptance criteria and test cases
+- `task.xml` - XML-structured prompt optimized for LLM consumption (agent-generated)
+
+## Final Confirmation Required
+**YOU MUST END WITH THIS EXACT MESSAGE:**
+```
+🎉 DOCUMENTATION GENERATION COMPLETE 🎉
+✅ Generated documentation for ALL tasks
+✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, task.xml)
+📋 Total files created: [COUNT]
+🔧 Generated comprehensive markdown documentation
+🔗 Git workflow and pull request will be handled automatically by orchestrator hook
+```
+DEFAULT_PROMPT_EOF
+      )
+      fi
+      
+      # Send initial prompt to Claude
+      if printf '{"text":%s}\n' "$INITIAL_TEXT" | \
+           curl -fsS -X POST http://127.0.0.1:8080/input \
+             -H 'Content-Type: application/json' \
+             --data-binary @- >/dev/null 2>&1; then
+        echo "✓ Initial prompt sent via sidecar /input"
+        
+        # Wait for Claude to complete, then request sidecar shutdown
+        wait $CLAUDE_PID
+        CLAUDE_EXIT_CODE=$?
+        echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
+        
+        if curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
+          echo "✓ Requested sidecar shutdown"
+        else
+          echo "⚠️ Failed to request sidecar shutdown (it may not be running)"
+        fi
+      else
+        echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
+        exec 9>"$FIFO_PATH"
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$INITIAL_TEXT" >&9
+        exec 9>&- 2>/dev/null || true
+        
+        # Wait for Claude to complete
+        wait $CLAUDE_PID
+        CLAUDE_EXIT_CODE=$?
+        echo "Claude completed with exit code: $CLAUDE_EXIT_CODE"
       fi
   fi
 
