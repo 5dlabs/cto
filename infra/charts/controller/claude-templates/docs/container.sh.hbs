@@ -320,48 +320,44 @@ if [ -f "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" ]; then
 
   gen_count=0
 
+  # Use jq directly to process tasks without base64 encoding/decoding
+  # This avoids the base64 invalid input errors
+
   # First, check the actual structure of tasks.json
   if jq -e 'type == "array" and length > 0' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
     echo "📋 Detected array structure, checking if it contains task objects directly..."
     # Check if it's an array of task objects directly
     if jq -e '.[0] | has("id")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
       echo "📋 Processing as direct array of task objects"
-      jq -c '.[] | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+      jq -c '.[] | select(.id != null)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
     elif jq -e '.[0] | has("tasks")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
       echo "📋 Processing as array with nested tasks arrays"
-      jq -c '.[].tasks[]? | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+      jq -c '.[].tasks[]? | select(.id != null)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
     else
       echo "📋 Processing as generic array structure"
-      jq -c '.[] | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+      jq -c '.[] | select(.id != null)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
     fi
   elif jq -e '.tasks and (.tasks | type == "array")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
     echo "📋 Processing as object with tasks array"
-    jq -c '.tasks[] | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+    jq -c '.tasks[] | select(.id != null)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
   else
     echo "⚠️ Unexpected tasks.json structure, attempting generic extraction..."
     # Fallback: try to extract any objects with id field
-    jq -c '.. | objects | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || {
+    jq -c '.. | objects | select(.id != null)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || {
       echo "❌ Failed to parse tasks.json structure"
       echo "Showing raw tasks.json content for debugging:"
       cat "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || echo "Could not read tasks.json"
       exit 1
     }
   fi \
-    | while IFS= read -r row; do
-      if [ -z "$row" ]; then
+    | while IFS= read -r task_json; do
+      if [ -z "$task_json" ]; then
         continue
       fi
 
-      # Safe base64 decoding with error handling
-      decoded=""
-      if ! decoded=$(printf '%s' "$row" | base64 -d 2>/dev/null); then
-        echo "⚠️ Failed to decode base64 row: $row"
-        continue
-      fi
-
-      # Safe JSON extraction with error handling
+      # Direct JSON extraction with error handling (no base64 decoding needed)
       _decode() {
-        printf '%s' "$decoded" | jq -r "$1" 2>/dev/null || echo ""
+        printf '%s' "$task_json" | jq -r "$1" 2>/dev/null || echo ""
       }
 
       task_id=$(_decode '.id')
