@@ -75,6 +75,17 @@ spec:
         description: "Claude model to use for all agents"
         value: ""  # Must be provided by MCP client
 
+      # Agent tool configurations (JSON strings from client-side config)
+      - name: implementation-tools
+        description: "JSON string of tools config for implementation agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
+      - name: quality-tools
+        description: "JSON string of tools config for quality agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
+      - name: testing-tools
+        description: "JSON string of tools config for testing agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
+
       # PR context (populated by suspend/resume)
       - name: pr-url
         description: "Pull request URL (populated after PR creation)"
@@ -163,6 +174,8 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "quality"
+                - name: tools-config
+                  value: "{{`{{workflow.parameters.quality-tools}}`}}"
                 - name: pr-url
                   value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
@@ -202,6 +215,8 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "testing"
+                - name: tools-config
+                  value: "{{`{{workflow.parameters.testing-tools}}`}}"
                 - name: pr-url
                   value: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
@@ -271,6 +286,8 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: tools-config
+                  value: "{{`{{workflow.parameters.implementation-tools}}`}}"
         - - name: wait-for-pr
             template: check-or-wait-for-pr
             arguments:
@@ -451,6 +468,8 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: tools-config
+            default: "{}"
           - name: pr-url
             default: ""
           - name: pr-number
@@ -473,6 +492,8 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: tools-config
+                  value: "{{`{{inputs.parameters.tools-config}}`}}"
                 - name: pr-url
                   value: "{{`{{inputs.parameters.pr-url}}`}}"
                 - name: pr-number
@@ -503,6 +524,8 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: tools-config
+            default: "{}"
           - name: pr-url
             default: ""
           - name: pr-number
@@ -533,6 +556,8 @@ spec:
               workflow-run: "{{`{{workflow.name}}`}}"
               workflow-stage: "{{`{{inputs.parameters.stage}}`}}"
               workflow-type: "play-orchestration"
+            annotations:
+              agents.platform/tools-config: "{{`{{inputs.parameters.tools-config}}`}}"
           spec:
             taskId: {{`{{inputs.parameters.task-id}}`}}
             service: "{{`{{workflow.parameters.service}}`}}"
