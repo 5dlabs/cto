@@ -28,7 +28,7 @@ struct AgentConfig {
     tools: Option<AgentTools>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct AgentTools {
     #[serde(default)]
     #[allow(dead_code)]
@@ -38,7 +38,7 @@ struct AgentTools {
     local_servers: Option<LocalServerConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct LocalServerConfig {
     #[serde(default)]
     #[allow(dead_code)]
@@ -48,7 +48,7 @@ struct LocalServerConfig {
     git: Option<ServerConfig>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct ServerConfig {
     #[allow(dead_code)]
     enabled: bool,
@@ -874,8 +874,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.implementation_agent.clone());
 
-    // Resolve agent name and extract CLI/model if it's a short alias
-    let (implementation_agent, implementation_cli, implementation_model) =
+    // Resolve agent name and extract CLI/model/tools if it's a short alias
+    let (implementation_agent, implementation_cli, implementation_model, implementation_tools) =
         if let Some(agent_config) = config.agents.get(&implementation_agent_input) {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
@@ -888,10 +888,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.model.clone()
             };
-            (agent_config.github_app.clone(), agent_cli, agent_model)
+            let agent_tools = agent_config.tools.as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            (implementation_agent_input, cli.clone(), model.clone())
+            (implementation_agent_input, cli.clone(), model.clone(), "{}".to_string())
         };
 
     // Handle quality agent - use provided value or config default
@@ -901,8 +904,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
 
-    // Resolve agent name and extract CLI/model if it's a short alias
-    let (quality_agent, quality_cli, quality_model) =
+    // Resolve agent name and extract CLI/model/tools if it's a short alias
+    let (quality_agent, quality_cli, quality_model, quality_tools) =
         if let Some(agent_config) = config.agents.get(&quality_agent_input) {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
@@ -915,10 +918,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.model.clone()
             };
-            (agent_config.github_app.clone(), agent_cli, agent_model)
+            let agent_tools = agent_config.tools.as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            (quality_agent_input, cli.clone(), model.clone())
+            (quality_agent_input, cli.clone(), model.clone(), "{}".to_string())
         };
 
     // Handle testing agent - use provided value or config default
@@ -928,8 +934,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
 
-    // Resolve agent name and extract CLI/model if it's a short alias
-    let (testing_agent, testing_cli, testing_model) =
+    // Resolve agent name and extract CLI/model/tools if it's a short alias
+    let (testing_agent, testing_cli, testing_model, testing_tools) =
         if let Some(agent_config) = config.agents.get(&testing_agent_input) {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
@@ -942,10 +948,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.model.clone()
             };
-            (agent_config.github_app.clone(), agent_cli, agent_model)
+            let agent_tools = agent_config.tools.as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string()))
+                .unwrap_or_else(|| "{}".to_string());
+            (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            (testing_agent_input, cli.clone(), model.clone())
+            (testing_agent_input, cli.clone(), model.clone(), "{}".to_string())
         };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
@@ -1015,12 +1024,15 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("implementation-agent={implementation_agent}"),
         format!("implementation-cli={implementation_cli}"),
         format!("implementation-model={implementation_model}"),
+        format!("implementation-tools={implementation_tools}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
+        format!("quality-tools={quality_tools}"),
         format!("testing-agent={testing_agent}"),
         format!("testing-cli={testing_cli}"),
         format!("testing-model={testing_model}"),
+        format!("testing-tools={testing_tools}"),
         format!("model={model}"),
     ];
 
