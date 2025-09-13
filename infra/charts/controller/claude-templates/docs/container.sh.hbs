@@ -324,7 +324,10 @@ if [ -f "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" ]; then
   # This avoids the base64 invalid input errors
 
   # First, check the actual structure of tasks.json
-  if jq -e 'type == "array" and length > 0' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
+  if jq -e '.master.tasks and (.master.tasks | type == "array")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
+    echo "📋 Detected TaskMaster structure with master.tasks array"
+    jq -c '.master.tasks[] | select(.id != null)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+  elif jq -e 'type == "array" and length > 0' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
     echo "📋 Detected array structure, checking if it contains task objects directly..."
     # Check if it's an array of task objects directly
     if jq -e '.[0] | has("id")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
