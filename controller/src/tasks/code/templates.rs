@@ -3,7 +3,7 @@ use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::Result;
 use handlebars::Handlebars;
 
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -186,25 +186,70 @@ impl CodeTemplateGenerator {
         use serde_json::to_string_pretty;
 
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        let agent_cfg = config
-            .agents
-            .values()
-            .find(|a| a.github_app == github_app)
-            .ok_or_else(|| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Agent config not found for githubApp='{github_app}' in controller config."
-                ))
-            })?;
+        
+        if let Some(agent_cfg) = config.agents.values().find(|a| a.github_app == github_app) {
+            debug!(
+                "code: matched agent config for githubApp='{}' (tools_present={}, clientConfig_present={})",
+                github_app,
+                agent_cfg.tools.is_some(),
+                agent_cfg.client_config.is_some()
+            );
+            
+            // 1) Verbatim clientConfig
+            if let Some(client_cfg) = &agent_cfg.client_config {
+                debug!("code: using verbatim clientConfig for '{}'", github_app);
+                return to_string_pretty(client_cfg).map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to serialize clientConfig: {e}"
+                    ))
+                });
+            }
 
-        let client_cfg = agent_cfg.client_config.as_ref().ok_or_else(|| {
-            crate::tasks::types::Error::ConfigError(
-                format!("Missing clientConfig for agent githubApp='{github_app}'. Define agents.<agent>.clientConfig in Helm values."),
-            )
-        })?;
+            // 2) Convert tools → client-config.json
+            if let Some(tools) = &agent_cfg.tools {
+                debug!(
+                    "code: building clientConfig from tools for '{}' (remote_count={}, local_present={})",
+                    github_app,
+                    tools.remote.len(),
+                    tools.local_servers.is_some()
+                );
+                
+                // remoteTools - tools.remote is Vec<String>, not Option
+                let remote_tools: Value = json!(tools.remote);
 
-        to_string_pretty(client_cfg).map_err(|e| {
+                // localServers (handle empty or missing local server configs)
+                let local_servers_obj = serde_json::Map::new();
+
+                let client = Value::Object(
+                    vec![
+                        ("remoteTools".to_string(), remote_tools),
+                        ("localServers".to_string(), Value::Object(local_servers_obj)),
+                    ]
+                    .into_iter()
+                    .collect(),
+                );
+
+                return to_string_pretty(&client).map_err(|e| {
+                    crate::tasks::types::Error::ConfigError(format!(
+                        "Failed to serialize tools-based clientConfig: {e}"
+                    ))
+                });
+            }
+        }
+
+        // 3) No clientConfig/tools provided → minimal JSON object
+        debug!(
+            "code: no tools/clientConfig found for '{}', using minimal config",
+            github_app
+        );
+        let minimal_client = json!({
+            "remoteTools": [],
+            "localServers": {}
+        });
+
+        to_string_pretty(&minimal_client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
-                "Failed to serialize clientConfig: {e}"
+                "Failed to serialize empty clientConfig: {e}"
             ))
         })
     }
