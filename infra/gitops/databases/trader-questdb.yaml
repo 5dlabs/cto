@@ -25,3 +25,4 @@ spec:
     http.enabled: "true"
     pg.enabled: "true"
     line.tcp.enabled: "true"
+    line.http.enabled: "true"
