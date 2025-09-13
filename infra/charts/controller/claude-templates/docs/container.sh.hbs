@@ -309,13 +309,66 @@ echo "Setting up task files..."
 if [ -f "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" ]; then
   echo "📋 Found tasks.json, generating individual task files..."
 
-  # Robust extraction: base64-encode each task to keep one line per task, then decode fields
+  # Robust extraction: handle different possible tasks.json structures
+  echo "🔍 Analyzing tasks.json structure..."
+
+  # Debug: Show the actual structure of tasks.json
+  echo "📄 Raw tasks.json structure preview:"
+  head -20 "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || echo "Could not read tasks.json"
+  echo "📊 JSON structure analysis:"
+  jq -r '"Type: " + (type | tostring) + ", Length: " + (if type == "array" then length else (keys | length) end | tostring)' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || echo "Could not analyze JSON structure"
+
   gen_count=0
-  jq -c '.[].tasks[]? | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" \
+
+  # First, check the actual structure of tasks.json
+  if jq -e 'type == "array" and length > 0' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
+    echo "📋 Detected array structure, checking if it contains task objects directly..."
+    # Check if it's an array of task objects directly
+    if jq -e '.[0] | has("id")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
+      echo "📋 Processing as direct array of task objects"
+      jq -c '.[] | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+    elif jq -e '.[0] | has("tasks")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
+      echo "📋 Processing as array with nested tasks arrays"
+      jq -c '.[].tasks[]? | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+    else
+      echo "📋 Processing as generic array structure"
+      jq -c '.[] | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+    fi
+  elif jq -e '.tasks and (.tasks | type == "array")' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" >/dev/null 2>&1; then
+    echo "📋 Processing as object with tasks array"
+    jq -c '.tasks[] | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json"
+  else
+    echo "⚠️ Unexpected tasks.json structure, attempting generic extraction..."
+    # Fallback: try to extract any objects with id field
+    jq -c '.. | objects | select(.id != null) | @base64' "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || {
+      echo "❌ Failed to parse tasks.json structure"
+      echo "Showing raw tasks.json content for debugging:"
+      cat "$CLAUDE_WORK_DIR/.taskmaster/tasks/tasks.json" 2>/dev/null || echo "Could not read tasks.json"
+      exit 1
+    }
+  fi \
     | while IFS= read -r row; do
-      _decode() { printf '%s' "$row" | base64 -d | jq -r "$1"; }
+      if [ -z "$row" ]; then
+        continue
+      fi
+
+      # Safe base64 decoding with error handling
+      decoded=""
+      if ! decoded=$(printf '%s' "$row" | base64 -d 2>/dev/null); then
+        echo "⚠️ Failed to decode base64 row: $row"
+        continue
+      fi
+
+      # Safe JSON extraction with error handling
+      _decode() {
+        printf '%s' "$decoded" | jq -r "$1" 2>/dev/null || echo ""
+      }
+
       task_id=$(_decode '.id')
-      [ -n "$task_id" ] && [ "$task_id" != "null" ] || continue
+      if [ -z "$task_id" ] || [ "$task_id" = "null" ]; then
+        echo "⚠️ Skipping task without valid id: $task_id"
+        continue
+      fi
       title=$(_decode '.title // "No Title"')
       description=$(_decode '.description // ""')
       details=$(_decode '.details // ""')
