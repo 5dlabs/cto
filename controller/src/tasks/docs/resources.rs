@@ -581,7 +581,7 @@ impl<'a> DocsResourceManager<'a> {
             .trim_start_matches("https://github.com/")
             .trim_end_matches(".git")
             .replace('/', "-");
-        
+
         let pvc_name = format!(
             "docs-workspace-{}-{}",
             repo_slug
@@ -957,7 +957,7 @@ impl<'a> DocsResourceManager<'a> {
             .trim_start_matches("https://github.com/")
             .trim_end_matches(".git")
             .replace('/', "-");
-        
+
         let pvc_name = format!(
             "docs-workspace-{}-{}",
             repo_slug
