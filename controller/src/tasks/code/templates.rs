@@ -217,13 +217,19 @@ impl CodeTemplateGenerator {
                 // remoteTools - tools.remote is Vec<String>, not Option
                 let remote_tools: Value = json!(tools.remote);
 
-                // localServers (handle empty or missing local server configs)
-                let local_servers_obj = serde_json::Map::new();
+                // localServers (safely handle any level of missing config)
+                let local_servers_obj = if let Some(ref ls) = tools.local_servers {
+                    // Convert whatever localServers structure exists to JSON
+                    serde_json::to_value(ls).unwrap_or_else(|_| json!({}))
+                } else {
+                    // No local servers configured
+                    json!({})
+                };
 
                 let client = Value::Object(
                     vec![
                         ("remoteTools".to_string(), remote_tools),
-                        ("localServers".to_string(), Value::Object(local_servers_obj)),
+                        ("localServers".to_string(), local_servers_obj),
                     ]
                     .into_iter()
                     .collect(),
