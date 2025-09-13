@@ -251,38 +251,42 @@ impl DocsTemplateGenerator {
                 let mut local_servers_obj = serde_json::Map::new();
                 if let Some(ref ls) = tools.local_servers {
                     // filesystem - check if enabled before accessing fields
-                    if ls.filesystem.enabled {
-                        let mut fs_obj = serde_json::Map::new();
-                        if !ls.filesystem.tools.is_empty() {
-                            fs_obj.insert("tools".to_string(), json!(ls.filesystem.tools));
+                    if let Some(ref fs) = ls.filesystem {
+                        if fs.enabled {
+                            let mut fs_obj = serde_json::Map::new();
+                            if !fs.tools.is_empty() {
+                                fs_obj.insert("tools".to_string(), json!(fs.tools));
+                            }
+                            if let Some(cmd) = &fs.command {
+                                fs_obj.insert("command".to_string(), json!(cmd));
+                            }
+                            if let Some(args) = &fs.args {
+                                fs_obj.insert("args".to_string(), json!(args));
+                            }
+                            if let Some(wd) = &fs.working_directory {
+                                fs_obj.insert("workingDirectory".to_string(), json!(wd));
+                            }
+                            local_servers_obj.insert("filesystem".to_string(), Value::Object(fs_obj));
                         }
-                        if let Some(cmd) = &ls.filesystem.command {
-                            fs_obj.insert("command".to_string(), json!(cmd));
-                        }
-                        if let Some(args) = &ls.filesystem.args {
-                            fs_obj.insert("args".to_string(), json!(args));
-                        }
-                        if let Some(wd) = &ls.filesystem.working_directory {
-                            fs_obj.insert("workingDirectory".to_string(), json!(wd));
-                        }
-                        local_servers_obj.insert("filesystem".to_string(), Value::Object(fs_obj));
                     }
                     // git - check if enabled before accessing fields
-                    if ls.git.enabled {
-                        let mut g_obj = serde_json::Map::new();
-                        if !ls.git.tools.is_empty() {
-                            g_obj.insert("tools".to_string(), json!(ls.git.tools));
+                    if let Some(ref git) = ls.git {
+                        if git.enabled {
+                            let mut g_obj = serde_json::Map::new();
+                            if !git.tools.is_empty() {
+                                g_obj.insert("tools".to_string(), json!(git.tools));
+                            }
+                            if let Some(cmd) = &git.command {
+                                g_obj.insert("command".to_string(), json!(cmd));
+                            }
+                            if let Some(args) = &git.args {
+                                g_obj.insert("args".to_string(), json!(args));
+                            }
+                            if let Some(wd) = &git.working_directory {
+                                g_obj.insert("workingDirectory".to_string(), json!(wd));
+                            }
+                            local_servers_obj.insert("git".to_string(), Value::Object(g_obj));
                         }
-                        if let Some(cmd) = &ls.git.command {
-                            g_obj.insert("command".to_string(), json!(cmd));
-                        }
-                        if let Some(args) = &ls.git.args {
-                            g_obj.insert("args".to_string(), json!(args));
-                        }
-                        if let Some(wd) = &ls.git.working_directory {
-                            g_obj.insert("workingDirectory".to_string(), json!(wd));
-                        }
-                        local_servers_obj.insert("git".to_string(), Value::Object(g_obj));
                     }
                 }
 
