@@ -302,8 +302,13 @@ if [ ! -d "$CLAUDE_WORK_DIR/.taskmaster" ]; then
   exit 1
 fi
 
-# Ensure docs directory exists
+# Ensure docs directory exists and clean old data to prevent contamination
 mkdir -p "$CLAUDE_WORK_DIR/.taskmaster/docs"
+
+# TEMPORARY: Clean any existing documentation to prevent cross-project contamination
+echo "🧹 Cleaning existing documentation to prevent cross-project contamination..."
+rm -rf "$CLAUDE_WORK_DIR/.taskmaster/docs/task-"* 2>/dev/null || true
+echo "✓ Cleaned existing task documentation"
 
 ## Handle task files - support both JSON and individual file formats
 echo "Setting up task files..."
