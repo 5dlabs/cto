@@ -186,7 +186,33 @@ impl CodeTemplateGenerator {
         use serde_json::to_string_pretty;
 
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-
+        
+        // 1) Check CodeRun annotations for client-side tool configs first
+        if let Some(annotations) = &code_run.metadata.annotations {
+            if let Some(tools_config_str) = annotations.get("agents.platform/tools-config") {
+                if !tools_config_str.trim().is_empty() && tools_config_str != "{}" {
+                    debug!("code: using tools config from CodeRun annotation for '{}'", github_app);
+                    
+                    // Parse the tools config from annotation
+                    if let Ok(tools_value) = serde_json::from_str::<Value>(tools_config_str) {
+                        let client_config = json!({
+                            "remoteTools": tools_value.get("remote").unwrap_or(&json!([])),
+                            "localServers": tools_value.get("localServers").unwrap_or(&json!({}))
+                        });
+                        
+                        return to_string_pretty(&client_config).map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to serialize annotation-based clientConfig: {e}"
+                            ))
+                        });
+                    } else {
+                        debug!("code: failed to parse tools config annotation, falling back to agent config");
+                    }
+                }
+            }
+        }
+        
+        // 2) Fall back to agent config from Helm values
         if let Some(agent_cfg) = config.agents.values().find(|a| a.github_app == github_app) {
             debug!(
                 "code: matched agent config for githubApp='{}' (tools_present={}, clientConfig_present={})",
@@ -194,8 +220,8 @@ impl CodeTemplateGenerator {
                 agent_cfg.tools.is_some(),
                 agent_cfg.client_config.is_some()
             );
-
-            // 1) Verbatim clientConfig
+            
+            // 2a) Verbatim clientConfig
             if let Some(client_cfg) = &agent_cfg.client_config {
                 debug!("code: using verbatim clientConfig for '{}'", github_app);
                 return to_string_pretty(client_cfg).map_err(|e| {
@@ -205,7 +231,7 @@ impl CodeTemplateGenerator {
                 });
             }
 
-            // 2) Convert tools → client-config.json
+            // 2b) Convert tools → client-config.json
             if let Some(tools) = &agent_cfg.tools {
                 debug!(
                     "code: building clientConfig from tools for '{}' (remote_count={}, local_present={})",
