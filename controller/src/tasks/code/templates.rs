@@ -186,7 +186,7 @@ impl CodeTemplateGenerator {
         use serde_json::to_string_pretty;
 
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        
+
         if let Some(agent_cfg) = config.agents.values().find(|a| a.github_app == github_app) {
             debug!(
                 "code: matched agent config for githubApp='{}' (tools_present={}, clientConfig_present={})",
@@ -194,7 +194,7 @@ impl CodeTemplateGenerator {
                 agent_cfg.tools.is_some(),
                 agent_cfg.client_config.is_some()
             );
-            
+
             // 1) Verbatim clientConfig
             if let Some(client_cfg) = &agent_cfg.client_config {
                 debug!("code: using verbatim clientConfig for '{}'", github_app);
@@ -213,7 +213,7 @@ impl CodeTemplateGenerator {
                     tools.remote.len(),
                     tools.local_servers.is_some()
                 );
-                
+
                 // remoteTools - tools.remote is Vec<String>, not Option
                 let remote_tools: Value = json!(tools.remote);
 
