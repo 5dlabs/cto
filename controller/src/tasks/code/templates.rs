@@ -520,20 +520,25 @@ impl CodeTemplateGenerator {
                         .local_servers
                         .as_ref()
                         .map(|local_servers_config| LocalServerConfigs {
-                            filesystem: local_servers_config.filesystem.as_ref().map(|fs| LocalServerConfig {
-                                enabled: fs.enabled,
-                                tools: fs.tools.clone(),
-                                command: fs.command.clone(),
-                                args: fs.args.clone(),
-                                working_directory: fs.working_directory.clone(),
+                            filesystem: local_servers_config.filesystem.as_ref().map(|fs| {
+                                LocalServerConfig {
+                                    enabled: fs.enabled,
+                                    tools: fs.tools.clone(),
+                                    command: fs.command.clone(),
+                                    args: fs.args.clone(),
+                                    working_directory: fs.working_directory.clone(),
+                                }
                             }),
-                            git: local_servers_config.git.as_ref().map(|git| LocalServerConfig {
-                                enabled: git.enabled,
-                                tools: git.tools.clone(),
-                                command: git.command.clone(),
-                                args: git.args.clone(),
-                                working_directory: git.working_directory.clone(),
-                            }),
+                            git: local_servers_config
+                                .git
+                                .as_ref()
+                                .map(|git| LocalServerConfig {
+                                    enabled: git.enabled,
+                                    tools: git.tools.clone(),
+                                    command: git.command.clone(),
+                                    args: git.args.clone(),
+                                    working_directory: git.working_directory.clone(),
+                                }),
                         });
 
                 return Ok(AgentTools {

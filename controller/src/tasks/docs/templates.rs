@@ -266,7 +266,8 @@ impl DocsTemplateGenerator {
                             if let Some(wd) = &fs.working_directory {
                                 fs_obj.insert("workingDirectory".to_string(), json!(wd));
                             }
-                            local_servers_obj.insert("filesystem".to_string(), Value::Object(fs_obj));
+                            local_servers_obj
+                                .insert("filesystem".to_string(), Value::Object(fs_obj));
                         }
                     }
                     // git - check if enabled before accessing fields
