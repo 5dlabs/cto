@@ -242,10 +242,12 @@ pub struct AgentTools {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LocalServerConfigs {
     /// Filesystem server configuration
-    pub filesystem: LocalServerConfig,
+    #[serde(default)]
+    pub filesystem: Option<LocalServerConfig>,
 
     /// Git server configuration
-    pub git: LocalServerConfig,
+    #[serde(default)]
+    pub git: Option<LocalServerConfig>,
 }
 
 /// Configuration for a local MCP server

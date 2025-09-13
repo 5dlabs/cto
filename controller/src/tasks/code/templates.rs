@@ -520,26 +520,20 @@ impl CodeTemplateGenerator {
                         .local_servers
                         .as_ref()
                         .map(|local_servers_config| LocalServerConfigs {
-                            filesystem: LocalServerConfig {
-                                enabled: local_servers_config.filesystem.enabled,
-                                tools: local_servers_config.filesystem.tools.clone(),
-                                command: local_servers_config.filesystem.command.clone(),
-                                args: local_servers_config.filesystem.args.clone(),
-                                working_directory: local_servers_config
-                                    .filesystem
-                                    .working_directory
-                                    .clone(),
-                            },
-                            git: LocalServerConfig {
-                                enabled: local_servers_config.git.enabled,
-                                tools: local_servers_config.git.tools.clone(),
-                                command: local_servers_config.git.command.clone(),
-                                args: local_servers_config.git.args.clone(),
-                                working_directory: local_servers_config
-                                    .git
-                                    .working_directory
-                                    .clone(),
-                            },
+                            filesystem: local_servers_config.filesystem.as_ref().map(|fs| LocalServerConfig {
+                                enabled: fs.enabled,
+                                tools: fs.tools.clone(),
+                                command: fs.command.clone(),
+                                args: fs.args.clone(),
+                                working_directory: fs.working_directory.clone(),
+                            }),
+                            git: local_servers_config.git.as_ref().map(|git| LocalServerConfig {
+                                enabled: git.enabled,
+                                tools: git.tools.clone(),
+                                command: git.command.clone(),
+                                args: git.args.clone(),
+                                working_directory: git.working_directory.clone(),
+                            }),
                         });
 
                 return Ok(AgentTools {
@@ -560,7 +554,7 @@ impl CodeTemplateGenerator {
                 "memory_add_observations".to_string(),
             ],
             local_servers: Some(LocalServerConfigs {
-                filesystem: LocalServerConfig {
+                filesystem: Some(LocalServerConfig {
                     enabled: true,
                     tools: vec![
                         "read_file".to_string(),
@@ -572,8 +566,8 @@ impl CodeTemplateGenerator {
                     command: None,
                     args: None,
                     working_directory: None,
-                },
-                git: LocalServerConfig {
+                }),
+                git: Some(LocalServerConfig {
                     enabled: true,
                     tools: vec![
                         "git_status".to_string(),
@@ -584,7 +578,7 @@ impl CodeTemplateGenerator {
                     command: None,
                     args: None,
                     working_directory: None,
-                },
+                }),
             }),
         })
     }
@@ -718,20 +712,20 @@ mod tests {
                 "brave_web_search".to_string(),
             ],
             local_servers: Some(LocalServerConfigs {
-                filesystem: LocalServerConfig {
+                filesystem: Some(LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
                     command: None,
                     args: None,
                     working_directory: None,
-                },
-                git: LocalServerConfig {
+                }),
+                git: Some(LocalServerConfig {
                     enabled: false,
                     tools: vec![],
                     command: None,
                     args: None,
                     working_directory: None,
-                },
+                }),
             }),
         };
 
