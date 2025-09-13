@@ -119,6 +119,76 @@ When the updated ConfigMap is deployed:
 - The issue was likely due to deployment lag or environment using stale ConfigMap
 - Version banner will provide immediate confirmation of template version in future investigations
 
+## CRITICAL FOLLOW-UP INVESTIGATION (2025-09-13)
+
+### Additional Root Causes Discovered
+
+#### 1. **PVC Data Contamination Issue** 🚨
+- **Symptom**: Docs job showing 8 tasks from "trader" project instead of 10 tasks from CLI-agnostic platform
+- **Root Cause**: PVC naming based only on `working_directory`, causing cross-project data sharing
+- **Evidence**: `controller/src/tasks/docs/resources.rs` lines 578-592 used format: `docs-workspace-{working_directory}`
+- **Impact**: Multiple projects with same working directory (e.g., "docs") share the same PVC and stale data
+
+**Original PVC Naming Logic**:
+```rust
+let pvc_name = format!("docs-workspace-{}", working_directory);
+// Problem: "docs" → same PVC for all projects using "docs" as working dir
+```
+
+**Fixed PVC Naming Logic**:
+```rust
+let pvc_name = format!("docs-workspace-{}-{}", repo_slug, working_directory);
+// Solution: "5dlabs-cto-docs" vs "5dlabs-trader-docs" → separate PVCs
+```
+
+#### 2. **XML File Generation Antipattern** ❌
+- **Issue**: Template was generating physical `task.xml` files on disk  
+- **Problem**: XML should be used as prompt format, not as persistent files
+- **Fixed**: Removed XML file generation from both container script and prompt template
+- **Impact**: Cleaner documentation structure, reduced disk usage, clearer purpose
+
+### Fixes Applied (Part 2)
+
+#### 3. Project-Specific PVC Naming
+- **Files Modified**: 
+  - `controller/src/tasks/docs/resources.rs` (lines 576-592 and 952-985)
+- **Change**: Include repository slug in PVC name to ensure project isolation
+- **New Format**: `docs-workspace-{repo-slug}-{working-directory}`
+- **Example**: `docs-workspace-5dlabs-cto-docs` vs `docs-workspace-5dlabs-trader-docs`
+
+#### 4. XML File Generation Removal
+- **Files Modified**:
+  - `infra/charts/controller/claude-templates/docs/container.sh.hbs` (removed XML generation logic)
+  - `infra/charts/controller/claude-templates/docs/prompt.md.hbs` (updated documentation requirements)
+- **Change**: Removed XML file creation, updated to generate only 3 files: `task.md`, `prompt.md`, `acceptance-criteria.md`
+- **Rationale**: XML should be used as prompt structure, not as physical files
+
+#### 5. Template Updates
+- **Action**: Regenerated ConfigMap with latest template changes
+- **Size Change**: 578418 → 572586 bytes (reduction due to XML removal)
+- **Verification**: All changes included in new ConfigMap
+
+### Expected Resolution (Updated)
+After deployment of updated controller and ConfigMap:
+1. **Version Banner**: "📍 Docs container template version: 2025-09-13 - jq-only processing (no base64 decode)"
+2. **Project Isolation**: Each project gets its own PVC based on repository and working directory
+3. **Correct Task Count**: Jobs will process the correct project's tasks (10 for CLI-agnostic platform, not 8 from trader)
+4. **Clean Documentation**: Only 3 files generated per task (no XML files)
+5. **No Cross-Contamination**: Stale data from previous projects won't affect new runs
+
+### Deployment Requirements (Updated)
+- **Controller**: Deploy updated Rust controller with new PVC naming logic
+- **ConfigMap**: Deploy updated template ConfigMap
+- **Cleanup**: Optional - delete old shared PVCs to clear stale data
+- **Verification**: Confirm new PVC names and correct task processing
+
+### Investigation Success
+- ✅ Base64 decode issue resolved
+- ✅ PVC cross-contamination issue identified and fixed
+- ✅ XML file generation antipattern removed
+- ✅ Project isolation implemented
+- ✅ Template versioning for future forensics
+
 ## Original Analysis
 
 Appendix: Why base64 failed

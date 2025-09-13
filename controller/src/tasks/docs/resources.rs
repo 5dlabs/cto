@@ -574,9 +574,26 @@ impl<'a> DocsResourceManager<'a> {
         }));
 
         // Persistent workspace volume for docs to prevent data loss
-        // Create a PVC name based on the working directory for reuse across jobs
+        // Create a project-specific PVC name to avoid cross-project data contamination
+        let repo_slug = docs_run
+            .spec
+            .repository_url
+            .trim_start_matches("https://github.com/")
+            .trim_end_matches(".git")
+            .replace('/', "-");
+        
         let pvc_name = format!(
-            "docs-workspace-{}",
+            "docs-workspace-{}-{}",
+            repo_slug
+                .chars()
+                .map(|c| if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                })
+                .collect::<String>()
+                .trim_matches('-')
+                .to_lowercase(),
             docs_run
                 .spec
                 .working_directory
@@ -933,8 +950,26 @@ impl<'a> DocsResourceManager<'a> {
     }
 
     async fn ensure_workspace_pvc(&self, docs_run: &DocsRun) -> Result<()> {
+        // Create a project-specific PVC name to avoid cross-project data contamination
+        let repo_slug = docs_run
+            .spec
+            .repository_url
+            .trim_start_matches("https://github.com/")
+            .trim_end_matches(".git")
+            .replace('/', "-");
+        
         let pvc_name = format!(
-            "docs-workspace-{}",
+            "docs-workspace-{}-{}",
+            repo_slug
+                .chars()
+                .map(|c| if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                })
+                .collect::<String>()
+                .trim_matches('-')
+                .to_lowercase(),
             docs_run
                 .spec
                 .working_directory

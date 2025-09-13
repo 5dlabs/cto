@@ -454,43 +454,10 @@ EOF
         <criterion>Implementation should be well-documented with clear comments</criterion>"
       fi
 
-      cat > "$task_dir/task.xml" << XML_EOF
-<prompt>
-    <role>You are a $tech_role.</role>
-    <task>
-        <id>$task_id</id>
-        <title>$title</title>
-        <description>$description</description>
-        <priority>$priority</priority>
-        <status>$status</status>
-        <dependencies>$dependencies</dependencies>
-    </task>
-    <technical_specifications>
-        $specs
-    </technical_specifications>
-    <implementation_details>
-        $details
-    </implementation_details>
-    <acceptance_criteria>
-        $criteria
-    </acceptance_criteria>
-    <test_strategy>
-        $test_strategy
-    </test_strategy>
-    <instructions>
-        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns.
-        Provide complete, production-ready code that follows best practices. Include necessary imports,
-        error handling, and documentation. Test your solution thoroughly before finalizing.
-        Ensure compatibility with the existing technology stack and architectural patterns.
-    </instructions>
-</prompt>
-XML_EOF
-
       gen_count=$((gen_count+1))
       echo "✓ Generated docs/task-$task_id/task.txt"
-      echo "✓ Generated docs/task-$task_id/task.xml (XML format for LLM consumption)"
     done
-  echo "Generated $gen_count task directories with txt and xml files from tasks.json"
+  echo "Generated $gen_count task directories with txt files from tasks.json"
 elif [ -d "$CLAUDE_WORK_DIR/.taskmaster/tasks" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/.taskmaster/tasks" 2>/dev/null)" ]; then
   echo "📋 Found individual task files, copying to docs directory..."
 
