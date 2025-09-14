@@ -874,7 +874,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
     let (implementation_agent, implementation_cli, implementation_model, implementation_tools) =
-        if let Some(agent_config) = config.agents.get(&implementation_agent_input) {
+        if let Some(agent_config) = config.agents.values().find(|a| a.github_app == implementation_agent_input) {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
                 cli.clone()
@@ -904,7 +904,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
     let (quality_agent, quality_cli, quality_model, quality_tools) =
-        if let Some(agent_config) = config.agents.get(&quality_agent_input) {
+        if let Some(agent_config) = config.agents.values().find(|a| a.github_app == quality_agent_input) {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
                 cli.clone()
@@ -934,7 +934,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
     let (testing_agent, testing_cli, testing_model, testing_tools) =
-        if let Some(agent_config) = config.agents.get(&testing_agent_input) {
+        if let Some(agent_config) = config.agents.values().find(|a| a.github_app == testing_agent_input) {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
                 cli.clone()
