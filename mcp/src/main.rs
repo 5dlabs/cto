@@ -32,7 +32,7 @@ struct AgentConfig {
 struct AgentTools {
     #[serde(default)]
     #[allow(dead_code)]
-    remote: Option<Vec<String>>,
+    remote: Vec<String>,
     #[serde(default, rename = "localServers")]
     #[allow(dead_code)]
     local_servers: Option<LocalServerConfig>,
@@ -729,11 +729,9 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         if let Some(agent_cfg) = config.agents.get(agent_key) {
             if let Some(tools) = &agent_cfg.tools {
                 // remote-tools
-                if let Some(remote) = &tools.remote {
-                    if !remote.is_empty() {
-                        let json = serde_json::to_string(remote).unwrap_or_else(|_| "[]".to_string());
-                        params.push(format!("remote-tools={json}"));
-                    }
+                if !tools.remote.is_empty() {
+                    let json = serde_json::to_string(&tools.remote).unwrap_or_else(|_| "[]".to_string());
+                    params.push(format!("remote-tools={json}"));
                 }
                 // local-tools: enable servers that are present and marked enabled
                 if let Some(ls) = &tools.local_servers {
@@ -894,7 +892,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            (implementation_agent_input, cli.clone(), model.clone(), "{}".to_string())
+            (implementation_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
         };
 
     // Handle quality agent - use provided value or config default
@@ -924,7 +922,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            (quality_agent_input, cli.clone(), model.clone(), "{}".to_string())
+            (quality_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
         };
 
     // Handle testing agent - use provided value or config default
@@ -954,7 +952,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            (testing_agent_input, cli.clone(), model.clone(), "{}".to_string())
+            (testing_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
         };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
@@ -972,12 +970,20 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
     eprintln!("🐛 DEBUG: Play workflow service: {service}");
     eprintln!("🐛 DEBUG: Implementation agent: {implementation_agent} (CLI: {implementation_cli}, Model: {implementation_model})");
+    eprintln!("🐛 DEBUG: Implementation tools: {implementation_tools}");
     eprintln!(
         "🐛 DEBUG: Quality agent: {quality_agent} (CLI: {quality_cli}, Model: {quality_model})"
     );
+    eprintln!("🐛 DEBUG: Quality tools: {quality_tools}");
     eprintln!(
         "🐛 DEBUG: Testing agent: {testing_agent} (CLI: {testing_cli}, Model: {testing_model})"
     );
+    eprintln!("🐛 DEBUG: Testing tools: {testing_tools}");
+
+    eprintln!("🐛 DEBUG: Available agents in config: {:?}", config.agents.keys().collect::<Vec<_>>());
+    eprintln!("🐛 DEBUG: Implementation agent input: '{implementation_agent_input}'");
+    eprintln!("🐛 DEBUG: Quality agent input: '{quality_agent_input}'");
+    eprintln!("🐛 DEBUG: Testing agent input: '{testing_agent_input}'");
 
     // Check for requirements.yaml file
     // Try to determine workspace directory, but don't fail if we can't
@@ -1052,6 +1058,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         // Always provide task-requirements parameter, even if empty (Argo requires it)
         params.push("task-requirements=".to_string());
     }
+
 
     let mut args = vec![
         "submit",
