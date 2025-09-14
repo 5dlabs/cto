@@ -134,25 +134,60 @@ jobs:
             ls -la $CARGO_HOME/ 2>/dev/null || echo "CARGO_HOME not found"
           fi
 
-      - name: Regenerate Helm templates
+      - name: Validate and regenerate Helm templates
         run: |
-          echo "🔄 Regenerating Helm templates before build..."
+          echo "🔄 Validating and regenerating Helm templates before deployment..."
           cd infra/charts/controller
+          
+          # Store original for comparison
+          cp templates/claude-templates-static.yaml templates/claude-templates-static.yaml.orig 2>/dev/null || true
+          
+          # Regenerate the templates
           ./scripts/generate-templates-configmap.sh
           
           # Check if templates were updated
-          if ! git diff --quiet templates/claude-templates-static.yaml; then
-            echo "📝 Templates updated but cannot push to protected main branch"
-            echo "⚠️ WARNING: Static templates are out of sync with source files!"
-            echo "🔧 Continuing with updated templates for this build only"
-            echo "📋 Manual action required: Run 'make generate-templates' and commit the changes"
-            
-            # Show the diff for visibility
-            echo "📄 Template changes detected:"
-            git diff --stat templates/claude-templates-static.yaml
+          if [ -f templates/claude-templates-static.yaml.orig ]; then
+            if ! diff -q templates/claude-templates-static.yaml.orig templates/claude-templates-static.yaml >/dev/null 2>&1; then
+              echo "⚠️ WARNING: Templates were out of sync and have been regenerated!"
+              echo "📄 Template changes detected:"
+              diff -u templates/claude-templates-static.yaml.orig templates/claude-templates-static.yaml | head -50 || true
+              echo ""
+              echo "🔧 Using regenerated templates for this deployment"
+              echo "📋 ACTION REQUIRED: Commit the template updates to avoid this in future deployments:"
+              echo "   cd infra/charts/controller"
+              echo "   ./scripts/generate-templates-configmap.sh"
+              echo "   git add templates/claude-templates-static.yaml"
+              echo "   git commit -m 'chore: update claude-templates ConfigMap'"
+              echo ""
+              
+              # For workflow_dispatch (manual deploys), this is critical
+              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                echo "⚠️ MANUAL DEPLOYMENT: Proceeding with regenerated templates"
+              fi
+            else
+              echo "✅ Templates are up to date"
+            fi
+            rm -f templates/claude-templates-static.yaml.orig
           else
-            echo "✅ Templates are up to date"
+            echo "✅ Templates generated successfully (no previous version to compare)"
           fi
+          
+          # Verify the generated ConfigMap is valid YAML
+          echo "🔍 Validating generated ConfigMap YAML..."
+          if command -v yamllint >/dev/null 2>&1; then
+            yamllint -d relaxed templates/claude-templates-static.yaml || {
+              echo "❌ ERROR: Generated ConfigMap is not valid YAML!"
+              exit 1
+            }
+          else
+            # Basic validation without yamllint
+            head -n 1 templates/claude-templates-static.yaml | grep -q "^#" || {
+              echo "❌ ERROR: Generated ConfigMap doesn't look valid!"
+              exit 1
+            }
+          fi
+          
+          echo "✅ Template ConfigMap is valid and ready for deployment"
 
       - name: Build release binary (ultra-fast)
         working-directory: ./controller
