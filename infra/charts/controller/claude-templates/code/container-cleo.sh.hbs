@@ -679,8 +679,16 @@ cd "$CLAUDE_WORK_DIR"
 # Build Claude command
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
-# Create Cleo's static prompt
-echo "✓ Creating Cleo's static code quality enforcement prompt"
+# Look for Cleo-specific system prompt file
+if [ -f "/task-files/cleo-system-prompt.md" ]; then
+    echo "✓ Found Cleo system prompt file, adding to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/cleo-system-prompt.md"
+else
+    echo "ℹ️ No Cleo system prompt file found, using inline prompt"
+fi
+
+# Create Cleo's static prompt (fallback if no system prompt file)
+echo "✓ Creating Cleo's code quality enforcement prompt"
 
 # Build static prompt with task context
 CLEO_PROMPT="# Code Quality Review Assignment
