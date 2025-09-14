@@ -142,15 +142,14 @@ jobs:
           
           # Check if templates were updated
           if ! git diff --quiet templates/claude-templates-static.yaml; then
-            echo "📝 Templates updated - committing changes"
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add templates/claude-templates-static.yaml
-            git commit -m "chore: auto-update claude-templates static ConfigMap
-
-            - Regenerated from claude-templates/ source files  
-            - Updated before controller build to ensure latest templates"
-            git push
+            echo "📝 Templates updated but cannot push to protected main branch"
+            echo "⚠️ WARNING: Static templates are out of sync with source files!"
+            echo "🔧 Continuing with updated templates for this build only"
+            echo "📋 Manual action required: Run 'make generate-templates' and commit the changes"
+            
+            # Show the diff for visibility
+            echo "📄 Template changes detected:"
+            git diff --stat templates/claude-templates-static.yaml
           else
             echo "✅ Templates are up to date"
           fi
