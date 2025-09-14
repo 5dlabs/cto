@@ -151,7 +151,6 @@ agents:
       strategic thinking to every challenge.
     tools:
       remote: ["brave_web_search", "solana_Solana_Expert__Ask_For_Help", "context7_get_library_docs", "rustdocs_query_rust_docs", "agent_docs_add_rust_crate", "agent_docs_birdeye_query", "agent_docs_solana_query", "agent_docs_jupiter_query", "agent_docs_meteora_query", "agent_docs_raydium_query"]
-      localServers: {}
 
   cleo:
     name: "Cleo"
@@ -181,7 +180,6 @@ agents:
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
     tools:
       remote: ["brave_web_search", "solana_Solana_Expert__Ask_For_Help", "context7_get_library_docs", "rustdocs_query_rust_docs", "agent_docs_add_rust_crate", "agent_docs_birdeye_query", "agent_docs_solana_query", "agent_docs_jupiter_query", "agent_docs_meteora_query", "agent_docs_raydium_query"]
-      localServers: {}
 
   tess:
     name: "Tess"
@@ -222,7 +220,6 @@ agents:
       **IMPORTANT: After submitting your PR review, your work is complete. Exit immediately.**
     tools:
       remote: ["brave_web_search", "solana_Solana_Expert__Ask_For_Help", "context7_get_library_docs", "rustdocs_query_rust_docs", "agent_docs_add_rust_crate", "agent_docs_birdeye_query", "agent_docs_solana_query", "agent_docs_jupiter_query", "agent_docs_meteora_query", "agent_docs_raydium_query", "kubernetes_helmInstall", "kubernetes_helmRollback", "kubernetes_getPodMetrics", "kubernetes_getPodsLogs", "kubernetes_describeResource", "kubernetes_listResources", "kubernetes_getEvents", "kubernetes_getNodeMetrics", "kubernetes_helmList", "kubernetes_helmGet", "kubernetes_helmUpgrade", "kubernetes_helmRepoAdd", "kubernetes_helmRepoList", "kubernetes_getResource", "kubernetes_helmUninstall", "kubernetes_createResource"]
-      localServers: {}
 
   blaze:
     name: "Blaze"
