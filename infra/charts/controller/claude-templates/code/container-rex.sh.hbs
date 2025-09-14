@@ -1184,7 +1184,30 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
           echo "✅ Claude process completed successfully"
         else
-          echo "⚠️ Claude process exited with code: $CLAUDE_EXIT_CODE"
+          echo "❌ Claude process FAILED with exit code: $CLAUDE_EXIT_CODE"
+          echo "🔍 Critical error - Claude did not complete successfully"
+          echo "📋 This typically indicates:"
+          echo "   - API rate limiting or authentication issues"
+          echo "   - MCP client configuration problems"
+          echo "   - Invalid prompt or system message formatting"
+          echo "   - Tool execution failures"
+          echo ""
+          echo "⚠️ ABORTING: Cannot continue without successful Claude execution"
+          echo "🔚 Force terminating container with error status..."
+          
+          # Clean up background processes
+          if [ -n "$TOKEN_REFRESH_PID" ]; then
+              kill $TOKEN_REFRESH_PID 2>/dev/null || true
+          fi
+          if [ -n "${HANG_DIAG_PID:-}" ]; then 
+              kill "$HANG_DIAG_PID" 2>/dev/null || true
+          fi
+          
+          # Write failure marker for debugging
+          echo "rex-implementation-failed:$(date -u +%Y-%m-%dT%H:%M:%SZ):exit-code-$CLAUDE_EXIT_CODE" > /workspace/.rex-failed
+          
+          # Exit with error to signal pod failure
+          exit $CLAUDE_EXIT_CODE
         fi
 
         # Stop diagnostics if running
