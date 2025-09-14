@@ -368,7 +368,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Setup tools
         run: |
@@ -382,6 +382,49 @@ jobs:
             chmod +x $HOME/bin/helm
           fi
           echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Prepare template updates for ArgoCD
+        id: template-check
+        run: |
+          echo "📦 Preparing template updates for ArgoCD deployment..."
+          
+          # Check if templates were regenerated in the build job
+          cd infra/charts/controller
+          
+          # Regenerate templates again to ensure consistency
+          ./scripts/generate-templates-configmap.sh
+          
+          # Create a patch file if templates differ from Git
+          if ! git diff --quiet templates/claude-templates-static.yaml; then
+            echo "templates-changed=true" >> $GITHUB_OUTPUT
+            echo "📝 Creating template update patch..."
+            git diff templates/claude-templates-static.yaml > /tmp/templates-update.patch
+            
+            # Also save the full updated file
+            cp templates/claude-templates-static.yaml /tmp/claude-templates-static.yaml
+            
+            echo "⚠️ IMPORTANT: Templates have been updated!"
+            echo "The regenerated templates will be used by ArgoCD for this deployment."
+            echo ""
+            echo "To make these changes permanent, apply this patch to your main branch:"
+            echo "   git apply /tmp/templates-update.patch"
+            echo "   git add infra/charts/controller/templates/claude-templates-static.yaml"
+            echo "   git commit -m 'chore: update claude-templates ConfigMap'"
+            echo "   git push"
+          else
+            echo "templates-changed=false" >> $GITHUB_OUTPUT
+            echo "✅ Templates are in sync with Git repository"
+          fi
+      
+      - name: Upload template updates
+        if: steps.template-check.outputs.templates-changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: template-updates-${{ github.run_id }}
+          path: |
+            /tmp/templates-update.patch
+            /tmp/claude-templates-static.yaml
+          retention-days: 7
 
       - name: GitOps Update (Skipped)
         run: |
