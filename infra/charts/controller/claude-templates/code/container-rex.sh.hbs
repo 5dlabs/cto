@@ -1292,6 +1292,81 @@ echo '════════════════════════�
 echo "Claude has completed successfully."
 
 # =============================================================================
+# CRITICAL PR VERIFICATION - MUST HAVE CREATED A PR
+# =============================================================================
+echo ""
+echo "🔍 VERIFYING PULL REQUEST CREATION (MANDATORY)..."
+echo ""
+
+# Give GitHub API a moment to register the PR if just created
+sleep 3
+
+# Check if a PR was created for this branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+PR_CHECK_FAILED=false
+
+if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
+    echo "📋 Checking for PR on branch: $CURRENT_BRANCH"
+    
+    # Try to find PR by branch
+    PR_EXISTS=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    
+    if [ -z "$PR_EXISTS" ]; then
+        # Also check by task label as backup
+        TASK_LABEL="task-${TASK_ID}"
+        PR_EXISTS=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+    
+    if [ -z "$PR_EXISTS" ]; then
+        echo "❌ CRITICAL ERROR: No pull request found!"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "║                    PR CREATION FAILED                        ║"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "Rex was required to create a pull request but failed to do so."
+        echo "This is a MANDATORY requirement that was not met."
+        echo ""
+        echo "Possible reasons:"
+        echo "  1. No code changes were made"
+        echo "  2. Changes were not committed"
+        echo "  3. Branch was not pushed to remote"
+        echo "  4. PR creation command failed"
+        echo "  5. GitHub authentication issues"
+        echo ""
+        echo "Diagnostic information:"
+        echo "  Branch: $CURRENT_BRANCH"
+        echo "  Task ID: ${TASK_ID}"
+        
+        # Check if there are uncommitted changes
+        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+            echo "  ⚠️ There are uncommitted changes in the repository"
+        fi
+        
+        # Check if branch exists on remote
+        if ! git ls-remote --heads origin "$CURRENT_BRANCH" | grep -q "$CURRENT_BRANCH"; then
+            echo "  ⚠️ Branch not found on remote repository"
+        fi
+        
+        echo ""
+        echo "🔚 FAILING CONTAINER: Rex did not create required pull request"
+        
+        # Write failure marker
+        echo "rex-no-pr-created:$(date -u +%Y-%m-%dT%H:%M:%SZ):branch-$CURRENT_BRANCH" > /workspace/.rex-pr-failed
+        
+        # Exit with error
+        exit 1
+    else
+        echo "✅ Pull request #${PR_EXISTS} found successfully"
+        echo "Rex has completed the task and created the required PR."
+    fi
+else
+    echo "⚠️ WARNING: Unable to verify PR (branch detection failed)"
+    echo "Branch: $CURRENT_BRANCH"
+    # Don't fail here as this might be a git configuration issue
+fi
+
+# =============================================================================
 # PR DETECTION AND LABELING
 # =============================================================================
 # After Claude completes, check if a PR was created and apply correlation labels
