@@ -242,11 +242,11 @@ pub struct AgentTools {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LocalServerConfigs {
     /// Filesystem server configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filesystem: Option<LocalServerConfig>,
 
     /// Git server configuration
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<LocalServerConfig>,
 }
 
