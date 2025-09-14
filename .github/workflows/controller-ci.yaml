@@ -207,13 +207,11 @@ jobs:
               echo "✅ Templates automatically updated in PR branch"
               
               # Add a comment to the PR
-              gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Auto-Update**: The claude-templates ConfigMap has been automatically regenerated and committed to this PR.
+              GH_TOKEN=${{ secrets.GITHUB_TOKEN }} gh pr comment ${{ github.event.pull_request.number }} --body "🤖 **Auto-Update**: The claude-templates ConfigMap has been automatically regenerated and committed to this PR.
               
               The templates were out of sync with the source files in \`claude-templates/\`. This has been fixed automatically.
               
               No further action is required - the templates are now up to date."
-              env:
-                GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             else
               # For main branch pushes
               git commit -m "chore: auto-update claude-templates ConfigMap

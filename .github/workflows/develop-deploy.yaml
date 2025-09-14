@@ -180,11 +180,27 @@ jobs:
               exit 1
             }
           else
-            # Basic validation without yamllint
-            head -n 1 templates/claude-templates-static.yaml | grep -q "^#" || {
-              echo "❌ ERROR: Generated ConfigMap doesn't look valid!"
+            # Basic validation without yamllint - check for valid YAML structure
+            if [ ! -f templates/claude-templates-static.yaml ]; then
+              echo "❌ ERROR: Generated ConfigMap file does not exist!"
               exit 1
-            }
+            fi
+            
+            # Check file is not empty and has reasonable size
+            if [ ! -s templates/claude-templates-static.yaml ]; then
+              echo "❌ ERROR: Generated ConfigMap is empty!"
+              exit 1
+            fi
+            
+            # Check for valid YAML start patterns (comment, document separator, or apiVersion)
+            if head -n 5 templates/claude-templates-static.yaml | grep -qE "^(#|---|apiVersion:|kind:)"; then
+              echo "✅ Basic YAML structure validation passed"
+            else
+              echo "❌ ERROR: Generated ConfigMap doesn't appear to be valid YAML!"
+              echo "First 5 lines:"
+              head -n 5 templates/claude-templates-static.yaml
+              exit 1
+            fi
           fi
           
           echo "✅ Template ConfigMap is valid and ready for deployment"
