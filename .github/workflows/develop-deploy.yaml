@@ -134,6 +134,27 @@ jobs:
             ls -la $CARGO_HOME/ 2>/dev/null || echo "CARGO_HOME not found"
           fi
 
+      - name: Regenerate Helm templates
+        run: |
+          echo "🔄 Regenerating Helm templates before build..."
+          cd infra/charts/controller
+          ./scripts/generate-templates-configmap.sh
+          
+          # Check if templates were updated
+          if ! git diff --quiet templates/claude-templates-static.yaml; then
+            echo "📝 Templates updated - committing changes"
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            git add templates/claude-templates-static.yaml
+            git commit -m "chore: auto-update claude-templates static ConfigMap
+
+            - Regenerated from claude-templates/ source files  
+            - Updated before controller build to ensure latest templates"
+            git push
+          else
+            echo "✅ Templates are up to date"
+          fi
+
       - name: Build release binary (ultra-fast)
         working-directory: ./controller
         env:
