@@ -134,6 +134,26 @@ jobs:
             ls -la $CARGO_HOME/ 2>/dev/null || echo "CARGO_HOME not found"
           fi
 
+      - name: Regenerate Helm templates
+        run: |
+          echo "🔄 Regenerating Helm templates before build..."
+          cd infra/charts/controller
+          ./scripts/generate-templates-configmap.sh
+          
+          # Check if templates were updated
+          if ! git diff --quiet templates/claude-templates-static.yaml; then
+            echo "📝 Templates updated but cannot push to protected main branch"
+            echo "⚠️ WARNING: Static templates are out of sync with source files!"
+            echo "🔧 Continuing with updated templates for this build only"
+            echo "📋 Manual action required: Run 'make generate-templates' and commit the changes"
+            
+            # Show the diff for visibility
+            echo "📄 Template changes detected:"
+            git diff --stat templates/claude-templates-static.yaml
+          else
+            echo "✅ Templates are up to date"
+          fi
+
       - name: Build release binary (ultra-fast)
         working-directory: ./controller
         env:
