@@ -186,10 +186,21 @@ impl CodeTemplateGenerator {
         use serde_json::to_string_pretty;
 
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        
+        debug!("🐛 DEBUG: generate_client_config called for github_app='{}'", github_app);
+        debug!("🐛 DEBUG: Available agents in config: {:?}", 
+            config.agents.keys().collect::<Vec<_>>());
+        debug!("🐛 DEBUG: Agent github_app mappings: {:?}", 
+            config.agents.iter().map(|(k, v)| (k, &v.github_app)).collect::<Vec<_>>());
 
         // 1) Check CodeRun annotations for client-side tool configs first
         if let Some(annotations) = &code_run.metadata.annotations {
             if let Some(tools_config_str) = annotations.get("agents.platform/tools-config") {
+                debug!("🐛 DEBUG: Found tools-config annotation: '{}'", tools_config_str);
+                debug!("🐛 DEBUG: Annotation trimmed: '{}', is_empty: {}, equals '{{}}': {}", 
+                    tools_config_str.trim(), 
+                    tools_config_str.trim().is_empty(),
+                    tools_config_str == "{}");
                 if !tools_config_str.trim().is_empty() && tools_config_str != "{}" {
                     debug!(
                         "code: using tools config from CodeRun annotation for '{}'",
@@ -216,7 +227,9 @@ impl CodeTemplateGenerator {
         }
 
         // 2) Fall back to agent config from Helm values
+        debug!("🐛 DEBUG: Falling back to Helm agent config for github_app='{}'", github_app);
         if let Some(agent_cfg) = config.agents.values().find(|a| a.github_app == github_app) {
+            debug!("🐛 DEBUG: Found matching agent config!");
             debug!(
                 "code: matched agent config for githubApp='{}' (tools_present={}, clientConfig_present={})",
                 github_app,
@@ -273,6 +286,7 @@ impl CodeTemplateGenerator {
         }
 
         // 3) No clientConfig/tools provided → minimal JSON object
+        debug!("🐛 DEBUG: No matching agent found in Helm config!");
         debug!(
             "code: no tools/clientConfig found for '{}', using minimal config",
             github_app
