@@ -527,22 +527,23 @@ rm -rf /tmp/docs-repo
 echo "✓ Docs repository cleaned up"
 
 # Set working directory to the target repository root
-REPO_NAME="$TARGET_REPO_DIR"
-echo "✓ Working directory: /workspace/$REPO_NAME"
+# DO NOT overwrite REPO_NAME - it's already correctly parsed for GitHub API calls
+WORKSPACE_DIR="$TARGET_REPO_DIR"
+echo "✓ Working directory: /workspace/$WORKSPACE_DIR"
 
 # Set Claude working directory early (needed for client-config.json copy)
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
 else
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
 fi
 mkdir -p "$CLAUDE_WORK_DIR"
 echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
-cd "/workspace/$REPO_NAME"
+cd "/workspace/$WORKSPACE_DIR"
 
 # Sync with latest main to prevent conflicts
 echo "🔄 Syncing with latest main to prevent conflicts..."
@@ -588,12 +589,12 @@ echo "🔑 CRITICAL: Claude will be launched from this directory"
 # Configure git user after successful clone
 echo "=== POST-CLONE GIT CONFIGURATION ==="
 # Fix dubious ownership issues
-git config --global --add safe.directory "/workspace/$REPO_NAME"
+git config --global --add safe.directory "/workspace/$WORKSPACE_DIR"
 echo "✓ Added repository to safe directories"
 
 # Set git config locally in the working repository (persistent on PVC)
-if [ -d "/workspace/$REPO_NAME/.git" ]; then
-    cd "/workspace/$REPO_NAME"
+if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
+    cd "/workspace/$WORKSPACE_DIR"
     git config --local user.name "$GIT_AUTHOR_NAME"
     git config --local user.email "$GIT_AUTHOR_EMAIL"
     # Set up automatic upstream for new branches
@@ -787,7 +788,7 @@ for file in $REQUIRED_FILES; do
 done
 
 # Check git repository (REQUIRED for implementation tasks)
-if [ ! -d "/workspace/$REPO_NAME/.git" ]; then
+if [ ! -d "/workspace/$WORKSPACE_DIR/.git" ]; then
   echo "✗ CRITICAL ERROR: No target git repository found!"
   MISSING_FILES="$MISSING_FILES git-repository"
 else
@@ -864,7 +865,7 @@ if [ ! -d ".git" ]; then
   echo "📂 Checking parent directory structure:"
   echo "  Current: $(pwd)"
   echo "  Contents: $(ls -la . | head -5)"
-  if [ -d "/workspace/$REPO_NAME/.git" ]; then
+  if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
     echo "  Found .git at: /workspace/$REPO_NAME/"
     echo "🔧 This indicates a working directory path mismatch"
     echo "🔧 CLAUDE_WORK_DIR: $CLAUDE_WORK_DIR"
