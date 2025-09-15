@@ -252,6 +252,58 @@ The Claude agent has completed the implementation and addressed all acceptance c
         echo "- Network connectivity issue"
         echo "- Repository permissions issue"
     fi
+
+    # Attempt to add correlation labels (task/run/service) even if PR already existed
+    echo "=== Ensuring correlation labels on PR ==="
+    # Derive repository slug from origin remote
+    REPO_SLUG=""
+    if ORIGIN_URL=$(git -C . remote get-url origin 2>/dev/null); then
+      if echo "$ORIGIN_URL" | grep -qE '^https://github.com/'; then
+        REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)(\\.git)?|\\1|')
+      elif echo "$ORIGIN_URL" | grep -qE '^git@github.com:'; then
+        REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\\.git)?|\\1|')
+      fi
+    fi
+
+    # Resolve PR number by head branch if needed
+    if [ -z "$PR_URL" ]; then
+      PR_URL=$(gh pr view -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
+    fi
+    PR_NUMBER=""
+    PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    if [ -z "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+      PR_NUMBER=$(gh pr view "$PR_URL" --json number -q .number 2>/dev/null || echo "")
+    fi
+
+    if [ -n "$PR_NUMBER" ]; then
+      # Build labels from environment when available; fall back to minimal
+      TASK_LABEL="task-${TASK_ID:-{{task_id}}}"
+      RUN_LABEL="run-${WORKFLOW_NAME:-${RUN_NAME:-unknown}}"
+      SERVICE_LABEL="service-${SERVICE_NAME:-{{service}}}"
+
+      echo "🏷️ Adding labels to PR #$PR_NUMBER on $REPO_SLUG: $TASK_LABEL, $RUN_LABEL, $SERVICE_LABEL"
+      LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "$TASK_LABEL,$RUN_LABEL,$SERVICE_LABEL" 2>&1)
+      if [ $? -ne 0 ]; then
+        echo "⚠️ Failed to add labels in one shot: $LABEL_ERROR"
+        # Ensure labels exist, then add individually
+        for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+          if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
+            case "$label" in
+              task-*) COLOR="f29513"; DESC="Task correlation" ;;
+              run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
+              service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+              *) COLOR="ededed"; DESC="Correlation label" ;;
+            esac
+            gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+          fi
+          gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "$label" 2>/dev/null || true
+        done
+      else
+        echo "✅ Correlation labels ensured on PR"
+      fi
+    else
+      echo "⚠️ Could not resolve PR number for labeling"
+    fi
 else
     echo "❌ GitHub CLI not available - PR must be created manually"
     echo ""
