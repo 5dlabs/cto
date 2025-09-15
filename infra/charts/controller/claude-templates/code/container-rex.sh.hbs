@@ -1437,17 +1437,31 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
     fi
   fi
 
-  # First, try to find PR by task label (Claude may have added task-N label)
-  TASK_LABEL="task-${TASK_ID}"
-  PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+  # Retry loop for PR detection (sometimes GitHub API takes a moment)
+  MAX_RETRIES=5
+  RETRY_COUNT=0
+  PR_NUMBER=""
 
-  # If not found by label, try by branch name (current branch)
-  if [ -z "$PR_NUMBER" ]; then
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
-    if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-      PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+  while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$PR_NUMBER" ]; do
+    if [ $RETRY_COUNT -gt 0 ]; then
+      echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES: Waiting for PR to appear in GitHub API..."
+      sleep 3
     fi
-  fi
+
+    # First, try to find PR by task label (Claude may have added task-N label)
+    TASK_LABEL="task-${TASK_ID}"
+    PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+
+    # If not found by label, try by branch name (current branch)
+    if [ -z "$PR_NUMBER" ]; then
+      CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+      if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
+        PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+      fi
+    fi
+
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+  done
 
   if [ -n "$PR_NUMBER" ]; then
     echo "✅ Found PR #${PR_NUMBER}"
@@ -1533,8 +1547,25 @@ EOF
     echo "   Run: $RUN_LABEL"
     echo "   Service: $SERVICE_LABEL"
 
+    # Pre-create labels if they don't exist (do this BEFORE trying to add them)
+    echo "🔍 Ensuring labels exist in repository..."
+    for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
+      if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
+        echo "   📝 Creating label '$label'..."
+        case "$label" in
+          task-*) COLOR="f29513"; DESC="Task correlation" ;;
+          run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
+          service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+          *) COLOR="ededed"; DESC="Correlation label" ;;
+        esac
+        gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+      else
+        echo "   ✓ Label '$label' already exists"
+      fi
+    done
+
     # Try to add labels with detailed error capture
-    echo "🔍 DEBUG: Attempting to add labels to PR..."
+    echo "🔍 Attempting to add labels to PR #${PR_NUMBER}..."
     LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
     LABEL_EXIT_CODE=$?
 
@@ -1597,6 +1628,23 @@ EOF
           echo "❌ PR is $PR_STATE - cannot add labels to closed/merged PRs"
         fi
       fi
+    fi
+
+    # Final verification that labels were applied
+    echo "🔍 Final verification of PR labels..."
+    PR_LABELS=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+    if echo "$PR_LABELS" | grep -q "^task-${TASK_ID}$" && \
+       echo "$PR_LABELS" | grep -q "^run-${WORKFLOW_NAME}$" && \
+       echo "$PR_LABELS" | grep -q "^service-${SERVICE_NAME}$"; then
+      echo "✅ VERIFIED: All correlation labels are present on PR #${PR_NUMBER}"
+    else
+      echo "⚠️ WARNING: Some labels may be missing. Current labels:"
+      echo "$PR_LABELS" | sed 's/^/   - /'
+      echo ""
+      echo "Expected labels:"
+      echo "   - task-${TASK_ID}"
+      echo "   - run-${WORKFLOW_NAME}"
+      echo "   - service-${SERVICE_NAME}"
     fi
   else
     echo "ℹ️ No PR found for this task (Claude may not have created one)"
