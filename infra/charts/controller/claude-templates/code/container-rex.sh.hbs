@@ -1426,6 +1426,10 @@ fi
 if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   echo "🔍 Checking for PRs created by this task..."
 
+  # Debug: Show current directory and work directory
+  echo "📍 Current directory: $(pwd)"
+  echo "📍 Claude work directory: $CLAUDE_WORK_DIR"
+
   # Determine implementation repository slug for gh -R
   REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
   if [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
@@ -1436,6 +1440,8 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\.git)?|\1|')
     fi
   fi
+
+  echo "📍 Repository: $REPO_SLUG"
 
   # Retry loop for PR detection (sometimes GitHub API takes a moment)
   MAX_RETRIES=5
@@ -1454,8 +1460,9 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
 
     # If not found by label, try by branch name (current branch)
     if [ -z "$PR_NUMBER" ]; then
-      CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+      CURRENT_BRANCH=$(cd "$CLAUDE_WORK_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
       if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
+        echo "🔍 Checking for PR on branch: $CURRENT_BRANCH"
         PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
       fi
     fi
