@@ -1350,13 +1350,13 @@ PR_CHECK_FAILED=false
 if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
     echo "📋 Checking for PR on branch: $CURRENT_BRANCH"
     
-    # Try to find PR by branch
-    PR_EXISTS=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    # Try to find PR by branch (need to specify repo)
+    PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
     
     if [ -z "$PR_EXISTS" ]; then
         # Also check by task label as backup
         TASK_LABEL="task-${TASK_ID}"
-        PR_EXISTS=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+        PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
     fi
 
     # If still not found, run the stop hook one more time (idempotent) then re-check
@@ -1367,7 +1367,7 @@ if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$
         ) || echo "⚠️ Stop hook retry failed"
         echo "⏳ Waiting briefly before re-checking PR..."
         sleep 3
-        PR_EXISTS=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+        PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
     fi
     
     if [ -z "$PR_EXISTS" ]; then
