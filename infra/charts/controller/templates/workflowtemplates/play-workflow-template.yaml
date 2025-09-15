@@ -165,6 +165,7 @@ spec:
           # Stage 2: Quality work
           - name: quality-work
             dependencies: [implementation-cycle, update-to-waiting-pr-created]
+            when: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}} != ''"
             template: agent-coderun
             arguments:
               parameters:
@@ -206,6 +207,7 @@ spec:
           # Stage 3: Testing work
           - name: testing-work
             dependencies: [wait-ready-for-qa]
+            when: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}} != ''"
             template: agent-coderun
             arguments:
               parameters:
@@ -404,26 +406,34 @@ spec:
           # Poll up to 60s (12 x 5s)
           attempts=12
           while [ $attempts -gt 0 ]; do
-            # GitHub API - list open PRs
-            if [ -n "$AUTH_HEADER" ]; then
-              resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
+            # Prefer Issues API for label queries; filter to PRs by presence of .pull_request
+            if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
+              q_labels=$(printf "%s" "$LABEL" | sed 's/,/%2C/g')
             else
-              resp=$(curl -sL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls?state=open") || resp="[]"
+              q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
             fi
 
-            # Different search logic based on stage
-            if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
-              # For quality/testing stages, just look for the task label (PR already exists)
-              pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
-              pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+            url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
+            if [ -n "$AUTH_HEADER" ]; then
+              resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
             else
-              # For implementation stage, look for both task and run labels first
-              pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .html_url' | head -n1)
-              pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | (any(.name=="'"$LABEL"'") and any(.name=="'"$RUN_LABEL"'"))) | .number' | head -n1)
-              # Fall back to just task label if not found
-              if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
-                pr_url=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .html_url' | head -n1)
-                pr_number=$(echo "$resp" | jq -r '.[] | select((.labels // []) | any(.name=="'"$LABEL"'")) | .number' | head -n1)
+              resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
+            fi
+
+            pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
+            pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
+            
+            # Fallback: if implementation stage and not found with both labels, try just task label
+            if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+              if [ "$STAGE" != "quality" ] && [ "$STAGE" != "testing" ]; then
+                url2="https://api.github.com/repos/${REPO}/issues?state=open&labels=$(printf "%s" "$LABEL" | sed 's/,/%2C/g')"
+                if [ -n "$AUTH_HEADER" ]; then
+                  resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url2") || resp="[]"
+                else
+                  resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url2") || resp="[]"
+                fi
+                pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
+                pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
               fi
             fi
 

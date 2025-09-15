@@ -366,6 +366,30 @@ else
     cd "$CLAUDE_WORK_DIR"
 fi
 
+# Derive repository slug for gh CLI operations
+REPO_SLUG=""
+if git -C "$CLAUDE_WORK_DIR" remote get-url origin >/dev/null 2>&1; then
+  ORIGIN_URL=$(git -C "$CLAUDE_WORK_DIR" remote get-url origin 2>/dev/null || echo "")
+  if echo "$ORIGIN_URL" | grep -qE '^https://github.com/'; then
+    REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)(\\.git)?|\\1|')
+  elif echo "$ORIGIN_URL" | grep -qE '^git@github.com:'; then
+    REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\\.git)?|\\1|')
+  fi
+fi
+
+# If PR context is missing, try to discover by task label
+if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
+  TASK_LABEL="task-${TASK_ID}"
+  if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ]; then
+      PR_NUMBER="$CAND_NUM"
+      PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
+      echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
+    fi
+  fi
+fi
+
 # Checkout PR branch for quality review
 if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
