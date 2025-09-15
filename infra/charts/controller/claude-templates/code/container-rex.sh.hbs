@@ -891,28 +891,29 @@ else
     echo "⚠️ No MCP configuration file found at /workspace/.mcp.json, MCP servers will not be available"
 fi
 
-# Look for Rex-specific system prompt file
-# Rex container always uses rex-system-prompt.md
+# Look for Rex-specific system prompt file, then combine with inline SYSTEM_PROMPT so it is always utilized
+SELECTED_SYS_PROMPT=""
 if [ -f "/task-files/rex-system-prompt.md" ]; then
-    echo "✓ Found Rex system prompt file, adding to Claude command"
-    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/rex-system-prompt.md"
+    echo "✓ Found Rex system prompt file"
+    SELECTED_SYS_PROMPT="/task-files/rex-system-prompt.md"
     if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-        echo "[DEBUG] System prompt path: /task-files/rex-system-prompt.md"
-        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/task-files/rex-system-prompt.md" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] System prompt path: $SELECTED_SYS_PROMPT"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "$SELECTED_SYS_PROMPT" | sed 's/^/[DEBUG] /'
         echo "[DEBUG] ----"
     fi
 elif [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
-    # Fallback to direct GitHub App name
     echo "✓ Found system prompt file for {{github_app}}"
-    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
+    SELECTED_SYS_PROMPT="/config/agents/{{github_app}}_system-prompt.md"
     if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
-        echo "[DEBUG] System prompt path: /config/agents/{{github_app}}_system-prompt.md"
-        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "/config/agents/{{github_app}}_system-prompt.md" | sed 's/^/[DEBUG] /'
+        echo "[DEBUG] System prompt path: $SELECTED_SYS_PROMPT"
+        echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "$SELECTED_SYS_PROMPT" | sed 's/^/[DEBUG] /'
         echo "[DEBUG] ----"
     fi
 else
-    echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
+    echo "ℹ️ No system prompt file found for agent {{github_app}}"
 fi
+
+# Defer combining with inline SYSTEM_PROMPT until after it is defined
 
 # Model is set via settings.json template, not CLI flag
 
@@ -1001,6 +1002,24 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
 
 **Remember**: Focus on thorough implementation and verification.'
 
+# Now that SYSTEM_PROMPT is defined, combine with selected file and add to CLI
+COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
+{
+  if [ -n "$SELECTED_SYS_PROMPT" ]; then
+    cat "$SELECTED_SYS_PROMPT" || true
+    echo "\n---\n(Appended inline system requirements)\n"
+  else
+    echo "---"
+    echo "name: InlineSystem"
+    echo "description: Appended inline system requirements"
+    echo "---"
+  fi
+  printf '%s' "$SYSTEM_PROMPT"
+} > "$COMBINED_SYS_PROMPT"
+
+# Ensure we pass the combined system prompt
+CLAUDE_CMD="$CLAUDE_CMD --system-prompt $COMBINED_SYS_PROMPT"
+
 echo "Starting Claude execution (stream-json via FIFO)..."
 echo "=========================="
 
@@ -1059,12 +1078,23 @@ You are assigned to work on **TASK {{task_id}} ONLY**.
 4. If you see existing code from other tasks, IGNORE IT
 5. If your memory (CLAUDE.md) mentions other tasks, IGNORE those parts
 6. Focus SOLELY on the requirements in task/prompt.md for Task {{task_id}}
-
-**TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
-
----
-
-"
+        
+        **TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
+        
+        ---
+        
+        🚨 NON-NEGOTIABLE PR REQUIREMENT 🚨
+        
+        After you finish implementation and validations:
+        - Stage and commit changes with a clear message
+        - Push the feature branch to origin
+        - Create a pull request targeting main using `gh pr create` with an informative title/body
+        - Do NOT claim completion until `gh pr list --head <current-branch>` returns a PR number
+        - If PR creation fails (auth/network), diagnose and retry until successful
+        
+        ---
+        
+        "
 
         # Add toolman guidance if available
         if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
@@ -1288,7 +1318,19 @@ echo '════════════════════════�
 echo '║                 IMPLEMENTATION TASK COMPLETE                 ║'
 echo '════════════════════════════════════════════════════════════════'
 
-# Claude execution completed - no hooks configured
+# Claude execution completed — run post-completion hook if present to ensure PR creation
+echo "🔗 Checking for post-completion PR hook..."
+if [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
+  echo "🔗 Found stop hook: /task-files/hooks-stop-code-pr-creation.sh"
+  chmod +x /task-files/hooks-stop-code-pr-creation.sh || true
+  echo "🚀 Running stop hook to commit, push, and create PR (as fallback)..."
+  (
+    cd "$CLAUDE_WORK_DIR" && /task-files/hooks-stop-code-pr-creation.sh
+  ) || echo "⚠️ Stop hook failed (continuing to PR verification)"
+else
+  echo "ℹ️ No stop hook found; relying on agent-driven PR creation"
+fi
+
 echo "Claude has completed successfully."
 
 # =============================================================================
@@ -1315,6 +1357,17 @@ if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$
         # Also check by task label as backup
         TASK_LABEL="task-${TASK_ID}"
         PR_EXISTS=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+
+    # If still not found, run the stop hook one more time (idempotent) then re-check
+    if [ -z "$PR_EXISTS" ] && [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
+        echo "🔁 No PR detected yet; retrying stop hook once more..."
+        (
+          cd "$CLAUDE_WORK_DIR" && /task-files/hooks-stop-code-pr-creation.sh
+        ) || echo "⚠️ Stop hook retry failed"
+        echo "⏳ Waiting briefly before re-checking PR..."
+        sleep 3
+        PR_EXISTS=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
     fi
     
     if [ -z "$PR_EXISTS" ]; then
@@ -1373,15 +1426,26 @@ fi
 if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   echo "🔍 Checking for PRs created by this task..."
 
-  # First, try to find PR by task label (Claude should have added task-N label)
+  # Determine implementation repository slug for gh -R
+  REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+  if [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
+    ORIGIN_URL=$(git -C "$CLAUDE_WORK_DIR" remote get-url origin 2>/dev/null || echo "")
+    if echo "$ORIGIN_URL" | grep -qE '^https://github.com/'; then
+      REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|https://github.com/([^/]+/[^/]+)(\.git)?|\1|')
+    elif echo "$ORIGIN_URL" | grep -qE '^git@github.com:'; then
+      REPO_SLUG=$(echo "$ORIGIN_URL" | sed -E 's|git@github.com:([^/]+/[^/]+)(\.git)?|\1|')
+    fi
+  fi
+
+  # First, try to find PR by task label (Claude may have added task-N label)
   TASK_LABEL="task-${TASK_ID}"
-  PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
+  PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
 
   # If not found by label, try by branch name (current branch)
   if [ -z "$PR_NUMBER" ]; then
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
     if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-      PR_NUMBER=$(gh pr list -R "{{docs_repository_url}}" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+      PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
     fi
   fi
 
@@ -1389,7 +1453,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
     echo "✅ Found PR #${PR_NUMBER}"
 
     # Get the PR URL
-    PR_URL="https://github.com/{{docs_repository_url}}/pull/${PR_NUMBER}"
+    PR_URL="https://github.com/${REPO_SLUG}/pull/${PR_NUMBER}"
     echo "📝 PR URL: $PR_URL"
 
     # Update CodeRun status with PR URL via Kubernetes API
@@ -1471,7 +1535,7 @@ EOF
 
     # Try to add labels with detailed error capture
     echo "🔍 DEBUG: Attempting to add labels to PR..."
-    LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
+    LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "${TASK_LABEL},${RUN_LABEL},${SERVICE_LABEL}" 2>&1)
     LABEL_EXIT_CODE=$?
 
     if [ $LABEL_EXIT_CODE -eq 0 ]; then
@@ -1483,7 +1547,7 @@ EOF
       # Check if labels exist
       echo "🔍 DEBUG: Checking which labels exist..."
       for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
-        if gh label list -R "{{docs_repository_url}}" --search "$label" | grep -q "^$label"; then
+        if gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
           echo "   ✓ Label '$label' exists"
         else
           echo "   ✗ Label '$label' does not exist"
@@ -1496,7 +1560,7 @@ EOF
             *) COLOR="ededed"; DESC="Unknown label type" ;;
           esac
 
-          CREATE_ERROR=$(gh label create "$label" -R "{{docs_repository_url}}" --color "$COLOR" --description "$DESC" 2>&1)
+          CREATE_ERROR=$(gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>&1)
           CREATE_EXIT=$?
           if [ $CREATE_EXIT -eq 0 ]; then
             echo "   ✅ Created label '$label'"
@@ -1510,7 +1574,7 @@ EOF
       echo "🔍 DEBUG: Retrying label addition individually..."
       LABELS_ADDED=0
       for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
-        RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "{{docs_repository_url}}" --add-label "$label" 2>&1)
+        RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "$label" 2>&1)
         RETRY_EXIT=$?
         if [ $RETRY_EXIT -eq 0 ]; then
           echo "   ✅ Added label '$label'"
@@ -1527,7 +1591,7 @@ EOF
       else
         echo "❌ CRITICAL: Could not add any labels to PR"
         echo "🔍 DEBUG: Checking PR state..."
-        PR_STATE=$(gh pr view "$PR_NUMBER" -R "{{docs_repository_url}}" --json state -q .state 2>/dev/null || echo "UNKNOWN")
+        PR_STATE=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json state -q .state 2>/dev/null || echo "UNKNOWN")
         echo "   PR State: $PR_STATE"
         if [ "$PR_STATE" = "CLOSED" ] || [ "$PR_STATE" = "MERGED" ]; then
           echo "❌ PR is $PR_STATE - cannot add labels to closed/merged PRs"
