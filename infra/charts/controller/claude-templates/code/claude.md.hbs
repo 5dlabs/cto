@@ -107,22 +107,22 @@ git commit -m "feat: implement [brief description]"
 
 ## Pull Request Requirements
 
-**CRITICAL**: After completing implementation, create `PR_DESCRIPTION.md` in the working directory root with:
+**CRITICAL**: After completing implementation, you MUST create a pull request using GitHub CLI:
 
-1. Concise implementation summary (2-3 sentences)
-2. Key changes made (bullet points)
-3. Important reviewer notes
-4. Testing recommendations
+```bash
+gh pr create --title "feat(task-{{task_id}}): [brief description]" \
+             --body "[detailed PR description with changes, testing, and notes]"
+```
 
-This file enables automatic pull request creation.
+**DO NOT** rely on PR_DESCRIPTION.md or any automated mechanism. You must explicitly run `gh pr create`.
 
 **IMPORTANT PR HANDLING**:
-- Always check if a PR already exists for this task before creating PR_DESCRIPTION.md
+- Always check if a PR already exists for this task before creating a new one
 - Use `gh pr list --state all --label "task-{{task_id}}"` to find existing PRs for your task
-- If a PR exists and is OPEN: do NOT create PR_DESCRIPTION.md (continue working on the existing PR)
+- If a PR exists and is OPEN: continue working on the existing PR (push more commits)
 - If a PR exists and is MERGED: the task is complete - do NOT create a new PR
-- If a PR exists and is CLOSED (not merged): create a new PR with PR_DESCRIPTION.md
-- Only create PR_DESCRIPTION.md when there's no open PR or when reopening after a closed (unmerged) PR
+- If a PR exists and is CLOSED (not merged): create a new PR with `gh pr create`
+- Only create a new PR when there's no open PR or when reopening after a closed (unmerged) PR
 
 Additional PR gating rules:
 - Do NOT open a PR unless: `cargo fmt --all -- --check` passes, `cargo clippy ... -D warnings -W clippy::pedantic` passes, and all tests pass
@@ -151,5 +151,7 @@ Additional PR gating rules:
 {{/if}}
 
 ---
+
+**🚨 FINAL REMINDER: You MUST create a pull request with `gh pr create` before completing your work. The container will FAIL if you don't. This is not optional. 🚨**
 
 *All referenced files (@filename) are automatically imported into Claude's context. For detailed information on any topic, refer to the specific imported files above.*

@@ -899,12 +899,16 @@ cd "$CLAUDE_WORK_DIR"
 # Build Claude command (continue flag disabled due to cache_control API bug)
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
-# Look for agent-specific system prompt file from agents ConfigMap
-if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+# Look for Tess-specific system prompt file
+if [ -f "/task-files/tess-system-prompt.md" ]; then
+    echo "✓ Found Tess system prompt file, adding to Claude command"
+    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /task-files/tess-system-prompt.md"
+elif [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
+    # Fallback to GitHub App specific prompt
     echo "✓ Found system prompt file for {{github_app}}, adding to Claude command"
     CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
 else
-    echo "ℹ️ No system prompt file found for agent {{github_app}}, using defaults"
+    echo "ℹ️ No system prompt file found, using defaults"
 fi
 
 # Continue flag disabled due to cache_control API bug - removed conditional logic
