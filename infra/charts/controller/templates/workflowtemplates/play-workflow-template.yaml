@@ -207,6 +207,7 @@ spec:
           # Stage 3: Testing work
           - name: testing-work
             dependencies: [wait-ready-for-qa]
+            when: "{{`{{tasks.implementation-cycle.outputs.parameters.pr-number}}`}} != ''"
             template: agent-coderun
             arguments:
               parameters:
