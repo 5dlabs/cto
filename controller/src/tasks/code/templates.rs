@@ -224,19 +224,41 @@ impl CodeTemplateGenerator {
                     );
 
                     // Parse the tools config from annotation
-                    if let Ok(tools_value) = serde_json::from_str::<Value>(tools_config_str) {
-                        let client_config = json!({
-                            "remoteTools": tools_value.get("remote").unwrap_or(&json!([])),
-                            "localServers": tools_value.get("localServers").unwrap_or(&json!({}))
-                        });
+                    match serde_json::from_str::<Value>(tools_config_str) {
+                        Ok(mut tools_value) => {
+                            // Accept both "tools" shape (remote + localServers) and full client-config shape (remoteTools + localServers)
+                            let looks_like_client_cfg = tools_value.get("remoteTools").is_some()
+                                || tools_value.get("localServers").is_some();
 
-                        return to_string_pretty(&client_config).map_err(|e| {
-                            crate::tasks::types::Error::ConfigError(format!(
-                                "Failed to serialize annotation-based clientConfig: {e}"
-                            ))
-                        });
-                    } else {
-                        debug!("code: failed to parse tools config annotation, falling back to agent config");
+                            if looks_like_client_cfg {
+                                // Normalize to ensure both keys exist
+                                if tools_value.get("remoteTools").is_none() {
+                                    tools_value["remoteTools"] = json!([]);
+                                }
+                                if tools_value.get("localServers").is_none() {
+                                    tools_value["localServers"] = json!({});
+                                }
+                                return to_string_pretty(&tools_value).map_err(|e| {
+                                    crate::tasks::types::Error::ConfigError(format!(
+                                        "Failed to serialize client provided clientConfig: {e}"
+                                    ))
+                                });
+                            } else {
+                                // Treat as tools-shape: { remote: [...], localServers: {...} }
+                                let client_config = json!({
+                                    "remoteTools": tools_value.get("remote").cloned().unwrap_or(json!([])),
+                                    "localServers": tools_value.get("localServers").cloned().unwrap_or(json!({}))
+                                });
+                                return to_string_pretty(&client_config).map_err(|e| {
+                                    crate::tasks::types::Error::ConfigError(format!(
+                                        "Failed to serialize annotation-based clientConfig: {e}"
+                                    ))
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            debug!("code: failed to parse tools config annotation ({}), falling back to agent config", e);
+                        }
                     }
                 }
             }
@@ -310,10 +332,8 @@ impl CodeTemplateGenerator {
             "code: no tools/clientConfig found for '{}', using minimal config",
             github_app
         );
-        let minimal_client = json!({
-            "remoteTools": [],
-            "localServers": {}
-        });
+        // Always emit at least the two top-level keys so downstream validators don't treat it as empty
+        let minimal_client = json!({ "remoteTools": [], "localServers": {} });
 
         to_string_pretty(&minimal_client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
