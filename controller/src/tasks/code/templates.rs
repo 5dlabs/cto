@@ -205,76 +205,14 @@ impl CodeTemplateGenerator {
         );
 
         // Helper to normalize a tools-shaped JSON ({"remote": [...], "localServers": {...}})
-        // into a full client-config.json with default local server launch commands.
-        // Ensures filesystem server has command/args and workingDirectory set when enabled.
-        let normalize_tools_to_client_config = |mut tools_value: Value| -> Value {
-            // Extract remote tools if present
-            let remote_tools = tools_value
-                .get("remote")
-                .cloned()
-                .unwrap_or_else(|| json!([]));
-
-            // Build localServers object
-            let mut local_servers = tools_value
+        // into the client-config.json shape without injecting additional servers.
+        // This preserves tool definitions from Helm and client config without hard-coded defaults.
+        let normalize_tools_to_client_config = |tools_value: Value| -> Value {
+            let remote_tools = tools_value.get("remote").cloned().unwrap_or_else(|| json!([]));
+            let local_servers = tools_value
                 .get("localServers")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
-
-            // Ensure filesystem server has executable details when enabled
-            let working_dir = Self::get_working_directory(code_run);
-
-            // Only proceed if localServers is an object
-            if let Some(obj) = local_servers.as_object_mut() {
-                // Filesystem
-                let mut need_fs = false;
-                let mut fs_tools: Option<Value> = None;
-
-                if let Some(fs_cfg) = obj.get("filesystem") {
-                    // Check enabled flag when present; if no flag, assume enabled when tools exist
-                    let enabled = fs_cfg
-                        .get("enabled")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or_else(|| fs_cfg.get("tools").map(|t| t.is_array()).unwrap_or(false));
-
-                    if enabled {
-                        // Capture tools if provided
-                        fs_tools = fs_cfg.get("tools").cloned();
-
-                        // Determine if command/args missing
-                        let has_command = fs_cfg.get("command").is_some();
-                        let has_args = fs_cfg.get("args").is_some();
-                        let has_workdir = fs_cfg.get("workingDirectory").is_some();
-                        need_fs = !(has_command && has_args && has_workdir);
-                    }
-                } else {
-                    // No filesystem key at all; don't create unless other keys imply it
-                    need_fs = false;
-                }
-
-                if need_fs {
-                    // Compose default filesystem server config and merge tools
-                    let mut fs_obj = json!({
-                        "command": "npx",
-                        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-                        "tools": [
-                            "read_file",
-                            "write_file",
-                            "list_directory",
-                            "create_directory"
-                        ],
-                        "workingDirectory": working_dir
-                    });
-
-                    if let Some(t) = fs_tools {
-                        if t.is_array() {
-                            fs_obj["tools"] = t;
-                        }
-                    }
-
-                    obj.insert("filesystem".to_string(), fs_obj);
-                }
-            }
-
             json!({
                 "remoteTools": remote_tools,
                 "localServers": local_servers
@@ -371,7 +309,7 @@ impl CodeTemplateGenerator {
                     tools.local_servers.is_some()
                 );
 
-                // Convert AgentTools -> Value for normalization
+                // Convert AgentTools -> Value for normalization (no defaults injected)
                 let tools_value = serde_json::to_value(tools)
                     .unwrap_or_else(|_| json!({"remote": [], "localServers": {}}));
                 let client = normalize_tools_to_client_config(tools_value);
@@ -391,18 +329,8 @@ impl CodeTemplateGenerator {
             github_app
         );
         // Always emit at least the two top-level keys so downstream validators don't treat it as empty
-        // Provide a sensible default filesystem server so local file ops work out of the box.
-        let minimal_client = json!({
-            "remoteTools": [],
-            "localServers": {
-                "filesystem": {
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-                    "tools": ["read_file", "write_file", "list_directory", "create_directory"],
-                    "workingDirectory": Self::get_working_directory(code_run)
-                }
-            }
-        });
+        // Do not inject any local servers by default; rely on Helm defaults or client config.
+        let minimal_client = json!({ "remoteTools": [], "localServers": {} });
 
         to_string_pretty(&minimal_client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
