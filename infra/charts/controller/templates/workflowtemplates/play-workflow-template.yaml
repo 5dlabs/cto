@@ -565,7 +565,8 @@ spec:
               workflow-stage: "{{`{{inputs.parameters.stage}}`}}"
               workflow-type: "play-orchestration"
             annotations:
-              agents.platform/tools-config: {{`{{inputs.parameters.tools-config | toJson}}`}}
+              agents.platform/tools-config: |
+                {{`{{inputs.parameters.tools-config}}`}}
           spec:
             taskId: "{{`{{inputs.parameters.task-id}}`}}"
             service: "{{`{{workflow.parameters.service}}`}}"
