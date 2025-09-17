@@ -204,6 +204,83 @@ impl CodeTemplateGenerator {
                 .collect::<Vec<_>>()
         );
 
+        // Helper to normalize a tools-shaped JSON ({"remote": [...], "localServers": {...}})
+        // into a full client-config.json with default local server launch commands.
+        // Ensures filesystem server has command/args and workingDirectory set when enabled.
+        let normalize_tools_to_client_config = |mut tools_value: Value| -> Value {
+            // Extract remote tools if present
+            let remote_tools = tools_value
+                .get("remote")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+
+            // Build localServers object
+            let mut local_servers = tools_value
+                .get("localServers")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+
+            // Ensure filesystem server has executable details when enabled
+            let working_dir = Self::get_working_directory(code_run);
+
+            // Only proceed if localServers is an object
+            if let Some(obj) = local_servers.as_object_mut() {
+                // Filesystem
+                let mut need_fs = false;
+                let mut fs_tools: Option<Value> = None;
+
+                if let Some(fs_cfg) = obj.get("filesystem") {
+                    // Check enabled flag when present; if no flag, assume enabled when tools exist
+                    let enabled = fs_cfg
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or_else(|| fs_cfg.get("tools").map(|t| t.is_array()).unwrap_or(false));
+
+                    if enabled {
+                        // Capture tools if provided
+                        fs_tools = fs_cfg.get("tools").cloned();
+
+                        // Determine if command/args missing
+                        let has_command = fs_cfg.get("command").is_some();
+                        let has_args = fs_cfg.get("args").is_some();
+                        let has_workdir = fs_cfg.get("workingDirectory").is_some();
+                        need_fs = !(has_command && has_args && has_workdir);
+                    }
+                } else {
+                    // No filesystem key at all; don't create unless other keys imply it
+                    need_fs = false;
+                }
+
+                if need_fs {
+                    // Compose default filesystem server config and merge tools
+                    let mut fs_obj = json!({
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+                        "tools": [
+                            "read_file",
+                            "write_file",
+                            "list_directory",
+                            "create_directory"
+                        ],
+                        "workingDirectory": working_dir
+                    });
+
+                    if let Some(t) = fs_tools {
+                        if t.is_array() {
+                            fs_obj["tools"] = t;
+                        }
+                    }
+
+                    obj.insert("filesystem".to_string(), fs_obj);
+                }
+            }
+
+            json!({
+                "remoteTools": remote_tools,
+                "localServers": local_servers
+            })
+        };
+
         // 1) Check CodeRun annotations for client-side tool configs first
         if let Some(annotations) = &code_run.metadata.annotations {
             if let Some(tools_config_str) = annotations.get("agents.platform/tools-config") {
@@ -245,10 +322,7 @@ impl CodeTemplateGenerator {
                                 });
                             } else {
                                 // Treat as tools-shape: { remote: [...], localServers: {...} }
-                                let client_config = json!({
-                                    "remoteTools": tools_value.get("remote").cloned().unwrap_or(json!([])),
-                                    "localServers": tools_value.get("localServers").cloned().unwrap_or(json!({}))
-                                });
+                                let client_config = normalize_tools_to_client_config(tools_value);
                                 return to_string_pretty(&client_config).map_err(|e| {
                                     crate::tasks::types::Error::ConfigError(format!(
                                         "Failed to serialize annotation-based clientConfig: {e}"
@@ -297,26 +371,10 @@ impl CodeTemplateGenerator {
                     tools.local_servers.is_some()
                 );
 
-                // remoteTools - tools.remote is Vec<String>, not Option
-                let remote_tools: Value = json!(tools.remote);
-
-                // localServers (safely handle any level of missing config)
-                let local_servers_obj = if let Some(ref ls) = tools.local_servers {
-                    // Convert whatever localServers structure exists to JSON
-                    serde_json::to_value(ls).unwrap_or_else(|_| json!({}))
-                } else {
-                    // No local servers configured
-                    json!({})
-                };
-
-                let client = Value::Object(
-                    vec![
-                        ("remoteTools".to_string(), remote_tools),
-                        ("localServers".to_string(), local_servers_obj),
-                    ]
-                    .into_iter()
-                    .collect(),
-                );
+                // Convert AgentTools -> Value for normalization
+                let tools_value = serde_json::to_value(tools)
+                    .unwrap_or_else(|_| json!({"remote": [], "localServers": {}}));
+                let client = normalize_tools_to_client_config(tools_value);
 
                 return to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
@@ -333,7 +391,18 @@ impl CodeTemplateGenerator {
             github_app
         );
         // Always emit at least the two top-level keys so downstream validators don't treat it as empty
-        let minimal_client = json!({ "remoteTools": [], "localServers": {} });
+        // Provide a sensible default filesystem server so local file ops work out of the box.
+        let minimal_client = json!({
+            "remoteTools": [],
+            "localServers": {
+                "filesystem": {
+                    "command": "npx",
+                    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+                    "tools": ["read_file", "write_file", "list_directory", "create_directory"],
+                    "workingDirectory": Self::get_working_directory(code_run)
+                }
+            }
+        });
 
         to_string_pretty(&minimal_client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
