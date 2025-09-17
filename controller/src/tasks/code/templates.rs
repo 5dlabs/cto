@@ -219,6 +219,77 @@ impl CodeTemplateGenerator {
             })
         };
 
+        // Small helpers for merge logic
+        let collect_string_array = |v: &Value| -> Vec<String> {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default()
+        };
+
+        let merge_client_configs = |base: &Value, overlay: &Value| -> Value {
+            // Merge remoteTools as a union preserving base order
+            let mut merged_remote = collect_string_array(base.get("remoteTools").unwrap_or(&json!([])));
+            let overlay_remote = collect_string_array(overlay.get("remoteTools").unwrap_or(&json!([])));
+            for t in overlay_remote {
+                if !merged_remote.contains(&t) {
+                    merged_remote.push(t);
+                }
+            }
+
+            // Merge localServers per server key, deep-merging fields; tools arrays are unioned
+            let mut merged_local = serde_json::Map::new();
+            let base_ls = base.get("localServers").and_then(|v| v.as_object());
+            let overlay_ls = overlay.get("localServers").and_then(|v| v.as_object());
+
+            // Collect all server keys
+            use std::collections::BTreeSet;
+            let mut keys = BTreeSet::new();
+            if let Some(m) = base_ls { keys.extend(m.keys().cloned()); }
+            if let Some(m) = overlay_ls { keys.extend(m.keys().cloned()); }
+
+            for k in keys {
+                let b = base_ls.and_then(|m| m.get(&k));
+                let o = overlay_ls.and_then(|m| m.get(&k));
+
+                let merged_val = match (b, o) {
+                    (Some(Value::Object(bm)), Some(Value::Object(om))) => {
+                        let mut out = bm.clone();
+                        // tools union if present
+                        let base_tools = collect_string_array(out.get("tools").unwrap_or(&json!([])));
+                        let overlay_tools = collect_string_array(om.get("tools").unwrap_or(&json!([])));
+                        if !base_tools.is_empty() || !overlay_tools.is_empty() {
+                            let mut union = base_tools;
+                            for t in overlay_tools {
+                                if !union.contains(&t) {
+                                    union.push(t);
+                                }
+                            }
+                            out.insert("tools".to_string(), json!(union));
+                        }
+                        // Overlay scalar/object fields from overlay
+                        for (ok, ov) in om.iter() {
+                            if ok == "tools" { continue; }
+                            out.insert(ok.clone(), ov.clone());
+                        }
+                        Value::Object(out)
+                    }
+                    (Some(bv), None) => bv.clone(),
+                    (None, Some(ov)) => ov.clone(),
+                    _ => json!({}),
+                };
+                merged_local.insert(k, merged_val);
+            }
+
+            json!({
+                "remoteTools": merged_remote,
+                "localServers": Value::Object(merged_local)
+            })
+        };
+
         // 1) Check CodeRun annotations for client-side tool configs first
         if let Some(annotations) = &code_run.metadata.annotations {
             if let Some(tools_config_str) = annotations.get("agents.platform/tools-config") {
@@ -245,28 +316,43 @@ impl CodeTemplateGenerator {
                             let looks_like_client_cfg = tools_value.get("remoteTools").is_some()
                                 || tools_value.get("localServers").is_some();
 
-                            if looks_like_client_cfg {
-                                // Normalize to ensure both keys exist
+                            // Build overlay client config from annotation
+                            let overlay_client = if looks_like_client_cfg {
                                 if tools_value.get("remoteTools").is_none() {
                                     tools_value["remoteTools"] = json!([]);
                                 }
                                 if tools_value.get("localServers").is_none() {
                                     tools_value["localServers"] = json!({});
                                 }
-                                return to_string_pretty(&tools_value).map_err(|e| {
-                                    crate::tasks::types::Error::ConfigError(format!(
-                                        "Failed to serialize client provided clientConfig: {e}"
-                                    ))
-                                });
+                                tools_value
                             } else {
-                                // Treat as tools-shape: { remote: [...], localServers: {...} }
-                                let client_config = normalize_tools_to_client_config(tools_value);
-                                return to_string_pretty(&client_config).map_err(|e| {
-                                    crate::tasks::types::Error::ConfigError(format!(
-                                        "Failed to serialize annotation-based clientConfig: {e}"
-                                    ))
-                                });
-                            }
+                                normalize_tools_to_client_config(tools_value)
+                            };
+
+                            // Build base client config from Helm agent config (defaults)
+                            let base_client = if let Some(agent_cfg) =
+                                config.agents.values().find(|a| a.github_app == github_app)
+                            {
+                                if let Some(client_cfg) = &agent_cfg.client_config {
+                                    client_cfg.clone()
+                                } else if let Some(tools) = &agent_cfg.tools {
+                                    let tools_value = serde_json::to_value(tools)
+                                        .unwrap_or_else(|_| json!({"remote": [], "localServers": {}}));
+                                    normalize_tools_to_client_config(tools_value)
+                                } else {
+                                    json!({ "remoteTools": [], "localServers": {} })
+                                }
+                            } else {
+                                json!({ "remoteTools": [], "localServers": {} })
+                            };
+
+                            // Merge base (Helm defaults) + overlay (MCP client additions)
+                            let merged = merge_client_configs(&base_client, &overlay_client);
+                            return to_string_pretty(&merged).map_err(|e| {
+                                crate::tasks::types::Error::ConfigError(format!(
+                                    "Failed to serialize merged clientConfig: {e}"
+                                ))
+                            });
                         }
                         Err(e) => {
                             debug!("code: failed to parse tools config annotation ({}), falling back to agent config", e);
@@ -662,7 +748,7 @@ mod tests {
     use super::*;
     use crate::crds::{CodeRun, CodeRunSpec};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     fn create_test_code_run(github_app: Option<String>) -> CodeRun {
         CodeRun {
@@ -842,5 +928,72 @@ mod tests {
         let filesystem = &local_servers["filesystem"];
         assert_eq!(filesystem["command"], "npx");
         assert!(filesystem["tools"].is_array());
+    }
+
+    #[test]
+    fn test_merge_client_config_overlay_on_helm_defaults() {
+        use crate::tasks::config::{
+            AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig, LocalServerConfigs,
+        };
+
+        // Helm defaults for rex
+        let mut config = ControllerConfig::default();
+        let helm_tools = AgentTools {
+            remote: vec!["memory_create_entities".to_string()],
+            local_servers: Some(LocalServerConfigs {
+                filesystem: Some(LocalServerConfig {
+                    enabled: true,
+                    tools: vec!["read_file".to_string(), "write_file".to_string()],
+                    command: None,
+                    args: None,
+                    working_directory: None,
+                }),
+                git: None,
+            }),
+        };
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                tools: Some(helm_tools),
+                client_config: None,
+            },
+        );
+
+        // CodeRun with annotation overlay client config
+        let mut code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let mut ann = BTreeMap::new();
+        ann.insert(
+            "agents.platform/tools-config".to_string(),
+            serde_json::json!({
+                "remoteTools": ["brave-search_brave_web_search"],
+                "localServers": {
+                    "filesystem": {
+                        "tools": ["list_directory"],
+                        "workingDirectory": "overlay_dir"
+                    }
+                }
+            })
+            .to_string(),
+        );
+        code_run.metadata.annotations = Some(ann);
+
+        let result = CodeTemplateGenerator::generate_client_config(&code_run, &config).unwrap();
+        let client_config: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+        // remoteTools should be union of helm + overlay (order preserved: helm, then overlay)
+        let remote = client_config["remoteTools"].as_array().unwrap();
+        assert!(remote.contains(&serde_json::json!("memory_create_entities")));
+        assert!(remote.contains(&serde_json::json!("brave-search_brave_web_search")));
+
+        // filesystem tools should include helm tools plus overlay tool
+        let fs = &client_config["localServers"]["filesystem"];
+        let tools = fs["tools"].as_array().unwrap();
+        assert!(tools.contains(&serde_json::json!("read_file")));
+        assert!(tools.contains(&serde_json::json!("write_file")));
+        assert!(tools.contains(&serde_json::json!("list_directory")));
+
+        // workingDirectory should be overlaid
+        assert_eq!(fs["workingDirectory"], "overlay_dir");
     }
 }
