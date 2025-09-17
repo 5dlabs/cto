@@ -204,6 +204,21 @@ impl CodeTemplateGenerator {
                 .collect::<Vec<_>>()
         );
 
+        // Helper to normalize a tools-shaped JSON ({"remote": [...], "localServers": {...}})
+        // into the client-config.json shape without injecting additional servers.
+        // This preserves tool definitions from Helm and client config without hard-coded defaults.
+        let normalize_tools_to_client_config = |tools_value: Value| -> Value {
+            let remote_tools = tools_value.get("remote").cloned().unwrap_or_else(|| json!([]));
+            let local_servers = tools_value
+                .get("localServers")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            json!({
+                "remoteTools": remote_tools,
+                "localServers": local_servers
+            })
+        };
+
         // 1) Check CodeRun annotations for client-side tool configs first
         if let Some(annotations) = &code_run.metadata.annotations {
             if let Some(tools_config_str) = annotations.get("agents.platform/tools-config") {
@@ -245,10 +260,7 @@ impl CodeTemplateGenerator {
                                 });
                             } else {
                                 // Treat as tools-shape: { remote: [...], localServers: {...} }
-                                let client_config = json!({
-                                    "remoteTools": tools_value.get("remote").cloned().unwrap_or(json!([])),
-                                    "localServers": tools_value.get("localServers").cloned().unwrap_or(json!({}))
-                                });
+                                let client_config = normalize_tools_to_client_config(tools_value);
                                 return to_string_pretty(&client_config).map_err(|e| {
                                     crate::tasks::types::Error::ConfigError(format!(
                                         "Failed to serialize annotation-based clientConfig: {e}"
@@ -297,26 +309,10 @@ impl CodeTemplateGenerator {
                     tools.local_servers.is_some()
                 );
 
-                // remoteTools - tools.remote is Vec<String>, not Option
-                let remote_tools: Value = json!(tools.remote);
-
-                // localServers (safely handle any level of missing config)
-                let local_servers_obj = if let Some(ref ls) = tools.local_servers {
-                    // Convert whatever localServers structure exists to JSON
-                    serde_json::to_value(ls).unwrap_or_else(|_| json!({}))
-                } else {
-                    // No local servers configured
-                    json!({})
-                };
-
-                let client = Value::Object(
-                    vec![
-                        ("remoteTools".to_string(), remote_tools),
-                        ("localServers".to_string(), local_servers_obj),
-                    ]
-                    .into_iter()
-                    .collect(),
-                );
+                // Convert AgentTools -> Value for normalization (no defaults injected)
+                let tools_value = serde_json::to_value(tools)
+                    .unwrap_or_else(|_| json!({"remote": [], "localServers": {}}));
+                let client = normalize_tools_to_client_config(tools_value);
 
                 return to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
@@ -333,6 +329,7 @@ impl CodeTemplateGenerator {
             github_app
         );
         // Always emit at least the two top-level keys so downstream validators don't treat it as empty
+        // Do not inject any local servers by default; rely on Helm defaults or client config.
         let minimal_client = json!({ "remoteTools": [], "localServers": {} });
 
         to_string_pretty(&minimal_client).map_err(|e| {
