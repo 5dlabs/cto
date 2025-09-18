@@ -1945,6 +1945,7 @@ else
   echo "⚠️ Tess QA testing exited with code: $CLAUDE_EXIT_CODE"
   echo "📊 Final status: FAILURE (exit code $CLAUDE_EXIT_CODE)"
   echo "🔍 This usually indicates a cache_control or API error occurred"
+  echo "📝 Note: Container will still exit successfully to allow workflow continuation"
 fi
 
 echo "🔍 Process information:"
