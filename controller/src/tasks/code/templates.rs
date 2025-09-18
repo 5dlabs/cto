@@ -222,7 +222,7 @@ impl CodeTemplateGenerator {
 
         // Helper to normalize a tools-shaped JSON ({"remote": [...], "localServers": {...}})
         // into the client-config.json shape without injecting additional servers.
-        // Drops any null server entries produced by partial YAML (e.g., filesystem: ~).
+        // Drops any null server entries produced by partial YAML (e.g., serverX: ~).
         let normalize_tools_to_client_config = |tools_value: Value| -> Value {
             let remote_tools = tools_value.get("remote").cloned().unwrap_or_else(|| json!([]));
             let local_servers = sanitize_local_servers(tools_value.get("localServers").unwrap_or(&json!({})));
@@ -230,6 +230,14 @@ impl CodeTemplateGenerator {
                 "remoteTools": remote_tools,
                 "localServers": local_servers
             })
+        };
+
+        // Sanitize helper for full client-config objects (drop null/non-object server entries)
+        let sanitize_client_local_servers = |v: &mut Value| {
+            if let Some(ls) = v.get_mut("localServers") {
+                let sanitized = sanitize_local_servers(ls);
+                *ls = sanitized;
+            }
         };
 
         // Helper: build client-config.json from strongly-typed AgentTools (Helm),
@@ -359,7 +367,7 @@ impl CodeTemplateGenerator {
                                 || tools_value.get("localServers").is_some();
 
                             // Build overlay client config from annotation
-                            let overlay_client = if looks_like_client_cfg {
+                            let mut overlay_client = if looks_like_client_cfg {
                                 if tools_value.get("remoteTools").is_none() {
                                     tools_value["remoteTools"] = json!([]);
                                 }
@@ -370,9 +378,11 @@ impl CodeTemplateGenerator {
                             } else {
                                 normalize_tools_to_client_config(tools_value)
                             };
+                            // Drop any null/non-object local server entries provided by client overlay
+                            sanitize_client_local_servers(&mut overlay_client);
 
                             // Build base client config from Helm agent config (defaults)
-                            let base_client = if let Some(agent_cfg) =
+                            let mut base_client = if let Some(agent_cfg) =
                                 config.agents.values().find(|a| a.github_app == github_app)
                             {
                                 if let Some(client_cfg) = &agent_cfg.client_config {
@@ -385,9 +395,13 @@ impl CodeTemplateGenerator {
                             } else {
                                 json!({ "remoteTools": [], "localServers": {} })
                             };
+                            // Sanitize base as well
+                            sanitize_client_local_servers(&mut base_client);
 
                             // Merge base (Helm defaults) + overlay (MCP client additions)
-                            let merged = merge_client_configs(&base_client, &overlay_client);
+                            let mut merged = merge_client_configs(&base_client, &overlay_client);
+                            // Final sanitize of merged result
+                            sanitize_client_local_servers(&mut merged);
                             return to_string_pretty(&merged).map_err(|e| {
                                 crate::tasks::types::Error::ConfigError(format!(
                                     "Failed to serialize merged clientConfig: {e}"
@@ -419,7 +433,9 @@ impl CodeTemplateGenerator {
             // 2a) Verbatim clientConfig
             if let Some(client_cfg) = &agent_cfg.client_config {
                 debug!("code: using verbatim clientConfig for '{}'", github_app);
-                return to_string_pretty(client_cfg).map_err(|e| {
+                let mut cfg = client_cfg.clone();
+                sanitize_client_local_servers(&mut cfg);
+                return to_string_pretty(&cfg).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize clientConfig: {e}"
                     ))
@@ -436,8 +452,8 @@ impl CodeTemplateGenerator {
                 );
 
                 // Build client-config including only explicitly enabled local servers
-                let client = client_from_agent_tools(tools);
-
+                let mut client = client_from_agent_tools(tools);
+                sanitize_client_local_servers(&mut client);
                 return to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize tools-based clientConfig: {e}"
@@ -828,7 +844,7 @@ mod tests {
             use std::collections::BTreeMap;
             let mut servers = BTreeMap::new();
             servers.insert(
-                "filesystem".to_string(),
+                "serverA".to_string(),
                 LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
@@ -838,7 +854,7 @@ mod tests {
                 },
             );
             servers.insert(
-                "git".to_string(),
+                "serverB".to_string(),
                 LocalServerConfig {
                     enabled: false,
                     tools: vec![],
@@ -881,9 +897,9 @@ mod tests {
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_web_search"],
                     "localServers": {
-                        "filesystem": {
+                        "serverA": {
                             "command": "npx",
-                            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+                            "args": ["-y", "@example/mcp-server", "/workspace"],
                             "tools": ["read_file", "write_file"]
                         }
                     }
@@ -906,14 +922,14 @@ mod tests {
         assert!(remote_tools.contains(&serde_json::json!("memory_create_entities")));
         assert!(remote_tools.contains(&serde_json::json!("brave_web_search")));
 
-        // Verify local servers
+        // Verify local servers (generic server names)
         let local_servers = client_config["localServers"].as_object().unwrap();
-        assert!(local_servers.contains_key("filesystem"));
-        assert!(!local_servers.contains_key("git")); // git not provided in clientConfig
+        assert!(local_servers.contains_key("serverA"));
+        assert!(!local_servers.contains_key("serverB"));
 
-        let filesystem = &local_servers["filesystem"];
-        assert_eq!(filesystem["command"], "npx");
-        assert!(filesystem["tools"].is_array());
+        let server_a = &local_servers["serverA"];
+        assert_eq!(server_a["command"], "npx");
+        assert!(server_a["tools"].is_array());
     }
 
     #[test]
@@ -926,7 +942,7 @@ mod tests {
             use std::collections::BTreeMap;
             let mut servers = BTreeMap::new();
             servers.insert(
-                "filesystem".to_string(),
+                "serverA".to_string(),
                 LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
@@ -954,7 +970,7 @@ mod tests {
             serde_json::json!({
                 "remoteTools": ["brave-search_brave_web_search"],
                 "localServers": {
-                    "filesystem": {
+                    "serverA": {
                         "tools": ["list_directory"],
                         "workingDirectory": "overlay_dir"
                     }
@@ -972,8 +988,8 @@ mod tests {
         assert!(remote.contains(&serde_json::json!("memory_create_entities")));
         assert!(remote.contains(&serde_json::json!("brave-search_brave_web_search")));
 
-        // filesystem tools should include helm tools plus overlay tool
-        let fs = &client_config["localServers"]["filesystem"];
+        // serverA tools should include helm tools plus overlay tool
+        let fs = &client_config["localServers"]["serverA"];
         let tools = fs["tools"].as_array().unwrap();
         assert!(tools.contains(&serde_json::json!("read_file")));
         assert!(tools.contains(&serde_json::json!("write_file")));

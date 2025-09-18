@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
@@ -35,18 +35,10 @@ struct AgentTools {
     remote: Vec<String>,
     #[serde(default, rename = "localServers")]
     #[allow(dead_code)]
-    local_servers: Option<LocalServerConfig>,
+    local_servers: Option<BTreeMap<String, ServerConfig>>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct LocalServerConfig {
-    #[serde(default)]
-    #[allow(dead_code)]
-    filesystem: Option<ServerConfig>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    git: Option<ServerConfig>,
-}
+// No predefined server names in code. Servers are defined only via config.
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct ServerConfig {
@@ -736,11 +728,10 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 // local-tools: enable servers that are present and marked enabled
                 if let Some(ls) = &tools.local_servers {
                     let mut local_list: Vec<&str> = Vec::new();
-                    if let Some(fs) = &ls.filesystem {
-                        if fs.enabled { local_list.push("filesystem"); }
-                    }
-                    if let Some(git) = &ls.git {
-                        if git.enabled { local_list.push("git"); }
+                    for (name, cfg) in ls {
+                        if cfg.enabled {
+                            local_list.push(name.as_str());
+                        }
                     }
                     if !local_list.is_empty() {
                         let json = serde_json::to_string(&local_list).unwrap_or_else(|_| "[]".to_string());
