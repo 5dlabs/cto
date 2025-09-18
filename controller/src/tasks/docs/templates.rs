@@ -249,47 +249,18 @@ impl DocsTemplateGenerator {
 
                 // localServers (generic: include only servers marked enabled)
                 let mut local_servers_obj = serde_json::Map::new();
-                if let Some(ref ls) = tools.local_servers {
-                    // filesystem - check if enabled before accessing fields
-                    if let Some(ref fs) = ls.filesystem {
-                        if fs.enabled {
-                            let mut fs_obj = serde_json::Map::new();
-                            if !fs.tools.is_empty() {
-                                fs_obj.insert("tools".to_string(), json!(fs.tools));
-                            }
-                            if let Some(cmd) = &fs.command {
-                                fs_obj.insert("command".to_string(), json!(cmd));
-                            }
-                            if let Some(args) = &fs.args {
-                                fs_obj.insert("args".to_string(), json!(args));
-                            }
-                            if let Some(wd) = &fs.working_directory {
-                                fs_obj.insert("workingDirectory".to_string(), json!(wd));
-                            }
-                            local_servers_obj
-                                .insert("filesystem".to_string(), Value::Object(fs_obj));
-                        }
-                    }
-                    // git - check if enabled before accessing fields
-                    if let Some(ref git) = ls.git {
-                        if git.enabled {
-                            let mut g_obj = serde_json::Map::new();
-                            if !git.tools.is_empty() {
-                                g_obj.insert("tools".to_string(), json!(git.tools));
-                            }
-                            if let Some(cmd) = &git.command {
-                                g_obj.insert("command".to_string(), json!(cmd));
-                            }
-                            if let Some(args) = &git.args {
-                                g_obj.insert("args".to_string(), json!(args));
-                            }
-                            if let Some(wd) = &git.working_directory {
-                                g_obj.insert("workingDirectory".to_string(), json!(wd));
-                            }
-                            local_servers_obj.insert("git".to_string(), Value::Object(g_obj));
-                        }
+            if let Some(ref servers) = tools.local_servers {
+                for (name, cfg) in servers {
+                    if cfg.enabled {
+                        let mut obj = serde_json::Map::new();
+                        if !cfg.tools.is_empty() { obj.insert("tools".to_string(), json!(cfg.tools)); }
+                        if let Some(cmd) = &cfg.command { obj.insert("command".to_string(), json!(cmd)); }
+                        if let Some(args) = &cfg.args { obj.insert("args".to_string(), json!(args)); }
+                        if let Some(wd) = &cfg.working_directory { obj.insert("workingDirectory".to_string(), json!(wd)); }
+                        local_servers_obj.insert(name.clone(), Value::Object(obj));
                     }
                 }
+            }
 
                 let mut client = Value::Object(
                     vec![

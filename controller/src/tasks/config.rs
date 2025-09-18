@@ -235,19 +235,7 @@ pub struct AgentTools {
 
     /// Local server configurations
     #[serde(default, rename = "localServers")]
-    pub local_servers: Option<LocalServerConfigs>,
-}
-
-/// Local server configurations
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct LocalServerConfigs {
-    /// Filesystem server configuration
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub filesystem: Option<LocalServerConfig>,
-
-    /// Git server configuration
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub git: Option<LocalServerConfig>,
+    pub local_servers: Option<std::collections::BTreeMap<String, LocalServerConfig>>,
 }
 
 /// Configuration for a local MCP server
