@@ -1,0 +1,25 @@
+name: Validate Claude Templates
+
+on:
+  pull_request:
+    paths:
+      - 'infra/charts/controller/claude-templates/**'
+      - 'infra/charts/controller/scripts/generate-templates-configmap.sh'
+      - 'infra/charts/controller/templates/claude-templates-static.yaml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate static ConfigMap
+        run: bash infra/charts/controller/scripts/generate-templates-configmap.sh
+      - name: Check for drift
+        run: |
+          if ! git diff --quiet -- infra/charts/controller/templates/claude-templates-static.yaml; then
+            echo 'claude-templates-static.yaml is out of date. Run scripts/update-templates.sh and commit.' >&2
+            git --no-pager diff -- infra/charts/controller/templates/claude-templates-static.yaml || true
+            exit 1
+          fi

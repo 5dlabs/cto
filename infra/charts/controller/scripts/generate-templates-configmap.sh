@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Script to generate the claude-templates ConfigMap from template files
 # This solves the ArgoCD .Files issue by creating a static ConfigMap
@@ -25,30 +25,49 @@ metadata:
   labels:
     {{- include "controller.labels" . | nindent 4 }}
   annotations:
-    generated-at: "TIMESTAMP_PLACEHOLDER"
+    templates-checksum: "CHECKSUM_PLACEHOLDER"
 binaryData:
 HEADER_EOF
 
-# Replace timestamp
-sed -i.bak "s/TIMESTAMP_PLACEHOLDER/$(date -u +%Y-%m-%dT%H:%M:%SZ)/" "$OUTPUT_FILE" && rm "$OUTPUT_FILE.bak"
+# Gather files deterministically (portable across macOS/Linux)
+FILES_LIST=$(find "claude-templates" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) | LC_ALL=C sort)
 
-# Process each template file and base64 encode it
-for file in claude-templates/**/*.hbs claude-templates/**/*.sh claude-templates/**/*.md; do
-  if [ -f "$file" ]; then
-    # Convert path to ConfigMap key format
-    key=$(echo "$file" | sed 's/claude-templates\///' | sed 's/\//_/g')
-    
-    echo "  Processing: $file -> $key"
-    
-    # Base64 encode the content (single line for YAML)
-    encoded=$(base64 < "$file" | tr -d '\n')
-    
-    # Add to ConfigMap
-    echo "  $key: $encoded" >> "$OUTPUT_FILE"
-  fi
-done
+# Compute a deterministic checksum over file paths + contents
+checksum_tmp=$(mktemp)
+trap 'rm -f "$checksum_tmp"' EXIT
+while IFS= read -r f; do
+  # Include path line and content bytes to the checksum stream
+  printf '%s\n' "$f" >> "$checksum_tmp"
+  cat "$f" >> "$checksum_tmp"
+  printf '\n' >> "$checksum_tmp"
+done <<< "$FILES_LIST"
+
+if command -v shasum >/dev/null 2>&1; then
+  CHECKSUM=$(shasum -a 256 "$checksum_tmp" | awk '{print $1}')
+else
+  # Fallback to openssl if shasum is unavailable
+  CHECKSUM=$(openssl dgst -sha256 -r "$checksum_tmp" | awk '{print $1}')
+fi
+
+# Inject checksum
+sed -i.bak "s/CHECKSUM_PLACEHOLDER/${CHECKSUM}/" "$OUTPUT_FILE" && rm "$OUTPUT_FILE.bak"
+
+# Write data keys in sorted, stable order
+while IFS= read -r file; do
+  # Convert path to ConfigMap key format
+  key=$(echo "$file" | sed 's/claude-templates\///' | sed 's/\//_/g')
+
+  echo "  Processing: $file -> $key"
+
+  # Base64 encode the content (single line for YAML)
+  encoded=$(base64 < "$file" | tr -d '\n')
+
+  # Add to ConfigMap
+  echo "  $key: $encoded" >> "$OUTPUT_FILE"
+done <<< "$FILES_LIST"
 
 echo "Generated: $OUTPUT_FILE"
+echo "Checksum: $CHECKSUM"
 echo "Total size: $(wc -c < "$OUTPUT_FILE") bytes"
 
 # Validate the generated file

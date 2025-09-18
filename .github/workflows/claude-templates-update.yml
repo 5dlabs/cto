@@ -1,0 +1,38 @@
+name: Update Claude Templates
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/charts/controller/claude-templates/**'
+      - 'infra/charts/controller/scripts/generate-templates-configmap.sh'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-claude-templates
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Generate static ConfigMap
+        run: bash infra/charts/controller/scripts/generate-templates-configmap.sh
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- infra/charts/controller/templates/claude-templates-static.yaml; then
+            echo "No changes."
+            exit 0
+          fi
+          git add infra/charts/controller/templates/claude-templates-static.yaml
+          git commit -m "chore(chart): regenerate claude-templates static ConfigMap [skip ci]"
+          git push
