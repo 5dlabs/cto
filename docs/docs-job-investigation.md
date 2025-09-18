@@ -15,7 +15,7 @@ What We Looked At
     - Each task object is streamed with `jq -c` and fields are read via `jq -r` in a helper `_decode()`; no `base64 -d` calls are present.
   - The only base64 use in this script is for GitHub App JWT generation (encoding only): lines ~35–43. That cannot produce “invalid input” because decode is not used there.
 - Generated static ConfigMap: `infra/charts/controller/templates/claude-templates-static.yaml`.
-  - This file embeds `docs_container.sh.hbs` (key: `docs_container.sh.hbs`) and carries a generator timestamp (e.g., `generated-at: "2025-09-12T19:35:32Z"`).
+  - This file embeds `docs_container.sh.hbs` (key: `docs_container.sh.hbs`) and carries a deterministic content checksum (e.g., `templates-checksum: "<sha256>"`).
   - It’s produced by `infra/charts/controller/scripts/generate-templates-configmap.sh`, which base64-embeds the raw templates for Helm/ArgoCD delivery.
 
 Inference About The Error
@@ -40,10 +40,10 @@ How To Verify What’s Running
      - “🔍 Analyzing tasks.json structure…”, “📄 Raw tasks.json structure preview:”, and “📊 JSON structure analysis:”.
    - If those do not appear and you see base64 errors instead, you’re on the older script.
 2) Inspect the live ConfigMap in the target cluster/namespace:
-   - `kubectl -n <ns> get cm <release>-claude-templates -o yaml | grep generated-at`
+   - `kubectl -n <ns> get cm <release>-claude-templates -o yaml | grep templates-checksum`
    - Extract `docs_container.sh.hbs` and confirm the presence of the comment: “Use jq directly to process tasks without base64 encoding/decoding”.
 3) Confirm your chart bundle includes the updated static ConfigMap:
-   - Open `infra/charts/controller/templates/claude-templates-static.yaml` and confirm it has a recent `generated-at` and a `docs_container.sh.hbs` entry that decodes to the jq-only script.
+   - Open `infra/charts/controller/templates/claude-templates-static.yaml` and confirm it has a `templates-checksum` and a `docs_container.sh.hbs` entry that decodes to the jq-only script.
    - If not current, run: `make -C infra/charts/controller` to regenerate via `scripts/generate-templates-configmap.sh`, commit, and redeploy.
 
 Likely Root Cause(s)
@@ -93,8 +93,8 @@ Files Touched In This Investigation
 
 #### 2. ConfigMap Regeneration
 - **Action**: Regenerated `claude-templates-static.yaml` using `make generate-templates`
-- **Before**: `generated-at: "2025-09-12T19:35:32Z"` (578278 bytes)
-- **After**: `generated-at: "2025-09-13T00:53:54Z"` (578418 bytes)
+- **Before**: `templates-checksum: "<old-sha256>"` (578278 bytes)
+- **After**: `templates-checksum: "<new-sha256>"` (578418 bytes)
 - **Verification**: Template now includes version banner and confirmed jq-only logic
 
 #### 3. Git Workflow
@@ -193,4 +193,3 @@ After deployment of updated controller and ConfigMap:
 
 Appendix: Why base64 failed
 - `base64: invalid input` is raised when the decoder receives non‑base64 characters, bad padding, or truncated input. When shell pipelines extract JSON strings with `jq -r` and then feed them into `base64 -d`, any plain text (e.g., a title like "Fix docs flow") will trigger this error. Quoting and word-splitting can magnify the issue by corrupting otherwise valid encodings. Removing the decode step (as the current template does) avoids this entire class of errors.
-

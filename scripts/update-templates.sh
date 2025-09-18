@@ -25,7 +25,7 @@ git diff --stat templates/claude-templates-static.yaml
 echo ""
 echo "🔍 Summary of changes:"
 echo "- Updated templates from claude-templates/ source files"
-echo "- New timestamp: $(grep 'generated-at:' templates/claude-templates-static.yaml | awk '{print $2}' | tr -d '"')"
+echo "- New checksum: $(grep 'templates-checksum:' templates/claude-templates-static.yaml | awk '{print $2}' | tr -d '"')"
 
 # Add and commit changes
 echo ""

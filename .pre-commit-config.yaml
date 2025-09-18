@@ -116,3 +116,6 @@ exclude: |
     vendor/.*|
     node_modules/.*
   )$
+
+# Claude templates: Avoid local enforcement to prevent merge conflicts.
+# CI will enforce no-commit policy and regenerate on main.
