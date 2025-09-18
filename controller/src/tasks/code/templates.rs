@@ -169,13 +169,13 @@ impl CodeTemplateGenerator {
                         {
                             for secret in secrets {
                                 if let Some(m) = secret.as_mapping() {
-                                    if let Some(name) = m.get(&serde_yaml::Value::from("name"))
+                                    if let Some(name) = m.get(serde_yaml::Value::from("name"))
                                         .and_then(|n| n.as_str())
                                     {
                                         req_secret_sources.push(name.to_string());
                                     }
                                     // If there are key mappings, surface the env var names (right-hand side)
-                                    if let Some(keys) = m.get(&serde_yaml::Value::from("keys"))
+                                    if let Some(keys) = m.get(serde_yaml::Value::from("keys"))
                                         .and_then(|k| k.as_sequence())
                                     {
                                         for entry in keys {
