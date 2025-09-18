@@ -931,20 +931,20 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                             json
                         },
                         Err(e) => {
-                            eprintln!("❌ Failed to serialize quality agent tools: {}", e);
-                            eprintln!("   Tools data: {:?}", t);
+                            eprintln!("❌ Failed to serialize quality agent tools: {e}");
+                            eprintln!("   Tools data: {t:?}");
                             "{}".to_string()
                         }
                     }
                 })
                 .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for quality agent {}", quality_agent_input);
+                    eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
                     "{}".to_string()
                 });
             (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {} not found in config, using defaults", quality_agent_input);
+            eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
             (quality_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
         };
 
@@ -973,24 +973,24 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 .map(|t| {
                     match serde_json::to_string(t) {
                         Ok(json) => {
-                            eprintln!("✅ Serialized testing agent tools: {}", json);
+                            eprintln!("✅ Serialized testing agent tools: {json}");
                             json
                         },
                         Err(e) => {
-                            eprintln!("❌ Failed to serialize testing agent tools: {}", e);
-                            eprintln!("   Tools data: {:?}", t);
+                            eprintln!("❌ Failed to serialize testing agent tools: {e}");
+                            eprintln!("   Tools data: {t:?}");
                             "{}".to_string()
                         }
                     }
                 })
                 .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for testing agent {}", testing_agent_input);
+                    eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
                     "{}".to_string()
                 });
             (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {} not found in config, using defaults", testing_agent_input);
+            eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
             (testing_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
         };
 
