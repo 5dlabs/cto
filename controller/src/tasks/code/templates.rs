@@ -204,19 +204,61 @@ impl CodeTemplateGenerator {
                 .collect::<Vec<_>>()
         );
 
+        // Helper: sanitize an arbitrary localServers value by dropping nulls and non-object entries
+        let sanitize_local_servers = |v: &Value| -> Value {
+            match v {
+                Value::Object(map) => {
+                    let mut out = serde_json::Map::new();
+                    for (k, val) in map.iter() {
+                        if let Value::Object(obj) = val {
+                            out.insert(k.clone(), Value::Object(obj.clone()));
+                        }
+                    }
+                    Value::Object(out)
+                }
+                _ => json!({}),
+            }
+        };
+
         // Helper to normalize a tools-shaped JSON ({"remote": [...], "localServers": {...}})
         // into the client-config.json shape without injecting additional servers.
-        // This preserves tool definitions from Helm and client config without hard-coded defaults.
+        // Drops any null server entries produced by partial YAML (e.g., filesystem: ~).
         let normalize_tools_to_client_config = |tools_value: Value| -> Value {
             let remote_tools = tools_value.get("remote").cloned().unwrap_or_else(|| json!([]));
-            let local_servers = tools_value
-                .get("localServers")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
+            let local_servers = sanitize_local_servers(tools_value.get("localServers").unwrap_or(&json!({})));
             json!({
                 "remoteTools": remote_tools,
                 "localServers": local_servers
             })
+        };
+
+        // Helper: build client-config.json from strongly-typed AgentTools (Helm),
+        // including only servers that are explicitly enabled. Generic over server names.
+        let client_from_agent_tools = |tools: &crate::tasks::config::AgentTools| -> Value {
+            let remote_tools: Value = json!(tools.remote.clone());
+
+            let mut local_servers_obj = serde_json::Map::new();
+            if let Some(ref servers) = tools.local_servers {
+                for (name, cfg) in servers {
+                    if cfg.enabled {
+                        let mut obj = serde_json::Map::new();
+                        if !cfg.tools.is_empty() { obj.insert("tools".to_string(), json!(cfg.tools.clone())); }
+                        if let Some(cmd) = &cfg.command { obj.insert("command".to_string(), json!(cmd)); }
+                        if let Some(args) = &cfg.args { obj.insert("args".to_string(), json!(args)); }
+                        if let Some(wd) = &cfg.working_directory { obj.insert("workingDirectory".to_string(), json!(wd)); }
+                        local_servers_obj.insert(name.clone(), Value::Object(obj));
+                    }
+                }
+            }
+
+            Value::Object(
+                vec![
+                    ("remoteTools".to_string(), remote_tools),
+                    ("localServers".to_string(), Value::Object(local_servers_obj)),
+                ]
+                .into_iter()
+                .collect(),
+            )
         };
 
         // Small helpers for merge logic
@@ -336,9 +378,7 @@ impl CodeTemplateGenerator {
                                 if let Some(client_cfg) = &agent_cfg.client_config {
                                     client_cfg.clone()
                                 } else if let Some(tools) = &agent_cfg.tools {
-                                    let tools_value = serde_json::to_value(tools)
-                                        .unwrap_or_else(|_| json!({"remote": [], "localServers": {}}));
-                                    normalize_tools_to_client_config(tools_value)
+                                    client_from_agent_tools(tools)
                                 } else {
                                     json!({ "remoteTools": [], "localServers": {} })
                                 }
@@ -395,10 +435,8 @@ impl CodeTemplateGenerator {
                     tools.local_servers.is_some()
                 );
 
-                // Convert AgentTools -> Value for normalization (no defaults injected)
-                let tools_value = serde_json::to_value(tools)
-                    .unwrap_or_else(|_| json!({"remote": [], "localServers": {}}));
-                let client = normalize_tools_to_client_config(tools_value);
+                // Build client-config including only explicitly enabled local servers
+                let client = client_from_agent_tools(tools);
 
                 return to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
@@ -645,41 +683,14 @@ impl CodeTemplateGenerator {
         agent_name: &str,
         config: &ControllerConfig,
     ) -> Result<crate::tasks::config::AgentTools> {
-        use crate::tasks::config::{AgentTools, LocalServerConfig, LocalServerConfigs};
+        use crate::tasks::config::AgentTools;
 
         // Try to get agent tools from controller config
         if let Some(agent_config) = config.agents.get(agent_name) {
             if let Some(tools) = &agent_config.tools {
-                let remote_tools = tools.remote.clone();
-                let local_servers =
-                    tools
-                        .local_servers
-                        .as_ref()
-                        .map(|local_servers_config| LocalServerConfigs {
-                            filesystem: local_servers_config.filesystem.as_ref().map(|fs| {
-                                LocalServerConfig {
-                                    enabled: fs.enabled,
-                                    tools: fs.tools.clone(),
-                                    command: fs.command.clone(),
-                                    args: fs.args.clone(),
-                                    working_directory: fs.working_directory.clone(),
-                                }
-                            }),
-                            git: local_servers_config
-                                .git
-                                .as_ref()
-                                .map(|git| LocalServerConfig {
-                                    enabled: git.enabled,
-                                    tools: git.tools.clone(),
-                                    command: git.command.clone(),
-                                    args: git.args.clone(),
-                                    working_directory: git.working_directory.clone(),
-                                }),
-                        });
-
                 return Ok(AgentTools {
-                    remote: remote_tools,
-                    local_servers,
+                    remote: tools.remote.clone(),
+                    local_servers: tools.local_servers.clone(),
                 });
             }
         }
@@ -689,39 +700,7 @@ impl CodeTemplateGenerator {
             "No agent-specific tools found for '{}', using defaults",
             agent_name
         );
-        Ok(AgentTools {
-            remote: vec![
-                "memory_create_entities".to_string(),
-                "memory_add_observations".to_string(),
-            ],
-            local_servers: Some(LocalServerConfigs {
-                filesystem: Some(LocalServerConfig {
-                    enabled: true,
-                    tools: vec![
-                        "read_file".to_string(),
-                        "write_file".to_string(),
-                        "list_directory".to_string(),
-                        "search_files".to_string(),
-                        "directory_tree".to_string(),
-                    ],
-                    command: None,
-                    args: None,
-                    working_directory: None,
-                }),
-                git: Some(LocalServerConfig {
-                    enabled: true,
-                    tools: vec![
-                        "git_status".to_string(),
-                        "git_diff".to_string(),
-                        "git_log".to_string(),
-                        "git_show".to_string(),
-                    ],
-                    command: None,
-                    args: None,
-                    working_directory: None,
-                }),
-            }),
-        })
+        Ok(AgentTools { remote: vec![], local_servers: None })
     }
 
     /// Load a template file from the mounted ConfigMap
@@ -842,32 +821,39 @@ mod tests {
 
     #[test]
     fn test_get_agent_tools_with_config() {
-        use crate::tasks::config::{
-            AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig, LocalServerConfigs,
-        };
+        use crate::tasks::config::{AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig};
 
         let mut config = ControllerConfig::default();
-        let agent_tools = AgentTools {
-            remote: vec![
-                "memory_create_entities".to_string(),
-                "brave_web_search".to_string(),
-            ],
-            local_servers: Some(LocalServerConfigs {
-                filesystem: Some(LocalServerConfig {
+        let agent_tools = {
+            use std::collections::BTreeMap;
+            let mut servers = BTreeMap::new();
+            servers.insert(
+                "filesystem".to_string(),
+                LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
                     command: None,
                     args: None,
                     working_directory: None,
-                }),
-                git: Some(LocalServerConfig {
+                },
+            );
+            servers.insert(
+                "git".to_string(),
+                LocalServerConfig {
                     enabled: false,
                     tools: vec![],
                     command: None,
                     args: None,
                     working_directory: None,
-                }),
-            }),
+                },
+            );
+            AgentTools {
+                remote: vec![
+                    "memory_create_entities".to_string(),
+                    "brave_web_search".to_string(),
+                ],
+                local_servers: Some(servers),
+            }
         };
 
         config.agents.insert(
@@ -932,24 +918,24 @@ mod tests {
 
     #[test]
     fn test_merge_client_config_overlay_on_helm_defaults() {
-        use crate::tasks::config::{
-            AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig, LocalServerConfigs,
-        };
+        use crate::tasks::config::{AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig};
 
         // Helm defaults for rex
         let mut config = ControllerConfig::default();
-        let helm_tools = AgentTools {
-            remote: vec!["memory_create_entities".to_string()],
-            local_servers: Some(LocalServerConfigs {
-                filesystem: Some(LocalServerConfig {
+        let helm_tools = {
+            use std::collections::BTreeMap;
+            let mut servers = BTreeMap::new();
+            servers.insert(
+                "filesystem".to_string(),
+                LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
                     command: None,
                     args: None,
                     working_directory: None,
-                }),
-                git: None,
-            }),
+                },
+            );
+            AgentTools { remote: vec!["memory_create_entities".to_string()], local_servers: Some(servers) }
         };
         config.agents.insert(
             "rex".to_string(),
