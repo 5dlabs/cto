@@ -1268,9 +1268,12 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         fi
 
         # Gracefully stop sidecar to allow Job to complete (all containers must exit)
-        echo "🔧 Attempting sidecar shutdown..."
-        shutdown_attempts=0
-        max_shutdown_attempts=3
+        if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
+          echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
+        else
+          echo "🔧 Attempting sidecar shutdown..."
+          shutdown_attempts=0
+          max_shutdown_attempts=3
 
         while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
           if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
@@ -1286,26 +1289,27 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           fi
         done
 
-        if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-          echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-          echo "🔧 Force terminating sidecar processes..."
-          pkill -f "sidecar" || echo "No sidecar processes found to kill"
-        fi
+          if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+            echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+            echo "🔧 Force terminating sidecar processes..."
+            pkill -f "sidecar" || echo "No sidecar processes found to kill"
+          fi
 
         # Wait for sidecar to actually terminate
-        echo "⏳ Waiting for sidecar termination..."
-        timeout=10
-        while [ $timeout -gt 0 ]; do
-          if ! pgrep -f "sidecar" > /dev/null 2>&1; then
-            echo "✅ Sidecar terminated successfully"
-            break
-          fi
-          sleep 1
-          timeout=$((timeout - 1))
-        done
+          echo "⏳ Waiting for sidecar termination..."
+          timeout=10
+          while [ $timeout -gt 0 ]; do
+            if ! pgrep -f "sidecar" > /dev/null 2>&1; then
+              echo "✅ Sidecar terminated successfully"
+              break
+            fi
+            sleep 1
+            timeout=$((timeout - 1))
+          done
 
-        if [ $timeout -eq 0 ]; then
-          echo "⚠️ Sidecar still running after wait period"
+          if [ $timeout -eq 0 ]; then
+            echo "⚠️ Sidecar still running after wait period"
+          fi
         fi
     else
         echo "❌ ERROR: No prompt.md found from docs service"
