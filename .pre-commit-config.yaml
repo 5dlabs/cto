@@ -117,18 +117,5 @@ exclude: |
     node_modules/.*
   )$
 
-# Auto-generated hooks to keep Claude templates in sync
-- repo: local
-  hooks:
-    - id: claude-templates-generate
-      name: Generate claude templates
-      entry: bash infra/charts/controller/scripts/generate-templates-configmap.sh
-      language: system
-      files: ^infra/charts/controller/(claude-templates/|scripts/generate-templates-configmap\.sh$)
-      pass_filenames: false
-    - id: claude-templates-drift
-      name: Check claude templates drift
-      entry: bash -c 'git diff --quiet -- infra/charts/controller/templates/claude-templates-static.yaml || { echo "Run scripts/update-templates.sh"; exit 1; }'
-      language: system
-      always_run: true
-      pass_filenames: false
+# Claude templates: Avoid local enforcement to prevent merge conflicts.
+# CI will enforce no-commit policy and regenerate on main.
