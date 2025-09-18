@@ -1539,9 +1539,9 @@ fi
 exec 9>&- 2>/dev/null || true
 
 # =============================================================================
-# PR REVIEW POSTING - Execute the actual GitHub commands
+# PR REVIEW POSTING - Check if Claude already handled it
 # =============================================================================
-echo "🔍 Posting PR review based on testing results..."
+echo "🔍 Checking if PR review was already posted by Claude..."
 
 # Use PR_NUMBER from environment if available, otherwise use template value
 PR_NUM="${PR_NUMBER:-{{pr_number}}}"
@@ -1557,6 +1557,16 @@ if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
   echo "🔍 This is normal for non-PR workflows or when PR context is not provided"
   echo "✅ Tess QA workflow completed successfully"
   exit 0
+fi
+
+# Check if Claude already posted a review (to avoid duplicate reviews)
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  EXISTING_REVIEW=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews[] | select(.author.login == "tess-5dlabs" or .author.login == "5dlabs-tess") | .state' 2>/dev/null | head -1)
+  if [ -n "$EXISTING_REVIEW" ]; then
+    echo "✅ Claude already posted a $EXISTING_REVIEW review - skipping duplicate"
+    echo "🔍 Tess QA workflow completed successfully"
+    exit 0
+  fi
 fi
 
 # Check CI status to determine review type
