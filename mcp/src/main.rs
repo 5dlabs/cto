@@ -881,24 +881,24 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 .map(|t| {
                     match serde_json::to_string(t) {
                         Ok(json) => {
-                            eprintln!("✅ Serialized implementation agent tools: {}", json);
+                            eprintln!("✅ Serialized implementation agent tools: {json}");
                             json
                         },
                         Err(e) => {
-                            eprintln!("❌ Failed to serialize implementation agent tools: {}", e);
-                            eprintln!("   Tools data: {:?}", t);
+                            eprintln!("❌ Failed to serialize implementation agent tools: {e}");
+                            eprintln!("   Tools data: {t:?}");
                             "{}".to_string()
                         }
                     }
                 })
                 .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for implementation agent {}", implementation_agent_input);
+                    eprintln!("ℹ️ No tools configured for implementation agent {implementation_agent_input}");
                     "{}".to_string()
                 });
             (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
         } else {
             // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {} not found in config, using defaults", implementation_agent_input);
+            eprintln!("⚠️ Agent {implementation_agent_input} not found in config, using defaults");
             (implementation_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
         };
 
@@ -927,7 +927,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 .map(|t| {
                     match serde_json::to_string(t) {
                         Ok(json) => {
-                            eprintln!("✅ Serialized quality agent tools: {}", json);
+                            eprintln!("✅ Serialized quality agent tools: {json}");
                             json
                         },
                         Err(e) => {
