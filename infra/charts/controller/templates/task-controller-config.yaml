@@ -13,7 +13,7 @@ data:
 
     # Job configuration
     job:
-      activeDeadlineSeconds: 3600  # 1 hour timeout
+      # No timeout - Claude processes should run as long as needed
 
     # Claude agent configuration
     agent:
