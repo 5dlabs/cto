@@ -325,14 +325,15 @@ spec:
                                 git config user.email "5DLabs-Morgan[bot]@users.noreply.github.com"
                                 git add -A
 
-                                git commit \
+                                if ! git commit \
                                   -m "chore: complete task ${TASK_ID}" \
                                   -m "- Task implementation merged to main" \
                                   -m "- Moved task-${TASK_ID} to .completed/" \
                                   -m "- Triggered by PR merge event" \
                                   -m "- Ready for next task progression" \
-                                  -m "🤖 Auto-completed by merge-to-main sensor" \
-                                  || echo "No changes to commit"
+                                  -m "🤖 Auto-completed by merge-to-main sensor"; then
+                                  echo "No changes to commit"
+                                fi
                                 if ! git push origin main 2>/dev/null; then
                                   echo "⚠️ Failed to push task move, continuing anyway..."
                                 else
