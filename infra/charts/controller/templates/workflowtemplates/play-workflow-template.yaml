@@ -568,7 +568,7 @@ spec:
               agents.platform/tools-config: |
                 {{`{{inputs.parameters.tools-config}}`}}
           spec:
-            taskId: "{{`{{inputs.parameters.task-id}}`}}"
+            taskId: {{`{{inputs.parameters.task-id}}`}}
             service: "{{`{{workflow.parameters.service}}`}}"
             repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
             docsRepositoryUrl: "https://github.com/{{`{{workflow.parameters.docs-repository}}`}}"
