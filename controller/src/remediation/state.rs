@@ -673,7 +673,7 @@ mod tests {
             total_iterations: 25,
         };
 
-        assert_eq!(stats.average_iterations(), 2.5);
-        assert_eq!(stats.success_rate(), 5.0 / 8.0); // 5 completed out of 8 total completed workflows
+        assert!((stats.average_iterations() - 2.5).abs() < f64::EPSILON);
+        assert!((stats.success_rate() - (5.0 / 8.0)).abs() < f64::EPSILON); // 5 completed out of 8 total completed workflows
     }
 }
