@@ -7,6 +7,37 @@
 - **Working Directory**: {{working_directory}}
 - **Implementation Target**: task {{task_id}}
 
+## Allowed Environment Variables
+
+These are the environment variable NAMES available to the agent. Values are never shown here.
+
+- Workflow-provided:
+{{#if workflow_env_vars}}
+{{#each workflow_env_vars}}
+  - {{this}}
+{{/each}}
+{{else}}
+  - (none)
+{{/if}}
+
+- From requirements.yaml:
+{{#if requirements_env_vars}}
+{{#each requirements_env_vars}}
+  - {{this}}
+{{/each}}
+{{else}}
+  - (none)
+{{/if}}
+
+- Secret sources (envFrom):
+{{#if requirements_secret_sources}}
+{{#each requirements_secret_sources}}
+  - {{this}}
+{{/each}}
+{{else}}
+  - (none)
+{{/if}}
+
 ## Tool Capabilities
 
 See @mcp-tools.md for your available tools and usage guidelines
