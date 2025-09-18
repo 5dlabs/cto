@@ -12,7 +12,7 @@ use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;
 use kube::ResourceExt;
 use serde_json::json;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -918,12 +918,18 @@ impl<'a> CodeResourceManager<'a> {
     ) -> Result<(Vec<serde_json::Value>, Vec<serde_json::Value>)> {
         let mut env_from = Vec::new();
 
+        // Tracking for visibility (names only, never values)
+        let mut workflow_env_names: BTreeSet<String> = BTreeSet::new();
+        let mut req_env_names: BTreeSet<String> = BTreeSet::new();
+        let mut req_secret_sources: BTreeSet<String> = BTreeSet::new();
+
         // ALWAYS process spec.env first (workflow-provided env vars like PR_URL, PR_NUMBER)
         for (key, value) in &code_run.spec.env {
             env_vars.push(json!({
                 "name": key,
                 "value": value
             }));
+            workflow_env_names.insert(key.clone());
         }
 
         // Check if we have non-empty task requirements
@@ -960,6 +966,7 @@ impl<'a> CodeResourceManager<'a> {
                 for secret in secrets {
                     if let Some(secret_map) = secret.as_mapping() {
                         if let Some(name) = secret_map.get("name").and_then(|n| n.as_str()) {
+                            req_secret_sources.insert(name.to_string());
                             // Check if we have specific key mappings
                             if let Some(keys) = secret_map.get("keys").and_then(|k| k.as_sequence())
                             {
@@ -979,6 +986,7 @@ impl<'a> CodeResourceManager<'a> {
                                                         }
                                                     }
                                                 }));
+                                                req_env_names.insert(env_name_str.to_string());
                                             }
                                         }
                                     }
@@ -1004,6 +1012,7 @@ impl<'a> CodeResourceManager<'a> {
                             "name": key_str,
                             "value": value_str
                         }));
+                        req_env_names.insert(key_str.to_string());
                     }
                 }
             }
@@ -1021,8 +1030,23 @@ impl<'a> CodeResourceManager<'a> {
                         }
                     }
                 }));
+                req_env_names.insert(secret_env.name.clone());
+                req_secret_sources.insert(secret_env.secret_name.clone());
             }
         }
+
+        // Surface non-sensitive visibility of env var allowances to the container as JSON strings
+        let wf_env_list: Vec<String> = workflow_env_names.into_iter().collect();
+        let req_env_list: Vec<String> = req_env_names.into_iter().collect();
+        let req_secret_list: Vec<String> = req_secret_sources.into_iter().collect();
+
+        let wf_env_json = serde_json::to_string(&wf_env_list).unwrap_or_else(|_| "[]".to_string());
+        let req_env_json = serde_json::to_string(&req_env_list).unwrap_or_else(|_| "[]".to_string());
+        let req_secret_json = serde_json::to_string(&req_secret_list).unwrap_or_else(|_| "[]".to_string());
+
+        env_vars.push(json!({ "name": "WORKFLOW_ENV_VARS", "value": wf_env_json }));
+        env_vars.push(json!({ "name": "REQUIREMENTS_ENV_VARS", "value": req_env_json }));
+        env_vars.push(json!({ "name": "REQUIREMENTS_SECRET_SOURCES", "value": req_secret_json }));
 
         Ok((env_vars, env_from))
     }
