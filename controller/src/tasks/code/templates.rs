@@ -224,8 +224,12 @@ impl CodeTemplateGenerator {
         // into the client-config.json shape without injecting additional servers.
         // Drops any null server entries produced by partial YAML (e.g., serverX: ~).
         let normalize_tools_to_client_config = |tools_value: Value| -> Value {
-            let remote_tools = tools_value.get("remote").cloned().unwrap_or_else(|| json!([]));
-            let local_servers = sanitize_local_servers(tools_value.get("localServers").unwrap_or(&json!({})));
+            let remote_tools = tools_value
+                .get("remote")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            let local_servers =
+                sanitize_local_servers(tools_value.get("localServers").unwrap_or(&json!({})));
             json!({
                 "remoteTools": remote_tools,
                 "localServers": local_servers
@@ -250,10 +254,18 @@ impl CodeTemplateGenerator {
                 for (name, cfg) in servers {
                     if cfg.enabled {
                         let mut obj = serde_json::Map::new();
-                        if !cfg.tools.is_empty() { obj.insert("tools".to_string(), json!(cfg.tools.clone())); }
-                        if let Some(cmd) = &cfg.command { obj.insert("command".to_string(), json!(cmd)); }
-                        if let Some(args) = &cfg.args { obj.insert("args".to_string(), json!(args)); }
-                        if let Some(wd) = &cfg.working_directory { obj.insert("workingDirectory".to_string(), json!(wd)); }
+                        if !cfg.tools.is_empty() {
+                            obj.insert("tools".to_string(), json!(cfg.tools.clone()));
+                        }
+                        if let Some(cmd) = &cfg.command {
+                            obj.insert("command".to_string(), json!(cmd));
+                        }
+                        if let Some(args) = &cfg.args {
+                            obj.insert("args".to_string(), json!(args));
+                        }
+                        if let Some(wd) = &cfg.working_directory {
+                            obj.insert("workingDirectory".to_string(), json!(wd));
+                        }
                         local_servers_obj.insert(name.clone(), Value::Object(obj));
                     }
                 }
@@ -282,8 +294,10 @@ impl CodeTemplateGenerator {
 
         let merge_client_configs = |base: &Value, overlay: &Value| -> Value {
             // Merge remoteTools as a union preserving base order
-            let mut merged_remote = collect_string_array(base.get("remoteTools").unwrap_or(&json!([])));
-            let overlay_remote = collect_string_array(overlay.get("remoteTools").unwrap_or(&json!([])));
+            let mut merged_remote =
+                collect_string_array(base.get("remoteTools").unwrap_or(&json!([])));
+            let overlay_remote =
+                collect_string_array(overlay.get("remoteTools").unwrap_or(&json!([])));
             for t in overlay_remote {
                 if !merged_remote.contains(&t) {
                     merged_remote.push(t);
@@ -298,8 +312,12 @@ impl CodeTemplateGenerator {
             // Collect all server keys
             use std::collections::BTreeSet;
             let mut keys = BTreeSet::new();
-            if let Some(m) = base_ls { keys.extend(m.keys().cloned()); }
-            if let Some(m) = overlay_ls { keys.extend(m.keys().cloned()); }
+            if let Some(m) = base_ls {
+                keys.extend(m.keys().cloned());
+            }
+            if let Some(m) = overlay_ls {
+                keys.extend(m.keys().cloned());
+            }
 
             for k in keys {
                 let b = base_ls.and_then(|m| m.get(&k));
@@ -309,8 +327,10 @@ impl CodeTemplateGenerator {
                     (Some(Value::Object(bm)), Some(Value::Object(om))) => {
                         let mut out = bm.clone();
                         // tools union if present
-                        let base_tools = collect_string_array(out.get("tools").unwrap_or(&json!([])));
-                        let overlay_tools = collect_string_array(om.get("tools").unwrap_or(&json!([])));
+                        let base_tools =
+                            collect_string_array(out.get("tools").unwrap_or(&json!([])));
+                        let overlay_tools =
+                            collect_string_array(om.get("tools").unwrap_or(&json!([])));
                         if !base_tools.is_empty() || !overlay_tools.is_empty() {
                             let mut union = base_tools;
                             for t in overlay_tools {
@@ -322,7 +342,9 @@ impl CodeTemplateGenerator {
                         }
                         // Overlay scalar/object fields from overlay
                         for (ok, ov) in om.iter() {
-                            if ok == "tools" { continue; }
+                            if ok == "tools" {
+                                continue;
+                            }
                             out.insert(ok.clone(), ov.clone());
                         }
                         Value::Object(out)
@@ -716,7 +738,10 @@ impl CodeTemplateGenerator {
             "No agent-specific tools found for '{}', using defaults",
             agent_name
         );
-        Ok(AgentTools { remote: vec![], local_servers: None })
+        Ok(AgentTools {
+            remote: vec![],
+            local_servers: None,
+        })
     }
 
     /// Load a template file from the mounted ConfigMap
@@ -837,7 +862,9 @@ mod tests {
 
     #[test]
     fn test_get_agent_tools_with_config() {
-        use crate::tasks::config::{AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig};
+        use crate::tasks::config::{
+            AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig,
+        };
 
         let mut config = ControllerConfig::default();
         let agent_tools = {
@@ -934,7 +961,9 @@ mod tests {
 
     #[test]
     fn test_merge_client_config_overlay_on_helm_defaults() {
-        use crate::tasks::config::{AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig};
+        use crate::tasks::config::{
+            AgentDefinition, AgentTools, ControllerConfig, LocalServerConfig,
+        };
 
         // Helm defaults for rex
         let mut config = ControllerConfig::default();
@@ -951,7 +980,10 @@ mod tests {
                     working_directory: None,
                 },
             );
-            AgentTools { remote: vec!["memory_create_entities".to_string()], local_servers: Some(servers) }
+            AgentTools {
+                remote: vec!["memory_create_entities".to_string()],
+                local_servers: Some(servers),
+            }
         };
         config.agents.insert(
             "rex".to_string(),

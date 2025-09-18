@@ -249,18 +249,26 @@ impl DocsTemplateGenerator {
 
                 // localServers (generic: include only servers marked enabled)
                 let mut local_servers_obj = serde_json::Map::new();
-            if let Some(ref servers) = tools.local_servers {
-                for (name, cfg) in servers {
-                    if cfg.enabled {
-                        let mut obj = serde_json::Map::new();
-                        if !cfg.tools.is_empty() { obj.insert("tools".to_string(), json!(cfg.tools)); }
-                        if let Some(cmd) = &cfg.command { obj.insert("command".to_string(), json!(cmd)); }
-                        if let Some(args) = &cfg.args { obj.insert("args".to_string(), json!(args)); }
-                        if let Some(wd) = &cfg.working_directory { obj.insert("workingDirectory".to_string(), json!(wd)); }
-                        local_servers_obj.insert(name.clone(), Value::Object(obj));
+                if let Some(ref servers) = tools.local_servers {
+                    for (name, cfg) in servers {
+                        if cfg.enabled {
+                            let mut obj = serde_json::Map::new();
+                            if !cfg.tools.is_empty() {
+                                obj.insert("tools".to_string(), json!(cfg.tools));
+                            }
+                            if let Some(cmd) = &cfg.command {
+                                obj.insert("command".to_string(), json!(cmd));
+                            }
+                            if let Some(args) = &cfg.args {
+                                obj.insert("args".to_string(), json!(args));
+                            }
+                            if let Some(wd) = &cfg.working_directory {
+                                obj.insert("workingDirectory".to_string(), json!(wd));
+                            }
+                            local_servers_obj.insert(name.clone(), Value::Object(obj));
+                        }
                     }
                 }
-            }
 
                 let mut client = Value::Object(
                     vec![
