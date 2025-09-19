@@ -1041,8 +1041,10 @@ impl<'a> CodeResourceManager<'a> {
         let req_secret_list: Vec<String> = req_secret_sources.into_iter().collect();
 
         let wf_env_json = serde_json::to_string(&wf_env_list).unwrap_or_else(|_| "[]".to_string());
-        let req_env_json = serde_json::to_string(&req_env_list).unwrap_or_else(|_| "[]".to_string());
-        let req_secret_json = serde_json::to_string(&req_secret_list).unwrap_or_else(|_| "[]".to_string());
+        let req_env_json =
+            serde_json::to_string(&req_env_list).unwrap_or_else(|_| "[]".to_string());
+        let req_secret_json =
+            serde_json::to_string(&req_secret_list).unwrap_or_else(|_| "[]".to_string());
 
         env_vars.push(json!({ "name": "WORKFLOW_ENV_VARS", "value": wf_env_json }));
         env_vars.push(json!({ "name": "REQUIREMENTS_ENV_VARS", "value": req_env_json }));

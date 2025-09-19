@@ -135,12 +135,7 @@ impl CodeTemplateGenerator {
 
         // Derive allowed env var name lists for inclusion in CLAUDE.md
         // 1) Workflow-provided env names (keys only)
-        let workflow_env_vars: Vec<String> = code_run
-            .spec
-            .env
-            .keys()
-            .cloned()
-            .collect();
+        let workflow_env_vars: Vec<String> = code_run.spec.env.keys().cloned().collect();
 
         // 2) From requirements.yaml (environment keys and mapped secret key names)
         let mut req_env_vars: Vec<String> = Vec::new();
@@ -153,9 +148,8 @@ impl CodeTemplateGenerator {
             if !req_b64.trim().is_empty() {
                 if let Ok(decoded) = general_purpose::STANDARD.decode(req_b64) {
                     if let Ok(req_yaml) = serde_yaml::from_slice::<serde_yaml::Value>(&decoded) {
-                        if let Some(env_map) = req_yaml
-                            .get("environment")
-                            .and_then(|e| e.as_mapping())
+                        if let Some(env_map) =
+                            req_yaml.get("environment").and_then(|e| e.as_mapping())
                         {
                             for (k, _v) in env_map {
                                 if let Some(key) = k.as_str() {
@@ -163,19 +157,19 @@ impl CodeTemplateGenerator {
                                 }
                             }
                         }
-                        if let Some(secrets) = req_yaml
-                            .get("secrets")
-                            .and_then(|s| s.as_sequence())
+                        if let Some(secrets) = req_yaml.get("secrets").and_then(|s| s.as_sequence())
                         {
                             for secret in secrets {
                                 if let Some(m) = secret.as_mapping() {
-                                    if let Some(name) = m.get(serde_yaml::Value::from("name"))
+                                    if let Some(name) = m
+                                        .get(serde_yaml::Value::from("name"))
                                         .and_then(|n| n.as_str())
                                     {
                                         req_secret_sources.push(name.to_string());
                                     }
                                     // If there are key mappings, surface the env var names (right-hand side)
-                                    if let Some(keys) = m.get(serde_yaml::Value::from("keys"))
+                                    if let Some(keys) = m
+                                        .get(serde_yaml::Value::from("keys"))
                                         .and_then(|k| k.as_sequence())
                                     {
                                         for entry in keys {
