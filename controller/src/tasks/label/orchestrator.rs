@@ -300,45 +300,59 @@ impl LabelOrchestrator {
         iteration_update: &mut Option<i32>,
     ) -> Result<(), OrchestratorError> {
         match action {
-            "add_needs_remediation" => {
+            "add_needs_fixes" => {
                 operations.push(LabelOperation {
                     operation_type: LabelOperationType::Add,
-                    labels: vec!["needs-remediation".to_string()],
+                    labels: vec!["needs-fixes".to_string()],
                     from_label: None,
                 });
             }
-            "remove_needs_remediation" => {
+            "remove_needs_fixes" => {
                 operations.push(LabelOperation {
                     operation_type: LabelOperationType::Remove,
-                    labels: vec!["needs-remediation".to_string()],
+                    labels: vec!["needs-fixes".to_string()],
                     from_label: None,
                 });
             }
-            "add_remediation_in_progress" => {
+            "add_fixing_in_progress" => {
                 operations.push(LabelOperation {
                     operation_type: LabelOperationType::Add,
-                    labels: vec!["remediation-in-progress".to_string()],
+                    labels: vec!["fixing-in-progress".to_string()],
                     from_label: None,
                 });
             }
-            "remove_remediation_in_progress" => {
+            "remove_fixing_in_progress" => {
                 operations.push(LabelOperation {
                     operation_type: LabelOperationType::Remove,
-                    labels: vec!["remediation-in-progress".to_string()],
+                    labels: vec!["fixing-in-progress".to_string()],
                     from_label: None,
                 });
             }
-            "add_ready_for_qa" => {
+            "add_needs_cleo" => {
                 operations.push(LabelOperation {
                     operation_type: LabelOperationType::Add,
-                    labels: vec!["ready-for-qa".to_string()],
+                    labels: vec!["needs-cleo".to_string()],
                     from_label: None,
                 });
             }
-            "remove_ready_for_qa" => {
+            "remove_needs_cleo" => {
                 operations.push(LabelOperation {
                     operation_type: LabelOperationType::Remove,
-                    labels: vec!["ready-for-qa".to_string()],
+                    labels: vec!["needs-cleo".to_string()],
+                    from_label: None,
+                });
+            }
+            "add_needs_tess" => {
+                operations.push(LabelOperation {
+                    operation_type: LabelOperationType::Add,
+                    labels: vec!["needs-tess".to_string()],
+                    from_label: None,
+                });
+            }
+            "remove_needs_tess" => {
+                operations.push(LabelOperation {
+                    operation_type: LabelOperationType::Remove,
+                    labels: vec!["needs-tess".to_string()],
                     from_label: None,
                 });
             }
@@ -451,9 +465,10 @@ impl LabelOrchestrator {
 
         // Remove all status labels first
         let status_labels = [
-            "needs-remediation",
-            "remediation-in-progress",
-            "ready-for-qa",
+            "needs-fixes",
+            "fixing-in-progress",
+            "needs-cleo",
+            "needs-tess",
             "approved",
             "failed-remediation",
         ];
@@ -474,9 +489,10 @@ impl LabelOrchestrator {
 
         // Add the target state label
         let target_label = match target_state {
-            WorkflowState::NeedsRemediation => "needs-remediation",
-            WorkflowState::RemediationInProgress => "remediation-in-progress",
-            WorkflowState::ReadyForQA => "ready-for-qa",
+            WorkflowState::NeedsFixes => "needs-fixes",
+            WorkflowState::FixingInProgress => "fixing-in-progress",
+            WorkflowState::NeedsCleo => "needs-cleo",
+            WorkflowState::NeedsTess => "needs-tess",
             WorkflowState::Approved => "approved",
             WorkflowState::Failed => "failed-remediation",
             WorkflowState::Initial | WorkflowState::ManualOverride => return operations,

@@ -50,17 +50,19 @@ pub enum LabelLifecycle {
 /// Workflow states in the remediation process
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WorkflowState {
-    /// Initial state - no workflow active
+    /// Initial state - no remediation loop running yet
     Initial,
-    /// Tess has identified issues requiring remediation
-    NeedsRemediation,
-    /// Rex is actively working on fixes
-    RemediationInProgress,
-    /// Rex has completed fixes, waiting for QA
-    ReadyForQA,
+    /// Tess (or a human) has requested fixes from Rex
+    NeedsFixes,
+    /// Rex is actively working on remediation fixes
+    FixingInProgress,
+    /// Rex completed the pass and Cleo needs to rerun quality checks
+    NeedsCleo,
+    /// Cleo approved and Tess needs to re-review
+    NeedsTess,
     /// Tess has approved the changes
     Approved,
-    /// Remediation failed (max iterations reached)
+    /// Remediation failed (manual stop or iteration cap)
     Failed,
     /// Human override is active
     ManualOverride,
@@ -162,11 +164,14 @@ impl Default for LabelSchema {
             LabelType::Status,
             LabelTypeSchema {
                 label_type: LabelType::Status,
-                pattern: "(needs-remediation|remediation-in-progress|ready-for-qa|approved|failed-remediation)".to_string(),
+                pattern:
+                    "(needs-fixes|fixing-in-progress|needs-cleo|needs-tess|approved|failed-remediation)"
+                        .to_string(),
                 examples: vec![
-                    "needs-remediation".to_string(),
-                    "remediation-in-progress".to_string(),
-                    "ready-for-qa".to_string(),
+                    "needs-fixes".to_string(),
+                    "fixing-in-progress".to_string(),
+                    "needs-cleo".to_string(),
+                    "needs-tess".to_string(),
                 ],
                 lifecycle: LabelLifecycle::StateBased,
                 purpose: "workflow status".to_string(),
@@ -190,9 +195,10 @@ impl Default for LabelSchema {
 
         let workflow_states = vec![
             WorkflowState::Initial,
-            WorkflowState::NeedsRemediation,
-            WorkflowState::RemediationInProgress,
-            WorkflowState::ReadyForQA,
+            WorkflowState::NeedsFixes,
+            WorkflowState::FixingInProgress,
+            WorkflowState::NeedsCleo,
+            WorkflowState::NeedsTess,
             WorkflowState::Approved,
             WorkflowState::Failed,
             WorkflowState::ManualOverride,
@@ -201,62 +207,110 @@ impl Default for LabelSchema {
         let state_transitions = vec![
             StateTransition {
                 from: WorkflowState::Initial,
-                to: WorkflowState::NeedsRemediation,
-                trigger: "tess_feedback_received".to_string(),
+                to: WorkflowState::NeedsFixes,
+                trigger: "tess_changes_requested".to_string(),
                 conditions: vec![],
                 actions: vec![
-                    "add_needs_remediation".to_string(),
+                    "add_needs_fixes".to_string(),
                     "increment_iteration".to_string(),
                 ],
             },
             StateTransition {
-                from: WorkflowState::NeedsRemediation,
-                to: WorkflowState::RemediationInProgress,
-                trigger: "rex_remediation_started".to_string(),
+                from: WorkflowState::NeedsFixes,
+                to: WorkflowState::FixingInProgress,
+                trigger: "rex_work_started".to_string(),
                 conditions: vec![],
                 actions: vec![
-                    "remove_needs_remediation".to_string(),
-                    "add_remediation_in_progress".to_string(),
+                    "remove_needs_fixes".to_string(),
+                    "add_fixing_in_progress".to_string(),
                 ],
             },
             StateTransition {
-                from: WorkflowState::RemediationInProgress,
-                to: WorkflowState::ReadyForQA,
-                trigger: "rex_remediation_completed".to_string(),
+                from: WorkflowState::FixingInProgress,
+                to: WorkflowState::NeedsCleo,
+                trigger: "rex_work_completed".to_string(),
                 conditions: vec![],
                 actions: vec![
-                    "remove_remediation_in_progress".to_string(),
-                    "add_ready_for_qa".to_string(),
+                    "remove_fixing_in_progress".to_string(),
+                    "add_needs_cleo".to_string(),
                 ],
             },
             StateTransition {
-                from: WorkflowState::ReadyForQA,
-                to: WorkflowState::NeedsRemediation,
-                trigger: "tess_additional_feedback".to_string(),
+                from: WorkflowState::NeedsCleo,
+                to: WorkflowState::NeedsTess,
+                trigger: "cleo_checks_passed".to_string(),
                 conditions: vec![],
                 actions: vec![
-                    "remove_ready_for_qa".to_string(),
-                    "add_needs_remediation".to_string(),
+                    "remove_needs_cleo".to_string(),
+                    "add_needs_tess".to_string(),
+                ],
+            },
+            StateTransition {
+                from: WorkflowState::NeedsCleo,
+                to: WorkflowState::NeedsFixes,
+                trigger: "cleo_changes_requested".to_string(),
+                conditions: vec![],
+                actions: vec![
+                    "remove_needs_cleo".to_string(),
+                    "add_needs_fixes".to_string(),
                     "increment_iteration".to_string(),
                 ],
             },
             StateTransition {
-                from: WorkflowState::ReadyForQA,
+                from: WorkflowState::NeedsTess,
+                to: WorkflowState::NeedsFixes,
+                trigger: "tess_changes_requested".to_string(),
+                conditions: vec![],
+                actions: vec![
+                    "remove_needs_tess".to_string(),
+                    "add_needs_fixes".to_string(),
+                    "increment_iteration".to_string(),
+                ],
+            },
+            StateTransition {
+                from: WorkflowState::NeedsTess,
                 to: WorkflowState::Approved,
-                trigger: "tess_approval".to_string(),
+                trigger: "tess_approved".to_string(),
                 conditions: vec![],
-                actions: vec![
-                    "remove_ready_for_qa".to_string(),
-                    "add_approved".to_string(),
-                ],
+                actions: vec!["remove_needs_tess".to_string(), "add_approved".to_string()],
             },
             StateTransition {
-                from: WorkflowState::RemediationInProgress,
+                from: WorkflowState::FixingInProgress,
                 to: WorkflowState::Failed,
                 trigger: "max_iterations_reached".to_string(),
                 conditions: vec!["iteration >= 10".to_string()],
                 actions: vec![
-                    "remove_remediation_in_progress".to_string(),
+                    "remove_fixing_in_progress".to_string(),
+                    "add_failed_remediation".to_string(),
+                ],
+            },
+            StateTransition {
+                from: WorkflowState::NeedsFixes,
+                to: WorkflowState::Failed,
+                trigger: "max_iterations_reached".to_string(),
+                conditions: vec!["iteration >= 10".to_string()],
+                actions: vec![
+                    "remove_needs_fixes".to_string(),
+                    "add_failed_remediation".to_string(),
+                ],
+            },
+            StateTransition {
+                from: WorkflowState::NeedsTess,
+                to: WorkflowState::Failed,
+                trigger: "max_iterations_reached".to_string(),
+                conditions: vec!["iteration >= 10".to_string()],
+                actions: vec![
+                    "remove_needs_tess".to_string(),
+                    "add_failed_remediation".to_string(),
+                ],
+            },
+            StateTransition {
+                from: WorkflowState::NeedsCleo,
+                to: WorkflowState::Failed,
+                trigger: "max_iterations_reached".to_string(),
+                conditions: vec!["iteration >= 10".to_string()],
+                actions: vec![
+                    "remove_needs_cleo".to_string(),
                     "add_failed_remediation".to_string(),
                 ],
             },
@@ -264,16 +318,20 @@ impl Default for LabelSchema {
 
         let mut status_labels = HashMap::new();
         status_labels.insert(
-            "needs-remediation".to_string(),
-            "Tess identified issues requiring remediation".to_string(),
+            "needs-fixes".to_string(),
+            "Tess (or human) requested Rex to remediate findings".to_string(),
         );
         status_labels.insert(
-            "remediation-in-progress".to_string(),
-            "Rex is actively working on fixes".to_string(),
+            "fixing-in-progress".to_string(),
+            "Rex is currently remediating the outstanding findings".to_string(),
         );
         status_labels.insert(
-            "ready-for-qa".to_string(),
-            "Rex completed fixes, waiting for QA".to_string(),
+            "needs-cleo".to_string(),
+            "Rex finished the pass; Cleo must re-run quality checks".to_string(),
+        );
+        status_labels.insert(
+            "needs-tess".to_string(),
+            "Cleo approved; Tess needs to re-review the changes".to_string(),
         );
         status_labels.insert(
             "approved".to_string(),
@@ -360,12 +418,14 @@ impl LabelSchema {
             WorkflowState::Approved
         } else if labels.contains(&"failed-remediation".to_string()) {
             WorkflowState::Failed
-        } else if labels.contains(&"ready-for-qa".to_string()) {
-            WorkflowState::ReadyForQA
-        } else if labels.contains(&"remediation-in-progress".to_string()) {
-            WorkflowState::RemediationInProgress
-        } else if labels.contains(&"needs-remediation".to_string()) {
-            WorkflowState::NeedsRemediation
+        } else if labels.contains(&"needs-tess".to_string()) {
+            WorkflowState::NeedsTess
+        } else if labels.contains(&"needs-cleo".to_string()) {
+            WorkflowState::NeedsCleo
+        } else if labels.contains(&"fixing-in-progress".to_string()) {
+            WorkflowState::FixingInProgress
+        } else if labels.contains(&"needs-fixes".to_string()) {
+            WorkflowState::NeedsFixes
         } else {
             WorkflowState::Initial
         }
