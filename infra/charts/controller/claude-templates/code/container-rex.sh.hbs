@@ -1327,10 +1327,16 @@ echo '════════════════════════�
 echo "🔗 Checking for post-completion PR hook..."
 if [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
   echo "🔗 Found stop hook: /task-files/hooks-stop-code-pr-creation.sh"
-  chmod +x /task-files/hooks-stop-code-pr-creation.sh || true
+  
+  # Copy script to writable location to fix permission issues
+  HOOK_SCRIPT="/tmp/hooks-stop-code-pr-creation.sh"
+  cp "/task-files/hooks-stop-code-pr-creation.sh" "$HOOK_SCRIPT"
+  chmod +x "$HOOK_SCRIPT"
+  echo "✓ Copied hook script to writable location with execute permissions"
+  
   echo "🚀 Running stop hook to commit, push, and create PR (as fallback)..."
   (
-    cd "$CLAUDE_WORK_DIR" && /task-files/hooks-stop-code-pr-creation.sh
+    cd "$CLAUDE_WORK_DIR" && "$HOOK_SCRIPT"
   ) || echo "⚠️ Stop hook failed (continuing to PR verification)"
 else
   echo "ℹ️ No stop hook found; relying on agent-driven PR creation"
@@ -1367,8 +1373,16 @@ if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$
     # If still not found, run the stop hook one more time (idempotent) then re-check
     if [ -z "$PR_EXISTS" ] && [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
         echo "🔁 No PR detected yet; retrying stop hook once more..."
+        
+        # Use the same writable copy approach for retry
+        HOOK_SCRIPT="/tmp/hooks-stop-code-pr-creation.sh"
+        if [ ! -f "$HOOK_SCRIPT" ]; then
+            cp "/task-files/hooks-stop-code-pr-creation.sh" "$HOOK_SCRIPT"
+            chmod +x "$HOOK_SCRIPT"
+        fi
+        
         (
-          cd "$CLAUDE_WORK_DIR" && /task-files/hooks-stop-code-pr-creation.sh
+          cd "$CLAUDE_WORK_DIR" && "$HOOK_SCRIPT"
         ) || echo "⚠️ Stop hook retry failed"
         echo "⏳ Waiting briefly before re-checking PR..."
         sleep 3
