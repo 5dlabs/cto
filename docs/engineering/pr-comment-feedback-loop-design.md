@@ -422,10 +422,16 @@ sequenceDiagram
 
 
 
-- `needs-remediation` - Tess found issues
+- `needs-fixes` - Tess (or a human) requested remediation from Rex
 
 
-- `remediation-in-progress` - Rex is fixing
+- `fixing-in-progress` - Rex is actively working on a remediation pass
+
+
+- `needs-cleo` - Rex finished; Cleo must re-run quality checks
+
+
+- `needs-tess` - Cleo approved; Tess needs to re-review
 
 
 - `iteration-{n}` - Track attempt number
