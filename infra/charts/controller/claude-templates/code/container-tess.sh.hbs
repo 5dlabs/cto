@@ -758,6 +758,7 @@ STATUS_LABEL_NEEDS_CLEO="needs-cleo"
 STATUS_LABEL_NEEDS_TESS="needs-tess"
 STATUS_LABEL_APPROVED="approved"
 STATUS_LABEL_FAILED="failed-remediation"
+STATUS_LABEL_NEEDS_TESTS_LEGACY="needs tests"
 
 ensure_status_labels() {
   local repo="$1"
@@ -1098,16 +1099,20 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
    - Ensure test coverage reaches 95% minimum
    - Push all test files to the repository
 
-3. **Deploy to Kubernetes (MANDATORY IF ACCESS EXISTS)**:
-   - Test kubectl access: \`kubectl get nodes\` and \`kubectl get ns\`
-   - If no access: Comment \"⚠️ Unable to verify K8s deployment - no cluster access\"
-   - If access exists, YOU MUST:
-     a) Create test namespace: \`kubectl create ns test-$TASK_ID\`
-     b) Deploy using universal chart (see deployment instructions below)
-     c) Verify pods are running: \`kubectl get pods -n test-$TASK_ID\`
-     d) Test the service endpoints
-     e) Cleanup: \`kubectl delete ns test-$TASK_ID\`
-   - Report deployment results in PR review
+3. **Deploy to Kubernetes (MANDATORY FOR END-TO-END VALIDATION)**:
+   - Tess must execute a full integration smoke test in the live Kubernetes environment.
+   - Use Toolman MCP Kubernetes commands (preferred) for all cluster operations. Fall back to local `kubectl` only if required.
+   - Quick capability test:
+     * `toolman kubernetes_listResources --kind namespaces`
+     * `toolman kubernetes_getPodsLogs --namespace test-$TASK_ID --pod <pod>`
+   - End-to-end expectations when cluster access exists:
+     a) **Create namespace** for the test (via Toolman `kubernetes_createResource` or `kubectl create ns test-$TASK_ID`).
+     b) **Deploy** the universal chart and wait for pods to become ready.
+     c) **Verify pod health** (Toolman list pods / `kubectl get pods`).
+     d) **Exercise the service** (port-forward and hit health/test endpoints).
+     e) **Teardown** namespace to avoid orphaned resources.
+   - If both Toolman and local `kubectl` are unavailable, record that in the PR review; otherwise a deployment check is required before approval.
+   - Always include the exact commands/tool invocations in the review summary so operators can audit the run.
 
 4. **Task $TASK_ID Acceptance Criteria (100% or REJECT)**:
    - EVERY requirement FOR THIS TASK must be PERFECTLY met
@@ -1207,8 +1212,9 @@ If you have kubectl access, deploy the application to verify it works:
 \`\`\`bash
 # 1. Check if we can actually deploy (skip Docker build/push - image should exist)
 if ! kubectl version --short 2>/dev/null; then
-  echo "⚠️ No kubectl access - skipping Kubernetes deployment"
-  # Don't exit - continue with other tests
+  echo "ℹ️ Local kubectl not configured. Use Toolman MCP Kubernetes commands instead (e.g. 'toolman kubernetes_createResource', 'toolman kubernetes_listResources')."
+  echo "⚠️ If Toolman commands also fail, document the lack of cluster access in your PR review."
+  # Don't exit - continue with other tests (Toolman commands can still be used manually)
 fi
 
 # 2. Create or use test namespace (idempotent)
@@ -1300,6 +1306,7 @@ if [ "$SKIP_K8S_DEPLOY" != "true" ] && kubectl version --short 2>/dev/null; then
   kubectl delete namespace test-$TASK_ID --wait=false || true
 else
   echo "ℹ️ Kubernetes deployment skipped - no access or chart missing"
+  echo "   ➤ Double-check Toolman MCP commands before skipping entirely."
 fi
 \`\`\`
 
@@ -1938,7 +1945,8 @@ $FAILED_DETAILS
         "$STATUS_LABEL_NEEDS_TESS" \
         "$STATUS_LABEL_NEEDS_CLEO" \
         "$STATUS_LABEL_APPROVED" \
-        "$STATUS_LABEL_FAILED"
+        "$STATUS_LABEL_FAILED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
     fi
   elif [ "$PENDING_CHECKS" -gt 0 ]; then
@@ -1970,7 +1978,8 @@ $PENDING_DETAILS
       pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
         "$STATUS_LABEL_NEEDS_FIXES" \
         "$STATUS_LABEL_APPROVED" \
-        "$STATUS_LABEL_FAILED"
+        "$STATUS_LABEL_FAILED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
     fi
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
@@ -2010,7 +2019,8 @@ $SUCCESS_DETAILS
         "$STATUS_LABEL_NEEDS_TESS" \
         "$STATUS_LABEL_NEEDS_CLEO" \
         "$STATUS_LABEL_FIXING" \
-        "$STATUS_LABEL_FAILED"
+        "$STATUS_LABEL_FAILED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_APPROVED"
     fi
   else
@@ -2040,7 +2050,8 @@ $SUCCESS_DETAILS
       pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
         "$STATUS_LABEL_NEEDS_TESS" \
         "$STATUS_LABEL_NEEDS_CLEO" \
-        "$STATUS_LABEL_APPROVED"
+        "$STATUS_LABEL_APPROVED" \
+        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
     fi
   fi

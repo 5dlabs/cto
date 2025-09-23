@@ -498,6 +498,7 @@ STATUS_LABEL_NEEDS_CLEO="needs-cleo"
 STATUS_LABEL_NEEDS_TESS="needs-tess"
 STATUS_LABEL_APPROVED="approved"
 STATUS_LABEL_FAILED="failed-remediation"
+STATUS_LABEL_NEEDS_TESTS_LEGACY="needs tests"
 
 ensure_status_labels() {
   local repo="$1"
@@ -1161,7 +1162,8 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       "$STATUS_LABEL_NEEDS_FIXES" \
       "$STATUS_LABEL_FIXING" \
       "$STATUS_LABEL_APPROVED" \
-      "$STATUS_LABEL_FAILED"
+      "$STATUS_LABEL_FAILED" \
+      "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
     pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
   else
     echo "🏷️ Updating remediation labels: Quality issues detected"
@@ -1169,7 +1171,8 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       "$STATUS_LABEL_NEEDS_CLEO" \
       "$STATUS_LABEL_NEEDS_TESS" \
       "$STATUS_LABEL_APPROVED" \
-      "$STATUS_LABEL_FAILED"
+      "$STATUS_LABEL_FAILED" \
+      "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
     pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
   fi
 else
