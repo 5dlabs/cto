@@ -492,6 +492,67 @@ is_valid_cfg() {
   jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
 }
 
+STATUS_LABEL_NEEDS_FIXES="needs-fixes"
+STATUS_LABEL_FIXING="fixing-in-progress"
+STATUS_LABEL_NEEDS_CLEO="needs-cleo"
+STATUS_LABEL_NEEDS_TESS="needs-tess"
+STATUS_LABEL_APPROVED="approved"
+STATUS_LABEL_FAILED="failed-remediation"
+
+ensure_status_labels() {
+  local repo="$1"
+  shift
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for entry in "$@"; do
+    [ -n "$entry" ] || continue
+    local label="${entry%%:*}"
+    local rest="${entry#*:}"
+    local color="${rest%%:*}"
+    local desc="${rest#*:}"
+
+    if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
+      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+pr_add_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR #$pr_number"
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR $pr_url"
+    fi
+  done
+}
+
+pr_remove_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --remove-label "$label" >/dev/null 2>&1 || true
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --remove-label "$label" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
@@ -1083,67 +1144,36 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   fi
 fi
 
-# Always attempt to add the ready-for-qa label
-if [ -n "$PR_NUMBER" ]; then
-  echo "🏷️ Adding 'ready-for-qa' label to PR #$PR_NUMBER..."
-  echo "🔍 DEBUG: PR_NUMBER='$PR_NUMBER', REPO_SLUG='$REPO_SLUG'"
+# Update remediation status labels for Cleo's outcome
+if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
+  ensure_status_labels "$REPO_SLUG" \
+    "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
+    "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
+    "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cleo quality review" \
+    "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
+    "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
+    "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
-  # Capture error output for debugging
-  LABEL_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-qa" 2>&1)
-  LABEL_EXIT=$?
-
-  if [ $LABEL_EXIT -eq 0 ]; then
-    echo "✅ Successfully added 'ready-for-qa' label"
+  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "🏷️ Updating remediation labels: Cleo approved quality checks"
+    pr_remove_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" \
+      "$STATUS_LABEL_NEEDS_CLEO" \
+      "$STATUS_LABEL_NEEDS_FIXES" \
+      "$STATUS_LABEL_FIXING" \
+      "$STATUS_LABEL_APPROVED" \
+      "$STATUS_LABEL_FAILED"
+    pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
   else
-    echo "⚠️ Failed to add label using PR number (exit code: $LABEL_EXIT)"
-    echo "🔍 DEBUG: Error: $LABEL_ERROR"
-
-    # Check if the label exists
-    echo "🔍 DEBUG: Checking if 'ready-for-qa' label exists..."
-    if gh label list -R "$REPO_SLUG" --search "ready-for-qa" | grep -q "ready-for-qa"; then
-      echo "   ✓ Label 'ready-for-qa' exists in repository"
-    else
-      echo "   ✗ Label 'ready-for-qa' does not exist - attempting to create it..."
-      CREATE_ERROR=$(gh label create "ready-for-qa" -R "$REPO_SLUG" --color "0e8a16" --description "Ready for QA testing" 2>&1)
-      CREATE_EXIT=$?
-      if [ $CREATE_EXIT -eq 0 ]; then
-        echo "   ✅ Created 'ready-for-qa' label"
-        # Retry adding the label
-        RETRY_ERROR=$(gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "ready-for-qa" 2>&1)
-        RETRY_EXIT=$?
-        if [ $RETRY_EXIT -eq 0 ]; then
-          echo "   ✅ Successfully added label after creating it"
-        else
-          echo "   ❌ Still failed to add label: $RETRY_ERROR"
-        fi
-      else
-        echo "   ❌ Failed to create label: $CREATE_ERROR"
-      fi
-    fi
-
-    # Try with PR URL as fallback
-    if [ -n "$PR_URL" ] && [ $LABEL_EXIT -ne 0 ]; then
-      echo "⚠️ Attempting with PR URL as fallback..."
-      URL_ERROR=$(gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>&1)
-      URL_EXIT=$?
-      if [ $URL_EXIT -eq 0 ]; then
-        echo "✅ Successfully added 'ready-for-qa' label using PR URL"
-      else
-        echo "❌ Failed to add 'ready-for-qa' label using PR URL: $URL_ERROR"
-      fi
-    fi
-  fi
-elif [ -n "$PR_URL" ]; then
-  echo "🏷️ Adding 'ready-for-qa' label using PR URL..."
-  URL_ERROR=$(gh pr edit "$PR_URL" --add-label "ready-for-qa" 2>&1)
-  URL_EXIT=$?
-  if [ $URL_EXIT -eq 0 ]; then
-    echo "✅ Successfully added 'ready-for-qa' label"
-  else
-    echo "❌ Failed to add 'ready-for-qa' label: $URL_ERROR"
+    echo "🏷️ Updating remediation labels: Quality issues detected"
+    pr_remove_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" \
+      "$STATUS_LABEL_NEEDS_CLEO" \
+      "$STATUS_LABEL_NEEDS_TESS" \
+      "$STATUS_LABEL_APPROVED" \
+      "$STATUS_LABEL_FAILED"
+    pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
   fi
 else
-  echo "⚠️ No PR_NUMBER or PR_URL available, cannot add label"
+  echo "⚠️ No PR reference available, skipping remediation label update"
 fi
 
 # Gracefully stop sidecar (with enhanced debugging and retries)
