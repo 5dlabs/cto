@@ -752,6 +752,67 @@ is_valid_cfg() {
   jq -e 'type=="object" and length>0' "$p" >/dev/null 2>&1
 }
 
+STATUS_LABEL_NEEDS_FIXES="needs-fixes"
+STATUS_LABEL_FIXING="fixing-in-progress"
+STATUS_LABEL_NEEDS_CLEO="needs-cleo"
+STATUS_LABEL_NEEDS_TESS="needs-tess"
+STATUS_LABEL_APPROVED="approved"
+STATUS_LABEL_FAILED="failed-remediation"
+
+ensure_status_labels() {
+  local repo="$1"
+  shift
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for entry in "$@"; do
+    [ -n "$entry" ] || continue
+    local label="${entry%%:*}"
+    local rest="${entry#*:}"
+    local color="${rest%%:*}"
+    local desc="${rest#*:}"
+
+    if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
+      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+pr_add_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR #$pr_number"
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --add-label "$label" >/dev/null 2>&1 || echo "⚠️ Failed to add label '$label' to PR $pr_url"
+    fi
+  done
+}
+
+pr_remove_labels() {
+  local repo="$1"
+  local pr_number="$2"
+  local pr_url="$3"
+  shift 3
+
+  command -v gh >/dev/null 2>&1 || return 0
+
+  for label in "$@"; do
+    [ -n "$label" ] || continue
+    if [ -n "$pr_number" ]; then
+      gh pr edit "$pr_number" -R "$repo" --remove-label "$label" >/dev/null 2>&1 || true
+    elif [ -n "$pr_url" ]; then
+      gh pr edit "$pr_url" --remove-label "$label" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
@@ -1834,6 +1895,18 @@ else
   echo "  - Failed: $FAILED_CHECKS"
   echo "  - Pending: $PENDING_CHECKS"
 
+  HAVE_PR_REF=false
+  if [ -n "$REPO_SLUG" ] && { [ -n "$PR_NUM" ] || [ -n "$PR_URL" ]; }; then
+    HAVE_PR_REF=true
+    ensure_status_labels "$REPO_SLUG" \
+      "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
+      "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
+      "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cleo quality review" \
+      "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
+      "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
+      "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
+  fi
+
   if [ "$FAILED_CHECKS" -gt 0 ]; then
     echo "❌ CI failures detected - posting REQUEST CHANGES review"
     # Get details of failed checks
@@ -1859,6 +1932,15 @@ $FAILED_DETAILS
 - [ ] Verify all workflows pass
 
 **Note**: Will re-evaluate once CI issues are resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_TESS" \
+        "$STATUS_LABEL_NEEDS_CLEO" \
+        "$STATUS_LABEL_APPROVED" \
+        "$STATUS_LABEL_FAILED"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
+    fi
   elif [ "$PENDING_CHECKS" -gt 0 ]; then
     echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
     # Get details of pending checks
@@ -1883,6 +1965,14 @@ $PENDING_DETAILS
 - [ ] Address any failures that may occur
 
 **Note**: Will re-evaluate once all CI checks are complete." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_FIXES" \
+        "$STATUS_LABEL_APPROVED" \
+        "$STATUS_LABEL_FAILED"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
+    fi
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
     echo "✅ All CI checks passing - posting APPROVE review"
     # Get details of successful checks
@@ -1913,6 +2003,16 @@ $SUCCESS_DETAILS
 - **No outstanding issues**: Clean, production-ready code
 
 **APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_FIXES" \
+        "$STATUS_LABEL_NEEDS_TESS" \
+        "$STATUS_LABEL_NEEDS_CLEO" \
+        "$STATUS_LABEL_FIXING" \
+        "$STATUS_LABEL_FAILED"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_APPROVED"
+    fi
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
     timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
@@ -1935,6 +2035,14 @@ $SUCCESS_DETAILS
 - [ ] Contact administrator if issues persist
 
 **Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+
+    if $HAVE_PR_REF; then
+      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
+        "$STATUS_LABEL_NEEDS_TESS" \
+        "$STATUS_LABEL_NEEDS_CLEO" \
+        "$STATUS_LABEL_APPROVED"
+      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
+    fi
   fi
 
 else

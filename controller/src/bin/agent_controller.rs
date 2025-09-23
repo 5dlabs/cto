@@ -25,14 +25,23 @@
 //! - Providing health and metrics endpoints
 
 use axum::{
+    body::Bytes,
     extract::State,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Json,
     routing::{get, post},
     Router,
 };
-use controller::tasks::run_task_controller;
+use controller::remediation::RemediationStateManager;
+use controller::tasks::label::client::GitHubLabelClient;
+use controller::tasks::{
+    config::ControllerConfig,
+    label::{override_detector::OverrideDetector, schema::WorkflowState, LabelOrchestrator},
+    run_task_controller,
+    types::Context as TaskContext,
+};
 use serde_json::{json, Value};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
 use tower::ServiceBuilder;
@@ -41,12 +50,14 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
-use tracing::{info, Level};
+use tracing::{error, info, warn, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Clone)]
 struct AppState {
-    // Could be extended with shared state if needed
+    client: kube::Client,
+    namespace: String,
+    config: Arc<ControllerConfig>,
 }
 
 #[tokio::main]
@@ -69,13 +80,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = kube::Client::try_default().await?;
     info!("Connected to Kubernetes cluster");
 
-    let state = AppState {};
+    let namespace = "agent-platform".to_string();
+    let controller_config = Arc::new(load_controller_config());
+
+    let state = AppState {
+        client: client.clone(),
+        namespace: namespace.clone(),
+        config: controller_config.clone(),
+    };
 
     // Start the controller in the background
     let controller_handle = {
         let client = client.clone();
+        let namespace = namespace.clone();
         tokio::spawn(async move {
-            if let Err(e) = run_task_controller(client, "agent-platform".to_string()).await {
+            if let Err(e) = run_task_controller(client, namespace).await {
                 tracing::error!("Controller error: {}", e);
             }
         })
@@ -143,12 +162,182 @@ async fn metrics() -> Json<Value> {
     }))
 }
 
-async fn webhook_handler() -> Result<Json<Value>, StatusCode> {
-    // Placeholder for webhook handling
-    Json(json!({
-        "message": "Webhook received"
-    }))
-    .pipe(Ok)
+fn load_controller_config() -> ControllerConfig {
+    match ControllerConfig::from_mounted_file("/config/config.yaml") {
+        Ok(cfg) => {
+            info!("Loaded controller configuration from mounted file");
+            cfg
+        }
+        Err(err) => {
+            warn!(
+                "Failed to load configuration from file: {}. Using defaults.",
+                err
+            );
+            ControllerConfig::default()
+        }
+    }
+}
+
+async fn webhook_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, StatusCode> {
+    let event = headers
+        .get("X-GitHub-Event")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+
+    if event != "pull_request" {
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "unsupported_event"
+        })));
+    }
+
+    let payload: Value = serde_json::from_slice(&body).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let action = payload.get("action").and_then(|v| v.as_str()).unwrap_or("");
+
+    if action != "labeled" {
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "non_labeled_action"
+        })));
+    }
+
+    let label_name = payload
+        .get("label")
+        .and_then(|label| label.get("name"))
+        .and_then(|name| name.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let pr_number = payload
+        .get("pull_request")
+        .and_then(|pr| pr.get("number"))
+        .and_then(|num| num.as_i64())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let repo_owner = payload
+        .get("repository")
+        .and_then(|repo| repo.get("owner"))
+        .and_then(|owner| owner.get("login"))
+        .and_then(|login| login.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let repo_name = payload
+        .get("repository")
+        .and_then(|repo| repo.get("name"))
+        .and_then(|name| name.as_str())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
+    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
+    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
+    const LABEL_NEEDS_TESS: &str = "needs-tess";
+    const LABEL_APPROVED: &str = "approved";
+    const LABEL_FAILED: &str = "failed-remediation";
+
+    let target_state = match label_name {
+        LABEL_NEEDS_FIXES => Some(WorkflowState::NeedsFixes),
+        LABEL_FIXING_IN_PROGRESS => Some(WorkflowState::FixingInProgress),
+        LABEL_NEEDS_CLEO => Some(WorkflowState::NeedsCleo),
+        LABEL_NEEDS_TESS => Some(WorkflowState::NeedsTess),
+        LABEL_APPROVED => Some(WorkflowState::Approved),
+        LABEL_FAILED => Some(WorkflowState::Failed),
+        _ => None,
+    };
+
+    if target_state.is_none() {
+        return Ok(Json(json!({
+            "status": "ignored",
+            "reason": "non_state_label"
+        })));
+    }
+
+    let task_label = payload
+        .get("pull_request")
+        .and_then(|pr| pr.get("labels"))
+        .and_then(|labels| labels.as_array())
+        .and_then(|labels| {
+            labels.iter().find_map(|label| {
+                label
+                    .get("name")
+                    .and_then(|name| name.as_str())
+                    .filter(|name| name.starts_with("task-"))
+            })
+        })
+        .ok_or(StatusCode::ACCEPTED)?;
+
+    let task_id = task_label.to_string();
+
+    let token = match std::env::var("GITHUB_TOKEN") {
+        Ok(value) => value,
+        Err(_) => {
+            warn!(
+                "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
+                label_name
+            );
+            return Ok(Json(json!({
+                "status": "skipped",
+                "reason": "missing_token"
+            })));
+        }
+    };
+
+    let label_client =
+        GitHubLabelClient::with_token(token, repo_owner.to_string(), repo_name.to_string());
+
+    let context = TaskContext {
+        client: state.client.clone(),
+        namespace: state.namespace.clone(),
+        config: state.config.clone(),
+    };
+
+    let state_manager = Arc::new(RemediationStateManager::new(&context));
+
+    let override_detector = OverrideDetector::new(label_client.clone());
+    let mut orchestrator =
+        LabelOrchestrator::new(label_client, state_manager.clone(), override_detector);
+
+    match state_manager.load_state(pr_number as u32, &task_id).await {
+        Ok(None) => {
+            if let Err(err) = state_manager
+                .initialize_state(pr_number as u32, task_id.clone(), None)
+                .await
+            {
+                warn!(
+                    "Failed to initialize remediation state for PR #{} (task {}): {}",
+                    pr_number, task_id, err
+                );
+            }
+        }
+        Err(err) => {
+            warn!(
+                "Failed to load remediation state for PR #{} (task {}): {}",
+                pr_number, task_id, err
+            );
+        }
+        _ => {}
+    }
+
+    if let Err(err) = orchestrator
+        .force_state(pr_number as i32, &task_id, target_state.unwrap())
+        .await
+    {
+        error!(
+            "Failed to update remediation state for PR #{} (task {}): {}",
+            pr_number, task_id, err
+        );
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    Ok(Json(json!({
+        "status": "ok",
+        "label": label_name,
+        "task": task_id,
+        "pr": pr_number
+    })))
 }
 
 async fn shutdown_signal() {
