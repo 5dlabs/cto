@@ -373,6 +373,7 @@ ${FEEDBACK_COMMENT}
 3. **FOCUS** on surgical changes, not broad reimplementation
 4. **VERIFY** each fix addresses the exact problem described
 5. **TEST** that your changes solve the issues without introducing new problems
+6. **MAINTAIN LIVE DATA**: If fixing implementations, ensure NO mocks are introduced - keep real databases, APIs, and configurable parameters
 
 ### Key Principles:
 - **Targeted Fixes**: Address specific problems, not general improvements
@@ -385,6 +386,8 @@ ${FEEDBACK_COMMENT}
 - ❌ Major refactoring unless specifically requested
 - ❌ Adding new features or capabilities
 - ❌ Changing established patterns or conventions
+- ❌ Introducing mocks or hard-coded values where live data existed
+- ❌ Replacing configurable parameters with fixed values
 
 ---
 

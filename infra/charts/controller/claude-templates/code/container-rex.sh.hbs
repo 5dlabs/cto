@@ -1043,6 +1043,8 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
 ## ⚠️ EXECUTION REQUIREMENTS
 
 - **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
+- **NO MOCKS ALLOWED**: Implement ONLY with real data sources and live APIs - no hard-coded values, no mock data
+- **Parameterized Configuration**: ALL business logic parameters (trading pairs, endpoints, thresholds) must be configurable via env vars, config files, or CLI args
 - **Pre-PR quality gates (MANDATORY)**: Do NOT open a PR unless all of these pass locally:
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
@@ -1143,6 +1145,7 @@ You are assigned to work on **TASK {{task_id}} ONLY**.
 4. If you see existing code from other tasks, IGNORE IT
 5. If your memory (CLAUDE.md) mentions other tasks, IGNORE those parts
 6. Focus SOLELY on the requirements in task/prompt.md for Task {{task_id}}
+7. NEVER use mocks or hard-coded values - implement with real APIs, databases, and configurable parameters
         
         **TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
         

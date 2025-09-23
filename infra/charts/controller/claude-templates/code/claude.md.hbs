@@ -42,6 +42,61 @@ These are the environment variable NAMES available to the agent. Values are neve
 
 See @mcp-tools.md for your available tools and usage guidelines
 
+## 🚨 CRITICAL: NO MOCKS - LIVE DATA ONLY 🚨
+
+**MANDATORY IMPLEMENTATION REQUIREMENT**: You MUST implement fully functional systems with live data - NO mock data, placeholders, or hard-coded values.
+
+### Live Data Requirements
+- **Database Operations**: Use real database connections, queries, and transactions
+- **API Integrations**: Connect to actual external APIs, not mock responses
+- **Configuration**: ALL configurable values (trading pairs, endpoints, thresholds) must be parameterized via:
+  - Environment variables
+  - Configuration files (config.json, .env, etc.)
+  - Command-line arguments
+  - Database-driven configuration
+
+### Examples of What NOT to Do:
+```rust
+// ❌ NEVER: Hard-coded trading pairs
+let pairs = vec!["BTC/USD", "ETH/USD"];
+
+// ❌ NEVER: Mock API responses
+fn get_price() -> f64 { 100.0 } // Mock price
+
+// ❌ NEVER: Placeholder implementations
+fn process_payment() { println!("Payment processed"); }
+```
+
+### Examples of Correct Implementation:
+```rust
+// ✅ DO: Parameterized configuration
+#[derive(Deserialize)]
+struct Config {
+    trading_pairs: Vec<String>,
+    api_endpoint: String,
+    api_key: String,
+}
+
+// ✅ DO: Real API calls with error handling
+async fn get_live_price(pair: &str, client: &ApiClient) -> Result<f64, ApiError> {
+    let response = client.get_price(pair).await?;
+    Ok(response.price)
+}
+
+// ✅ DO: Actual business logic implementation
+async fn process_real_payment(payment: PaymentRequest) -> Result<PaymentResponse, PaymentError> {
+    // Real payment processing logic
+}
+```
+
+### Configuration Strategy:
+1. **Environment Variables**: For sensitive data (API keys, database URLs)
+2. **Config Files**: For business logic parameters (pairs, thresholds, timeouts)
+3. **CLI Arguments**: For runtime behavior (log levels, debug modes)
+4. **Database Config**: For dynamic, user-configurable settings
+
+**VERIFICATION**: Before claiming completion, demonstrate that your implementation works with real data sources and can be reconfigured without code changes.
+
 ## Project Guidelines & Standards
 
 See @coding-guidelines.md for project coding standards and best practices
