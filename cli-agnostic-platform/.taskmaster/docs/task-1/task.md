@@ -1,135 +1,153 @@
-# Task 1: Initialize Project Structure and Dependencies
+# Task 1: Assess Current CLI-Agnostic Platform Implementation
 
 ## Overview
-Set up the foundational project structure with Rust workspace for controller, TypeScript for MCP integration, and Docker build infrastructure for multi-CLI support. This task establishes the foundation for the entire Multi-CLI Agent Platform project.
+Analyze and document the existing CLI-agnostic platform implementation to understand what capabilities already exist and what still needs to be built. This task provides a clear understanding of the current system architecture and identifies gaps for future development.
 
 ## Context
-The 5D Labs Agent Platform currently operates exclusively with Claude Code CLI. This task begins the implementation of CLI-agnostic support by establishing the proper project structure that will support 8 different CLI tools (Claude, Codex, Opencode, Gemini, Grok, Qwen, Cursor, OpenHands).
+The 5D Labs Agent Platform already has a substantial CLI-agnostic implementation with Rust-based controller, MCP server, and Docker images for multiple CLI tools (Claude, Codex, OpenCode, Gemini, Grok, Qwen, Cursor, OpenHands). This task assesses the current state to guide further development.
 
-## Technical Specification
+## Assessment Areas
 
-### 1. Rust Workspace Setup
-- **Location**: Root directory with `Cargo.toml`
-- **Structure**: Workspace with controller crate
-- **Dependencies**:
-  - `kube-rs v0.95.0` for Kubernetes client integration
-  - `tokio v1.41.0` for async runtime
-  - Additional Rust crates for CLI adapters
+### 1. Existing Rust Architecture Analysis
+- **Location**: `controller/` directory 
+- **Current State**: Examine existing Rust controller implementation
+- **Assessment Goals**:
+  - Document current CLI integration capabilities
+  - Identify which CLI types are supported
+  - Analyze CRD definitions and controller logic
+  - Review error handling and logging patterns
 
-### 2. Controller Implementation
-- **Path**: `controller/src/main.rs`
-- **Purpose**: Basic Kubernetes client initialization
-- **Features**:
-  - Kubernetes cluster connection
-  - CRD handling setup
-  - Error handling patterns
-
-### 3. MCP Integration Setup
+### 2. MCP Server Implementation Review
 - **Location**: `mcp/` directory
-- **Technology**: TypeScript/Node.js
-- **Dependencies**: `@modelcontextprotocol/sdk v1.0.4`
-- **Purpose**: Model Context Protocol integration layer
+- **Current State**: Rust-based MCP server (NO TypeScript)
+- **Assessment Goals**:
+  - Document current MCP protocol support
+  - Identify tool integration capabilities
+  - Review client connection handling
+  - Analyze performance and scalability
 
-### 4. Container Infrastructure
-- **Path**: `infra/images/`
-- **Structure**: Subdirectories for each CLI:
-  - `claude/` - Claude Code CLI
-  - `codex/` - OpenAI Codex CLI
-  - `opencode/` - Opencode CLI
-  - `gemini/` - Google Gemini CLI
-  - `grok/` - Grok CLI
-  - `qwen/` - Qwen CLI
-  - `cursor/` - Cursor CLI
-  - `openhands/` - OpenHands CLI
+### 3. Container Infrastructure Audit
+- **Location**: `infra/images/`
+- **Current State**: Multiple CLI Docker images exist
+- **Assessment Goals**:
+  - Verify which CLI images are functional:
+    - `claude/` - Claude Code CLI
+    - `codex/` - OpenAI Codex CLI
+    - `opencode/` - OpenCode CLI  
+    - `gemini/` - Google Gemini CLI
+    - `grok/` - Grok CLI
+    - `qwen/` - Qwen CLI
+    - `cursor/` - Cursor CLI
+    - `openhands/` - OpenHands CLI
+  - Test build processes and dependencies
+  - Document configuration requirements
 
-### 5. CI/CD Pipeline
-- **Path**: `.github/workflows/build-images.yml`
-- **Purpose**: Automated multi-arch container builds
-- **Features**:
-  - Docker buildx integration
-  - Multi-architecture support (amd64, arm64)
-  - Container registry push
+### 4. GitOps and Deployment Analysis
+- **Location**: `infra/gitops/`
+- **Current State**: ArgoCD applications exist
+- **Assessment Goals**:
+  - Review existing ArgoCD application configurations
+  - Document current deployment patterns
+  - Identify any missing automation
 
-### 6. Build System
-- **File**: Root `Makefile`
-- **Targets**:
-  - `build`: Build all components
-  - `test`: Run test suites
-  - `deploy`: Deploy to cluster
-  - `clean`: Clean build artifacts
+### 5. Build and CI/CD Evaluation
+- **Current State**: GitHub Actions workflows exist
+- **Assessment Goals**:
+  - Review existing automation pipelines
+  - Document build processes
+  - Identify gaps in testing/deployment
 
 ## Implementation Steps
 
-### Phase 1: Workspace Initialization
-1. Create root `Cargo.toml` with workspace configuration
-2. Initialize `controller/` directory with basic crate structure
-3. Set up initial dependencies in `controller/Cargo.toml`
+### Phase 1: Architecture Documentation
+1. Analyze existing `controller/` Rust implementation
+2. Document current CRD definitions and controller capabilities  
+3. Map out existing CLI integration patterns
+4. Identify supported vs. unsupported CLI types
+5. **Use docs MCP server to research CLI functionality**:
+   - **Codex Research**: Use `codex_query` for "installation requirements", "configuration patterns", "MCP integration"
+   - **OpenCode Research**: Use `opencode_query` for "setup guide", "MCP server support", "agent configuration"
+   - **OpenHands Research**: Use `openhands_query` for "CLI usage", "python dependencies", "automation capabilities"
+   - **Gemini Research**: Use `gemini_query` for "installation", "authentication", "model configuration"
+   - **Qwen Research**: Use `qwen_query` for "setup instructions", "model handling", "API configuration"
+   - **Grok Research**: Use `grok_query` for "installation", "X.AI integration", "MCP tools support"
+   - Document CLI-specific requirements, authentication patterns, and configuration formats
+   - Identify which CLIs support MCP natively vs. need wrapper integration
 
-### Phase 2: MCP Setup
-1. Create `mcp/` directory with `package.json`
-2. Install TypeScript dependencies and MCP SDK
-3. Set up TypeScript configuration
+### Phase 2: MCP Server Assessment  
+1. Review `mcp/` Rust-based implementation
+2. Test MCP protocol functionality
+3. Document current tool integration capabilities
+4. Assess performance and identify bottlenecks
 
-### Phase 3: Container Infrastructure
-1. Create `infra/images/` directory structure
-2. Add placeholder Dockerfiles for each CLI
-3. Set up base image configurations
+### Phase 3: Container Infrastructure Testing
+1. Build and test each CLI Docker image
+2. **Research CLI requirements using docs MCP server**:
+   - `codex_query("docker installation requirements and runtime configuration")`
+   - `openhands_query("python virtualenv setup and CLI dependencies")`
+   - `gemini_query("npm installation and Google API authentication")`
+   - `qwen_query("installation via npm and model configuration patterns")`
+   - `grok_query("bun installation requirements and X.AI API setup")`
+   - `opencode_query("TypeScript CLI setup and MCP server integration")`
+   - Cross-reference docs research with actual Dockerfile implementations
+   - Document CLI-specific dependencies and environment requirements
+3. Document configuration requirements per CLI based on research
+4. Verify runtime functionality
+5. Identify broken or incomplete images
 
-### Phase 4: CI/CD Integration
-1. Create GitHub Actions workflow
-2. Configure Docker buildx for multi-arch builds
-3. Set up container registry integration
+### Phase 4: Deployment Pipeline Review
+1. Analyze existing GitOps configurations
+2. Test current ArgoCD application deployments
+3. Review CI/CD pipeline effectiveness
+4. Document manual deployment steps
 
-### Phase 5: Build System
-1. Create comprehensive Makefile
-2. Add development and deployment targets
-3. Configure git repository with appropriate .gitignore
+### Phase 5: Gap Analysis and Recommendations
+1. Create comprehensive current-state documentation
+2. Identify missing functionality
+3. Prioritize development needs
+4. Provide recommendations for next steps
 
 ## Dependencies
-- Docker and Docker buildx
-- Rust toolchain (1.70+)
-- Node.js (18+) and npm
-- Kubernetes cluster access
-- GitHub Actions environment
+- Docker and Docker buildx for image testing
+- Rust toolchain (1.70+) for code analysis
+- Kubernetes cluster access for deployment testing
+- GitHub Actions access for CI/CD review
+- **Docs MCP server access** for CLI documentation research
+- **Ingested CLI documentation** (Codex, OpenCode, OpenHands, Gemini, Qwen, Grok)
 
 ## Success Criteria
-- `cargo check` passes for Rust workspace
-- `npm install` succeeds in MCP directory
-- Docker build infrastructure validates
-- GitHub Actions workflow can be tested locally
-- All Makefile targets execute correctly
+- Complete documentation of current architecture
+- All CLI Docker images tested and status documented
+- Current MCP server capabilities documented
+- **CLI research completed using docs MCP server queries**
+- Cross-reference between CLI documentation and actual implementation
+- Gap analysis completed with prioritized recommendations
+- Clear roadmap for next development phases
 
-## Files Created
-```
-├── Cargo.toml (workspace)
-├── controller/
-│   ├── Cargo.toml
-│   └── src/main.rs
-├── mcp/
-│   ├── package.json
-│   └── tsconfig.json
-├── infra/images/
-│   ├── claude/Dockerfile
-│   ├── codex/Dockerfile
-│   ├── opencode/Dockerfile
-│   ├── gemini/Dockerfile
-│   ├── grok/Dockerfile
-│   ├── qwen/Dockerfile
-│   ├── cursor/Dockerfile
-│   └── openhands/Dockerfile
-├── .github/workflows/build-images.yml
-├── Makefile
-└── .gitignore
-```
+## Deliverables
+- **Architecture Assessment Report**: Document current Rust controller capabilities
+- **MCP Server Analysis**: Review of existing Rust-based MCP implementation
+- **CLI Image Status Matrix**: Functional status of each CLI Docker image  
+- **CLI Research Report**: Analysis of each CLI's capabilities using docs MCP server queries
+  - Codex configuration patterns and requirements (via `codex_query`)
+  - OpenCode setup and usage patterns (via `opencode_query`)
+  - OpenHands automation capabilities (via `openhands_query`)
+  - Gemini integration approaches (via `gemini_query`)
+  - Qwen model handling (via `qwen_query`)
+  - Grok MCP tool integration (via `grok_query`)
+- **Deployment Pipeline Review**: Analysis of current GitOps setup
+- **Gap Analysis Document**: Prioritized list of missing functionality
+- **Development Roadmap**: Recommended next steps for CLI-agnostic platform
 
 ## Next Steps
-After completion, this task enables:
-- Task 2: CLI-Aware Model Validation Framework
-- Task 3: CLI Adapter Trait System
-- Container builds for specific CLI implementations
+After completion, this assessment enables:
+- Informed development of missing CLI integration features
+- Prioritized bug fixes for broken CLI implementations
+- Enhanced MCP server capabilities where needed
+- Improved deployment automation
 
 ## Risk Mitigation
-- Version pin all dependencies to ensure reproducible builds
-- Use multi-stage Docker builds to optimize image sizes
-- Implement comprehensive error handling in controller
-- Set up automated security scanning for containers
+- Document current working functionality before making changes
+- Preserve existing functional CLI integrations during updates
+- Test current deployment processes before modifying them
+- Maintain backward compatibility with existing configurations
