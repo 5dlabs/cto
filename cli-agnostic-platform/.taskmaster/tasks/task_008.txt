@@ -1,0 +1,67 @@
+# Task ID: 8
+# Title: Create Multi-CLI Container Images
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Build optimized Docker images for each CLI with proper runtime environments, dependencies, and health checks
+# Details:
+Create base Dockerfiles in infra/images/{cli}/Dockerfile. For Node.js CLIs (Claude, Opencode, Gemini): Use node:22-slim base, install CLI via npm/curl, set up workspace directories. For Rust-based Codex: Use rust:1.83-slim, install with cargo install @openai/codex, cache cargo registry. For Python CLIs (Cursor, OpenHands): Use python:3.12-slim, create virtualenv, install with pip. Implement multi-stage builds to minimize image size. Add health check scripts checking CLI availability and MCP connectivity. Configure entrypoint scripts for initialization and environment setup. Add security scanning with Trivy in CI pipeline. Implement SBOM generation with syft. Sign images with cosign for supply chain security. Create matrix build for linux/amd64 and linux/arm64. Optimize layer caching with proper COPY ordering.
+
+# Test Strategy:
+Build all images and verify size < 500MB (Node), < 700MB (Rust), < 800MB (Python). Test health checks return proper status codes. Verify CLI commands execute successfully in containers. Test multi-arch images on both amd64 and arm64. Scan images for vulnerabilities with severity threshold. Verify signed images with cosign verify.
+
+# Subtasks:
+## 1. Create Node.js Dockerfiles for Claude, Opencode, and Gemini CLIs [pending]
+### Dependencies: None
+### Description: Build optimized Dockerfiles for Node.js-based CLIs using node:22-slim base image with proper dependency installation
+### Details:
+Create Dockerfiles in infra/images/{claude,opencode,gemini}/Dockerfile. Use node:22-slim as base image. Install each CLI via npm or curl based on availability. Set up workspace directories at /workspace. Configure NODE_ENV=production. Add non-root user for security. Install essential system packages (ca-certificates, curl). Set up proper PATH and environment variables. Ensure proper file permissions and ownership.
+
+## 2. Build Rust-based Dockerfile for Codex with Cargo Caching [pending]
+### Dependencies: None
+### Description: Create optimized Dockerfile for Codex using rust:1.83-slim with cargo registry caching for faster rebuilds
+### Details:
+Create infra/images/codex/Dockerfile using rust:1.83-slim base. Implement cargo caching layer with CARGO_HOME=/usr/local/cargo. Install Codex with 'cargo install @openai/codex'. Use cargo-chef for dependency caching optimization. Configure RUST_LOG environment variable. Set up cargo registry caching with --mount=type=cache. Add sccache for compilation caching. Create minimal runtime image with only necessary libraries.
+
+## 3. Create Python Dockerfiles for Cursor and OpenHands CLIs [pending]
+### Dependencies: None
+### Description: Build Python-based Docker images using python:3.12-slim with virtual environments and pip installations
+### Details:
+Create Dockerfiles in infra/images/{cursor,openhands}/Dockerfile. Use python:3.12-slim as base. Create virtual environment at /opt/venv. Install CLIs with pip in isolated environments. Set PYTHONUNBUFFERED=1 for proper logging. Add requirements.txt for dependency management. Configure proper PYTHONPATH. Install build-essential for native dependencies. Set up pip caching with --mount=type=cache,target=/root/.cache/pip.
+
+## 4. Implement Multi-stage Builds for Size Optimization [pending]
+### Dependencies: 8.1, 8.2, 8.3
+### Description: Refactor all Dockerfiles to use multi-stage builds reducing final image sizes below target thresholds
+### Details:
+Convert all Dockerfiles to multi-stage builds. Create builder stage for compilation/installation. Create minimal runtime stage with only necessary files. Copy only required binaries and dependencies. Remove build tools and temporary files. Optimize layer ordering for better caching. Use .dockerignore to exclude unnecessary files. Target sizes: Node.js < 500MB, Rust < 700MB, Python < 800MB. Use 'docker history' to analyze layer sizes.
+
+## 5. Add Health Check Scripts for CLI and MCP Connectivity [pending]
+### Dependencies: 8.1, 8.2, 8.3
+### Description: Implement health check scripts that verify CLI availability and MCP server connectivity for each container
+### Details:
+Create health-check.sh scripts in each image directory. Implement CLI availability check with 'command -v {cli}' or version check. Add MCP connectivity test using curl/wget to MCP endpoint. Configure HEALTHCHECK instruction in Dockerfiles with proper intervals (30s) and timeouts (10s). Return proper exit codes (0 for healthy, 1 for unhealthy). Log health check results to stdout. Add retry logic for transient failures. Include memory and disk space checks.
+
+## 6. Configure Entrypoint Scripts with Initialization Logic [pending]
+### Dependencies: 8.5
+### Description: Create entrypoint scripts that handle environment setup, configuration injection, and graceful startup for each CLI
+### Details:
+Create entrypoint.sh scripts for each CLI. Handle environment variable expansion and validation. Create necessary directories and set permissions. Wait for dependent services (MCP server) to be ready. Configure signal handling for graceful shutdown. Support both interactive and daemon modes. Load configuration from mounted ConfigMaps. Initialize CLI-specific settings and preferences. Log startup sequence to help debugging.
+
+## 7. Integrate Security Scanning with Trivy in CI Pipeline [pending]
+### Dependencies: 8.4
+### Description: Add Trivy vulnerability scanning to GitHub Actions workflow with configurable severity thresholds and reporting
+### Details:
+Add Trivy action to .github/workflows/docker-build.yml. Configure severity threshold (HIGH, CRITICAL). Scan images before pushing to registry. Generate SARIF reports for GitHub Security tab. Set up ignore file for known false positives (.trivyignore). Configure exit codes for CI failure on vulnerabilities. Add daily scheduled scans for existing images. Create vulnerability database update job. Generate HTML reports as artifacts.
+
+## 8. Implement SBOM Generation and Image Signing with Cosign [pending]
+### Dependencies: 8.7
+### Description: Set up Software Bill of Materials generation using Syft and implement image signing with Cosign for supply chain security
+### Details:
+Install syft in CI pipeline for SBOM generation. Generate SBOM in SPDX and CycloneDX formats. Store SBOMs as OCI artifacts alongside images. Set up Cosign with GitHub OIDC for keyless signing. Sign all images after successful builds and scans. Attach SBOMs as attestations to signed images. Create verification policy for deployment. Document signature verification process. Store public keys in repository.
+
+## 9. Set Up Matrix Builds for Multi-architecture Support [pending]
+### Dependencies: 8.4, 8.6
+### Description: Configure Docker buildx matrix builds to support both linux/amd64 and linux/arm64 architectures
+### Details:
+Configure Docker buildx in GitHub Actions. Set up QEMU for cross-platform builds. Create build matrix for amd64 and arm64. Use buildx cache for faster builds. Push multi-arch manifests to registry. Test images on both architectures. Optimize architecture-specific dependencies. Configure platform-specific build args. Verify manifest lists with 'docker manifest inspect'. Document platform compatibility.
+

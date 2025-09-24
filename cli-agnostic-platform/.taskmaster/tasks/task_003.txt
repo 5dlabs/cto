@@ -1,0 +1,85 @@
+# Task ID: 3
+# Title: Design and Implement CLI Adapter Trait System
+# Status: pending
+# Dependencies: 1, 2
+# Priority: high
+# Description: Create the core abstraction layer with CliAdapter trait and base implementations for unified CLI interaction patterns
+# Details:
+Create controller/src/cli/adapter.rs with the CliAdapter trait defining core methods: async fn validate_model(&self, model: &str) -> Result<bool>, async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String>, fn format_prompt(&self, prompt: &str) -> String, async fn parse_response(&self, response: &str) -> Result<ParsedResponse>, fn get_memory_filename(&self) -> &str, fn get_executable_name(&self) -> &str, async fn initialize(&self, container: &Container) -> Result<()>. Implement BaseAdapter with shared functionality for logging, metrics, and error handling. Create AdapterFactory with fn create(cli_type: CLIType) -> Box<dyn CliAdapter> using pattern matching. Add lifecycle hooks for pre/post execution, cleanup, and health checks. Implement adapter configuration with per-CLI defaults and overrides. Add telemetry with OpenTelemetry integration for distributed tracing.
+
+# Test Strategy:
+Unit test trait implementations with mock adapters. Test factory pattern creates correct adapter types. Verify shared functionality in BaseAdapter works across all implementations. Test lifecycle hooks are called in correct order. Mock container interactions to test initialization. Verify telemetry data is properly exported.
+
+# Subtasks:
+## 1. Define Core CliAdapter Trait Interface [pending]
+### Dependencies: None
+### Description: Design and implement the main CliAdapter trait with all required async methods and associated types
+### Details:
+Create controller/src/cli/adapter.rs and define the CliAdapter trait with methods: async fn validate_model(&self, model: &str) -> Result<bool>, async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String>, fn format_prompt(&self, prompt: &str) -> String, async fn parse_response(&self, response: &str) -> Result<ParsedResponse>. Define associated types for Result<T> and error handling. Include lifetime parameters and Send + Sync bounds for async compatibility.
+
+## 2. Implement Lifecycle Management Methods [pending]
+### Dependencies: 3.1
+### Description: Add lifecycle hooks and container initialization methods to the CliAdapter trait
+### Details:
+Extend CliAdapter trait with lifecycle methods: async fn initialize(&self, container: &Container) -> Result<()>, async fn pre_execution(&self) -> Result<()>, async fn post_execution(&self) -> Result<()>, async fn cleanup(&self) -> Result<()>, async fn health_check(&self) -> Result<HealthStatus>. Define HealthStatus enum with Ready, NotReady, and Degraded states. Add readiness probe support for Kubernetes integration.
+
+## 3. Create BaseAdapter Implementation [pending]
+### Dependencies: 3.1, 3.2
+### Description: Build the BaseAdapter struct with shared functionality for all CLI adapters
+### Details:
+Implement BaseAdapter struct in controller/src/cli/base.rs with common fields: logger: Arc<Logger>, metrics: Arc<MetricsCollector>, error_handler: ErrorHandler, config: AdapterConfig. Implement default methods for logging with structured context, error handling with retry logic, and metrics collection. Add circuit breaker pattern for fault tolerance. Include connection pooling for HTTP clients.
+
+## 4. Design AdapterFactory with Pattern Matching [pending]
+### Dependencies: 3.3
+### Description: Create the factory pattern for instantiating appropriate CLI adapters based on CLI type
+### Details:
+Create controller/src/cli/factory.rs with AdapterFactory struct. Implement create method: fn create(cli_type: CLIType, config: AdapterConfig) -> Result<Box<dyn CliAdapter>>. Use pattern matching on CLIType enum to instantiate correct adapter. Implement lazy loading with Arc<RwLock<HashMap<CLIType, Box<dyn CliAdapter>>>>. Add adapter caching and reuse logic for performance optimization.
+
+## 5. Build Configuration System with Defaults [pending]
+### Dependencies: 3.3
+### Description: Implement per-CLI configuration with defaults and override mechanisms
+### Details:
+Create controller/src/cli/config.rs with AdapterConfig struct containing: timeout_ms: u64, retry_count: u32, batch_size: usize, rate_limit: RateLimit, custom_headers: HashMap<String, String>. Implement ConfigBuilder with fluent API for configuration. Create default configurations for each CLI type using const values. Add configuration validation with serde_valid. Support environment variable overrides with prefix CLI_ADAPTER_.
+
+## 6. Integrate OpenTelemetry for Distributed Tracing [pending]
+### Dependencies: 3.3
+### Description: Add comprehensive telemetry with OpenTelemetry for observability across the adapter system
+### Details:
+Add opentelemetry v0.24.0 and opentelemetry-otlp v0.17.0 dependencies. Implement tracing in BaseAdapter with span creation for each method call. Add trace context propagation across async boundaries. Configure OTLP exporter for Jaeger/Zipkin integration. Implement custom span attributes for CLI type, model, and operation. Add metrics for latency, throughput, and error rates per adapter.
+
+## 7. Implement Async File Operations Methods [pending]
+### Dependencies: 3.1
+### Description: Create async methods for file reading, writing, and manipulation required by CLI adapters
+### Details:
+Add file operation methods to CliAdapter trait: async fn read_file(&self, path: &Path) -> Result<Vec<u8>>, async fn write_file(&self, path: &Path, content: &[u8]) -> Result<()>, async fn list_directory(&self, path: &Path) -> Result<Vec<PathBuf>>. Implement using tokio::fs for async I/O. Add file locking mechanisms for concurrent access. Include checksum validation for file integrity.
+
+## 8. Build Prompt Formatting and Response Parsing [pending]
+### Dependencies: 3.1
+### Description: Implement flexible prompt formatting and response parsing logic for different CLI output formats
+### Details:
+Create ParsedResponse enum with variants: Text(String), Json(serde_json::Value), Structured(StructuredOutput), Stream(AsyncStream). Implement format_prompt with template support using handlebars-rs. Add response parsers for JSON, YAML, and plain text formats. Include streaming response support with tokio::sync::mpsc. Implement error recovery for malformed responses.
+
+## 9. Create Container Initialization Logic [pending]
+### Dependencies: 3.2
+### Description: Implement container setup and initialization for Kubernetes pod management
+### Details:
+Build container initialization in initialize method with volume mounts, environment variable injection, and resource limits. Implement init container support for pre-flight checks. Add sidecar container management for logging and monitoring. Create PodSpec modifications for security contexts and service accounts. Include liveness and readiness probe configuration.
+
+## 10. Implement Adapter Registry and Discovery [pending]
+### Dependencies: 3.4
+### Description: Build a dynamic registry system for adapter registration and discovery at runtime
+### Details:
+Create controller/src/cli/registry.rs with AdapterRegistry struct using Arc<RwLock<HashMap<String, AdapterMetadata>>>. Implement register_adapter and discover_adapters methods. Add plugin system support for external adapters using dynamic library loading. Create AdapterMetadata with version, capabilities, and requirements. Implement capability negotiation for feature detection.
+
+## 11. Add Health Check and Readiness Probes [pending]
+### Dependencies: 3.2, 3.6
+### Description: Implement comprehensive health checking system for adapter availability and performance
+### Details:
+Create HealthChecker with periodic health checks using tokio::time::interval. Implement health endpoints for Kubernetes probes at /health/live and /health/ready. Add performance metrics collection for response times and error rates. Create circuit breaker integration to mark unhealthy adapters. Include dependency health checks for external services. Add graceful degradation for partial failures.
+
+## 12. Write Comprehensive Test Suite with Mocks [pending]
+### Dependencies: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11
+### Description: Create extensive unit and integration tests for the entire adapter system
+### Details:
+Create mock implementations using mockall v0.13.0 for CliAdapter trait. Write unit tests for each adapter method with success and failure scenarios. Test factory pattern with all CLI types. Verify configuration merging and validation. Test async execution with tokio::test. Mock container and Kubernetes interactions. Test health checks and circuit breaker behavior. Add property-based tests using proptest. Include benchmarks for performance regression detection.
+

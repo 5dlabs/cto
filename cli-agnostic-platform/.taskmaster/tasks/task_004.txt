@@ -1,0 +1,79 @@
+# Task ID: 4
+# Title: Implement Configuration Resolution Engine
+# Status: pending
+# Dependencies: 3
+# Priority: high
+# Description: Build the multi-source configuration merger that handles Helm defaults, cto-config.json overrides, and runtime parameters with field-level granularity
+# Details:
+Create controller/src/agents/resolver.rs with AgentResolver struct. Implement configuration loading from multiple sources: Helm values via ConfigMap (agent.agentCliConfigs), repository cto-config.json via Git clone, environment variables, and runtime parameters. Build MergeStrategy enum with Replace, Merge, Append, and DeepMerge options per field. Implement field-level merge rules using serde_json::Value manipulation. Add JSONSchema validation using jsonschema-rs v0.20.0 for configuration validation. Create precedence rules: Runtime > Environment > CtoConfig > Helm. Implement configuration caching with Redis using redis-rs v0.27.0 with 5-minute TTL. Add configuration preview API that shows resolved config without applying. Build audit trail logging all configuration changes with who/what/when/why. Handle backwards compatibility for agents without CLI specifications.
+
+# Test Strategy:
+Test merge strategies with conflicting configurations. Verify precedence rules with multiple override sources. Test deep merge with nested JSON structures. Validate schema enforcement rejects invalid configs. Test cache invalidation on configuration changes. Verify audit trail captures all modifications. Load test with 100+ agents with different configurations.
+
+# Subtasks:
+## 1. Create AgentResolver struct and core interfaces [pending]
+### Dependencies: None
+### Description: Design and implement the main AgentResolver struct with configuration source interfaces
+### Details:
+Create controller/src/agents/resolver.rs with AgentResolver struct containing fields for configuration sources, merge strategies, and caching. Define ConfigSource trait with load_config() method. Create ConfigurationValue wrapper enum for handling different value types (String, Number, Bool, Object, Array). Implement basic constructor and initialization methods. Define error types for configuration resolution failures.
+
+## 2. Implement Helm ConfigMap configuration loader [pending]
+### Dependencies: 4.1
+### Description: Build the Helm values loader that reads from Kubernetes ConfigMaps
+### Details:
+Create HelmConfigLoader implementing ConfigSource trait. Use k8s-openapi to read ConfigMap named 'agent-cli-configs' from namespace. Parse agent.agentCliConfigs YAML structure into serde_json::Value. Handle ConfigMap watch events for live updates. Implement retry logic for transient Kubernetes API failures. Add metrics for ConfigMap load times and failures.
+
+## 3. Build Git integration for cto-config.json retrieval [pending]
+### Dependencies: 4.1
+### Description: Implement Git clone and checkout functionality to fetch repository-specific configurations
+### Details:
+Create GitConfigLoader using git2-rs v0.19.0 for repository operations. Implement shallow clone with depth=1 for performance. Support authentication via SSH keys and tokens from secret manager. Parse cto-config.json from repository root. Handle branch/tag/commit specification. Implement file watching for local development mode. Add caching of cloned repositories with TTL.
+
+## 4. Create field-level merge strategy engine [pending]
+### Dependencies: 4.1
+### Description: Implement the MergeStrategy enum and field-level merge rules
+### Details:
+Define MergeStrategy enum with Replace, Merge, Append, and DeepMerge variants. Create MergeRules struct mapping field paths to strategies using JSONPath expressions. Implement merge_values() function handling each strategy type. Build deep merge logic for nested objects preserving array order. Handle type conflicts with configurable resolution. Support wildcard patterns in merge rules (e.g., '*.credentials' uses Replace).
+
+## 5. Implement JSONSchema validation system [pending]
+### Dependencies: 4.4
+### Description: Add schema validation using jsonschema-rs for configuration verification
+### Details:
+Integrate jsonschema-rs v0.20.0 for validation. Create schema registry loading schemas from embedded resources and external files. Implement validate_config() method checking merged configuration against schema. Build custom validators for CLI-specific constraints (model names, tool availability). Generate helpful error messages with field paths and expected values. Support schema versioning and migration between versions.
+
+## 6. Build precedence rules engine [pending]
+### Dependencies: 4.2, 4.3, 4.4
+### Description: Implement the configuration precedence system (Runtime > Environment > CtoConfig > Helm)
+### Details:
+Create PrecedenceEngine struct managing source priority. Implement resolve_config() method applying sources in correct order. Build environment variable parser supporting nested paths (AGENT_CONFIG_MODEL=gpt-4). Handle runtime parameter injection from API requests. Create precedence override mechanism for specific fields. Log precedence decisions for debugging. Support precedence customization per agent type.
+
+## 7. Implement Redis caching with TTL management [pending]
+### Dependencies: 4.6
+### Description: Add configuration caching layer using Redis with automatic invalidation
+### Details:
+Integrate redis-rs v0.27.0 for caching layer. Implement cache key generation from agent ID and configuration sources. Set 5-minute default TTL with configurable overrides. Build cache invalidation on source changes (ConfigMap updates, Git commits). Implement cache warming on startup. Add cache hit/miss metrics. Support cache bypass for debugging. Handle Redis connection failures with fallback to direct resolution.
+
+## 8. Create configuration preview API [pending]
+### Dependencies: 4.6
+### Description: Build REST endpoint showing resolved configuration without applying changes
+### Details:
+Create POST /agents/{id}/config/preview endpoint. Accept override parameters in request body. Return resolved configuration with source attribution per field. Show merge strategy applied for each field. Include validation results and warnings. Support diff view against current configuration. Add dry-run mode for testing changes. Implement response caching for repeated previews.
+
+## 9. Build audit trail logging system [pending]
+### Dependencies: 4.6, 4.7
+### Description: Implement comprehensive audit logging for all configuration changes
+### Details:
+Create AuditLogger with structured event format. Log configuration changes with before/after values. Capture change metadata: user/service identity, timestamp, change reason, source system. Implement log shipping to centralized storage (S3/GCS). Add query API for audit history retrieval. Support compliance export formats (CSV, JSON). Implement log retention policies. Add tamper detection using cryptographic signatures.
+
+## 10. Implement backwards compatibility handling [pending]
+### Dependencies: 4.6
+### Description: Add support for legacy agents without CLI specifications
+### Details:
+Create LegacyAgentAdapter detecting agents without CLI configs. Implement default configuration generation based on agent type. Map legacy environment variables to new configuration structure. Support gradual migration with deprecation warnings. Build compatibility shims for old configuration formats. Add feature flags for enabling new configuration system per agent. Implement configuration migration tool for bulk updates.
+
+## 11. Create comprehensive test suite for merge scenarios [pending]
+### Dependencies: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10
+### Description: Build extensive tests covering all merge strategies and edge cases
+### Details:
+Write unit tests for each merge strategy with complex nested structures. Test precedence rules with all source combinations. Create property-based tests for merge commutativity and associativity. Test schema validation with valid and invalid configurations. Verify cache invalidation triggers correctly. Test audit trail captures all changes accurately. Build integration tests with real Kubernetes and Redis. Add performance benchmarks for 1000+ field configurations.
+

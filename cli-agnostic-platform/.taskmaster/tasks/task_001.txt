@@ -1,0 +1,61 @@
+# Task ID: 1
+# Title: Initialize Project Structure and Dependencies
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Set up the foundational project structure with Rust workspace for controller, TypeScript for MCP integration, and Docker build infrastructure for multi-CLI support
+# Details:
+Create a Rust workspace with the controller crate using Cargo.toml at the root. Set up controller/src/main.rs with basic Kubernetes client initialization using kube-rs v0.95.0 and tokio v1.41.0. Create MCP directory with TypeScript/Node.js setup using package.json with @modelcontextprotocol/sdk v1.0.4. Initialize infra/images/ directory structure with subdirectories for each CLI (claude, codex, opencode, gemini, grok, qwen, cursor, openhands). Set up GitHub Actions workflow in .github/workflows/build-images.yml for automated multi-arch container builds using buildx. Create a Makefile with targets for building, testing, and deploying components. Initialize git repository with proper .gitignore for Rust (target/), Node.js (node_modules/), and Docker artifacts.
+
+# Test Strategy:
+Verify project structure with 'cargo check' for Rust workspace. Run 'npm install' in MCP directory to validate package.json. Test Docker build infrastructure with 'docker buildx create --use' and build a minimal test image. Ensure GitHub Actions workflow validates with 'act' tool locally. Run 'make help' to verify Makefile targets are properly defined.
+
+# Subtasks:
+## 1. Create Rust workspace structure with controller crate [pending]
+### Dependencies: None
+### Description: Set up the root Cargo.toml workspace configuration and initialize the controller crate with proper dependencies
+### Details:
+Create root Cargo.toml with [workspace] section defining members = ["controller"]. Initialize controller/Cargo.toml with package name "cli-controller", version "0.1.0", and edition "2021". Add dependencies: kube = "0.95.0", kube-runtime = "0.95.0", k8s-openapi = { version = "0.22.0", features = ["v1_31"] }, tokio = { version = "1.41.0", features = ["full"] }, serde = { version = "1.0", features = ["derive"] }, serde_json = "1.0". Create controller/src/main.rs with basic tokio::main async function and kube::Client initialization. Set up controller/src/lib.rs with module declarations for future api, cli, and monitoring modules.
+
+## 2. Set up TypeScript MCP integration directory [pending]
+### Dependencies: None
+### Description: Create MCP directory structure with TypeScript/Node.js configuration and Model Context Protocol SDK
+### Details:
+Create mcp/ directory at project root. Initialize mcp/package.json with name "@cli-controller/mcp", version "0.1.0", type "module", and main "dist/index.js". Add dependencies: @modelcontextprotocol/sdk "^1.0.4", typescript "^5.7.0". Add devDependencies: @types/node "^22.10.0", tsx "^4.19.0", vitest "^2.1.0". Create mcp/tsconfig.json with ES2022 target, module "NodeNext", strict mode enabled, and outDir "./dist". Initialize mcp/src/index.ts with basic MCP client setup. Create mcp/src/transport/ directory for future transport implementations.
+
+## 3. Create Docker infrastructure for multi-CLI support [pending]
+### Dependencies: None
+### Description: Set up Docker build directories and base configuration for each supported CLI
+### Details:
+Create infra/images/ directory structure with subdirectories: claude/, codex/, opencode/, gemini/, grok/, qwen/, cursor/, openhands/. In each CLI directory, create placeholder Dockerfile with initial FROM scratch and LABEL maintainer comments. Create infra/images/base/ directory with shared scripts: entrypoint.sh (common initialization), health-check.sh (readiness probe). Add infra/images/.dockerignore with common exclusions (*.log, .git, node_modules). Create infra/images/build.sh helper script with functions for building individual or all images using docker buildx.
+
+## 4. Configure GitHub Actions CI/CD workflow [pending]
+### Dependencies: 1.3
+### Description: Set up automated multi-architecture container builds and testing pipeline
+### Details:
+Create .github/workflows/build-images.yml with on.push triggers for main branch and infra/images/** paths. Configure build matrix for all CLI types (claude, codex, opencode, gemini, grok, qwen, cursor, openhands). Set up docker/setup-buildx-action@v3 and docker/setup-qemu-action@v3 for multi-arch support (linux/amd64, linux/arm64). Add docker/build-push-action@v6 with cache-from type=gha and cache-to type=gha,mode=max. Create .github/workflows/test.yml for Rust tests (cargo test) and TypeScript tests (npm test). Add dependency caching for cargo and npm. Configure GITHUB_TOKEN and registry credentials as secrets.
+
+## 5. Create comprehensive Makefile [pending]
+### Dependencies: 1.1, 1.2
+### Description: Implement build automation with Make targets for all project components
+### Details:
+Create root Makefile with .PHONY declarations for all targets. Add build targets: build-controller (cargo build --release), build-mcp (cd mcp && npm run build), build-images (docker buildx build for each CLI). Add test targets: test-controller (cargo test), test-mcp (cd mcp && npm test), test-integration (combined testing). Create dev targets: dev-controller (cargo watch -x run), dev-mcp (cd mcp && npm run dev). Add deploy targets: deploy-controller (kubectl apply), deploy-crds (kubectl apply -f crds/). Include clean target removing target/, node_modules/, and dist/. Add help target with documentation for each command.
+
+## 6. Initialize git repository with proper ignore patterns [pending]
+### Dependencies: None
+### Description: Set up version control with comprehensive .gitignore for all technology stacks
+### Details:
+Initialize git repository with 'git init'. Create comprehensive .gitignore with sections: Rust (target/, Cargo.lock for libraries, **/*.rs.bk, *.pdb), Node.js (node_modules/, dist/, *.log, .npm/, .env), Docker (.dockerignore, *.tar, buildx-cache/), IDEs (.vscode/, .idea/, *.swp, .DS_Store), Testing (coverage/, *.lcov, test-results/). Add .gitattributes with LF line endings enforcement (*.rs text eol=lf, *.ts text eol=lf). Create initial commit with message 'chore: initialize cli-agnostic-platform repository'. Set up git hooks directory .githooks/ with pre-commit for formatting checks.
+
+## 7. Set up development environment configuration [pending]
+### Dependencies: 1.1, 1.2
+### Description: Create environment configuration files and development tooling setup
+### Details:
+Create .env.example with template variables: RUST_LOG=debug, MCP_SERVER_URL=http://localhost:8080, KUBERNETES_NAMESPACE=default, CONTAINER_REGISTRY=localhost:5000. Add .editorconfig for consistent formatting: indent_style=space, indent_size=2 for YAML/JSON, indent_size=4 for Rust/TypeScript. Create rust-toolchain.toml specifying channel="1.83.0" and components=["rustfmt", "clippy"]. Add .prettierrc for TypeScript: printWidth=100, singleQuote=true, trailingComma="es5". Create docker-compose.dev.yml with local development services: PostgreSQL for state, Redis for caching, local registry. Add VSCode configuration in .vscode/settings.json with recommended extensions.
+
+## 8. Create initial documentation structure [pending]
+### Dependencies: 1.1, 1.2, 1.3, 1.4, 1.5
+### Description: Set up README and documentation framework for the project
+### Details:
+Create README.md with project overview, architecture diagram placeholder, quick start guide referencing make commands, and contribution guidelines. Initialize docs/ directory with architecture.md (system design overview), api.md (REST endpoint documentation), deployment.md (Kubernetes deployment guide), development.md (local setup instructions). Add docs/cli-support.md documenting each CLI's capabilities, limitations, and configuration. Create CONTRIBUTING.md with code style guidelines, PR process, and testing requirements. Add LICENSE file (Apache 2.0 or MIT). Create CHANGELOG.md following Keep a Changelog format. Set up docs/adr/ (Architecture Decision Records) directory with 001-use-rust-controller.md as first entry.
+
