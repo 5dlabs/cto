@@ -1,0 +1,48 @@
+<prompt>
+    <role>You are a senior Rust engineer specializing in high-performance validation systems, async programming, and multi-provider AI model integration with expertise in caching, fuzzy matching, and production-grade error handling.</role>
+    <task>
+        <id>2</id>
+        <title>Implement CLI-Aware Model Validation Framework</title>
+        <description>Refactor the hard-coded validate_model_name() function to support all CLI providers with extensible validation patterns and comprehensive model catalog. This is a critical blocker that prevents any multi-CLI integration work and must be resolved with highest priority. The current validation immediately rejects any non-Claude models like gpt-5-codex or o3, blocking the entire multi-CLI platform development.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>1</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Create controller/src/cli/validation.rs with ModelValidator trait system</spec>
+        <spec>Implement provider-specific validators: ClaudeModelValidator, OpenAIModelValidator, GoogleModelValidator</spec>
+        <spec>Build ModelCatalog with LRU cache, fuzzy matching, and model capabilities metadata</spec>
+        <spec>Replace existing validate_model_name() function with CLI-aware validation</spec>
+        <spec>Support Claude models (claude-3-opus, claude-3.5-sonnet, claude-3-haiku, legacy opus/sonnet/haiku)</spec>
+        <spec>Support OpenAI models (gpt-4o, gpt-4-turbo, gpt-3.5-turbo, o1-preview, o3-mini, gpt-5-codex)</spec>
+        <spec>Support Google models (gemini-1.5-pro, gemini-2.0-flash, gemini-pro-vision)</spec>
+        <spec>Implement Levenshtein distance fuzzy matching for typo correction</spec>
+        <spec>Add model capability metadata (context window, multimodal, streaming, cost)</spec>
+        <spec>Achieve performance targets: <10ms validation, >80% cache hit ratio, 1000+ concurrent requests</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create controller/src/cli/validation.rs with a trait-based validation system. Implement ModelValidator trait with validate_model(&self, model: &str, cli_type: CLIType) -> Result<ValidatedModel>. Create provider-specific validators: ClaudeModelValidator (claude-3-opus, claude-3.5-sonnet, claude-3-haiku patterns), OpenAIModelValidator (gpt-4o, gpt-4-turbo, o1-preview, o3-mini patterns), GoogleModelValidator (gemini-1.5-pro, gemini-2.0-flash patterns), and extensible validators for Grok, Qwen, etc. Build a ModelCatalog struct that maintains a registry of valid models per CLI with version support. Implement fuzzy matching for common typos and provide helpful suggestions. Add comprehensive regex patterns for each provider's naming conventions. Create a validation cache with TTL to avoid repeated validations. Include model capability metadata (context window, multimodal support, streaming capability).
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>All CLI provider models validate correctly (Claude, OpenAI/Codex, Google/Gemini)</criterion>
+        <criterion>Complete backward compatibility with existing Claude model validation</criterion>
+        <criterion>Performance requirements met: <10ms validation latency, >80% cache hit ratio</criterion>
+        <criterion>Fuzzy matching provides helpful suggestions for typos with >70% confidence</criterion>
+        <criterion>Model capabilities metadata available (context window, multimodal, streaming, cost)</criterion>
+        <criterion>Thread-safe concurrent validation supports 1000+ simultaneous requests</criterion>
+        <criterion>Comprehensive error handling with actionable error messages</criterion>
+        <criterion>LRU cache with TTL maintains <100MB memory usage</criterion>
+        <criterion>Integration with existing MCP server maintains API compatibility</criterion>
+        <criterion>Comprehensive test coverage >90% with performance benchmarks</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        Unit test each validator with valid and invalid model names. Test edge cases like version numbers, special characters, and case sensitivity. Verify fuzzy matching suggests correct models for typos. Test model catalog updates and cache invalidation. Performance test validation with 1000+ concurrent requests. Integration test with mock CLI responses to verify model availability. Load test cache effectiveness and memory usage. Test backward compatibility with existing Claude agent configurations.
+    </test_strategy>
+    <instructions>
+        Think step-by-step about the implementation approach. This is the critical blocker preventing all multi-CLI integration - the current hard-coded validation must be completely replaced.
+        Start by analyzing the existing validate_model_name() function in /mcp/src/main.rs to understand the exact behavior that must be preserved for Claude models. Then design the trait-based system that extends this to support all CLI providers.
+        Focus on performance - this will be called for every agent request. Use async/await patterns, implement comprehensive caching, and ensure thread safety. The fuzzy matching algorithm should use Levenshtein distance for typo correction.
+        Provide complete, production-ready code with comprehensive error handling, logging, and monitoring. Include necessary imports, async patterns, and caching strategies. Test thoroughly with concurrent load patterns.
+        Where appropriate, use MCP tools (filesystem, git, web search) to research Rust async patterns, caching strategies, and fuzzy matching algorithms to ensure optimal performance and correctness.
+    </instructions>
+</prompt>

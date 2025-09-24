@@ -1,0 +1,10 @@
+# Task 6: Build MCP Transport Abstraction Layer
+
+## Description
+Create unified MCP communication layer supporting streaming, buffered relay, and STDIO patterns across different CLI implementations
+
+## Implementation Details
+Create mcp/src/transport/mod.ts with abstract Transport class. Implement DirectStreamingTransport using native fetch with ReadableStream for CLIs with HTTP streaming. Build BufferedRelayTransport with configurable buffer sizes (default 64KB) for STDIO-based CLIs. Create StdioTransport using Node.js child_process for local MCP servers. Implement transport auto-detection based on CLI capabilities. Add retry logic with exponential backoff (initial: 100ms, max: 30s, jitter: 0.1). Build request/response correlation with UUID tracking. Implement timeout handling (default: 30s, configurable per tool). Add compression support using zstd for large payloads. Create metrics collection for latency, throughput, and error rates. Build connection pooling for HTTP transports with keep-alive.
+
+## Test Strategy
+Test streaming transport with mock SSE server. Verify buffered relay handles partial messages correctly. Test STDIO transport with mock child process. Verify auto-detection selects correct transport. Test retry logic with simulated failures. Verify timeout handling cancels requests properly. Load test with 100 concurrent MCP calls.

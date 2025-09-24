@@ -1,0 +1,10 @@
+# Task 5: Create Template Management System
+
+## Description
+Implement dynamic template selection and rendering system for CLI-specific prompts, configurations, and scripts with fallback mechanisms
+
+## Implementation Details
+Create controller/src/templates/manager.rs with TemplateManager struct. Implement template registry with HashMap<(CLIType, TemplateType), Template>. Use Handlebars-rust v6.2.0 for template rendering with custom helpers. Create template types: SystemPrompt, ConfigFile, EntrypointScript, MemoryFile. Implement template discovery from filesystem (templates/{cli_type}/{template_type}.hbs). Add fallback chain: CLI-specific -> Generic -> Default. Create template variables context with agent metadata, configuration, and runtime info. Implement template validation with syntax checking and variable verification. Add template hot-reloading for development with notify-rs v7.0.0. Create template versioning system for gradual rollout. Build template performance cache with compiled templates.
+
+## Test Strategy
+Test template selection falls back correctly when CLI-specific missing. Verify Handlebars rendering with complex variable contexts. Test custom helpers produce correct output. Validate hot-reloading updates templates without restart. Test versioning system serves correct template versions. Performance test rendering 1000 templates/second.

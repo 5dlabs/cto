@@ -1,0 +1,44 @@
+<prompt>
+    <role>You are a senior DevOps and Rust engineer specializing in multi-CLI agent platform development, Kubernetes integration, and container orchestration.</role>
+    <task>
+        <id>1</id>
+        <title>Initialize Project Structure and Dependencies</title>
+        <description>Set up the foundational project structure with Rust workspace for controller, TypeScript for MCP integration, and Docker build infrastructure for multi-CLI support. This establishes the foundation for supporting 8 different CLI tools (Claude, Codex, Opencode, Gemini, Grok, Qwen, Cursor, OpenHands) in the 5D Labs Agent Platform.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies></dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Create Rust workspace with Cargo.toml at root level</spec>
+        <spec>Set up controller crate with kube-rs v0.95.0 and tokio v1.41.0 dependencies</spec>
+        <spec>Implement basic Kubernetes client initialization in controller/src/main.rs</spec>
+        <spec>Create MCP directory with TypeScript/Node.js setup and @modelcontextprotocol/sdk v1.0.4</spec>
+        <spec>Initialize infra/images/ directory structure with subdirectories for all 8 CLIs</spec>
+        <spec>Set up GitHub Actions workflow for multi-arch container builds using buildx</spec>
+        <spec>Create comprehensive Makefile with build, test, deploy, and clean targets</spec>
+        <spec>Configure git repository with proper .gitignore for Rust, Node.js, and Docker</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create a Rust workspace with the controller crate using Cargo.toml at the root. Set up controller/src/main.rs with basic Kubernetes client initialization using kube-rs v0.95.0 and tokio v1.41.0. Create MCP directory with TypeScript/Node.js setup using package.json with @modelcontextprotocol/sdk v1.0.4. Initialize infra/images/ directory structure with subdirectories for each CLI (claude, codex, opencode, gemini, grok, qwen, cursor, openhands). Set up GitHub Actions workflow in .github/workflows/build-images.yml for automated multi-arch container builds using buildx. Create a Makefile with targets for building, testing, and deploying components. Initialize git repository with proper .gitignore for Rust (target/), Node.js (node_modules/), and Docker artifacts.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Rust workspace builds successfully with 'cargo check' passing</criterion>
+        <criterion>TypeScript MCP layer compiles with 'npm install' and 'npm run build'</criterion>
+        <criterion>All 8 CLI container directories exist with valid Dockerfiles</criterion>
+        <criterion>GitHub Actions workflow validates with 'act' tool locally</criterion>
+        <criterion>All Makefile targets execute correctly including help, build, test, clean</criterion>
+        <criterion>Project follows security best practices with no hardcoded secrets</criterion>
+        <criterion>Container images support multi-architecture builds (amd64, arm64)</criterion>
+        <criterion>Full project build completes in under 5 minutes</criterion>
+        <criterion>All code passes quality gates (clippy, linting, security scanning)</criterion>
+        <criterion>Comprehensive documentation exists for all components</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        Verify project structure with 'cargo check' for Rust workspace. Run 'npm install' in MCP directory to validate package.json. Test Docker build infrastructure with 'docker buildx create --use' and build a minimal test image. Ensure GitHub Actions workflow validates with 'act' tool locally. Run 'make help' to verify Makefile targets are properly defined. Test cross-platform compatibility on Linux, macOS, and Windows WSL2. Validate security scanning integration and dependency management.
+    </test_strategy>
+    <instructions>
+        Think step-by-step about the implementation approach. Start with the foundational Rust workspace, then build the MCP TypeScript layer, followed by container infrastructure. Consider the existing codebase structure and patterns from the 5D Labs Agent Platform.
+        Provide complete, production-ready code that follows best practices for Rust, TypeScript, and DevOps. Include necessary error handling, logging, and documentation. Test your solution thoroughly before finalizing.
+        Use MCP tools to gather insights about Rust workspace patterns, Kubernetes client best practices, and container build optimization strategies to ensure correctness and performance.
+    </instructions>
+</prompt>

@@ -1,0 +1,10 @@
+# Task 8: Create Multi-CLI Container Images
+
+## Description
+Build optimized Docker images for each CLI with proper runtime environments, dependencies, and health checks
+
+## Implementation Details
+Create base Dockerfiles in infra/images/{cli}/Dockerfile. For Node.js CLIs (Claude, Opencode, Gemini): Use node:22-slim base, install CLI via npm/curl, set up workspace directories. For Rust-based Codex: Use rust:1.83-slim, install with cargo install @openai/codex, cache cargo registry. For Python CLIs (Cursor, OpenHands): Use python:3.12-slim, create virtualenv, install with pip. Implement multi-stage builds to minimize image size. Add health check scripts checking CLI availability and MCP connectivity. Configure entrypoint scripts for initialization and environment setup. Add security scanning with Trivy in CI pipeline. Implement SBOM generation with syft. Sign images with cosign for supply chain security. Create matrix build for linux/amd64 and linux/arm64. Optimize layer caching with proper COPY ordering.
+
+## Test Strategy
+Build all images and verify size < 500MB (Node), < 700MB (Rust), < 800MB (Python). Test health checks return proper status codes. Verify CLI commands execute successfully in containers. Test multi-arch images on both amd64 and arm64. Scan images for vulnerabilities with severity threshold. Verify signed images with cosign verify.
