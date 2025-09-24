@@ -64,6 +64,15 @@ The 5D Labs Agent Platform already has a substantial CLI-agnostic implementation
 2. Document current CRD definitions and controller capabilities  
 3. Map out existing CLI integration patterns
 4. Identify supported vs. unsupported CLI types
+5. **Use docs MCP server to research CLI functionality**:
+   - **Codex Research**: Use `codex_query` for "installation requirements", "configuration patterns", "MCP integration"
+   - **OpenCode Research**: Use `opencode_query` for "setup guide", "MCP server support", "agent configuration"
+   - **OpenHands Research**: Use `openhands_query` for "CLI usage", "python dependencies", "automation capabilities"
+   - **Gemini Research**: Use `gemini_query` for "installation", "authentication", "model configuration"
+   - **Qwen Research**: Use `qwen_query` for "setup instructions", "model handling", "API configuration"
+   - **Grok Research**: Use `grok_query` for "installation", "X.AI integration", "MCP tools support"
+   - Document CLI-specific requirements, authentication patterns, and configuration formats
+   - Identify which CLIs support MCP natively vs. need wrapper integration
 
 ### Phase 2: MCP Server Assessment  
 1. Review `mcp/` Rust-based implementation
@@ -73,9 +82,18 @@ The 5D Labs Agent Platform already has a substantial CLI-agnostic implementation
 
 ### Phase 3: Container Infrastructure Testing
 1. Build and test each CLI Docker image
-2. Document configuration requirements per CLI
-3. Verify runtime functionality
-4. Identify broken or incomplete images
+2. **Research CLI requirements using docs MCP server**:
+   - `codex_query("docker installation requirements and runtime configuration")`
+   - `openhands_query("python virtualenv setup and CLI dependencies")`
+   - `gemini_query("npm installation and Google API authentication")`
+   - `qwen_query("installation via npm and model configuration patterns")`
+   - `grok_query("bun installation requirements and X.AI API setup")`
+   - `opencode_query("TypeScript CLI setup and MCP server integration")`
+   - Cross-reference docs research with actual Dockerfile implementations
+   - Document CLI-specific dependencies and environment requirements
+3. Document configuration requirements per CLI based on research
+4. Verify runtime functionality
+5. Identify broken or incomplete images
 
 ### Phase 4: Deployment Pipeline Review
 1. Analyze existing GitOps configurations
@@ -94,11 +112,15 @@ The 5D Labs Agent Platform already has a substantial CLI-agnostic implementation
 - Rust toolchain (1.70+) for code analysis
 - Kubernetes cluster access for deployment testing
 - GitHub Actions access for CI/CD review
+- **Docs MCP server access** for CLI documentation research
+- **Ingested CLI documentation** (Codex, OpenCode, OpenHands, Gemini, Qwen, Grok)
 
 ## Success Criteria
 - Complete documentation of current architecture
 - All CLI Docker images tested and status documented
 - Current MCP server capabilities documented
+- **CLI research completed using docs MCP server queries**
+- Cross-reference between CLI documentation and actual implementation
 - Gap analysis completed with prioritized recommendations
 - Clear roadmap for next development phases
 
@@ -106,6 +128,13 @@ The 5D Labs Agent Platform already has a substantial CLI-agnostic implementation
 - **Architecture Assessment Report**: Document current Rust controller capabilities
 - **MCP Server Analysis**: Review of existing Rust-based MCP implementation
 - **CLI Image Status Matrix**: Functional status of each CLI Docker image  
+- **CLI Research Report**: Analysis of each CLI's capabilities using docs MCP server queries
+  - Codex configuration patterns and requirements (via `codex_query`)
+  - OpenCode setup and usage patterns (via `opencode_query`)
+  - OpenHands automation capabilities (via `openhands_query`)
+  - Gemini integration approaches (via `gemini_query`)
+  - Qwen model handling (via `qwen_query`)
+  - Grok MCP tool integration (via `grok_query`)
 - **Deployment Pipeline Review**: Analysis of current GitOps setup
 - **Gap Analysis Document**: Prioritized list of missing functionality
 - **Development Roadmap**: Recommended next steps for CLI-agnostic platform
