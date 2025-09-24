@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: update-claude-templates
@@ -21,18 +22,44 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Configure git author
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      
       - name: Generate static ConfigMap
         run: bash infra/charts/controller/scripts/generate-templates-configmap.sh
-      - name: Commit if changed
+      
+      - name: Check for changes
+        id: check_changes
         run: |
           if git diff --quiet -- infra/charts/controller/templates/claude-templates-static.yaml; then
-            echo "No changes."
-            exit 0
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit."
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in generated ConfigMap."
           fi
-          git add infra/charts/controller/templates/claude-templates-static.yaml
-          git commit -m "chore(chart): regenerate claude-templates static ConfigMap [skip ci]"
-          git push
+      
+      - name: Create Pull Request
+        if: steps.check_changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore(chart): regenerate claude-templates static ConfigMap'
+          title: 'chore: update Claude templates static ConfigMap'
+          body: |
+            ## Automated Update
+
+            This PR was automatically generated to update the Claude templates static ConfigMap after changes were made to the template files.
+
+            ### Changes
+            - Regenerated `infra/charts/controller/templates/claude-templates-static.yaml` from source templates
+
+            ### Files Changed
+            - Template files in `infra/charts/controller/claude-templates/`
+            
+            This is a routine update that ensures the ConfigMap stays in sync with the template files.
+          branch: auto-update-claude-templates
+          delete-branch: true
+          base: main
+          labels: |
+            automated
+            charts
+            skip-changelog
