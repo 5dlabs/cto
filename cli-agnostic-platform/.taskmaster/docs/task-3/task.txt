@@ -1,0 +1,10 @@
+# Task 3: Design and Implement CLI Adapter Trait System
+
+## Description
+Create the core abstraction layer with CliAdapter trait and base implementations for unified CLI interaction patterns
+
+## Implementation Details
+Create controller/src/cli/adapter.rs with the CliAdapter trait defining core methods: async fn validate_model(&self, model: &str) -> Result<bool>, async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String>, fn format_prompt(&self, prompt: &str) -> String, async fn parse_response(&self, response: &str) -> Result<ParsedResponse>, fn get_memory_filename(&self) -> &str, fn get_executable_name(&self) -> &str, async fn initialize(&self, container: &Container) -> Result<()>. Implement BaseAdapter with shared functionality for logging, metrics, and error handling. Create AdapterFactory with fn create(cli_type: CLIType) -> Box<dyn CliAdapter> using pattern matching. Add lifecycle hooks for pre/post execution, cleanup, and health checks. Implement adapter configuration with per-CLI defaults and overrides. Add telemetry with OpenTelemetry integration for distributed tracing.
+
+## Test Strategy
+Unit test trait implementations with mock adapters. Test factory pattern creates correct adapter types. Verify shared functionality in BaseAdapter works across all implementations. Test lifecycle hooks are called in correct order. Mock container interactions to test initialization. Verify telemetry data is properly exported.

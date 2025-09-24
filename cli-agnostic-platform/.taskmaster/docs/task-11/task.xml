@@ -1,0 +1,52 @@
+<prompt>
+    <role>You are a senior platform migration engineer specializing in automated migration systems, A/B testing frameworks, traffic splitting with Istio/Envoy, configuration conversion, and zero-downtime deployment strategies.</role>
+    <task>
+        <id>11</id>
+        <title>Implement Migration Tools and Rollout Strategy</title>
+        <description>Build automated migration utilities for transitioning agents between CLIs with validation, rollback capabilities, and gradual rollout controls. This system enables safe and controlled migration of agents from one CLI to another with comprehensive testing and rollback mechanisms.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>3,4,7,9,10</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Create controller/src/migration/mod.rs with migration orchestrator and state machine management</spec>
+        <spec>Build configuration converters: CLAUDE.md to AGENTS.md translator, JSON to TOML converter, prompt adaptation</spec>
+        <spec>Implement migration validator checking configuration compatibility, tool availability, and model support</spec>
+        <spec>Create rollout controller with percentage-based traffic splitting using Istio/Envoy service mesh</spec>
+        <spec>Build A/B testing framework comparing response quality, latency, cost, and accuracy metrics</spec>
+        <spec>Implement automatic rollback triggers: error rate > 5%, latency > 2x baseline, cost > 1.5x threshold</spec>
+        <spec>Create shadow mode running new CLI in parallel without affecting user-visible responses</spec>
+        <spec>Build migration state machine: Planning, Testing, Canary (10%), Rollout (25%, 50%), Complete</spec>
+        <spec>Add comprehensive migration metrics dashboard showing progress, issues, and performance comparisons</spec>
+        <spec>Create dry-run mode for risk-free testing and validation of migration plans</spec>
+        <spec>Implement migration rollback with state restoration and configuration recovery</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create controller/src/migration/mod.rs with migration orchestrator. Build configuration converters: CLAUDE.md to AGENTS.md translator, JSON to TOML converter for Codex, prompt adaptation for model differences. Implement migration validator checking configuration compatibility, tool availability, and model support. Create rollout controller with percentage-based traffic splitting using Istio/Envoy. Build A/B testing framework comparing response quality, latency, and cost. Implement automatic rollback triggers on error rate > 5%, latency > 2x baseline, or cost > 1.5x threshold. Create shadow mode running new CLI in parallel without user impact. Build migration state machine with stages: Planning, Testing, Canary (10%), Rollout (25%, 50%), Complete. Add migration metrics dashboard showing progress and issues. Create dry-run mode for risk-free testing.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Configuration converters produce valid output formats for target CLI with no data loss</criterion>
+        <criterion>Migration validator catches incompatible configurations and provides helpful error messages</criterion>
+        <criterion>Traffic splitting accurately routes specified percentages to new and old CLI implementations</criterion>
+        <criterion>A/B testing framework measures quality, latency, and cost differences with statistical significance</criterion>
+        <criterion>Automatic rollback triggers activate immediately when thresholds are breached</criterion>
+        <criterion>Shadow mode runs new CLI without affecting production responses or user experience</criterion>
+        <criterion>Migration state machine transitions correctly through all phases with proper validation</criterion>
+        <criterion>Dry-run mode validates migration plans without modifying any production state</criterion>
+        <criterion>Migration metrics provide comprehensive visibility into progress and issues</criterion>
+        <criterion>Rollback capabilities restore previous state completely within SLA timeframes</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        Configuration converters produce valid output formats. Migration validator catches incompatibilities. Traffic splitting routes correct percentage. A/B tests measure differences accurately. Rollback triggers activate on threshold breach. Shadow mode doesn't affect production. State machine transitions correctly. Dry-run doesn't modify any state. Migration metrics track progress accurately. Rollback restores previous state completely.
+    </test_strategy>
+    <instructions>
+        Think step-by-step about building a comprehensive migration system. This is critical infrastructure that enables safe transitions between CLI implementations.
+        Start by designing the migration orchestrator that can handle complex multi-phase rollouts. Consider the state machine carefully - each transition should have proper validation and rollback capabilities.
+        The configuration converters are crucial - they must handle the nuanced differences between CLI formats (CLAUDE.md vs AGENTS.md, JSON vs TOML) without losing semantic meaning.
+        Focus on the A/B testing framework - it should provide statistically significant comparisons of quality, performance, and cost. Consider how to measure response quality objectively.
+        The rollback system is your safety net - design it to be fast, reliable, and comprehensive. Practice the "chaos engineering" principle - assume things will go wrong and plan accordingly.
+        Traffic splitting with service mesh technology requires careful integration with Istio/Envoy. Ensure proper observability and control over traffic routing decisions.
+        Provide complete, production-ready Rust code with comprehensive error handling, state management, and monitoring integration. Include extensive testing for edge cases and failure scenarios.
+        Where appropriate, use MCP tools to research migration patterns, A/B testing methodologies, and service mesh traffic management to ensure robust implementation.
+    </instructions>
+</prompt>

@@ -1,0 +1,10 @@
+# Task 1: Initialize Project Structure and Dependencies
+
+## Description
+Set up the foundational project structure with Rust workspace for controller, TypeScript for MCP integration, and Docker build infrastructure for multi-CLI support
+
+## Implementation Details
+Create a Rust workspace with the controller crate using Cargo.toml at the root. Set up controller/src/main.rs with basic Kubernetes client initialization using kube-rs v0.95.0 and tokio v1.41.0. Create MCP directory with TypeScript/Node.js setup using package.json with @modelcontextprotocol/sdk v1.0.4. Initialize infra/images/ directory structure with subdirectories for each CLI (claude, codex, opencode, gemini, grok, qwen, cursor, openhands). Set up GitHub Actions workflow in .github/workflows/build-images.yml for automated multi-arch container builds using buildx. Create a Makefile with targets for building, testing, and deploying components. Initialize git repository with proper .gitignore for Rust (target/), Node.js (node_modules/), and Docker artifacts.
+
+## Test Strategy
+Verify project structure with 'cargo check' for Rust workspace. Run 'npm install' in MCP directory to validate package.json. Test Docker build infrastructure with 'docker buildx create --use' and build a minimal test image. Ensure GitHub Actions workflow validates with 'act' tool locally. Run 'make help' to verify Makefile targets are properly defined.

@@ -1,0 +1,50 @@
+<prompt>
+    <role>You are a senior template engine architect with expertise in Handlebars templating, dynamic content generation, hot-reloading systems, high-performance caching, and secure template execution patterns.</role>
+    <task>
+        <id>5</id>
+        <title>Create Template Management System</title>
+        <description>Implement dynamic template selection and rendering system for CLI-specific prompts, configurations, and scripts with fallback mechanisms. This system enables the platform to generate optimized content for each CLI while maintaining consistency through intelligent fallback chains, hot reloading for development, template versioning for gradual rollouts, and high-performance rendering.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>3,4</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Create controller/src/templates/manager.rs with TemplateManager using HashMap registry for template storage</spec>
+        <spec>Use Handlebars-rust v6.2.0 for template rendering with custom CLI-specific helpers</spec>
+        <spec>Implement template types: SystemPrompt, ConfigFile, EntrypointScript, MemoryFile with CLI-specific variants</spec>
+        <spec>Build template discovery system scanning filesystem patterns: templates/{cli_type}/{template_type}.hbs</spec>
+        <spec>Create intelligent fallback chain: CLI-specific -> Generic -> Default with inheritance support</spec>
+        <spec>Add template performance cache with LRU eviction and configurable TTL for rendered output</spec>
+        <spec>Implement hot reloading using notify-rs v7.0.0 with debounced updates for development workflow</spec>
+        <spec>Build template versioning system supporting gradual rollout with percentage-based assignment</spec>
+        <spec>Create custom Handlebars helpers: cli_config_format, if_streaming, model_context_window, escape_shell</spec>
+        <spec>Achieve performance targets: <10ms rendering, 1000+ templates/second, >90% cache hit ratio</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create controller/src/templates/manager.rs with TemplateManager struct. Implement template registry with HashMap<(CLIType, TemplateType), Template>. Use Handlebars-rust v6.2.0 for template rendering with custom helpers. Create template types: SystemPrompt, ConfigFile, EntrypointScript, MemoryFile. Implement template discovery from filesystem (templates/{cli_type}/{template_type}.hbs). Add fallback chain: CLI-specific -> Generic -> Default. Create template variables context with agent metadata, configuration, and runtime info. Implement template validation with syntax checking and variable verification. Add template hot-reloading for development with notify-rs v7.0.0. Create template versioning system for gradual rollout. Build template performance cache with compiled templates.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Dynamic template discovery from filesystem with automatic loading and compilation</criterion>
+        <criterion>Intelligent fallback chain: CLI-specific -> Generic -> Default with inheritance patterns</criterion>
+        <criterion>High-performance rendering: <10ms per template, 1000+ templates/second sustained throughput</criterion>
+        <criterion>Custom Handlebars helpers provide CLI-specific functionality (config formats, capabilities)</criterion>
+        <criterion>Hot reloading system updates templates without service restart in <100ms</criterion>
+        <criterion>Template versioning supports gradual rollout with consistent agent assignment</criterion>
+        <criterion>Performance cache achieves >90% hit ratio with LRU eviction and TTL management</criterion>
+        <criterion>Template validation prevents syntax errors and provides helpful error messages</criterion>
+        <criterion>Memory usage <2MB for 100 compiled templates with efficient resource management</criterion>
+        <criterion>Security controls prevent template injection and limit resource consumption</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        Test template selection falls back correctly when CLI-specific missing. Verify Handlebars rendering with complex variable contexts. Test custom helpers produce correct output. Validate hot-reloading updates templates without restart. Test versioning system serves correct template versions. Performance test rendering 1000 templates/second. Test cache effectiveness with repeated renders. Verify template inheritance patterns work correctly. Test error handling and recovery scenarios.
+    </test_strategy>
+    <instructions>
+        Think step-by-step about the implementation approach. This template system is the content intelligence layer that adapts to each CLI's unique requirements while maintaining platform consistency.
+        Start by designing the template organization structure that supports 8 different CLI types with their unique needs. Consider how Codex needs TOML configs while Claude uses JSON, how Python CLIs need different script patterns.
+        Focus on the Handlebars integration - create powerful custom helpers that understand CLI capabilities and generate appropriate content. The fallback system should be intelligent, considering CLI similarities (Qwen inherits from Gemini).
+        Performance is critical - this system will be called for every agent interaction. Use compiled template caching, efficient context handling, and smart cache invalidation strategies.
+        The hot reloading system should enhance developer productivity without compromising production stability. Use file system watching with proper debouncing and error recovery.
+        Provide complete, production-ready code with comprehensive error handling, security considerations, and performance optimization. Include proper async/await patterns, resource cleanup, and monitoring integration.
+        Where appropriate, use MCP tools (filesystem, web search) to research Handlebars optimization techniques, template engine performance patterns, and hot reloading best practices to ensure optimal implementation.
+    </instructions>
+</prompt>

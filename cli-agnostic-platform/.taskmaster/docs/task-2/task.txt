@@ -1,0 +1,10 @@
+# Task 2: Implement CLI-Aware Model Validation Framework
+
+## Description
+Refactor the hard-coded validate_model_name() function to support all CLI providers with extensible validation patterns and comprehensive model catalog
+
+## Implementation Details
+Create controller/src/cli/validation.rs with a trait-based validation system. Implement ModelValidator trait with validate_model(&self, model: &str, cli_type: CLIType) -> Result<ValidatedModel>. Create provider-specific validators: ClaudeModelValidator (claude-3-opus, claude-3.5-sonnet, claude-3-haiku patterns), OpenAIModelValidator (gpt-4o, gpt-4-turbo, o1-preview, o3-mini patterns), GoogleModelValidator (gemini-1.5-pro, gemini-2.0-flash patterns), and extensible validators for Grok, Qwen, etc. Build a ModelCatalog struct that maintains a registry of valid models per CLI with version support. Implement fuzzy matching for common typos and provide helpful suggestions. Add comprehensive regex patterns for each provider's naming conventions. Create a validation cache with TTL to avoid repeated validations. Include model capability metadata (context window, multimodal support, streaming capability).
+
+## Test Strategy
+Unit test each validator with valid and invalid model names. Test edge cases like version numbers, special characters, and case sensitivity. Verify fuzzy matching suggests correct models for typos. Test model catalog updates and cache invalidation. Performance test validation with 1000+ concurrent requests. Integration test with mock CLI responses to verify model availability.

@@ -1,0 +1,52 @@
+<prompt>
+    <role>You are a senior security engineer specializing in credential management, OAuth flows, encryption at rest, secret rotation, and compliance with expertise in Kubernetes secrets, HashiCorp Vault, and security audit systems.</role>
+    <task>
+        <id>9</id>
+        <title>Implement Authentication and Secret Management</title>
+        <description>Build secure credential handling for API keys, OAuth tokens, and session management across different CLI authentication patterns. This system provides the security foundation for Multi-CLI Agent Platform with encryption at rest, automatic rotation, and comprehensive audit trails.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>3,4</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Create controller/src/auth/manager.rs with AuthManager supporting multiple credential providers</spec>
+        <spec>Implement KubernetesSecretProvider using k8s-openapi v0.23.0 for secret management</spec>
+        <spec>Build VaultProvider for HashiCorp Vault integration with dynamic secrets and lease management</spec>
+        <spec>Create authentication strategies: ApiKeyAuth for usage-based billing, OAuthTokenAuth with PKCE flow</spec>
+        <spec>Add HeadlessAuth for CLI login flows and ServiceAccount auth for Google Cloud services</spec>
+        <spec>Implement secure storage using AES-256-GCM encryption at rest with key rotation</spec>
+        <spec>Build automatic token refresh with 15-minute buffer before expiry and retry logic</spec>
+        <spec>Create credential rotation scheduler with zero-downtime updates and rollback capabilities</spec>
+        <spec>Implement security audit logging to separate log stream with structured events</spec>
+        <spec>Build rate limiting per API key to prevent abuse and cost overruns</spec>
+        <spec>Add authentication cache to reduce provider API calls with TTL and invalidation</spec>
+        <spec>Create fallback authentication chain for high availability and disaster recovery</spec>
+    </technical_specifications>
+    <implementation_details>
+        Create controller/src/auth/manager.rs with AuthManager struct. Implement credential providers: KubernetesSecretProvider using k8s-openapi v0.23.0, VaultProvider for HashiCorp Vault integration, EnvironmentProvider for development. Build authentication strategies: ApiKeyAuth for usage-based billing (OpenAI, Anthropic), OAuthTokenAuth with PKCE flow for session-based auth, HeadlessAuth for CLI login flows. Implement secure storage using AES-256-GCM encryption at rest. Add automatic token refresh with 15-minute buffer before expiry. Create credential rotation scheduler with zero-downtime updates. Implement audit logging to separate security log with structured events. Build rate limiting per API key to prevent abuse. Add authentication cache to reduce provider API calls. Create fallback authentication chain for high availability.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Secure credential storage with AES-256-GCM encryption at rest and proper key management</criterion>
+        <criterion>Multiple credential providers support Kubernetes secrets, Vault, and environment variables</criterion>
+        <criterion>OAuth flows implement PKCE with proper token refresh and error handling</criterion>
+        <criterion>Automatic token refresh prevents expiration with 15-minute buffer and retry logic</criterion>
+        <criterion>Zero-downtime credential rotation updates secrets without service interruption</criterion>
+        <criterion>Comprehensive security audit trail captures all authentication events with correlation IDs</criterion>
+        <criterion>Rate limiting prevents API abuse with configurable limits per key and time window</criterion>
+        <criterion>Authentication cache reduces provider load with appropriate TTL and security considerations</criterion>
+        <criterion>Fallback authentication chain provides high availability during provider outages</criterion>
+        <criterion>Compliance support for SOC2, GDPR, and other security frameworks</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        Test each provider retrieves credentials correctly. Verify encryption/decryption with known test vectors. Test OAuth flow with mock authorization server. Verify token refresh happens before expiry. Test credential rotation doesn't cause downtime. Audit log contains all authentication events. Rate limiting prevents excessive API usage. Test fallback chain during provider failures.
+    </test_strategy>
+    <instructions>
+        Think step-by-step about implementing a comprehensive authentication and secret management system. This is the security foundation that all CLI operations depend on.
+        Start by designing the AuthManager architecture that can handle diverse authentication patterns - API keys for usage-based billing, OAuth flows for session-based auth, and service account authentication for cloud services.
+        Focus on the credential provider abstraction - it must handle Kubernetes secrets, HashiCorp Vault, and environment variables seamlessly. Each provider has different capabilities and failure modes.
+        Security is paramount - implement proper encryption at rest, secure key management, and comprehensive audit logging. The system must be compliant with security frameworks like SOC2.
+        The rotation and refresh logic is critical - implement zero-downtime updates with proper rollback capabilities. Handle edge cases like provider outages and token expiration gracefully.
+        Provide complete, production-ready Rust code with comprehensive error handling, security best practices, and proper resource management. Include extensive testing for security edge cases.
+        Where appropriate, use MCP tools to research security best practices, OAuth implementation patterns, and compliance requirements to ensure robust and secure implementation.
+    </instructions>
+</prompt>

@@ -1,0 +1,57 @@
+<prompt>
+    <role>You are a senior production engineering expert specializing in reliability patterns, performance optimization, security hardening, chaos engineering, SLO monitoring, and operational excellence with expertise in Rust performance tuning and distributed systems.</role>
+    <task>
+        <id>12</id>
+        <title>Production Hardening and Performance Optimization</title>
+        <description>Implement reliability patterns, performance optimizations, security hardening, and operational excellence features for production deployment. This ensures the Multi-CLI Agent Platform can operate reliably at scale with proper performance, security, and operational characteristics.</description>
+        <priority>high</priority>
+        <status>pending</status>
+        <dependencies>9,10,11</dependencies>
+    </task>
+    <technical_specifications>
+        <spec>Implement circuit breakers using tower-rs v0.5.0 with 50% failure threshold over 10 requests</spec>
+        <spec>Add request hedging for critical operations with 95th percentile latency trigger and timeout management</spec>
+        <spec>Build connection pooling with bb8 v0.8.0 for database and external service connections</spec>
+        <spec>Implement lazy loading for CLI components reducing startup time by 60% through deferred initialization</spec>
+        <spec>Add request coalescing for duplicate requests within 100ms window to reduce external API calls</spec>
+        <spec>Create adaptive timeout adjustment based on historical latency percentiles and success rates</spec>
+        <spec>Implement graceful degradation falling back to simpler models on overload conditions</spec>
+        <spec>Add intelligent cost optimization selecting cheapest capable model for each task type</spec>
+        <spec>Build comprehensive security scanning: OWASP dependency check, Snyk vulnerabilities, Semgrep code patterns</spec>
+        <spec>Implement zero-trust networking with mTLS between all service components</spec>
+        <spec>Add compliance logging for SOC2, GDPR, and audit requirements with data retention policies</spec>
+        <spec>Create chaos engineering tests with Litmus framework for reliability validation</spec>
+        <spec>Build SLO monitoring with 99.9% availability target and comprehensive alerting</spec>
+    </technical_specifications>
+    <implementation_details>
+        Implement circuit breakers using tower-rs v0.5.0 with failure threshold 50% over 10 requests. Add request hedging for critical operations with 95th percentile trigger. Build connection pooling with bb8 v0.8.0 for database connections. Implement lazy loading for CLI components reducing startup time by 60%. Add request coalescing for duplicate requests within 100ms window. Create adaptive timeout adjustment based on historical latency. Implement graceful degradation falling back to simpler models on overload. Add cost optimization selecting cheapest capable model for task. Build security scanning with OWASP dependency check, Snyk for vulnerabilities, and Semgrep for code patterns. Implement zero-trust networking with mTLS between services. Add compliance logging for SOC2 and GDPR requirements. Create chaos engineering tests with Litmus framework. Build SLO monitoring with 99.9% availability target.
+    </implementation_details>
+    <acceptance_criteria>
+        <criterion>Circuit breakers prevent cascade failures by opening after 50% failure rate threshold</criterion>
+        <criterion>Request hedging reduces p99 latency by 30% for critical operations with proper resource management</criterion>
+        <criterion>Connection pooling handles failures gracefully with automatic recovery and health checking</criterion>
+        <criterion>Lazy loading reduces application startup time to under 5 seconds from cold start</criterion>
+        <criterion>Request coalescing reduces external API calls by >40% for duplicate operations</criterion>
+        <criterion>Adaptive timeouts adjust based on historical performance with proper fallback mechanisms</criterion>
+        <criterion>Graceful degradation maintains service availability during overload conditions</criterion>
+        <criterion>Cost optimization reduces operational costs by >25% through intelligent model selection</criterion>
+        <criterion>Security scans detect zero high/critical vulnerabilities with comprehensive coverage</criterion>
+        <criterion>Zero-trust mTLS authenticates all inter-service communication with certificate management</criterion>
+        <criterion>Compliance logging meets SOC2 and GDPR requirements with proper data handling</criterion>
+        <criterion>Chaos engineering tests validate system resilience without causing data loss</criterion>
+        <criterion>SLO monitoring maintains 99.9% availability with comprehensive incident response</criterion>
+    </acceptance_criteria>
+    <test_strategy>
+        Circuit breakers open after threshold failures. Request hedging reduces p99 latency by 30%. Connection pools handle connection failures gracefully. Lazy loading reduces startup time below 5 seconds. Security scans find no critical vulnerabilities. Chaos tests don't cause data loss. SLOs maintained under load testing with 10x normal traffic. Cost optimization reduces expenses measurably. Compliance logging captures required events. mTLS authentication works across all services.
+    </test_strategy>
+    <instructions>
+        Think step-by-step about production hardening. This is the culmination of the Multi-CLI Agent Platform - everything must work reliably at scale under adverse conditions.
+        Start with reliability patterns - circuit breakers, request hedging, and graceful degradation are your safety nets. Design them to fail fast and recover quickly, protecting downstream systems and user experience.
+        Performance optimization requires understanding the system's bottlenecks. Focus on startup time, request coalescing, and adaptive timeouts. Each optimization should be measurable and have clear success criteria.
+        Security hardening is non-negotiable for production. Implement defense in depth with vulnerability scanning, zero-trust networking, and comprehensive audit logging. Consider the full attack surface.
+        Chaos engineering validates your assumptions about system behavior. Design experiments that test real failure modes without causing actual harm. Use tools like Litmus to inject controlled failures.
+        SLO monitoring is about understanding what users care about - availability, latency, and correctness. Build monitoring that tells you when users are having a bad experience, not just when systems are failing.
+        Provide complete, production-ready Rust code with comprehensive reliability patterns, performance optimizations, and security controls. Include proper testing for all edge cases and failure scenarios.
+        Where appropriate, use MCP tools to research production hardening patterns, performance optimization techniques, and security best practices to ensure enterprise-grade implementation.
+    </instructions>
+</prompt>
