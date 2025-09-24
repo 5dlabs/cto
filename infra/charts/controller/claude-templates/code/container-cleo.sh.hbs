@@ -660,6 +660,14 @@ cat .github/workflows/*.yml | head -50
 
 ## Code Quality Requirements
 
+### CRITICAL: Clippy Pedantic Enforcement
+**ABSOLUTE PRIORITY: Avoid #[allow(clippy::...)] bypasses at all costs!**
+- **DO NOT** add \`#[allow(clippy::pedantic)]\` or similar suppressions
+- **DO NOT** use \`#![allow(...)]\` at module or crate level
+- **ALWAYS** fix the underlying code issue instead of suppressing warnings
+- **ONLY** bypass if absolutely necessary AND document WHY in detail
+- Each bypass is a code smell that should be addressed, not hidden
+
 ### Change Detection Logic
 Analyze git diff to determine appropriate quality checks:
 \\\`\\\`\\\`bash
@@ -669,16 +677,19 @@ YAML_CHANGES=\\\$(git diff --name-only origin/main...HEAD | grep -E '\\\.(yaml|y
 
 ### Quality Check Execution
 **For Rust Changes:**
-1. \\\`cargo clippy -- -D warnings -D clippy::pedantic\\\` (zero tolerance)
-2. \\\`cargo fmt\\\` (auto-fix formatting)
-3. \\\`cargo test\\\` (all tests must pass)
+1. \\\`cargo clippy -- -D warnings -D clippy::pedantic\\\` (ZERO tolerance, NO bypasses)
+2. Review existing code for any \`#[allow(clippy::...)]\` and remove them by fixing the code
+3. \\\`cargo fmt\\\` (auto-fix formatting)
+4. \\\`cargo test\\\` (all tests must pass)
 
 **For YAML Changes:**
 1. YAML syntax validation with yamllint
 2. Auto-fix trailing spaces and formatting issues
 
 ### Error Handling
-- Automatically fix formatting and linting issues
+- **NEVER** suppress Clippy warnings with #[allow(...)]
+- **ALWAYS** fix the root cause of Clippy warnings
+- Automatically fix formatting and linting issues properly
 - Fix compilation errors if straightforward
 - Update outdated dependencies if causing CI failures
 - Never approve when quality checks fail after fixes
@@ -825,13 +836,16 @@ CLEO_PROMPT="$CLEO_PROMPT
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
 3. **Verify Live Data Implementation**: Ensure NO mocks exist - all implementations must use real databases, APIs, and configurable parameters (no hard-coded trading pairs, endpoints, etc.)
-4. **Run quality checks**:
+4. **Run quality checks (CRITICAL - NO BYPASSES)**:
    - For Rust: cargo clippy -- -D warnings -W clippy::pedantic
+   - **ABSOLUTELY CRITICAL**: DO NOT add #[allow(clippy::...)] to bypass warnings!
+   - Instead, FIX the underlying code issues that Clippy identifies
+   - Review existing code and REMOVE any #[allow(clippy::...)] attributes by fixing the code
    - Run cargo fmt to fix any formatting issues
    - For YAML: YAML linting and validation
    - IMPORTANT: Commit and push ALL fixes immediately (don't wait until the end)
    - NOTE: Do NOT write tests - Tess handles all testing
-4. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
+5. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
    - Check if .github/workflows/ci.yml exists (or similar CI workflow)
    - If not, create using these PROVEN TEMPLATES:
 
@@ -965,14 +979,17 @@ CLEO_PROMPT="$CLEO_PROMPT
      * Ensure workflow file is in .github/workflows/
      * Check if workflow needs to be enabled in Actions settings
    - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI (when workflows exist)
+   - **VERIFY NO #[allow(clippy::...)] BYPASSES**: Check that no warnings are suppressed
    - SUCCESS = Code quality checks pass + CI passes (if workflows exist) OR code quality checks pass (if no workflows)
    - Do NOT proceed until quality standards are met
-6. **Review against task requirements**: Verify implementation matches acceptance criteria
-7. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
-8. **Success criteria**: Quality checks must pass for approval. CI/CD validation required only when workflows exist.
+7. **Review against task requirements**: Verify implementation matches acceptance criteria
+8. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
+9. **Success criteria**: Quality checks must pass for approval. CI/CD validation required only when workflows exist.
 
 ## Quality Standards (MUST PASS IN GITHUB ACTIONS WHEN WORKFLOWS EXIST, OTHERWISE LOCALLY!)
 - **Zero tolerance** for clippy warnings at pedantic level (in CI if workflows exist, locally otherwise)
+- **NO CLIPPY BYPASSES** - Absolutely no #[allow(clippy::...)] attributes unless critically necessary with documented justification
+- **FIX THE CODE, NOT THE WARNING** - Address the underlying issues Clippy identifies
 - **Perfect formatting** required (cargo fmt --check must pass in CI if workflows exist, locally otherwise)
 - **All tests pass** (cargo test must succeed in CI if workflows exist, locally otherwise)
 - **Clean YAML** syntax and structure
