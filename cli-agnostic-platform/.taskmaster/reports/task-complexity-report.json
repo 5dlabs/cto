@@ -1,0 +1,109 @@
+{
+	"meta": {
+		"generatedAt": "2025-09-24T19:29:17.180Z",
+		"tasksAnalyzed": 12,
+		"totalTasks": 12,
+		"analysisCount": 12,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Initialize Project Structure and Dependencies",
+			"complexityScore": 5,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Break down the project initialization into: 1) Create Rust workspace structure with controller crate and proper Cargo.toml configuration, 2) Set up TypeScript/Node.js MCP directory with package.json and @modelcontextprotocol/sdk dependency, 3) Create Docker infrastructure directories for each CLI (claude, codex, opencode, gemini, grok, qwen, cursor, openhands), 4) Configure GitHub Actions workflow with multi-arch build support, 5) Create comprehensive Makefile with build, test, and deploy targets, 6) Initialize git repository with proper .gitignore entries, 7) Set up development environment configuration files, 8) Create initial README and documentation structure",
+			"reasoning": "This is a foundational task starting from scratch. While straightforward, it requires setting up multiple technology stacks (Rust, TypeScript, Docker) and CI/CD infrastructure. The complexity comes from coordinating multiple build systems and ensuring proper workspace configuration."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Implement CLI-Aware Model Validation Framework",
+			"complexityScore": 7,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Implement the model validation framework with: 1) Create trait-based validation architecture in controller/src/cli/validation.rs, 2) Implement ClaudeModelValidator with comprehensive Claude model patterns, 3) Create OpenAIModelValidator for GPT/O-series models, 4) Build GoogleModelValidator for Gemini models, 5) Implement validators for Grok, Qwen, and other providers, 6) Create ModelCatalog registry with version support, 7) Implement fuzzy matching and suggestion system for typos, 8) Build validation caching mechanism with TTL, 9) Add model capability metadata system, 10) Create comprehensive unit and integration tests",
+			"reasoning": "This requires implementing a complex trait system with multiple provider-specific validators. Each validator needs detailed knowledge of model naming patterns, version support, and capability metadata. The fuzzy matching and caching add additional complexity layers."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Design and Implement CLI Adapter Trait System",
+			"complexityScore": 8,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Create the adapter system with: 1) Design CliAdapter trait with core async methods for validation, config generation, and execution, 2) Implement BaseAdapter with shared logging and error handling, 3) Create AdapterFactory with pattern matching for CLI type selection, 4) Implement lifecycle hooks for initialization and cleanup, 5) Build configuration system with per-CLI defaults, 6) Integrate OpenTelemetry for distributed tracing, 7) Create async execution methods for file operations, 8) Implement prompt formatting and response parsing, 9) Build container initialization logic, 10) Create adapter registry and discovery mechanism, 11) Implement health check and readiness probes, 12) Write comprehensive test suite with mocks",
+			"reasoning": "This is the core abstraction layer requiring careful design of async traits, lifecycle management, and complex interaction patterns. The trait system must be flexible enough to handle diverse CLI behaviors while maintaining type safety and performance."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Implement Configuration Resolution Engine",
+			"complexityScore": 8,
+			"recommendedSubtasks": 11,
+			"expansionPrompt": "Build the configuration resolver with: 1) Create AgentResolver struct with multi-source loading, 2) Implement Helm ConfigMap configuration loading, 3) Build Git integration for cto-config.json retrieval, 4) Create field-level merge strategies (Replace, Merge, Append, DeepMerge), 5) Implement JSONSchema validation with jsonschema-rs, 6) Build precedence rules engine (Runtime > Environment > CtoConfig > Helm), 7) Implement Redis caching with TTL management, 8) Create configuration preview API, 9) Build audit trail logging system, 10) Implement backwards compatibility handling, 11) Create comprehensive test suite for merge scenarios",
+			"reasoning": "This involves complex JSON manipulation, multiple data sources, sophisticated merge strategies, and caching. The field-level granularity and precedence rules add significant complexity, plus integration with Redis and schema validation."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Create Template Management System",
+			"complexityScore": 6,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Implement template management with: 1) Create TemplateManager with registry architecture, 2) Integrate Handlebars-rust with custom helpers, 3) Implement template discovery from filesystem, 4) Build fallback chain logic (CLI-specific -> Generic -> Default), 5) Create template context builder with agent metadata, 6) Implement template validation and syntax checking, 7) Add hot-reloading with notify-rs for development, 8) Build template versioning system, 9) Create performance cache for compiled templates",
+			"reasoning": "While template management is a well-understood pattern, the multi-level fallback system, hot-reloading, and versioning add complexity. Integration with Handlebars and custom helpers requires careful implementation."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Build MCP Transport Abstraction Layer",
+			"complexityScore": 7,
+			"recommendedSubtasks": 11,
+			"expansionPrompt": "Create MCP transport layer with: 1) Design abstract Transport class in TypeScript, 2) Implement DirectStreamingTransport with ReadableStream support, 3) Build BufferedRelayTransport with configurable buffers, 4) Create StdioTransport for child_process communication, 5) Implement transport auto-detection logic, 6) Build retry mechanism with exponential backoff, 7) Create request/response correlation with UUID tracking, 8) Implement timeout handling and cancellation, 9) Add zstd compression for large payloads, 10) Build metrics collection system, 11) Implement connection pooling with keep-alive",
+			"reasoning": "This requires handling multiple transport patterns (streaming, buffered, STDIO) with different complexity levels. The retry logic, compression, and connection pooling add significant implementation complexity in TypeScript."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Implement Claude and Codex CLI Adapters",
+			"complexityScore": 7,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Create CLI adapters with: 1) Implement Claude adapter maintaining CLAUDE.md compatibility, 2) Build Claude-specific model validation and config generation, 3) Create Codex adapter with TOML configuration support, 4) Implement Codex sandbox presets and model reasoning configuration, 5) Build OAuth token exchange for Codex authentication, 6) Create configuration mapping between universal and CLI formats, 7) Implement response parsing for both CLIs, 8) Build CLI-specific error handling and recovery, 9) Create health check implementations, 10) Write integration tests with mock CLI binaries",
+			"reasoning": "Implementing two different adapters with distinct configuration formats (Markdown vs TOML) and authentication patterns (API key vs OAuth) requires significant effort. The Codex adapter has additional complexity with sandbox presets and experimental features."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Create Multi-CLI Container Images",
+			"complexityScore": 6,
+			"recommendedSubtasks": 9,
+			"expansionPrompt": "Build container images with: 1) Create base Dockerfiles for Node.js CLIs (Claude, Opencode, Gemini), 2) Build Rust-based Dockerfile for Codex with cargo caching, 3) Create Python Dockerfiles for Cursor and OpenHands, 4) Implement multi-stage builds for size optimization, 5) Add health check scripts for CLI and MCP connectivity, 6) Configure entrypoint scripts with initialization logic, 7) Integrate security scanning with Trivy, 8) Implement SBOM generation and image signing, 9) Set up matrix builds for multi-arch support",
+			"reasoning": "While Docker containerization is standard, supporting multiple runtime environments (Node, Rust, Python) with optimization, security scanning, and multi-arch builds adds complexity. Each CLI may have unique dependencies and initialization requirements."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Implement Authentication and Secret Management",
+			"complexityScore": 8,
+			"recommendedSubtasks": 11,
+			"expansionPrompt": "Build authentication system with: 1) Create AuthManager with provider pattern, 2) Implement KubernetesSecretProvider with k8s-openapi, 3) Build VaultProvider for HashiCorp Vault, 4) Create EnvironmentProvider for development, 5) Implement ApiKeyAuth for usage-based billing, 6) Build OAuthTokenAuth with PKCE flow, 7) Implement AES-256-GCM encryption for storage, 8) Create automatic token refresh logic, 9) Build credential rotation scheduler, 10) Implement audit logging system, 11) Add rate limiting and authentication caching",
+			"reasoning": "Security-critical component requiring multiple authentication strategies, encryption, and integration with external systems (Kubernetes, Vault). The OAuth PKCE flow, token refresh, and rotation add significant complexity."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Create Controller API and Monitoring Infrastructure",
+			"complexityScore": 7,
+			"recommendedSubtasks": 10,
+			"expansionPrompt": "Implement API and monitoring with: 1) Create REST API with Axum web framework, 2) Implement core endpoints for CLI operations and migration, 3) Add OpenAPI documentation with utoipa, 4) Create Prometheus metrics for CLI operations, 5) Build Grafana dashboards for visualization, 6) Implement distributed tracing with OpenTelemetry, 7) Set up structured logging with tracing-subscriber, 8) Create alerting rules and SLO definitions, 9) Write runbooks linked to alerts, 10) Implement load testing harness",
+			"reasoning": "Requires implementing a full REST API with comprehensive observability. The integration of multiple monitoring tools (Prometheus, Grafana, Jaeger) and creation of dashboards/alerts adds complexity beyond basic API development."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Implement Migration Tools and Rollout Strategy",
+			"complexityScore": 9,
+			"recommendedSubtasks": 12,
+			"expansionPrompt": "Build migration system with: 1) Create migration orchestrator with state machine, 2) Implement CLAUDE.md to AGENTS.md translator, 3) Build JSON to TOML converter for configurations, 4) Create prompt adaptation for model differences, 5) Implement migration validator for compatibility checks, 6) Build traffic splitting with Istio/Envoy integration, 7) Create A/B testing framework for quality comparison, 8) Implement automatic rollback triggers, 9) Build shadow mode for parallel execution, 10) Create migration state machine with staged rollout, 11) Build migration metrics dashboard, 12) Implement dry-run mode for testing",
+			"reasoning": "Most complex task involving state machines, traffic management, A/B testing, and integration with service mesh. The automatic rollback triggers and shadow mode require sophisticated orchestration and monitoring."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Production Hardening and Performance Optimization",
+			"complexityScore": 9,
+			"recommendedSubtasks": 13,
+			"expansionPrompt": "Implement production hardening with: 1) Create circuit breakers with tower-rs, 2) Implement request hedging for critical operations, 3) Build connection pooling with bb8, 4) Implement lazy loading for components, 5) Create request coalescing mechanism, 6) Build adaptive timeout adjustment, 7) Implement graceful degradation patterns, 8) Create cost optimization with model selection, 9) Integrate security scanning tools (OWASP, Snyk, Semgrep), 10) Implement mTLS for zero-trust networking, 11) Add compliance logging for SOC2/GDPR, 12) Create chaos engineering tests with Litmus, 13) Build SLO monitoring and reporting",
+			"reasoning": "Comprehensive production hardening touching security, performance, reliability, and compliance. Requires deep integration with multiple tools and implementation of sophisticated patterns like circuit breakers, hedging, and chaos engineering."
+		}
+	]
+}

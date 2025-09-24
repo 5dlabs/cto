@@ -1,0 +1,85 @@
+# Task ID: 11
+# Title: Implement Migration Tools and Rollout Strategy
+# Status: pending
+# Dependencies: 7, 10
+# Priority: medium
+# Description: Build automated migration utilities for transitioning agents between CLIs with validation, rollback capabilities, and gradual rollout controls
+# Details:
+Create controller/src/migration/mod.rs with migration orchestrator. Build configuration converters: CLAUDE.md to AGENTS.md translator, JSON to TOML converter for Codex, prompt adaptation for model differences. Implement migration validator checking configuration compatibility, tool availability, and model support. Create rollout controller with percentage-based traffic splitting using Istio/Envoy. Build A/B testing framework comparing response quality, latency, and cost. Implement automatic rollback triggers on error rate > 5%, latency > 2x baseline, or cost > 1.5x threshold. Create shadow mode running new CLI in parallel without user impact. Build migration state machine with stages: Planning, Testing, Canary (10%), Rollout (25%, 50%), Complete. Add migration metrics dashboard showing progress and issues. Create dry-run mode for risk-free testing.
+
+# Test Strategy:
+Configuration converters produce valid output formats. Migration validator catches incompatibilities. Traffic splitting routes correct percentage. A/B tests measure differences accurately. Rollback triggers activate on threshold breach. Shadow mode doesn't affect production. State machine transitions correctly. Dry-run doesn't modify any state.
+
+# Subtasks:
+## 1. Create Migration Orchestrator Core Module [pending]
+### Dependencies: None
+### Description: Build the foundation migration orchestrator in controller/src/migration/mod.rs with state machine implementation
+### Details:
+Create MigrationOrchestrator struct with state management using enum MigrationState (Planning, Testing, Canary, Rollout25, Rollout50, Complete, RolledBack). Implement state transition logic with validation rules. Add configuration for migration parameters including thresholds, timeouts, and retry policies. Create migration context to track source/target CLI, configuration mappings, and progress metrics. Implement async execution with tokio for non-blocking operations.
+
+## 2. Implement CLAUDE.md to AGENTS.md Translator [pending]
+### Dependencies: 11.1
+### Description: Build configuration converter to translate Claude's CLAUDE.md format to Codex's AGENTS.md format with syntax adaptation
+### Details:
+Create MarkdownTranslator trait with convert_memory_file() method. Parse CLAUDE.md using markdown parser to extract directives, tools, and instructions. Map Claude-specific syntax (@./.taskmaster/CLAUDE.md imports) to Codex equivalents. Handle tool permission formats (allowedTools vs sandbox_preset mappings). Convert instruction blocks preserving semantic meaning. Generate valid AGENTS.md with proper TOML frontmatter. Add validation to ensure no information loss during translation.
+
+## 3. Build JSON to TOML Configuration Converter [pending]
+### Dependencies: 11.1
+### Description: Create converter for transforming JSON configurations to TOML format required by Codex and other CLIs
+### Details:
+Implement ConfigConverter with to_toml() and from_json() methods using serde_json and toml crates. Handle nested structures with proper TOML table syntax. Map JSON arrays to TOML arrays preserving order. Convert camelCase to snake_case following TOML conventions. Handle special types like dates, booleans, and null values. Add pretty-printing for readable TOML output. Implement reverse conversion for bidirectional support.
+
+## 4. Create Prompt Adaptation Layer [pending]
+### Dependencies: 11.1
+### Description: Implement prompt transformer to adapt prompts between different model providers and their specific requirements
+### Details:
+Build PromptAdapter with adapt_prompt() method for each CLI type. Handle Claude's constitutional AI prompt structure vs OpenAI's system/user format. Adapt token limits (Claude 200k vs GPT-4 128k vs Gemini 2M). Transform special tokens and formatting (@-mentions, markdown blocks). Handle model-specific features (Claude's artifacts, GPT's functions, Gemini's grounding). Add context window management with smart truncation. Preserve semantic intent across transformations.
+
+## 5. Implement Migration Validator [pending]
+### Dependencies: 11.2, 11.3, 11.4
+### Description: Build comprehensive validator to check compatibility between source and target CLI configurations before migration
+### Details:
+Create MigrationValidator with validate_compatibility() returning ValidationResult. Check tool availability mapping between CLIs (Edit, Bash, WebSearch equivalents). Verify model support and fallback options. Validate authentication methods compatibility (API keys vs OAuth). Check configuration schema compliance using JSONSchema. Verify file path conventions and workspace access. Test memory file format compatibility. Generate detailed validation report with warnings and errors.
+
+## 6. Build Traffic Splitting with Istio Integration [pending]
+### Dependencies: 11.1
+### Description: Implement percentage-based traffic routing using Istio VirtualService and DestinationRule for gradual rollout
+### Details:
+Create TrafficController interfacing with Istio via k8s-openapi. Generate VirtualService with weighted routing (10%, 25%, 50%, 100%). Configure DestinationRule with subsets for old/new CLI versions. Implement dynamic weight updates without downtime. Add circuit breaker configuration for fault tolerance. Configure retry policies and timeouts per subset. Monitor traffic distribution metrics via Envoy stats. Create rollback mechanism updating weights to 100% old version.
+
+## 7. Create A/B Testing Framework [pending]
+### Dependencies: 11.6
+### Description: Build framework to compare response quality, latency, and cost between old and new CLI implementations
+### Details:
+Implement ABTestRunner with parallel execution capability. Create ResponseComparator using similarity scoring (cosine similarity for embeddings). Measure latency percentiles (p50, p95, p99) for both versions. Track token usage and calculate cost differences. Implement quality metrics: task completion rate, error frequency, user satisfaction proxy. Store results in time-series database (Prometheus). Generate statistical significance tests (t-test, chi-square). Create comparison dashboard with Grafana.
+
+## 8. Implement Automatic Rollback Triggers [pending]
+### Dependencies: 11.6, 11.7
+### Description: Build monitoring and automatic rollback system triggered by error rates, latency, or cost thresholds
+### Details:
+Create RollbackController with threshold monitoring. Implement error rate trigger (>5% 5xx errors in 5-minute window). Add latency trigger (p95 > 2x baseline for 3 minutes). Build cost trigger (rolling hour cost > 1.5x threshold). Create composite health score combining all metrics. Implement graceful rollback updating traffic weights gradually. Add manual override capability with reason logging. Send alerts via webhook/email on trigger activation. Store rollback events in audit log.
+
+## 9. Build Shadow Mode Execution [pending]
+### Dependencies: 11.7
+### Description: Implement parallel execution mode where new CLI runs alongside production without affecting users
+### Details:
+Create ShadowExecutor running requests in parallel threads. Implement request duplication preserving headers and context. Route shadow responses to metrics collection only. Add sampling configuration (1%, 10%, 100% of traffic). Implement timeout handling preventing shadow delays affecting production. Store shadow results in separate database for analysis. Compare shadow vs production responses offline. Generate shadow mode performance reports. Add feature flag for instant enable/disable.
+
+## 10. Create Migration State Machine [pending]
+### Dependencies: 11.5, 11.8
+### Description: Implement state machine managing staged rollout with Planning, Testing, Canary, and Complete phases
+### Details:
+Build StateMachine with state transitions and guards. Implement Planning state running validation and generating migration plan. Create Testing state executing integration tests and shadow mode. Build Canary state (10% traffic) with duration and success criteria. Implement progressive Rollout states (25%, 50%, 100%). Add automatic progression based on health metrics. Create manual approval gates for critical transitions. Implement state persistence for crash recovery. Add state history with timestamp and trigger tracking.
+
+## 11. Build Migration Metrics Dashboard [pending]
+### Dependencies: 11.7, 11.9, 11.10
+### Description: Create comprehensive dashboard showing migration progress, health metrics, and issue tracking
+### Details:
+Implement MetricsDashboard using Grafana with Prometheus datasource. Create migration progress panel showing current state and completion percentage. Add traffic distribution chart with real-time weight updates. Build error rate comparison between old/new versions. Display latency percentile graphs with baseline overlay. Show cost tracking with projection and alerts. Add A/B test results with confidence intervals. Create rollback history timeline. Implement issue tracker integration showing related problems.
+
+## 12. Implement Dry-Run Mode [pending]
+### Dependencies: 11.10, 11.11
+### Description: Create risk-free testing mode simulating migration without making actual changes
+### Details:
+Build DryRunExecutor with simulation capabilities. Mock traffic splitting without Istio changes. Simulate state transitions logging planned actions. Generate migration preview report with expected outcomes. Test configuration converters without writing files. Validate all prerequisites and dependencies. Simulate rollback scenarios with injected failures. Calculate estimated migration duration and resource usage. Generate dry-run summary with risk assessment and recommendations.
+
