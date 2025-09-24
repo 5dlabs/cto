@@ -1023,6 +1023,8 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
 ## ⚠️ EXECUTION REQUIREMENTS
 
 - **Follow patterns**: Use @coding-guidelines.md and @github-guidelines.md
+- **NO MOCKS ALLOWED**: Implement ONLY with real data sources and live APIs - no hard-coded values, no mock data
+- **Parameterized Configuration**: ALL business logic parameters (trading pairs, endpoints, thresholds) must be configurable via env vars, config files, or CLI args
 - **Pre-PR quality gates (MANDATORY)**: Do NOT open a PR unless all of these pass locally:
   - `cargo fmt --all -- --check`
   - `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`

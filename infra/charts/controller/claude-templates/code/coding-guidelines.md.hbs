@@ -20,6 +20,87 @@ Before opening any pull request or requesting merge:
 
 ## Code Quality Standards
 
+### Live Data Implementation (MANDATORY)
+- **NO MOCK DATA**: Always implement with real data sources and live APIs
+- **Parameterized Configuration**: Hard-coded values are prohibited - use configuration
+- **Environment-driven**: Support multiple environments (dev, staging, prod) via config
+- **Runtime Configurable**: Business logic parameters must be externally configurable
+
+#### Configuration Architecture:
+```rust
+// ✅ DO: Layered configuration with defaults
+#[derive(Deserialize, Debug)]
+pub struct AppConfig {
+    pub database_url: String,
+    pub api_endpoints: ApiEndpoints,
+    pub trading_config: TradingConfig,
+    pub feature_flags: FeatureFlags,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TradingConfig {
+    pub supported_pairs: Vec<String>,  // From config, not hard-coded
+    pub price_precision: u8,
+    pub min_trade_amount: Decimal,
+    pub rate_limits: RateLimits,
+}
+
+// ✅ DO: Load from multiple sources
+impl AppConfig {
+    pub fn load() -> Result<Self> {
+        let config = Config::builder()
+            .add_source(File::with_name("config/default"))
+            .add_source(File::with_name(&format!("config/{}", env::var("ENV")?)))
+            .add_source(Environment::with_prefix("APP"))
+            .build()?;
+        
+        config.try_deserialize()
+    }
+}
+```
+
+#### Database Integration:
+```rust
+// ❌ NEVER: Mock database or hardcoded data
+fn get_users() -> Vec<User> {
+    vec![User { id: 1, name: "test".to_string() }]  // WRONG
+}
+
+// ✅ DO: Real database operations with proper error handling
+pub async fn get_users(pool: &PgPool) -> Result<Vec<User>, DatabaseError> {
+    let users = sqlx::query_as!(User, "SELECT id, name FROM users WHERE active = true")
+        .fetch_all(pool)
+        .await?;
+    Ok(users)
+}
+```
+
+#### API Integration:
+```rust
+// ❌ NEVER: Mock external API responses
+async fn get_market_price() -> f64 { 100.0 }  // WRONG
+
+// ✅ DO: Real API integration with proper clients
+pub struct MarketDataClient {
+    client: reqwest::Client,
+    base_url: String,
+    api_key: String,
+}
+
+impl MarketDataClient {
+    pub async fn get_price(&self, pair: &str) -> Result<Decimal, ApiError> {
+        let response = self.client
+            .get(&format!("{}/price/{}", self.base_url, pair))
+            .header("Authorization", &format!("Bearer {}", self.api_key))
+            .send()
+            .await?;
+        
+        let price_data: PriceResponse = response.json().await?;
+        Ok(price_data.price)
+    }
+}
+```
+
 ### Error Handling
 - Use `Result<T, E>` for fallible operations
 - Use `anyhow::Result` for application-level errors

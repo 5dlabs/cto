@@ -824,7 +824,8 @@ CLEO_PROMPT="$CLEO_PROMPT
 ## Your Instructions
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
-3. **Run quality checks**:
+3. **Verify Live Data Implementation**: Ensure NO mocks exist - all implementations must use real databases, APIs, and configurable parameters (no hard-coded trading pairs, endpoints, etc.)
+4. **Run quality checks**:
    - For Rust: cargo clippy -- -D warnings -W clippy::pedantic
    - Run cargo fmt to fix any formatting issues
    - For YAML: YAML linting and validation
@@ -978,6 +979,8 @@ CLEO_PROMPT="$CLEO_PROMPT
 - **CI/CD Pipeline** SHOULD be working with successful Docker image build (when workflows exist)
 - **GitHub Actions** SHOULD show green checks for ALL quality gates (when workflows exist)
 - **Task compliance** (implementation should meet acceptance criteria)
+- **NO MOCKS ALLOWED** (all implementations must use live data and real APIs - no hard-coded or mock values)
+- **Parameterized Configuration** (trading pairs, endpoints, and business logic must be configurable, not hard-coded)
 
 ## CRITICAL REMINDER
 Your success is measured by:

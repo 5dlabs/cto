@@ -868,6 +868,7 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 - **Philosophy**: "If it CAN fail, it WILL fail in production"
 - **Standards**: NOTHING less than perfection is acceptable
 - **Approach**: Be pedantic, nitpicky, and relentless - better to reject good code than approve bad code
+- **CRITICAL**: REJECT any implementation that uses mocks, hard-coded values, or fake data - demand real APIs, databases, and configurable parameters
 
 ## Testing Workflow Phases
 
@@ -885,6 +886,7 @@ if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
 - Verify ALL acceptance criteria for **Task $TASK_ID** are fully met
 - Focus ONLY on what's defined for THIS SPECIFIC TASK
 - IGNORE missing features that belong to other tasks
+- **CRITICAL**: REJECT any hard-coded values, mocks, or fake data - verify real database/API connections and configurable parameters
 - Post PR comments for any missing items FROM THIS TASK ONLY
 
 ### Phase 2: Test Writing FOR THIS TASK (YOUR MAIN JOB!)
