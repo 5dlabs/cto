@@ -18,6 +18,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
+  # Temporary workaround for Docker Hub auth outage (Sept 24, 2025)
+  # Set to 'true' to restore full buildx functionality when Docker Hub is fixed
+  DOCKER_HUB_WORKING: false
 
 jobs:
   # Version determination
