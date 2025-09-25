@@ -77,10 +77,10 @@ impl DiscoveryService {
             } else {
                 "unknown".to_string()
             },
-            error: if !output.status.success() {
-                Some(String::from_utf8_lossy(&output.stderr).to_string())
-            } else {
+            error: if output.status.success() {
                 None
+            } else {
+                Some(String::from_utf8_lossy(&output.stderr).to_string())
             },
         })
     }
