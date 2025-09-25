@@ -282,9 +282,9 @@ async fn run_code_controller(
 
 /// Error policy for DocsRun controller - limit to single retry
 #[instrument(skip(_ctx), fields(docs_run_name = %_docs_run.name_any(), namespace = %_ctx.namespace))]
-fn error_policy_docs(_docs_run: Arc<DocsRun>, error: &Error, _ctx: Arc<Context>) -> Action {
+fn error_policy_docs(_docs_run: Arc<DocsRun>, err: &Error, _ctx: Arc<Context>) -> Action {
     error!(
-        error = ?error,
+        error = ?err,
         docs_run_name = %_docs_run.name_any(),
         "DocsRun reconciliation failed - no retries, stopping"
     );
@@ -294,9 +294,9 @@ fn error_policy_docs(_docs_run: Arc<DocsRun>, error: &Error, _ctx: Arc<Context>)
 
 /// Error policy for CodeRun controller - limit to single retry
 #[instrument(skip(_ctx), fields(code_run_name = %_code_run.name_any(), namespace = %_ctx.namespace))]
-fn error_policy_code(_code_run: Arc<CodeRun>, error: &Error, _ctx: Arc<Context>) -> Action {
+fn error_policy_code(_code_run: Arc<CodeRun>, err: &Error, _ctx: Arc<Context>) -> Action {
     error!(
-        error = ?error,
+        error = ?err,
         code_run_name = %_code_run.name_any(),
         "CodeRun reconciliation failed - no retries, stopping"
     );

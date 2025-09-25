@@ -3,18 +3,35 @@
 //! This module provides support for multiple AI CLI tools through a
 //! standardized middleware layer that translates between universal
 //! configuration and CLI-specific requirements.
+//!
+//! The new CLI Adapter Trait System provides a unified interface for all CLI providers
+//! while preserving their unique capabilities and requirements.
 
 pub mod adapter;
+pub mod adapters;
+pub mod base_adapter;
 pub mod bridge;
 pub mod discovery;
+pub mod factory;
 pub mod router;
 pub mod session;
 pub mod types;
 
-// Re-export commonly used types and structs
+// Re-export new trait system components
+pub use adapter::{
+    AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
+    ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
+    ParsedResponse, ResponseMetadata, StreamingDelta, ToolCall,
+};
+pub use adapters::ClaudeAdapter;
+pub use base_adapter::{AdapterConfig, AdapterMetrics, BaseAdapter};
+pub use factory::{AdapterFactory, FactoryConfig, FactoryStats};
+
+// Re-export legacy components for backward compatibility
 pub use adapter::{CLIExecutionAdapter, CommandBuilder, ResultProcessor};
 pub use bridge::{
-    CLIAdapter, ConfigurationBridge, JsonCLIAdapter, MarkdownCLIAdapter, TomlCLIAdapter,
+    CLIAdapter as BridgeCLIAdapter, ConfigurationBridge, JsonCLIAdapter, MarkdownCLIAdapter,
+    TomlCLIAdapter,
 };
 pub use discovery::DiscoveryService;
 pub use router::CLIRouter;

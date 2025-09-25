@@ -393,22 +393,21 @@ impl<'a> DocsResourceManager<'a> {
                         controller: Some(false),
                         block_owner_deletion: Some(true),
                     }));
-                } else {
-                    error!(
-                        "⚠️ RESOURCE_MANAGER: Job {} exists but has no pods, will let Job controller handle it",
-                        job_name
-                    );
-
-                    // Job exists but no pods - the Job controller will create them
-                    return Ok(Some(OwnerReference {
-                        api_version: "batch/v1".to_string(),
-                        kind: "Job".to_string(),
-                        name: job_name.clone(),
-                        uid: existing_job.metadata.uid.unwrap_or_default(),
-                        controller: Some(false),
-                        block_owner_deletion: Some(true),
-                    }));
                 }
+                error!(
+                    "⚠️ RESOURCE_MANAGER: Job {} exists but has no pods, will let Job controller handle it",
+                    job_name
+                );
+
+                // Job exists but no pods - the Job controller will create them
+                return Ok(Some(OwnerReference {
+                    api_version: "batch/v1".to_string(),
+                    kind: "Job".to_string(),
+                    name: job_name.clone(),
+                    uid: existing_job.metadata.uid.unwrap_or_default(),
+                    controller: Some(false),
+                    block_owner_deletion: Some(true),
+                }));
             }
             Err(_) => {
                 // Job doesn't exist, proceed with creation

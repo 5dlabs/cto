@@ -266,7 +266,7 @@ impl OverrideDetector {
         };
 
         // Store the request (implementation would depend on storage mechanism)
-        self.store_bypass_request(&request).await?;
+        self.store_bypass_request(&request)?;
 
         // Send notification if service is configured
         if let Some(service) = &self.notification_service {
@@ -282,14 +282,14 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request is not found or cannot be approved
-    pub async fn approve_bypass_request(
+    pub fn approve_bypass_request(
         &mut self,
         request_id: &str,
         approver: &str,
     ) -> Result<(), OverrideError> {
         info!("Approving bypass request {} by {}", request_id, approver);
 
-        let mut request = self.get_bypass_request(request_id).await?.ok_or_else(|| {
+        let mut request = self.get_bypass_request(request_id)?.ok_or_else(|| {
             OverrideError::BypassError(format!("Bypass request {request_id} not found"))
         })?;
 
@@ -303,7 +303,7 @@ impl OverrideDetector {
         request.approvers.push(approver.to_string());
         request.status = BypassStatus::Approved;
 
-        self.update_bypass_request(&request).await?;
+        self.update_bypass_request(&request)?;
 
         info!("Bypass request {} approved by {}", request_id, approver);
         Ok(())
@@ -313,14 +313,14 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request is not found or cannot be denied
-    pub async fn deny_bypass_request(
+    pub fn deny_bypass_request(
         &mut self,
         request_id: &str,
         approver: &str,
     ) -> Result<(), OverrideError> {
         info!("Denying bypass request {} by {}", request_id, approver);
 
-        let mut request = self.get_bypass_request(request_id).await?.ok_or_else(|| {
+        let mut request = self.get_bypass_request(request_id)?.ok_or_else(|| {
             OverrideError::BypassError(format!("Bypass request {request_id} not found"))
         })?;
 
@@ -334,7 +334,7 @@ impl OverrideDetector {
         request.approvers.push(approver.to_string());
         request.status = BypassStatus::Denied;
 
-        self.update_bypass_request(&request).await?;
+        self.update_bypass_request(&request)?;
 
         info!("Bypass request {} denied by {}", request_id, approver);
         Ok(())
@@ -344,23 +344,23 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request status cannot be retrieved
-    pub async fn get_bypass_status(
+    pub fn get_bypass_status(
         &mut self,
         request_id: &str,
     ) -> Result<Option<BypassStatus>, OverrideError> {
-        let request = self.get_bypass_request(request_id).await?;
+        let request = self.get_bypass_request(request_id)?;
         Ok(request.map(|r| r.status))
     }
 
     /// Store a bypass request (placeholder implementation)
-    async fn store_bypass_request(&self, _request: &BypassRequest) -> Result<(), OverrideError> {
+    fn store_bypass_request(&self, _request: &BypassRequest) -> Result<(), OverrideError> {
         // TODO: Implement storage mechanism (database, config map, etc.)
         debug!("Storing bypass request (placeholder implementation)");
         Ok(())
     }
 
     /// Retrieve a bypass request (placeholder implementation)
-    async fn get_bypass_request(
+    fn get_bypass_request(
         &self,
         _request_id: &str,
     ) -> Result<Option<BypassRequest>, OverrideError> {
@@ -370,7 +370,7 @@ impl OverrideDetector {
     }
 
     /// Update a bypass request (placeholder implementation)
-    async fn update_bypass_request(&self, _request: &BypassRequest) -> Result<(), OverrideError> {
+    fn update_bypass_request(&self, _request: &BypassRequest) -> Result<(), OverrideError> {
         // TODO: Implement update mechanism
         debug!("Updating bypass request (placeholder implementation)");
         Ok(())

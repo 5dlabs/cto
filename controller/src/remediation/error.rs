@@ -297,6 +297,7 @@ pub struct ErrorContext {
 
 impl ErrorContext {
     /// Create new error context
+    #[must_use]
     pub fn new(error: ParseError) -> Self {
         Self {
             error,

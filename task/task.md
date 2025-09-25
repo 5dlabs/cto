@@ -1,225 +1,435 @@
-# Task 2: Implement Flexible CLI Model Configuration
+# Task 3: Design and Implement CLI Adapter Trait System
 
 ## Overview
-Remove hardcoded model validation and implement a flexible configuration system that allows users to specify any model for any CLI. Each CLI will handle its own model validation, eliminating the need for maintaining hardcoded model lists in our codebase.
+Create the core abstraction layer with CliAdapter trait and base implementations for unified CLI interaction patterns. This task establishes the foundational interface that all CLI providers will implement, enabling consistent behavior across 8 different CLI tools while handling their unique requirements.
 
 ## Context
-The current system has hardcoded Claude-only model validation that blocks other CLI providers. Instead of expanding this validation to include more hardcoded models, we should eliminate the validation entirely and let each CLI handle model compatibility on its own.
+With the model validation framework in place (Task 2), we now need the core abstraction layer that will unify interactions with different CLI providers. Each CLI has unique characteristics - Codex uses TOML configuration, Claude uses markdown memory, Gemini supports multimodal inputs - but our platform must provide a consistent interface for all of them.
 
 ## Technical Specification
 
-### 1. Current Validation Problem
-The system currently rejects any non-Claude models:
+### 1. Core CliAdapter Trait
 ```rust
-fn validate_model_name(model: &str) -> Result<()> {
-    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model) {
-        return Err(anyhow!(
-            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
-            model
-        ));
-    }
-    Ok(())
+#[async_trait]
+pub trait CliAdapter: Send + Sync + std::fmt::Debug {
+    // Model and validation
+    async fn validate_model(&self, model: &str) -> Result<bool>;
+
+    // Configuration management
+    async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String>;
+
+    // Prompt formatting
+    fn format_prompt(&self, prompt: &str) -> String;
+
+    // Response handling
+    async fn parse_response(&self, response: &str) -> Result<ParsedResponse>;
+
+    // CLI-specific information
+    fn get_memory_filename(&self) -> &str;
+    fn get_executable_name(&self) -> &str;
+
+    // Lifecycle management
+    async fn initialize(&self, container: &Container) -> Result<()>;
+    async fn cleanup(&self, container: &Container) -> Result<()>;
+
+    // Health and status
+    async fn health_check(&self) -> Result<HealthStatus>;
+
+    // Capabilities
+    fn get_capabilities(&self) -> CliCapabilities;
 }
 ```
 
-### 2. New Pass-Through Architecture
-Replace validation with flexible configuration:
+### 2. Supporting Types and Enums
+
+#### CLI Type Enumeration
 ```rust
-pub struct CLIModelConfig {
-    pub model_name: String,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CLIType {
+    Claude,
+    Codex,
+    Opencode,
+    Gemini,
+    Grok,
+    Qwen,
+    Cursor,
+    OpenHands,
+}
+```
+
+#### Parsed Response Structure
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParsedResponse {
+    pub content: String,
+    pub tool_calls: Vec<ToolCall>,
+    pub metadata: ResponseMetadata,
+    pub finish_reason: FinishReason,
+}
+```
+
+#### CLI Capabilities
+```rust
+#[derive(Debug, Clone, PartialEq)]
+pub struct CliCapabilities {
+    pub supports_streaming: bool,
+    pub supports_multimodal: bool,
+    pub supports_function_calling: bool,
+    pub supports_system_prompts: bool,
+    pub max_context_tokens: u32,
+    pub memory_strategy: MemoryStrategy,
+    pub config_format: ConfigFormat,
+}
+```
+
+### 3. Base Adapter Implementation
+```rust
+pub struct BaseAdapter {
     pub cli_type: CLIType,
-    pub custom_parameters: HashMap<String, String>,
+    pub config: AdapterConfig,
+    pub metrics: Arc<AdapterMetrics>,
+    pub logger: slog::Logger,
 }
 
-impl CLIModelConfig {
-    pub fn new(model_name: String, cli_type: CLIType) -> Self {
-        Self {
-            model_name,
-            cli_type,
-            custom_parameters: HashMap::new(),
-        }
+impl BaseAdapter {
+    // Shared functionality for all adapters
+    fn log_request(&self, operation: &str, model: &str) {
+        info!(self.logger, "CLI operation";
+            "operation" => operation,
+            "cli_type" => ?self.cli_type,
+            "model" => model
+        );
     }
-    
-    // No validation - just pass through to CLI
-    pub fn validate_format(&self) -> Result<()> {
-        // Only validate configuration structure, not model names
-        if self.model_name.is_empty() {
-            return Err(anyhow!("Model name cannot be empty"));
-        }
-        Ok(())
+
+    async fn record_metrics(&self, operation: &str, duration: Duration, success: bool) {
+        self.metrics.record_operation(
+            self.cli_type,
+            operation,
+            duration,
+            success
+        ).await;
     }
-}
-```
 
-### 3. CLI-Native Model Handling
-Instead of provider-specific validators, let each CLI handle its own models:
-
-#### Philosophy: Trust the CLI
-- **No Hardcoded Lists**: Zero model names in source code  
-- **CLI Responsibility**: Each CLI validates its own supported models
-- **User Freedom**: Users can configure any model identifier
-- **Runtime Validation**: Model validity checked when CLI executes
-
-#### Implementation Approach
-```rust
-pub struct CLIModelHandler {
-    pub cli_type: CLIType,
-    pub model_config: String,
-    pub environment: HashMap<String, String>,
-}
-
-impl CLIModelHandler {
-    pub fn new(cli_type: CLIType, model_config: String) -> Self {
-        Self {
-            cli_type,
-            model_config,
-            environment: HashMap::new(),
-        }
-    }
-    
-    // Pass through model config without validation
-    pub fn prepare_cli_args(&self) -> Vec<String> {
-        match self.cli_type {
-            CLIType::Claude => vec!["--model".to_string(), self.model_config.clone()],
-            CLIType::Codex => vec!["--model".to_string(), self.model_config.clone()],
-            CLIType::Gemini => vec!["--model".to_string(), self.model_config.clone()],
-            // Each CLI gets its model config passed through unchanged
-            _ => vec!["--model".to_string(), self.model_config.clone()],
-        }
+    fn validate_config(&self, config: &AgentConfig) -> Result<()> {
+        // Common validation logic
     }
 }
 ```
 
-### 4. Configuration Management
-Simple configuration structure without hardcoded models:
+### 4. Adapter Factory Pattern
 ```rust
-pub struct CLIConfiguration {
-    pub default_models: HashMap<CLIType, String>,
-    pub environment_overrides: HashMap<String, String>,
-    pub cli_specific_params: HashMap<CLIType, HashMap<String, String>>,
+pub struct AdapterFactory {
+    adapters: HashMap<CLIType, Arc<dyn CliAdapter>>,
+    config_registry: ConfigRegistry,
 }
 
-impl CLIConfiguration {
-    pub fn get_model_for_cli(&self, cli_type: CLIType) -> Option<&String> {
-        // Check environment override first
-        let env_key = format!("{}_MODEL", cli_type.as_str().to_uppercase());
-        if let Ok(env_model) = std::env::var(&env_key) {
-            return Some(&env_model);
+impl AdapterFactory {
+    pub fn new() -> Self {
+        let mut factory = Self {
+            adapters: HashMap::new(),
+            config_registry: ConfigRegistry::new(),
+        };
+
+        // Register built-in adapters
+        factory.register_adapter(CLIType::Claude, Arc::new(ClaudeAdapter::new()));
+        factory.register_adapter(CLIType::Codex, Arc::new(CodexAdapter::new()));
+        factory.register_adapter(CLIType::Opencode, Arc::new(OpencodeAdapter::new()));
+        factory.register_adapter(CLIType::Gemini, Arc::new(GeminiAdapter::new()));
+
+        factory
+    }
+
+    pub fn create(&self, cli_type: CLIType) -> Result<Arc<dyn CliAdapter>> {
+        self.adapters.get(&cli_type)
+            .cloned()
+            .ok_or_else(|| anyhow!("Unsupported CLI type: {:?}", cli_type))
+    }
+
+    pub fn register_adapter(&mut self, cli_type: CLIType, adapter: Arc<dyn CliAdapter>) {
+        self.adapters.insert(cli_type, adapter);
+    }
+
+    pub fn get_supported_clis(&self) -> Vec<CLIType> {
+        self.adapters.keys().cloned().collect()
+    }
+}
+```
+
+### 5. CLI-Specific Adapter Examples
+
+#### Claude Adapter (Reference Implementation)
+```rust
+#[derive(Debug)]
+pub struct ClaudeAdapter {
+    base: BaseAdapter,
+    model_validator: ClaudeModelValidator,
+}
+
+#[async_trait]
+impl CliAdapter for ClaudeAdapter {
+    async fn validate_model(&self, model: &str) -> Result<bool> {
+        self.model_validator.validate(model).await
+    }
+
+    async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
+        let template = include_str!("../templates/claude-config.json.hbs");
+        let context = json!({
+            "model": agent_config.model,
+            "max_tokens": agent_config.max_tokens,
+            "temperature": agent_config.temperature,
+            "tools": agent_config.tools,
+        });
+        render_template(template, &context)
+    }
+
+    fn format_prompt(&self, prompt: &str) -> String {
+        // Claude-specific prompt formatting
+        format!("Human: {}\n\nAssistant: ", prompt)
+    }
+
+    fn get_memory_filename(&self) -> &str {
+        "CLAUDE.md"
+    }
+
+    fn get_executable_name(&self) -> &str {
+        "claude"
+    }
+
+    fn get_capabilities(&self) -> CliCapabilities {
+        CliCapabilities {
+            supports_streaming: true,
+            supports_multimodal: false,
+            supports_function_calling: true,
+            supports_system_prompts: true,
+            max_context_tokens: 200_000,
+            memory_strategy: MemoryStrategy::MarkdownFile("CLAUDE.md".to_string()),
+            config_format: ConfigFormat::Json,
         }
-        
-        // Fall back to default
-        self.default_models.get(&cli_type)
+    }
+}
+```
+
+#### Codex Adapter (TOML Configuration)
+```rust
+#[derive(Debug)]
+pub struct CodexAdapter {
+    base: BaseAdapter,
+    model_validator: OpenAIModelValidator,
+}
+
+#[async_trait]
+impl CliAdapter for CodexAdapter {
+    async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
+        let template = include_str!("../templates/codex-config.toml.hbs");
+        let context = json!({
+            "model": agent_config.model,
+            "provider": "openai",
+            "max_tokens": agent_config.max_tokens,
+            "temperature": agent_config.temperature,
+        });
+        render_template(template, &context)
+    }
+
+    fn get_memory_filename(&self) -> &str {
+        "AGENTS.md"
+    }
+
+    fn get_executable_name(&self) -> &str {
+        "codex"
+    }
+
+    fn get_capabilities(&self) -> CliCapabilities {
+        CliCapabilities {
+            supports_streaming: false, // STDIO-based
+            supports_multimodal: false,
+            supports_function_calling: true,
+            supports_system_prompts: true,
+            max_context_tokens: 128_000,
+            memory_strategy: MemoryStrategy::MarkdownFile("AGENTS.md".to_string()),
+            config_format: ConfigFormat::Toml,
+        }
+    }
+}
+```
+
+### 6. Lifecycle Management and Telemetry
+
+#### Lifecycle Hooks
+```rust
+pub trait LifecycleHooks {
+    async fn pre_execution(&self, context: &ExecutionContext) -> Result<()>;
+    async fn post_execution(&self, context: &ExecutionContext, result: &ExecutionResult) -> Result<()>;
+    async fn on_error(&self, context: &ExecutionContext, error: &AdapterError) -> Result<()>;
+}
+```
+
+#### Telemetry Integration
+```rust
+pub struct AdapterTelemetry {
+    tracer: Tracer,
+    meter: Meter,
+    counters: AdapterCounters,
+    histograms: AdapterHistograms,
+}
+
+impl AdapterTelemetry {
+    pub async fn record_operation(&self, cli_type: CLIType, operation: &str, duration: Duration, success: bool) {
+        // OpenTelemetry metrics recording
+        self.counters.operations_total
+            .add(1, &[KeyValue::new("cli_type", cli_type.as_str()),
+                     KeyValue::new("operation", operation.to_string()),
+                     KeyValue::new("success", success.to_string())]);
+
+        self.histograms.operation_duration
+            .record(duration.as_millis() as f64, &[
+                KeyValue::new("cli_type", cli_type.as_str()),
+                KeyValue::new("operation", operation.to_string())
+            ]);
+    }
+
+    pub fn create_span(&self, operation: &str) -> Span {
+        self.tracer.start(&format!("cli_adapter_{}", operation))
     }
 }
 ```
 
 ## Implementation Steps
 
-### Phase 1: Remove Validation Logic
-1. Locate and remove `validate_model_name()` function
-2. Update all callers to accept any model string
-3. Remove hardcoded model constants and lists
-4. Add simple format validation (non-empty string only)
+### Phase 1: Core Trait Design
+1. Define the `CliAdapter` trait with all required methods
+2. Create supporting types and enums (CLIType, ParsedResponse, etc.)
+3. Implement error types for adapter operations
+4. Add comprehensive documentation and examples
 
-### Phase 2: Configuration Pass-Through
-1. Create `CLIModelConfig` structure for flexible configuration
-2. Implement model parameter passing to CLI commands
-3. Add environment variable override support
-4. Update configuration loading to accept any model names
+### Phase 2: Base Implementation
+1. Create `BaseAdapter` with shared functionality
+2. Implement logging, metrics, and common utilities
+3. Add configuration validation and helper methods
+4. Create adapter configuration system
 
-### Phase 3: Error Handling
-1. Remove model validation errors from our code
-2. Capture and forward CLI-specific model errors
-3. Implement proper error propagation from CLI processes
-4. Add helpful error context without model validation
+### Phase 3: Adapter Factory
+1. Design and implement the `AdapterFactory` pattern
+2. Add adapter registration and discovery
+3. Implement dynamic adapter creation
+4. Add configuration management integration
 
-### Phase 4: Integration
-1. Replace existing `validate_model_name()` function with pass-through
-2. Update MCP server to accept any model configuration
-3. Remove hardcoded model constants and validation logic
-4. Test with various CLI model configurations
+### Phase 4: Reference Implementation
+1. Implement `ClaudeAdapter` as the reference implementation
+2. Ensure complete backward compatibility with existing behavior
+3. Add comprehensive test coverage
+4. Document implementation patterns
 
-### Phase 5: Testing & Verification
-1. Test that any model string is accepted in configuration
-2. Verify model parameters are passed to CLI unchanged
-3. Test environment variable override functionality
-4. Verify CLI-specific error handling works properly
+### Phase 5: Lifecycle and Telemetry
+1. Add lifecycle hooks for pre/post execution
+2. Implement telemetry with OpenTelemetry integration
+3. Add health checking and status reporting
+4. Create monitoring dashboards and alerts
 
 ## Dependencies
-- Current MCP server codebase (Rust-based)
-- CLI type definitions
-- Basic error handling framework
-- Standard Rust HashMap for configuration storage
+- Task 1: Project structure for module organization
+- Task 2: Model validation framework for validator integration
+- Kubernetes client libraries for container management
+- OpenTelemetry for distributed tracing and metrics
+- Handlebars for template rendering
+- Async runtime (tokio)
 
 ## Success Criteria
-- Any model name is accepted in configuration
-- Model strings are passed to CLI without modification
-- Environment variables can override default models
-- CLI-specific errors are properly forwarded
-- Zero hardcoded model names in source code
-- Backward compatibility with existing configurations maintained
+- All trait methods are properly defined and documented
+- BaseAdapter provides consistent shared functionality
+- AdapterFactory creates correct adapter instances
+- ClaudeAdapter maintains exact backward compatibility
+- Comprehensive telemetry and monitoring integration
+- Thread-safe concurrent adapter operations
+- Extensible architecture for new CLI additions
 
-## Files Created/Modified
+## Files Created
 ```
-mcp/src/
-├── main.rs (modified - remove validate_model_name function)
-└── config.rs (modified - add flexible model configuration)
-
 controller/src/cli/
-└── model_config.rs (new - simple model pass-through logic)
+├── adapter.rs (main trait and types)
+├── base_adapter.rs (shared implementation)
+├── factory.rs (adapter factory pattern)
+├── lifecycle.rs (lifecycle management)
+├── telemetry.rs (metrics and tracing)
+└── adapters/
+    ├── claude.rs (reference implementation)
+    ├── codex.rs (stub for Task 4)
+    ├── opencode.rs (stub for future)
+    ├── gemini.rs (stub for future)
+    └── mod.rs
+
+controller/src/cli/templates/
+├── claude-config.json.hbs
+├── codex-config.toml.hbs
+└── base-template-helpers.rs
+
+tests/
+├── adapter_tests.rs
+├── factory_tests.rs
+└── integration/
+    └── cli_adapter_integration.rs
 ```
 
 ## Risk Mitigation
 
 ### Backward Compatibility
-- Ensure all existing configurations continue working unchanged
-- No breaking changes to configuration APIs
-- Preserve CLI-specific behavior patterns
+- ClaudeAdapter must behave identically to existing code
+- Comprehensive regression testing
+- Feature flags for gradual rollout
+- Rollback capabilities
 
-### Error Handling
-- Proper error propagation from CLI tools to users
-- Clear distinction between configuration errors and runtime errors
-- Graceful handling of CLI-specific authentication failures
+### Performance
+- Async-first design for non-blocking operations
+- Efficient trait object dispatch
+- Memory pool for frequent allocations
+- Connection pooling where applicable
 
-### Configuration Security
-- Input validation for configuration format (not content)
-- Protection against command injection in model parameters
-- Secure handling of environment variable overrides
+### Extensibility
+- Plugin-based architecture for new CLI adapters
+- Configuration-driven adapter behavior
+- Version-aware adapter interfaces
+- Hot-swappable adapter implementations
 
 ## Testing Strategy
 ```rust
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[tokio::test]
-    async fn test_any_model_accepted() {
-        // Test that any model string is accepted
-        let config = CLIModelConfig::new("any-model".to_string(), CLIType::Claude);
-        assert!(config.validate_format().is_ok());
+    async fn test_adapter_factory_creation() {
+        let factory = AdapterFactory::new();
+        let claude_adapter = factory.create(CLIType::Claude).unwrap();
+
+        assert_eq!(claude_adapter.get_executable_name(), "claude");
     }
 
     #[tokio::test]
-    async fn test_model_passthrough() {
-        // Test model parameters are passed unchanged to CLI
-        let handler = CLIModelHandler::new(CLIType::Gemini, "custom-model".to_string());
-        let args = handler.prepare_cli_args();
-        assert!(args.contains(&"custom-model".to_string()));
+    async fn test_claude_adapter_config_generation() {
+        let adapter = ClaudeAdapter::new();
+        let config = AgentConfig::default();
+
+        let result = adapter.generate_config(&config).await.unwrap();
+        assert!(result.contains("claude"));
     }
 
     #[tokio::test]
-    async fn test_env_variable_override() {
-        // Test environment variable model overrides
-        std::env::set_var("CLAUDE_MODEL", "test-model");
-        let config = CLIConfiguration::new();
-        assert_eq!(config.get_model_for_cli(CLIType::Claude), Some(&"test-model".to_string()));
+    async fn test_lifecycle_hooks() {
+        let adapter = ClaudeAdapter::new();
+        let context = ExecutionContext::new();
+
+        adapter.pre_execution(&context).await.unwrap();
+        // Test execution
+        adapter.post_execution(&context, &result).await.unwrap();
     }
 }
 ```
 
 ## Next Steps
-After completion enables:
-- Task 3: CLI Adapter Trait System (can use any configured models)
-- All subsequent CLI integrations (Codex, Opencode, Gemini)
-- Model capability-based routing
-- Cost optimization based on model pricing
+After completion, this task enables:
+- Task 4: Codex CLI Integration (implements CodexAdapter)
+- Task 5: Opencode CLI Integration (implements OpencodeAdapter)
+- Task 6+: Additional CLI integrations
+- Dynamic adapter loading and hot-swapping
+- Advanced adapter features (streaming, multimodal)
 
-This task is the foundation that unblocks the entire multi-CLI platform development.
+This task establishes the architectural foundation that all subsequent CLI integrations will build upon.

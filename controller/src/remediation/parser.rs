@@ -396,7 +396,7 @@ mod tests {
     use super::*;
     use crate::remediation::types::{IssueType, Severity};
 
-    const SAMPLE_COMMENT: &str = r#"🔴 Required Changes
+    const SAMPLE_COMMENT: &str = r"🔴 Required Changes
 **Issue Type**: [Bug]
 **Severity**: [High]
 
@@ -415,7 +415,7 @@ The login button is not working properly when users click it.
 
 ### Expected vs Actual
 - **Expected**: User should be logged in and redirected to dashboard
-- **Actual**: Page refreshes without login attempt"#;
+- **Actual**: Page refreshes without login attempt";
 
     #[test]
     fn test_parse_complete_feedback() {
@@ -507,7 +507,7 @@ The login button is not working properly when users click it.
 
     #[test]
     fn test_parse_minimal_feedback() {
-        let minimal_comment = r#"🔴 Required Changes
+        let minimal_comment = r"🔴 Required Changes
 **Issue Type**: [Bug]
 **Severity**: [Low]
 
@@ -515,7 +515,7 @@ The login button is not working properly when users click it.
 Minimal test case.
 
 ### Acceptance Criteria Not Met
-- [ ] Test criterion"#;
+- [ ] Test criterion";
 
         let parser = FeedbackParser::new();
         let result = parser.parse_comment(minimal_comment, "5DLabs-Tess", 12345, 678, "task-2");

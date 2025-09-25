@@ -1,26 +1,283 @@
-//! CLI Adapter
+//! CLI Adapter Trait System
 //!
-//! Handles CLI-specific execution and command adaptation.
-//! Manages the actual execution of CLI commands and result processing.
+//! Core abstraction layer providing unified CLI interactions across 8 different CLI tools.
+//! This trait system enables consistent behavior while preserving each CLI's unique capabilities.
 
-use crate::cli::types::*;
-use std::process::Stdio;
-use tokio::process::Command;
+use crate::cli::types::{CLIExecutionContext, CLIExecutionResult, CLIType, ConfigFile};
+use anyhow::Result;
+use async_trait::async_trait;
+use k8s_openapi::api::core::v1::Pod;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt::Debug;
 
-/// CLI execution adapter
+/// Core CLI abstraction trait providing unified interface for all CLI providers
+#[async_trait]
+pub trait CliAdapter: Send + Sync + Debug {
+    /// Validate model name for this CLI type
+    async fn validate_model(&self, model: &str) -> Result<bool>;
+
+    /// Generate CLI-specific configuration from agent config
+    async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String>;
+
+    /// Format prompt for this CLI's requirements
+    fn format_prompt(&self, prompt: &str) -> String;
+
+    /// Parse CLI response into structured format
+    async fn parse_response(&self, response: &str) -> Result<ParsedResponse>;
+
+    /// Get CLI-specific memory filename (e.g., "CLAUDE.md", "AGENTS.md")
+    fn get_memory_filename(&self) -> &str;
+
+    /// Get CLI executable name
+    fn get_executable_name(&self) -> &str;
+
+    /// Get CLI capabilities and limitations
+    fn get_capabilities(&self) -> CliCapabilities;
+
+    /// Initialize adapter for container execution
+    async fn initialize(&self, container: &ContainerContext) -> Result<()>;
+
+    /// Cleanup adapter resources after execution
+    async fn cleanup(&self, container: &ContainerContext) -> Result<()>;
+
+    /// Check adapter and CLI health status
+    async fn health_check(&self) -> Result<HealthStatus>;
+}
+
+/// Container context for adapter operations
+#[derive(Debug, Clone)]
+pub struct ContainerContext {
+    /// Kubernetes pod reference
+    pub pod: Option<Pod>,
+    /// Container name within pod
+    pub container_name: String,
+    /// Working directory path
+    pub working_dir: String,
+    /// Environment variables
+    pub env_vars: HashMap<String, String>,
+    /// Container namespace
+    pub namespace: String,
+}
+
+/// Parsed response from CLI execution
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParsedResponse {
+    /// Main response content
+    pub content: String,
+    /// Tool/function calls made during response
+    pub tool_calls: Vec<ToolCall>,
+    /// Response metadata (tokens, timing, etc.)
+    pub metadata: ResponseMetadata,
+    /// Reason for response completion
+    pub finish_reason: FinishReason,
+    /// Streaming delta if applicable
+    pub streaming_delta: Option<StreamingDelta>,
+}
+
+/// Tool/function call representation
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ToolCall {
+    /// Tool name
+    pub name: String,
+    /// Tool arguments
+    pub arguments: serde_json::Value,
+    /// Tool call ID for tracking
+    pub id: Option<String>,
+}
+
+/// Response metadata
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct ResponseMetadata {
+    /// Input tokens consumed
+    pub input_tokens: Option<u32>,
+    /// Output tokens generated
+    pub output_tokens: Option<u32>,
+    /// Response generation time
+    pub duration_ms: Option<u64>,
+    /// Model used for generation
+    pub model: Option<String>,
+    /// Additional CLI-specific metadata
+    pub extra: HashMap<String, serde_json::Value>,
+}
+
+/// Response completion reasons
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FinishReason {
+    /// Response completed normally
+    Stop,
+    /// Hit token/length limit
+    Length,
+    /// Function/tool call completed
+    ToolCall,
+    /// Content filtered
+    ContentFilter,
+    /// Error occurred
+    Error,
+    /// Response incomplete/interrupted
+    Incomplete,
+}
+
+/// Streaming response delta
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StreamingDelta {
+    /// Content delta
+    pub content: Option<String>,
+    /// Tool call delta
+    pub tool_call_delta: Option<ToolCall>,
+    /// Whether this is the final delta
+    pub is_final: bool,
+}
+
+/// CLI-specific capabilities
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)] // Appropriate for capabilities struct
+pub struct CliCapabilities {
+    /// Supports streaming responses
+    pub supports_streaming: bool,
+    /// Supports multimodal inputs (images, audio)
+    pub supports_multimodal: bool,
+    /// Supports function/tool calling
+    pub supports_function_calling: bool,
+    /// Supports system prompts
+    pub supports_system_prompts: bool,
+    /// Maximum context tokens
+    pub max_context_tokens: u32,
+    /// Memory strategy for persistence
+    pub memory_strategy: MemoryStrategy,
+    /// Configuration file format
+    pub config_format: ConfigFormat,
+    /// Supported authentication methods
+    pub authentication_methods: Vec<AuthMethod>,
+}
+
+/// Memory persistence strategies
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MemoryStrategy {
+    /// Single markdown file (Claude: CLAUDE.md, Codex: AGENTS.md)
+    MarkdownFile(String),
+    /// Subdirectory with multiple files (Grok: .grok/GROK.md)
+    Subdirectory(String),
+    /// Session-based memory (Cursor, `OpenHands`)
+    SessionBased,
+    /// Configuration-based persistence
+    ConfigurationBased,
+}
+
+/// Configuration file formats
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ConfigFormat {
+    /// JSON format
+    Json,
+    /// TOML format (Codex)
+    Toml,
+    /// YAML format
+    Yaml,
+    /// Markdown format (Claude)
+    Markdown,
+    /// Custom/proprietary format
+    Custom(String),
+}
+
+/// Authentication methods
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AuthMethod {
+    /// Session token (Claude)
+    SessionToken,
+    /// API key (`OpenAI`, Anthropic)
+    ApiKey,
+    /// OAuth flow (Google)
+    OAuth,
+    /// No authentication needed
+    None,
+    /// Custom authentication
+    Custom(String),
+}
+
+/// Health status for adapters
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HealthStatus {
+    /// Overall health status
+    pub status: HealthState,
+    /// Status message
+    pub message: Option<String>,
+    /// Last check timestamp
+    pub checked_at: chrono::DateTime<chrono::Utc>,
+    /// Additional health details
+    pub details: HashMap<String, serde_json::Value>,
+}
+
+/// Health state enumeration
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HealthState {
+    /// Adapter is healthy
+    Healthy,
+    /// Adapter has warnings but is functional
+    Warning,
+    /// Adapter is unhealthy
+    Unhealthy,
+    /// Adapter health is unknown
+    Unknown,
+}
+
+/// Agent configuration for CLI adapters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    /// GitHub app identifier
+    pub github_app: String,
+    /// CLI type to use
+    pub cli: String,
+    /// Model name/identifier
+    pub model: String,
+    /// Maximum tokens for generation
+    pub max_tokens: Option<u32>,
+    /// Temperature for generation
+    pub temperature: Option<f32>,
+    /// Tool configuration
+    pub tools: Option<ToolConfiguration>,
+    /// Additional CLI-specific config
+    pub cli_config: Option<serde_json::Value>,
+}
+
+/// Tool configuration for agents
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolConfiguration {
+    /// Remote tools available
+    pub remote: Vec<String>,
+    /// Local server configurations
+    pub local_servers: Option<HashMap<String, LocalServerConfig>>,
+}
+
+/// Local server configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalServerConfig {
+    /// Whether server is enabled
+    pub enabled: bool,
+    /// Tools provided by this server
+    pub tools: Vec<String>,
+}
+
+/// CLI execution adapter (legacy compatibility)
 pub struct CLIExecutionAdapter {
     /// CLI type this adapter handles
     cli_type: CLIType,
 }
 
 impl CLIExecutionAdapter {
-    /// Create a new adapter for a specific CLI type
+    /// Create a new legacy adapter for a specific CLI type
+    #[must_use]
     pub fn new(cli_type: CLIType) -> Self {
         Self { cli_type }
     }
 
-    /// Execute a CLI command with the given context
+    /// Execute a CLI command with the given context (legacy method)
+    ///
+    /// # Errors
+    /// Returns an error if command execution fails or if I/O operations fail
     pub async fn execute(&self, context: &CLIExecutionContext) -> Result<CLIExecutionResult> {
+        use std::process::Stdio;
+        use tokio::process::Command;
+
         let start_time = std::time::Instant::now();
 
         // Create the command
@@ -49,7 +306,8 @@ impl CLIExecutionAdapter {
             exit_code: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            duration_ms: duration.as_millis() as u64,
+            duration_ms: u64::try_from(duration.as_millis().min(u128::from(u64::MAX)))
+                .unwrap_or(u64::MAX),
             cli_type: self.cli_type,
         };
 
@@ -57,6 +315,9 @@ impl CLIExecutionAdapter {
     }
 
     /// Prepare files for CLI execution
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail or if paths are invalid
     pub async fn prepare_files(&self, config_files: &[ConfigFile]) -> Result<()> {
         for config_file in config_files {
             // Ensure parent directory exists
@@ -99,6 +360,9 @@ impl CLIExecutionAdapter {
     }
 
     /// Validate CLI environment
+    ///
+    /// # Errors
+    /// Returns an error if environment validation fails or if required variables are missing
     pub async fn validate_environment(&self, required_vars: &[String]) -> Result<Vec<String>> {
         let mut missing = Vec::new();
 
@@ -109,13 +373,14 @@ impl CLIExecutionAdapter {
         }
 
         if !missing.is_empty() {
-            return Err(AdapterError::MissingEnvironmentVariables(missing));
+            return Err(AdapterError::MissingEnvironmentVariables(missing).into());
         }
 
         Ok(required_vars.to_vec())
     }
 
     /// Get CLI-specific execution hints
+    #[must_use]
     pub fn get_execution_hints(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec![
@@ -144,11 +409,13 @@ pub struct CommandBuilder {
 }
 
 impl CommandBuilder {
+    #[must_use]
     pub fn new(cli_type: CLIType) -> Self {
         Self { cli_type }
     }
 
     /// Build command for task execution
+    #[must_use]
     pub fn build_task_command(&self, task: &str, auto_mode: bool) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => {
@@ -169,13 +436,12 @@ impl CommandBuilder {
             CLIType::OpenCode => {
                 vec!["opencode".to_string(), task.to_string()]
             }
-            _ => {
-                vec!["echo".to_string(), format!("Task: {}", task)]
-            }
+            _ => vec!["echo".to_string(), format!("Task: {task}")],
         }
     }
 
     /// Build command for version check
+    #[must_use]
     pub fn build_version_command(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec!["claude-code".to_string(), "--version".to_string()],
@@ -186,6 +452,7 @@ impl CommandBuilder {
     }
 
     /// Build command for help
+    #[must_use]
     pub fn build_help_command(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec!["claude-code".to_string(), "--help".to_string()],
@@ -202,11 +469,13 @@ pub struct ResultProcessor {
 }
 
 impl ResultProcessor {
+    #[must_use]
     pub fn new(cli_type: CLIType) -> Self {
         Self { cli_type }
     }
 
     /// Process execution result and extract key information
+    #[must_use]
     pub fn process_result(&self, result: &CLIExecutionResult) -> ProcessedResult {
         let mut processed = ProcessedResult {
             success: result.success,
@@ -238,6 +507,7 @@ impl ResultProcessor {
     }
 
     fn process_claude_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+        let _ = self;
         // Look for CLAUDE.md creation
         if result.stdout.contains("CLAUDE.md") {
             processed.files_modified.push("CLAUDE.md".to_string());
@@ -250,6 +520,7 @@ impl ResultProcessor {
     }
 
     fn process_codex_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+        let _ = self;
         // Look for config file creation
         if result.stdout.contains("config.toml") {
             processed
@@ -273,6 +544,7 @@ impl ResultProcessor {
         result: &CLIExecutionResult,
         processed: &mut ProcessedResult,
     ) {
+        let _ = self;
         // Look for cache directory usage
         if result.stdout.contains(".cache/opencode") {
             processed
@@ -289,6 +561,7 @@ impl ResultProcessor {
     }
 
     fn process_generic_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+        let _ = self;
         // Basic error extraction
         if !result.stderr.is_empty() {
             processed.errors.push(result.stderr.clone());
@@ -330,21 +603,99 @@ pub enum AdapterError {
     #[error("CLI validation failed: {0}")]
     ValidationError(String),
 
+    #[error("Model validation failed for CLI {cli_type}: model '{model}' is not supported")]
+    InvalidModel {
+        cli_type: String,
+        model: String,
+        suggestions: Option<Vec<String>>,
+    },
+
+    #[error("Configuration generation failed: {0}")]
+    ConfigGenerationError(String),
+
+    #[error("Response parsing failed: {0}")]
+    ResponseParsingError(String),
+
+    #[error("Adapter initialization failed: {0}")]
+    InitializationError(String),
+
+    #[error("Health check failed: {0}")]
+    HealthCheckError(String),
+
+    #[error("Unsupported CLI type: {0}")]
+    UnsupportedCliType(String),
+
+    #[error("Template rendering failed: {0}")]
+    TemplateError(String),
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("TOML error: {0}")]
+    TomlError(String),
+
+    #[error("YAML error: {0}")]
+    YamlError(String),
 }
 
-pub type Result<T> = std::result::Result<T, AdapterError>;
+pub type AdapterResult<T> = std::result::Result<T, AdapterError>;
+
+impl Default for HealthStatus {
+    fn default() -> Self {
+        Self {
+            status: HealthState::Unknown,
+            message: None,
+            checked_at: chrono::Utc::now(),
+            details: HashMap::new(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn test_cli_capabilities_serialization() {
+        let caps = CliCapabilities {
+            supports_streaming: true,
+            supports_multimodal: false,
+            supports_function_calling: true,
+            supports_system_prompts: true,
+            max_context_tokens: 200_000,
+            memory_strategy: MemoryStrategy::MarkdownFile("CLAUDE.md".to_string()),
+            config_format: ConfigFormat::Json,
+            authentication_methods: vec![AuthMethod::SessionToken],
+        };
+
+        let serialized = serde_json::to_string(&caps).unwrap();
+        let deserialized: CliCapabilities = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(caps, deserialized);
+    }
+
+    #[test]
     fn test_command_builder_claude() {
         let builder = CommandBuilder::new(CLIType::Claude);
         let cmd = builder.build_task_command("implement auth", false);
         assert_eq!(cmd, vec!["claude-code", "implement auth"]);
+    }
+
+    #[test]
+    fn test_parsed_response_creation() {
+        let response = ParsedResponse {
+            content: "Hello, world!".to_string(),
+            tool_calls: vec![],
+            metadata: ResponseMetadata::default(),
+            finish_reason: FinishReason::Stop,
+            streaming_delta: None,
+        };
+
+        assert_eq!(response.content, "Hello, world!");
+        assert_eq!(response.finish_reason, FinishReason::Stop);
     }
 
     #[test]
@@ -374,6 +725,13 @@ mod tests {
             codex_builder.build_version_command(),
             vec!["codex", "--version"]
         );
+    }
+
+    #[test]
+    fn test_health_status_default() {
+        let health = HealthStatus::default();
+        assert_eq!(health.status, HealthState::Unknown);
+        assert!(health.message.is_none());
     }
 
     #[tokio::test]
@@ -412,5 +770,27 @@ mod tests {
             .files_modified
             .contains(&"~/.codex/config.toml".to_string()));
         assert!(processed.files_modified.contains(&"AGENTS.md".to_string()));
+    }
+
+    #[test]
+    fn test_memory_strategy_variants() {
+        let claude_memory = MemoryStrategy::MarkdownFile("CLAUDE.md".to_string());
+        let grok_memory = MemoryStrategy::Subdirectory(".grok".to_string());
+        let session_memory = MemoryStrategy::SessionBased;
+
+        match claude_memory {
+            MemoryStrategy::MarkdownFile(filename) => assert_eq!(filename, "CLAUDE.md"),
+            _ => panic!("Expected MarkdownFile variant"),
+        }
+
+        match grok_memory {
+            MemoryStrategy::Subdirectory(dir) => assert_eq!(dir, ".grok"),
+            _ => panic!("Expected Subdirectory variant"),
+        }
+
+        match session_memory {
+            MemoryStrategy::SessionBased => {}
+            _ => panic!("Expected SessionBased variant"),
+        }
     }
 }
