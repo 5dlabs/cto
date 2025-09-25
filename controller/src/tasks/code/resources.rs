@@ -3,7 +3,7 @@ use super::naming::ResourceNaming;
 use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
 use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
-use crate::tasks::types::{github_app_secret_name, Context, Result};
+use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ConfigMap, PersistentVolumeClaim, Service},
@@ -15,7 +15,7 @@ use kube::ResourceExt;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct CodeResourceManager<'a> {
     pub jobs: &'a Api<Job>,
@@ -629,7 +629,7 @@ impl<'a> CodeResourceManager<'a> {
         );
 
         // Select image based on CLI type (if specified) or fallback to default
-        let image = self.select_image_for_cli(code_run);
+        let image = self.select_image_for_cli(code_run)?;
 
         // Resolve CLI-specific API key binding (env var + secret reference)
         let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type);
@@ -1313,26 +1313,44 @@ impl<'a> CodeResourceManager<'a> {
         }
     }
 
-    fn select_image_for_cli(&self, code_run: &CodeRun) -> String {
+    fn select_image_for_cli(&self, code_run: &CodeRun) -> Result<String> {
         // Check if CLI config is specified
         if let Some(cli_config) = &code_run.spec.cli_config {
             // Try to get CLI-specific image configuration
             let cli_key = cli_config.cli_type.to_string().to_lowercase();
             if let Some(cli_image) = self.config.agent.cli_images.get(&cli_key) {
-                return format!("{}:{}", cli_image.repository, cli_image.tag);
+                if cli_image.is_configured() {
+                    return Ok(format!("{}:{}", cli_image.repository, cli_image.tag));
+                }
             }
 
-            // Fallback: construct image name from CLI type
-            let default_registry = "ghcr.io/5dlabs";
-            let image_name = cli_key;
-            let tag = &self.config.agent.image.tag;
-            return format!("{default_registry}/{image_name}:{tag}");
+            if self.config.agent.image.is_configured() {
+                warn!(
+                    cli = %cli_config.cli_type,
+                    "CLI-specific image not configured; using deprecated fallback agent.image"
+                );
+                return Ok(format!(
+                    "{}:{}",
+                    self.config.agent.image.repository, self.config.agent.image.tag
+                ));
+            }
+
+            return Err(Error::ConfigError(format!(
+                "No image configured for CLI type {}. Configure agent.cliImages or provide a fallback agent.image.",
+                cli_config.cli_type
+            )));
         }
 
         // No CLI config specified - use default image (backward compatibility)
-        format!(
-            "{}:{}",
-            self.config.agent.image.repository, self.config.agent.image.tag
-        )
+        if self.config.agent.image.is_configured() {
+            return Ok(format!(
+                "{}:{}",
+                self.config.agent.image.repository, self.config.agent.image.tag
+            ));
+        }
+
+        Err(Error::ConfigError(
+            "No CLI configuration provided and agent.image fallback is not set.".to_string(),
+        ))
     }
 }

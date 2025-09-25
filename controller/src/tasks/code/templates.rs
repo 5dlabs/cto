@@ -1,6 +1,11 @@
 use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
 use crate::tasks::config::ControllerConfig;
+use crate::tasks::template_paths::{
+    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
+    CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
+    CODE_CODING_GUIDELINES_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+};
 use crate::tasks::types::Result;
 use handlebars::Handlebars;
 
@@ -11,7 +16,7 @@ use std::path::Path;
 use tracing::debug;
 
 // Template base path (mounted from ConfigMap)
-const CLAUDE_TEMPLATES_PATH: &str = "/claude-templates";
+const AGENT_TEMPLATES_PATH: &str = "/agent-templates";
 
 pub struct CodeTemplateGenerator;
 
@@ -93,7 +98,7 @@ impl CodeTemplateGenerator {
                     "Agent-specific template {} not found, falling back to default",
                     template_path
                 );
-                Self::load_template("code/container.sh.hbs")?
+                Self::load_template(CODE_CLAUDE_CONTAINER_TEMPLATE)?
             }
             Err(e) => return Err(e),
         };
@@ -133,7 +138,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/claude.md.hbs")?;
+        let template = Self::load_template(CODE_CLAUDE_MEMORY_TEMPLATE)?;
 
         handlebars
             .register_template_string("claude_memory", template)
@@ -233,7 +238,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/settings.json.hbs")?;
+        let template = Self::load_template(CODE_CLAUDE_SETTINGS_TEMPLATE)?;
 
         handlebars
             .register_template_string("claude_settings", template)
@@ -258,7 +263,7 @@ impl CodeTemplateGenerator {
 
     fn generate_mcp_config(_code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
         // MCP config is currently static, so just load and return the template content
-        Self::load_template("code/mcp.json.hbs")
+        Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
     }
 
     fn generate_codex_container_script(
@@ -269,7 +274,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let base_template = Self::load_template("code/codex/container-base.sh.hbs")?;
+        let base_template = Self::load_template(CODE_CODEX_CONTAINER_BASE_TEMPLATE)?;
         handlebars
             .register_partial("codex_container_base", base_template)
             .map_err(|e| {
@@ -389,7 +394,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/codex/config.toml.hbs")?;
+        let template = Self::load_template(CODE_CODEX_CONFIG_TEMPLATE)?;
 
         handlebars
             .register_template_string("codex_config", template)
@@ -907,7 +912,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/coding-guidelines.md.hbs")?;
+        let template = Self::load_template(CODE_CODING_GUIDELINES_TEMPLATE)?;
 
         handlebars
             .register_template_string("coding_guidelines", template)
@@ -935,7 +940,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/github-guidelines.md.hbs")?;
+        let template = Self::load_template(CODE_GITHUB_GUIDELINES_TEMPLATE)?;
 
         handlebars
             .register_template_string("github_guidelines", template)
@@ -962,79 +967,94 @@ impl CodeTemplateGenerator {
 
     fn generate_hook_scripts(code_run: &CodeRun) -> Result<BTreeMap<String, String>> {
         let mut hook_scripts = BTreeMap::new();
-        let hooks_prefix = "code_hooks_";
+        let cli_key = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|cfg| cfg.cli_type.to_string())
+            .unwrap_or_else(|| CLIType::Claude.to_string());
+
+        let hook_prefixes = vec![
+            format!("code_{}_hooks_", cli_key),
+            "code_shared_hooks_".to_string(),
+            "code_hooks_".to_string(), // legacy prefix
+        ];
 
         debug!(
-            "Scanning for code hook templates with prefix: {}",
-            hooks_prefix
+            cli = %cli_key,
+            prefixes = ?hook_prefixes,
+            "Scanning for code hook templates"
         );
 
         // Read the ConfigMap directory and find files with the hook prefix
-        match std::fs::read_dir(CLAUDE_TEMPLATES_PATH) {
+        match std::fs::read_dir(AGENT_TEMPLATES_PATH) {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if path.is_file() {
                         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                            // Check if this is a hook template for code
-                            if filename.starts_with(hooks_prefix) && filename.ends_with(".hbs") {
-                                // Extract just the hook filename (remove prefix)
-                                let hook_name =
-                                    filename.strip_prefix(hooks_prefix).unwrap_or(filename);
+                            if filename.ends_with(".hbs") {
+                                if let Some(prefix) = hook_prefixes
+                                    .iter()
+                                    .find(|prefix| filename.starts_with(prefix.as_str()))
+                                {
+                                    let hook_name =
+                                        filename.strip_prefix(prefix).unwrap_or(filename);
 
-                                match std::fs::read_to_string(&path) {
-                                    Ok(template_content) => {
-                                        debug!(
-                                            "Loaded code hook template: {} (from {})",
-                                            hook_name, filename
-                                        );
-
-                                        let mut handlebars = Handlebars::new();
-                                        handlebars.set_strict_mode(false);
-
-                                        if let Err(e) = handlebars
-                                            .register_template_string("hook", template_content)
-                                        {
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(template_content) => {
                                             debug!(
-                                                "Failed to register hook template {}: {}",
-                                                hook_name, e
+                                                "Loaded code hook template: {} (from {})",
+                                                hook_name, filename
                                             );
-                                            continue;
-                                        }
 
-                                        let context = json!({
-                                            "task_id": code_run.spec.task_id,
-                                            "service": code_run.spec.service,
-                                            "repository_url": code_run.spec.repository_url,
-                                            "docs_repository_url": code_run.spec.docs_repository_url,
-                                            "working_directory": Self::get_working_directory(code_run),
-                                            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-                                        });
+                                            let mut handlebars = Handlebars::new();
+                                            handlebars.set_strict_mode(false);
 
-                                        match handlebars.render("hook", &context) {
-                                            Ok(rendered_script) => {
-                                                // Remove .hbs extension for the final filename
-                                                let script_name = hook_name
-                                                    .strip_suffix(".hbs")
-                                                    .unwrap_or(hook_name);
-                                                hook_scripts.insert(
-                                                    script_name.to_string(),
-                                                    rendered_script,
-                                                );
-                                            }
-                                            Err(e) => {
+                                            if let Err(e) = handlebars
+                                                .register_template_string("hook", template_content)
+                                            {
                                                 debug!(
-                                                    "Failed to render code hook script {}: {}",
+                                                    "Failed to register hook template {}: {}",
                                                     hook_name, e
                                                 );
+                                                continue;
+                                            }
+
+                                            let context = json!({
+                                                "task_id": code_run.spec.task_id,
+                                                "service": code_run.spec.service,
+                                                "repository_url": code_run.spec.repository_url,
+                                                "docs_repository_url": code_run.spec.docs_repository_url,
+                                                "working_directory": Self::get_working_directory(code_run),
+                                                "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+                                            });
+
+                                            match handlebars.render("hook", &context) {
+                                                Ok(rendered_script) => {
+                                                    // Remove .hbs extension for the final filename
+                                                    let script_name = hook_name
+                                                        .strip_suffix(".hbs")
+                                                        .unwrap_or(hook_name);
+                                                    hook_scripts.insert(
+                                                        script_name.to_string(),
+                                                        rendered_script,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    debug!(
+                                                        "Failed to render code hook script {}: {}",
+                                                        hook_name, e
+                                                    );
+                                                }
                                             }
                                         }
-                                    }
-                                    Err(e) => {
-                                        debug!(
-                                            "Failed to load code hook template {}: {}",
-                                            filename, e
-                                        );
+                                        Err(e) => {
+                                            debug!(
+                                                "Failed to load code hook template {}: {}",
+                                                filename, e
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -1074,16 +1094,16 @@ impl CodeTemplateGenerator {
 
         // Map GitHub App to agent-specific container template
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "container-rex.sh.hbs",
-            "5DLabs-Cleo" => "container-cleo.sh.hbs",
-            "5DLabs-Tess" => "container-tess.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "claude/container-rex.sh.hbs",
+            "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "claude/container-tess.sh.hbs",
             _ => {
                 // Default to the generic container template for unknown agents
                 debug!(
                     "No agent-specific template for '{}', using default container.sh.hbs",
                     github_app
                 );
-                "container.sh.hbs"
+                "claude/container.sh.hbs"
             }
         };
 
@@ -1174,7 +1194,7 @@ impl CodeTemplateGenerator {
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
         let configmap_key = relative_path.replace('/', "_");
-        let full_path = Path::new(CLAUDE_TEMPLATES_PATH).join(&configmap_key);
+        let full_path = Path::new(AGENT_TEMPLATES_PATH).join(&configmap_key);
         debug!(
             "Loading code template from: {} (key: {})",
             full_path.display(),
@@ -1232,28 +1252,28 @@ mod tests {
     fn test_rex_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/container-rex.sh.hbs");
+        assert_eq!(template_path, "code/claude/container-rex.sh.hbs");
     }
 
     #[test]
     fn test_cleo_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/container-cleo.sh.hbs");
+        assert_eq!(template_path, "code/claude/container-cleo.sh.hbs");
     }
 
     #[test]
     fn test_tess_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/container-tess.sh.hbs");
+        assert_eq!(template_path, "code/claude/container-tess.sh.hbs");
     }
 
     #[test]
     fn test_default_template_selection() {
         let code_run = create_test_code_run(None);
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/container.sh.hbs");
+        assert_eq!(template_path, "code/claude/container.sh.hbs");
     }
 
     #[test]
@@ -1329,6 +1349,10 @@ mod tests {
             "test-agent".to_string(),
             AgentDefinition {
                 github_app: "Test-App".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
                 tools: Some(agent_tools.clone()),
                 client_config: None,
             },
@@ -1346,6 +1370,10 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
                 tools: Some(agent_tools),
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_web_search"],
@@ -1415,6 +1443,10 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
                 tools: Some(helm_tools),
                 client_config: None,
             },

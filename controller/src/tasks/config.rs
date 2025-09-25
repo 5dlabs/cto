@@ -4,10 +4,12 @@
 //! Contains only the essential configuration needed for our current implementation.
 
 use crate::cli::types::CLIType;
+use crate::crds::coderun::CLIConfig;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{api::Api, Client};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
+use tracing::warn;
 
 /// Main controller configuration structure
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -51,6 +53,7 @@ pub struct JobConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentConfig {
     /// Default container image configuration (for backward compatibility)
+    #[serde(default = "default_agent_image")]
     pub image: ImageConfig,
 
     /// CLI-specific image configurations
@@ -59,7 +62,7 @@ pub struct AgentConfig {
 
     /// Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
     #[serde(default, rename = "agentCliConfigs")]
-    pub agent_cli_configs: HashMap<String, crate::crds::CLIConfig>,
+    pub agent_cli_configs: HashMap<String, CLIConfig>,
 
     /// Image pull secrets for private registries
     #[serde(default, rename = "imagePullSecrets")]
@@ -82,6 +85,40 @@ pub struct ImageConfig {
 
     /// Image tag (e.g., "latest", "v2.1.0")
     pub tag: String,
+}
+
+impl ImageConfig {
+    /// Returns `true` when both repository and tag are populated with real values.
+    pub fn is_configured(&self) -> bool {
+        let repo = self.repository.trim();
+        let tag = self.tag.trim();
+
+        !repo.is_empty()
+            && repo != "MISSING_IMAGE_CONFIG"
+            && !tag.is_empty()
+            && tag != "MISSING_IMAGE_CONFIG"
+    }
+}
+
+fn find_cli_image<'a>(
+    cli_images: &'a HashMap<String, ImageConfig>,
+    cli_key: &str,
+) -> Option<&'a ImageConfig> {
+    if let Some(image) = cli_images.get(cli_key) {
+        return Some(image);
+    }
+
+    cli_images
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(cli_key))
+        .map(|(_, image)| image)
+}
+
+fn default_agent_image() -> ImageConfig {
+    ImageConfig {
+        repository: "MISSING_IMAGE_CONFIG".to_string(),
+        tag: "MISSING_IMAGE_CONFIG".to_string(),
+    }
 }
 
 /// Sidecar (auxiliary tools) configuration
@@ -274,6 +311,22 @@ pub struct AgentDefinition {
     #[serde(rename = "githubApp")]
     pub github_app: String,
 
+    /// Preferred CLI type for this agent (e.g., "Codex", "Claude")
+    #[serde(default, alias = "cliType", alias = "cli_type")]
+    pub cli: Option<String>,
+
+    /// Default model identifier for this agent
+    #[serde(default)]
+    pub model: Option<String>,
+
+    /// Optional maximum output tokens for this agent's CLI
+    #[serde(default, rename = "maxTokens", alias = "max_tokens")]
+    pub max_tokens: Option<u32>,
+
+    /// Optional temperature setting for this agent's CLI
+    #[serde(default)]
+    pub temperature: Option<f32>,
+
     /// Tool configuration for this agent
     #[serde(default)]
     pub tools: Option<AgentTools>,
@@ -332,24 +385,90 @@ impl Default for CleanupConfig {
 }
 
 impl ControllerConfig {
+    /// Merge agent-level CLI metadata into the normalized agent CLI configs map.
+    fn merge_agent_cli_defaults(&mut self) {
+        for agent in self.agents.values() {
+            let Some(cli_str) = agent.cli.as_ref() else {
+                continue;
+            };
+
+            let Some(model) = agent.model.as_ref() else {
+                warn!(
+                    github_app = %agent.github_app,
+                    "Agent definition specifies CLI '{}' but no model; skipping",
+                    cli_str
+                );
+                continue;
+            };
+
+            match CLIType::from_str_ci(cli_str) {
+                Some(cli_type) => {
+                    let config = CLIConfig {
+                        cli_type,
+                        model: model.clone(),
+                        settings: HashMap::new(),
+                        max_tokens: agent.max_tokens,
+                        temperature: agent.temperature,
+                    };
+
+                    self.agent
+                        .agent_cli_configs
+                        .insert(agent.github_app.clone(), config);
+                }
+                None => {
+                    warn!(
+                        github_app = %agent.github_app,
+                        cli = %cli_str,
+                        "Unsupported CLI type specified for agent; skipping"
+                    );
+                }
+            }
+        }
+    }
+
     /// Validate that configuration has required fields
     pub fn validate(&self) -> Result<(), anyhow::Error> {
-        if self.agent.image.repository == "MISSING_IMAGE_CONFIG"
-            || self.agent.image.tag == "MISSING_IMAGE_CONFIG"
-        {
+        for (cli_key, image) in &self.agent.cli_images {
+            if !image.is_configured() {
+                return Err(anyhow::anyhow!(format!(
+                    "CLI image configuration for '{cli_key}' must specify both repository and tag."
+                )));
+            }
+        }
+
+        let fallback_available = self.agent.image.is_configured();
+        let mut missing_cli_types: BTreeSet<String> = BTreeSet::new();
+
+        if self.agent.agent_cli_configs.is_empty() && !fallback_available {
             return Err(anyhow::anyhow!(
-                "Agent image configuration is missing! This indicates the controller ConfigMap was not loaded properly. \
-                Please ensure the 'agent.image.repository' and 'agent.image.tag' are set in the Helm values."
+                "Default agent image is not configured. Provide agent.image.repository and agent.image.tag or configure CLI-specific overrides under agent.cliImages."
             ));
         }
 
+        for cli_cfg in self.agent.agent_cli_configs.values() {
+            let cli_key = cli_cfg.cli_type.to_string();
+            match find_cli_image(&self.agent.cli_images, &cli_key) {
+                Some(image) if image.is_configured() => {}
+                Some(_) => {
+                    missing_cli_types.insert(cli_cfg.cli_type.to_string());
+                }
+                None => {
+                    if !fallback_available {
+                        missing_cli_types.insert(cli_cfg.cli_type.to_string());
+                    }
+                }
+            }
+        }
+
+        if !missing_cli_types.is_empty() {
+            return Err(anyhow::anyhow!(format!(
+                "Missing agent image configuration for CLI types: {}. Provide entries under agent.cliImages or configure agent.image as a fallback.",
+                missing_cli_types.into_iter().collect::<Vec<_>>().join(", ")
+            )));
+        }
+
         // If input bridge is enabled, ensure its image is configured
-        if self.agent.input_bridge.enabled
-            && (self.agent.input_bridge.image.repository.trim().is_empty()
-                || self.agent.input_bridge.image.tag.trim().is_empty()
-                || self.agent.input_bridge.image.repository == "MISSING_IMAGE_CONFIG"
-                || self.agent.input_bridge.image.tag == "MISSING_IMAGE_CONFIG")
-        {
+        if self.agent.input_bridge.enabled && !self.agent.input_bridge.image.is_configured() {
             return Err(anyhow::anyhow!(
                 "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
             ));
@@ -362,9 +481,10 @@ impl ControllerConfig {
         let config_str = std::fs::read_to_string(config_path)
             .map_err(|e| anyhow::anyhow!("Failed to read config file {}: {}", config_path, e))?;
 
-        let config: ControllerConfig = serde_yaml::from_str(&config_str)
+        let mut config: ControllerConfig = serde_yaml::from_str(&config_str)
             .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {}", e))?;
 
+        config.merge_agent_cli_defaults();
         Ok(config)
     }
 
@@ -384,7 +504,8 @@ impl ControllerConfig {
             .get("config.yaml")
             .ok_or_else(|| anyhow::anyhow!("ConfigMap missing config.yaml"))?;
 
-        let config: ControllerConfig = serde_yaml::from_str(config_str)?;
+        let mut config: ControllerConfig = serde_yaml::from_str(config_str)?;
+        config.merge_agent_cli_defaults();
         Ok(config)
     }
 }
@@ -396,10 +517,7 @@ impl Default for ControllerConfig {
                 active_deadline_seconds: 7200, // 2 hours
             },
             agent: AgentConfig {
-                image: ImageConfig {
-                    repository: "MISSING_IMAGE_CONFIG".to_string(),
-                    tag: "MISSING_IMAGE_CONFIG".to_string(),
-                },
+                image: default_agent_image(),
                 cli_images: HashMap::new(),
                 agent_cli_configs: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
@@ -477,6 +595,7 @@ impl Default for ControllerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_config_deserialization() {
@@ -525,6 +644,67 @@ cleanup:
         assert_eq!(config.cleanup.completed_job_delay_minutes, 5);
         assert_eq!(config.cleanup.failed_job_delay_minutes, 60);
         assert!(config.secrets.cli_api_keys.is_empty());
+    }
+
+    #[test]
+    fn validate_requires_configured_fallback_when_no_cli_overrides() {
+        let config = ControllerConfig::default();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_case_insensitive_cli_image_keys() {
+        let mut config = ControllerConfig::default();
+
+        config.agent.cli_images.insert(
+            "CODEX".to_string(),
+            ImageConfig {
+                repository: "ghcr.io/5dlabs/codex".to_string(),
+                tag: "v1.2.3".to_string(),
+            },
+        );
+
+        config.agent.agent_cli_configs.insert(
+            "codex".to_string(),
+            CLIConfig {
+                cli_type: CLIType::Codex,
+                model: "test-model".to_string(),
+                settings: HashMap::new(),
+                max_tokens: None,
+                temperature: None,
+            },
+        );
+
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn agent_cli_defaults_merge_into_map() {
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                cli: Some("Codex".to_string()),
+                model: Some("gpt-4.1-mini".to_string()),
+                max_tokens: Some(16000),
+                temperature: Some(0.65),
+                tools: None,
+                client_config: None,
+            },
+        );
+        config.merge_agent_cli_defaults();
+
+        let entry = config
+            .agent
+            .agent_cli_configs
+            .get("5DLabs-Rex")
+            .expect("CLI defaults should be populated");
+
+        assert_eq!(entry.model, "gpt-4.1-mini");
+        assert_eq!(entry.cli_type, CLIType::Codex);
+        assert_eq!(entry.max_tokens, Some(16000));
+        assert_eq!(entry.temperature, Some(0.65));
     }
 
     #[test]

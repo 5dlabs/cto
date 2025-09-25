@@ -18,10 +18,10 @@ kubectl get coderun -n agent-platform -o yaml > current-coderuns.yaml
 kubectl get coderun -n agent-platform > coderun-list.txt
 
 echo "3. Checking controller ConfigMap (container scripts)..."
-kubectl get configmap controller-claude-templates -n agent-platform -o yaml > controller-templates-configmap.yaml
+kubectl get configmap controller-agent-templates -n agent-platform -o yaml > controller-templates-configmap.yaml
 
 echo "4. Checking if our validation function is in the deployed ConfigMap..."
-kubectl get configmap controller-claude-templates -n agent-platform -o jsonpath='{.data.container\.sh\.hbs}' | grep -c "is_valid_cfg" > validation-function-count.txt || echo "0" > validation-function-count.txt
+kubectl get configmap controller-agent-templates -n agent-platform -o jsonpath='{.data.container\.sh\.hbs}' | grep -c "is_valid_cfg" > validation-function-count.txt || echo "0" > validation-function-count.txt
 
 echo "5. Checking controller configuration (Helm values)..."
 kubectl get configmap controller-task-controller-config -n agent-platform -o yaml > controller-config.yaml

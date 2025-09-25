@@ -13,6 +13,8 @@ image:
 
 # Agent/Task Runner image configuration (used by controller to create Jobs)
 agent:
+  # Deprecated: fallback image used only when a CLI-specific image is not defined.
+  # Prefer configuring `cliImages` for each CLI type instead.
   image:
     repository: ghcr.io/5dlabs/claude
     tag: "latest"
@@ -29,46 +31,6 @@ agent:
     claude:
       repository: ghcr.io/5dlabs/claude
       tag: "latest"
-
-  # Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
-  agentCliConfigs:
-    "5DLabs-Morgan":
-      cliType: "claude"
-      model: "claude-opus-4-1-20250805"
-      maxTokens: 8192
-      temperature: 0.8
-    "5DLabs-Rex":
-      cliType: "codex"
-      model: "gpt-4.1-mini"
-      maxTokens: 16000
-      temperature: 0.7
-    "5DLabs-Blaze":
-      cliType: "codex"
-      model: "gpt-4.1-mini"
-      maxTokens: 16000
-      temperature: 0.6
-    "5DLabs-Cipher":
-      cliType: "codex"
-      model: "gpt-4.1-mini"
-      maxTokens: 16000
-      temperature: 0.6
-    "5DLabs-Cleo":
-      cliType: "claude"
-      model: "claude-sonnet-4-20250514"
-      maxTokens: 2048
-      temperature: 0.3
-    "5DLabs-Tess":
-      cliType: "claude"
-      model: "claude-sonnet-4-20250514"
-      maxTokens: 4096
-      temperature: 0.7
-    "5DLabs-Stitch":
-      cliType: "claude"
-      model: "claude-sonnet-4-20250514"
-      maxTokens: 2048
-      temperature: 0.5
-
-
 
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
@@ -115,6 +77,10 @@ agents:
   morgan:
     name: "Morgan"
     githubApp: "5DLabs-Morgan"
+    cli: "Claude"
+    model: "claude-opus-4-1-20250805"
+    maxTokens: 8192
+    temperature: 0.8
     appId: "1723711"
     clientId: "Iv23liXbJaNAQELWXIYD"
     role: "Product Manager & Documentation Specialist"
@@ -138,6 +104,10 @@ agents:
   rex:
     name: "Rex"
     githubApp: "5DLabs-Rex"
+    cli: "Codex"
+    model: "gpt-4.1-mini"
+    maxTokens: 16000
+    temperature: 0.7
     appId: "1724452"
     clientId: "Iv23liTnu9e0imdRPhCC"
     role: "Senior Backend Architect & Systems Engineer"
@@ -155,6 +125,10 @@ agents:
   cleo:
     name: "Cleo"
     githubApp: "5DLabs-Cleo"
+    cli: "Claude"
+    model: "claude-sonnet-4-20250514"
+    maxTokens: 2048
+    temperature: 0.3
     appId: "1794540"
     clientId: "Iv23lieWLAmH0ocG3CUO"
     role: "Formatting & Code Quality Specialist"
@@ -184,6 +158,10 @@ agents:
   tess:
     name: "Tess"
     githubApp: "5DLabs-Tess"
+    cli: "Claude"
+    model: "claude-sonnet-4-20250514"
+    maxTokens: 4096
+    temperature: 0.7
     appId: "1794556"
     clientId: "Iv23livHVGK1dDETIcxa"
     role: "Quality Assurance & Testing Specialist"
@@ -224,6 +202,10 @@ agents:
   blaze:
     name: "Blaze"
     githubApp: "5DLabs-Blaze"
+    cli: "Codex"
+    model: "gpt-4.1-mini"
+    maxTokens: 16000
+    temperature: 0.6
     appId: "1724451"
     clientId: "Iv23liiNQuFT6UcWGMTk"
     role: "Performance Engineer & Optimization Specialist"
@@ -248,6 +230,10 @@ agents:
   cipher:
     name: "Cipher"
     githubApp: "5DLabs-Cipher"
+    cli: "Codex"
+    model: "gpt-4.1-mini"
+    maxTokens: 16000
+    temperature: 0.6
     appId: "1724450"
     clientId: "Iv23li7dL883Q9dG6qpX"
     role: "Security Engineer & Code Analysis Specialist"
@@ -272,6 +258,10 @@ agents:
   stitch:
     name: "Stitch"
     githubApp: "5DLabs-Stitch"
+    cli: "Claude"
+    model: "claude-sonnet-4-20250514"
+    maxTokens: 2048
+    temperature: 0.5
     appId: "1794583"
     clientId: "Iv23liDvrGw3Qkaxjw4b"
     role: "CI/CD Triage & Remediation Specialist"

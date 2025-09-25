@@ -5,6 +5,13 @@
 
 #![allow(clippy::disallowed_macros)]
 
+use controller::tasks::template_paths::{
+    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
+    CODE_CODEX_AGENTS_TEMPLATE, CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_TEMPLATE,
+    DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE, DOCS_CLAUDE_CONTAINER_TEMPLATE,
+    DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE, DOCS_CLAUDE_SETTINGS_TEMPLATE,
+    DOCS_CLAUDE_TOOLMAN_TEMPLATE,
+};
 use handlebars::Handlebars;
 use serde_json::json;
 use std::path::Path;
@@ -15,8 +22,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize handlebars engine
     let mut handlebars = Handlebars::new();
 
-    // Template directory - relative path from controller directory to infra/charts/controller/claude-templates
-    let template_dir = Path::new("../infra/charts/controller/claude-templates");
+    // Template directory - relative path from controller directory to infra/charts/controller/agent-templates
+    let template_dir = Path::new("../infra/charts/controller/agent-templates");
 
     // Test docs templates
     test_docs_templates(&mut handlebars, template_dir)?;
@@ -40,15 +47,52 @@ fn test_docs_templates(
         "working_directory": "_projects/simple-api",
         "source_branch": "feature/example-project-and-cli",
         "model": "claude-3-5-sonnet-20241022",
-        "github_user": "pm0-5dlabs"
+        "github_user": "pm0-5dlabs",
+        "remote_tools": ["rustdocs_query_rust_docs"],
+        "toolman_catalog": {
+            "local": {
+                "filesystem": {
+                    "description": "Workspace filesystem access",
+                    "command": "npx",
+                    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
+                    "working_directory": "/workspace",
+                    "tools": [
+                        {
+                            "name": "read_file",
+                            "category": "filesystem",
+                            "description": "Read file contents",
+                            "use_cases": ["Inspect existing code" ]
+                        }
+                    ]
+                }
+            },
+            "remote": {
+                "docs": {
+                    "description": "Documentation retrieval",
+                    "endpoint": "http://toolman/docs",
+                    "tools": [
+                        {
+                            "name": "rustdocs_query_rust_docs",
+                            "category": "documentation",
+                            "description": "Search Rust documentation",
+                            "use_cases": ["API lookups", "Trait discovery"]
+                        }
+                    ]
+                }
+            }
+        },
+        "total_tool_count": 2,
+        "generated_timestamp": "2025-01-01T00:00:00Z"
     });
 
     // Test docs templates
     let docs_templates = [
-        "docs/claude.md.hbs",
-        "docs/settings.json.hbs",
-        "docs/container.sh.hbs",
-        "docs/prompt.md.hbs",
+        DOCS_CLAUDE_MEMORY_TEMPLATE,
+        DOCS_CLAUDE_SETTINGS_TEMPLATE,
+        DOCS_CLAUDE_CONTAINER_TEMPLATE,
+        DOCS_CLAUDE_PROMPT_TEMPLATE,
+        DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE,
+        DOCS_CLAUDE_TOOLMAN_TEMPLATE,
     ];
 
     for template_name in &docs_templates {
@@ -109,9 +153,9 @@ fn test_code_templates(
     });
 
     for template_name in [
-        "code/claude.md.hbs",
-        "code/settings.json.hbs",
-        "code/container.sh.hbs",
+        CODE_CLAUDE_MEMORY_TEMPLATE,
+        CODE_CLAUDE_SETTINGS_TEMPLATE,
+        CODE_CLAUDE_CONTAINER_TEMPLATE,
     ] {
         let template_path = template_dir.join(template_name);
 
@@ -184,9 +228,9 @@ fn test_code_templates(
     });
 
     for template_name in [
-        "code/codex/container.sh.hbs",
-        "code/codex/agents.md.hbs",
-        "code/codex/config.toml.hbs",
+        CODE_CODEX_CONTAINER_TEMPLATE,
+        CODE_CODEX_AGENTS_TEMPLATE,
+        CODE_CODEX_CONFIG_TEMPLATE,
     ] {
         let template_path = template_dir.join(template_name);
 

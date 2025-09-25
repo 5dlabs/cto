@@ -90,7 +90,7 @@ fn validate_model_name(model: &str) -> Result<()> {
 ### 📋 Open Questions for Other Agent
 
 #### Configuration Management
-1. **Helm Merge Strategy**: Should `cto-config.json` fields merge at the field level or replace entire objects from `agent.agentCliConfigs`?
+1. **Helm Merge Strategy**: Should `cto-config.json` fields merge at the field level or replace entire objects from the Helm `agents.<agent>` CLI settings?
    - Field-level: `cto-config.json.agents.rex.cliConfig.model` overrides only the model
    - Object-level: `cto-config.json.agents.rex.cliConfig` replaces entire Helm config
    - **Recommendation Needed**: Which approach fits better with existing reconciliation patterns?
@@ -262,7 +262,7 @@ This provides comprehensive coverage without scope creep to 8 different CLI arch
 
 1. **Helm Values Configuration** (`/infra/charts/controller/values.yaml`)
    - Agent CLI configurations: `agent.cliImages` maps CLI types to Docker images
-   - Agent-specific CLI configs: `agent.agentCliConfigs` per GitHub app
+   - Agent-specific CLI configs: `agents.<agent>.cli` / `agents.<agent>.model` per GitHub app
    - Current support: `claude`, `codex`, `opencode` images defined
 
 2. **MCP Server Configuration** (`/mcp/src/main.rs`)
@@ -273,7 +273,7 @@ This provides comprehensive coverage without scope creep to 8 different CLI arch
 3. **Container Templates** (`/infra/charts/controller/templates/`)
    - Template system uses Handlebars for dynamic script generation
    - CLI-specific configurations passed via workflow parameters
-   - Container script templates in `claude-templates-static.yaml`
+   - Container script templates in `agent-templates-static.yaml`
 
 4. **Controller Architecture** (`/controller/src/`)
    - Dual-CRD system (CodeRun/DocsRun) with agent classification
@@ -377,7 +377,7 @@ Key points:
 - `cli` continues to drive the CLI selection path, enabling backward-compatible defaulting to Claude when unset.
 - `cliConfig` carries model/tuning parameters plus CLI-specific settings (such as Codex authentication mode and container image overrides).
 - Set `cliConfig.auth.mode` to `api_key` and populate `apiKeySecretRef` with a Kubernetes Secret reference when usage-based billing is required.
-- Helm’s `agent.agentCliConfigs` remains the canonical source for cluster defaults; a reconciler will merge those values with any repository-level overrides from `cto-config.json`.
+- Helm’s `agents.<agent>` entries (specifically `cli`, `model`, `maxTokens`, and `temperature`) remain the canonical source for cluster defaults; a reconciler will merge those values with any repository-level overrides from `cto-config.json`.
 
 #### 1.2 CLI Adapter Interface
 
@@ -423,7 +423,7 @@ Implementation note: rather than introducing a parallel stack, the new adapter l
 Create CLI-specific template variants:
 
 ```
-/infra/charts/controller/claude-templates/
+/infra/charts/controller/agent-templates/
 ├── agents_claude-system-prompt.md.hbs
 ├── agents_codex-system-prompt.md.hbs
 ├── agents_opencode-system-prompt.md.hbs
@@ -435,7 +435,7 @@ Create CLI-specific template variants:
     └── opencode-entrypoint.sh.hbs
 ```
 
-The Codex/OpenCode prompts and scripts are net-new assets. Add them to `infra/charts/controller/claude-templates/` and update `scripts/generate-templates-configmap.sh` so the ConfigMap now bundles all CLI variants.
+The Codex/OpenCode prompts and scripts are net-new assets. Add them to `infra/charts/controller/agent-templates/` and update `scripts/generate-agent-templates-configmap.sh` so the ConfigMap now bundles all CLI variants.
 
 ### Phase 2: Codex CLI Integration Implementation
 
@@ -510,7 +510,7 @@ Authentication handling:
 #### 2.3 MCP Integration
 
 - The MCP server keeps its single Toolman instance; Codex reuses the existing Toolman client-config that is mounted for Claude today.
-- Toolman is exposed to the agents through the `toolman` CLI, which bridges STDIO ↔ HTTP (`infra/charts/controller/claude-templates/code/mcp.json.hbs` calls `toolman --url ...`). Codex’s MCP support is STDIO-only (`docs/codex/docs/config.md:341`), so the existing wrapper remains compatible without additional adapters.
+- Toolman is exposed to the agents through the `toolman` CLI, which bridges STDIO ↔ HTTP (`infra/charts/controller/agent-templates/code/mcp.json.hbs` calls `toolman --url ...`). Codex’s MCP support is STDIO-only (`docs/codex/docs/config.md:341`), so the existing wrapper remains compatible without additional adapters.
 - The runtime base image already ships the `toolman` CLI (`infra/images/runtime/Dockerfile` installs release v2.4.4), ensuring the Codex container inherits the binary automatically.
 - The controller continues to derive Toolman’s configuration (tool enablement, repository workspace paths) from `agent.tools` and injects it into the Pod environment, independent of the selected CLI.
 - We will audit Codex’s current MCP support for HTTP streaming; if it lacks stable streaming, add a lightweight wrapper that proxies Toolman responses until upstream support lands.
@@ -571,7 +571,7 @@ impl TemplateManager {
 ```rust
 // controller/src/agents/resolver.rs
 pub struct AgentResolver {
-    helm_defaults: AgentCliDefaults,   // from values.yaml (agent.agentCliConfigs)
+    helm_defaults: AgentCliDefaults,   // from values.yaml (agents.<agent>)
     cto_config: CtoConfig,             // repository-level overrides
     router: CliRouter,                 // existing controller::cli::router
 }
@@ -743,7 +743,7 @@ impl AgentResolver {
 #### Configuration Merge Conflicts
 ```json
 // Helm values.yaml has:
-// agent.agentCliConfigs["5DLabs-Rex"].model = "claude-opus-4-1-20250805"
+// agents.rex.model = "claude-opus-4-1-20250805"
 
 // cto-config.json has:
 {
@@ -876,7 +876,7 @@ Given the complexity of CLI-specific configurations, recommend maintaining separ
 
 The enhanced `cto-config.json` schema provides:
 
-1. **Agent-Scoped Defaults**: `agent.agentCliConfigs` in Helm supply cluster-wide defaults for model, tokens, and images.
+1. **Agent-Scoped Defaults**: `agents.<agent>` CLI attributes in Helm supply cluster-wide defaults for model, tokens, and images.
 2. **Repository Overrides**: `cto-config.json` augments per-agent settings without duplicating Helm values.
 3. **Backward Compatibility**: Agents with only `cli` set continue to run on Claude with the existing template stack.
 4. **Validation Hooks**: Controller-side schema validation ensures merged configs satisfy per-CLI requirements before scheduling a job.

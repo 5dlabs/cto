@@ -159,14 +159,14 @@ spec:
         image: {{ .Values.agent.image.repository }}:{{ .Values.agent.image.tag | default "latest" }}
         imagePullPolicy: {{ .Values.agent.image.pullPolicy | default "Always" }}
         command: ["/bin/bash"]
-        args: ["/claude-templates/intake_intake.sh"]
+        args: ["/agent-templates/intake_intake.sh"]
         workingDir: /workspace
         volumeMounts:
           - name: intake-files
             mountPath: /intake-files
             readOnly: true
-          - name: claude-templates
-            mountPath: /claude-templates
+          - name: agent-templates
+            mountPath: /agent-templates
             readOnly: true
           - name: agents-config
             mountPath: /config/agents
@@ -233,9 +233,9 @@ spec:
         - name: intake-files
           configMap:
             name: "{{`{{inputs.parameters.configmap-name}}`}}"
-        - name: claude-templates
+        - name: agent-templates
           configMap:
-            name: {{ include "controller.fullname" . }}-claude-templates
+            name: {{ include "controller.fullname" . }}-agent-templates
         - name: agents-config
           configMap:
             name: {{ include "controller.fullname" . }}-agents

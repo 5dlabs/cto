@@ -17,6 +17,7 @@ pub mod config;
 pub mod docs;
 pub mod github;
 pub mod label;
+pub mod template_paths;
 pub mod types;
 pub mod workflow;
 

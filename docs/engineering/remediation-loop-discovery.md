@@ -98,7 +98,7 @@ Key details:
 ### Agent Templates
 - Cleo template always attempts to apply the `needs-tess` label if a PR is known.
   - References:
-    - infra/charts/controller/claude-templates/code/container-cleo.sh.hbs:1060
+    - infra/charts/controller/agent-templates/code/claude/container-cleo.sh.hbs:1060
 
 ## Gaps / Incomplete Work
 These items prevent the remediation loop from running end-to-end:
@@ -190,4 +190,4 @@ These items prevent the remediation loop from running end-to-end:
 - controller/src/tasks/label/orchestrator.rs:371
 - infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml:198
 - infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml:887
-- infra/charts/controller/claude-templates/code/container-cleo.sh.hbs:1060
+- infra/charts/controller/agent-templates/code/claude/container-cleo.sh.hbs:1060

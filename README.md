@@ -612,14 +612,14 @@ The platform uses a template system to customize Claude agent behavior, settings
 **Docs Tasks**: Generate documentation for Task Master projects
 
 - **Prompts**: Rendered from `docs/prompt.md.hbs` template into ConfigMap
-- **Settings**: `docs/settings.json.hbs` controls model, permissions, tools
-- **Container Script**: `docs/container.sh.hbs` handles Git workflow and Claude execution
+- **Settings**: `docs/claude/settings.json.hbs` controls model, permissions, tools
+- **Container Script**: `docs/claude/container.sh.hbs` handles Git workflow and Claude execution
 
 **Code Tasks**: Implement specific Task Master task IDs
 
 - **Prompts**: Read from docs repository at `{docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md` (or `_projects/{service}/.taskmaster/docs/task-{id}/prompt.md`)
-- **Settings**: `code/settings.json.hbs` controls model, permissions, MCP tools
-- **Container Script**: `code/container.sh.hbs` handles dual-repo workflow and Claude execution
+- **Settings**: `code/claude/settings.json.hbs` controls model, permissions, MCP tools
+- **Container Script**: `code/claude/container.sh.hbs` handles dual-repo workflow and Claude execution
 
 **Play Workflows**: Multi-agent orchestration with event-driven coordination
 

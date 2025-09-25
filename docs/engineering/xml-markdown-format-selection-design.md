@@ -221,7 +221,7 @@ Update handlebars templates to support format selection:
 
 
 ```handlebars
-{{!-- In claude-templates/code/container-rex.sh.hbs --}}
+{{!-- In agent-templates/code/claude/container-rex.sh.hbs --}}
 
 # Set documentation format
 export DOC_FORMAT="{{#if format}}{{format}}{{else}}markdown{{/if}}"

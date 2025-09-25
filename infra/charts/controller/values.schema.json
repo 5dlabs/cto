@@ -49,6 +49,27 @@
             "type": "string",
             "minLength": 100,
             "description": "System prompt defining the agent's behavior"
+          },
+          "cli": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Default CLI used by this agent (e.g., Codex, Claude)"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Default model identifier for this agent"
+          },
+          "maxTokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional maximum tokens for the agent's CLI"
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Optional temperature for the agent's CLI"
           }
         }
       }
@@ -70,14 +91,14 @@
         "tag": {
           "type": "string"
         }
-      },
-      "required": ["repository"]
+      }
     },
     "agent": {
       "type": "object",
       "properties": {
         "image": {
           "type": "object",
+          "description": "(Deprecated) Fallback image used when a CLI-specific image is not configured.",
           "properties": {
             "repository": {
               "type": "string"
@@ -89,8 +110,7 @@
               "type": "string",
               "enum": ["Always", "IfNotPresent", "Never"]
             }
-          },
-          "required": ["repository"]
+          }
         },
         "inputBridge": {
           "type": "object",

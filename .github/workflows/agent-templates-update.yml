@@ -1,18 +1,18 @@
-name: Update Claude Templates
+name: Update Agent Templates
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'infra/charts/controller/claude-templates/**'
-      - 'infra/charts/controller/scripts/generate-templates-configmap.sh'
+      - 'infra/charts/controller/agent-templates/**'
+      - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
 
 permissions:
   contents: write
   pull-requests: write
 
 concurrency:
-  group: update-claude-templates
+  group: update-agent-templates
   cancel-in-progress: false
 
 jobs:
@@ -24,12 +24,12 @@ jobs:
           fetch-depth: 0
       
       - name: Generate static ConfigMap
-        run: bash infra/charts/controller/scripts/generate-templates-configmap.sh
+        run: bash infra/charts/controller/scripts/generate-agent-templates-configmap.sh
       
       - name: Check for changes
         id: check_changes
         run: |
-          if git diff --quiet -- infra/charts/controller/templates/claude-templates-static.yaml; then
+          if git diff --quiet -- infra/charts/controller/templates/agent-templates-static.yaml; then
             echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes to commit."
           else
@@ -42,21 +42,21 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore(chart): regenerate claude-templates static ConfigMap'
-          title: 'chore: update Claude templates static ConfigMap'
+          commit-message: 'chore(chart): regenerate agent templates static ConfigMap'
+          title: 'chore: update agent templates static ConfigMap'
           body: |
             ## Automated Update
 
-            This PR was automatically generated to update the Claude templates static ConfigMap after changes were made to the template files.
+            This PR was automatically generated to update the agent templates static ConfigMap after changes were made to the template files.
 
             ### Changes
-            - Regenerated `infra/charts/controller/templates/claude-templates-static.yaml` from source templates
+            - Regenerated `infra/charts/controller/templates/agent-templates-static.yaml` from source templates
 
             ### Files Changed
-            - Template files in `infra/charts/controller/claude-templates/`
+            - Template files in `infra/charts/controller/agent-templates/`
             
             This is a routine update that ensures the ConfigMap stays in sync with the template files.
-          branch: auto-update-claude-templates
+          branch: auto-update-agent-templates
           delete-branch: true
           base: main
           labels: |
