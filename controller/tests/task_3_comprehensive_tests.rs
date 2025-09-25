@@ -383,10 +383,13 @@ async fn test_fr4_adapter_factory_implementation() {
     let factory = AdapterFactory::new()
         .await
         .expect("AdapterFactory must be creatable");
-    assert_eq!(
-        factory.get_supported_clis().len(),
-        0,
-        "New factory should start empty"
+    assert!(
+        factory.supports_cli(CLIType::Claude),
+        "Factory must register Claude adapter by default"
+    );
+    assert!(
+        !factory.get_supported_clis().is_empty(),
+        "Factory should include built-in adapters"
     );
 
     // ✅ Test adapter registration

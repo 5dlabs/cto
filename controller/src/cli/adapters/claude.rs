@@ -1,12 +1,12 @@
 //! Claude CLI Adapter Implementation
 //!
-//! Reference implementation of the CliAdapter trait for Claude Code CLI.
+//! Reference implementation of the `CliAdapter` trait for Claude Code CLI.
 //! Maintains 100% backward compatibility with existing Claude functionality.
 
 use crate::cli::adapter::{
     AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
     ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
-    ParsedResponse, ResponseMetadata, ToolCall,
+    ParsedResponse, ResponseMetadata, ToolCall, ToolConfiguration,
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
@@ -30,12 +30,18 @@ pub struct ClaudeAdapter {
 }
 
 impl ClaudeAdapter {
-    /// Create new Claude adapter
+    /// Create a new Claude adapter using default configuration.
+    ///
+    /// # Errors
+    /// Returns an [`AdapterError`] if the adapter fails to initialize.
     pub async fn new() -> AdapterResult<Self> {
         Self::with_config(AdapterConfig::new(CLIType::Claude)).await
     }
 
-    /// Create Claude adapter with custom configuration
+    /// Create a new Claude adapter with custom configuration.
+    ///
+    /// # Errors
+    /// Returns an [`AdapterError`] if the adapter fails to initialize with the provided config.
     pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing Claude adapter");
 
@@ -53,11 +59,9 @@ impl ClaudeAdapter {
         Ok(adapter)
     }
 
-    /// Generate MCP configuration for Claude
-    fn generate_mcp_config(
-        &self,
-        tools: &Option<crate::cli::adapter::ToolConfiguration>,
-    ) -> AdapterResult<Value> {
+    /// Generate MCP configuration for Claude.
+    #[must_use]
+    fn generate_mcp_config(tools: Option<&ToolConfiguration>) -> Value {
         let mut mcp_servers = json!({});
 
         // Get MCP server URL from environment variables (configurable, not hardcoded)
@@ -70,27 +74,20 @@ impl ClaudeAdapter {
             for tool_name in &tool_config.remote {
                 // Map known tool names to MCP server configurations
                 let server_config = match tool_name.as_str() {
-                    "memory_create_entities" => json!({
+                    "memory_create_entities" | "rustdocs_query_rust_docs" => json!({
                         "command": "toolman",
-                        "args": ["--url", &toolman_url],
+                        "args": ["--url", toolman_url.clone()],
                         "env": {
-                            "TOOLMAN_SERVER_URL": &toolman_url
-                        }
-                    }),
-                    "rustdocs_query_rust_docs" => json!({
-                        "command": "toolman",
-                        "args": ["--url", &toolman_url],
-                        "env": {
-                            "TOOLMAN_SERVER_URL": &toolman_url
+                            "TOOLMAN_SERVER_URL": toolman_url.clone()
                         }
                     }),
                     _ => {
                         debug!(tool_name = %tool_name, "Unknown remote tool, using default MCP config");
                         json!({
                             "command": "toolman",
-                            "args": ["--url", &toolman_url, "--tool", tool_name],
+                            "args": ["--url", toolman_url.clone(), "--tool", tool_name],
                             "env": {
-                                "TOOLMAN_SERVER_URL": &toolman_url
+                                "TOOLMAN_SERVER_URL": toolman_url.clone()
                             }
                         })
                     }
@@ -127,7 +124,7 @@ impl ClaudeAdapter {
             }
         }
 
-        Ok(mcp_servers)
+        mcp_servers
     }
 }
 
@@ -158,7 +155,7 @@ impl CliAdapter for ClaudeAdapter {
         self.base.validate_base_config(agent_config)?;
 
         // Generate MCP configuration
-        let mcp_servers = self.generate_mcp_config(&agent_config.tools)?;
+        let mcp_servers = Self::generate_mcp_config(agent_config.tools.as_ref());
 
         // Get default values from environment variables (configurable, not hardcoded)
         let default_max_tokens = std::env::var("CLAUDE_DEFAULT_MAX_TOKENS")

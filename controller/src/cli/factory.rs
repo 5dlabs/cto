@@ -4,6 +4,7 @@
 //! and dynamic adapter discovery.
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
+use crate::cli::adapters::ClaudeAdapter;
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
 #[cfg(test)]
@@ -145,6 +146,9 @@ impl AdapterFactory {
             config,
         };
 
+        // Register built-in adapters
+        factory.register_default_adapters().await?;
+
         // Start health monitoring if enabled
         if factory.config.enable_health_monitoring {
             factory.start_health_monitoring().await;
@@ -156,6 +160,14 @@ impl AdapterFactory {
         );
 
         Ok(factory)
+    }
+
+    /// Register built-in adapters that are always available
+    async fn register_default_adapters(&self) -> AdapterResult<()> {
+        let claude_adapter = Arc::new(ClaudeAdapter::new().await?);
+        self.register_adapter(CLIType::Claude, claude_adapter)
+            .await?;
+        Ok(())
     }
 
     /// Register a CLI adapter
@@ -559,7 +571,8 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 0);
+        assert_eq!(factory.get_supported_clis().len(), 1);
+        assert!(factory.supports_cli(CLIType::Claude));
     }
 
     #[tokio::test]
@@ -576,7 +589,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis(), vec![CLIType::Claude]);
+        assert_eq!(factory.get_supported_clis().len(), 1);
     }
 
     #[tokio::test]
