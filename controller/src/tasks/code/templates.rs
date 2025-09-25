@@ -357,6 +357,17 @@ impl CodeTemplateGenerator {
                 .as_ref()
                 .map(|cfg| cfg.model.as_str())
                 .unwrap_or(&code_run.spec.model),
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "working_directory": Self::get_working_directory(code_run),
             "toolman": {
                 "tools": remote_tools,
             },

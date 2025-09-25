@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "claude-opus-4-1-20250805",
+      "model": "gpt-4.1-mini",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -16,7 +16,8 @@
       "repository": "5dlabs/cto",
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
-      "service": "cto"
+      "service": "cto",
+      "cli": "codex"
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
@@ -73,8 +74,8 @@
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "gpt-4.1-mini",
       "tools": {
         "remote": [
           "brave_web_search",
@@ -133,8 +134,8 @@
     },
     "blaze": {
       "githubApp": "5DLabs-Blaze",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "gpt-4.1-mini",
       "tools": {
         "remote": [
           "brave_web_search",
@@ -152,8 +153,8 @@
     },
     "cipher": {
       "githubApp": "5DLabs-Cipher",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "gpt-4.1-mini",
       "tools": {
         "remote": [
           "brave_web_search",
