@@ -46,6 +46,8 @@ spec:
   destinations:
     - namespace: agent-platform
       server: https://kubernetes.default.svc
+    - namespace: trader
+      server: https://kubernetes.default.svc
     - namespace: argo
       server: https://kubernetes.default.svc
     - namespace: argocd
