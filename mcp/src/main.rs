@@ -14,6 +14,9 @@ use tokio::time::{timeout, Duration};
 
 mod tools;
 
+#[cfg(test)]
+mod model_validation_tests;
+
 // Global configuration loaded once at startup
 static CTO_CONFIG: OnceLock<CtoConfig> = OnceLock::new();
 
