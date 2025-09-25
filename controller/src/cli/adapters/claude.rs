@@ -158,7 +158,7 @@ impl CliAdapter for ClaudeAdapter {
         // Render configuration template
         let config = self
             .base
-            .render_template(CLAUDE_CONFIG_TEMPLATE, &context)
+            .render_template_file(CLAUDE_CONFIG_TEMPLATE, &context)
             .map_err(|e| {
                 error!(error = %e, "Failed to render Claude configuration template");
                 e

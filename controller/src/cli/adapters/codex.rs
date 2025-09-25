@@ -6,20 +6,36 @@
 
 use crate::cli::adapter::{
     AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
-    ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
-    ParsedResponse, ResponseMetadata, ToolCall,
+    ConfigFormat, ContainerContext, FinishReason, HealthStatus, MemoryStrategy, ParsedResponse,
+    ResponseMetadata, ToolCall,
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
 use anyhow::Result;
 use async_trait::async_trait;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::env;
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, info, instrument};
 
 const CODEX_CONFIG_TEMPLATE: &str = "code/codex-config.toml.hbs";
 const CODEX_MEMORY_TEMPLATE: &str = "code/codex-agents.md.hbs";
+
+fn first_string<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+}
+
+fn first_u64(value: &Value, keys: &[&str]) -> Option<u64> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_u64))
+}
+
+fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_f64))
+}
 
 /// Codex CLI adapter implementation
 #[derive(Debug)]
@@ -52,26 +68,35 @@ impl CodexAdapter {
     }
 
     fn render_memory_file(&self, agent_config: &AgentConfig) -> AdapterResult<String> {
-        let context = serde_json::json!({
-            "instructions": agent_config.cli_config,
+        let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
+
+        let toolman_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|tools| tools.remote.clone())
+            .unwrap_or_default();
+
+        let context = json!({
+            "cli_config": cli_config,
+            "github_app": agent_config.github_app,
+            "model": agent_config.model,
+            "toolman": {
+                "tools": toolman_tools,
+            },
         });
 
         self.base
-            .render_template(self.memory_template_name, &context)
+            .render_template_file(self.memory_template_name, &context)
             .map_err(|e| {
-                AdapterError::TemplateError(format!(
-                    "Failed to render Codex memory template: {e}",
-                ))
+                AdapterError::TemplateError(format!("Failed to render Codex memory template: {e}",))
             })
     }
 
     fn render_config(&self, context: &Value) -> AdapterResult<String> {
         self.base
-            .render_template(self.config_template_name, context)
+            .render_template_file(self.config_template_name, context)
             .map_err(|e| {
-                AdapterError::TemplateError(format!(
-                    "Failed to render Codex config template: {e}",
-                ))
+                AdapterError::TemplateError(format!("Failed to render Codex config template: {e}",))
             })
     }
 
@@ -145,21 +170,122 @@ impl CliAdapter for CodexAdapter {
 
         self.base.validate_base_config(agent_config)?;
 
-        let mcp_servers = serde_json::json!({});
+        let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
-        let context = serde_json::json!({
-            "model": agent_config.model,
+        let model = first_string(&cli_config, &["model"])
+            .map(str::to_string)
+            .unwrap_or_else(|| agent_config.model.clone());
+
+        let max_output_tokens = first_u64(&cli_config, &["maxTokens", "modelMaxOutputTokens"])
+            .map(|value| value as u32)
+            .or(agent_config.max_tokens);
+
+        let temperature = first_f64(&cli_config, &["temperature"])
+            .map(|value| value as f32)
+            .or(agent_config.temperature);
+
+        let approval_policy = first_string(&cli_config, &["approvalPolicy"])
+            .unwrap_or("never")
+            .to_string();
+
+        let sandbox_mode = first_string(&cli_config, &["sandboxPreset", "sandboxMode", "sandbox"])
+            .unwrap_or("danger-full-access")
+            .to_string();
+
+        let project_doc_max_bytes =
+            first_u64(&cli_config, &["projectDocMaxBytes"]).unwrap_or(32_768);
+
+        let toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        });
+
+        let toolman_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|tools| tools.remote.clone())
+            .unwrap_or_default();
+
+        let model_provider = if let Some(provider_map) =
+            cli_config.get("modelProvider").and_then(Value::as_object)
+        {
+            let name = provider_map
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("OpenAI");
+            let base_url = provider_map
+                .get("base_url")
+                .and_then(Value::as_str)
+                .or_else(|| provider_map.get("baseUrl").and_then(Value::as_str))
+                .unwrap_or("https://api.openai.com/v1");
+            let env_key = provider_map
+                .get("env_key")
+                .and_then(Value::as_str)
+                .or_else(|| provider_map.get("envKey").and_then(Value::as_str))
+                .unwrap_or("OPENAI_API_KEY");
+            let wire_api = provider_map
+                .get("wire_api")
+                .and_then(Value::as_str)
+                .or_else(|| provider_map.get("wireApi").and_then(Value::as_str))
+                .unwrap_or("chat");
+
+            json!({
+                "name": name,
+                "base_url": base_url,
+                "env_key": env_key,
+                "wire_api": wire_api,
+                "request_max_retries": provider_map
+                    .get("request_max_retries")
+                    .and_then(Value::as_u64),
+                "stream_max_retries": provider_map
+                    .get("stream_max_retries")
+                    .and_then(Value::as_u64),
+            })
+        } else {
+            json!({
+                "name": "OpenAI",
+                "base_url": "https://api.openai.com/v1",
+                "env_key": "OPENAI_API_KEY",
+                "wire_api": "chat",
+            })
+        };
+
+        let raw_additional_toml = cli_config
+            .get("rawToml")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .or_else(|| {
+                cli_config
+                    .get("raw_config")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            });
+
+        let context = json!({
+            "model": model,
             "github_app": agent_config.github_app,
             "cli": agent_config.cli,
+            "max_output_tokens": max_output_tokens,
+            "temperature": temperature,
+            "approval_policy": approval_policy,
+            "sandbox_mode": sandbox_mode,
+            "project_doc_max_bytes": project_doc_max_bytes,
             "timestamp": chrono::Utc::now().to_rfc3339(),
             "correlation_id": self.base.config.correlation_id,
-            "mcp_servers": mcp_servers,
-            "cli_config": agent_config.cli_config,
+            "toolman": {
+                "url": toolman_url,
+                "tools": toolman_tools,
+            },
+            "model_provider": model_provider,
+            "cli_config": cli_config,
+            "raw_additional_toml": raw_additional_toml,
         });
 
         let config = self.render_config(&context)?;
 
-        info!(config_length = config.len(), "Codex configuration generated successfully");
+        info!(
+            config_length = config.len(),
+            "Codex configuration generated successfully"
+        );
         Ok(config)
     }
 
@@ -262,13 +388,93 @@ impl CliAdapter for CodexAdapter {
             serde_json::json!(config_result.is_ok()),
         );
 
+        let memory_result = self.render_memory_file(&mock_config);
+        health.details.insert(
+            "memory_render".to_string(),
+            serde_json::json!(memory_result.is_ok()),
+        );
+
         let parse_result = self.parse_response("{}").await;
-        health
-            .details
-            .insert("response_parsing".to_string(), serde_json::json!(parse_result.is_ok()));
+        health.details.insert(
+            "response_parsing".to_string(),
+            serde_json::json!(parse_result.is_ok()),
+        );
 
         Ok(health)
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::adapter::{AgentConfig, ToolConfiguration};
+    use serde_json::json;
+    use std::path::PathBuf;
 
+    fn templates_root() -> String {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("infra/charts/controller/claude-templates")
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    fn sample_agent_config() -> AgentConfig {
+        AgentConfig {
+            github_app: "test-app".to_string(),
+            cli: "codex".to_string(),
+            model: "fallback-model".to_string(),
+            max_tokens: Some(4096),
+            temperature: Some(0.5),
+            tools: Some(ToolConfiguration {
+                remote: vec![
+                    "memory_create_entities".to_string(),
+                    "rustdocs_query_rust_docs".to_string(),
+                ],
+                local_servers: None,
+            }),
+            cli_config: Some(json!({
+                "model": "gpt-4.1-mini",
+                "maxTokens": 16000,
+                "temperature": 0.72,
+                "approvalPolicy": "on-request",
+                "sandboxPreset": "workspace-write",
+                "instructions": "Follow team standards",
+            })),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_generate_config_applies_overrides() {
+        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+        std::env::set_var("TOOLMAN_SERVER_URL", "http://localhost:9000/mcp");
+
+        let adapter = CodexAdapter::new().await.unwrap();
+        let agent_config = sample_agent_config();
+
+        let config = adapter.generate_config(&agent_config).await.unwrap();
+
+        assert!(config.contains("model = \"gpt-4.1-mini\""));
+        assert!(config.contains("model_max_output_tokens = 16000"));
+        assert!(config.contains("temperature = 0.72"));
+        assert!(config.contains("approval_policy = \"on-request\""));
+        assert!(config.contains("sandbox_mode = \"workspace-write\""));
+        assert!(config.contains("project_doc_max_bytes = 32768"));
+        assert!(config.contains("[mcp_servers.toolman]"));
+        assert!(config.contains("--tool"));
+        assert!(config.contains("memory_create_entities"));
+        assert!(config.contains("[model_providers.openai]"));
+    }
+
+    #[tokio::test]
+    async fn test_memory_template_includes_tools_and_instructions() {
+        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
+        let adapter = CodexAdapter::new().await.unwrap();
+        let agent_config = sample_agent_config();
+
+        let memory = adapter.render_memory_file(&agent_config).unwrap();
+
+        assert!(memory.contains("Follow team standards"));
+        assert!(memory.contains("memory_create_entities"));
+    }
+}

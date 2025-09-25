@@ -410,12 +410,16 @@ async fn test_fr4_adapter_factory_implementation() {
     let supported = factory.get_supported_clis();
     assert_eq!(
         supported.len(),
-        1,
+        2,
         "Factory must return correct supported CLI count"
     );
     assert!(
         supported.contains(&CLIType::Claude),
         "Factory must include registered CLI"
+    );
+    assert!(
+        supported.contains(&CLIType::Codex),
+        "Factory must include default Codex CLI"
     );
 
     // ✅ Test adapter creation
@@ -447,13 +451,20 @@ async fn test_fr4_adapter_factory_implementation() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        1,
+        2,
         "Factory must provide health summary"
     );
     assert_eq!(
         health_summary[&CLIType::Claude].status,
         HealthState::Healthy,
         "Healthy adapter should report healthy"
+    );
+    assert!(
+        matches!(
+            health_summary[&CLIType::Codex].status,
+            HealthState::Healthy | HealthState::Warning
+        ),
+        "Codex adapter should be tracked in health summary"
     );
 
     // ✅ Test concurrent adapter creation
