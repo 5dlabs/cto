@@ -60,6 +60,10 @@ impl ClaudeAdapter {
     ) -> AdapterResult<Value> {
         let mut mcp_servers = json!({});
 
+        // Get MCP server URL from environment variables (configurable, not hardcoded)
+        let toolman_url = std::env::var("TOOLMAN_SERVER_URL")
+            .unwrap_or_else(|_| "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string());
+
         if let Some(tool_config) = tools {
             // Add remote tools (MCP servers)
             for tool_name in &tool_config.remote {
@@ -67,24 +71,26 @@ impl ClaudeAdapter {
                 let server_config = match tool_name.as_str() {
                     "memory_create_entities" => json!({
                         "command": "toolman",
-                        "args": ["--url", "http://toolman.agent-platform.svc.cluster.local:3000/mcp"],
+                        "args": ["--url", &toolman_url],
                         "env": {
-                            "TOOLMAN_SERVER_URL": "http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+                            "TOOLMAN_SERVER_URL": &toolman_url
                         }
                     }),
                     "rustdocs_query_rust_docs" => json!({
                         "command": "toolman",
-                        "args": ["--url", "http://toolman.agent-platform.svc.cluster.local:3000/mcp"],
+                        "args": ["--url", &toolman_url],
                         "env": {
-                            "TOOLMAN_SERVER_URL": "http://toolman.agent-platform.svc.cluster.local:3000/mcp"
+                            "TOOLMAN_SERVER_URL": &toolman_url
                         }
                     }),
                     _ => {
                         debug!(tool_name = %tool_name, "Unknown remote tool, using default MCP config");
                         json!({
                             "command": "toolman",
-                            "args": ["--tool", tool_name],
-                            "env": {}
+                            "args": ["--url", &toolman_url, "--tool", tool_name],
+                            "env": {
+                                "TOOLMAN_SERVER_URL": &toolman_url
+                            }
                         })
                     }
                 };
@@ -153,11 +159,22 @@ impl CliAdapter for ClaudeAdapter {
         // Generate MCP configuration
         let mcp_servers = self.generate_mcp_config(&agent_config.tools)?;
 
+        // Get default values from environment variables (configurable, not hardcoded)
+        let default_max_tokens = std::env::var("CLAUDE_DEFAULT_MAX_TOKENS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(4096);
+
+        let default_temperature = std::env::var("CLAUDE_DEFAULT_TEMPERATURE")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.7);
+
         // Prepare template context
         let context = json!({
             "model": agent_config.model,
-            "max_tokens": agent_config.max_tokens.unwrap_or(4096),
-            "temperature": agent_config.temperature.unwrap_or(0.7),
+            "max_tokens": agent_config.max_tokens.unwrap_or(default_max_tokens),
+            "temperature": agent_config.temperature.unwrap_or(default_temperature),
             "github_app": agent_config.github_app,
             "cli": agent_config.cli,
             "mcp_servers": mcp_servers,
@@ -236,12 +253,18 @@ impl CliAdapter for ClaudeAdapter {
     }
 
     fn get_capabilities(&self) -> CliCapabilities {
+        // Get context window size from environment variable (configurable, not hardcoded)
+        let max_context_tokens = std::env::var("CLAUDE_MAX_CONTEXT_TOKENS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(200_000); // Claude 3.5 Sonnet default context window
+
         CliCapabilities {
             supports_streaming: true,
             supports_multimodal: false, // Claude Code CLI doesn't support multimodal yet
             supports_function_calling: true,
             supports_system_prompts: true,
-            max_context_tokens: 200_000, // Claude 3.5 Sonnet context window
+            max_context_tokens,
             memory_strategy: MemoryStrategy::MarkdownFile("CLAUDE.md".to_string()),
             config_format: ConfigFormat::Json,
             authentication_methods: vec![AuthMethod::SessionToken],
