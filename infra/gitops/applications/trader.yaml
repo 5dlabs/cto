@@ -28,6 +28,10 @@ spec:
       valueFiles:
         - values.yaml
 
+      values: |
+        imagePullSecrets:
+          - name: ghcr-secret
+
       # Override values for GitOps deployment
       parameters:
         - name: image.repository
