@@ -479,7 +479,7 @@ docs({
 ```
 
 ### 2. **`code()` - Rex & Blaze in Action**
-Deploys an autonomous Claude agent to implement a specific task from your Task Master project.
+Deploys an autonomous CLI agent (Claude or Codex, depending on configuration) to implement a specific task from your Task Master project.
 
 ```javascript
 // Minimal call - let Rex/Blaze work their magic!
@@ -506,7 +506,7 @@ code({
 ```
 
 **What Rex/Blaze do:**
-✅ Creates a Claude agent with the generated docs as context  
+✅ Creates a CLI agent with the generated docs as context  
 ✅ Loads the specific task details from Task Master  
 ✅ Implements the code autonomously  
 ✅ Runs tests and validation  
@@ -538,9 +538,9 @@ play({
 ```
 
 **What the team does:**
-✅ **Phase 1 - Implementation**: Rex/Blaze agent implements the core functionality  
-✅ **Phase 2 - Quality Assurance**: Cleo agent reviews, refactors, and improves the code  
-✅ **Phase 3 - Testing**: Tess agent creates comprehensive tests and validates the implementation  
+✅ **Phase 1 - Implementation**: Rex/Blaze agent implements the core functionality (Codex or Claude)  
+✅ **Phase 2 - Quality Assurance**: Cleo agent reviews, refactors, and improves the code (Claude)  
+✅ **Phase 3 - Testing**: Tess agent creates comprehensive tests and validates the implementation (Claude)  
 ✅ **Event-Driven Coordination**: Each phase triggers the next automatically  
 ✅ **GitHub Integration**: All phases submit PRs with detailed explanations
 

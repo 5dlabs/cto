@@ -21,6 +21,18 @@ data:
       image:
         repository: {{ .Values.agent.image.repository | quote }}
         tag: {{ .Values.agent.image.tag | quote }}
+      cliImages:
+        {{- if .Values.agent.cliImages }}
+        {{- toYaml .Values.agent.cliImages | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
+      agentCliConfigs:
+        {{- if .Values.agent.agentCliConfigs }}
+        {{- toYaml .Values.agent.agentCliConfigs | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
       {{- /* Compute effective ServiceAccount: prefer non-empty agent.serviceAccountName; else cluster-admin SA if created; else omit */ -}}
       {{- $explicitSA := "" -}}
       {{- if (hasKey .Values "agent") }}
