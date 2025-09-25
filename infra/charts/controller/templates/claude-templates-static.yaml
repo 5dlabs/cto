@@ -1,0 +1,5 @@
+{{- /*
+    Legacy placeholder for the claude-templates ConfigMap.
+    The real templates are generated in agent-templates-static.yaml.
+    This stub keeps pre-multi-CLI CI workflows from failing during the transition.
+*/ -}}
