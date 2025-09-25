@@ -1,223 +1,166 @@
-# Acceptance Criteria: Initialize Project Structure and Dependencies
+# Acceptance Criteria: Flexible CLI Model Configuration
 
 ## Functional Requirements
 
-### FR-1: Rust Workspace Structure
-**Requirement**: Create a properly configured Rust workspace
-- [ ] Root `Cargo.toml` exists with workspace configuration
-- [ ] Workspace includes `controller` as a member crate
-- [ ] Controller crate has proper `Cargo.toml` with required dependencies
-- [ ] `controller/src/main.rs` exists with basic Kubernetes client setup
-- [ ] `cargo check` passes without errors or warnings
+### FR-1: User-Configured Model Support
+**Requirement**: Allow users to configure any model name without hardcoded validation
+- [ ] Accept any model string provided by user configuration
+- [ ] Pass model name directly to CLI without validation
+- [ ] Let each CLI handle model validation internally
+- [ ] Support custom/local models (e.g., Ollama, custom endpoints)
+- [ ] Provide helpful error messages from CLI responses when models fail
 
 **Verification**:
-```bash
-# Must pass without errors
-cargo check
-cargo clippy -- -D warnings
+```rust
+#[tokio::test]
+async fn test_flexible_model_configuration() {
+    let config = CLIConfig::new();
+
+    // Any model name should be accepted
+    assert!(config.set_model("claude-3-5-sonnet-20241022", CLIType::Claude).is_ok());
+    assert!(config.set_model("gpt-4o-2024-08-06", CLIType::Codex).is_ok());
+    assert!(config.set_model("gemini-2.0-flash-exp", CLIType::Gemini).is_ok());
+    assert!(config.set_model("llama3.1:70b", CLIType::Custom).is_ok());
+    assert!(config.set_model("my-custom-model", CLIType::Custom).is_ok());
+    
+    // Model validation happens at CLI level, not in our code
+    // We just pass through whatever the user configured
+}
 ```
 
-### FR-2: Kubernetes Integration Foundation
-**Requirement**: Basic Kubernetes client initialization
-- [ ] `kube-rs v0.95.0` dependency is properly configured
-- [ ] `tokio v1.41.0` is set up for async runtime
-- [ ] Basic cluster connection code is implemented
-- [ ] Error handling patterns are established
-- [ ] Logging framework is configured
+### FR-2: Backward Compatibility
+**Requirement**: Existing configurations continue working without modification
+- [ ] Accept any model name from existing configurations
+- [ ] No breaking changes to configuration file formats
+- [ ] Pass through model names to CLI without interference
+- [ ] Preserve existing behavior for all CLI types
 
 **Verification**:
-```bash
-# Controller should compile and show basic connection attempt
-cargo run --bin controller
+```rust
+#[tokio::test]
+async fn test_backward_compatibility() {
+    // Existing configurations should work without modification
+    let config = AgentConfig::load_existing();
+    
+    // Any model name should be accepted and passed through
+    assert!(config.model_name().is_some());
+    assert!(config.validate().is_ok()); // Only validates config structure, not model names
+    
+    // Model validation happens at runtime by the CLI itself
+}
 ```
 
-### FR-3: MCP Integration Setup
-**Requirement**: TypeScript/Node.js MCP foundation
-- [ ] `mcp/` directory exists with proper structure
-- [ ] `package.json` includes `@modelcontextprotocol/sdk v1.0.4`
-- [ ] `tsconfig.json` is properly configured
-- [ ] TypeScript dependencies install successfully
-- [ ] Basic MCP integration placeholder exists
+### FR-3: Configuration Flexibility
+**Requirement**: Support diverse model configuration patterns
+- [ ] Environment variable model override support
+- [ ] CLI-specific model configuration sections
+- [ ] Default model fallback when none specified
+- [ ] Configuration validation for format, not content
+- [ ] Runtime model discovery through CLI introspection
 
 **Verification**:
-```bash
-cd mcp && npm install
-cd mcp && npm run build
+```rust
+#[tokio::test]
+async fn test_configuration_flexibility() {
+    let mut config = CLIConfig::new();
+
+    // Environment variable override
+    std::env::set_var("CLAUDE_MODEL", "claude-3-5-sonnet-20241022");
+    config.load_env_overrides();
+    assert_eq!(config.model_for_cli(CLIType::Claude), Some("claude-3-5-sonnet-20241022"));
+
+    // CLI-specific configuration
+    config.set_default_model(CLIType::Gemini, "gemini-2.0-flash-exp");
+    assert!(config.has_default_for_cli(CLIType::Gemini));
+}
 ```
 
-### FR-4: Container Infrastructure
-**Requirement**: Docker infrastructure for all 8 CLIs
-- [ ] `infra/images/` directory exists
-- [ ] Subdirectories for all 8 CLIs: claude, codex, opencode, gemini, grok, qwen, cursor, openhands
-- [ ] Each subdirectory contains a valid Dockerfile
-- [ ] Dockerfiles use appropriate base images for each CLI type
-- [ ] Multi-stage builds are implemented where beneficial
+### FR-4: CLI Integration
+**Requirement**: Seamless integration with each CLI's model handling
+- [ ] Pass model configuration directly to CLI without modification
+- [ ] Support CLI-specific model parameter formats
+- [ ] Handle CLI-specific authentication patterns
+- [ ] Preserve CLI-native error messages
+- [ ] Support CLI auto-discovery of available models
 
 **Verification**:
-```bash
-# Each Dockerfile should validate
-for dir in infra/images/*/; do
-    docker build --dry-run $dir
-done
-```
-
-### FR-5: CI/CD Pipeline
-**Requirement**: GitHub Actions workflow for automated builds
-- [ ] `.github/workflows/build-images.yml` exists
-- [ ] Workflow configured for multi-architecture builds (amd64, arm64)
-- [ ] Docker buildx is properly set up
-- [ ] Container registry integration is configured
-- [ ] Security scanning is included
-
-**Verification**:
-```bash
-# Test workflow locally with act
-act -j build-images --dry-run
-```
-
-### FR-6: Build System
-**Requirement**: Comprehensive Makefile for development
-- [ ] Root `Makefile` exists with all required targets
-- [ ] `make build` builds all components
-- [ ] `make test` runs test suites
-- [ ] `make deploy` handles deployment
-- [ ] `make clean` cleans artifacts
-- [ ] `make help` shows usage information
-
-**Verification**:
-```bash
-make help
-make build
-make test
-make clean
+```rust
+#[tokio::test]
+async fn test_cli_integration() {
+    let cli_runner = CLIRunner::new(CLIType::Claude);
+    
+    // Model name is passed through unchanged
+    let config = cli_runner.build_config("any-model-name").await;
+    assert!(config.contains("any-model-name"));
+    
+    // CLI handles its own model validation and error reporting
+    let result = cli_runner.execute_with_model("custom-model").await;
+    // We don't validate the model - let the CLI decide if it's valid
+}
 ```
 
 ## Non-Functional Requirements
 
-### NFR-1: Development Experience
-**Requirement**: Smooth developer workflow
-- [ ] Complete project builds in under 5 minutes on standard hardware
-- [ ] Clear error messages when builds fail
-- [ ] Development dependencies are minimized
-- [ ] Hot reload capabilities where applicable
+### NFR-1: Performance
+**Requirement**: Configuration handling should be fast and lightweight
+- [ ] Model configuration loading <10ms
+- [ ] No external API calls for model validation
+- [ ] Minimal memory footprint for configuration storage
+- [ ] Concurrent configuration access support
 
-### NFR-2: Security
-**Requirement**: Security best practices
-- [ ] No hardcoded secrets in any files
-- [ ] Minimal attack surface in container images
-- [ ] Security scanning integrated in CI/CD
-- [ ] Proper file permissions set
+### NFR-2: Reliability
+**Requirement**: Robust configuration handling
+- [ ] Graceful handling of malformed model names
+- [ ] Fallback to default models when configured model fails
+- [ ] Proper error propagation from CLI tools
+- [ ] Configuration persistence across restarts
 
-### NFR-3: Cross-Platform Compatibility
-**Requirement**: Works on multiple platforms
-- [ ] Builds successfully on Linux (Ubuntu 20.04+)
-- [ ] Builds successfully on macOS (Intel and Apple Silicon)
-- [ ] Windows compatibility with WSL2
-- [ ] Container images support both amd64 and arm64
+### NFR-3: Maintainability
+**Requirement**: Simple, maintainable model handling
+- [ ] No hardcoded model lists to maintain
+- [ ] CLI-agnostic configuration structure
+- [ ] Clear separation between configuration and execution
+- [ ] Minimal code complexity for model handling
 
-### NFR-4: Maintainability
-**Requirement**: Code is maintainable and extensible
-- [ ] Clear directory structure and naming conventions
-- [ ] Comprehensive documentation in README files
-- [ ] Consistent coding standards across all languages
-- [ ] Version pinning for all dependencies
+## Integration Requirements
 
-## Test Cases
+### IR-1: CLI Compatibility
+**Requirement**: Work with each CLI's native model handling
+- [ ] Claude: Support any Claude model identifier
+- [ ] Codex: Support any OpenAI model identifier  
+- [ ] Gemini: Support any Google model identifier
+- [ ] Grok: Support any X.AI model identifier
+- [ ] Qwen: Support any Qwen model identifier
+- [ ] OpenHands: Support any configured model
+- [ ] OpenCode: Support any configured model
+- [ ] Custom: Support any custom model endpoint
 
-### TC-1: Fresh Environment Setup
-**Scenario**: New developer setting up the project
-```bash
-git clone <repository>
-cd cli-agnostic-platform
-make build
-```
-**Expected**: All components build successfully without manual intervention
+### IR-2: Error Handling
+**Requirement**: Proper error handling without model validation
+- [ ] Configuration format errors are caught early
+- [ ] Model runtime errors are reported clearly
+- [ ] CLI-specific error messages are preserved
+- [ ] Fallback behavior when models are unavailable
 
-### TC-2: Dependency Validation
-**Scenario**: Verify all dependencies are properly specified
-```bash
-cargo clean
-rm -rf node_modules
-make build
-```
-**Expected**: Build succeeds with all dependencies fetched automatically
+## Success Criteria
 
-### TC-3: Container Build Test
-**Scenario**: Build all container images
-```bash
-make build-containers
-```
-**Expected**: All 8 CLI container images build without errors
+### Primary Goals
+- [ ] **Zero Hardcoded Models**: No model names in source code
+- [ ] **User Freedom**: Users can configure any model they want
+- [ ] **CLI Native**: Each CLI handles its own model validation
+- [ ] **Backward Compatible**: Existing configurations continue working
 
-### TC-4: CI/CD Validation
-**Scenario**: GitHub Actions workflow execution
-```bash
-act -j build-images
-```
-**Expected**: Workflow completes successfully with all checks passing
+### Verification Checklist
+- [ ] All existing Claude configurations work unchanged
+- [ ] New CLI types can be added without code changes
+- [ ] Model names are passed through without modification
+- [ ] Configuration validation only checks structure, not content
+- [ ] Runtime errors come from CLI tools, not our validation
 
-### TC-5: Cross-Platform Build
-**Scenario**: Multi-architecture container builds
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 infra/images/claude/
-```
-**Expected**: Images build successfully for both architectures
+### Performance Benchmarks
+- [ ] Configuration loading: <10ms
+- [ ] Model parameter passing: <1ms overhead
+- [ ] Memory usage: <10MB for all CLI configurations
+- [ ] Startup time: No additional delay for model handling
 
-## Quality Gates
-
-### Code Quality
-- [ ] All Rust code passes `cargo clippy` with zero warnings
-- [ ] TypeScript code compiles without errors
-- [ ] All shell scripts pass shellcheck
-- [ ] Dockerfiles follow hadolint best practices
-
-### Performance
-- [ ] Full project build completes in < 5 minutes
-- [ ] Container image sizes are optimized (< 500MB per image)
-- [ ] Build cache is properly utilized
-- [ ] Parallel builds work correctly
-
-### Documentation
-- [ ] Each component has a README with setup instructions
-- [ ] Architecture decisions are documented
-- [ ] Troubleshooting guide exists
-- [ ] Contributing guidelines are clear
-
-## Edge Cases and Error Scenarios
-
-### EC-1: Missing Dependencies
-**Scenario**: Required system dependencies not installed
-**Expected**: Clear error message with installation instructions
-
-### EC-2: Network Connectivity Issues
-**Scenario**: Unable to fetch dependencies due to network issues
-**Expected**: Graceful failure with retry suggestions
-
-### EC-3: Insufficient Permissions
-**Scenario**: Docker daemon not accessible
-**Expected**: Clear error message about permission requirements
-
-### EC-4: Platform Incompatibility
-**Scenario**: Attempting to build on unsupported platform
-**Expected**: Early detection with helpful error message
-
-## Definition of Done
-Task 1 is considered complete when:
-- [ ] All functional requirements are met and verified
-- [ ] All non-functional requirements are satisfied
-- [ ] All test cases pass
-- [ ] Code quality gates are met
-- [ ] Documentation is complete and accurate
-- [ ] Peer review has been completed
-- [ ] CI/CD pipeline runs successfully
-- [ ] No security vulnerabilities detected
-- [ ] Performance benchmarks are met
-- [ ] Project structure supports future CLI additions
-
-## Rollback Criteria
-If any of these conditions occur, the implementation should be rolled back:
-- Build failure on supported platforms
-- Security vulnerabilities detected
-- Performance regression > 50%
-- Incompatibility with existing systems
-- Missing critical functionality
+This approach ensures maximum flexibility while maintaining simplicity and reliability.

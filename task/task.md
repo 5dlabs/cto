@@ -1,153 +1,225 @@
-# Task 1: Assess Current CLI-Agnostic Platform Implementation
+# Task 2: Implement Flexible CLI Model Configuration
 
 ## Overview
-Analyze and document the existing CLI-agnostic platform implementation to understand what capabilities already exist and what still needs to be built. This task provides a clear understanding of the current system architecture and identifies gaps for future development.
+Remove hardcoded model validation and implement a flexible configuration system that allows users to specify any model for any CLI. Each CLI will handle its own model validation, eliminating the need for maintaining hardcoded model lists in our codebase.
 
 ## Context
-The 5D Labs Agent Platform already has a substantial CLI-agnostic implementation with Rust-based controller, MCP server, and Docker images for multiple CLI tools (Claude, Codex, OpenCode, Gemini, Grok, Qwen, Cursor, OpenHands). This task assesses the current state to guide further development.
+The current system has hardcoded Claude-only model validation that blocks other CLI providers. Instead of expanding this validation to include more hardcoded models, we should eliminate the validation entirely and let each CLI handle model compatibility on its own.
 
-## Assessment Areas
+## Technical Specification
 
-### 1. Existing Rust Architecture Analysis
-- **Location**: `controller/` directory 
-- **Current State**: Examine existing Rust controller implementation
-- **Assessment Goals**:
-  - Document current CLI integration capabilities
-  - Identify which CLI types are supported
-  - Analyze CRD definitions and controller logic
-  - Review error handling and logging patterns
+### 1. Current Validation Problem
+The system currently rejects any non-Claude models:
+```rust
+fn validate_model_name(model: &str) -> Result<()> {
+    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model) {
+        return Err(anyhow!(
+            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
+            model
+        ));
+    }
+    Ok(())
+}
+```
 
-### 2. MCP Server Implementation Review
-- **Location**: `mcp/` directory
-- **Current State**: Rust-based MCP server (NO TypeScript)
-- **Assessment Goals**:
-  - Document current MCP protocol support
-  - Identify tool integration capabilities
-  - Review client connection handling
-  - Analyze performance and scalability
+### 2. New Pass-Through Architecture
+Replace validation with flexible configuration:
+```rust
+pub struct CLIModelConfig {
+    pub model_name: String,
+    pub cli_type: CLIType,
+    pub custom_parameters: HashMap<String, String>,
+}
 
-### 3. Container Infrastructure Audit
-- **Location**: `infra/images/`
-- **Current State**: Multiple CLI Docker images exist
-- **Assessment Goals**:
-  - Verify which CLI images are functional:
-    - `claude/` - Claude Code CLI
-    - `codex/` - OpenAI Codex CLI
-    - `opencode/` - OpenCode CLI  
-    - `gemini/` - Google Gemini CLI
-    - `grok/` - Grok CLI
-    - `qwen/` - Qwen CLI
-    - `cursor/` - Cursor CLI
-    - `openhands/` - OpenHands CLI
-  - Test build processes and dependencies
-  - Document configuration requirements
+impl CLIModelConfig {
+    pub fn new(model_name: String, cli_type: CLIType) -> Self {
+        Self {
+            model_name,
+            cli_type,
+            custom_parameters: HashMap::new(),
+        }
+    }
+    
+    // No validation - just pass through to CLI
+    pub fn validate_format(&self) -> Result<()> {
+        // Only validate configuration structure, not model names
+        if self.model_name.is_empty() {
+            return Err(anyhow!("Model name cannot be empty"));
+        }
+        Ok(())
+    }
+}
+```
 
-### 4. GitOps and Deployment Analysis
-- **Location**: `infra/gitops/`
-- **Current State**: ArgoCD applications exist
-- **Assessment Goals**:
-  - Review existing ArgoCD application configurations
-  - Document current deployment patterns
-  - Identify any missing automation
+### 3. CLI-Native Model Handling
+Instead of provider-specific validators, let each CLI handle its own models:
 
-### 5. Build and CI/CD Evaluation
-- **Current State**: GitHub Actions workflows exist
-- **Assessment Goals**:
-  - Review existing automation pipelines
-  - Document build processes
-  - Identify gaps in testing/deployment
+#### Philosophy: Trust the CLI
+- **No Hardcoded Lists**: Zero model names in source code  
+- **CLI Responsibility**: Each CLI validates its own supported models
+- **User Freedom**: Users can configure any model identifier
+- **Runtime Validation**: Model validity checked when CLI executes
+
+#### Implementation Approach
+```rust
+pub struct CLIModelHandler {
+    pub cli_type: CLIType,
+    pub model_config: String,
+    pub environment: HashMap<String, String>,
+}
+
+impl CLIModelHandler {
+    pub fn new(cli_type: CLIType, model_config: String) -> Self {
+        Self {
+            cli_type,
+            model_config,
+            environment: HashMap::new(),
+        }
+    }
+    
+    // Pass through model config without validation
+    pub fn prepare_cli_args(&self) -> Vec<String> {
+        match self.cli_type {
+            CLIType::Claude => vec!["--model".to_string(), self.model_config.clone()],
+            CLIType::Codex => vec!["--model".to_string(), self.model_config.clone()],
+            CLIType::Gemini => vec!["--model".to_string(), self.model_config.clone()],
+            // Each CLI gets its model config passed through unchanged
+            _ => vec!["--model".to_string(), self.model_config.clone()],
+        }
+    }
+}
+```
+
+### 4. Configuration Management
+Simple configuration structure without hardcoded models:
+```rust
+pub struct CLIConfiguration {
+    pub default_models: HashMap<CLIType, String>,
+    pub environment_overrides: HashMap<String, String>,
+    pub cli_specific_params: HashMap<CLIType, HashMap<String, String>>,
+}
+
+impl CLIConfiguration {
+    pub fn get_model_for_cli(&self, cli_type: CLIType) -> Option<&String> {
+        // Check environment override first
+        let env_key = format!("{}_MODEL", cli_type.as_str().to_uppercase());
+        if let Ok(env_model) = std::env::var(&env_key) {
+            return Some(&env_model);
+        }
+        
+        // Fall back to default
+        self.default_models.get(&cli_type)
+    }
+}
+```
 
 ## Implementation Steps
 
-### Phase 1: Architecture Documentation
-1. Analyze existing `controller/` Rust implementation
-2. Document current CRD definitions and controller capabilities  
-3. Map out existing CLI integration patterns
-4. Identify supported vs. unsupported CLI types
-5. **Use docs MCP server to research CLI functionality**:
-   - **Codex Research**: Use `codex_query` for "installation requirements", "configuration patterns", "MCP integration"
-   - **OpenCode Research**: Use `opencode_query` for "setup guide", "MCP server support", "agent configuration"
-   - **OpenHands Research**: Use `openhands_query` for "CLI usage", "python dependencies", "automation capabilities"
-   - **Gemini Research**: Use `gemini_query` for "installation", "authentication", "model configuration"
-   - **Qwen Research**: Use `qwen_query` for "setup instructions", "model handling", "API configuration"
-   - **Grok Research**: Use `grok_query` for "installation", "X.AI integration", "MCP tools support"
-   - Document CLI-specific requirements, authentication patterns, and configuration formats
-   - Identify which CLIs support MCP natively vs. need wrapper integration
+### Phase 1: Remove Validation Logic
+1. Locate and remove `validate_model_name()` function
+2. Update all callers to accept any model string
+3. Remove hardcoded model constants and lists
+4. Add simple format validation (non-empty string only)
 
-### Phase 2: MCP Server Assessment  
-1. Review `mcp/` Rust-based implementation
-2. Test MCP protocol functionality
-3. Document current tool integration capabilities
-4. Assess performance and identify bottlenecks
+### Phase 2: Configuration Pass-Through
+1. Create `CLIModelConfig` structure for flexible configuration
+2. Implement model parameter passing to CLI commands
+3. Add environment variable override support
+4. Update configuration loading to accept any model names
 
-### Phase 3: Container Infrastructure Testing
-1. Build and test each CLI Docker image
-2. **Research CLI requirements using docs MCP server**:
-   - `codex_query("docker installation requirements and runtime configuration")`
-   - `openhands_query("python virtualenv setup and CLI dependencies")`
-   - `gemini_query("npm installation and Google API authentication")`
-   - `qwen_query("installation via npm and model configuration patterns")`
-   - `grok_query("bun installation requirements and X.AI API setup")`
-   - `opencode_query("TypeScript CLI setup and MCP server integration")`
-   - Cross-reference docs research with actual Dockerfile implementations
-   - Document CLI-specific dependencies and environment requirements
-3. Document configuration requirements per CLI based on research
-4. Verify runtime functionality
-5. Identify broken or incomplete images
+### Phase 3: Error Handling
+1. Remove model validation errors from our code
+2. Capture and forward CLI-specific model errors
+3. Implement proper error propagation from CLI processes
+4. Add helpful error context without model validation
 
-### Phase 4: Deployment Pipeline Review
-1. Analyze existing GitOps configurations
-2. Test current ArgoCD application deployments
-3. Review CI/CD pipeline effectiveness
-4. Document manual deployment steps
+### Phase 4: Integration
+1. Replace existing `validate_model_name()` function with pass-through
+2. Update MCP server to accept any model configuration
+3. Remove hardcoded model constants and validation logic
+4. Test with various CLI model configurations
 
-### Phase 5: Gap Analysis and Recommendations
-1. Create comprehensive current-state documentation
-2. Identify missing functionality
-3. Prioritize development needs
-4. Provide recommendations for next steps
+### Phase 5: Testing & Verification
+1. Test that any model string is accepted in configuration
+2. Verify model parameters are passed to CLI unchanged
+3. Test environment variable override functionality
+4. Verify CLI-specific error handling works properly
 
 ## Dependencies
-- Docker and Docker buildx for image testing
-- Rust toolchain (1.70+) for code analysis
-- Kubernetes cluster access for deployment testing
-- GitHub Actions access for CI/CD review
-- **Docs MCP server access** for CLI documentation research
-- **Ingested CLI documentation** (Codex, OpenCode, OpenHands, Gemini, Qwen, Grok)
+- Current MCP server codebase (Rust-based)
+- CLI type definitions
+- Basic error handling framework
+- Standard Rust HashMap for configuration storage
 
 ## Success Criteria
-- Complete documentation of current architecture
-- All CLI Docker images tested and status documented
-- Current MCP server capabilities documented
-- **CLI research completed using docs MCP server queries**
-- Cross-reference between CLI documentation and actual implementation
-- Gap analysis completed with prioritized recommendations
-- Clear roadmap for next development phases
+- Any model name is accepted in configuration
+- Model strings are passed to CLI without modification
+- Environment variables can override default models
+- CLI-specific errors are properly forwarded
+- Zero hardcoded model names in source code
+- Backward compatibility with existing configurations maintained
 
-## Deliverables
-- **Architecture Assessment Report**: Document current Rust controller capabilities
-- **MCP Server Analysis**: Review of existing Rust-based MCP implementation
-- **CLI Image Status Matrix**: Functional status of each CLI Docker image  
-- **CLI Research Report**: Analysis of each CLI's capabilities using docs MCP server queries
-  - Codex configuration patterns and requirements (via `codex_query`)
-  - OpenCode setup and usage patterns (via `opencode_query`)
-  - OpenHands automation capabilities (via `openhands_query`)
-  - Gemini integration approaches (via `gemini_query`)
-  - Qwen model handling (via `qwen_query`)
-  - Grok MCP tool integration (via `grok_query`)
-- **Deployment Pipeline Review**: Analysis of current GitOps setup
-- **Gap Analysis Document**: Prioritized list of missing functionality
-- **Development Roadmap**: Recommended next steps for CLI-agnostic platform
+## Files Created/Modified
+```
+mcp/src/
+├── main.rs (modified - remove validate_model_name function)
+└── config.rs (modified - add flexible model configuration)
 
-## Next Steps
-After completion, this assessment enables:
-- Informed development of missing CLI integration features
-- Prioritized bug fixes for broken CLI implementations
-- Enhanced MCP server capabilities where needed
-- Improved deployment automation
+controller/src/cli/
+└── model_config.rs (new - simple model pass-through logic)
+```
 
 ## Risk Mitigation
-- Document current working functionality before making changes
-- Preserve existing functional CLI integrations during updates
-- Test current deployment processes before modifying them
-- Maintain backward compatibility with existing configurations
+
+### Backward Compatibility
+- Ensure all existing configurations continue working unchanged
+- No breaking changes to configuration APIs
+- Preserve CLI-specific behavior patterns
+
+### Error Handling
+- Proper error propagation from CLI tools to users
+- Clear distinction between configuration errors and runtime errors
+- Graceful handling of CLI-specific authentication failures
+
+### Configuration Security
+- Input validation for configuration format (not content)
+- Protection against command injection in model parameters
+- Secure handling of environment variable overrides
+
+## Testing Strategy
+```rust
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_any_model_accepted() {
+        // Test that any model string is accepted
+        let config = CLIModelConfig::new("any-model".to_string(), CLIType::Claude);
+        assert!(config.validate_format().is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_model_passthrough() {
+        // Test model parameters are passed unchanged to CLI
+        let handler = CLIModelHandler::new(CLIType::Gemini, "custom-model".to_string());
+        let args = handler.prepare_cli_args();
+        assert!(args.contains(&"custom-model".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_env_variable_override() {
+        // Test environment variable model overrides
+        std::env::set_var("CLAUDE_MODEL", "test-model");
+        let config = CLIConfiguration::new();
+        assert_eq!(config.get_model_for_cli(CLIType::Claude), Some(&"test-model".to_string()));
+    }
+}
+```
+
+## Next Steps
+After completion enables:
+- Task 3: CLI Adapter Trait System (can use any configured models)
+- All subsequent CLI integrations (Codex, Opencode, Gemini)
+- Model capability-based routing
+- Cost optimization based on model pricing
+
+This task is the foundation that unblocks the entire multi-CLI platform development.
