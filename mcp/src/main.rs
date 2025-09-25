@@ -707,12 +707,14 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Local working directory: {working_directory}");
     eprintln!("🐛 DEBUG: Container working directory: {container_working_directory}");
 
+    let workflow_model = implementation_model.clone();
+
     let mut params = vec![
         format!("working-directory={container_working_directory}"),
         format!("repository-url={repository_url}"),
         format!("source-branch={source_branch}"),
         format!("github-app={github_app}"),
-        format!("model={model}"),
+        format!("model={workflow_model}"),
     ];
 
     // Always add include_codebase parameter as boolean (required by workflow template)
