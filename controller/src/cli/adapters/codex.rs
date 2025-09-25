@@ -375,7 +375,7 @@ impl CliAdapter for CodexAdapter {
         let mock_config = AgentConfig {
             github_app: "test-app".to_string(),
             cli: "codex".to_string(),
-            model: "gpt-4.1-mini".to_string(),
+            model: "gpt-5-codex".to_string(),
             max_tokens: Some(8192),
             temperature: Some(0.7),
             tools: None,
@@ -434,7 +434,7 @@ mod tests {
                 local_servers: None,
             }),
             cli_config: Some(json!({
-                "model": "gpt-4.1-mini",
+                "model": "gpt-5-codex",
                 "maxTokens": 16000,
                 "temperature": 0.72,
                 "approvalPolicy": "on-request",
@@ -451,10 +451,15 @@ mod tests {
 
         let adapter = CodexAdapter::new().await.unwrap();
         let agent_config = sample_agent_config();
+        let expected_model = agent_config
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| cfg.get("model").and_then(|m| m.as_str()))
+            .expect("sample agent config should include model override");
 
         let config = adapter.generate_config(&agent_config).await.unwrap();
 
-        assert!(config.contains("model = \"gpt-4.1-mini\""));
+        assert!(config.contains(&format!("model = \"{expected_model}\"")));
         assert!(config.contains("model_max_output_tokens = 16000"));
         assert!(config.contains("temperature = 0.72"));
         assert!(config.contains("approval_policy = \"on-request\""));

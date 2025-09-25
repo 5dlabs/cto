@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -75,7 +75,7 @@
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "codex",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "brave_web_search",
@@ -135,7 +135,7 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "brave_web_search",
@@ -154,7 +154,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "codex",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "brave_web_search",

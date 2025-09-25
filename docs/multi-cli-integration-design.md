@@ -350,7 +350,7 @@ Extend `cto-config.json` by enriching each `agents.<name>` entry instead of intr
       "githubApp": "5DLabs-Rex",
       "cli": "codex",
       "cliConfig": {
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5-codex",
         "maxTokens": 8192,
         "temperature": 0.7,
         "containerImage": "ghcr.io/5dlabs/codex:latest",

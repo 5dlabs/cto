@@ -191,13 +191,13 @@ fn test_code_templates(
         "github_app": "5DLabs-Rex",
         "cli": {
             "type": "codex",
-            "model": "gpt-4.1-mini",
+            "model": "gpt-5-codex",
             "settings": json!({"sandboxPreset": "workspace-write"}),
             "remote_tools": ["memory_create_entities"]
         },
         "cli_config": {
             "cliType": "codex",
-            "model": "gpt-4.1-mini",
+            "model": "gpt-5-codex",
             "maxTokens": 16000,
             "temperature": 0.7,
             "settings": {
@@ -205,7 +205,7 @@ fn test_code_templates(
                 "approvalPolicy": "never"
             }
         },
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5-codex",
         "temperature": 0.7,
         "max_output_tokens": 16000,
         "approval_policy": "never",
