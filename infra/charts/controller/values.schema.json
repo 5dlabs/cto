@@ -209,8 +209,23 @@
         "anthropicApiKey": {
           "type": "string"
         },
+        "openaiApiKey": {
+          "type": "string"
+        },
         "externalSecretsName": {
           "type": "string"
+        },
+        "cliApiKeys": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "secretKey": {"type": "string"},
+              "secretName": {"type": "string"},
+              "envVar": {"type": "string"}
+            },
+            "required": ["secretKey"]
+          }
         }
       }
     },
