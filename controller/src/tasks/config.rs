@@ -534,6 +534,7 @@ impl Default for ControllerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_config_deserialization() {
@@ -582,6 +583,38 @@ cleanup:
         assert_eq!(config.cleanup.completed_job_delay_minutes, 5);
         assert_eq!(config.cleanup.failed_job_delay_minutes, 60);
         assert!(config.secrets.cli_api_keys.is_empty());
+    }
+
+    #[test]
+    fn validate_requires_configured_fallback_when_no_cli_overrides() {
+        let config = ControllerConfig::default();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_case_insensitive_cli_image_keys() {
+        let mut config = ControllerConfig::default();
+
+        config.agent.cli_images.insert(
+            "CODEX".to_string(),
+            ImageConfig {
+                repository: "ghcr.io/5dlabs/codex".to_string(),
+                tag: "v1.2.3".to_string(),
+            },
+        );
+
+        config.agent.agent_cli_configs.insert(
+            "codex".to_string(),
+            crate::crds::coderun::CLIConfig {
+                cli_type: CLIType::Codex,
+                model: "test-model".to_string(),
+                settings: HashMap::new(),
+                max_tokens: None,
+                temperature: None,
+            },
+        );
+
+        assert!(config.validate().is_ok());
     }
 
     #[test]
