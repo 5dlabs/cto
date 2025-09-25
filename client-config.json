@@ -1,0 +1,15 @@
+{
+  "localServers": {},
+  "remoteTools": [
+    "brave_web_search",
+    "context7_get_library_docs",
+    "rustdocs_query_rust_docs",
+    "agent_docs_codex_query",
+    "agent_docs_cursor_query",
+    "agent_docs_opencode_query",
+    "agent_docs_gemini_query",
+    "agent_docs_grok_query",
+    "agent_docs_qwen_query",
+    "agent_docs_openhands_query"
+  ]
+}
