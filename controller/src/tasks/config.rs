@@ -98,6 +98,20 @@ impl ImageConfig {
     }
 }
 
+fn find_cli_image<'a>(
+    cli_images: &'a HashMap<String, ImageConfig>,
+    cli_key: &str,
+) -> Option<&'a ImageConfig> {
+    if let Some(image) = cli_images.get(cli_key) {
+        return Some(image);
+    }
+
+    cli_images
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(cli_key))
+        .map(|(_, image)| image)
+}
+
 fn default_agent_image() -> ImageConfig {
     ImageConfig {
         repository: "MISSING_IMAGE_CONFIG".to_string(),
@@ -366,9 +380,15 @@ impl ControllerConfig {
         let fallback_available = self.agent.image.is_configured();
         let mut missing_cli_types: BTreeSet<String> = BTreeSet::new();
 
+        if self.agent.agent_cli_configs.is_empty() && !fallback_available {
+            return Err(anyhow::anyhow!(
+                "Default agent image is not configured. Provide agent.image.repository and agent.image.tag or configure CLI-specific overrides under agent.cliImages."
+            ));
+        }
+
         for cli_cfg in self.agent.agent_cli_configs.values() {
-            let cli_key = cli_cfg.cli_type.to_string().to_lowercase();
-            match self.agent.cli_images.get(&cli_key) {
+            let cli_key = cli_cfg.cli_type.to_string();
+            match find_cli_image(&self.agent.cli_images, &cli_key) {
                 Some(image) if image.is_configured() => {}
                 Some(_) => {
                     missing_cli_types.insert(cli_cfg.cli_type.to_string());
