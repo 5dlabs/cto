@@ -52,28 +52,11 @@ data:
       apiKeySecretName: "agent-platform-secrets"
       apiKeySecretKey: "ANTHROPIC_API_KEY"
 
-    # Tool permissions configuration (only used when agentToolsOverride=true)
-    # When false: uses hardcoded list in settings.json.hbs template
-    # When true: uses this configuration
+    # Tool permissions configuration (enterprise policy: allow all tools)
     permissions:
-      agentToolsOverride: false
+      agentToolsOverride: true
       allow:
-        - "Bash"
-        - "Edit"
-        - "Read"
-        - "Write"
-        - "MultiEdit"
-        - "Glob"
-        - "Grep"
-        - "LS"
-        - "Task"
-        - "ExitPlanMode"
-        - "NotebookRead"
-        - "NotebookEdit"
-        - "WebFetch"
-        - "WebSearch"
-        - "TodoRead"
-        - "TodoWrite"
+        - "Tool(*)"
       deny: []
 
     # Telemetry configuration (used in templates)
