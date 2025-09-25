@@ -90,8 +90,8 @@ fn test_code_templates(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("💻 Testing Code Templates:");
 
-    // Mock CodeRunSpec data
-    let code_data = json!({
+    // Mock Claude data
+    let claude_data = json!({
         "task_id": 42,
         "service": "simple-api",
         "repository_url": "https://github.com/5dlabs/cto",
@@ -108,34 +108,97 @@ fn test_code_templates(
         "prompt_mode": "append"
     });
 
-    // Test code templates
-    let code_templates = [
+    for template_name in [
         "code/claude.md.hbs",
         "code/settings.json.hbs",
         "code/container.sh.hbs",
-    ];
-
-    for template_name in &code_templates {
+    ] {
         let template_path = template_dir.join(template_name);
 
         if template_path.exists() {
             println!("  Testing {template_name}...");
-
-            // Register template
             let template_content = std::fs::read_to_string(&template_path)?;
             handlebars.register_template_string(template_name, &template_content)?;
-
-            // Render template
-            let result = handlebars.render(template_name, &code_data)?;
-
+            let result = handlebars.render(template_name, &claude_data)?;
             println!("    ✅ Rendered successfully ({} chars)", result.len());
-
-            // Show first few lines of output for verification
-            let lines: Vec<&str> = result.lines().take(3).collect();
-            for line in lines {
+            for line in result.lines().take(3) {
                 println!("    │ {line}");
             }
+            if result.lines().count() > 3 {
+                println!("    │ ... ({} total lines)", result.lines().count());
+            }
+            println!();
+        } else {
+            println!("  ⚠️  Template not found: {}", template_path.display());
+        }
+    }
 
+    // Mock Codex data
+    let codex_data = json!({
+        "task_id": 42,
+        "service": "simple-api",
+        "repository_url": "https://github.com/5dlabs/cto",
+        "docs_repository_url": "https://github.com/5dlabs/cto-docs",
+        "docs_branch": "main",
+        "docs_project_directory": "_projects/simple-api",
+        "working_directory": "simple-api",
+        "continue_session": false,
+        "overwrite_memory": false,
+        "github_app": "5DLabs-Rex",
+        "cli": {
+            "type": "codex",
+            "model": "gpt-4.1-mini",
+            "settings": json!({"sandboxPreset": "workspace-write"}),
+            "remote_tools": ["memory_create_entities"]
+        },
+        "cli_config": {
+            "cliType": "codex",
+            "model": "gpt-4.1-mini",
+            "maxTokens": 16000,
+            "temperature": 0.7,
+            "settings": {
+                "sandboxPreset": "workspace-write",
+                "approvalPolicy": "never"
+            }
+        },
+        "model": "gpt-4.1-mini",
+        "temperature": 0.7,
+        "max_output_tokens": 16000,
+        "approval_policy": "never",
+        "sandbox_mode": "workspace-write",
+        "project_doc_max_bytes": 32768,
+        "toolman": {
+            "url": "http://toolman.test",
+            "tools": ["memory_create_entities"]
+        },
+        "model_provider": {
+            "name": "OpenAI",
+            "base_url": "https://api.openai.com/v1",
+            "env_key": "OPENAI_API_KEY",
+            "wire_api": "chat"
+        },
+        "client_config": {
+            "remoteTools": ["memory_create_entities"],
+            "localServers": {}
+        }
+    });
+
+    for template_name in [
+        "code/codex/container.sh.hbs",
+        "code/codex/agents.md.hbs",
+        "code/codex/config.toml.hbs",
+    ] {
+        let template_path = template_dir.join(template_name);
+
+        if template_path.exists() {
+            println!("  Testing {template_name}...");
+            let template_content = std::fs::read_to_string(&template_path)?;
+            handlebars.register_template_string(template_name, &template_content)?;
+            let result = handlebars.render(template_name, &codex_data)?;
+            println!("    ✅ Rendered successfully ({} chars)", result.len());
+            for line in result.lines().take(3) {
+                println!("    │ {line}");
+            }
             if result.lines().count() > 3 {
                 println!("    │ ... ({} total lines)", result.lines().count());
             }

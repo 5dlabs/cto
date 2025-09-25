@@ -19,8 +19,8 @@ use std::env;
 use std::sync::Arc;
 use tracing::{debug, info, instrument};
 
-const CODEX_CONFIG_TEMPLATE: &str = "code/codex-config.toml.hbs";
-const CODEX_MEMORY_TEMPLATE: &str = "code/codex-agents.md.hbs";
+const CODEX_CONFIG_TEMPLATE: &str = "code/codex/config.toml.hbs";
+const CODEX_MEMORY_TEMPLATE: &str = "code/codex/agents.md.hbs";
 
 fn first_string<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a str> {
     keys.iter()

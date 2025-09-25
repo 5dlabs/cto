@@ -1,3 +1,4 @@
+use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::Result;
@@ -20,9 +21,27 @@ impl CodeTemplateGenerator {
         code_run: &CodeRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
+        match Self::determine_cli_type(code_run) {
+            CLIType::Codex => Self::generate_codex_templates(code_run, config),
+            _ => Self::generate_claude_templates(code_run, config),
+        }
+    }
+
+    fn determine_cli_type(code_run: &CodeRun) -> CLIType {
+        code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|cfg| cfg.cli_type)
+            .unwrap_or(CLIType::Claude)
+    }
+
+    fn generate_claude_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
         let mut templates = BTreeMap::new();
 
-        // Generate core code templates
         templates.insert(
             "container.sh".to_string(),
             Self::generate_container_script(code_run)?,
@@ -35,18 +54,12 @@ impl CodeTemplateGenerator {
             "settings.json".to_string(),
             Self::generate_claude_settings(code_run, config)?,
         );
-
-        // Generate code-specific templates
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
         );
-
-        // Generate agent-specific client-config.json
-        templates.insert(
-            "client-config.json".to_string(),
-            Self::generate_client_config(code_run, config)?,
-        );
+        let client_config = Self::generate_client_config(code_run, config)?;
+        templates.insert("client-config.json".to_string(), client_config);
 
         templates.insert(
             "coding-guidelines.md".to_string(),
@@ -57,10 +70,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        // Generate hook scripts
-        let hook_scripts = Self::generate_hook_scripts(code_run)?;
-        for (filename, content) in hook_scripts {
-            // Use hooks- prefix to comply with ConfigMap key constraints
+        for (filename, content) in Self::generate_hook_scripts(code_run)? {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -249,6 +259,318 @@ impl CodeTemplateGenerator {
     fn generate_mcp_config(_code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
         // MCP config is currently static, so just load and return the template content
         Self::load_template("code/mcp.json.hbs")
+    }
+
+    fn generate_codex_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let base_template = Self::load_template("code/codex/container-base.sh.hbs")?;
+        handlebars
+            .register_partial("codex_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Codex container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_codex_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("codex_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Codex container template {template_path}: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "continue_session": Self::get_continue_session(code_run),
+            "overwrite_memory": code_run.spec.overwrite_memory,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": code_run
+                    .spec
+                    .cli_config
+                    .as_ref()
+                    .map(|cfg| cfg.model.as_str())
+                    .unwrap_or(&code_run.spec.model),
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+        });
+
+        handlebars.render("codex_container", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Codex container template: {e}"
+            ))
+        })
+    }
+
+    fn generate_codex_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template_path = Self::get_codex_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("codex_agents", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Codex AGENTS.md template {template_path}: {e}"
+                ))
+            })?;
+
+        let context = json!({
+            "cli_config": cli_config,
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "model": code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .map(|cfg| cfg.model.as_str())
+                .unwrap_or(&code_run.spec.model),
+            "toolman": {
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars.render("codex_agents", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Codex AGENTS.md template: {e}"
+            ))
+        })
+    }
+
+    fn generate_codex_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        client_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template("code/codex/config.toml.hbs")?;
+
+        handlebars
+            .register_template_string("codex_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Codex config template: {e}"
+                ))
+            })?;
+
+        let settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model);
+
+        let max_output_tokens = cli_config
+            .get("maxTokens")
+            .and_then(Value::as_u64)
+            .or_else(|| {
+                cli_config
+                    .get("modelMaxOutputTokens")
+                    .and_then(Value::as_u64)
+            })
+            .map(|v| v as u32);
+
+        let temperature = cli_config
+            .get("temperature")
+            .and_then(Value::as_f64)
+            .or_else(|| settings.get("temperature").and_then(Value::as_f64));
+
+        let approval_policy = settings
+            .get("approvalPolicy")
+            .and_then(Value::as_str)
+            .unwrap_or("never");
+
+        let sandbox_mode = settings
+            .get("sandboxPreset")
+            .or_else(|| settings.get("sandboxMode"))
+            .or_else(|| settings.get("sandbox"))
+            .and_then(Value::as_str)
+            .unwrap_or("danger-full-access");
+
+        let project_doc_max_bytes = settings
+            .get("projectDocMaxBytes")
+            .and_then(Value::as_u64)
+            .unwrap_or(32_768);
+
+        let toolman_url = std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        });
+
+        let model_provider = settings
+            .get("modelProvider")
+            .and_then(Value::as_object)
+            .map(|provider| {
+                let get = |key: &str| provider.get(key).and_then(Value::as_str);
+                json!({
+                    "name": get("name").unwrap_or("OpenAI"),
+                    "base_url": get("base_url")
+                        .or_else(|| get("baseUrl"))
+                        .unwrap_or("https://api.openai.com/v1"),
+                    "env_key": get("env_key")
+                        .or_else(|| get("envKey"))
+                        .unwrap_or("OPENAI_API_KEY"),
+                    "wire_api": get("wire_api")
+                        .or_else(|| get("wireApi"))
+                        .unwrap_or("chat"),
+                    "request_max_retries": provider
+                        .get("request_max_retries")
+                        .and_then(Value::as_u64),
+                    "stream_max_retries": provider
+                        .get("stream_max_retries")
+                        .and_then(Value::as_u64),
+                })
+            })
+            .unwrap_or_else(|| {
+                json!({
+                    "name": "OpenAI",
+                    "base_url": "https://api.openai.com/v1",
+                    "env_key": "OPENAI_API_KEY",
+                    "wire_api": "chat"
+                })
+            });
+
+        let raw_additional_toml = settings
+            .get("rawToml")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string())
+            .or_else(|| {
+                settings
+                    .get("raw_config")
+                    .and_then(Value::as_str)
+                    .map(|s| s.to_string())
+            });
+
+        let context = json!({
+            "model": model,
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+            "approval_policy": approval_policy,
+            "sandbox_mode": sandbox_mode,
+            "project_doc_max_bytes": project_doc_max_bytes,
+            "toolman": {
+                "url": toolman_url,
+                "tools": remote_tools,
+            },
+            "model_provider": model_provider,
+            "cli_config": cli_config,
+            "client_config": client_config,
+            "raw_additional_toml": raw_additional_toml,
+        });
+
+        handlebars.render("codex_config", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Codex config template: {e}"
+            ))
+        })
+    }
+
+    fn generate_codex_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools: Vec<String> = client_config_value
+            .get("remoteTools")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_codex_container_script(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "AGENTS.md".to_string(),
+            Self::generate_codex_memory(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "codex-config.toml".to_string(),
+            Self::generate_codex_config(
+                code_run,
+                &cli_config_value,
+                &client_config_value,
+                &remote_tools,
+            )?,
+        );
+
+        // Reuse shared guidance and hook generation across CLIs
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        // Provide shared MCP configuration for Codex as well (Toolman passthrough)
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
     }
 
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
@@ -755,6 +1077,30 @@ impl CodeTemplateGenerator {
         };
 
         format!("code/{template_name}")
+    }
+
+    fn get_codex_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/codex/container-rex.sh.hbs",
+            "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
+            _ => "code/codex/container.sh.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_codex_memory_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/codex/agents-rex.md.hbs",
+            "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
+            "5DLabs-Tess" => "code/codex/agents-tess.md.hbs",
+            _ => "code/codex/agents.md.hbs",
+        };
+
+        template_name.to_string()
     }
 
     /// Extract agent name from GitHub app identifier

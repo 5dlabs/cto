@@ -1,0 +1,224 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# Environment bootstrapping
+# =========================================================================
+
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else}}
+echo "🔧 Initialising Codex environment"
+{{/if}}
+
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+if command -v rustup >/dev/null 2>&1; then
+  rustup default stable 2>/dev/null || true
+fi
+
+echo "PATH: $PATH"
+
+# =========================================================================
+# GitHub App authentication
+# =========================================================================
+
+REPO_URL="{{repository_url}}"
+
+if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+  echo "❌ Missing GitHub App credentials"
+  exit 1
+fi
+
+echo "🔐 Authenticating with GitHub App"
+TEMP_KEY_FILE="/tmp/github-app-key.pem"
+printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
+chmod 600 "$TEMP_KEY_FILE"
+
+JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+NOW=$(date +%s)
+EXP=$((NOW + 600))
+JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+rm -f "$TEMP_KEY_FILE"
+
+parse_repo() {
+  local input="$1"
+  if echo "$input" | grep -qE '^https://github.com/'; then
+    echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  elif echo "$input" | grep -qE '^git@github.com:'; then
+    echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  else
+    echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
+  fi
+}
+
+read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
+REPO_HTTP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+
+INSTALLATION_ID=$(curl -s -L \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+fi
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  echo "❌ Unable to resolve installation ID for $REPO_OWNER/$REPO_NAME"
+  exit 1
+fi
+
+GITHUB_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+  echo "❌ Unable to obtain installation token"
+  exit 1
+fi
+
+export GITHUB_TOKEN
+
+git config --global --replace-all credential.helper store
+echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+echo "$GITHUB_TOKEN" | gh auth login --with-token >/dev/null
+
+git config --global --add safe.directory /workspace
+GITHUB_APP="{{github_app}}"
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Codex CLI)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_NAME
+export GIT_AUTHOR_EMAIL
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+
+# =========================================================================
+# Repository checkout
+# =========================================================================
+
+WORK_DIR={{working_directory}}
+if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  WORK_DIR="{{service}}"
+fi
+
+TARGET_DIR="/workspace/$WORK_DIR"
+mkdir -p "$TARGET_DIR"
+cd /workspace
+
+if [ -d "$REPO_NAME/.git" ]; then
+  echo "🔁 Repository already cloned, fetching latest"
+  cd "$REPO_NAME"
+  git fetch --all --prune
+else
+  echo "⬇️  Cloning repository"
+  git clone "$REPO_HTTP_URL"
+  cd "$REPO_NAME"
+fi
+
+CODEX_WORK_DIR="/workspace/$REPO_NAME"
+if [ "$WORK_DIR" != "$REPO_NAME" ]; then
+  CODEX_WORK_DIR="$CODEX_WORK_DIR/$WORK_DIR"
+  mkdir -p "$CODEX_WORK_DIR"
+fi
+
+cd "$CODEX_WORK_DIR"
+echo "✓ Working directory: $CODEX_WORK_DIR"
+
+echo "📦 git status"
+git status --short || true
+
+# =========================================================================
+# Materialise task context
+# =========================================================================
+
+echo "🧱 Syncing task assets"
+mkdir -p "$CODEX_WORK_DIR/task"
+cp -R /task-files/task/* "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+
+if [ -f /task-files/AGENTS.md ]; then
+  cp /task-files/AGENTS.md "$CODEX_WORK_DIR/AGENTS.md"
+fi
+
+if [ -f /task-files/coding-guidelines.md ]; then
+  cp /task-files/coding-guidelines.md "$CODEX_WORK_DIR/"
+fi
+
+if [ -f /task-files/github-guidelines.md ]; then
+  cp /task-files/github-guidelines.md "$CODEX_WORK_DIR/"
+fi
+
+if [ -f /task-files/client-config.json ]; then
+  cp /task-files/client-config.json "$CODEX_WORK_DIR/"
+fi
+
+if [ -f /task-files/mcp.json ]; then
+  cp /task-files/mcp.json "$CODEX_WORK_DIR/.mcp.json"
+fi
+
+mkdir -p ~/.codex
+if [ -f /task-files/codex-config.toml ]; then
+  cp /task-files/codex-config.toml ~/.codex/config.toml
+  echo "✓ Installed codex-config.toml"
+else
+  echo "⚠️ codex-config.toml not provided; falling back to defaults"
+fi
+
+if [ ! -f "$CODEX_WORK_DIR/AGENTS.md" ]; then
+  echo "⚠️ AGENTS.md missing; creating placeholder"
+  cat <<'PLACEHOLDER' > "$CODEX_WORK_DIR/AGENTS.md"
+# Project Guidance
+
+This Codex run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give Codex richer instructions.
+PLACEHOLDER
+fi
+
+# =========================================================================
+# Prompt assembly and Codex execution
+# =========================================================================
+
+PROMPT_PREFIX=""
+if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
+  PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+fi
+
+PROMPT_FILE="$CODEX_WORK_DIR/task/prompt.md"
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "❌ prompt.md not found at $PROMPT_FILE"
+  exit 1
+fi
+
+PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+
+set +e
+codex exec --full-auto --cd "$CODEX_WORK_DIR" "$PROMPT_CONTENT"
+EXIT_CODE=$?
+set -e
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "⚠️ Codex exited with status $EXIT_CODE"
+fi
+
+touch /workspace/.agent_done 2>/dev/null || true
+
+{{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+{{else}}
+echo "✅ Codex execution complete"
+{{/if}}
+exit $EXIT_CODE
