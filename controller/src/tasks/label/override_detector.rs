@@ -282,7 +282,7 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request is not found or cannot be approved
-    pub async fn approve_bypass_request(
+    pub fn approve_bypass_request(
         &mut self,
         request_id: &str,
         approver: &str,
@@ -313,7 +313,7 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request is not found or cannot be denied
-    pub async fn deny_bypass_request(
+    pub fn deny_bypass_request(
         &mut self,
         request_id: &str,
         approver: &str,
@@ -344,7 +344,7 @@ impl OverrideDetector {
     ///
     /// # Errors
     /// Returns `OverrideError::BypassError` if the request status cannot be retrieved
-    pub async fn get_bypass_status(
+    pub fn get_bypass_status(
         &mut self,
         request_id: &str,
     ) -> Result<Option<BypassStatus>, OverrideError> {
