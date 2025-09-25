@@ -4,7 +4,7 @@
 //! and dynamic adapter discovery.
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
-use crate::cli::adapters::ClaudeAdapter;
+use crate::cli::adapters::{ClaudeAdapter, CodexAdapter};
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
 #[cfg(test)]
@@ -167,6 +167,11 @@ impl AdapterFactory {
         let claude_adapter = Arc::new(ClaudeAdapter::new().await?);
         self.register_adapter(CLIType::Claude, claude_adapter)
             .await?;
+
+        let codex_adapter = Arc::new(CodexAdapter::new().await?);
+        self.register_adapter(CLIType::Codex, codex_adapter)
+            .await?;
+
         Ok(())
     }
 
