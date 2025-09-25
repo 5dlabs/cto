@@ -11,7 +11,7 @@
     },
     "_comment_code": "Default values for task() tool - code implementation workflows",
     "code": {
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -96,7 +96,7 @@
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "codex",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -192,7 +192,7 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -221,7 +221,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "codex",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5-codex",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -258,7 +258,7 @@
     "defaults.docs.githubApp": "Default GitHub App for docs workflows",
     "defaults.docs.includeCodebase": "Whether to include existing codebase as markdown context",
     "defaults.docs.sourceBranch": "Default source branch to work from",
-    "defaults.code.model": "Model for code implementation CLI (e.g., gpt-4.1-mini for Codex or claude-sonnet-4-20250514)",
+    "defaults.code.model": "Model for code implementation CLI (e.g., gpt-5-codex for Codex or claude-sonnet-4-20250514)",
     "defaults.code.githubApp": "Default GitHub App for code workflows",
     "defaults.code.continueSession": "Whether to continue a previous CLI session by default",
     "defaults.code.workingDirectory": "Default working directory within repository (. for root)",

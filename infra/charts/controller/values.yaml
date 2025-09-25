@@ -105,9 +105,10 @@ agents:
     name: "Rex"
     githubApp: "5DLabs-Rex"
     cli: "Codex"
-    model: "gpt-4.1-mini"
+    model: "gpt-5-codex"
     maxTokens: 16000
     temperature: 0.7
+    reasoningEffort: "high"
     appId: "1724452"
     clientId: "Iv23liTnu9e0imdRPhCC"
     role: "Senior Backend Architect & Systems Engineer"
@@ -203,9 +204,10 @@ agents:
     name: "Blaze"
     githubApp: "5DLabs-Blaze"
     cli: "Codex"
-    model: "gpt-4.1-mini"
+    model: "gpt-5-codex"
     maxTokens: 16000
     temperature: 0.6
+    reasoningEffort: "high"
     appId: "1724451"
     clientId: "Iv23liiNQuFT6UcWGMTk"
     role: "Performance Engineer & Optimization Specialist"
@@ -231,9 +233,10 @@ agents:
     name: "Cipher"
     githubApp: "5DLabs-Cipher"
     cli: "Codex"
-    model: "gpt-4.1-mini"
+    model: "gpt-5-codex"
     maxTokens: 16000
     temperature: 0.6
+    reasoningEffort: "high"
     appId: "1724450"
     clientId: "Iv23li7dL883Q9dG6qpX"
     role: "Security Engineer & Code Analysis Specialist"

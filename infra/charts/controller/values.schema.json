@@ -70,6 +70,11 @@
             "minimum": 0,
             "maximum": 2,
             "description": "Optional temperature for the agent's CLI"
+          },
+          "reasoningEffort": {
+            "type": "string",
+            "description": "Optional reasoning effort for Codex models",
+            "enum": ["minimal", "low", "medium", "high"]
           }
         }
       }
