@@ -18,6 +18,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument};
 
+const CLAUDE_CONFIG_TEMPLATE: &str = "code/claude-config.json.hbs";
+
 /// Claude CLI adapter - reference implementation
 #[derive(Debug)]
 pub struct ClaudeAdapter {
@@ -25,8 +27,6 @@ pub struct ClaudeAdapter {
     base: Arc<BaseAdapter>,
     /// Claude-specific model validator
     model_validator: Arc<ClaudeModelValidator>,
-    /// Claude configuration template
-    config_template: Arc<str>,
 }
 
 impl ClaudeAdapter {
@@ -47,12 +47,10 @@ impl ClaudeAdapter {
 
         let base = Arc::new(BaseAdapter::new(config).await?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
-        let config_template = Arc::from(include_str!("../templates/claude-config.json.hbs"));
 
         let adapter = Self {
             base,
             model_validator,
-            config_template,
         };
 
         info!("Claude adapter initialized successfully");
@@ -70,28 +68,15 @@ impl ClaudeAdapter {
         });
 
         if let Some(tool_config) = tools {
-            // Add remote tools (MCP servers)
+            // Add remote tools (MCP servers) using a uniform Toolman invocation
             for tool_name in &tool_config.remote {
-                // Map known tool names to MCP server configurations
-                let server_config = match tool_name.as_str() {
-                    "memory_create_entities" | "rustdocs_query_rust_docs" => json!({
-                        "command": "toolman",
-                        "args": ["--url", toolman_url.clone()],
-                        "env": {
-                            "TOOLMAN_SERVER_URL": toolman_url.clone()
-                        }
-                    }),
-                    _ => {
-                        debug!(tool_name = %tool_name, "Unknown remote tool, using default MCP config");
-                        json!({
-                            "command": "toolman",
-                            "args": ["--url", toolman_url.clone(), "--tool", tool_name],
-                            "env": {
-                                "TOOLMAN_SERVER_URL": toolman_url.clone()
-                            }
-                        })
+                let server_config = json!({
+                    "command": "toolman",
+                    "args": ["--url", toolman_url.clone(), "--tool", tool_name],
+                    "env": {
+                        "TOOLMAN_SERVER_URL": toolman_url.clone()
                     }
-                };
+                });
 
                 mcp_servers[tool_name] = server_config;
             }
@@ -100,23 +85,11 @@ impl ClaudeAdapter {
             if let Some(local_servers) = &tool_config.local_servers {
                 for (server_name, server_config) in local_servers {
                     if server_config.enabled {
-                        let local_server_config = match server_name.as_str() {
-                            "filesystem" => json!({
-                                "command": "mcp-server-filesystem",
-                                "args": ["/workspace"],
-                                "env": {}
-                            }),
-                            "git" => json!({
-                                "command": "mcp-server-git",
-                                "args": ["--repository", "/workspace"],
-                                "env": {}
-                            }),
-                            _ => json!({
-                                "command": format!("mcp-server-{}", server_name),
-                                "args": [],
-                                "env": {}
-                            }),
-                        };
+                        let local_server_config = json!({
+                            "command": format!("mcp-server-{}", server_name),
+                            "args": [],
+                            "env": {}
+                        });
 
                         mcp_servers[server_name] = local_server_config;
                     }
@@ -185,7 +158,7 @@ impl CliAdapter for ClaudeAdapter {
         // Render configuration template
         let config = self
             .base
-            .render_template(&self.config_template, &context)
+            .render_template(CLAUDE_CONFIG_TEMPLATE, &context)
             .map_err(|e| {
                 error!(error = %e, "Failed to render Claude configuration template");
                 e
