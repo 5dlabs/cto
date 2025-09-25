@@ -1,5 +1,9 @@
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
+use crate::tasks::template_paths::{
+    CODE_MCP_CONFIG_TEMPLATE, DOCS_CLAUDE_CONTAINER_TEMPLATE, DOCS_CLAUDE_MEMORY_TEMPLATE,
+    DOCS_CLAUDE_PROMPT_TEMPLATE, DOCS_CLAUDE_SETTINGS_TEMPLATE,
+};
 use crate::tasks::types::Result;
 use handlebars::Handlebars;
 use serde_json::json;
@@ -63,7 +67,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/claude/container.sh.hbs")?;
+        let template = Self::load_template(DOCS_CLAUDE_CONTAINER_TEMPLATE)?;
 
         handlebars
             .register_template_string("container_script", template)
@@ -96,7 +100,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/claude/memory.md.hbs")?;
+        let template = Self::load_template(DOCS_CLAUDE_MEMORY_TEMPLATE)?;
 
         handlebars
             .register_template_string("claude_memory", template)
@@ -124,7 +128,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/claude/settings.json.hbs")?;
+        let template = Self::load_template(DOCS_CLAUDE_SETTINGS_TEMPLATE)?;
 
         handlebars
             .register_template_string("claude_settings", template)
@@ -162,7 +166,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/claude/prompt.md.hbs")?;
+        let template = Self::load_template(DOCS_CLAUDE_PROMPT_TEMPLATE)?;
 
         handlebars
             .register_template_string("docs_prompt", template)
@@ -187,7 +191,7 @@ impl DocsTemplateGenerator {
 
     fn generate_mcp_config() -> Result<String> {
         // Reuse the code template to avoid duplication in the templates ConfigMap
-        Self::load_template("code/mcp.json.hbs")
+        Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
     }
 
     /// Generate agent-centric client-config.json for DocsRun.

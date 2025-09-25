@@ -10,6 +10,7 @@ use crate::cli::adapter::{
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
+use crate::tasks::template_paths::CODE_CLAUDE_CONFIG_TEMPLATE;
 use anyhow::Result;
 use async_trait::async_trait;
 use regex::Regex;
@@ -18,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument};
 
-const CLAUDE_CONFIG_TEMPLATE: &str = "code/claude/config.json.hbs";
+const CLAUDE_CONFIG_TEMPLATE: &str = CODE_CLAUDE_CONFIG_TEMPLATE;
 
 /// Claude CLI adapter - reference implementation
 #[derive(Debug)]

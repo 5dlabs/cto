@@ -1,6 +1,11 @@
 use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
 use crate::tasks::config::ControllerConfig;
+use crate::tasks::template_paths::{
+    CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
+    CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
+    CODE_CODING_GUIDELINES_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+};
 use crate::tasks::types::Result;
 use handlebars::Handlebars;
 
@@ -93,7 +98,7 @@ impl CodeTemplateGenerator {
                     "Agent-specific template {} not found, falling back to default",
                     template_path
                 );
-                Self::load_template("code/claude/container.sh.hbs")?
+                Self::load_template(CODE_CLAUDE_CONTAINER_TEMPLATE)?
             }
             Err(e) => return Err(e),
         };
@@ -133,7 +138,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/claude/memory.md.hbs")?;
+        let template = Self::load_template(CODE_CLAUDE_MEMORY_TEMPLATE)?;
 
         handlebars
             .register_template_string("claude_memory", template)
@@ -233,7 +238,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/claude/settings.json.hbs")?;
+        let template = Self::load_template(CODE_CLAUDE_SETTINGS_TEMPLATE)?;
 
         handlebars
             .register_template_string("claude_settings", template)
@@ -258,7 +263,7 @@ impl CodeTemplateGenerator {
 
     fn generate_mcp_config(_code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
         // MCP config is currently static, so just load and return the template content
-        Self::load_template("code/mcp.json.hbs")
+        Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
     }
 
     fn generate_codex_container_script(
@@ -269,7 +274,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let base_template = Self::load_template("code/codex/container-base.sh.hbs")?;
+        let base_template = Self::load_template(CODE_CODEX_CONTAINER_BASE_TEMPLATE)?;
         handlebars
             .register_partial("codex_container_base", base_template)
             .map_err(|e| {
@@ -389,7 +394,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/codex/config.toml.hbs")?;
+        let template = Self::load_template(CODE_CODEX_CONFIG_TEMPLATE)?;
 
         handlebars
             .register_template_string("codex_config", template)
@@ -907,7 +912,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/coding-guidelines.md.hbs")?;
+        let template = Self::load_template(CODE_CODING_GUIDELINES_TEMPLATE)?;
 
         handlebars
             .register_template_string("coding_guidelines", template)
@@ -935,7 +940,7 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("code/github-guidelines.md.hbs")?;
+        let template = Self::load_template(CODE_GITHUB_GUIDELINES_TEMPLATE)?;
 
         handlebars
             .register_template_string("github_guidelines", template)
