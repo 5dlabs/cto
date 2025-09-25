@@ -1,5 +1,6 @@
 use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
+use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, Context, Result};
@@ -559,12 +560,13 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
-        // Mount settings.json as managed-settings.json for enterprise compatibility
-        volume_mounts.push(json!({
-            "name": "task-files",
-            "mountPath": "/etc/claude-code/managed-settings.json",
-            "subPath": "settings.json"
-        }));
+        if Self::code_run_cli_type(code_run) == CLIType::Claude {
+            volume_mounts.push(json!({
+                "name": "task-files",
+                "mountPath": "/etc/claude-code/managed-settings.json",
+                "subPath": "settings.json"
+            }));
+        }
 
         // PVC workspace volume for code (persistent across sessions)
         // Use conditional naming based on agent classification
@@ -1236,6 +1238,15 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         sanitized
+    }
+
+    fn code_run_cli_type(code_run: &CodeRun) -> CLIType {
+        code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|cfg| cfg.cli_type)
+            .unwrap_or(CLIType::Claude)
     }
 
     /// Select the appropriate Docker image based on the CLI type specified in the CodeRun
