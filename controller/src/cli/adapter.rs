@@ -4,15 +4,12 @@
 //! This trait system enables consistent behavior while preserving each CLI's unique capabilities.
 
 use crate::cli::types::*;
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{error, info, warn};
 
 /// Core CLI abstraction trait providing unified interface for all CLI providers
 #[async_trait]

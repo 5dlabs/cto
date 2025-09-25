@@ -10,14 +10,13 @@ use crate::cli::adapter::{
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
 use crate::cli::types::CLIType;
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use handlebars::Handlebars;
 use regex::Regex;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument};
 
 /// Claude CLI adapter - reference implementation
 #[derive(Debug)]

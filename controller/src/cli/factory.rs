@@ -4,9 +4,8 @@
 //! and dynamic adapter discovery.
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
-use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
+use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
-use anyhow::Result;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;

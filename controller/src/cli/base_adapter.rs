@@ -4,11 +4,10 @@
 //! template rendering, and common utilities.
 
 use crate::cli::adapter::{
-    AdapterError, AdapterResult, AgentConfig, CliCapabilities, ContainerContext, HealthState,
+    AdapterError, AdapterResult, AgentConfig, ContainerContext, HealthState,
     HealthStatus,
 };
 use crate::cli::types::CLIType;
-use anyhow::{Context as AnyhowContext, Result};
 use handlebars::{handlebars_helper, Handlebars, Helper, HelperResult, Output, RenderContext, Context as HandlebarsContext};
 use opentelemetry::{
     global,
