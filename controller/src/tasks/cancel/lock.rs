@@ -294,15 +294,19 @@ impl ActiveLease {
                 interval.tick().await;
 
                 // Attempt to renew the lease
-                if let Err(e) = Self::renew_lease(&lease_api, &lease_name).await {
-                    error!(
-                        lease_name = %lease_name,
-                        error = %e,
-                        "Failed to renew lease, lease may expire"
-                    );
-                    break;
+                match Self::renew_lease(&lease_api, &lease_name).await {
+                    Ok(()) => {
+                        debug!(lease_name = %lease_name, "Lease renewed successfully");
+                    }
+                    Err(e) => {
+                        error!(
+                            lease_name = %lease_name,
+                            error = %e,
+                            "Failed to renew lease, lease may expire"
+                        );
+                        break;
+                    }
                 }
-                debug!(lease_name = %lease_name, "Lease renewed successfully");
             }
         });
 
