@@ -8,29 +8,30 @@
 //! while preserving their unique capabilities and requirements.
 
 pub mod adapter;
-pub mod base_adapter;
-pub mod factory;
 pub mod adapters;
+pub mod base_adapter;
 pub mod bridge;
 pub mod discovery;
+pub mod factory;
 pub mod router;
 pub mod session;
 pub mod types;
 
 // Re-export new trait system components
 pub use adapter::{
-    CliAdapter, AgentConfig, CliCapabilities, ContainerContext, ParsedResponse, HealthStatus,
-    AuthMethod, ConfigFormat, MemoryStrategy, ToolCall, ResponseMetadata, FinishReason,
-    StreamingDelta, HealthState, AdapterError, AdapterResult,
+    AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
+    ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
+    ParsedResponse, ResponseMetadata, StreamingDelta, ToolCall,
 };
-pub use base_adapter::{BaseAdapter, AdapterConfig, AdapterMetrics};
+pub use adapters::ClaudeAdapter;
+pub use base_adapter::{AdapterConfig, AdapterMetrics, BaseAdapter};
 pub use factory::{AdapterFactory, FactoryConfig, FactoryStats};
-pub use adapters::{ClaudeAdapter};
 
 // Re-export legacy components for backward compatibility
 pub use adapter::{CLIExecutionAdapter, CommandBuilder, ResultProcessor};
 pub use bridge::{
-    CLIAdapter as BridgeCLIAdapter, ConfigurationBridge, JsonCLIAdapter, MarkdownCLIAdapter, TomlCLIAdapter,
+    CLIAdapter as BridgeCLIAdapter, ConfigurationBridge, JsonCLIAdapter, MarkdownCLIAdapter,
+    TomlCLIAdapter,
 };
 pub use discovery::DiscoveryService;
 pub use router::CLIRouter;

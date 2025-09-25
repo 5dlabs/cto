@@ -4,11 +4,13 @@
 //! template rendering, and common utilities.
 
 use crate::cli::adapter::{
-    AdapterError, AdapterResult, AgentConfig, ContainerContext, HealthState,
-    HealthStatus,
+    AdapterError, AdapterResult, AgentConfig, ContainerContext, HealthState, HealthStatus,
 };
 use crate::cli::types::CLIType;
-use handlebars::{handlebars_helper, Handlebars, Helper, HelperResult, Output, RenderContext, Context as HandlebarsContext};
+use handlebars::{
+    handlebars_helper, Context as HandlebarsContext, Handlebars, Helper, HelperResult, Output,
+    RenderContext,
+};
 use opentelemetry::{
     global,
     metrics::{Counter, Histogram},
@@ -110,7 +112,10 @@ impl BaseAdapter {
     pub fn log_operation(&self, operation: &str, context: &HashMap<String, String>) {
         let mut log_context = context.clone();
         log_context.insert("cli_type".to_string(), self.cli_type.to_string());
-        log_context.insert("correlation_id".to_string(), self.config.correlation_id.clone());
+        log_context.insert(
+            "correlation_id".to_string(),
+            self.config.correlation_id.clone(),
+        );
 
         info!(
             operation = %operation,
@@ -275,20 +280,29 @@ impl BaseAdapter {
         });
 
         // Helper for timestamp formatting
-        fn timestamp_helper(_: &Helper, _: &Handlebars, _: &HandlebarsContext, _: &mut RenderContext, out: &mut dyn Output) -> HelperResult {
+        fn timestamp_helper(
+            _: &Helper,
+            _: &Handlebars,
+            _: &HandlebarsContext,
+            _: &mut RenderContext,
+            out: &mut dyn Output,
+        ) -> HelperResult {
             let timestamp = chrono::Utc::now().to_rfc3339();
             out.write(&timestamp)?;
             Ok(())
         }
 
         // Helper for environment variable substitution
-        fn env_helper(h: &Helper, _: &Handlebars, _: &HandlebarsContext, _: &mut RenderContext, out: &mut dyn Output) -> HelperResult {
-            let var_name = h.param(0)
-                .and_then(|v| v.value().as_str())
-                .unwrap_or("");
+        fn env_helper(
+            h: &Helper,
+            _: &Handlebars,
+            _: &HandlebarsContext,
+            _: &mut RenderContext,
+            out: &mut dyn Output,
+        ) -> HelperResult {
+            let var_name = h.param(0).and_then(|v| v.value().as_str()).unwrap_or("");
 
-            let value = std::env::var(var_name)
-                .unwrap_or_else(|_| format!("${{{}}}", var_name));
+            let value = std::env::var(var_name).unwrap_or_else(|_| format!("${{{}}}", var_name));
 
             out.write(&value)?;
             Ok(())
@@ -328,7 +342,10 @@ impl BaseAdapter {
 
     /// Perform common health checks
     #[instrument(skip(self, container))]
-    pub async fn base_health_check(&self, container: &ContainerContext) -> AdapterResult<HealthStatus> {
+    pub async fn base_health_check(
+        &self,
+        container: &ContainerContext,
+    ) -> AdapterResult<HealthStatus> {
         let _ctx = self.create_operation_context("health_check");
         let start_time = Instant::now();
         let mut health_details = HashMap::new();
@@ -361,10 +378,7 @@ impl BaseAdapter {
         }
 
         let duration = start_time.elapsed();
-        health_details.insert(
-            "check_duration_ms".to_string(),
-            json!(duration.as_millis()),
-        );
+        health_details.insert("check_duration_ms".to_string(), json!(duration.as_millis()));
 
         // Determine overall health
         let is_healthy = template_test.is_ok() && duration < self.config.health_check_timeout;
@@ -464,11 +478,26 @@ impl BaseAdapter {
         let mut summary = HashMap::new();
 
         summary.insert("cli_type".to_string(), json!(self.cli_type.to_string()));
-        summary.insert("correlation_id".to_string(), json!(self.config.correlation_id));
-        summary.insert("template_cache_size".to_string(), json!(self.config.template_cache_size));
-        summary.insert("health_check_timeout_ms".to_string(), json!(self.config.health_check_timeout.as_millis()));
-        summary.insert("metrics_prefix".to_string(), json!(self.config.metrics_prefix));
-        summary.insert("verbose_logging".to_string(), json!(self.config.verbose_logging));
+        summary.insert(
+            "correlation_id".to_string(),
+            json!(self.config.correlation_id),
+        );
+        summary.insert(
+            "template_cache_size".to_string(),
+            json!(self.config.template_cache_size),
+        );
+        summary.insert(
+            "health_check_timeout_ms".to_string(),
+            json!(self.config.health_check_timeout.as_millis()),
+        );
+        summary.insert(
+            "metrics_prefix".to_string(),
+            json!(self.config.metrics_prefix),
+        );
+        summary.insert(
+            "verbose_logging".to_string(),
+            json!(self.config.verbose_logging),
+        );
 
         summary
     }
@@ -643,8 +672,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_summary() {
-        let config = AdapterConfig::new(CLIType::Gemini)
-            .with_correlation_id("test-456".to_string());
+        let config =
+            AdapterConfig::new(CLIType::Gemini).with_correlation_id("test-456".to_string());
 
         let adapter = BaseAdapter::new(config).await.unwrap();
         let summary = adapter.get_config_summary();

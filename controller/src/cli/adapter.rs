@@ -3,7 +3,7 @@
 //! Core abstraction layer providing unified CLI interactions across 8 different CLI tools.
 //! This trait system enables consistent behavior while preserving each CLI's unique capabilities.
 
-use crate::cli::types::*;
+use crate::cli::types::{CLIExecutionContext, CLIExecutionResult, CLIType, ConfigFile};
 use anyhow::Result;
 use async_trait::async_trait;
 use k8s_openapi::api::core::v1::Pod;
@@ -157,7 +157,7 @@ pub enum MemoryStrategy {
     MarkdownFile(String),
     /// Subdirectory with multiple files (Grok: .grok/GROK.md)
     Subdirectory(String),
-    /// Session-based memory (Cursor, OpenHands)
+    /// Session-based memory (Cursor, `OpenHands`)
     SessionBased,
     /// Configuration-based persistence
     ConfigurationBased,
@@ -183,7 +183,7 @@ pub enum ConfigFormat {
 pub enum AuthMethod {
     /// Session token (Claude)
     SessionToken,
-    /// API key (OpenAI, Anthropic)
+    /// API key (`OpenAI`, Anthropic)
     ApiKey,
     /// OAuth flow (Google)
     OAuth,
@@ -264,6 +264,7 @@ pub struct CLIExecutionAdapter {
 
 impl CLIExecutionAdapter {
     /// Create a new legacy adapter for a specific CLI type
+    #[must_use]
     pub fn new(cli_type: CLIType) -> Self {
         Self { cli_type }
     }
@@ -780,7 +781,7 @@ mod tests {
         }
 
         match session_memory {
-            MemoryStrategy::SessionBased => {},
+            MemoryStrategy::SessionBased => {}
             _ => panic!("Expected SessionBased variant"),
         }
     }

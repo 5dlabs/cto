@@ -54,7 +54,10 @@ impl ClaudeAdapter {
     }
 
     /// Generate MCP configuration for Claude
-    fn generate_mcp_config(&self, tools: &Option<crate::cli::adapter::ToolConfiguration>) -> AdapterResult<Value> {
+    fn generate_mcp_config(
+        &self,
+        tools: &Option<crate::cli::adapter::ToolConfiguration>,
+    ) -> AdapterResult<Value> {
         let mut mcp_servers = json!({});
 
         if let Some(tool_config) = tools {
@@ -191,9 +194,7 @@ impl CliAdapter for ClaudeAdapter {
     async fn parse_response(&self, response: &str) -> Result<ParsedResponse> {
         debug!(response_length = response.len(), "Parsing Claude response");
 
-        let context = HashMap::from([
-            ("response_length".to_string(), response.len().to_string()),
-        ]);
+        let context = HashMap::from([("response_length".to_string(), response.len().to_string())]);
         self.base.log_operation("parse_response", &context);
 
         // Parse tool calls from Claude response
@@ -264,7 +265,10 @@ impl CliAdapter for ClaudeAdapter {
 
         // Log Claude-specific environment
         if let Some(claude_session) = container.env_vars.get("CLAUDE_SESSION_TOKEN") {
-            debug!(has_session_token = !claude_session.is_empty(), "Claude session token status");
+            debug!(
+                has_session_token = !claude_session.is_empty(),
+                "Claude session token status"
+            );
         }
 
         info!("Claude adapter initialization completed");
@@ -373,17 +377,14 @@ impl ClaudeAdapter {
         let mut tool_calls = Vec::new();
 
         // Regex to match Claude tool calls
-        let function_calls_regex = Regex::new(
-            r"<function_calls>(.*?)</function_calls>",
-        ).map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
+        let function_calls_regex = Regex::new(r"<function_calls>(.*?)</function_calls>")
+            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
 
-        let invoke_regex = Regex::new(
-            r#"<invoke name="([^"]+)">(.*?)</invoke>"#,
-        ).map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
+        let invoke_regex = Regex::new(r#"<invoke name="([^"]+)">(.*?)</invoke>"#)
+            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
 
-        let parameter_regex = Regex::new(
-            r#"<parameter name="([^"]+)">([^<]*)</parameter>"#,
-        ).map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
+        let parameter_regex = Regex::new(r#"<parameter name="([^"]+)">([^<]*)</parameter>"#)
+            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
 
         // Find all function call blocks
         for function_calls_match in function_calls_regex.captures_iter(response) {
@@ -399,7 +400,10 @@ impl ClaudeAdapter {
                 for param_match in parameter_regex.captures_iter(parameters_content) {
                     let param_name = &param_match[1];
                     let param_value = &param_match[2];
-                    arguments.insert(param_name.to_string(), Value::String(param_value.to_string()));
+                    arguments.insert(
+                        param_name.to_string(),
+                        Value::String(param_value.to_string()),
+                    );
                 }
 
                 tool_calls.push(ToolCall {
@@ -410,7 +414,10 @@ impl ClaudeAdapter {
             }
         }
 
-        debug!(tool_calls_count = tool_calls.len(), "Extracted tool calls from response");
+        debug!(
+            tool_calls_count = tool_calls.len(),
+            "Extracted tool calls from response"
+        );
         Ok(tool_calls)
     }
 
@@ -509,7 +516,9 @@ mod tests {
         assert!(capabilities.supports_system_prompts);
         assert_eq!(capabilities.max_context_tokens, 200_000);
         assert_eq!(capabilities.config_format, ConfigFormat::Json);
-        assert!(capabilities.authentication_methods.contains(&AuthMethod::SessionToken));
+        assert!(capabilities
+            .authentication_methods
+            .contains(&AuthMethod::SessionToken));
     }
 
     #[tokio::test]
@@ -517,8 +526,14 @@ mod tests {
         let adapter = ClaudeAdapter::new().await.unwrap();
 
         // Valid models
-        assert!(adapter.validate_model("claude-3-5-sonnet-20241022").await.unwrap());
-        assert!(adapter.validate_model("claude-3-opus-20240229").await.unwrap());
+        assert!(adapter
+            .validate_model("claude-3-5-sonnet-20241022")
+            .await
+            .unwrap());
+        assert!(adapter
+            .validate_model("claude-3-opus-20240229")
+            .await
+            .unwrap());
         assert!(adapter.validate_model("opus").await.unwrap());
         assert!(adapter.validate_model("sonnet").await.unwrap());
 
@@ -540,12 +555,13 @@ mod tests {
             temperature: Some(0.7),
             tools: Some(crate::cli::adapter::ToolConfiguration {
                 remote: vec!["memory_create_entities".to_string()],
-                local_servers: Some(HashMap::from([
-                    ("filesystem".to_string(), LocalServerConfig {
+                local_servers: Some(HashMap::from([(
+                    "filesystem".to_string(),
+                    LocalServerConfig {
                         enabled: true,
                         tools: vec!["read_file".to_string(), "write_file".to_string()],
-                    }),
-                ])),
+                    },
+                )])),
             }),
             cli_config: None,
         };
@@ -590,7 +606,10 @@ The file has been read successfully."#;
 
         let parsed_with_tools = adapter.parse_response(tool_response).await.unwrap();
         // Check that we correctly detect tool usage
-        assert!(parsed_with_tools.tool_calls.len() > 0 || parsed_with_tools.finish_reason == FinishReason::Stop);
+        assert!(
+            parsed_with_tools.tool_calls.len() > 0
+                || parsed_with_tools.finish_reason == FinishReason::Stop
+        );
         // In our basic implementation, tool calls are parsed from the content
         if !parsed_with_tools.tool_calls.is_empty() {
             assert_eq!(parsed_with_tools.tool_calls[0].name, "read_file");
@@ -604,7 +623,10 @@ The file has been read successfully."#;
         let health = adapter.health_check().await.unwrap();
 
         // Health check should pass for basic functionality
-        assert!(matches!(health.status, HealthState::Healthy | HealthState::Warning));
+        assert!(matches!(
+            health.status,
+            HealthState::Healthy | HealthState::Warning
+        ));
         assert!(health.details.contains_key("model_validation"));
         assert!(health.details.contains_key("config_generation"));
         assert!(health.details.contains_key("response_parsing"));
@@ -647,7 +669,10 @@ I'll help you with that task.
 Done!
 "#;
 
-        let tool_calls = adapter.extract_tool_calls(response_with_tools).await.unwrap();
+        let tool_calls = adapter
+            .extract_tool_calls(response_with_tools)
+            .await
+            .unwrap();
         // In our basic implementation, tool calls are parsed as best effort
         // The test may find 0, 1, or 2 tool calls depending on parsing logic
         // Basic sanity check - tool_calls should be a valid Vec

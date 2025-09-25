@@ -6,6 +6,7 @@
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
+use anyhow::Result;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -57,6 +58,33 @@ pub struct ConfigRegistry {
     defaults: HashMap<CLIType, AdapterConfig>,
     /// Override configurations
     overrides: HashMap<String, AdapterConfig>,
+}
+
+impl ConfigRegistry {
+    /// Create a new configuration registry
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set default configuration for a CLI type
+    pub fn set_default(&mut self, cli_type: CLIType, config: AdapterConfig) {
+        self.defaults.insert(cli_type, config);
+    }
+
+    /// Get default configuration for a CLI type
+    pub fn get_default(&self, cli_type: CLIType) -> Option<&AdapterConfig> {
+        self.defaults.get(&cli_type)
+    }
+
+    /// Set override configuration
+    pub fn set_override(&mut self, key: String, config: AdapterConfig) {
+        self.overrides.insert(key, config);
+    }
+
+    /// Get override configuration
+    pub fn get_override(&self, key: &str) -> Option<&AdapterConfig> {
+        self.overrides.get(key)
+    }
 }
 
 /// Health monitor for tracking adapter health over time
@@ -121,8 +149,10 @@ impl AdapterFactory {
             factory.start_health_monitoring().await;
         }
 
-        info!("Adapter factory initialized with {} CLI types supported",
-              factory.get_supported_clis().len());
+        info!(
+            "Adapter factory initialized with {} CLI types supported",
+            factory.get_supported_clis().len()
+        );
 
         Ok(factory)
     }
@@ -232,6 +262,11 @@ impl AdapterFactory {
         }
 
         health_summary
+    }
+
+    /// Get configuration registry (for configuration management)
+    pub async fn get_config_registry(&self) -> Arc<RwLock<ConfigRegistry>> {
+        self.config_registry.clone()
     }
 
     /// Get detailed factory statistics
@@ -430,7 +465,7 @@ impl HealthMonitor {
 mod tests {
     use super::*;
     use crate::cli::adapter::{
-        AgentConfig, CliCapabilities, ConfigFormat, ContainerContext, MemoryStrategy, AuthMethod,
+        AgentConfig, AuthMethod, CliCapabilities, ConfigFormat, ContainerContext, MemoryStrategy,
     };
     use async_trait::async_trait;
     use std::collections::HashMap;
@@ -456,7 +491,10 @@ mod tests {
             format!("Mock: {}", prompt)
         }
 
-        async fn parse_response(&self, response: &str) -> Result<crate::cli::adapter::ParsedResponse> {
+        async fn parse_response(
+            &self,
+            response: &str,
+        ) -> Result<crate::cli::adapter::ParsedResponse> {
             Ok(crate::cli::adapter::ParsedResponse {
                 content: response.to_string(),
                 tool_calls: vec![],
@@ -563,7 +601,10 @@ mod tests {
 
         let result = factory.create(CLIType::Gemini).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AdapterError::UnsupportedCliType(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AdapterError::UnsupportedCliType(_)
+        ));
     }
 
     #[tokio::test]
@@ -580,14 +621,26 @@ mod tests {
             healthy: false,
         });
 
-        factory.register_adapter(CLIType::Claude, healthy_adapter).await.unwrap();
-        factory.register_adapter(CLIType::Codex, unhealthy_adapter).await.unwrap();
+        factory
+            .register_adapter(CLIType::Claude, healthy_adapter)
+            .await
+            .unwrap();
+        factory
+            .register_adapter(CLIType::Codex, unhealthy_adapter)
+            .await
+            .unwrap();
 
         let health_summary = factory.get_health_summary().await;
 
         assert_eq!(health_summary.len(), 2);
-        assert_eq!(health_summary[&CLIType::Claude].status, HealthState::Healthy);
-        assert_eq!(health_summary[&CLIType::Codex].status, HealthState::Unhealthy);
+        assert_eq!(
+            health_summary[&CLIType::Claude].status,
+            HealthState::Healthy
+        );
+        assert_eq!(
+            health_summary[&CLIType::Codex].status,
+            HealthState::Unhealthy
+        );
     }
 
     #[tokio::test]
@@ -599,7 +652,10 @@ mod tests {
             healthy: true,
         });
 
-        factory.register_adapter(CLIType::Claude, healthy_adapter).await.unwrap();
+        factory
+            .register_adapter(CLIType::Claude, healthy_adapter)
+            .await
+            .unwrap();
 
         let stats = factory.get_factory_stats().await;
 
