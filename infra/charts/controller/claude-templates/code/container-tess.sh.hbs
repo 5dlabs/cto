@@ -814,6 +814,40 @@ pr_remove_labels() {
   done
 }
 
+update_coderun_status() {
+  local remediation="$1"
+  local qa="$2"
+  local pr_url_value="${3:-$PR_URL}"
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local patch
+  patch=$(jq -n \
+    --arg ts "$timestamp" \
+    --arg pr "$pr_url_value" \
+    --arg rem "$remediation" \
+    --arg qa "$qa" \
+    '{status: ({lastUpdate: $ts}
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+        + (if $rem != "" then {remediationStatus: $rem} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end))}')
+
+  if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+    kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$patch" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to update CodeRun status with remediation context"
+  fi
+}
+
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
@@ -1951,6 +1985,7 @@ $FAILED_DETAILS
         "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
     fi
+    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
   elif [ "$PENDING_CHECKS" -gt 0 ]; then
     echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
     # Get details of pending checks
@@ -1984,6 +2019,7 @@ $PENDING_DETAILS
         "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
     fi
+    update_coderun_status "$STATUS_LABEL_NEEDS_TESS" "pending" "$PR_URL"
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
     echo "✅ All CI checks passing - posting APPROVE review"
     # Get details of successful checks
@@ -2025,6 +2061,7 @@ $SUCCESS_DETAILS
         "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_APPROVED"
     fi
+    update_coderun_status "$STATUS_LABEL_APPROVED" "approved" "$PR_URL"
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
     timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
@@ -2056,6 +2093,7 @@ $SUCCESS_DETAILS
         "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
       pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
     fi
+    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
   fi
 
 else

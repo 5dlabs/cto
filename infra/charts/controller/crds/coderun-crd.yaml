@@ -147,6 +147,12 @@ spec:
               pullRequestUrl:
                 type: string
                 description: "Pull request URL if created"
+              remediationStatus:
+                type: string
+                description: "Latest remediation status label applied to the PR (needs-fixes, needs-tess, approved, etc.)"
+              qaStatus:
+                type: string
+                description: "QA decision recorded by Tess (approved, changes_requested, pending)"
               retryCount:
                 type: integer
                 description: "Current retry attempt (if applicable)"

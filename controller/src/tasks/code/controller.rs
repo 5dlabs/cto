@@ -415,6 +415,16 @@ async fn handle_workflow_resumption_on_completion(code_run: &CodeRun, ctx: &Cont
         }
     };
 
+    let remediation_status = code_run
+        .status
+        .as_ref()
+        .and_then(|s| s.remediation_status.as_deref());
+
+    let qa_status = code_run
+        .status
+        .as_ref()
+        .and_then(|s| s.qa_status.as_deref());
+
     // Check if PR URL is already available
     if let Some(status) = &code_run.status {
         if let Some(pr_url) = &status.pull_request_url {
@@ -433,6 +443,8 @@ async fn handle_workflow_resumption_on_completion(code_run: &CodeRun, ctx: &Cont
                     &workflow_name,
                     pr_url,
                     pr_number,
+                    remediation_status,
+                    qa_status,
                 )
                 .await
                 {
@@ -518,12 +530,22 @@ async fn handle_no_pr_timeout(
                         return Ok(());
                     }
                 };
+                let remediation_status = updated_code_run
+                    .status
+                    .as_ref()
+                    .and_then(|s| s.remediation_status.as_deref());
+                let qa_status = updated_code_run
+                    .status
+                    .as_ref()
+                    .and_then(|s| s.qa_status.as_deref());
                 if let Err(e) = crate::tasks::workflow::resume_workflow_for_pr(
                     &ctx.client,
                     &ctx.namespace,
                     workflow_name,
                     pr_url,
                     pr_number,
+                    remediation_status,
+                    qa_status,
                 )
                 .await
                 {
@@ -553,12 +575,22 @@ async fn handle_no_pr_timeout(
                 return Ok(());
             }
         };
+        let remediation_status = updated_code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.remediation_status.as_deref());
+        let qa_status = updated_code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.qa_status.as_deref());
         if let Err(e) = crate::tasks::workflow::resume_workflow_for_pr(
             &ctx.client,
             &ctx.namespace,
             workflow_name,
             &pr_url,
             pr_number,
+            remediation_status,
+            qa_status,
         )
         .await
         {

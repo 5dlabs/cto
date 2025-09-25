@@ -166,6 +166,14 @@ pub struct CodeRunStatus {
     /// Pull request URL if created
     pub pull_request_url: Option<String>,
 
+    /// Latest remediation status label applied to the PR (e.g., needs-fixes, needs-tess, approved)
+    #[serde(rename = "remediationStatus", skip_serializing_if = "Option::is_none")]
+    pub remediation_status: Option<String>,
+
+    /// QA decision captured from Tess (approved, changes_requested, pending)
+    #[serde(rename = "qaStatus", skip_serializing_if = "Option::is_none")]
+    pub qa_status: Option<String>,
+
     /// Current retry attempt (if applicable)
     pub retry_count: Option<u32>,
 
