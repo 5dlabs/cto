@@ -1,139 +1,91 @@
-# AI Agent Prompt: Initialize Project Structure and Dependencies
+# AI Agent Prompt: Simplify Model Validation for Multi-CLI Support
 
-You are a senior DevOps and Rust engineer tasked with setting up the foundational project structure for a Multi-CLI Agent Platform. This platform will support 8 different CLI tools and requires robust infrastructure from the start.
+You are a senior Rust engineer focused on removing blockers and enabling rapid multi-CLI integration. Your mission: eliminate the hard-coded Claude-only model validation that prevents multi-CLI support with a minimal, flexible solution.
 
 ## Your Mission
-Analyze the existing comprehensive project structure that includes:
-1. Rust workspace with controller implementation
-2. Rust-based MCP integration layer  
-3. Existing Docker infrastructure for 8 different CLI containers
-4. CI/CD pipeline with GitHub Actions
-5. Current build system and development workflow
+The current `validate_model_name()` function in `/mcp/src/main.rs` blocks all non-Claude models. You need to replace this with a simple, permissive validation approach that allows rapid CLI integration without complex model catalogs or validation frameworks.
 
-## Technical Requirements
+## Current Blocking Code
+```rust
+fn validate_model_name(model: &str) -> Result<()> {
+    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model) {
+        return Err(anyhow!(
+            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
+            model
+        ));
+    }
+    Ok(())
+}
+```
 
-### Rust Workspace Setup
-- Create `Cargo.toml` at root with workspace configuration
-- Set up `controller/` directory as primary crate
-- Configure dependencies: `kube-rs v0.95.0`, `tokio v1.41.0`
-- Implement basic Kubernetes client in `controller/src/main.rs`
-- Follow Rust best practices for error handling and async patterns
+This blocks models like `gpt-4o`, `gpt-5-codex`, `gemini-pro`, `qwen-max`, etc.
 
-### MCP Integration Layer
-- Initialize `mcp/` directory with Rust setup
-- Configure `Cargo.toml` with appropriate MCP protocol dependencies
-- Set up proper Rust configuration and project structure
-- Prepare for Model Context Protocol integration
+## Simple Solution Approach
 
-### Container Infrastructure
-Design `infra/images/` with subdirectories:
-- `claude/` - Node.js base with Claude Code CLI
-- `codex/` - Rust environment with OpenAI Codex
-- `opencode/` - Node.js environment for OpenCode CLI
-- `gemini/` - Node.js environment for Google Gemini CLI
-- `grok/` - Bun/Node.js environment for Grok CLI
-- `qwen/` - Node.js environment for Qwen CLI
-- `cursor/` - Python environment for Cursor
-- `openhands/` - Python environment for OpenHands
+### Replace Hard-Coded Validation
+Replace the restrictive validation with a permissive approach that allows any reasonable model name:
 
-### GitHub Actions Configuration
-Create `.github/workflows/build-images.yml` with:
-- Multi-architecture builds (amd64, arm64)
-- Docker buildx setup
-- Container registry integration
-- Automated testing and security scanning
+```rust
+fn validate_model_name(model: &str) -> Result<()> {
+    // Simple validation: reject empty or obviously invalid names
+    if model.trim().is_empty() {
+        return Err(anyhow!("Model name cannot be empty"));
+    }
+    
+    // Allow any non-empty model name - let the CLI handle model-specific validation
+    Ok(())
+}
+```
 
-### Build System Design
-Implement comprehensive Makefile with targets:
-- `build`: Build all components in correct order
-- `test`: Run comprehensive test suites
-- `deploy`: Deploy to Kubernetes cluster
-- `clean`: Clean all build artifacts
-- `help`: Display available targets
+### Key Principles
+- **Permissive by default**: Accept any reasonable model name
+- **Fail fast**: Let individual CLIs handle their specific validation
+- **No hardcoding**: Avoid maintaining model catalogs or complex validation rules
+- **Future-proof**: New models work automatically without code changes
 
-## Implementation Approach
+## Implementation Steps
 
-### Step 1: Current Architecture Analysis
-1. Analyze existing Rust workspace structure in `controller/` directory
-2. Document current Kubernetes controller implementation and CRDs
-3. Review existing MCP server capabilities in `mcp/` directory
-4. Assess current CLI integration patterns and supported types
+### Step 1: Replace Current Validation
+1. Locate the `validate_model_name()` function in `/mcp/src/main.rs`
+2. Replace the restrictive Claude-only logic with permissive validation
+3. Test that the function accepts various model names from different providers
 
-### Step 2: CLI Documentation Research
-1. **Use CLI documentation tools extensively** to research each CLI:
-   - `agent_docs_codex_query` for OpenAI Codex installation, configuration, and MCP integration
-   - `agent_docs_cursor_query` for Cursor CLI setup, authentication, and usage patterns
-   - `agent_docs_opencode_query` for OpenCode installation, MCP server support, and configuration
-   - `agent_docs_gemini_query` for Google Gemini setup, authentication, and model configuration
-   - `agent_docs_grok_query` for Grok CLI installation, X.AI integration, and MCP tools support
-   - `agent_docs_qwen_query` for Qwen setup, model handling, and API configuration
-   - `agent_docs_openhands_query` for OpenHands Python dependencies, CLI usage, and automation
-2. Document CLI-specific requirements, authentication patterns, and configuration formats
-3. Identify which CLIs support MCP natively vs. need wrapper integration
+### Step 2: Verify Integration Points
+1. Check all callers of `validate_model_name()` 
+2. Ensure the simplified validation works throughout the system
+3. Test with sample model names from each CLI type
 
-### Step 3: Container Infrastructure Assessment
-1. Review existing Docker images in `infra/images/` for all 8 CLI types
-2. Test build processes and identify functional vs. broken images
-3. Cross-reference CLI documentation research with actual Dockerfile implementations
-4. Document configuration requirements per CLI based on research findings
+### Step 3: Update Tests
+1. Update existing unit tests to reflect new permissive validation
+2. Add tests for edge cases (empty strings, whitespace-only)
+3. Remove tests that enforce Claude-specific model name patterns
 
-### Step 4: Deployment and CI/CD Review
-1. Analyze existing GitOps configurations in `infra/gitops/`
-2. Review current GitHub Actions workflows and automation
-3. Test current ArgoCD application deployments
-4. Document manual deployment steps and automation gaps
+## Test Cases to Validate
 
-### Step 5: Research Findings Documentation
-1. **Create comprehensive CLI Research Findings Document** consolidating all research
-2. Provide clear gap analysis between current state and requirements
-3. Prioritize missing functionality and recommend next development phases
-4. Document CLI-specific integration patterns and authentication requirements
+Test the updated function accepts these model names:
+- **Claude**: `claude-3-opus`, `claude-3.5-sonnet`, `opus`, `sonnet`, `haiku`
+- **OpenAI**: `gpt-4o`, `gpt-4-turbo`, `gpt-5-codex`, `o1-preview`, `o3-mini`
+- **Google**: `gemini-1.5-pro`, `gemini-pro`, `gemini-pro-vision`
+- **Qwen**: `qwen-max`, `qwen-turbo`, `qwen-plus`
+- **Grok**: `grok-beta`, `grok-1`, `grok-2`
+- **Custom**: Any reasonable custom model names
 
-## Code Quality Standards
-- All Rust code must pass `cargo clippy` with no warnings
-- Rust code must follow formatting standards with `cargo fmt`
-- Dockerfiles should follow best practices (multi-stage, minimal layers)
-- All scripts should have error handling and logging
-- Documentation should be clear and comprehensive
-
-## Testing Strategy
-- Verify Rust workspace builds with `cargo check`
-- Test Rust MCP layer compiles with `cargo build`
-- Validate Docker infrastructure with test builds
-- Test GitHub Actions workflow with `act` tool
-- Verify all Makefile targets execute successfully
+Test the updated function rejects these:
+- **Empty**: `""`, `"   "` (whitespace only)
+- **Invalid**: Potentially add basic format validation if needed
 
 ## Success Criteria
-Your analysis and research is successful when:
-- ✅ **Comprehensive CLI Research Findings Document** is created with detailed analysis
-- ✅ All CLI documentation tools have been used to research each CLI type
-- ✅ Current architecture state is thoroughly documented
-- ✅ Container infrastructure status is assessed and documented
-- ✅ Gap analysis clearly identifies what exists vs. what's needed
-- ✅ Prioritized recommendations provide clear next steps
-- ✅ CLI-specific integration patterns and requirements are documented
-- ✅ Research findings enable informed development decisions
+- ✅ All non-Claude model names are accepted
+- ✅ Empty/whitespace-only names are rejected  
+- ✅ Existing Claude models continue to work
+- ✅ No complex validation frameworks or model catalogs
+- ✅ Multi-CLI integration is unblocked
+- ✅ All tests pass
 
-## Constraints and Considerations
-- Use specific dependency versions as specified
-- Follow established naming conventions
-- Ensure cross-platform compatibility
-- Plan for scalability with 8 different CLI types
-- Implement security best practices from the start
-- Consider development workflow efficiency
+## Constraints
+- **Keep it simple**: Avoid over-engineering or complex validation systems
+- **No breaking changes**: Existing Claude model names must continue to work
+- **Performance**: Validation should be fast and lightweight
+- **Maintainability**: Solution should be easy to understand and modify
 
-## Deliverables
-1. **CLI Research Findings Document**: Comprehensive report documenting your research findings, including:
-   - Current architecture analysis (Rust controller, MCP server, existing infrastructure)
-   - CLI-specific research results from documentation queries
-   - Container infrastructure assessment  
-   - Gap analysis between documented requirements and current implementation
-   - Prioritized recommendations for next development phases
-2. Assessment of existing Rust workspace and controller implementation
-3. Analysis of current Rust-based MCP integration capabilities
-4. Status report on existing Docker infrastructure for all 8 CLI types
-5. Review of current CI/CD pipeline and deployment processes
-6. Documentation of current build system and development workflow
-7. Clear roadmap for completing the CLI-agnostic platform
-
-Remember: Your research and analysis will guide the development of the entire Multi-CLI Agent Platform. Thorough documentation and comprehensive CLI research are paramount. Use all available CLI documentation tools extensively to provide the most informed analysis possible for the 8 different CLI tools and their unique requirements.
+Remember: The goal is to **unblock multi-CLI support quickly** by removing artificial restrictions, not to build a comprehensive model validation system. Let individual CLIs handle their own model-specific validation.
