@@ -1,14 +1,14 @@
 ---
-# Argo CD Application for Trader Service
-# This enables GitOps deployment of the trader application using the universal Helm chart
+# Argo CD Application for Paper Trader Service
+# This enables GitOps deployment of the paper trader application using the universal Helm chart
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: trader
+  name: paper-trader
   namespace: argocd
   labels:
-    app.kubernetes.io/name: trader
+    app.kubernetes.io/name: paper-trader
     app.kubernetes.io/part-of: platform
     allow-auto-prune: "true"
   finalizers:
