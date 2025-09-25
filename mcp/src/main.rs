@@ -707,7 +707,7 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Local working directory: {working_directory}");
     eprintln!("🐛 DEBUG: Container working directory: {container_working_directory}");
 
-    let workflow_model = implementation_model.clone();
+    let workflow_model = model.clone();
 
     let mut params = vec![
         format!("working-directory={container_working_directory}"),

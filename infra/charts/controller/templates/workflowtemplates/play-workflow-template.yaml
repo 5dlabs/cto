@@ -29,10 +29,15 @@ spec:
       # Store initial parameters for forwarding to subsequent tasks
       platform.agents/initial-params: |
         {
-          "model": "{{`{{workflow.parameters.model}}`}}",
           "implementation-agent": "{{`{{workflow.parameters.implementation-agent}}`}}",
+          "implementation-cli": "{{`{{workflow.parameters.implementation-cli}}`}}",
+          "implementation-model": "{{`{{workflow.parameters.implementation-model}}`}}",
           "quality-agent": "{{`{{workflow.parameters.quality-agent}}`}}",
+          "quality-cli": "{{`{{workflow.parameters.quality-cli}}`}}",
+          "quality-model": "{{`{{workflow.parameters.quality-model}}`}}",
           "testing-agent": "{{`{{workflow.parameters.testing-agent}}`}}",
+          "testing-cli": "{{`{{workflow.parameters.testing-cli}}`}}",
+          "testing-model": "{{`{{workflow.parameters.testing-model}}`}}",
           "repository": "{{`{{workflow.parameters.repository}}`}}",
           "service": "{{`{{workflow.parameters.service}}`}}",
           "docs-repository": "{{`{{workflow.parameters.docs-repository}}`}}",
@@ -73,9 +78,24 @@ spec:
         description: "Directory within docs repository containing project documentation"
         value: ""  # Must be provided by MCP client
 
-      # Model configuration
-      - name: model
-        description: "Claude model to use for all agents"
+      # CLI configuration per agent (multi-CLI aware)
+      - name: implementation-cli
+        description: "CLI to use for implementation agent (e.g., codex, claude)"
+        value: ""  # Must be provided by MCP client
+      - name: implementation-model
+        description: "Model to use for implementation agent (e.g., gpt-5-codex, claude-sonnet-4-20250514)"
+        value: ""  # Must be provided by MCP client
+      - name: quality-cli
+        description: "CLI to use for quality agent (e.g., claude, codex)"
+        value: ""  # Must be provided by MCP client
+      - name: quality-model
+        description: "Model to use for quality agent"
+        value: ""  # Must be provided by MCP client
+      - name: testing-cli
+        description: "CLI to use for testing agent"
+        value: ""  # Must be provided by MCP client
+      - name: testing-model
+        description: "Model to use for testing agent"
         value: ""  # Must be provided by MCP client
 
       # Agent tool configurations (JSON strings from client-side config)
@@ -205,6 +225,8 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: cli-type
+          - name: model
       outputs:
         parameters:
           - name: pr-url
@@ -224,6 +246,10 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: cli-type
+                  value: "{{`{{inputs.parameters.cli-type}}`}}"
+                - name: model
+                  value: "{{`{{inputs.parameters.model}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.implementation-tools}}`}}"
         - - name: wait-for-pr
@@ -267,6 +293,10 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "implementation"
+                - name: cli-type
+                  value: "{{`{{workflow.parameters.implementation-cli}}`}}"
+                - name: model
+                  value: "{{`{{workflow.parameters.implementation-model}}`}}"
         - - name: update-to-waiting-pr-created
             template: update-workflow-stage
             arguments:
@@ -285,6 +315,10 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "quality"
+                - name: cli-type
+                  value: "{{`{{workflow.parameters.quality-cli}}`}}"
+                - name: model
+                  value: "{{`{{workflow.parameters.quality-model}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.quality-tools}}`}}"
                 - name: pr-url
@@ -309,6 +343,10 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "testing"
+                - name: cli-type
+                  value: "{{`{{workflow.parameters.testing-cli}}`}}"
+                - name: model
+                  value: "{{`{{workflow.parameters.testing-model}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.testing-tools}}`}}"
                 - name: pr-url
@@ -631,6 +669,10 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: cli-type
+            default: ""
+          - name: model
+            default: ""
           - name: tools-config
             default: "{}"
           - name: pr-url
@@ -655,6 +697,10 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
+                - name: cli-type
+                  value: "{{`{{inputs.parameters.cli-type}}`}}"
+                - name: model
+                  value: "{{`{{inputs.parameters.model}}`}}"
                 - name: tools-config
                   value: "{{`{{inputs.parameters.tools-config}}`}}"
                 - name: pr-url
@@ -687,6 +733,10 @@ spec:
           - name: github-app
           - name: task-id
           - name: stage
+          - name: cli-type
+            default: ""
+          - name: model
+            default: ""
           - name: tools-config
             default: "{}"
           - name: pr-url
@@ -730,11 +780,14 @@ spec:
             docsProjectDirectory: "{{`{{workflow.parameters.docs-project-directory}}`}}"
             workingDirectory: "."
             githubApp: "{{`{{inputs.parameters.github-app}}`}}"
-            model: "{{`{{workflow.parameters.model}}`}}"
+            model: "{{`{{inputs.parameters.model}}`}}"
             continueSession: true
             overwriteMemory: false
             docsBranch: "main"
             contextVersion: 1
+            cliConfig:
+              cliType: "{{`{{inputs.parameters.cli-type}}`}}"
+              model: "{{`{{inputs.parameters.model}}`}}"
             # Pass task requirements if available
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             # Pass PR context as environment if available
