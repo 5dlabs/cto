@@ -19,7 +19,7 @@ use opentelemetry::{
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, warn};
@@ -55,9 +55,25 @@ pub struct AdapterConfig {
 
 impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
-        let default_template_root = std::env::var("CLI_TEMPLATES_ROOT")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/claude-templates"));
+        let default_template_root = match std::env::var("CLI_TEMPLATES_ROOT") {
+            Ok(path) => PathBuf::from(path),
+            Err(_) => {
+                let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
+                let repo_relative = manifest_dir
+                    .map(PathBuf::from)
+                    .map(|dir| {
+                        dir.join("..")
+                            .join("infra/charts/controller/claude-templates")
+                    })
+                    .filter(|path| path.exists());
+
+                if let Some(path) = repo_relative {
+                    path
+                } else {
+                    PathBuf::from("/claude-templates")
+                }
+            }
+        };
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
@@ -236,8 +252,12 @@ impl BaseAdapter {
     }
 
     /// Render template with Handlebars and context
-    #[instrument(skip(self, template_name, context))]
-    pub fn render_template(&self, template_name: &str, context: &Value) -> AdapterResult<String> {
+    #[instrument(skip(self, template_content, context))]
+    pub fn render_template(
+        &self,
+        template_content: &str,
+        context: &Value,
+    ) -> AdapterResult<String> {
         let start_time = Instant::now();
 
         // Add base context
@@ -257,11 +277,9 @@ impl BaseAdapter {
             );
         }
 
-        let template_content = self.load_template(template_name)?;
-
         let result = self
             .templates
-            .render_template(&template_content, &full_context)
+            .render_template(template_content, &full_context)
             .map_err(|e| {
                 error!(error = %e, "Template rendering failed");
                 AdapterError::TemplateError(format!("Template rendering failed: {e}"))
@@ -276,6 +294,17 @@ impl BaseAdapter {
         );
 
         Ok(result)
+    }
+
+    /// Render template from file relative to template root
+    #[instrument(skip(self, template_path, context))]
+    pub fn render_template_file(
+        &self,
+        template_path: &str,
+        context: &Value,
+    ) -> AdapterResult<String> {
+        let template_content = self.load_template(template_path)?;
+        self.render_template(&template_content, context)
     }
 
     /// Load a template from the configured template root

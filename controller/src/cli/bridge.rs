@@ -93,8 +93,10 @@ impl CLIAdapter for TomlCLIAdapter {
 
         // Basic settings
         toml_config.push_str(&format!("model = \"{}\"\n", universal.settings.model));
-        // Always grant the agent full environment access
-        toml_config.push_str("sandbox_mode = \"danger-full-access\"\n");
+        toml_config.push_str(&format!(
+            "sandbox_mode = \"{}\"\n",
+            universal.settings.sandbox_mode
+        ));
 
         // Model constraints
         if universal.settings.max_tokens > 0 {

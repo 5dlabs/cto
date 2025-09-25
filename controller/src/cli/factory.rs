@@ -169,8 +169,7 @@ impl AdapterFactory {
             .await?;
 
         let codex_adapter = Arc::new(CodexAdapter::new().await?);
-        self.register_adapter(CLIType::Codex, codex_adapter)
-            .await?;
+        self.register_adapter(CLIType::Codex, codex_adapter).await?;
 
         Ok(())
     }
@@ -576,8 +575,9 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 1);
+        assert_eq!(factory.get_supported_clis().len(), 2);
         assert!(factory.supports_cli(CLIType::Claude));
+        assert!(factory.supports_cli(CLIType::Codex));
     }
 
     #[tokio::test]
@@ -594,7 +594,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 1);
+        assert_eq!(factory.get_supported_clis().len(), 2);
     }
 
     #[tokio::test]
@@ -678,8 +678,8 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 1);
-        assert_eq!(stats.healthy_adapters, 1);
+        assert_eq!(stats.total_adapters, 2);
+        assert_eq!(stats.healthy_adapters, 2);
         assert_eq!(stats.warning_adapters, 0);
         assert_eq!(stats.unhealthy_adapters, 0);
     }
