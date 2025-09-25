@@ -30,8 +30,23 @@ data:
         {}
         {{- end }}
       agentCliConfigs:
-        {{- if .Values.agent.agentCliConfigs }}
-        {{- toYaml .Values.agent.agentCliConfigs | nindent 8 }}
+        {{- $legacy := default dict .Values.agent.agentCliConfigs }}
+        {{- $fromAgents := dict }}
+        {{- range $name, $agent := .Values.agents }}
+          {{- if and $agent.githubApp $agent.cli $agent.model }}
+            {{- $cliCfg := dict "cliType" $agent.cli "model" $agent.model }}
+            {{- if hasKey $agent "maxTokens" }}
+              {{- $_ := set $cliCfg "maxTokens" $agent.maxTokens }}
+            {{- end }}
+            {{- if hasKey $agent "temperature" }}
+              {{- $_ := set $cliCfg "temperature" $agent.temperature }}
+            {{- end }}
+            {{- $_ := set $fromAgents $agent.githubApp $cliCfg }}
+          {{- end }}
+        {{- end }}
+        {{- $merged := merge $legacy $fromAgents }}
+        {{- if gt (len $merged) 0 }}
+        {{- toYaml $merged | nindent 8 }}
         {{- else }}
         {}
         {{- end }}
@@ -116,6 +131,18 @@ data:
       {{- range $key, $agent := .Values.agents }}
       {{ $key }}:
         githubApp: {{ $agent.githubApp | quote }}
+        {{- if $agent.cli }}
+        cli: {{ $agent.cli | quote }}
+        {{- end }}
+        {{- if $agent.model }}
+        model: {{ $agent.model | quote }}
+        {{- end }}
+        {{- if hasKey $agent "maxTokens" }}
+        maxTokens: {{ $agent.maxTokens }}
+        {{- end }}
+        {{- if hasKey $agent "temperature" }}
+        temperature: {{ $agent.temperature }}
+        {{- end }}
         {{- if $agent.tools }}
         tools:
           {{- toYaml $agent.tools | nindent 10 }}

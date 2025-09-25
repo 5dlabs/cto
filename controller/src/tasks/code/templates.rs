@@ -1344,6 +1344,10 @@ mod tests {
             "test-agent".to_string(),
             AgentDefinition {
                 github_app: "Test-App".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
                 tools: Some(agent_tools.clone()),
                 client_config: None,
             },
@@ -1361,6 +1365,10 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
                 tools: Some(agent_tools),
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_web_search"],
@@ -1430,6 +1438,10 @@ mod tests {
             "rex".to_string(),
             AgentDefinition {
                 github_app: "5DLabs-Rex".to_string(),
+                cli: None,
+                model: None,
+                max_tokens: None,
+                temperature: None,
                 tools: Some(helm_tools),
                 client_config: None,
             },

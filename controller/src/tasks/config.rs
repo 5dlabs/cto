@@ -4,10 +4,12 @@
 //! Contains only the essential configuration needed for our current implementation.
 
 use crate::cli::types::CLIType;
+use crate::crds::coderun::CLIConfig;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{api::Api, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
+use tracing::warn;
 
 /// Main controller configuration structure
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -60,7 +62,7 @@ pub struct AgentConfig {
 
     /// Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
     #[serde(default, rename = "agentCliConfigs")]
-    pub agent_cli_configs: HashMap<String, crate::crds::CLIConfig>,
+    pub agent_cli_configs: HashMap<String, CLIConfig>,
 
     /// Image pull secrets for private registries
     #[serde(default, rename = "imagePullSecrets")]
@@ -309,6 +311,22 @@ pub struct AgentDefinition {
     #[serde(rename = "githubApp")]
     pub github_app: String,
 
+    /// Preferred CLI type for this agent (e.g., "Codex", "Claude")
+    #[serde(default, alias = "cliType", alias = "cli_type")]
+    pub cli: Option<String>,
+
+    /// Default model identifier for this agent
+    #[serde(default)]
+    pub model: Option<String>,
+
+    /// Optional maximum output tokens for this agent's CLI
+    #[serde(default, rename = "maxTokens", alias = "max_tokens")]
+    pub max_tokens: Option<u32>,
+
+    /// Optional temperature setting for this agent's CLI
+    #[serde(default)]
+    pub temperature: Option<f32>,
+
     /// Tool configuration for this agent
     #[serde(default)]
     pub tools: Option<AgentTools>,
@@ -367,6 +385,47 @@ impl Default for CleanupConfig {
 }
 
 impl ControllerConfig {
+    /// Merge agent-level CLI metadata into the normalized agent CLI configs map.
+    fn merge_agent_cli_defaults(&mut self) {
+        for agent in self.agents.values() {
+            let Some(cli_str) = agent.cli.as_ref() else {
+                continue;
+            };
+
+            let Some(model) = agent.model.as_ref() else {
+                warn!(
+                    github_app = %agent.github_app,
+                    "Agent definition specifies CLI '{}' but no model; skipping",
+                    cli_str
+                );
+                continue;
+            };
+
+            match CLIType::from_str_ci(cli_str) {
+                Some(cli_type) => {
+                    let config = CLIConfig {
+                        cli_type,
+                        model: model.clone(),
+                        settings: HashMap::new(),
+                        max_tokens: agent.max_tokens,
+                        temperature: agent.temperature,
+                    };
+
+                    self.agent
+                        .agent_cli_configs
+                        .insert(agent.github_app.clone(), config);
+                }
+                None => {
+                    warn!(
+                        github_app = %agent.github_app,
+                        cli = %cli_str,
+                        "Unsupported CLI type specified for agent; skipping"
+                    );
+                }
+            }
+        }
+    }
+
     /// Validate that configuration has required fields
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         for (cli_key, image) in &self.agent.cli_images {
@@ -422,9 +481,10 @@ impl ControllerConfig {
         let config_str = std::fs::read_to_string(config_path)
             .map_err(|e| anyhow::anyhow!("Failed to read config file {}: {}", config_path, e))?;
 
-        let config: ControllerConfig = serde_yaml::from_str(&config_str)
+        let mut config: ControllerConfig = serde_yaml::from_str(&config_str)
             .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {}", e))?;
 
+        config.merge_agent_cli_defaults();
         Ok(config)
     }
 
@@ -444,7 +504,8 @@ impl ControllerConfig {
             .get("config.yaml")
             .ok_or_else(|| anyhow::anyhow!("ConfigMap missing config.yaml"))?;
 
-        let config: ControllerConfig = serde_yaml::from_str(config_str)?;
+        let mut config: ControllerConfig = serde_yaml::from_str(config_str)?;
+        config.merge_agent_cli_defaults();
         Ok(config)
     }
 }
@@ -605,7 +666,7 @@ cleanup:
 
         config.agent.agent_cli_configs.insert(
             "codex".to_string(),
-            crate::crds::coderun::CLIConfig {
+            CLIConfig {
                 cli_type: CLIType::Codex,
                 model: "test-model".to_string(),
                 settings: HashMap::new(),
@@ -615,6 +676,35 @@ cleanup:
         );
 
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn agent_cli_defaults_merge_into_map() {
+        let mut config = ControllerConfig::default();
+        config.agents.insert(
+            "rex".to_string(),
+            AgentDefinition {
+                github_app: "5DLabs-Rex".to_string(),
+                cli: Some("Codex".to_string()),
+                model: Some("gpt-4.1-mini".to_string()),
+                max_tokens: Some(16000),
+                temperature: Some(0.65),
+                tools: None,
+                client_config: None,
+            },
+        );
+        config.merge_agent_cli_defaults();
+
+        let entry = config
+            .agent
+            .agent_cli_configs
+            .get("5DLabs-Rex")
+            .expect("CLI defaults should be populated");
+
+        assert_eq!(entry.model, "gpt-4.1-mini");
+        assert_eq!(entry.cli_type, CLIType::Codex);
+        assert_eq!(entry.max_tokens, Some(16000));
+        assert_eq!(entry.temperature, Some(0.65));
     }
 
     #[test]

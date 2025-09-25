@@ -41,13 +41,31 @@ impl std::fmt::Display for CLIType {
     }
 }
 
+impl CLIType {
+    /// Parse a CLI type from a string, ignoring case and accepting legacy aliases.
+    pub fn from_str_ci(value: &str) -> Option<Self> {
+        let normalized = value.trim().to_lowercase();
+
+        match normalized.as_str() {
+            "claude" => Some(CLIType::Claude),
+            "codex" => Some(CLIType::Codex),
+            "opencode" | "open-code" => Some(CLIType::OpenCode),
+            "cursor" => Some(CLIType::Cursor),
+            "openhands" | "open-hands" => Some(CLIType::OpenHands),
+            "grok" => Some(CLIType::Grok),
+            "gemini" => Some(CLIType::Gemini),
+            "qwen" => Some(CLIType::Qwen),
+            _ => None,
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for CLIType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        let normalized = value.trim().to_lowercase();
 
         const VARIANTS: &[&str] = &[
             "claude",
@@ -60,17 +78,8 @@ impl<'de> Deserialize<'de> for CLIType {
             "qwen",
         ];
 
-        match normalized.as_str() {
-            "claude" => Ok(CLIType::Claude),
-            "codex" => Ok(CLIType::Codex),
-            "opencode" | "open-code" => Ok(CLIType::OpenCode),
-            "cursor" => Ok(CLIType::Cursor),
-            "openhands" | "open-hands" => Ok(CLIType::OpenHands),
-            "grok" => Ok(CLIType::Grok),
-            "gemini" => Ok(CLIType::Gemini),
-            "qwen" => Ok(CLIType::Qwen),
-            other => Err(serde::de::Error::unknown_variant(other, VARIANTS)),
-        }
+        CLIType::from_str_ci(&value)
+            .ok_or_else(|| serde::de::Error::unknown_variant(&value, VARIANTS))
     }
 }
 
