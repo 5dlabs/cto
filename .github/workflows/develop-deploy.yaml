@@ -289,15 +289,24 @@ jobs:
           ls -la agent-controller
 
       - name: Log in to Docker Hub (for builder images only)
+        if: env.DOCKER_HUB_WORKING == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildx (full functionality)
+        if: env.DOCKER_HUB_WORKING == 'true'
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
+          install: true
+
+      - name: Set up Docker Buildx (outage workaround - limited functionality)
+        if: env.DOCKER_HUB_WORKING == 'false'
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
           install: true
 
       - name: Log in to Container Registry
@@ -307,7 +316,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Controller image
+      - name: Build and push Controller image (full functionality)
+        if: env.DOCKER_HUB_WORKING == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -320,6 +330,19 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build and push Controller image (outage workaround)
+        if: env.DOCKER_HUB_WORKING == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/images/controller/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/controller:${{ needs.version.outputs.short-sha }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
@@ -362,15 +385,24 @@ jobs:
           ls -lh ./sidecar
 
       - name: Log in to Docker Hub (for builder images only)
+        if: env.DOCKER_HUB_WORKING == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildx (full functionality)
+        if: env.DOCKER_HUB_WORKING == 'true'
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
+          install: true
+
+      - name: Set up Docker Buildx (outage workaround - limited functionality)
+        if: env.DOCKER_HUB_WORKING == 'false'
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
           install: true
 
       - name: Log in to Container Registry
@@ -380,7 +412,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push sidecar image
+      - name: Build and push sidecar image (full functionality)
+        if: env.DOCKER_HUB_WORKING == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -393,6 +426,19 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.short-sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build and push sidecar image (outage workaround)
+        if: env.DOCKER_HUB_WORKING == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/images/sidecar/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}/sidecar:${{ needs.version.outputs.short-sha }}
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
