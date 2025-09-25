@@ -5,7 +5,7 @@ You are a senior DevOps and Rust engineer tasked with setting up the foundationa
 ## Your Mission
 Create a comprehensive project structure that includes:
 1. Rust workspace with controller implementation
-2. TypeScript/Node.js MCP integration layer
+2. Rust-based MCP integration layer
 3. Docker infrastructure for 8 different CLI containers
 4. CI/CD pipeline with GitHub Actions
 5. Comprehensive build system with Makefile
@@ -20,19 +20,19 @@ Create a comprehensive project structure that includes:
 - Follow Rust best practices for error handling and async patterns
 
 ### MCP Integration Layer
-- Initialize `mcp/` directory with TypeScript setup
-- Configure `package.json` with `@modelcontextprotocol/sdk v1.0.4`
-- Set up proper TypeScript configuration
+- Initialize `mcp/` directory with Rust setup
+- Configure `Cargo.toml` with appropriate MCP protocol dependencies
+- Set up proper Rust configuration and project structure
 - Prepare for Model Context Protocol integration
 
 ### Container Infrastructure
 Design `infra/images/` with subdirectories:
 - `claude/` - Node.js base with Claude Code CLI
 - `codex/` - Rust environment with OpenAI Codex
-- `opencode/` - TypeScript/Node.js for Opencode
-- `gemini/` - TypeScript/Node.js for Google Gemini
-- `grok/` - TypeScript/Node.js for Grok CLI
-- `qwen/` - TypeScript/Node.js for Qwen CLI
+- `opencode/` - Node.js environment for OpenCode CLI
+- `gemini/` - Node.js environment for Google Gemini CLI
+- `grok/` - Bun/Node.js environment for Grok CLI
+- `qwen/` - Node.js environment for Qwen CLI
 - `cursor/` - Python environment for Cursor
 - `openhands/` - Python environment for OpenHands
 
@@ -60,10 +60,10 @@ Implement comprehensive Makefile with targets:
 4. Configure initial logging and error handling
 
 ### Step 2: Development Environment
-1. Set up MCP directory with TypeScript configuration
-2. Install and configure development dependencies
-3. Create initial package.json with scripts
-4. Configure TypeScript compiler options
+1. Set up MCP directory with Rust configuration
+2. Install and configure Rust development dependencies
+3. Create initial Cargo.toml with proper workspace setup
+4. Configure Rust project structure and modules
 
 ### Step 3: Container Strategy
 1. Create Dockerfile templates for each CLI type
@@ -85,14 +85,14 @@ Implement comprehensive Makefile with targets:
 
 ## Code Quality Standards
 - All Rust code must pass `cargo clippy` with no warnings
-- TypeScript must compile without errors and pass linting
+- Rust code must follow formatting standards with `cargo fmt`
 - Dockerfiles should follow best practices (multi-stage, minimal layers)
 - All scripts should have error handling and logging
 - Documentation should be clear and comprehensive
 
 ## Testing Strategy
 - Verify Rust workspace builds with `cargo check`
-- Test TypeScript setup with `npm install` and compilation
+- Test Rust MCP layer compiles with `cargo build`
 - Validate Docker infrastructure with test builds
 - Test GitHub Actions workflow with `act` tool
 - Verify all Makefile targets execute successfully
@@ -101,7 +101,7 @@ Implement comprehensive Makefile with targets:
 Your implementation is successful when:
 - ✅ Complete project structure is created
 - ✅ Rust workspace builds without errors
-- ✅ TypeScript MCP layer compiles successfully
+- ✅ Rust-based MCP layer compiles successfully
 - ✅ All container Dockerfiles are valid
 - ✅ GitHub Actions workflow is properly configured
 - ✅ Makefile targets execute correctly
@@ -118,7 +118,7 @@ Your implementation is successful when:
 ## Deliverables
 1. Complete project directory structure
 2. Working Rust workspace with controller foundation
-3. Configured TypeScript MCP integration layer
+3. Configured Rust-based MCP integration layer
 4. Docker infrastructure for all 8 CLI types
 5. Functional GitHub Actions CI/CD pipeline
 6. Comprehensive Makefile with all targets
