@@ -77,7 +77,7 @@ After analyzing the current implementation of the multi-agent remediation loop, 
 
 #### 5. **Template Loading Issue Blocks Agent Execution**
 
-**Issue**: The controller expects templates at `/claude-templates/` but:
+**Issue**: The controller expects templates at `/agent-templates/` but:
 - ConfigMap had empty values when deployed via ArgoCD
 - Controller tries to read from filesystem instead of ConfigMap API
 - Binary encoding workaround may not be compatible
@@ -125,7 +125,7 @@ dependencies:
 
 // If using binaryData mount:
 fn load_template(key: &str) -> Result<String> {
-    let path = format!("/claude-templates/{}", key);
+    let path = format!("/agent-templates/{}", key);
     let encoded = std::fs::read_to_string(&path)?;
     let decoded = base64::decode(encoded)?;
     Ok(String::from_utf8(decoded)?)

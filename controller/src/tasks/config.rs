@@ -7,7 +7,7 @@ use crate::cli::types::CLIType;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{api::Api, Client};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 /// Main controller configuration structure
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -51,6 +51,7 @@ pub struct JobConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentConfig {
     /// Default container image configuration (for backward compatibility)
+    #[serde(default = "default_agent_image")]
     pub image: ImageConfig,
 
     /// CLI-specific image configurations
@@ -82,6 +83,26 @@ pub struct ImageConfig {
 
     /// Image tag (e.g., "latest", "v2.1.0")
     pub tag: String,
+}
+
+impl ImageConfig {
+    /// Returns `true` when both repository and tag are populated with real values.
+    pub fn is_configured(&self) -> bool {
+        let repo = self.repository.trim();
+        let tag = self.tag.trim();
+
+        !repo.is_empty()
+            && repo != "MISSING_IMAGE_CONFIG"
+            && !tag.is_empty()
+            && tag != "MISSING_IMAGE_CONFIG"
+    }
+}
+
+fn default_agent_image() -> ImageConfig {
+    ImageConfig {
+        repository: "MISSING_IMAGE_CONFIG".to_string(),
+        tag: "MISSING_IMAGE_CONFIG".to_string(),
+    }
 }
 
 /// Sidecar (auxiliary tools) configuration
@@ -334,22 +355,41 @@ impl Default for CleanupConfig {
 impl ControllerConfig {
     /// Validate that configuration has required fields
     pub fn validate(&self) -> Result<(), anyhow::Error> {
-        if self.agent.image.repository == "MISSING_IMAGE_CONFIG"
-            || self.agent.image.tag == "MISSING_IMAGE_CONFIG"
-        {
-            return Err(anyhow::anyhow!(
-                "Agent image configuration is missing! This indicates the controller ConfigMap was not loaded properly. \
-                Please ensure the 'agent.image.repository' and 'agent.image.tag' are set in the Helm values."
-            ));
+        for (cli_key, image) in &self.agent.cli_images {
+            if !image.is_configured() {
+                return Err(anyhow::anyhow!(format!(
+                    "CLI image configuration for '{cli_key}' must specify both repository and tag."
+                )));
+            }
+        }
+
+        let fallback_available = self.agent.image.is_configured();
+        let mut missing_cli_types: BTreeSet<String> = BTreeSet::new();
+
+        for cli_cfg in self.agent.agent_cli_configs.values() {
+            let cli_key = cli_cfg.cli_type.to_string().to_lowercase();
+            match self.agent.cli_images.get(&cli_key) {
+                Some(image) if image.is_configured() => {}
+                Some(_) => {
+                    missing_cli_types.insert(cli_cfg.cli_type.to_string());
+                }
+                None => {
+                    if !fallback_available {
+                        missing_cli_types.insert(cli_cfg.cli_type.to_string());
+                    }
+                }
+            }
+        }
+
+        if !missing_cli_types.is_empty() {
+            return Err(anyhow::anyhow!(format!(
+                "Missing agent image configuration for CLI types: {}. Provide entries under agent.cliImages or configure agent.image as a fallback.",
+                missing_cli_types.into_iter().collect::<Vec<_>>().join(", ")
+            )));
         }
 
         // If input bridge is enabled, ensure its image is configured
-        if self.agent.input_bridge.enabled
-            && (self.agent.input_bridge.image.repository.trim().is_empty()
-                || self.agent.input_bridge.image.tag.trim().is_empty()
-                || self.agent.input_bridge.image.repository == "MISSING_IMAGE_CONFIG"
-                || self.agent.input_bridge.image.tag == "MISSING_IMAGE_CONFIG")
-        {
+        if self.agent.input_bridge.enabled && !self.agent.input_bridge.image.is_configured() {
             return Err(anyhow::anyhow!(
                 "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
             ));
@@ -396,10 +436,7 @@ impl Default for ControllerConfig {
                 active_deadline_seconds: 7200, // 2 hours
             },
             agent: AgentConfig {
-                image: ImageConfig {
-                    repository: "MISSING_IMAGE_CONFIG".to_string(),
-                    tag: "MISSING_IMAGE_CONFIG".to_string(),
-                },
+                image: default_agent_image(),
                 cli_images: HashMap::new(),
                 agent_cli_configs: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],

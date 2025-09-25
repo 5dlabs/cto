@@ -15,8 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize handlebars engine
     let mut handlebars = Handlebars::new();
 
-    // Template directory - relative path from controller directory to infra/charts/controller/claude-templates
-    let template_dir = Path::new("../infra/charts/controller/claude-templates");
+    // Template directory - relative path from controller directory to infra/charts/controller/agent-templates
+    let template_dir = Path::new("../infra/charts/controller/agent-templates");
 
     // Test docs templates
     test_docs_templates(&mut handlebars, template_dir)?;
@@ -45,10 +45,10 @@ fn test_docs_templates(
 
     // Test docs templates
     let docs_templates = [
-        "docs/claude.md.hbs",
-        "docs/settings.json.hbs",
-        "docs/container.sh.hbs",
-        "docs/prompt.md.hbs",
+        "docs/claude/memory.md.hbs",
+        "docs/claude/settings.json.hbs",
+        "docs/claude/container.sh.hbs",
+        "docs/claude/prompt.md.hbs",
     ];
 
     for template_name in &docs_templates {
@@ -109,9 +109,9 @@ fn test_code_templates(
     });
 
     for template_name in [
-        "code/claude.md.hbs",
-        "code/settings.json.hbs",
-        "code/container.sh.hbs",
+        "code/claude/memory.md.hbs",
+        "code/claude/settings.json.hbs",
+        "code/claude/container.sh.hbs",
     ] {
         let template_path = template_dir.join(template_name);
 

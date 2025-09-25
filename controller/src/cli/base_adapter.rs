@@ -63,14 +63,14 @@ impl AdapterConfig {
                     .map(PathBuf::from)
                     .map(|dir| {
                         dir.join("..")
-                            .join("infra/charts/controller/claude-templates")
+                            .join("infra/charts/controller/agent-templates")
                     })
                     .filter(|path| path.exists());
 
                 if let Some(path) = repo_relative {
                     path
                 } else {
-                    PathBuf::from("/claude-templates")
+                    PathBuf::from("/agent-templates")
                 }
             }
         };

@@ -13,6 +13,8 @@ image:
 
 # Agent/Task Runner image configuration (used by controller to create Jobs)
 agent:
+  # Deprecated: fallback image used only when a CLI-specific image is not defined.
+  # Prefer configuring `cliImages` for each CLI type instead.
   image:
     repository: ghcr.io/5dlabs/claude
     tag: "latest"
@@ -33,37 +35,37 @@ agent:
   # Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
   agentCliConfigs:
     "5DLabs-Morgan":
-      cliType: "claude"
+      cliType: "Claude"
       model: "claude-opus-4-1-20250805"
       maxTokens: 8192
       temperature: 0.8
     "5DLabs-Rex":
-      cliType: "codex"
+      cliType: "Codex"
       model: "gpt-4.1-mini"
       maxTokens: 16000
       temperature: 0.7
     "5DLabs-Blaze":
-      cliType: "codex"
+      cliType: "Codex"
       model: "gpt-4.1-mini"
       maxTokens: 16000
       temperature: 0.6
     "5DLabs-Cipher":
-      cliType: "codex"
+      cliType: "Codex"
       model: "gpt-4.1-mini"
       maxTokens: 16000
       temperature: 0.6
     "5DLabs-Cleo":
-      cliType: "claude"
+      cliType: "Claude"
       model: "claude-sonnet-4-20250514"
       maxTokens: 2048
       temperature: 0.3
     "5DLabs-Tess":
-      cliType: "claude"
+      cliType: "Claude"
       model: "claude-sonnet-4-20250514"
       maxTokens: 4096
       temperature: 0.7
     "5DLabs-Stitch":
-      cliType: "claude"
+      cliType: "Claude"
       model: "claude-sonnet-4-20250514"
       maxTokens: 2048
       temperature: 0.5

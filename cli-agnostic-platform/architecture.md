@@ -273,7 +273,7 @@ This provides comprehensive coverage without scope creep to 8 different CLI arch
 3. **Container Templates** (`/infra/charts/controller/templates/`)
    - Template system uses Handlebars for dynamic script generation
    - CLI-specific configurations passed via workflow parameters
-   - Container script templates in `claude-templates-static.yaml`
+   - Container script templates in `agent-templates-static.yaml`
 
 4. **Controller Architecture** (`/controller/src/`)
    - Dual-CRD system (CodeRun/DocsRun) with agent classification
@@ -423,7 +423,7 @@ Implementation note: rather than introducing a parallel stack, the new adapter l
 Create CLI-specific template variants:
 
 ```
-/infra/charts/controller/claude-templates/
+/infra/charts/controller/agent-templates/
 ├── agents_claude-system-prompt.md.hbs
 ├── agents_codex-system-prompt.md.hbs
 ├── agents_opencode-system-prompt.md.hbs
@@ -435,7 +435,7 @@ Create CLI-specific template variants:
     └── opencode-entrypoint.sh.hbs
 ```
 
-The Codex/OpenCode prompts and scripts are net-new assets. Add them to `infra/charts/controller/claude-templates/` and update `scripts/generate-templates-configmap.sh` so the ConfigMap now bundles all CLI variants.
+The Codex/OpenCode prompts and scripts are net-new assets. Add them to `infra/charts/controller/agent-templates/` and update `scripts/generate-agent-templates-configmap.sh` so the ConfigMap now bundles all CLI variants.
 
 ### Phase 2: Codex CLI Integration Implementation
 
@@ -510,7 +510,7 @@ Authentication handling:
 #### 2.3 MCP Integration
 
 - The MCP server keeps its single Toolman instance; Codex reuses the existing Toolman client-config that is mounted for Claude today.
-- Toolman is exposed to the agents through the `toolman` CLI, which bridges STDIO ↔ HTTP (`infra/charts/controller/claude-templates/code/mcp.json.hbs` calls `toolman --url ...`). Codex’s MCP support is STDIO-only (`docs/codex/docs/config.md:341`), so the existing wrapper remains compatible without additional adapters.
+- Toolman is exposed to the agents through the `toolman` CLI, which bridges STDIO ↔ HTTP (`infra/charts/controller/agent-templates/code/mcp.json.hbs` calls `toolman --url ...`). Codex’s MCP support is STDIO-only (`docs/codex/docs/config.md:341`), so the existing wrapper remains compatible without additional adapters.
 - The runtime base image already ships the `toolman` CLI (`infra/images/runtime/Dockerfile` installs release v2.4.4), ensuring the Codex container inherits the binary automatically.
 - The controller continues to derive Toolman’s configuration (tool enablement, repository workspace paths) from `agent.tools` and injects it into the Pod environment, independent of the selected CLI.
 - We will audit Codex’s current MCP support for HTTP streaming; if it lacks stable streaming, add a lightweight wrapper that proxies Toolman responses until upstream support lands.

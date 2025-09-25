@@ -82,7 +82,7 @@ Yeah, so I have one question. I'm just looking at the changes from the previous,
 
 **Cursor**
 
-Good call—there’s nothing binding `claude-config.json.hbs` to `controller/src/cli/templates`. It only lives there because Task 3 bootstrapped the new adapter quickly with an embedded include. We can (and should) move it alongside the existing Helm-bundled assets under `infra/charts/controller/claude-templates/code/`. That keeps every CLI template in one place and lets the ConfigMap generator pick them up uniformly. When we implement Codex we’ll follow the same pattern: add the TOML/config + system-prompt + entrypoint templates in that infra directory, wire the chart script to ship them, and have the controller load them via the template manager rather than hardcoding paths in the crate.
+Good call—there’s nothing binding `claude-config.json.hbs` to `controller/src/cli/templates`. It only lives there because Task 3 bootstrapped the new adapter quickly with an embedded include. We can (and should) move it alongside the existing Helm-bundled assets under `infra/charts/controller/agent-templates/code/`. That keeps every CLI template in one place and lets the ConfigMap generator pick them up uniformly. When we implement Codex we’ll follow the same pattern: add the TOML/config + system-prompt + entrypoint templates in that infra directory, wire the chart script to ship them, and have the controller load them via the template manager rather than hardcoding paths in the crate.
 
 ---
 
@@ -94,7 +94,7 @@ OK, yeah, let's do that before we begin with the rest of the implementation.
 
 **Cursor**
 
-Moved `claude-config.json.hbs` into `infra/charts/controller/claude-templates/code/` so all adapter templates live under the Helm bundle. Clean diff staged in `feature/codex-cli-onboarding`; ready to continue with the Codex work.
+Moved `claude-config.json.hbs` into `infra/charts/controller/agent-templates/code/` so all adapter templates live under the Helm bundle. Clean diff staged in `feature/codex-cli-onboarding`; ready to continue with the Codex work.
 
 ---
 
@@ -109,7 +109,7 @@ Okay, let's fucking go let's do it. Keep going until you reach a blocker.
 Game plan:
 
 - **Controller adapters**: add a real `CodexAdapter` alongside Claude—implement config generation (TOML), `AGENTS.md` memory, prompt formatting, response parsing, health checks, and register it in `AdapterFactory`. Relax model validation so we just trust the incoming string.
-- **Template system**: add Codex-specific assets (`codex-config.toml.hbs`, system prompt, entrypoint script) under `infra/charts/controller/claude-templates/code/`, update the ConfigMap scripts, and make the controller load them via the template manager.
+- **Template system**: add Codex-specific assets (`codex-config.toml.hbs`, system prompt, entrypoint script) under `infra/charts/controller/agent-templates/code/`, update the ConfigMap scripts, and make the controller load them via the template manager.
 - **Config resolution**: adjust resolver/Helm integration so `cto-config.json` overrides *replace* Helm defaults rather than merge; ensure codex CLI settings flow end-to-end.
 - **MCP server**: drop hard-coded model validation, make sure Codex CLI selection/config is accepted, stick with existing Toolman STDIO bridge (instrument for later tuning).
 - **Testing/docs**: extend adapter unit tests + integration coverage, then update architecture/task docs to reflect the new flow.
@@ -2406,7 +2406,7 @@ impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
         let default_template_root = std::env::var("CLI_TEMPLATES_ROOT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/claude-templates"));
+            .unwrap_or_else(|_| PathBuf::from("/agent-templates"));
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
@@ -3095,7 +3095,7 @@ mod tests {
 @@
 -        let config_template = Arc::from("claude-config.json.hbs");
 +        let config_template = base
-+            .load_template("code/claude-config.json.hbs")
++            .load_template("code/claude/config.json.hbs")
 +            .map(Arc::from)?;
 *** End Patch
 ```
@@ -3151,7 +3151,7 @@ impl ClaudeAdapter {
         let base = Arc::new(BaseAdapter::new(config).await?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
         let config_template = Arc::from(
-            base.load_template("code/claude-config.json.hbs").map_err(|e| {
+            base.load_template("code/claude/config.json.hbs").map_err(|e| {
                 AdapterError::TemplateError(format!(
                     "Failed to load Claude config template: {e}",
                 ))
@@ -3893,7 +3893,7 @@ impl ClaudeAdapter {
         let base = Arc::new(BaseAdapter::new(config).await?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
         let config_template = Arc::from(
-            base.load_template("code/claude-config.json.hbs").map_err(|e| {
+            base.load_template("code/claude/config.json.hbs").map_err(|e| {
                 AdapterError::TemplateError(format!(
                     "Failed to load Claude config template: {e}",
                 ))
@@ -4635,7 +4635,7 @@ impl ClaudeAdapter {
         let base = Arc::new(BaseAdapter::new(config).await?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
         let config_template = Arc::from(
-            base.load_template("code/claude-config.json.hbs").map_err(|e| {
+            base.load_template("code/claude/config.json.hbs").map_err(|e| {
                 AdapterError::TemplateError(format!(
                     "Failed to load Claude config template: {e}",
                 ))
@@ -5386,7 +5386,7 @@ impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
         let default_template_root = std::env::var("CLI_TEMPLATES_ROOT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/claude-templates"));
+            .unwrap_or_else(|_| PathBuf::from("/agent-templates"));
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
@@ -6145,7 +6145,7 @@ impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
         let default_template_root = std::env::var("CLI_TEMPLATES_ROOT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/claude-templates"));
+            .unwrap_or_else(|_| PathBuf::from("/agent-templates"));
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
@@ -6879,7 +6879,7 @@ impl ClaudeAdapter {
         let base = Arc::new(BaseAdapter::new(config).await?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
         let config_template = Arc::from(
-            base.load_template("code/claude-config.json.hbs").map_err(|e| {
+            base.load_template("code/claude/config.json.hbs").map_err(|e| {
                 AdapterError::TemplateError(format!(
                     "Failed to load Claude config template: {e}",
                 ))
@@ -7572,9 +7572,9 @@ Done!
 
 Templates are now centralized:
 
-- `controller/src/cli/templates/claude-config.json.hbs` moved to `infra/charts/controller/claude-templates/code/claude-config.json.hbs`.
-- `ClaudeAdapter` + `BaseAdapter` now load templates from the mounted ConfigMap (default root `/claude-templates` set via new `template_root` config).
-- Template reference in `ClaudeAdapter` updated to read the file from `code/claude-config.json.hbs`.
+- `controller/src/cli/templates/claude-config.json.hbs` moved to `infra/charts/controller/agent-templates/code/claude/config.json.hbs`.
+- `ClaudeAdapter` + `BaseAdapter` now load templates from the mounted ConfigMap (default root `/agent-templates` set via new `template_root` config).
+- Template reference in `ClaudeAdapter` updated to read the file from `code/claude/config.json.hbs`.
 
 Everything is staged on `feature/codex-cli-onboarding`, and we’re ready to push forward with the Codex implementation.
 
@@ -7639,7 +7639,7 @@ impl ClaudeAdapter {
         let base = Arc::new(BaseAdapter::new(config).await?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
         let config_template = Arc::from(
-            base.load_template("code/claude-config.json.hbs").map_err(|e| {
+            base.load_template("code/claude/config.json.hbs").map_err(|e| {
                 AdapterError::TemplateError(format!(
                     "Failed to load Claude config template: {e}",
                 ))
@@ -8808,7 +8808,7 @@ Okay, yeah, and then I'm just a little bit confused about the @claude-config.jso
 
 `claude-config.json.hbs` isn’t new functionality—it’s the same template we’ve always used to generate the runtime JSON the controller feeds to Claude. Before Task 3 it lived in `controller/src/cli/templates/`; the controller would `include_str!` it and write the rendered file into the job workspace.
 
-All we did was relocate it into `infra/charts/controller/claude-templates/code/` so every adapter template now ships via the Helm-managed ConfigMap. The controller still needs the template to render a per-run config; now it just reads the file from the mounted ConfigMap instead of embedding it at compile time. So it isn’t redundant—just repositioned to match the new agnostic pattern and keep all templates in one place.
+All we did was relocate it into `infra/charts/controller/agent-templates/code/` so every adapter template now ships via the Helm-managed ConfigMap. The controller still needs the template to render a per-run config; now it just reads the file from the mounted ConfigMap instead of embedding it at compile time. So it isn’t redundant—just repositioned to match the new agnostic pattern and keep all templates in one place.
 
 ---
 
@@ -8880,7 +8880,7 @@ impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
         let default_template_root = std::env::var("CLI_TEMPLATES_ROOT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/claude-templates"));
+            .unwrap_or_else(|_| PathBuf::from("/agent-templates"));
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
@@ -10976,7 +10976,7 @@ impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
         let default_template_root = std::env::var("CLI_TEMPLATES_ROOT")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/claude-templates"));
+            .unwrap_or_else(|_| PathBuf::from("/agent-templates"));
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
@@ -11671,5 +11671,5 @@ I think probably the most prudent thing would just be for us to have a brand new
 
 **Cursor**
 
-Totally agree—per-CLI template sets will keep things clean. I’ll carve out a dedicated `codex/` subtree under `infra/charts/controller/claude-templates/`, parallel to `code/`, and drop in the Codex-specific assets there (config TOML, AGENTS.md, container script, etc.). Controller-side loading will point at those new files so each adapter stays fully self-contained. Continuing with that approach now.
+Totally agree—per-CLI template sets will keep things clean. I’ll carve out a dedicated `codex/` subtree under `infra/charts/controller/agent-templates/`, parallel to `code/`, and drop in the Codex-specific assets there (config TOML, AGENTS.md, container script, etc.). Controller-side loading will point at those new files so each adapter stays fully self-contained. Continuing with that approach now.
 

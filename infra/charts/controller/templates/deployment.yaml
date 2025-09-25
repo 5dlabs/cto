@@ -15,8 +15,8 @@ spec:
   template:
     metadata:
       annotations:
-        # Force pod restart when claude-templates ConfigMap changes
-        claude-templates/checksum: {{ include (print $.Template.BasePath "/claude-templates-static.yaml") . | sha256sum }}
+        # Force pod restart when agent-templates ConfigMap changes
+        agent-templates/checksum: {{ include (print $.Template.BasePath "/agent-templates-static.yaml") . | sha256sum }}
         # Force pod restart when controller config changes
         controller-config/checksum: {{ include (print $.Template.BasePath "/task-controller-config.yaml") . | sha256sum }}
         # Force pod restart when main config changes
@@ -61,9 +61,9 @@ spec:
                   key: RUST_LOG
 
           volumeMounts:
-            # Mount claude templates ConfigMap
-            - name: claude-templates
-              mountPath: /claude-templates
+            # Mount agent templates ConfigMap
+            - name: agent-templates
+              mountPath: /agent-templates
               readOnly: true
             # Mount controller configuration ConfigMap
             - name: controller-config
@@ -100,10 +100,10 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        # Mount claude templates ConfigMap
-        - name: claude-templates
+        # Mount agent templates ConfigMap
+        - name: agent-templates
           configMap:
-            name: {{ include "controller.fullname" . }}-claude-templates
+            name: {{ include "controller.fullname" . }}-agent-templates
         # Mount controller configuration ConfigMap
         - name: controller-config
           configMap:

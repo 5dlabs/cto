@@ -414,7 +414,7 @@ mod tests {
     fn templates_root() -> String {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
-            .join("infra/charts/controller/claude-templates")
+            .join("infra/charts/controller/agent-templates")
             .to_string_lossy()
             .into_owned()
     }

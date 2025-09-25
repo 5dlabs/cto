@@ -9,7 +9,7 @@ use std::path::Path;
 use tracing::debug;
 
 // Template base path (mounted from ConfigMap)
-const CLAUDE_TEMPLATES_PATH: &str = "/claude-templates";
+const AGENT_TEMPLATES_PATH: &str = "/agent-templates";
 
 pub struct DocsTemplateGenerator;
 
@@ -63,7 +63,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/container.sh.hbs")?;
+        let template = Self::load_template("docs/claude/container.sh.hbs")?;
 
         handlebars
             .register_template_string("container_script", template)
@@ -96,7 +96,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/claude.md.hbs")?;
+        let template = Self::load_template("docs/claude/memory.md.hbs")?;
 
         handlebars
             .register_template_string("claude_memory", template)
@@ -124,7 +124,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/settings.json.hbs")?;
+        let template = Self::load_template("docs/claude/settings.json.hbs")?;
 
         handlebars
             .register_template_string("claude_settings", template)
@@ -162,7 +162,7 @@ impl DocsTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template("docs/prompt.md.hbs")?;
+        let template = Self::load_template("docs/claude/prompt.md.hbs")?;
 
         handlebars
             .register_template_string("docs_prompt", template)
@@ -361,78 +361,87 @@ impl DocsTemplateGenerator {
 
     fn generate_hook_scripts(docs_run: &DocsRun) -> Result<BTreeMap<String, String>> {
         let mut hook_scripts = BTreeMap::new();
-        let hooks_prefix = "docs_hooks_";
+        let hooks_prefixes = vec![
+            "docs_claude_hooks_".to_string(),
+            "docs_shared_hooks_".to_string(),
+            "docs_hooks_".to_string(),
+        ];
 
         debug!(
-            "Scanning for docs hook templates with prefix: {}",
-            hooks_prefix
+            prefixes = ?hooks_prefixes,
+            "Scanning for docs hook templates"
         );
 
         // Read the ConfigMap directory and find files with the hook prefix
-        match std::fs::read_dir(CLAUDE_TEMPLATES_PATH) {
+        match std::fs::read_dir(AGENT_TEMPLATES_PATH) {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if path.is_file() {
                         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
                             // Check if this is a hook template for docs
-                            if filename.starts_with(hooks_prefix) && filename.ends_with(".hbs") {
-                                // Extract just the hook filename (remove prefix)
-                                let hook_name =
-                                    filename.strip_prefix(hooks_prefix).unwrap_or(filename);
+                            if filename.ends_with(".hbs") {
+                                if let Some(prefix) = hooks_prefixes
+                                    .iter()
+                                    .find(|prefix| filename.starts_with(prefix.as_str()))
+                                {
+                                    // Extract just the hook filename (remove prefix)
+                                    let hook_name =
+                                        filename.strip_prefix(prefix).unwrap_or(filename);
 
-                                match std::fs::read_to_string(&path) {
-                                    Ok(template_content) => {
-                                        debug!(
-                                            "Loaded docs hook template: {} (from {})",
-                                            hook_name, filename
-                                        );
-
-                                        let mut handlebars = Handlebars::new();
-                                        handlebars.set_strict_mode(false);
-
-                                        if let Err(e) = handlebars
-                                            .register_template_string("hook", template_content)
-                                        {
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(template_content) => {
                                             debug!(
-                                                "Failed to register hook template {}: {}",
-                                                hook_name, e
+                                                "Loaded docs hook template: {} (from {})",
+                                                hook_name, filename
                                             );
-                                            continue;
-                                        }
 
-                                        let context = json!({
-                                            "repository_url": docs_run.spec.repository_url,
-                                            "source_branch": docs_run.spec.source_branch,
-                                            "working_directory": docs_run.spec.working_directory,
-                                            "github_app": docs_run.spec.github_app.as_deref().unwrap_or(""),
-                                            "service_name": "docs-generator"
-                                        });
+                                            let mut handlebars = Handlebars::new();
+                                            handlebars.set_strict_mode(false);
 
-                                        match handlebars.render("hook", &context) {
-                                            Ok(rendered_script) => {
-                                                // Remove .hbs extension for the final filename
-                                                let script_name = hook_name
-                                                    .strip_suffix(".hbs")
-                                                    .unwrap_or(hook_name);
-                                                hook_scripts.insert(
-                                                    script_name.to_string(),
-                                                    rendered_script,
-                                                );
-                                            }
-                                            Err(e) => {
+                                            if let Err(e) = handlebars
+                                                .register_template_string("hook", template_content)
+                                            {
                                                 debug!(
-                                                    "Failed to render docs hook script {}: {}",
+                                                    "Failed to register hook template {}: {}",
                                                     hook_name, e
                                                 );
+                                                continue;
+                                            }
+
+                                            let context = json!({
+                                                "repository_url": docs_run.spec.repository_url,
+                                                "source_branch": docs_run.spec.source_branch,
+                                                "working_directory": docs_run.spec.working_directory,
+                                                "github_app": docs_run.spec.github_app.as_deref().unwrap_or(""),
+                                                "service_name": "docs-generator"
+                                            });
+
+                                            match handlebars.render("hook", &context) {
+                                                Ok(rendered_script) => {
+                                                    // Remove .hbs extension for the final filename
+                                                    let script_name = hook_name
+                                                        .strip_suffix(".hbs")
+                                                        .unwrap_or(hook_name);
+                                                    hook_scripts.insert(
+                                                        script_name.to_string(),
+                                                        rendered_script,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    debug!(
+                                                        "Failed to render docs hook script {}: {}",
+                                                        hook_name, e
+                                                    );
+                                                }
                                             }
                                         }
-                                    }
-                                    Err(e) => {
-                                        debug!(
-                                            "Failed to load docs hook template {}: {}",
-                                            filename, e
-                                        );
+                                        Err(e) => {
+                                            debug!(
+                                                "Failed to load docs hook template {}: {}",
+                                                filename, e
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -452,7 +461,7 @@ impl DocsTemplateGenerator {
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
         let configmap_key = relative_path.replace('/', "_");
-        let full_path = Path::new(CLAUDE_TEMPLATES_PATH).join(&configmap_key);
+        let full_path = Path::new(AGENT_TEMPLATES_PATH).join(&configmap_key);
         debug!(
             "Loading docs template from: {} (key: {})",
             full_path.display(),

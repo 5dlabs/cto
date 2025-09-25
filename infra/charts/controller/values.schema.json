@@ -70,14 +70,14 @@
         "tag": {
           "type": "string"
         }
-      },
-      "required": ["repository"]
+      }
     },
     "agent": {
       "type": "object",
       "properties": {
         "image": {
           "type": "object",
+          "description": "(Deprecated) Fallback image used when a CLI-specific image is not configured.",
           "properties": {
             "repository": {
               "type": "string"
@@ -89,8 +89,7 @@
               "type": "string",
               "enum": ["Always", "IfNotPresent", "Never"]
             }
-          },
-          "required": ["repository"]
+          }
         },
         "inputBridge": {
           "type": "object",

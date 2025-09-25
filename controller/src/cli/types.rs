@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Supported CLI types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum CLIType {
     /// Anthropic Claude Code CLI
     Claude,
@@ -37,6 +38,70 @@ impl std::fmt::Display for CLIType {
             CLIType::Gemini => write!(f, "gemini"),
             CLIType::Qwen => write!(f, "qwen"),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for CLIType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        let normalized = value.trim().to_lowercase();
+
+        const VARIANTS: &[&str] = &[
+            "claude",
+            "codex",
+            "opencode",
+            "cursor",
+            "openhands",
+            "grok",
+            "gemini",
+            "qwen",
+        ];
+
+        match normalized.as_str() {
+            "claude" => Ok(CLIType::Claude),
+            "codex" => Ok(CLIType::Codex),
+            "opencode" | "open-code" => Ok(CLIType::OpenCode),
+            "cursor" => Ok(CLIType::Cursor),
+            "openhands" | "open-hands" => Ok(CLIType::OpenHands),
+            "grok" => Ok(CLIType::Grok),
+            "gemini" => Ok(CLIType::Gemini),
+            "qwen" => Ok(CLIType::Qwen),
+            other => Err(serde::de::Error::unknown_variant(other, VARIANTS)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserializes_case_insensitive_variants() {
+        let codex_upper: CLIType = serde_json::from_str("\"Codex\"").unwrap();
+        let codex_lower: CLIType = serde_json::from_str("\"codex\"").unwrap();
+        let claude_mixed: CLIType = serde_json::from_str("\"ClAuDe\"").unwrap();
+
+        assert_eq!(codex_upper, CLIType::Codex);
+        assert_eq!(codex_lower, CLIType::Codex);
+        assert_eq!(claude_mixed, CLIType::Claude);
+    }
+
+    #[test]
+    fn deserializes_hyphenated_aliases() {
+        let open_code: CLIType = serde_json::from_str("\"open-code\"").unwrap();
+        let open_hands: CLIType = serde_json::from_str("\"open-hands\"").unwrap();
+
+        assert_eq!(open_code, CLIType::OpenCode);
+        assert_eq!(open_hands, CLIType::OpenHands);
+    }
+
+    #[test]
+    fn rejects_unknown_variants() {
+        let err = serde_json::from_str::<CLIType>("\"unknown\"").unwrap_err();
+        assert!(err.to_string().contains("unknown variant"));
     }
 }
 

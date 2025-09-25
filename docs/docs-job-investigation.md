@@ -8,15 +8,15 @@ Summary
 - Finding: The current docs container template in this repo does not use base64 during task extraction. It was refactored to use jq-only parsing. If you still see base64 errors, the running job is using an older template/config that still attempted to base64‑decode task fields.
 
 What We Looked At
-- Template referenced by you: `infra/charts/controller/claude-templates/docs/container.sh.hbs`.
+- Template referenced by you: `infra/charts/controller/agent-templates/docs/claude/container.sh.hbs`.
   - This template emits the exact line “📋 Found tasks.json, generating individual task files…”.
   - Immediately after, it analyzes and iterates tasks using jq only:
     - Lines ~323–361: “Use jq directly to process tasks without base64 encoding/decoding.”
     - Each task object is streamed with `jq -c` and fields are read via `jq -r` in a helper `_decode()`; no `base64 -d` calls are present.
   - The only base64 use in this script is for GitHub App JWT generation (encoding only): lines ~35–43. That cannot produce “invalid input” because decode is not used there.
-- Generated static ConfigMap: `infra/charts/controller/templates/claude-templates-static.yaml`.
+- Generated static ConfigMap: `infra/charts/controller/templates/agent-templates-static.yaml`.
   - This file embeds `docs_container.sh.hbs` (key: `docs_container.sh.hbs`) and carries a deterministic content checksum (e.g., `templates-checksum: "<sha256>"`).
-  - It’s produced by `infra/charts/controller/scripts/generate-templates-configmap.sh`, which base64-embeds the raw templates for Helm/ArgoCD delivery.
+  - It’s produced by `infra/charts/controller/scripts/generate-agent-templates-configmap.sh`, which base64-embeds the raw templates for Helm/ArgoCD delivery.
 
 Inference About The Error
 - The repeated “base64: invalid input” messages right after the “Found tasks.json…” banner indicate a script variant that tries something like:
@@ -24,7 +24,7 @@ Inference About The Error
 - That pattern fails when the value being piped is not actually base64 (e.g., plain text like a title/description), or when quoting/word-splitting corrupts the encoded blob.
 - Because the current repo template no longer does this, the most likely cause is a deployment mismatch:
   1) The target repo/environment is running an older `docs_container.sh.hbs` (pre-refactor), or
-  2) Its chart still contains an older `claude-templates-static.yaml` that wasn’t regenerated and committed after the refactor, or
+  2) Its chart still contains an older `agent-templates-static.yaml` that wasn’t regenerated and committed after the refactor, or
   3) The job selects a different container template (e.g., a forked chart or an environment-specific ConfigMap override) that still contains the base64 logic.
 
 Prompt Reading Concern
@@ -40,11 +40,11 @@ How To Verify What’s Running
      - “🔍 Analyzing tasks.json structure…”, “📄 Raw tasks.json structure preview:”, and “📊 JSON structure analysis:”.
    - If those do not appear and you see base64 errors instead, you’re on the older script.
 2) Inspect the live ConfigMap in the target cluster/namespace:
-   - `kubectl -n <ns> get cm <release>-claude-templates -o yaml | grep templates-checksum`
+   - `kubectl -n <ns> get cm <release>-agent-templates -o yaml | grep templates-checksum`
    - Extract `docs_container.sh.hbs` and confirm the presence of the comment: “Use jq directly to process tasks without base64 encoding/decoding”.
 3) Confirm your chart bundle includes the updated static ConfigMap:
-   - Open `infra/charts/controller/templates/claude-templates-static.yaml` and confirm it has a `templates-checksum` and a `docs_container.sh.hbs` entry that decodes to the jq-only script.
-   - If not current, run: `make -C infra/charts/controller` to regenerate via `scripts/generate-templates-configmap.sh`, commit, and redeploy.
+   - Open `infra/charts/controller/templates/agent-templates-static.yaml` and confirm it has a `templates-checksum` and a `docs_container.sh.hbs` entry that decodes to the jq-only script.
+   - If not current, run: `make -C infra/charts/controller` to regenerate via `scripts/generate-agent-templates-configmap.sh`, commit, and redeploy.
 
 Likely Root Cause(s)
 - Stale chart/config: Target environment using an older `docs_container.sh.hbs` that still base64-decodes task fields.
@@ -53,10 +53,10 @@ Likely Root Cause(s)
 
 Recommendations
 - Roll out the jq-only template:
-  - Regenerate and commit `claude-templates-static.yaml` in the chart.
+  - Regenerate and commit `agent-templates-static.yaml` in the chart.
   - Bump chart/app version and redeploy the controller so the new ConfigMap is mounted.
 - Add a runtime version banner for easier forensics:
-  - Optionally, add an `echo "Docs container template version: <git-sha or date>"` near the start of `docs/container.sh.hbs` so logs immediately confirm which script is live.
+  - Optionally, add an `echo "Docs container template version: <git-sha or date>"` near the start of `docs/claude/container.sh.hbs` so logs immediately confirm which script is live.
 - Prompt handling:
   - Ensure a `prompt.md` is provided via the task ConfigMap if you want an initial prompt injected. The script does not read a `prompt` property from `tasks.json`.
 - Optional compatibility shim (if you must support old `tasks.json` encodings):
@@ -70,15 +70,15 @@ Next Steps For Us
 
 Files Touched In This Investigation
 - Read/inspected:
-  - `infra/charts/controller/claude-templates/docs/container.sh.hbs`
-  - `infra/charts/controller/templates/claude-templates-static.yaml`
-  - `infra/charts/controller/scripts/generate-templates-configmap.sh`
+  - `infra/charts/controller/agent-templates/docs/claude/container.sh.hbs`
+  - `infra/charts/controller/templates/agent-templates-static.yaml`
+  - `infra/charts/controller/scripts/generate-agent-templates-configmap.sh`
 
 ## REMEDIATION IMPLEMENTED (2025-09-13)
 
 ### Root Cause Confirmed
 - **Issue**: The docs job was experiencing "base64: invalid input" errors after "📋 Found tasks.json, generating individual task files…"
-- **Analysis**: The current source template (`claude-templates/docs/container.sh.hbs`) already contains the jq-only logic (line 323-324) with no problematic base64 decoding
+- **Analysis**: The current source template (`agent-templates/docs/claude/container.sh.hbs`) already contains the jq-only logic (line 323-324) with no problematic base64 decoding
 - **Verification**: Template validation confirmed:
   - 1091 lines in full template (matches source)
   - Line 324: "Use jq directly to process tasks without base64 encoding/decoding" 
@@ -87,12 +87,12 @@ Files Touched In This Investigation
 ### Fixes Applied
 
 #### 1. Version Banner Added
-- **Change**: Added version banner to `claude-templates/docs/container.sh.hbs` at line 4
+- **Change**: Added version banner to `agent-templates/docs/claude/container.sh.hbs` at line 4
 - **Purpose**: Easier forensics to identify template version during execution
 - **Banner**: `echo "📍 Docs container template version: $(date -u +%Y-%m-%d) - jq-only processing (no base64 decode)"`
 
 #### 2. ConfigMap Regeneration
-- **Action**: Regenerated `claude-templates-static.yaml` using `make generate-templates`
+- **Action**: Regenerated `agent-templates-static.yaml` using `make generate-templates`
 - **Before**: `templates-checksum: "<old-sha256>"` (578278 bytes)
 - **After**: `templates-checksum: "<new-sha256>"` (578418 bytes)
 - **Verification**: Template now includes version banner and confirmed jq-only logic
@@ -100,8 +100,8 @@ Files Touched In This Investigation
 #### 3. Git Workflow
 - **Commit**: `86d2ee8` - Added version banner and regenerated ConfigMap
 - **Files Changed**: 
-  - `claude-templates/docs/container.sh.hbs` (source template)
-  - `templates/claude-templates-static.yaml` (generated ConfigMap)
+  - `agent-templates/docs/claude/container.sh.hbs` (source template)
+  - `templates/agent-templates-static.yaml` (generated ConfigMap)
 
 ### Expected Resolution
 When the updated ConfigMap is deployed:
@@ -158,8 +158,8 @@ let pvc_name = format!("docs-workspace-{}-{}", repo_slug, working_directory);
 
 #### 4. XML File Generation Removal
 - **Files Modified**:
-  - `infra/charts/controller/claude-templates/docs/container.sh.hbs` (removed XML generation logic)
-  - `infra/charts/controller/claude-templates/docs/prompt.md.hbs` (updated documentation requirements)
+  - `infra/charts/controller/agent-templates/docs/claude/container.sh.hbs` (removed XML generation logic)
+  - `infra/charts/controller/agent-templates/docs/prompt.md.hbs` (updated documentation requirements)
 - **Change**: Removed XML file creation, updated to generate only 3 files: `task.md`, `prompt.md`, `acceptance-criteria.md`
 - **Rationale**: XML should be used as prompt structure, not as physical files
 

@@ -16,11 +16,13 @@ data:
       # No timeout - Claude processes should run as long as needed
       activeDeadlineSeconds: 7200  # 2 hours default timeout
 
-    # Claude agent configuration
+    # Agent runtime configuration
     agent:
+      {{- if and .Values.agent.image .Values.agent.image.repository .Values.agent.image.tag }}
       image:
         repository: {{ .Values.agent.image.repository | quote }}
         tag: {{ .Values.agent.image.tag | quote }}
+      {{- end }}
       cliImages:
         {{- if .Values.agent.cliImages }}
         {{- toYaml .Values.agent.cliImages | nindent 8 }}
