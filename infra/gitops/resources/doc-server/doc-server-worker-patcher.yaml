@@ -54,12 +54,25 @@ spec:
             - -c
             - |
               echo "Checking doc-server worker Redis URL..."
-              CURRENT_URL=$(kubectl get deployment doc-server-agent-docs-server-worker -n mcp -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="REDIS_URL")].value}')
+              JSONPATH="{.spec.template.spec.containers[0].env[?(@.name==\"REDIS_URL\")].value}"
+              CURRENT_URL=$(kubectl get deployment doc-server-agent-docs-server-worker \
+                -n mcp \
+                -o jsonpath="${JSONPATH}")
               if [ "$CURRENT_URL" != "redis://redis.databases.svc.cluster.local:6379" ]; then
                 echo "Patching doc-server worker deployment with correct Redis URL..."
-                kubectl patch deployment doc-server-agent-docs-server-worker -n mcp \
+                kubectl patch deployment doc-server-agent-docs-server-worker \
+                  -n mcp \
                   --type='json' \
-                  -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/env/3/value", "value": "redis://redis.databases.svc.cluster.local:6379"}]'
+                  -p="$(cat <<'JSON'
+                    [
+                      {
+                        "op": "replace",
+                        "path": "/spec/template/spec/containers/0/env/3/value",
+                        "value": "redis://redis.databases.svc.cluster.local:6379"
+                      }
+                    ]
+                  JSON
+                  )"
                 echo "Patch applied successfully"
               else
                 echo "Redis URL is already correct"
