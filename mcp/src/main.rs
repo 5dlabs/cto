@@ -143,14 +143,14 @@ impl Default for IntakeDefaults {
     }
 }
 
-/// Validate model name format (support both Claude API and CLAUDE code formats)
+/// Validate model name format (permissive - allows any reasonable model name)
 fn validate_model_name(model: &str) -> Result<()> {
-    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model) {
-        return Err(anyhow!(
-            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
-            model
-        ));
+    // Simple validation: reject empty or obviously invalid names
+    if model.trim().is_empty() {
+        return Err(anyhow!("Model name cannot be empty"));
     }
+
+    // Allow any non-empty model name - let the CLI handle model-specific validation
     Ok(())
 }
 
@@ -722,7 +722,8 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             if let Some(tools) = &agent_cfg.tools {
                 // remote-tools
                 if !tools.remote.is_empty() {
-                    let json = serde_json::to_string(&tools.remote).unwrap_or_else(|_| "[]".to_string());
+                    let json =
+                        serde_json::to_string(&tools.remote).unwrap_or_else(|_| "[]".to_string());
                     params.push(format!("remote-tools={json}"));
                 }
                 // local-tools: enable servers that are present and marked enabled
@@ -734,7 +735,8 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                         }
                     }
                     if !local_list.is_empty() {
-                        let json = serde_json::to_string(&local_list).unwrap_or_else(|_| "[]".to_string());
+                        let json =
+                            serde_json::to_string(&local_list).unwrap_or_else(|_| "[]".to_string());
                         params.push(format!("local-tools={json}"));
                     }
                 }
@@ -865,7 +867,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
     let (implementation_agent, implementation_cli, implementation_model, implementation_tools) =
-        if let Some(agent_config) = config.agents.values().find(|a| a.github_app == implementation_agent_input) {
+        if let Some(agent_config) = config
+            .agents
+            .values()
+            .find(|a| a.github_app == implementation_agent_input)
+        {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
                 cli.clone()
@@ -895,11 +901,21 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for implementation agent {implementation_agent_input}");
                     "{}".to_string()
                 });
-            (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+            )
         } else {
             // Not a configured agent, use provided name with defaults
             eprintln!("⚠️ Agent {implementation_agent_input} not found in config, using defaults");
-            (implementation_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
+            (
+                implementation_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+            )
         };
 
     // Handle quality agent - use provided value or config default
@@ -910,43 +926,57 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
-    let (quality_agent, quality_cli, quality_model, quality_tools) =
-        if let Some(agent_config) = config.agents.values().find(|a| a.github_app == quality_agent_input) {
-            // Use the structured agent configuration
-            let agent_cli = if agent_config.cli.is_empty() {
-                cli.clone()
-            } else {
-                agent_config.cli.clone()
-            };
-            let agent_model = if agent_config.model.is_empty() {
-                model.clone()
-            } else {
-                agent_config.model.clone()
-            };
-            let agent_tools = agent_config.tools.as_ref()
-                .map(|t| {
-                    match serde_json::to_string(t) {
-                        Ok(json) => {
-                            eprintln!("✅ Serialized quality agent tools: {json}");
-                            json
-                        },
-                        Err(e) => {
-                            eprintln!("❌ Failed to serialize quality agent tools: {e}");
-                            eprintln!("   Tools data: {t:?}");
-                            "{}".to_string()
-                        }
-                    }
-                })
-                .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
-                    "{}".to_string()
-                });
-            (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
+    let (quality_agent, quality_cli, quality_model, quality_tools) = if let Some(agent_config) =
+        config
+            .agents
+            .values()
+            .find(|a| a.github_app == quality_agent_input)
+    {
+        // Use the structured agent configuration
+        let agent_cli = if agent_config.cli.is_empty() {
+            cli.clone()
         } else {
-            // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
-            (quality_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
+            agent_config.cli.clone()
         };
+        let agent_model = if agent_config.model.is_empty() {
+            model.clone()
+        } else {
+            agent_config.model.clone()
+        };
+        let agent_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|t| match serde_json::to_string(t) {
+                Ok(json) => {
+                    eprintln!("✅ Serialized quality agent tools: {json}");
+                    json
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to serialize quality agent tools: {e}");
+                    eprintln!("   Tools data: {t:?}");
+                    "{}".to_string()
+                }
+            })
+            .unwrap_or_else(|| {
+                eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
+                "{}".to_string()
+            });
+        (
+            agent_config.github_app.clone(),
+            agent_cli,
+            agent_model,
+            agent_tools,
+        )
+    } else {
+        // Not a configured agent, use provided name with defaults
+        eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
+        (
+            quality_agent_input.clone(),
+            cli.clone(),
+            model.clone(),
+            "{}".to_string(),
+        )
+    };
 
     // Handle testing agent - use provided value or config default
     let testing_agent_input = arguments
@@ -956,43 +986,57 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
-    let (testing_agent, testing_cli, testing_model, testing_tools) =
-        if let Some(agent_config) = config.agents.values().find(|a| a.github_app == testing_agent_input) {
-            // Use the structured agent configuration
-            let agent_cli = if agent_config.cli.is_empty() {
-                cli.clone()
-            } else {
-                agent_config.cli.clone()
-            };
-            let agent_model = if agent_config.model.is_empty() {
-                model.clone()
-            } else {
-                agent_config.model.clone()
-            };
-            let agent_tools = agent_config.tools.as_ref()
-                .map(|t| {
-                    match serde_json::to_string(t) {
-                        Ok(json) => {
-                            eprintln!("✅ Serialized testing agent tools: {json}");
-                            json
-                        },
-                        Err(e) => {
-                            eprintln!("❌ Failed to serialize testing agent tools: {e}");
-                            eprintln!("   Tools data: {t:?}");
-                            "{}".to_string()
-                        }
-                    }
-                })
-                .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
-                    "{}".to_string()
-                });
-            (agent_config.github_app.clone(), agent_cli, agent_model, agent_tools)
+    let (testing_agent, testing_cli, testing_model, testing_tools) = if let Some(agent_config) =
+        config
+            .agents
+            .values()
+            .find(|a| a.github_app == testing_agent_input)
+    {
+        // Use the structured agent configuration
+        let agent_cli = if agent_config.cli.is_empty() {
+            cli.clone()
         } else {
-            // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
-            (testing_agent_input.clone(), cli.clone(), model.clone(), "{}".to_string())
+            agent_config.cli.clone()
         };
+        let agent_model = if agent_config.model.is_empty() {
+            model.clone()
+        } else {
+            agent_config.model.clone()
+        };
+        let agent_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|t| match serde_json::to_string(t) {
+                Ok(json) => {
+                    eprintln!("✅ Serialized testing agent tools: {json}");
+                    json
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to serialize testing agent tools: {e}");
+                    eprintln!("   Tools data: {t:?}");
+                    "{}".to_string()
+                }
+            })
+            .unwrap_or_else(|| {
+                eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
+                "{}".to_string()
+            });
+        (
+            agent_config.github_app.clone(),
+            agent_cli,
+            agent_model,
+            agent_tools,
+        )
+    } else {
+        // Not a configured agent, use provided name with defaults
+        eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
+        (
+            testing_agent_input.clone(),
+            cli.clone(),
+            model.clone(),
+            "{}".to_string(),
+        )
+    };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
@@ -1019,7 +1063,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     );
     eprintln!("🐛 DEBUG: Testing tools: {testing_tools}");
 
-    eprintln!("🐛 DEBUG: Available agents in config: {:?}", config.agents.keys().collect::<Vec<_>>());
+    eprintln!(
+        "🐛 DEBUG: Available agents in config: {:?}",
+        config.agents.keys().collect::<Vec<_>>()
+    );
     eprintln!("🐛 DEBUG: Implementation agent input: '{implementation_agent_input}'");
     eprintln!("🐛 DEBUG: Quality agent input: '{quality_agent_input}'");
     eprintln!("🐛 DEBUG: Testing agent input: '{testing_agent_input}'");
@@ -1097,7 +1144,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         // Always provide task-requirements parameter, even if empty (Argo requires it)
         params.push("task-requirements=".to_string());
     }
-
 
     let mut args = vec![
         "submit",
