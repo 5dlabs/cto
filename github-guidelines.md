@@ -25,7 +25,7 @@ You MUST run `gh pr create` before your work is complete. Just pushing commits i
 - **Repository**: 
 - **Feature Branch**: feature/task--implementation
 - **Target Branch**: main (never push directly to this)
-- **Authentication**: GitHub App (5DLabs-Rex - pre-configured)
+- **Authentication**: GitHub App (5DLabs-Cleo - pre-configured)
 
 ### **Required Git Pattern:**
 
@@ -201,7 +201,7 @@ gh pr list --head feature/task--implementation
 - GitHub App authentication is pre-configured in the container
 - All git operations use GitHub App tokens automatically
 - Repository access: ``
-- GitHub App: `5DLabs-Rex`
+- GitHub App: `5DLabs-Cleo`
 
 ### Git Commands (GitHub App-based)
 ```bash
