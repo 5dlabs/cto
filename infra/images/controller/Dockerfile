@@ -1,5 +1,7 @@
 # Runtime stage - expects pre-built binaries
-FROM debian:bookworm-slim
+# TEMPORARY: Using Amazon ECR Public due to Docker Hub auth outage (Sept 24, 2025)
+# RESTORE WHEN FIXED: FROM debian:bookworm-slim
+FROM public.ecr.aws/debian/debian:bookworm-slim
 
 # Install only essential runtime dependencies
 RUN apt-get update && apt-get install -y \
