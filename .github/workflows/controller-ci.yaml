@@ -72,7 +72,7 @@ jobs:
 
       - name: Run Clippy
         working-directory: ./controller
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic
 
   # Commit formatting changes (runs on push events when formatting was needed)
   commit-format-changes:

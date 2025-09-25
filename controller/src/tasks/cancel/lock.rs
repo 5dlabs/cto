@@ -301,9 +301,8 @@ impl ActiveLease {
                         "Failed to renew lease, lease may expire"
                     );
                     break;
-                } else {
-                    debug!(lease_name = %lease_name, "Lease renewed successfully");
                 }
+                debug!(lease_name = %lease_name, "Lease renewed successfully");
             }
         });
 

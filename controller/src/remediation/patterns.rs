@@ -293,7 +293,7 @@ impl PatternExtractor {
 mod tests {
     use super::*;
 
-    const SAMPLE_COMMENT: &str = r#"🔴 Required Changes
+    const SAMPLE_COMMENT: &str = r"🔴 Required Changes
 **Issue Type**: [Bug]
 **Severity**: [High]
 
@@ -311,7 +311,7 @@ The login button is not working properly when users click it.
 
 ### Expected vs Actual
 - **Expected**: User should be logged in and redirected to dashboard
-- **Actual**: Page refreshes without login attempt"#;
+- **Actual**: Page refreshes without login attempt";
 
     #[test]
     fn test_extract_issue_type() {

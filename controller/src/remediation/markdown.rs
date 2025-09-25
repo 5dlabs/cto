@@ -178,15 +178,15 @@ impl MarkdownParser {
 mod tests {
     use super::*;
 
-    const SAMPLE_CRITERIA_SECTION: &str = r#"### Acceptance Criteria Not Met
+    const SAMPLE_CRITERIA_SECTION: &str = r"### Acceptance Criteria Not Met
 - [ ] User authentication works properly
 - [x] Password reset functionality is implemented
 - [ ] Error messages are user-friendly
 - [ ] Form validation prevents invalid inputs
 
-Some other content here"#;
+Some other content here";
 
-    const SAMPLE_COMPLEX_SECTION: &str = r#"### Acceptance Criteria Not Met
+    const SAMPLE_COMPLEX_SECTION: &str = r"### Acceptance Criteria Not Met
 
 #### Authentication Features
 - [ ] Login with email and password
@@ -201,7 +201,7 @@ Some other content here"#;
 - [x] Password change functionality
 
 ### Next Section
-Some other content"#;
+Some other content";
 
     #[test]
     fn test_extract_criteria_checkboxes() {
@@ -282,9 +282,9 @@ Some other content"#;
         assert!(!MarkdownParser::are_all_criteria_met(&comment));
 
         // Create a comment with all criteria met
-        let all_met_comment = r#"### Acceptance Criteria Not Met
+        let all_met_comment = r"### Acceptance Criteria Not Met
 - [x] User authentication works properly
-- [x] Password reset functionality is implemented"#;
+- [x] Password reset functionality is implemented";
         let full_comment = format!("Some header\n\n{all_met_comment}");
         assert!(MarkdownParser::are_all_criteria_met(&full_comment));
     }
@@ -372,9 +372,9 @@ Some other content"#;
 
     #[test]
     fn test_empty_criteria_section() {
-        let comment = r#"### Acceptance Criteria Not Met
+        let comment = r"### Acceptance Criteria Not Met
 
-### Next Section"#;
+### Next Section";
         let result = MarkdownParser::extract_criteria_checkboxes(comment);
         assert!(result.is_err());
         assert!(result

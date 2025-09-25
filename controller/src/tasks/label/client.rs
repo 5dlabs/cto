@@ -291,7 +291,6 @@ impl GitHubLabelClient {
                             backoff_ms, attempt, max_retries
                         );
                         sleep(Duration::from_millis(backoff_ms as u64)).await;
-                        continue;
                     }
                 }
                 Err(e) => {

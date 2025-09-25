@@ -169,7 +169,7 @@ mod tests {
     use super::*;
     use crate::remediation::types::{IssueType, Severity};
 
-    const TEST_COMMENT: &str = r#"🔴 Required Changes
+    const TEST_COMMENT: &str = r"🔴 Required Changes
 **Issue Type**: [Bug]
 **Severity**: [High]
 
@@ -178,7 +178,7 @@ Test feedback for parsing functionality.
 
 ### Acceptance Criteria Not Met
 - [ ] Authentication works
-- [x] UI renders correctly"#;
+- [x] UI renders correctly";
 
     #[test]
     fn test_public_api() {
