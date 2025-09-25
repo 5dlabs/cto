@@ -18,8 +18,25 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: 5dlabs
-  # Temporary workaround for Docker Hub auth outage (Sept 24, 2025)
-  # Set to 'true' to restore full buildx functionality when Docker Hub is fixed
+  
+  # ========================================
+  # TEMPORARY DOCKER HUB OUTAGE WORKAROUND
+  # ========================================
+  # Docker Hub authentication is down (Sept 24, 2025)
+  # Status: https://status.docker.com/
+  # 
+  # WHEN DOCKER HUB IS FIXED:
+  # 1. Change DOCKER_HUB_WORKING to 'true'
+  # 2. This will restore:
+  #    - Docker Hub login for buildx builder images
+  #    - docker-container driver (supports GitHub Actions cache)
+  #    - Multi-platform builds (linux/amd64,linux/arm64)
+  #
+  # CURRENT WORKAROUND (DOCKER_HUB_WORKING=false):
+  # - Uses docker driver (no Docker Hub auth needed)
+  # - Single platform builds only (linux/amd64)  
+  # - No GitHub Actions build cache support
+  # ========================================
   DOCKER_HUB_WORKING: false
 
 jobs:
