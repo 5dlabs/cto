@@ -68,16 +68,7 @@
           "agent_docs_qwen_query",
           "agent_docs_openhands_query"
         ],
-        "localServers": {
-          "filesystem": {
-            "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
-          },
-          "git": {
-            "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
-          }
-        }
+        "localServers": {}
       }
     },
     "rex": {
