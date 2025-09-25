@@ -554,6 +554,40 @@ pr_remove_labels() {
   done
 }
 
+update_coderun_status() {
+  local remediation="$1"
+  local qa="$2"
+  local pr_url_value="${3:-$PR_URL}"
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local patch
+  patch=$(jq -n \
+    --arg ts "$timestamp" \
+    --arg pr "$pr_url_value" \
+    --arg rem "$remediation" \
+    --arg qa "$qa" \
+    '{status: ({lastUpdate: $ts}
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+        + (if $rem != "" then {remediationStatus: $rem} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end))}')
+
+  if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+    kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$patch" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to update CodeRun status with remediation context"
+  fi
+}
+
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
@@ -1185,6 +1219,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       "$STATUS_LABEL_FAILED" \
       "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
     pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
+    update_coderun_status "$STATUS_LABEL_NEEDS_TESS" "pending" "$PR_URL"
   else
     echo "🏷️ Updating remediation labels: Quality issues detected"
     pr_remove_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" \
@@ -1194,9 +1229,11 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       "$STATUS_LABEL_FAILED" \
       "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
     pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
+    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
   fi
 else
   echo "⚠️ No PR reference available, skipping remediation label update"
+  update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" ""
 fi
 
 # Gracefully stop sidecar (with enhanced debugging and retries)

@@ -41,6 +41,8 @@ pub async fn resume_workflow_for_pr(
     workflow_name: &str,
     pr_url: &str,
     pr_number: u32,
+    remediation_status: Option<&str>,
+    qa_status: Option<&str>,
 ) -> Result<()> {
     info!(
         "Resuming workflow {} with PR: {} (#{}) in namespace: {}",
@@ -55,6 +57,8 @@ pub async fn resume_workflow_for_pr(
         Some(pr_url),
         Some(pr_number),
         None,
+        remediation_status,
+        qa_status,
     )
     .await
 }
@@ -79,6 +83,8 @@ pub async fn resume_workflow_for_failure(
         None,
         None,
         Some(error_message),
+        None,
+        None,
     )
     .await
 }
@@ -105,6 +111,7 @@ pub async fn resume_workflow_for_no_pr(
 }
 
 /// Resume workflow by forcing re-evaluation of stuck resource nodes
+#[allow(clippy::too_many_arguments)]
 async fn resume_workflow_via_http(
     _client: &Client,
     namespace: &str,
@@ -112,6 +119,8 @@ async fn resume_workflow_via_http(
     pr_url: Option<&str>,
     pr_number: Option<u32>,
     error_message: Option<&str>,
+    remediation_status: Option<&str>,
+    qa_status: Option<&str>,
 ) -> Result<()> {
     info!(
         "🚀 Attempting to force workflow {} to re-evaluate stuck nodes in namespace {}",
@@ -198,12 +207,42 @@ async fn resume_workflow_via_http(
     }
 
     // Force workflow controller to re-evaluate by adding a retry annotation
-    // This is similar to what `argo retry` does
+    // This is similar to what `argo retry` does, but we also propagate context annotations
+    let mut annotations = serde_json::Map::new();
+    annotations.insert(
+        "workflows.argoproj.io/force-retry".to_string(),
+        json!(chrono::Utc::now().to_rfc3339()),
+    );
+
+    if let Some(pr_url) = pr_url {
+        annotations.insert("agents.platform/pr-url".to_string(), json!(pr_url));
+    }
+
+    if let Some(pr_number) = pr_number {
+        annotations.insert("agents.platform/pr-number".to_string(), json!(pr_number));
+    }
+
+    if let Some(remediation_status) = remediation_status {
+        annotations.insert(
+            "agents.platform/remediation-status".to_string(),
+            json!(remediation_status),
+        );
+    }
+
+    if let Some(qa_status) = qa_status {
+        annotations.insert("agents.platform/qa-status".to_string(), json!(qa_status));
+    }
+
+    if let Some(error_message) = error_message {
+        annotations.insert(
+            "agents.platform/error-message".to_string(),
+            json!(error_message),
+        );
+    }
+
     let retry_patch = json!({
         "metadata": {
-            "annotations": {
-                "workflows.argoproj.io/force-retry": chrono::Utc::now().to_rfc3339()
-            }
+            "annotations": serde_json::Value::Object(annotations)
         }
     });
 
@@ -255,6 +294,20 @@ async fn resume_workflow_via_http(
         info!("❌ Workflow triggered with error context: {}", error);
     } else {
         info!("⚠️ Workflow triggered with no-PR context");
+    }
+
+    if let Some(remediation_status) = remediation_status {
+        info!(
+            "🔄 Forwarded remediation status to workflow annotations: {}",
+            remediation_status
+        );
+    }
+
+    if let Some(qa_status) = qa_status {
+        info!(
+            "🧪 Forwarded QA status to workflow annotations: {}",
+            qa_status
+        );
     }
 
     Ok(())

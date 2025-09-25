@@ -806,6 +806,40 @@ pr_remove_labels() {
   done
 }
 
+update_coderun_status() {
+  local remediation="$1"
+  local qa="$2"
+  local pr_url_value="${3:-$PR_URL}"
+
+  if ! command -v kubectl >/dev/null 2>&1; then
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local patch
+  patch=$(jq -n \
+    --arg ts "$timestamp" \
+    --arg pr "$pr_url_value" \
+    --arg rem "$remediation" \
+    --arg qa "$qa" \
+    '{status: ({lastUpdate: $ts}
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+        + (if $rem != "" then {remediationStatus: $rem} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end))}')
+
+  if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ]; then
+    kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$patch" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to update CodeRun status with remediation context"
+  fi
+}
+
 SRC_OK=false
 WS_OK=false
 if is_valid_cfg "$SOURCE_CFG"; then SRC_OK=true; fi
@@ -1581,29 +1615,8 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
 
     pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_CLEO"
 
-    # Update CodeRun status with PR URL via Kubernetes API
-    echo "🔄 Updating CodeRun status with PR URL..."
-    if command -v kubectl >/dev/null 2>&1; then
-      # Create a patch to update the CodeRun status
-      PATCH_JSON=$(cat <<EOF
-{
-  "status": {
-    "pullRequestUrl": "$PR_URL",
-    "lastUpdate": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  }
-}
-EOF
-)
-
-      # Apply the patch to update CodeRun status
-      if kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$PATCH_JSON" 2>/dev/null; then
-        echo "✅ Updated CodeRun status with PR URL"
-      else
-        echo "⚠️ Failed to update CodeRun status (kubectl patch failed)"
-      fi
-    else
-      echo "⚠️ kubectl not available, cannot update CodeRun status"
-    fi
+    echo "🔄 Recording remediation status (needs-cleo) for CodeRun"
+    update_coderun_status "$STATUS_LABEL_NEEDS_CLEO" "pending" "$PR_URL"
 
     # Apply correlation labels with comprehensive debugging
     echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
