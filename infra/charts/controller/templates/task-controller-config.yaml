@@ -49,8 +49,23 @@ data:
 
     # Secrets configuration (references Kubernetes secrets)
     secrets:
-      apiKeySecretName: "agent-platform-secrets"
+      apiKeySecretName: {{ .Values.secrets.externalSecretsName | quote }}
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      cliApiKeys:
+        {{- if .Values.secrets.cliApiKeys }}
+        {{- range $cli, $secret := .Values.secrets.cliApiKeys }}
+        {{ $cli }}:
+          secretKey: {{ $secret.secretKey | quote }}
+          {{- if $secret.secretName }}
+          secretName: {{ $secret.secretName | quote }}
+          {{- end }}
+          {{- if $secret.envVar }}
+          envVar: {{ $secret.envVar | quote }}
+          {{- end }}
+        {{- end }}
+        {{- else }}
+        {}
+        {{- end }}
 
     # Tool permissions configuration (enterprise policy: allow all tools)
     permissions:

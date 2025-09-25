@@ -3,6 +3,7 @@
 //! Simplified configuration structure for the new DocsRun/CodeRun controller.
 //! Contains only the essential configuration needed for our current implementation.
 
+use crate::cli::types::CLIType;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{api::Api, Client};
 use serde::{Deserialize, Serialize};
@@ -115,6 +116,63 @@ pub struct SecretsConfig {
     /// Anthropic API key secret key
     #[serde(rename = "apiKeySecretKey")]
     pub api_key_secret_key: String,
+
+    /// Optional CLI-specific secret overrides
+    #[serde(default, rename = "cliApiKeys")]
+    pub cli_api_keys: HashMap<String, CLISecretConfig>,
+}
+
+/// CLI specific secret override configuration
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct CLISecretConfig {
+    /// Secret key within the Kubernetes Secret
+    #[serde(rename = "secretKey")]
+    pub secret_key: String,
+
+    /// Optional override for the Secret resource name (defaults to apiKeySecretName)
+    #[serde(default, rename = "secretName")]
+    pub secret_name: Option<String>,
+
+    /// Optional override for the environment variable name (defaults to secretKey)
+    #[serde(default, rename = "envVar")]
+    pub env_var: Option<String>,
+}
+
+/// Resolved secret binding for a CLI type
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolvedSecretBinding {
+    pub env_var: String,
+    pub secret_name: String,
+    pub secret_key: String,
+}
+
+impl SecretsConfig {
+    /// Resolve the secret binding (env var + secret key/name) for a given CLI
+    pub fn resolve_cli_binding(&self, cli_type: &CLIType) -> ResolvedSecretBinding {
+        let cli_key = cli_type.to_string().to_lowercase();
+
+        if let Some(override_cfg) = self.cli_api_keys.get(&cli_key) {
+            let env_var = override_cfg
+                .env_var
+                .clone()
+                .unwrap_or_else(|| override_cfg.secret_key.clone());
+            let secret_name = override_cfg
+                .secret_name
+                .clone()
+                .unwrap_or_else(|| self.api_key_secret_name.clone());
+            return ResolvedSecretBinding {
+                env_var,
+                secret_name,
+                secret_key: override_cfg.secret_key.clone(),
+            };
+        }
+
+        ResolvedSecretBinding {
+            env_var: self.api_key_secret_key.clone(),
+            secret_name: self.api_key_secret_name.clone(),
+            secret_key: self.api_key_secret_key.clone(),
+        }
+    }
 }
 
 /// Tool permissions configuration (used in templates)
@@ -359,6 +417,18 @@ impl Default for ControllerConfig {
             secrets: SecretsConfig {
                 api_key_secret_name: "orchestrator-secrets".to_string(),
                 api_key_secret_key: "ANTHROPIC_API_KEY".to_string(),
+                cli_api_keys: {
+                    let mut overrides = HashMap::new();
+                    overrides.insert(
+                        "codex".to_string(),
+                        CLISecretConfig {
+                            secret_key: "OPENAI_API_KEY".to_string(),
+                            secret_name: None,
+                            env_var: Some("OPENAI_API_KEY".to_string()),
+                        },
+                    );
+                    overrides
+                },
             },
             permissions: PermissionsConfig {
                 agent_tools_override: false,
@@ -454,6 +524,7 @@ cleanup:
         assert!(config.cleanup.enabled);
         assert_eq!(config.cleanup.completed_job_delay_minutes, 5);
         assert_eq!(config.cleanup.failed_job_delay_minutes, 60);
+        assert!(config.secrets.cli_api_keys.is_empty());
     }
 
     #[test]
@@ -462,6 +533,14 @@ cleanup:
         assert_eq!(config.job.active_deadline_seconds, 7200);
         assert_eq!(config.agent.image.repository, "MISSING_IMAGE_CONFIG");
         assert_eq!(config.secrets.api_key_secret_name, "orchestrator-secrets");
+        assert_eq!(
+            config
+                .secrets
+                .cli_api_keys
+                .get("codex")
+                .map(|cfg| cfg.secret_key.as_str()),
+            Some("OPENAI_API_KEY")
+        );
         assert!(!config.telemetry.enabled);
         assert!(!config.permissions.agent_tools_override);
     }

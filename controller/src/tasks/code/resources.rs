@@ -2,7 +2,7 @@ use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
 use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
-use crate::tasks::config::ControllerConfig;
+use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -560,7 +560,9 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
-        if Self::code_run_cli_type(code_run) == CLIType::Claude {
+        let cli_type = Self::code_run_cli_type(code_run);
+
+        if cli_type == CLIType::Claude {
             volume_mounts.push(json!({
                 "name": "task-files",
                 "mountPath": "/etc/claude-code/managed-settings.json",
@@ -629,6 +631,14 @@ impl<'a> CodeResourceManager<'a> {
         // Select image based on CLI type (if specified) or fallback to default
         let image = self.select_image_for_cli(code_run);
 
+        // Resolve CLI-specific API key binding (env var + secret reference)
+        let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type);
+        let ResolvedSecretBinding {
+            env_var: api_env_var,
+            secret_name: api_secret_name,
+            secret_key: api_secret_key,
+        } = api_key_binding;
+
         // Build environment variables for code tasks
         // Note: Critical system vars (CODERUN_NAME, WORKFLOW_NAME, NAMESPACE) are added
         // AFTER requirements processing to prevent overrides
@@ -652,11 +662,11 @@ impl<'a> CodeResourceManager<'a> {
                 }
             }),
             json!({
-                "name": "ANTHROPIC_API_KEY",
+                "name": api_env_var,
                 "valueFrom": {
                     "secretKeyRef": {
-                        "name": self.config.secrets.api_key_secret_name,
-                        "key": self.config.secrets.api_key_secret_key
+                        "name": api_secret_name,
+                        "key": api_secret_key
                     }
                 }
             }),

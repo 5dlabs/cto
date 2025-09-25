@@ -402,8 +402,16 @@ config:
 secrets:
   # REQUIRED: Set your Anthropic API key
   anthropicApiKey: "use-existing"
+  # OPTIONAL: Set your OpenAI API key (used by Codex CLI)
+  openaiApiKey: "use-existing"
   # External secrets name (created by External Secrets Operator)
   externalSecretsName: "agent-platform-secrets"
+  # CLI-specific secret key overrides (env var + secret key names)
+  cliApiKeys:
+    claude:
+      secretKey: "ANTHROPIC_API_KEY"
+    codex:
+      secretKey: "OPENAI_API_KEY"
   # Note: GitHub secrets (SSH keys + tokens) are managed externally per agent
   # See infra/scripts/setup-agent-secrets.sh for setup instructions
 
