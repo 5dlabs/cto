@@ -1,3 +1,11 @@
+#![allow(
+    unused_imports,
+    unused_attributes,
+    clippy::single_component_path_imports,
+    clippy::disallowed_macros,
+    clippy::useless_vec
+)]
+
 //! Comprehensive Test Suite for Task 3: CLI Adapter Trait System
 //!
 //! This test suite validates ALL acceptance criteria for Task 3 as defined in
@@ -39,7 +47,7 @@ impl CliAdapter for TestAdapter {
     }
 
     fn format_prompt(&self, prompt: &str) -> String {
-        format!("Test[{}]: {}", format!("{:?}", self.cli_type), prompt)
+        format!("Test[{cli_type:?}]: {prompt}", cli_type = self.cli_type)
     }
 
     async fn parse_response(&self, response: &str) -> Result<ParsedResponse> {
@@ -146,7 +154,10 @@ async fn test_fr1_core_cli_adapter_trait_definition() {
     });
 
     // ✅ Test all trait methods are callable
-    assert!(adapter.validate_model("test-model").await.is_ok(), "validate_model method must be callable");
+    assert!(
+        adapter.validate_model("test-model").await.is_ok(),
+        "validate_model method must be callable"
+    );
 
     let agent_config = AgentConfig {
         github_app: "test-app".to_string(),
@@ -158,18 +169,36 @@ async fn test_fr1_core_cli_adapter_trait_definition() {
         cli_config: None,
     };
 
-    assert!(adapter.generate_config(&agent_config).await.is_ok(), "generate_config method must be callable");
+    assert!(
+        adapter.generate_config(&agent_config).await.is_ok(),
+        "generate_config method must be callable"
+    );
 
     let formatted = adapter.format_prompt("test prompt");
-    assert!(!formatted.is_empty(), "format_prompt must return non-empty string");
+    assert!(
+        !formatted.is_empty(),
+        "format_prompt must return non-empty string"
+    );
 
-    assert!(adapter.parse_response("test response").await.is_ok(), "parse_response method must be callable");
+    assert!(
+        adapter.parse_response("test response").await.is_ok(),
+        "parse_response method must be callable"
+    );
 
-    assert!(!adapter.get_memory_filename().is_empty(), "get_memory_filename must return non-empty string");
-    assert!(!adapter.get_executable_name().is_empty(), "get_executable_name must return non-empty string");
+    assert!(
+        !adapter.get_memory_filename().is_empty(),
+        "get_memory_filename must return non-empty string"
+    );
+    assert!(
+        !adapter.get_executable_name().is_empty(),
+        "get_executable_name must return non-empty string"
+    );
 
     let capabilities = adapter.get_capabilities();
-    assert!(capabilities.max_context_tokens > 0, "get_capabilities must return valid capabilities");
+    assert!(
+        capabilities.max_context_tokens > 0,
+        "get_capabilities must return valid capabilities"
+    );
 
     let container = ContainerContext {
         pod: None,
@@ -179,9 +208,18 @@ async fn test_fr1_core_cli_adapter_trait_definition() {
         namespace: "default".to_string(),
     };
 
-    assert!(adapter.initialize(&container).await.is_ok(), "initialize method must be callable");
-    assert!(adapter.cleanup(&container).await.is_ok(), "cleanup method must be callable");
-    assert!(adapter.health_check().await.is_ok(), "health_check method must be callable");
+    assert!(
+        adapter.initialize(&container).await.is_ok(),
+        "initialize method must be callable"
+    );
+    assert!(
+        adapter.cleanup(&container).await.is_ok(),
+        "cleanup method must be callable"
+    );
+    assert!(
+        adapter.health_check().await.is_ok(),
+        "health_check method must be callable"
+    );
 
     println!("✅ FR-1: All trait methods successfully callable");
 }
@@ -204,7 +242,11 @@ async fn test_fr2_supporting_type_system() {
         CLIType::Cursor,
         CLIType::OpenHands,
     ];
-    assert_eq!(cli_types.len(), 8, "CLIType enum must include exactly 8 CLI types");
+    assert_eq!(
+        cli_types.len(),
+        8,
+        "CLIType enum must include exactly 8 CLI types"
+    );
 
     // ✅ Test ParsedResponse structure
     let response = ParsedResponse {
@@ -225,9 +267,20 @@ async fn test_fr2_supporting_type_system() {
         streaming_delta: None,
     };
 
-    assert!(!response.content.is_empty(), "ParsedResponse must have non-empty content");
-    assert_eq!(response.tool_calls.len(), 1, "ParsedResponse must support tool_calls");
-    assert_eq!(response.finish_reason, FinishReason::ToolCall, "ParsedResponse must have finish_reason");
+    assert!(
+        !response.content.is_empty(),
+        "ParsedResponse must have non-empty content"
+    );
+    assert_eq!(
+        response.tool_calls.len(),
+        1,
+        "ParsedResponse must support tool_calls"
+    );
+    assert_eq!(
+        response.finish_reason,
+        FinishReason::ToolCall,
+        "ParsedResponse must have finish_reason"
+    );
 
     // ✅ Test CliCapabilities structure
     let caps = CliCapabilities {
@@ -240,7 +293,10 @@ async fn test_fr2_supporting_type_system() {
         config_format: ConfigFormat::Json,
         authentication_methods: vec![AuthMethod::SessionToken],
     };
-    assert!(caps.max_context_tokens > 0, "CliCapabilities must have positive max_context_tokens");
+    assert!(
+        caps.max_context_tokens > 0,
+        "CliCapabilities must have positive max_context_tokens"
+    );
 
     // ✅ Test MemoryStrategy enum variants
     let _memory_strategies = vec![
@@ -261,8 +317,12 @@ async fn test_fr2_supporting_type_system() {
 
     // ✅ Test serialization/deserialization
     let caps_json = serde_json::to_string(&caps).expect("CliCapabilities must be serializable");
-    let caps_deserialize: CliCapabilities = serde_json::from_str(&caps_json).expect("CliCapabilities must be deserializable");
-    assert_eq!(caps.max_context_tokens, caps_deserialize.max_context_tokens, "Serialization must preserve data");
+    let caps_deserialize: CliCapabilities =
+        serde_json::from_str(&caps_json).expect("CliCapabilities must be deserializable");
+    assert_eq!(
+        caps.max_context_tokens, caps_deserialize.max_context_tokens,
+        "Serialization must preserve data"
+    );
 
     println!("✅ FR-2: All supporting types validated successfully");
 }
@@ -275,7 +335,9 @@ async fn test_fr3_base_adapter_functionality() {
     println!("🧪 FR-3: Testing BaseAdapter Shared Functionality");
 
     // This test verifies the base functionality through the ClaudeAdapter
-    let adapter = ClaudeAdapter::new().await.expect("BaseAdapter must be creatable");
+    let adapter = ClaudeAdapter::new()
+        .await
+        .expect("BaseAdapter must be creatable");
 
     // ✅ Test basic functionality exists (covered by existing tests)
     // Note: BaseAdapter functionality is tested via the ClaudeAdapter implementation
@@ -292,11 +354,20 @@ async fn test_fr3_base_adapter_functionality() {
     };
 
     let config_result = adapter.generate_config(&valid_config).await;
-    assert!(config_result.is_ok(), "BaseAdapter must provide configuration validation utilities");
+    assert!(
+        config_result.is_ok(),
+        "BaseAdapter must provide configuration validation utilities"
+    );
 
     // ✅ Test health check functionality
-    let health = adapter.health_check().await.expect("BaseAdapter must provide health checking");
-    assert!(matches!(health.status, HealthState::Healthy | HealthState::Warning), "BaseAdapter health check must work");
+    let health = adapter
+        .health_check()
+        .await
+        .expect("BaseAdapter must provide health checking");
+    assert!(
+        matches!(health.status, HealthState::Healthy | HealthState::Warning),
+        "BaseAdapter health check must work"
+    );
 
     println!("✅ FR-3: BaseAdapter shared functionality validated");
 }
@@ -309,8 +380,14 @@ async fn test_fr4_adapter_factory_implementation() {
     println!("🧪 FR-4: Testing AdapterFactory Implementation");
 
     // ✅ Test factory creation
-    let factory = AdapterFactory::new().await.expect("AdapterFactory must be creatable");
-    assert_eq!(factory.get_supported_clis().len(), 0, "New factory should start empty");
+    let factory = AdapterFactory::new()
+        .await
+        .expect("AdapterFactory must be creatable");
+    assert_eq!(
+        factory.get_supported_clis().len(),
+        0,
+        "New factory should start empty"
+    );
 
     // ✅ Test adapter registration
     let test_adapter = Arc::new(TestAdapter {
@@ -318,29 +395,63 @@ async fn test_fr4_adapter_factory_implementation() {
         healthy: true,
     });
 
-    factory.register_adapter(CLIType::Claude, test_adapter.clone()).await
+    factory
+        .register_adapter(CLIType::Claude, test_adapter.clone())
+        .await
         .expect("Factory must support adapter registration");
 
-    assert!(factory.supports_cli(CLIType::Claude), "Factory must track supported CLIs");
+    assert!(
+        factory.supports_cli(CLIType::Claude),
+        "Factory must track supported CLIs"
+    );
     let supported = factory.get_supported_clis();
-    assert_eq!(supported.len(), 1, "Factory must return correct supported CLI count");
-    assert!(supported.contains(&CLIType::Claude), "Factory must include registered CLI");
+    assert_eq!(
+        supported.len(),
+        1,
+        "Factory must return correct supported CLI count"
+    );
+    assert!(
+        supported.contains(&CLIType::Claude),
+        "Factory must include registered CLI"
+    );
 
     // ✅ Test adapter creation
-    let created_adapter = factory.create(CLIType::Claude).await
+    let created_adapter = factory
+        .create(CLIType::Claude)
+        .await
         .expect("Factory must create registered adapters");
-    assert_eq!(created_adapter.get_executable_name(), "claude", "Created adapter must match registered adapter");
+    assert_eq!(
+        created_adapter.get_executable_name(),
+        "claude",
+        "Created adapter must match registered adapter"
+    );
 
     // ✅ Test unsupported CLI error
     let unsupported_result = factory.create(CLIType::Gemini).await;
-    assert!(unsupported_result.is_err(), "Factory must reject unsupported CLI types");
-    assert!(matches!(unsupported_result.unwrap_err(), AdapterError::UnsupportedCliType(_)),
-        "Factory must return UnsupportedCliType error");
+    assert!(
+        unsupported_result.is_err(),
+        "Factory must reject unsupported CLI types"
+    );
+    assert!(
+        matches!(
+            unsupported_result.unwrap_err(),
+            AdapterError::UnsupportedCliType(_)
+        ),
+        "Factory must return UnsupportedCliType error"
+    );
 
     // ✅ Test health checking before returning adapters
     let health_summary = factory.get_health_summary().await;
-    assert_eq!(health_summary.len(), 1, "Factory must provide health summary");
-    assert_eq!(health_summary[&CLIType::Claude].status, HealthState::Healthy, "Healthy adapter should report healthy");
+    assert_eq!(
+        health_summary.len(),
+        1,
+        "Factory must provide health summary"
+    );
+    assert_eq!(
+        health_summary[&CLIType::Claude].status,
+        HealthState::Healthy,
+        "Healthy adapter should report healthy"
+    );
 
     // ✅ Test concurrent adapter creation
     let factory_arc = Arc::new(factory);
@@ -355,7 +466,10 @@ async fn test_fr4_adapter_factory_implementation() {
 
     for handle in handles {
         let result = handle.await.expect("Concurrent task must complete");
-        assert!(result.is_ok(), "Factory must support concurrent adapter creation");
+        assert!(
+            result.is_ok(),
+            "Factory must support concurrent adapter creation"
+        );
     }
 
     println!("✅ FR-4: AdapterFactory implementation fully validated");
@@ -368,24 +482,59 @@ async fn test_fr5_claude_adapter_reference_implementation() {
 
     println!("🧪 FR-5: Testing ClaudeAdapter Reference Implementation");
 
-    let adapter = ClaudeAdapter::new().await.expect("ClaudeAdapter must be creatable");
+    let adapter = ClaudeAdapter::new()
+        .await
+        .expect("ClaudeAdapter must be creatable");
 
     // ✅ Test all CliAdapter trait methods implemented
-    assert_eq!(adapter.get_executable_name(), "claude", "ClaudeAdapter must use 'claude' executable");
-    assert_eq!(adapter.get_memory_filename(), "CLAUDE.md", "ClaudeAdapter must use 'CLAUDE.md' memory file");
+    assert_eq!(
+        adapter.get_executable_name(),
+        "claude",
+        "ClaudeAdapter must use 'claude' executable"
+    );
+    assert_eq!(
+        adapter.get_memory_filename(),
+        "CLAUDE.md",
+        "ClaudeAdapter must use 'CLAUDE.md' memory file"
+    );
 
     // ✅ Test model validation
-    assert!(adapter.validate_model("claude-3-opus").await.expect("Model validation must work"),
-        "ClaudeAdapter must accept valid Claude models");
-    assert!(adapter.validate_model("claude-3-5-sonnet-20241022").await.expect("Model validation must work"),
-        "ClaudeAdapter must accept Claude 3.5 models");
-    assert!(adapter.validate_model("opus").await.expect("Model validation must work"),
-        "ClaudeAdapter must accept legacy model names");
+    assert!(
+        adapter
+            .validate_model("claude-3-opus")
+            .await
+            .expect("Model validation must work"),
+        "ClaudeAdapter must accept valid Claude models"
+    );
+    assert!(
+        adapter
+            .validate_model("claude-3-5-sonnet-20241022")
+            .await
+            .expect("Model validation must work"),
+        "ClaudeAdapter must accept Claude 3.5 models"
+    );
+    assert!(
+        adapter
+            .validate_model("opus")
+            .await
+            .expect("Model validation must work"),
+        "ClaudeAdapter must accept legacy model names"
+    );
 
-    assert!(!adapter.validate_model("gpt-4").await.expect("Model validation must work"),
-        "ClaudeAdapter must reject non-Claude models");
-    assert!(!adapter.validate_model("").await.expect("Model validation must work"),
-        "ClaudeAdapter must reject empty models");
+    assert!(
+        !adapter
+            .validate_model("gpt-4")
+            .await
+            .expect("Model validation must work"),
+        "ClaudeAdapter must reject non-Claude models"
+    );
+    assert!(
+        !adapter
+            .validate_model("")
+            .await
+            .expect("Model validation must work"),
+        "ClaudeAdapter must reject empty models"
+    );
 
     // ✅ Test configuration generation
     let config = AgentConfig {
@@ -396,57 +545,126 @@ async fn test_fr5_claude_adapter_reference_implementation() {
         temperature: Some(0.7),
         tools: Some(ToolConfiguration {
             remote: vec!["memory_create_entities".to_string()],
-            local_servers: Some(HashMap::from([
-                ("filesystem".to_string(), LocalServerConfig {
+            local_servers: Some(HashMap::from([(
+                "filesystem".to_string(),
+                LocalServerConfig {
                     enabled: true,
                     tools: vec!["read_file".to_string(), "write_file".to_string()],
-                }),
-            ])),
+                },
+            )])),
         }),
         cli_config: None,
     };
 
-    let generated_config = adapter.generate_config(&config).await.expect("Configuration generation must work");
-    assert!(generated_config.contains("claude-3-opus"), "Generated config must contain model name");
-    assert!(generated_config.contains("memory_create_entities"), "Generated config must contain remote tools");
-    assert!(generated_config.contains("filesystem"), "Generated config must contain local servers");
+    let generated_config = adapter
+        .generate_config(&config)
+        .await
+        .expect("Configuration generation must work");
+    assert!(
+        generated_config.contains("claude-3-opus"),
+        "Generated config must contain model name"
+    );
+    assert!(
+        generated_config.contains("memory_create_entities"),
+        "Generated config must contain remote tools"
+    );
+    assert!(
+        generated_config.contains("filesystem"),
+        "Generated config must contain local servers"
+    );
 
     // ✅ Test prompt formatting
     let formatted = adapter.format_prompt("Hello, world!");
-    assert_eq!(formatted, "Human: Hello, world!\n\nAssistant: ", "ClaudeAdapter must format prompts correctly");
+    assert_eq!(
+        formatted, "Human: Hello, world!\n\nAssistant: ",
+        "ClaudeAdapter must format prompts correctly"
+    );
 
     // ✅ Test capabilities
     let capabilities = adapter.get_capabilities();
-    assert!(capabilities.supports_streaming, "ClaudeAdapter must support streaming");
-    assert!(!capabilities.supports_multimodal, "ClaudeAdapter currently doesn't support multimodal");
-    assert!(capabilities.supports_function_calling, "ClaudeAdapter must support function calling");
-    assert!(capabilities.supports_system_prompts, "ClaudeAdapter must support system prompts");
-    assert_eq!(capabilities.max_context_tokens, 200_000, "ClaudeAdapter must report correct context window");
-    assert_eq!(capabilities.config_format, ConfigFormat::Json, "ClaudeAdapter must use JSON config");
-    assert!(capabilities.authentication_methods.contains(&AuthMethod::SessionToken),
-        "ClaudeAdapter must support session token auth");
+    assert!(
+        capabilities.supports_streaming,
+        "ClaudeAdapter must support streaming"
+    );
+    assert!(
+        !capabilities.supports_multimodal,
+        "ClaudeAdapter currently doesn't support multimodal"
+    );
+    assert!(
+        capabilities.supports_function_calling,
+        "ClaudeAdapter must support function calling"
+    );
+    assert!(
+        capabilities.supports_system_prompts,
+        "ClaudeAdapter must support system prompts"
+    );
+    assert_eq!(
+        capabilities.max_context_tokens, 200_000,
+        "ClaudeAdapter must report correct context window"
+    );
+    assert_eq!(
+        capabilities.config_format,
+        ConfigFormat::Json,
+        "ClaudeAdapter must use JSON config"
+    );
+    assert!(
+        capabilities
+            .authentication_methods
+            .contains(&AuthMethod::SessionToken),
+        "ClaudeAdapter must support session token auth"
+    );
 
     match &capabilities.memory_strategy {
         MemoryStrategy::MarkdownFile(filename) => {
-            assert_eq!(filename, "CLAUDE.md", "ClaudeAdapter must use CLAUDE.md memory strategy");
+            assert_eq!(
+                filename, "CLAUDE.md",
+                "ClaudeAdapter must use CLAUDE.md memory strategy"
+            );
         }
         _ => panic!("ClaudeAdapter must use MarkdownFile memory strategy"),
     }
 
     // ✅ Test response parsing
     let simple_response = "Hello! How can I help you today?";
-    let parsed = adapter.parse_response(simple_response).await.expect("Response parsing must work");
-    assert_eq!(parsed.content, simple_response, "Parsed response must preserve content");
-    assert_eq!(parsed.finish_reason, FinishReason::Stop, "Simple response should have Stop finish reason");
-    assert!(parsed.tool_calls.is_empty(), "Simple response should have no tool calls");
+    let parsed = adapter
+        .parse_response(simple_response)
+        .await
+        .expect("Response parsing must work");
+    assert_eq!(
+        parsed.content, simple_response,
+        "Parsed response must preserve content"
+    );
+    assert_eq!(
+        parsed.finish_reason,
+        FinishReason::Stop,
+        "Simple response should have Stop finish reason"
+    );
+    assert!(
+        parsed.tool_calls.is_empty(),
+        "Simple response should have no tool calls"
+    );
 
     // ✅ Test health check
-    let health = adapter.health_check().await.expect("Health check must work");
-    assert!(matches!(health.status, HealthState::Healthy | HealthState::Warning),
-        "ClaudeAdapter health check must report healthy or warning");
-    assert!(health.details.contains_key("model_validation"), "Health check must include model validation");
-    assert!(health.details.contains_key("config_generation"), "Health check must include config generation");
-    assert!(health.details.contains_key("response_parsing"), "Health check must include response parsing");
+    let health = adapter
+        .health_check()
+        .await
+        .expect("Health check must work");
+    assert!(
+        matches!(health.status, HealthState::Healthy | HealthState::Warning),
+        "ClaudeAdapter health check must report healthy or warning"
+    );
+    assert!(
+        health.details.contains_key("model_validation"),
+        "Health check must include model validation"
+    );
+    assert!(
+        health.details.contains_key("config_generation"),
+        "Health check must include config generation"
+    );
+    assert!(
+        health.details.contains_key("response_parsing"),
+        "Health check must include response parsing"
+    );
 
     println!("✅ FR-5: ClaudeAdapter reference implementation fully validated");
 }
@@ -462,10 +680,14 @@ async fn test_nfr1_performance_requirements() {
 
     // ✅ Test adapter creation time (<50ms)
     let start = Instant::now();
-    let adapter = ClaudeAdapter::new().await.expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new()
+        .await
+        .expect("Adapter creation must work");
     let creation_time = start.elapsed();
-    assert!(creation_time < Duration::from_millis(50),
-        "Adapter creation must complete in <50ms, took: {:?}", creation_time);
+    assert!(
+        creation_time < Duration::from_millis(50),
+        "Adapter creation must complete in <50ms, took: {creation_time:?}"
+    );
 
     // ✅ Test configuration generation time (<100ms)
     let config = AgentConfig {
@@ -479,10 +701,15 @@ async fn test_nfr1_performance_requirements() {
     };
 
     let start = Instant::now();
-    let _generated = adapter.generate_config(&config).await.expect("Config generation must work");
+    let _generated = adapter
+        .generate_config(&config)
+        .await
+        .expect("Config generation must work");
     let config_time = start.elapsed();
-    assert!(config_time < Duration::from_millis(100),
-        "Configuration generation must complete in <100ms, took: {:?}", config_time);
+    assert!(
+        config_time < Duration::from_millis(100),
+        "Configuration generation must complete in <100ms, took: {config_time:?}"
+    );
 
     // ✅ Test concurrent operations (1000+)
     let adapter_arc = Arc::new(adapter);
@@ -491,7 +718,11 @@ async fn test_nfr1_performance_requirements() {
     let start = Instant::now();
     for i in 0..1000 {
         let adapter_clone = adapter_arc.clone();
-        let model = if i % 2 == 0 { "claude-3-opus" } else { "claude-3-sonnet" };
+        let model = if i % 2 == 0 {
+            "claude-3-opus"
+        } else {
+            "claude-3-sonnet"
+        };
         handles.push(tokio::spawn(async move {
             adapter_clone.validate_model(model).await
         }));
@@ -506,14 +737,19 @@ async fn test_nfr1_performance_requirements() {
     }
     let concurrent_time = start.elapsed();
 
-    assert_eq!(success_count, 1000, "All concurrent operations must succeed");
-    assert!(concurrent_time < Duration::from_secs(5),
-        "1000 concurrent operations must complete in <5s, took: {:?}", concurrent_time);
+    assert_eq!(
+        success_count, 1000,
+        "All concurrent operations must succeed"
+    );
+    assert!(
+        concurrent_time < Duration::from_secs(5),
+        "1000 concurrent operations must complete in <5s, took: {concurrent_time:?}"
+    );
 
     println!("✅ NFR-1: Performance requirements satisfied");
-    println!("   - Adapter creation: {:?} (<50ms required)", creation_time);
-    println!("   - Config generation: {:?} (<100ms required)", config_time);
-    println!("   - 1000 concurrent ops: {:?} (<5s)", concurrent_time);
+    println!("   - Adapter creation: {creation_time:?} (<50ms required)");
+    println!("   - Config generation: {config_time:?} (<100ms required)");
+    println!("   - 1000 concurrent ops: {concurrent_time:?} (<5s)");
 }
 
 #[tokio::test]
@@ -523,13 +759,19 @@ async fn test_nfr2_thread_safety() {
 
     println!("🧪 NFR-2: Testing Thread Safety");
 
-    let factory = Arc::new(AdapterFactory::new().await.expect("Factory creation must work"));
+    let factory = Arc::new(
+        AdapterFactory::new()
+            .await
+            .expect("Factory creation must work"),
+    );
     let test_adapter = Arc::new(TestAdapter {
         cli_type: CLIType::Claude,
         healthy: true,
     });
 
-    factory.register_adapter(CLIType::Claude, test_adapter).await
+    factory
+        .register_adapter(CLIType::Claude, test_adapter)
+        .await
         .expect("Adapter registration must work");
 
     // ✅ Test concurrent factory access
@@ -549,7 +791,9 @@ async fn test_nfr2_thread_safety() {
     }
 
     for handle in handles {
-        handle.await.expect("Concurrent task must complete")
+        handle
+            .await
+            .expect("Concurrent task must complete")
             .expect("Thread safety test must pass");
     }
 
@@ -568,23 +812,39 @@ async fn test_nfr3_observability() {
 
     println!("🧪 NFR-3: Testing Observability");
 
-    let adapter = ClaudeAdapter::new().await.expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new()
+        .await
+        .expect("Adapter creation must work");
 
     // ✅ Test health check functionality
-    let health = adapter.health_check().await.expect("Health check must work");
-    assert!(!health.details.is_empty(), "Health check must provide details");
-    assert!(health.checked_at <= chrono::Utc::now(), "Health check timestamp must be valid");
+    let health = adapter
+        .health_check()
+        .await
+        .expect("Health check must work");
+    assert!(
+        !health.details.is_empty(),
+        "Health check must provide details"
+    );
+    assert!(
+        health.checked_at <= chrono::Utc::now(),
+        "Health check timestamp must be valid"
+    );
 
     // ✅ Test structured health check details
     let expected_checks = ["model_validation", "config_generation", "response_parsing"];
     for check in expected_checks {
-        assert!(health.details.contains_key(check),
-            "Health check must include '{}' detail", check);
+        assert!(
+            health.details.contains_key(check),
+            "Health check must include '{check}' detail"
+        );
     }
 
     // ✅ Test error tracking through model validation
     let invalid_model_result = adapter.validate_model("").await;
-    assert!(invalid_model_result.is_ok(), "Error tracking test must complete");
+    assert!(
+        invalid_model_result.is_ok(),
+        "Error tracking test must complete"
+    );
 
     println!("✅ NFR-3: Observability requirements satisfied");
 }
@@ -596,7 +856,9 @@ async fn test_nfr4_extensibility() {
 
     println!("🧪 NFR-4: Testing Extensibility");
 
-    let factory = AdapterFactory::new().await.expect("Factory creation must work");
+    let factory = AdapterFactory::new()
+        .await
+        .expect("Factory creation must work");
 
     // ✅ Test dynamic adapter registration for all CLI types
     let all_cli_types = [
@@ -616,13 +878,22 @@ async fn test_nfr4_extensibility() {
             healthy: true,
         });
 
-        factory.register_adapter(cli_type, test_adapter).await
+        factory
+            .register_adapter(cli_type, test_adapter)
+            .await
             .expect("Factory must support dynamic registration");
 
-        assert!(factory.supports_cli(cli_type), "Factory must support registered CLI type");
+        assert!(
+            factory.supports_cli(cli_type),
+            "Factory must support registered CLI type"
+        );
 
-        let created = factory.create(cli_type).await.expect("Factory must create registered adapter");
-        assert_eq!(created.get_executable_name(),
+        let created = factory
+            .create(cli_type)
+            .await
+            .expect("Factory must create registered adapter");
+        assert_eq!(
+            created.get_executable_name(),
             match cli_type {
                 CLIType::Claude => "claude",
                 CLIType::Codex => "codex",
@@ -633,11 +904,16 @@ async fn test_nfr4_extensibility() {
                 CLIType::Cursor => "cursor",
                 CLIType::OpenHands => "openhands",
             },
-            "Created adapter must match CLI type");
+            "Created adapter must match CLI type"
+        );
     }
 
     let supported_clis = factory.get_supported_clis();
-    assert_eq!(supported_clis.len(), 8, "Factory must support all 8 CLI types");
+    assert_eq!(
+        supported_clis.len(),
+        8,
+        "Factory must support all 8 CLI types"
+    );
 
     // ✅ Test minimal boilerplate for new adapters (via TestAdapter)
     // TestAdapter demonstrates the minimal implementation required
@@ -656,13 +932,25 @@ async fn test_error_handling() {
 
     println!("🧪 Testing Error Handling Scenarios");
 
-    let adapter = ClaudeAdapter::new().await.expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new()
+        .await
+        .expect("Adapter creation must work");
 
     // ✅ Test invalid model handling
-    assert!(!adapter.validate_model("gpt-4").await.expect("Invalid model test must work"),
-        "Invalid models must be rejected");
-    assert!(!adapter.validate_model("").await.expect("Empty model test must work"),
-        "Empty models must be rejected");
+    assert!(
+        !adapter
+            .validate_model("gpt-4")
+            .await
+            .expect("Invalid model test must work"),
+        "Invalid models must be rejected"
+    );
+    assert!(
+        !adapter
+            .validate_model("")
+            .await
+            .expect("Empty model test must work"),
+        "Empty models must be rejected"
+    );
 
     // ✅ Test invalid configuration handling
     let invalid_config = AgentConfig {
@@ -676,18 +964,24 @@ async fn test_error_handling() {
     };
 
     // The adapter should handle empty github_app gracefully
-    let config_result = adapter.generate_config(&invalid_config).await;
+    let _config_result = adapter.generate_config(&invalid_config).await;
     // Note: Current implementation might accept empty github_app - this tests graceful handling
 
     // ✅ Test factory error handling
     let factory = AdapterFactory::new().await.expect("Factory must work");
     let unsupported_result = factory.create(CLIType::Gemini).await;
-    assert!(unsupported_result.is_err(), "Unsupported CLI must return error");
+    assert!(
+        unsupported_result.is_err(),
+        "Unsupported CLI must return error"
+    );
 
     match unsupported_result.unwrap_err() {
         AdapterError::UnsupportedCliType(cli_type) => {
             // CLI type is stored as lowercase in the error
-            assert!(cli_type.to_lowercase().contains("gemini"), "Error must contain correct CLI type");
+            assert!(
+                cli_type.to_lowercase().contains("gemini"),
+                "Error must contain correct CLI type"
+            );
         }
         _ => panic!("Must return UnsupportedCliType error"),
     }
@@ -702,14 +996,29 @@ async fn test_trait_object_usage() {
     println!("🧪 Testing Trait Object Usage");
 
     let adapters: Vec<Box<dyn CliAdapter>> = vec![
-        Box::new(TestAdapter { cli_type: CLIType::Claude, healthy: true }),
-        Box::new(TestAdapter { cli_type: CLIType::Codex, healthy: true }),
+        Box::new(TestAdapter {
+            cli_type: CLIType::Claude,
+            healthy: true,
+        }),
+        Box::new(TestAdapter {
+            cli_type: CLIType::Codex,
+            healthy: true,
+        }),
     ];
 
     for adapter in adapters {
-        assert!(adapter.health_check().await.is_ok(), "Trait object health check must work");
-        assert!(!adapter.get_executable_name().is_empty(), "Trait object methods must work");
-        assert!(adapter.validate_model("test-model").await.is_ok(), "Trait object async methods must work");
+        assert!(
+            adapter.health_check().await.is_ok(),
+            "Trait object health check must work"
+        );
+        assert!(
+            !adapter.get_executable_name().is_empty(),
+            "Trait object methods must work"
+        );
+        assert!(
+            adapter.validate_model("test-model").await.is_ok(),
+            "Trait object async methods must work"
+        );
     }
 
     println!("✅ Trait object usage validated");
@@ -723,23 +1032,29 @@ async fn test_adapter_lifecycle() {
 
     println!("🧪 Testing Adapter Lifecycle");
 
-    let adapter = ClaudeAdapter::new().await.expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new()
+        .await
+        .expect("Adapter creation must work");
 
     let container = ContainerContext {
         pod: None,
         container_name: "test-lifecycle".to_string(),
         working_dir: "/tmp".to_string(),
-        env_vars: HashMap::from([
-            ("CLAUDE_SESSION_TOKEN".to_string(), "test-token".to_string()),
-        ]),
+        env_vars: HashMap::from([("CLAUDE_SESSION_TOKEN".to_string(), "test-token".to_string())]),
         namespace: "test".to_string(),
     };
 
     // ✅ Test initialization
-    adapter.initialize(&container).await.expect("Adapter initialization must work");
+    adapter
+        .initialize(&container)
+        .await
+        .expect("Adapter initialization must work");
 
     // ✅ Test usage during lifecycle
-    assert!(adapter.validate_model("claude-3-opus").await.expect("Model validation must work"));
+    assert!(adapter
+        .validate_model("claude-3-opus")
+        .await
+        .expect("Model validation must work"));
 
     let config = AgentConfig {
         github_app: "lifecycle-test".to_string(),
@@ -751,11 +1066,20 @@ async fn test_adapter_lifecycle() {
         cli_config: None,
     };
 
-    let _generated = adapter.generate_config(&config).await.expect("Config generation must work");
-    let _parsed = adapter.parse_response("Test response").await.expect("Response parsing must work");
+    let _generated = adapter
+        .generate_config(&config)
+        .await
+        .expect("Config generation must work");
+    let _parsed = adapter
+        .parse_response("Test response")
+        .await
+        .expect("Response parsing must work");
 
     // ✅ Test cleanup
-    adapter.cleanup(&container).await.expect("Adapter cleanup must work");
+    adapter
+        .cleanup(&container)
+        .await
+        .expect("Adapter cleanup must work");
 
     println!("✅ Adapter lifecycle validated");
 }
@@ -773,27 +1097,60 @@ async fn test_factory_health_monitoring() {
         max_concurrent_creations: 5,
     };
 
-    let factory = AdapterFactory::with_config(factory_config).await.expect("Factory with config must work");
+    let factory = AdapterFactory::with_config(factory_config)
+        .await
+        .expect("Factory with config must work");
 
     // Add healthy and unhealthy adapters
-    let healthy_adapter = Arc::new(TestAdapter { cli_type: CLIType::Claude, healthy: true });
-    let unhealthy_adapter = Arc::new(TestAdapter { cli_type: CLIType::Codex, healthy: false });
+    let healthy_adapter = Arc::new(TestAdapter {
+        cli_type: CLIType::Claude,
+        healthy: true,
+    });
+    let unhealthy_adapter = Arc::new(TestAdapter {
+        cli_type: CLIType::Codex,
+        healthy: false,
+    });
 
-    factory.register_adapter(CLIType::Claude, healthy_adapter).await.expect("Healthy adapter registration must work");
-    factory.register_adapter(CLIType::Codex, unhealthy_adapter).await.expect("Unhealthy adapter registration must work");
+    factory
+        .register_adapter(CLIType::Claude, healthy_adapter)
+        .await
+        .expect("Healthy adapter registration must work");
+    factory
+        .register_adapter(CLIType::Codex, unhealthy_adapter)
+        .await
+        .expect("Unhealthy adapter registration must work");
 
     // ✅ Test health summary
     let health_summary = factory.get_health_summary().await;
-    assert_eq!(health_summary.len(), 2, "Health summary must include all adapters");
-    assert_eq!(health_summary[&CLIType::Claude].status, HealthState::Healthy);
-    assert_eq!(health_summary[&CLIType::Codex].status, HealthState::Unhealthy);
+    assert_eq!(
+        health_summary.len(),
+        2,
+        "Health summary must include all adapters"
+    );
+    assert_eq!(
+        health_summary[&CLIType::Claude].status,
+        HealthState::Healthy
+    );
+    assert_eq!(
+        health_summary[&CLIType::Codex].status,
+        HealthState::Unhealthy
+    );
 
     // ✅ Test factory statistics
     let stats = factory.get_factory_stats().await;
     assert_eq!(stats.total_adapters, 2, "Stats must show correct total");
-    assert_eq!(stats.healthy_adapters, 1, "Stats must show correct healthy count");
-    assert_eq!(stats.unhealthy_adapters, 1, "Stats must show correct unhealthy count");
-    assert!(stats.health_monitoring_enabled, "Health monitoring must be enabled");
+    assert_eq!(
+        stats.healthy_adapters, 1,
+        "Stats must show correct healthy count"
+    );
+    assert_eq!(
+        stats.unhealthy_adapters, 1,
+        "Stats must show correct unhealthy count"
+    );
+    assert!(
+        stats.health_monitoring_enabled,
+        "Health monitoring must be enabled"
+    );
 
     println!("✅ Factory health monitoring validated");
 }
@@ -846,21 +1203,41 @@ async fn test_task_3_definition_of_done() {
 
     // ✅ All functional requirements implemented and tested
     let claude_adapter = ClaudeAdapter::new().await.expect("ClaudeAdapter must work");
-    let factory = AdapterFactory::new().await.expect("AdapterFactory must work");
+    let factory = AdapterFactory::new()
+        .await
+        .expect("AdapterFactory must work");
 
     // ✅ ClaudeAdapter maintains backward compatibility
     assert_eq!(claude_adapter.get_memory_filename(), "CLAUDE.md");
     assert_eq!(claude_adapter.get_executable_name(), "claude");
-    assert!(claude_adapter.validate_model("opus").await.expect("Legacy model must work"));
+    assert!(claude_adapter
+        .validate_model("opus")
+        .await
+        .expect("Legacy model must work"));
 
     // ✅ AdapterFactory manages lifecycle correctly
-    let test_adapter = Arc::new(TestAdapter { cli_type: CLIType::Claude, healthy: true });
-    factory.register_adapter(CLIType::Claude, test_adapter).await.expect("Registration must work");
-    let _created = factory.create(CLIType::Claude).await.expect("Creation must work");
+    let test_adapter = Arc::new(TestAdapter {
+        cli_type: CLIType::Claude,
+        healthy: true,
+    });
+    factory
+        .register_adapter(CLIType::Claude, test_adapter)
+        .await
+        .expect("Registration must work");
+    let _created = factory
+        .create(CLIType::Claude)
+        .await
+        .expect("Creation must work");
 
     // ✅ Comprehensive telemetry and observability
-    let health = claude_adapter.health_check().await.expect("Health check must work");
-    assert!(!health.details.is_empty(), "Telemetry must be comprehensive");
+    let health = claude_adapter
+        .health_check()
+        .await
+        .expect("Health check must work");
+    assert!(
+        !health.details.is_empty(),
+        "Telemetry must be comprehensive"
+    );
 
     // ✅ Thread safety verified (compile-time + runtime tests)
     // Already covered in NFR-2 tests above

@@ -56,7 +56,7 @@ impl AdapterConfig {
             correlation_id: Uuid::new_v4().to_string(),
             template_cache_size: 100,
             health_check_timeout: Duration::from_secs(10),
-            metrics_prefix: format!("cli_adapter_{}", cli_type),
+            metrics_prefix: format!("cli_adapter_{cli_type}"),
             verbose_logging: false,
         }
     }
@@ -249,7 +249,7 @@ impl BaseAdapter {
             .render_template(template, &full_context)
             .map_err(|e| {
                 error!(error = %e, "Template rendering failed");
-                AdapterError::TemplateError(format!("Template rendering failed: {}", e))
+                AdapterError::TemplateError(format!("Template rendering failed: {e}"))
             })?;
 
         let duration = start_time.elapsed();
@@ -273,8 +273,8 @@ impl BaseAdapter {
         // Helper for CLI-specific formatting
         handlebars_helper!(cli_format: |cli_type: str, content: str| {
             match cli_type {
-                "claude" => format!("# Claude Configuration\n\n{}", content),
-                "codex" => format!("# Codex Configuration\n{}", content),
+                "claude" => format!("# Claude Configuration\n\n{content}"),
+                "codex" => format!("# Codex Configuration\n{content}"),
                 _ => content.to_string(),
             }
         });
@@ -302,7 +302,7 @@ impl BaseAdapter {
         ) -> HelperResult {
             let var_name = h.param(0).and_then(|v| v.value().as_str()).unwrap_or("");
 
-            let value = std::env::var(var_name).unwrap_or_else(|_| format!("${{{}}}", var_name));
+            let value = std::env::var(var_name).unwrap_or_else(|_| format!("${{{var_name}}}"));
 
             out.write(&value)?;
             Ok(())
@@ -520,17 +520,17 @@ impl AdapterMetrics {
         let meter = global::meter("cli_adapter");
 
         let operations_total = meter
-            .u64_counter(format!("{}_operations_total", prefix))
+            .u64_counter(format!("{prefix}_operations_total"))
             .with_description("Total number of adapter operations")
             .build();
 
         let operation_failures = meter
-            .u64_counter(format!("{}_operation_failures", prefix))
+            .u64_counter(format!("{prefix}_operation_failures"))
             .with_description("Number of failed adapter operations")
             .build();
 
         let operation_duration = meter
-            .f64_histogram(format!("{}_operation_duration_ms", prefix))
+            .f64_histogram(format!("{prefix}_operation_duration_ms"))
             .with_description("Duration of adapter operations in milliseconds")
             .build();
 

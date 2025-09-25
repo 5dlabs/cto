@@ -61,8 +61,9 @@ impl ClaudeAdapter {
         let mut mcp_servers = json!({});
 
         // Get MCP server URL from environment variables (configurable, not hardcoded)
-        let toolman_url = std::env::var("TOOLMAN_SERVER_URL")
-            .unwrap_or_else(|_| "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string());
+        let toolman_url = std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        });
 
         if let Some(tool_config) = tools {
             // Add remote tools (MCP servers)
@@ -204,7 +205,7 @@ impl CliAdapter for ClaudeAdapter {
     fn format_prompt(&self, prompt: &str) -> String {
         // Claude-specific prompt formatting
         // Maintain exact compatibility with existing Claude behavior
-        format!("Human: {}\n\nAssistant: ", prompt)
+        format!("Human: {prompt}\n\nAssistant: ")
     }
 
     #[instrument(skip(self, response))]
@@ -401,13 +402,13 @@ impl ClaudeAdapter {
 
         // Regex to match Claude tool calls
         let function_calls_regex = Regex::new(r"<function_calls>(.*?)</function_calls>")
-            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
+            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {e}")))?;
 
         let invoke_regex = Regex::new(r#"<invoke name="([^"]+)">(.*?)</invoke>"#)
-            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
+            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {e}")))?;
 
         let parameter_regex = Regex::new(r#"<parameter name="([^"]+)">([^<]*)</parameter>"#)
-            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {}", e)))?;
+            .map_err(|e| AdapterError::ResponseParsingError(format!("Invalid regex: {e}")))?;
 
         // Find all function call blocks
         for function_calls_match in function_calls_regex.captures_iter(response) {
@@ -511,6 +512,12 @@ impl ClaudeModelValidator {
             "sonnet".to_string(),
             "haiku".to_string(),
         ]
+    }
+}
+
+impl Default for ClaudeModelValidator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -630,7 +637,7 @@ The file has been read successfully."#;
         let parsed_with_tools = adapter.parse_response(tool_response).await.unwrap();
         // Check that we correctly detect tool usage
         assert!(
-            parsed_with_tools.tool_calls.len() > 0
+            !parsed_with_tools.tool_calls.is_empty()
                 || parsed_with_tools.finish_reason == FinishReason::Stop
         );
         // In our basic implementation, tool calls are parsed from the content
@@ -700,7 +707,7 @@ Done!
         // The test may find 0, 1, or 2 tool calls depending on parsing logic
         // Basic sanity check - tool_calls should be a valid Vec
 
-        if tool_calls.len() >= 1 {
+        if !tool_calls.is_empty() {
             assert_eq!(tool_calls[0].name, "read_file");
 
             // Check parameters if available

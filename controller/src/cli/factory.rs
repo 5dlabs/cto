@@ -253,7 +253,7 @@ impl AdapterFactory {
                 Err(e) => {
                     let error_health = HealthStatus {
                         status: HealthState::Unhealthy,
-                        message: Some(format!("Health check failed: {}", e)),
+                        message: Some(format!("Health check failed: {e}")),
                         checked_at: chrono::Utc::now(),
                         details: HashMap::new(),
                     };
@@ -489,7 +489,7 @@ mod tests {
         }
 
         fn format_prompt(&self, prompt: &str) -> String {
-            format!("Mock: {}", prompt)
+            format!("Mock: {prompt}")
         }
 
         async fn parse_response(

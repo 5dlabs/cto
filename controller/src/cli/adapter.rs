@@ -87,7 +87,7 @@ pub struct ToolCall {
 }
 
 /// Response metadata
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ResponseMetadata {
     /// Input tokens consumed
     pub input_tokens: Option<u32>,
@@ -306,7 +306,8 @@ impl CLIExecutionAdapter {
             exit_code: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            duration_ms: u64::try_from(duration.as_millis().min(u128::from(u64::MAX))).unwrap_or(u64::MAX),
+            duration_ms: u64::try_from(duration.as_millis().min(u128::from(u64::MAX)))
+                .unwrap_or(u64::MAX),
             cli_type: self.cli_type,
         };
 
@@ -408,11 +409,13 @@ pub struct CommandBuilder {
 }
 
 impl CommandBuilder {
+    #[must_use]
     pub fn new(cli_type: CLIType) -> Self {
         Self { cli_type }
     }
 
     /// Build command for task execution
+    #[must_use]
     pub fn build_task_command(&self, task: &str, auto_mode: bool) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => {
@@ -433,13 +436,12 @@ impl CommandBuilder {
             CLIType::OpenCode => {
                 vec!["opencode".to_string(), task.to_string()]
             }
-            _ => {
-                vec!["echo".to_string(), format!("Task: {}", task)]
-            }
+            _ => vec!["echo".to_string(), format!("Task: {task}")],
         }
     }
 
     /// Build command for version check
+    #[must_use]
     pub fn build_version_command(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec!["claude-code".to_string(), "--version".to_string()],
@@ -450,6 +452,7 @@ impl CommandBuilder {
     }
 
     /// Build command for help
+    #[must_use]
     pub fn build_help_command(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec!["claude-code".to_string(), "--help".to_string()],
@@ -466,11 +469,13 @@ pub struct ResultProcessor {
 }
 
 impl ResultProcessor {
+    #[must_use]
     pub fn new(cli_type: CLIType) -> Self {
         Self { cli_type }
     }
 
     /// Process execution result and extract key information
+    #[must_use]
     pub fn process_result(&self, result: &CLIExecutionResult) -> ProcessedResult {
         let mut processed = ProcessedResult {
             success: result.success,
@@ -502,6 +507,7 @@ impl ResultProcessor {
     }
 
     fn process_claude_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+        let _ = self;
         // Look for CLAUDE.md creation
         if result.stdout.contains("CLAUDE.md") {
             processed.files_modified.push("CLAUDE.md".to_string());
@@ -514,6 +520,7 @@ impl ResultProcessor {
     }
 
     fn process_codex_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+        let _ = self;
         // Look for config file creation
         if result.stdout.contains("config.toml") {
             processed
@@ -537,6 +544,7 @@ impl ResultProcessor {
         result: &CLIExecutionResult,
         processed: &mut ProcessedResult,
     ) {
+        let _ = self;
         // Look for cache directory usage
         if result.stdout.contains(".cache/opencode") {
             processed
@@ -553,6 +561,7 @@ impl ResultProcessor {
     }
 
     fn process_generic_output(&self, result: &CLIExecutionResult, processed: &mut ProcessedResult) {
+        let _ = self;
         // Basic error extraction
         if !result.stderr.is_empty() {
             processed.errors.push(result.stderr.clone());
@@ -633,18 +642,6 @@ pub enum AdapterError {
 }
 
 pub type AdapterResult<T> = std::result::Result<T, AdapterError>;
-
-impl Default for ResponseMetadata {
-    fn default() -> Self {
-        Self {
-            input_tokens: None,
-            output_tokens: None,
-            duration_ms: None,
-            model: None,
-            extra: HashMap::new(),
-        }
-    }
-}
 
 impl Default for HealthStatus {
     fn default() -> Self {

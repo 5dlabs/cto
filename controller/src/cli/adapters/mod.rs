@@ -1,6 +1,6 @@
 //! CLI Adapter Implementations
 //!
-//! Concrete implementations of the CliAdapter trait for different CLI tools.
+//! Concrete implementations of the `CliAdapter` trait for different CLI tools.
 
 pub mod claude;
 
