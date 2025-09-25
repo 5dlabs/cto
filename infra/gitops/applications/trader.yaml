@@ -61,7 +61,7 @@ spec:
   # Destination configuration
   destination:
     server: https://kubernetes.default.svc
-    namespace: agent-platform
+    namespace: trader
 
   # Sync policy
   syncPolicy:
