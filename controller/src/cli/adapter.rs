@@ -131,6 +131,7 @@ pub struct StreamingDelta {
 
 /// CLI-specific capabilities
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)] // Appropriate for capabilities struct
 pub struct CliCapabilities {
     /// Supports streaming responses
     pub supports_streaming: bool,
@@ -305,7 +306,7 @@ impl CLIExecutionAdapter {
             exit_code: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            duration_ms: duration.as_millis().min(u64::MAX as u128) as u64,
+            duration_ms: u64::try_from(duration.as_millis().min(u128::from(u64::MAX))).unwrap_or(u64::MAX),
             cli_type: self.cli_type,
         };
 

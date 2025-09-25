@@ -6,6 +6,7 @@
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
+#[cfg(test)]
 use anyhow::Result;
 use dashmap::DashMap;
 use std::collections::HashMap;
