@@ -38,20 +38,20 @@ agent:
       maxTokens: 8192
       temperature: 0.8
     "5DLabs-Rex":
-      cliType: "claude"
-      model: "claude-sonnet-4-20250514"
-      maxTokens: 4096
+      cliType: "codex"
+      model: "gpt-4.1-mini"
+      maxTokens: 16000
       temperature: 0.7
     "5DLabs-Blaze":
       cliType: "codex"
-      model: "gpt-4"
-      maxTokens: 4096
+      model: "gpt-4.1-mini"
+      maxTokens: 16000
       temperature: 0.6
     "5DLabs-Cipher":
       cliType: "codex"
-      model: "gpt-4"
-      maxTokens: 2048
-      temperature: 0.5
+      model: "gpt-4.1-mini"
+      maxTokens: 16000
+      temperature: 0.6
     "5DLabs-Cleo":
       cliType: "claude"
       model: "claude-sonnet-4-20250514"
@@ -63,8 +63,8 @@ agent:
       maxTokens: 4096
       temperature: 0.7
     "5DLabs-Stitch":
-      cliType: "codex"
-      model: "gpt-4"
+      cliType: "claude"
+      model: "claude-sonnet-4-20250514"
       maxTokens: 2048
       temperature: 0.5
 
@@ -402,8 +402,16 @@ config:
 secrets:
   # REQUIRED: Set your Anthropic API key
   anthropicApiKey: "use-existing"
+  # OPTIONAL: Set your OpenAI API key (used by Codex CLI)
+  openaiApiKey: "use-existing"
   # External secrets name (created by External Secrets Operator)
   externalSecretsName: "agent-platform-secrets"
+  # CLI-specific secret key overrides (env var + secret key names)
+  cliApiKeys:
+    claude:
+      secretKey: "ANTHROPIC_API_KEY"
+    codex:
+      secretKey: "OPENAI_API_KEY"
   # Note: GitHub secrets (SSH keys + tokens) are managed externally per agent
   # See infra/scripts/setup-agent-secrets.sh for setup instructions
 

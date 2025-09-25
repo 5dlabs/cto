@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "claude-opus-4-1-20250805",
+      "model": "gpt-4.1-mini",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -16,7 +16,8 @@
       "repository": "5dlabs/cto",
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
-      "service": "cto"
+      "service": "cto",
+      "cli": "codex"
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
@@ -54,35 +55,66 @@
     "morgan": {
       "githubApp": "5DLabs-Morgan",
       "cli": "claude",
- "model": "claude-sonnet-4-20250514",
+      "model": "claude-sonnet-4-20250514",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search", "rustdocs_query_rust_docs"],
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "brave_web_search",
+          "rustdocs_query_rust_docs"
+        ],
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory",
+              "search_files",
+              "directory_tree"
+            ]
           },
           "git": {
             "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+            "tools": [
+              "git_status",
+              "git_diff",
+              "git_log",
+              "git_show"
+            ]
           }
         }
       }
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "gpt-4.1-mini",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "rustdocs_query_rust_docs"
+        ],
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory",
+              "search_files",
+              "directory_tree"
+            ]
           },
           "git": {
             "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+            "tools": [
+              "git_status",
+              "git_diff",
+              "git_log",
+              "git_show"
+            ]
           }
         }
       }
@@ -92,15 +124,30 @@
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "rustdocs_query_rust_docs"
+        ],
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory",
+              "search_files",
+              "directory_tree"
+            ]
           },
           "git": {
             "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+            "tools": [
+              "git_status",
+              "git_diff",
+              "git_log",
+              "git_show"
+            ]
           }
         }
       }
@@ -110,51 +157,89 @@
       "cli": "claude",
       "model": "claude-sonnet-4-20250514",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations"],
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations"
+        ],
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory",
+              "search_files",
+              "directory_tree"
+            ]
           },
           "git": {
             "enabled": true,
-            "tools": ["git_status", "git_diff"]
+            "tools": [
+              "git_status",
+              "git_diff"
+            ]
           }
         }
       }
     },
     "blaze": {
       "githubApp": "5DLabs-Blaze",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "gpt-4.1-mini",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "brave_web_search"
+        ],
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory"]
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory"
+            ]
           },
           "git": {
             "enabled": true,
-            "tools": ["git_status", "git_log"]
+            "tools": [
+              "git_status",
+              "git_log"
+            ]
           }
         }
       }
     },
     "cipher": {
       "githubApp": "5DLabs-Cipher",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "gpt-4.1-mini",
       "tools": {
-        "remote": ["memory_create_entities", "memory_add_observations", "brave_web_search"],
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "brave_web_search"
+        ],
         "localServers": {
           "filesystem": {
             "enabled": true,
-            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory",
+              "search_files",
+              "directory_tree"
+            ]
           },
           "git": {
             "enabled": true,
-            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+            "tools": [
+              "git_status",
+              "git_diff",
+              "git_log",
+              "git_show"
+            ]
           }
         }
       }

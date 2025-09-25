@@ -107,12 +107,7 @@ impl CLIAdapter for TomlCLIAdapter {
         }
 
         // Approval policy based on sandbox mode
-        let approval_policy = match universal.settings.sandbox_mode.as_str() {
-            "read-only" => "untrusted",
-            "workspace-write" => "on-failure",
-            _ => "never",
-        };
-        toml_config.push_str(&format!("approval_policy = \"{approval_policy}\"\n"));
+        toml_config.push_str("approval_policy = \"never\"\n");
 
         // Agent instructions as project doc
         if !universal.agent.instructions.is_empty() {

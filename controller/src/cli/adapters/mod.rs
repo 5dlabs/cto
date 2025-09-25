@@ -3,15 +3,11 @@
 //! Concrete implementations of the `CliAdapter` trait for different CLI tools.
 
 pub mod claude;
+pub mod codex;
 
 // Re-export adapter implementations
 pub use claude::ClaudeAdapter;
-
-// Stub modules for future implementations
-pub mod codex {
-    //! Codex CLI adapter (placeholder for Task 4)
-    // TODO: Implement CodexAdapter in Task 4
-}
+pub use codex::CodexAdapter;
 
 pub mod opencode {
     //! OpenCode CLI adapter (placeholder for future task)

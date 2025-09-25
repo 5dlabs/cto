@@ -568,15 +568,10 @@ The traditional Helm-based deployment is still supported for environments not re
 ```bash
 # Traditional deployment
 helm install orchestrator ./charts/orchestrator \
-
-
   --namespace orchestrator \
-
-
   --create-namespace \
-
-
-  --set secrets.anthropicApiKey="your-key"
+  --set secrets.anthropicApiKey="your-anthropic-key" \
+  --set secrets.openaiApiKey="your-openai-key"
 
 
 

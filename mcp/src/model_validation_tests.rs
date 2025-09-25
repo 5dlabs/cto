@@ -105,6 +105,10 @@ mod tests {
         let duration = start.elapsed();
 
         // Should be very fast - less than 10ms for 40,000 validations
-        assert!(duration.as_millis() < 10, "Validation took {:?} ms for 40k validations", duration.as_millis());
+        assert!(
+            duration.as_millis() < 10,
+            "Validation took {:?} ms for 40k validations",
+            duration.as_millis()
+        );
     }
 }

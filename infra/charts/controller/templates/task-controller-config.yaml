@@ -21,6 +21,18 @@ data:
       image:
         repository: {{ .Values.agent.image.repository | quote }}
         tag: {{ .Values.agent.image.tag | quote }}
+      cliImages:
+        {{- if .Values.agent.cliImages }}
+        {{- toYaml .Values.agent.cliImages | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
+      agentCliConfigs:
+        {{- if .Values.agent.agentCliConfigs }}
+        {{- toYaml .Values.agent.agentCliConfigs | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
       {{- /* Compute effective ServiceAccount: prefer non-empty agent.serviceAccountName; else cluster-admin SA if created; else omit */ -}}
       {{- $explicitSA := "" -}}
       {{- if (hasKey .Values "agent") }}
@@ -49,8 +61,23 @@ data:
 
     # Secrets configuration (references Kubernetes secrets)
     secrets:
-      apiKeySecretName: "agent-platform-secrets"
+      apiKeySecretName: {{ .Values.secrets.externalSecretsName | quote }}
       apiKeySecretKey: "ANTHROPIC_API_KEY"
+      cliApiKeys:
+        {{- if .Values.secrets.cliApiKeys }}
+        {{- range $cli, $secret := .Values.secrets.cliApiKeys }}
+        {{ $cli }}:
+          secretKey: {{ $secret.secretKey | quote }}
+          {{- if $secret.secretName }}
+          secretName: {{ $secret.secretName | quote }}
+          {{- end }}
+          {{- if $secret.envVar }}
+          envVar: {{ $secret.envVar | quote }}
+          {{- end }}
+        {{- end }}
+        {{- else }}
+        {}
+        {{- end }}
 
     # Tool permissions configuration (enterprise policy: allow all tools)
     permissions:

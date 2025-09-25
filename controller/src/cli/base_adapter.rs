@@ -18,6 +18,8 @@ use opentelemetry::{
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, warn};
@@ -39,6 +41,8 @@ pub struct AdapterConfig {
     pub cli_type: CLIType,
     /// Correlation ID for tracing
     pub correlation_id: String,
+    /// Root directory for CLI templates
+    pub template_root: PathBuf,
     /// Template cache size
     pub template_cache_size: usize,
     /// Health check timeout
@@ -51,9 +55,29 @@ pub struct AdapterConfig {
 
 impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
+        let default_template_root = match std::env::var("CLI_TEMPLATES_ROOT") {
+            Ok(path) => PathBuf::from(path),
+            Err(_) => {
+                let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
+                let repo_relative = manifest_dir
+                    .map(PathBuf::from)
+                    .map(|dir| {
+                        dir.join("..")
+                            .join("infra/charts/controller/claude-templates")
+                    })
+                    .filter(|path| path.exists());
+
+                if let Some(path) = repo_relative {
+                    path
+                } else {
+                    PathBuf::from("/claude-templates")
+                }
+            }
+        };
         Self {
             cli_type,
             correlation_id: Uuid::new_v4().to_string(),
+            template_root: default_template_root,
             template_cache_size: 100,
             health_check_timeout: Duration::from_secs(10),
             metrics_prefix: format!("cli_adapter_{cli_type}"),
@@ -63,6 +87,11 @@ impl AdapterConfig {
 
     pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
         self.correlation_id = correlation_id;
+        self
+    }
+
+    pub fn with_template_root<P: Into<PathBuf>>(mut self, template_root: P) -> Self {
+        self.template_root = template_root.into();
         self
     }
 
@@ -223,8 +252,12 @@ impl BaseAdapter {
     }
 
     /// Render template with Handlebars and context
-    #[instrument(skip(self, template, context))]
-    pub fn render_template(&self, template: &str, context: &Value) -> AdapterResult<String> {
+    #[instrument(skip(self, template_content, context))]
+    pub fn render_template(
+        &self,
+        template_content: &str,
+        context: &Value,
+    ) -> AdapterResult<String> {
         let start_time = Instant::now();
 
         // Add base context
@@ -246,7 +279,7 @@ impl BaseAdapter {
 
         let result = self
             .templates
-            .render_template(template, &full_context)
+            .render_template(template_content, &full_context)
             .map_err(|e| {
                 error!(error = %e, "Template rendering failed");
                 AdapterError::TemplateError(format!("Template rendering failed: {e}"))
@@ -254,13 +287,37 @@ impl BaseAdapter {
 
         let duration = start_time.elapsed();
         debug!(
-            template_length = template.len(),
+            template_length = template_content.len(),
             result_length = result.len(),
             duration_ms = duration.as_millis(),
             "Template rendered successfully"
         );
 
         Ok(result)
+    }
+
+    /// Render template from file relative to template root
+    #[instrument(skip(self, template_path, context))]
+    pub fn render_template_file(
+        &self,
+        template_path: &str,
+        context: &Value,
+    ) -> AdapterResult<String> {
+        let template_content = self.load_template(template_path)?;
+        self.render_template(&template_content, context)
+    }
+
+    /// Load a template from the configured template root
+    pub fn load_template(&self, relative_path: &str) -> AdapterResult<String> {
+        let path = self.config.template_root.join(relative_path);
+        let content = fs::read_to_string(&path).map_err(|e| {
+            AdapterError::TemplateError(format!(
+                "Failed to load template {}: {}",
+                path.display(),
+                e
+            ))
+        })?;
+        Ok(content)
     }
 
     /// Register custom template helpers
