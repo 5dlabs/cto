@@ -96,7 +96,7 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "workingDirectory")]
     pub working_directory: Option<String>,
 
-    /// Claude model to use (sonnet, opus)
+    /// Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514)
     pub model: String,
 
     /// GitHub username for authentication and commits (deprecated - use githubApp)
