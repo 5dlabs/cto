@@ -270,6 +270,9 @@ impl CLIExecutionAdapter {
     }
 
     /// Execute a CLI command with the given context (legacy method)
+    ///
+    /// # Errors
+    /// Returns an error if command execution fails or if I/O operations fail
     pub async fn execute(&self, context: &CLIExecutionContext) -> Result<CLIExecutionResult> {
         use std::process::Stdio;
         use tokio::process::Command;
@@ -302,7 +305,7 @@ impl CLIExecutionAdapter {
             exit_code: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            duration_ms: duration.as_millis() as u64,
+            duration_ms: duration.as_millis().min(u64::MAX as u128) as u64,
             cli_type: self.cli_type,
         };
 
@@ -310,6 +313,9 @@ impl CLIExecutionAdapter {
     }
 
     /// Prepare files for CLI execution
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail or if paths are invalid
     pub async fn prepare_files(&self, config_files: &[ConfigFile]) -> Result<()> {
         for config_file in config_files {
             // Ensure parent directory exists
@@ -352,6 +358,9 @@ impl CLIExecutionAdapter {
     }
 
     /// Validate CLI environment
+    ///
+    /// # Errors
+    /// Returns an error if environment validation fails or if required variables are missing
     pub async fn validate_environment(&self, required_vars: &[String]) -> Result<Vec<String>> {
         let mut missing = Vec::new();
 
@@ -369,6 +378,7 @@ impl CLIExecutionAdapter {
     }
 
     /// Get CLI-specific execution hints
+    #[must_use]
     pub fn get_execution_hints(&self) -> Vec<String> {
         match self.cli_type {
             CLIType::Claude => vec![
