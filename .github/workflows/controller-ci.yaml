@@ -180,7 +180,7 @@ jobs:
       
       - name: Regenerate and commit templates
         run: |
-          echo "🔄 Auto-updating claude-templates ConfigMap..."
+          echo "🔄 Auto-updating agent-templates ConfigMap..."
           cd infra/charts/controller
           
           # Generate the ConfigMap
