@@ -102,6 +102,13 @@ impl DiscoveryService {
                 init_commands: vec![],
                 cleanup_commands: vec![],
             }),
+            CLIType::Cursor => Ok(CLIConfiguration {
+                config_format: ConfigFormat::JSON,
+                config_location: "/workspace/.cursor/cli.json".to_string(),
+                required_env_vars: vec!["CURSOR_API_KEY".to_string()],
+                init_commands: vec![],
+                cleanup_commands: vec![],
+            }),
             CLIType::OpenCode => Ok(CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/home/node/.config/opencode/config.json".to_string(),
@@ -141,6 +148,15 @@ impl DiscoveryService {
                 supports_file_operations: true,
                 session_persistence: SessionType::Persistent,
             }),
+            CLIType::Cursor => Ok(CLICapabilities {
+                max_context_window: 128_000,
+                supports_tools: true,
+                supports_vision: false,
+                supports_web_search: true,
+                supports_code_execution: true,
+                supports_file_operations: true,
+                session_persistence: SessionType::Persistent,
+            }),
             CLIType::OpenCode => Ok(CLICapabilities {
                 max_context_window: 128_000,
                 supports_tools: true,
@@ -172,6 +188,11 @@ impl DiscoveryService {
                 free_tier_tokens: None,
             }),
             CLIType::Codex => Ok(CostModel {
+                input_token_cost: 0.0015,
+                output_token_cost: 0.006,
+                free_tier_tokens: None,
+            }),
+            CLIType::Cursor => Ok(CostModel {
                 input_token_cost: 0.0015,
                 output_token_cost: 0.006,
                 free_tier_tokens: None,

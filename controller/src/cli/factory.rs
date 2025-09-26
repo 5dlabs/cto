@@ -4,7 +4,7 @@
 //! and dynamic adapter discovery.
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
-use crate::cli::adapters::{ClaudeAdapter, CodexAdapter};
+use crate::cli::adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter};
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
 #[cfg(test)]
@@ -170,6 +170,10 @@ impl AdapterFactory {
 
         let codex_adapter = Arc::new(CodexAdapter::new().await?);
         self.register_adapter(CLIType::Codex, codex_adapter).await?;
+
+        let cursor_adapter = Arc::new(CursorAdapter::new().await?);
+        self.register_adapter(CLIType::Cursor, cursor_adapter)
+            .await?;
 
         Ok(())
     }
@@ -575,9 +579,10 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 2);
+        assert_eq!(factory.get_supported_clis().len(), 3);
         assert!(factory.supports_cli(CLIType::Claude));
         assert!(factory.supports_cli(CLIType::Codex));
+        assert!(factory.supports_cli(CLIType::Cursor));
     }
 
     #[tokio::test]
@@ -594,7 +599,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 2);
+        assert_eq!(factory.get_supported_clis().len(), 3);
     }
 
     #[tokio::test]
@@ -651,7 +656,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 2);
+        assert_eq!(health_summary.len(), 3);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -660,6 +665,7 @@ mod tests {
             health_summary[&CLIType::Codex].status,
             HealthState::Unhealthy
         );
+        assert!(health_summary.contains_key(&CLIType::Cursor));
     }
 
     #[tokio::test]
@@ -678,8 +684,8 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 2);
-        assert_eq!(stats.healthy_adapters, 2);
+        assert_eq!(stats.total_adapters, 3);
+        assert_eq!(stats.healthy_adapters, 3);
         assert_eq!(stats.warning_adapters, 0);
         assert_eq!(stats.unhealthy_adapters, 0);
     }

@@ -242,6 +242,62 @@ impl CLIAdapter for JsonCLIAdapter {
     }
 }
 
+/// Cursor CLI adapter (skeleton)
+pub struct CursorCLIAdapter;
+
+#[async_trait]
+impl CLIAdapter for CursorCLIAdapter {
+    async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
+        let cursor_config = serde_json::json!({
+            "version": 1,
+            "editor": { "vimMode": false },
+            "permissions": {
+                "allow": [],
+                "deny": [],
+            },
+            "notes": "TODO(cursor): populate CLI configuration",
+        });
+
+        let config_content = serde_json::to_string_pretty(&cursor_config)
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
+
+        let mut config_files = vec![ConfigFile {
+            path: "/workspace/.cursor/cli.json".to_string(),
+            content: config_content.clone(),
+            permissions: Some("0644".to_string()),
+        }];
+
+        config_files.push(ConfigFile {
+            path: "/workspace/AGENTS.md".to_string(),
+            content: universal.agent.instructions.clone(),
+            permissions: Some("0644".to_string()),
+        });
+
+        Ok(TranslationResult {
+            content: config_content,
+            config_files,
+            env_vars: vec!["CURSOR_API_KEY".to_string()],
+        })
+    }
+
+    async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
+        Ok(vec![
+            "cursor-agent".to_string(),
+            "--print".to_string(),
+            "--force".to_string(),
+            task.to_string(),
+        ])
+    }
+
+    fn required_env_vars(&self) -> Vec<String> {
+        vec!["CURSOR_API_KEY".to_string()]
+    }
+
+    fn cli_type(&self) -> CLIType {
+        CLIType::Cursor
+    }
+}
+
 /// Main configuration bridge
 pub struct ConfigurationBridge {
     adapters: std::collections::HashMap<CLIType, Box<dyn CLIAdapter>>,
@@ -263,6 +319,10 @@ impl ConfigurationBridge {
         adapters.insert(
             CLIType::OpenCode,
             Box::new(JsonCLIAdapter) as Box<dyn CLIAdapter>,
+        );
+        adapters.insert(
+            CLIType::Cursor,
+            Box::new(CursorCLIAdapter) as Box<dyn CLIAdapter>,
         );
 
         Self { adapters }
@@ -471,5 +531,46 @@ mod tests {
         // Check that MCP server environment variables are included
         assert!(result.env_vars.contains(&"OPENAI_API_KEY".to_string()));
         assert!(result.env_vars.contains(&"TOOLMAN_SERVER_URL".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_cursor_adapter_placeholder() {
+        let adapter = CursorCLIAdapter;
+        let universal = UniversalConfig {
+            context: ContextConfig {
+                project_name: "Cursor Project".to_string(),
+                project_description: "Testing cursor adapter".to_string(),
+                architecture_notes: String::new(),
+                constraints: vec![],
+            },
+            tools: vec![],
+            settings: SettingsConfig {
+                model: "gpt-5-cursor".to_string(),
+                temperature: 0.2,
+                max_tokens: 2000,
+                timeout: 300,
+                sandbox_mode: "workspace-write".to_string(),
+            },
+            agent: AgentConfig {
+                role: "developer".to_string(),
+                capabilities: vec![],
+                instructions: "Test instructions".to_string(),
+            },
+            mcp_config: None,
+        };
+
+        let result = adapter.to_cli_config(&universal).await.unwrap();
+        assert!(result
+            .config_files
+            .iter()
+            .any(|f| f.path.ends_with(".cursor/cli.json")));
+        assert!(result.env_vars.contains(&"CURSOR_API_KEY".to_string()));
+
+        let command = adapter
+            .generate_command("implement feature", &universal)
+            .await
+            .unwrap();
+        assert_eq!(command[0], "cursor-agent");
+        assert!(command.contains(&"--print".to_string()));
     }
 }

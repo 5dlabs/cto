@@ -29,6 +29,7 @@ impl CodeTemplateGenerator {
     ) -> Result<BTreeMap<String, String>> {
         match Self::determine_cli_type(code_run) {
             CLIType::Codex => Self::generate_codex_templates(code_run, config),
+            CLIType::Cursor => Self::generate_cursor_templates(),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -81,6 +82,12 @@ impl CodeTemplateGenerator {
         }
 
         Ok(templates)
+    }
+
+    fn generate_cursor_templates() -> Result<BTreeMap<String, String>> {
+        Err(crate::tasks::types::Error::ConfigError(
+            "Cursor CLI templates are not implemented yet".to_string(),
+        ))
     }
 
     fn generate_container_script(code_run: &CodeRun) -> Result<String> {
