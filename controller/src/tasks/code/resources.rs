@@ -1320,7 +1320,16 @@ impl<'a> CodeResourceManager<'a> {
         if let Some(cli_config) = &code_run.spec.cli_config {
             // Try to get CLI-specific image configuration
             let cli_key = cli_config.cli_type.to_string().to_lowercase();
-            if let Some(cli_image) = self.config.agent.cli_images.get(&cli_key) {
+            let cli_image_opt = self.config.agent.cli_images.get(&cli_key).or_else(|| {
+                self.config
+                    .agent
+                    .cli_images
+                    .iter()
+                    .find(|(key, _)| key.eq_ignore_ascii_case(&cli_key))
+                    .map(|(_, img)| img)
+            });
+
+            if let Some(cli_image) = cli_image_opt {
                 if cli_image.is_configured() {
                     return Ok(format!("{}:{}", cli_image.repository, cli_image.tag));
                 }
