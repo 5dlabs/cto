@@ -603,23 +603,30 @@ play({
 
 ## **🎨 Template Customization**
 
-The platform uses a template system to customize Claude agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files that get rendered with task-specific data.
+The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. Multi-CLI support lives alongside these templates so Claude, Codex, and future CLIs follow the same structure.
 
-**Model Defaults**: Models are configured through `cto-config.json` defaults and can be overridden via MCP parameters. The platform supports all Claude models including `claude-opus-4-20250514` and `claude-3-5-sonnet-20241022`.
+**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). We ship presets for Claude (`claude-sonnet-4-20250514`) and Codex (`gpt-5-codex`), but any supported model for a CLI can be supplied via configuration.
 
 ### Template Architecture
 
-**Docs Tasks**: Generate documentation for Task Master projects
+All templates now live under `infra/charts/controller/agent-templates/` with CLI-specific subdirectories:
 
-- **Prompts**: Rendered from `docs/prompt.md.hbs` template into ConfigMap
+**Docs Tasks (Claude today)**
+
+- **Prompts**: Rendered from `docs/claude/prompt.md.hbs` into the ConfigMap
 - **Settings**: `docs/claude/settings.json.hbs` controls model, permissions, tools
-- **Container Script**: `docs/claude/container.sh.hbs` handles Git workflow and Claude execution
+- **Container Script**: `docs/claude/container.sh.hbs` handles Git workflow and CLI execution
 
-**Code Tasks**: Implement specific Task Master task IDs
+**Code Tasks (multi-CLI)**
 
-- **Prompts**: Read from docs repository at `{docs_project_directory}/.taskmaster/docs/task-{id}/prompt.md` (or `_projects/{service}/.taskmaster/docs/task-{id}/prompt.md`)
-- **Settings**: `code/claude/settings.json.hbs` controls model, permissions, MCP tools
-- **Container Script**: `code/claude/container.sh.hbs` handles dual-repo workflow and Claude execution
+- **Claude**: `code/claude/**`
+  - Settings: `code/claude/settings.json.hbs`
+  - Container: `code/claude/container.sh.hbs`
+- **Codex**: `code/codex/**`
+  - Agents memory: `code/codex/agents.md.hbs`
+  - Config: `code/codex/config.toml.hbs`
+  - Container scripts: `code/codex/container*.sh.hbs`
+- **Shared assets**: `code/mcp.json.hbs`, `code/coding-guidelines.md.hbs`, and `code/github-guidelines.md.hbs`
 
 **Play Workflows**: Multi-agent orchestration with event-driven coordination
 
@@ -634,11 +641,14 @@ The platform uses a template system to customize Claude agent behavior, settings
 Edit the settings template files directly:
 
 ```bash
-# For docs generation agents
-vim infra/charts/agent-platform/claude-templates/docs/settings.json.hbs
+# For docs (Claude) agents
+vim infra/charts/controller/agent-templates/docs/claude/settings.json.hbs
 
-# For code implementation agents
-vim infra/charts/agent-platform/claude-templates/code/settings.json.hbs
+# For code (Claude) agents
+vim infra/charts/controller/agent-templates/code/claude/settings.json.hbs
+
+# For code (Codex) agents
+vim infra/charts/controller/agent-templates/code/codex/config.toml.hbs
 ```
 
 Settings control:
@@ -655,7 +665,7 @@ See [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settin
 
 ```bash
 # Edit the docs prompt template
-vim infra/charts/agent-platform/claude-templates/docs/prompt.md.hbs
+vim infra/charts/controller/agent-templates/docs/claude/prompt.md.hbs
 ```
 
 **For code tasks** (affects specific task implementation):
@@ -673,7 +683,7 @@ vim {docs_project_directory}/.taskmaster/docs/task-{id}/acceptance-criteria.md
 
 ```bash
 # Edit the play workflow template
-vim infra/charts/agent-platform/templates/workflowtemplates/play-workflow-template.yaml
+vim infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml
 ```
 
 The play workflow template controls:
@@ -684,14 +694,14 @@ The play workflow template controls:
 
 #### 4. Adding Custom Hooks
 
-Hooks are shell scripts that run during agent execution. Add new hook files to the `claude-templates` directory:
+Hooks are shell scripts that run during agent execution. Add new hook files beneath the CLI you are extending:
 
 ```bash
-# Create new hook script (docs example)
-vim infra/charts/agent-platform/claude-templates/docs/hooks/my-custom-hook.sh.hbs
+# Create new hook script (docs/Claude example)
+vim infra/charts/controller/agent-templates/docs/claude/hooks/my-custom-hook.sh.hbs
 
-# Create new hook script (code example)
-vim infra/charts/agent-platform/claude-templates/code/hooks/my-custom-hook.sh.hbs
+# Create new hook script (code/Codex example)
+vim infra/charts/controller/agent-templates/code/codex/hooks/my-custom-hook.sh.hbs
 ```
 
 Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
@@ -704,10 +714,10 @@ After editing any template files, redeploy the agent-platform:
 
 ```bash
 # Deploy template changes
-helm upgrade agent-platform . -n agent-platform
+helm upgrade agent-platform infra/charts/controller -n agent-platform
 
-# Verify ConfigMap was updated
-kubectl get configmap claude-templates-configmap -n agent-platform -o yaml
+# Verify ConfigMap was updated (fullname = <release>-controller)
+kubectl get configmap agent-platform-controller-agent-templates -n agent-platform -o yaml
 ```
 
 **Important**: Template changes only affect new agent jobs. Running jobs continue with their original templates.
