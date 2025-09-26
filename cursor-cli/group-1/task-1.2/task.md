@@ -10,11 +10,12 @@
 Author the handlebars templates that drive Cursor execution, mirroring the Codex structure but incorporating Cursor-specific CLI behaviours.
 
 Deliverables:
-1. Directory layout under `infra/charts/controller/agent-templates/code/cursor/` matching Codex naming:
+1. Directory layout under `infra/charts/controller/agent-templates/code/cursor/` mirroring the Codex structure while honouring Cursor naming conventions:
    - `container-base.sh.hbs` (shared logic)
    - `container-{rex,cleo,tess,...}.sh.hbs` wrappers that inject banners and role-specific instructions
    - `agents*.md.hbs` (memory/prompt documents per agent)
-   - `cursor-config.toml.hbs`
+   - `cursor-cli-config.json.hbs` (global CLI settings rendered into `~/.cursor/cli-config.json`)
+   - `cursor-cli.json.hbs` (project permissions rendered into `.cursor/cli.json`)
    - Shared artifacts like `client-config.json.hbs` if the CLI expects config (reuse existing template or add cursor-specific conditionals).
 2. Container script specifics:
    - Invoke `cursor-agent` instead of `codex exec`.
@@ -26,10 +27,10 @@ Deliverables:
 3. Memory/agents docs:
    - Update instructions to speak to Cursor CLI features (mention `/compress`, MCP usage, shell mode constraints, 30s timeout).
    - Inject explicit guidance on using `--force` responsibly and to respect permissions from `cli-config.json`.
-4. Config template (`cursor-config.toml.hbs`):
-   - Set `approval_policy = "never"`, `sandbox_mode = "danger-full-access"` (matching Codex defaults to avoid command prompts).
-   - Support optional `reasoning_effort` from CLI settings (same path as Codex: `cli_config.settings.reasoningEffort`).
-   - Configure MCP server entry for Toolman identical to Codex (command `toolman`, args `--url ...`).
+4. Config templates (`cursor-cli-config.json.hbs`, `cursor-cli.json.hbs`):
+   - Enforce non-interactive defaults (`approvalPolicy = "never"`, `sandboxMode = "danger-full-access"`) matching the Codex behaviour.
+   - Support optional `reasoningEffort` from CLI settings (same path as Codex: `cli_config.settings.reasoningEffort`).
+   - Configure the Toolman MCP server identical to Codex (command `toolman`, args `--url ...`) so both global and project configs are ready for headless execution.
 
 ## Acceptance Criteria
 - `cargo run --manifest-path controller/Cargo.toml --bin test-templates` renders Cursor templates without panic once Task 1.3 wires them up.
