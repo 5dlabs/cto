@@ -601,7 +601,7 @@ if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
 
 if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
@@ -640,27 +640,94 @@ echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
-set +e
-codex exec \
-  --dangerously-bypass-approvals-and-sandbox \
-  --skip-git-repo-check \
-  --cd "$CODEX_WORK_DIR" \
-  "$PROMPT_CONTENT"
-EXIT_CODE=$?
-set -e
+MAX_RETRIES=${CODEX_MAX_RETRIES:-3}
+ATTEMPT=1
+SUCCESS=0
+CODEX_EXIT=1
+LAST_MESSAGE_FILE=""
+RUN_LOG=""
 
-if [ $EXIT_CODE -ne 0 ]; then
-  echo "⚠️ Codex exited with status $EXIT_CODE"
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "🚀 Codex execution attempt $ATTEMPT/$MAX_RETRIES"
+  LAST_MESSAGE_FILE="/tmp/codex-last-message-${ATTEMPT}.txt"
+  RUN_LOG="/tmp/codex-run-${ATTEMPT}.jsonl"
+
+  set +e
+  set -o pipefail
+  codex exec \
+    --dangerously-bypass-approvals-and-sandbox \
+    --skip-git-repo-check \
+    --experimental-json \
+    --output-last-message "$LAST_MESSAGE_FILE" \
+    --cd "$CODEX_WORK_DIR" \
+    "$PROMPT_CONTENT" | tee "$RUN_LOG"
+  CODEX_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  if [ $CODEX_EXIT -ne 0 ]; then
+    echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
+  fi
+
+  COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
+  COMPLETION_LAST_MESSAGE="/tmp/codex-completion-${ATTEMPT}.txt"
+  COMPLETION_LOG="/tmp/codex-completion-${ATTEMPT}.jsonl"
+
+  set +e
+  set -o pipefail
+  codex exec \
+    --dangerously-bypass-approvals-and-sandbox \
+    --skip-git-repo-check \
+    --experimental-json \
+    --output-last-message "$COMPLETION_LAST_MESSAGE" \
+    --cd "$CODEX_WORK_DIR" \
+    "$COMPLETION_PROMPT" | tee "$COMPLETION_LOG"
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  if [ $COMPLETION_EXIT -ne 0 ]; then
+    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+  fi
+
+  if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
+    COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
+  else
+    COMPLETION_RESPONSE=""
+  fi
+  if echo "$COMPLETION_RESPONSE" | grep -Eq '^yes'; then
+    SUCCESS=1
+    break
+  fi
+
+  echo "⚠️ Codex reported task incomplete; retrying..."
+  ATTEMPT=$((ATTEMPT + 1))
+done
+
+if [ $SUCCESS -ne 1 ]; then
+  echo "❌ Codex did not confirm task completion after $MAX_RETRIES attempts"
+  EXIT_CODE=${CODEX_EXIT:-1}
+else
+  EXIT_CODE=$CODEX_EXIT
 fi
 
-if [ $EXIT_CODE -eq 0 ]; then
+if [ $EXIT_CODE -eq 0 ] && [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
 else
-  echo "⚠️ Skipping auto PR enforcement due to Codex exit status $EXIT_CODE"
+  echo "⚠️ Skipping auto PR enforcement due to Codex completion status"
 fi
 
 touch /workspace/.agent_done 2>/dev/null || true
+
+if [ $EXIT_CODE -ne 0 ] || [ $SUCCESS -ne 1 ]; then
+  {{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+  {{else}}
+echo "⚠️ Codex execution incomplete"
+  {{/if}}
+  exit 1
+fi
 
 {{#if agent_completion_message}}
 echo "{{agent_completion_message}}"
