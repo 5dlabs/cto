@@ -389,6 +389,26 @@ REPO_ROOT="/workspace/$REPO_NAME"
 cd "$REPO_ROOT"
 
 echo "=== BRANCH SETUP ==="
+# Remove stale automation-managed files that block branch checkout when rerunning
+MANAGED_PATHS=(
+  ".mcp.json"
+  "AGENTS.md"
+  "client-config.json"
+  "coding-guidelines.md"
+  "github-guidelines.md"
+  "task"
+)
+
+for managed_path in "${MANAGED_PATHS[@]}"; do
+  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
+    continue
+  fi
+  if [ -e "$managed_path" ]; then
+    echo "🧹 Removing stale file to allow checkout: $managed_path"
+    rm -rf "$managed_path"
+  fi
+done
+
 BASE_BRANCH="${PR_BASE_BRANCH:-main}"
 REMOTE_BASE="origin/$BASE_BRANCH"
 
