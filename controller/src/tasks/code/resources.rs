@@ -15,7 +15,7 @@ use kube::ResourceExt;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 pub struct CodeResourceManager<'a> {
     pub jobs: &'a Api<Job>,
@@ -1335,20 +1335,11 @@ impl<'a> CodeResourceManager<'a> {
                 }
             }
 
-            if self.config.agent.image.is_configured() {
-                warn!(
-                    cli = %cli_config.cli_type,
-                    "CLI-specific image not configured; using deprecated fallback agent.image"
-                );
-                return Ok(format!(
-                    "{}:{}",
-                    self.config.agent.image.repository, self.config.agent.image.tag
-                ));
-            }
-
             return Err(Error::ConfigError(format!(
-                "No image configured for CLI type {}. Configure agent.cliImages or provide a fallback agent.image.",
-                cli_config.cli_type
+                "No image configured for CLI type {}. Configure agent.cliImages with an entry for '{}' (available keys: {:?}).",
+                cli_config.cli_type,
+                cli_key,
+                self.config.agent.cli_images.keys().collect::<Vec<_>>()
             )));
         }
 
