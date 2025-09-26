@@ -367,7 +367,7 @@ if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR with task-specific labels via \`gh pr create\`.\n\n---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels `task-{{task_id}}`, `service-{{service}}`, and the current workflow label.\n\n---\n\n"
 
 if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
@@ -380,11 +380,20 @@ if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding
   PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
 fi
 
+echo "🔍 DEBUG: About to check for prompt.md at: $CODEX_WORK_DIR/task/prompt.md"
+echo "🔍 DEBUG: Contents of task directory:"
+ls -la "$CODEX_WORK_DIR/task/" || echo "Task directory not found or empty"
+echo "🔍 DEBUG: Current working directory contents:"
+ls -la "$CODEX_WORK_DIR/" || echo "Working directory not accessible"
+
 PROMPT_FILE="$CODEX_WORK_DIR/task/prompt.md"
 if [ ! -f "$PROMPT_FILE" ]; then
   echo "❌ prompt.md not found at $PROMPT_FILE"
   exit 1
 fi
+
+echo "startingTask:{{task_id}}"
+echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
