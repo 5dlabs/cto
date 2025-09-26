@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "hasChangedDefaultModel": true,
+  "model": {
+    "default": "{{model}}"{{#if model_reasoning_effort}},
+    "reasoningEffort": "{{model_reasoning_effort}}"{{/if}}{{#if temperature}},
+    "temperature": {{temperature}}{{/if}}{{#if max_output_tokens}},
+    "maxOutputTokens": {{max_output_tokens}}{{/if}}
+  },
+  "editor": {
+    "vimMode": {{#if editor_vim_mode}}true{{else}}false{{/if}}
+  },
+  "permissions": {
+    "allow": [
+      "Shell(cargo)",
+      "Shell(curl)",
+      "Shell(git)",
+      "Shell(go)",
+      "Shell(make)",
+      "Shell(npm)",
+      "Shell(pnpm)",
+      "Shell(poetry)",
+      "Shell(python)",
+      "Shell(yarn)",
+      "Read(**/*)",
+      "Write(**/*)"
+    ],
+    "deny": [
+      "Shell(rm)",
+      "Shell(dd)",
+      "Shell(reboot)",
+      "Shell(shutdown)"
+    ]
+  },
+  "automation": {
+    "approvalPolicy": "{{approval_policy}}",
+    "sandboxMode": "{{sandbox_mode}}"{{#if project_doc_max_bytes}},
+    "projectDocMaxBytes": {{project_doc_max_bytes}}{{/if}}
+  },
+  "mcp": {
+    "servers": {
+      "toolman": {
+        "command": "toolman",
+        "args": ["--url", "{{toolman.url}}"],
+        "env": {
+          "TOOLMAN_SERVER_URL": "{{toolman.url}}"
+        }{{#if toolman.tools}},
+        "availableTools": [
+          {{#each toolman.tools}}
+          "{{this}}"{{#unless @last}},{{/unless}}
+          {{/each}}
+        ]{{/if}}
+      }
+    }
+  }
+}

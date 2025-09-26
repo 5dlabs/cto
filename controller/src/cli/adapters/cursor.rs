@@ -42,9 +42,17 @@ impl CursorAdapter {
     }
 
     fn unsupported(feature: &str) -> AdapterError {
-        AdapterError::UnsupportedCliType(format!(
-            "Cursor adapter placeholder invoked: {feature} is not implemented yet"
-        ))
+        match feature {
+            "configuration generation" => AdapterError::ConfigGenerationError(format!(
+                "Cursor adapter placeholder: {feature} is not implemented yet"
+            )),
+            "response parsing" => AdapterError::ResponseParsingError(format!(
+                "Cursor adapter placeholder: {feature} is not implemented yet"
+            )),
+            _ => AdapterError::ValidationError(format!(
+                "Cursor adapter placeholder: {feature} is not implemented yet"
+            )),
+        }
     }
 }
 
