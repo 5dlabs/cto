@@ -6,8 +6,8 @@ temperature = {{temperature}}
 {{#if max_output_tokens}}
 model_max_output_tokens = {{max_output_tokens}}
 {{/if}}
-{{#if cli_config.settings.reasoningEffort}}
-model_reasoning_effort = "{{cli_config.settings.reasoningEffort}}"
+{{#if model_reasoning_effort}}
+model_reasoning_effort = "{{model_reasoning_effort}}"
 {{/if}}
 approval_policy = "{{approval_policy}}"
 sandbox_mode = "{{sandbox_mode}}"

@@ -1,7 +1,7 @@
 use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
 use crate::cli::types::CLIType;
-use crate::crds::CodeRun;
+use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
@@ -1264,54 +1264,65 @@ impl<'a> CodeResourceManager<'a> {
     /// Select the appropriate Docker image based on the CLI type specified in the CodeRun
     /// Auto-populate CLI config based on agent GitHub app (if not already specified)
     async fn populate_cli_config_if_needed(&self, code_run: &Arc<CodeRun>) -> Result<Arc<CodeRun>> {
-        // If CLI config is already specified, return as-is
-        if code_run.spec.cli_config.is_some() {
-            return Ok(code_run.clone());
-        }
-
-        // If no GitHub app is specified, we can't look up agent CLI config
-        let github_app = match &code_run.spec.github_app {
-            Some(app) => app,
-            None => {
+        // If we have no GitHub app context, we cannot enrich the CLI config
+        let Some(github_app) = &code_run.spec.github_app else {
+            if code_run.spec.cli_config.is_none() {
                 info!("No CLI config or GitHub app specified, using defaults");
-                return Ok(code_run.clone());
             }
+            return Ok(code_run.clone());
         };
 
-        // Extract agent name from GitHub app (for future use if needed)
+        // Extract agent name for logging only—we still continue even if this fails
         let classifier = AgentClassifier::new();
-        let _agent_name = match classifier.extract_agent_name(github_app) {
-            Ok(name) => name.to_lowercase(),
-            Err(_) => {
-                info!(
-                    "Could not extract agent name from {}, using defaults",
-                    github_app
-                );
-                return Ok(code_run.clone());
-            }
-        };
-
-        // Look up CLI config from loaded configuration (no hardcoded values)
-        if let Some(agent_cli_config) = self.config.agent.agent_cli_configs.get(github_app) {
+        if let Ok(agent_name) = classifier.extract_agent_name(github_app) {
             info!(
-                "🔧 Auto-populating CLI config for agent {}: {} ({})",
-                github_app, agent_cli_config.cli_type, agent_cli_config.model
-            );
-
-            // Create a new CodeRun with the CLI config populated
-            let mut new_spec = code_run.spec.clone();
-            new_spec.cli_config = Some(agent_cli_config.clone());
-
-            let mut new_code_run = (**code_run).clone();
-            new_code_run.spec = new_spec;
-
-            Ok(Arc::new(new_code_run))
-        } else {
-            info!(
-                "No CLI config found for agent {} in configuration, using defaults",
+                "🔍 Preparing CLI configuration for agent '{}' ({})",
+                agent_name,
                 github_app
             );
-            Ok(code_run.clone())
+        }
+
+        let Some(agent_cli_config) = self.config.agent.agent_cli_configs.get(github_app) else {
+            // Nothing to merge, fall back to whatever the CodeRun already provided
+            return Ok(code_run.clone());
+        };
+
+        let mut new_code_run = (**code_run).clone();
+
+        match new_code_run.spec.cli_config.as_mut() {
+            Some(existing) => {
+                Self::merge_cli_config(existing, agent_cli_config);
+            }
+            None => {
+                info!(
+                    "🔧 Auto-populating CLI config for agent {}: {} ({})",
+                    github_app, agent_cli_config.cli_type, agent_cli_config.model
+                );
+                new_code_run.spec.cli_config = Some(agent_cli_config.clone());
+            }
+        }
+
+        Ok(Arc::new(new_code_run))
+    }
+
+    fn merge_cli_config(existing: &mut CLIConfig, defaults: &CLIConfig) {
+        if existing.model.trim().is_empty() {
+            existing.model = defaults.model.clone();
+        }
+
+        if existing.max_tokens.is_none() {
+            existing.max_tokens = defaults.max_tokens;
+        }
+
+        if existing.temperature.is_none() {
+            existing.temperature = defaults.temperature;
+        }
+
+        for (key, value) in &defaults.settings {
+            existing
+                .settings
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
         }
     }
 

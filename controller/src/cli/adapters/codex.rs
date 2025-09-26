@@ -260,6 +260,13 @@ impl CliAdapter for CodexAdapter {
                     .map(str::to_string)
             });
 
+        let reasoning_effort = cli_config
+            .get("settings")
+            .and_then(Value::as_object)
+            .and_then(|settings| settings.get("reasoningEffort"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+
         let context = json!({
             "model": model,
             "github_app": agent_config.github_app,
@@ -277,6 +284,7 @@ impl CliAdapter for CodexAdapter {
             },
             "model_provider": model_provider,
             "cli_config": cli_config,
+            "model_reasoning_effort": reasoning_effort,
             "raw_additional_toml": raw_additional_toml,
         });
 
