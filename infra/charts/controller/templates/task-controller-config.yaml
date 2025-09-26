@@ -49,10 +49,16 @@ data:
           {{- if and $agent.githubApp $agent.reasoningEffort (hasKey $merged $agent.githubApp) }}
             {{- $cfg := index $merged $agent.githubApp }}
             {{- if hasKey $cfg "settings" }}
-              {{- $_ := set $cfg.settings "reasoningEffort" $agent.reasoningEffort }}
+              {{- if not (hasKey $cfg.settings "reasoningEffort") }}
+                {{- $_ := set $cfg.settings "reasoningEffort" $agent.reasoningEffort }}
+              {{- end }}
             {{- else }}
               {{- $_ := set $cfg "settings" (dict "reasoningEffort" $agent.reasoningEffort) }}
             {{- end }}
+            {{- $_ := set $merged $agent.githubApp $cfg }}
+          {{- else if and $agent.githubApp $agent.reasoningEffort (not (hasKey $merged $agent.githubApp)) }}
+            {{- /* Helm didn’t specify a config; supply minimal reasoning effort hint */ -}}
+            {{- $cfg := dict "settings" (dict "reasoningEffort" $agent.reasoningEffort) }}
             {{- $_ := set $merged $agent.githubApp $cfg }}
           {{- end }}
         {{- end }}
