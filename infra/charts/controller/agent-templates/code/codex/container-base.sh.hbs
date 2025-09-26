@@ -166,6 +166,117 @@ refresh_token_if_needed() {
   fi
 }
 
+ensure_pr_created() {
+  if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
+    echo "⏭️  Auto PR creation disabled via SKIP_AUTO_PR=1"
+    return
+  fi
+
+  if [ ! -d .git ]; then
+    echo "⚠️ Repository not initialised; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI not available; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping auto PR creation"
+    return
+  fi
+
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "⚠️ GITHUB_TOKEN not set; skipping auto PR creation"
+    return
+  fi
+
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
+  if [ -z "$CURRENT_BRANCH" ]; then
+    echo "⚠️ Unable to determine current branch; skipping auto PR creation"
+    return
+  fi
+
+  PR_DATA=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>/dev/null || echo "[]")
+  if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
+    echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
+    return
+  fi
+
+  BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+  refresh_token_if_needed || true
+  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+
+  if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
+    AUTO_BRANCH="task-{{task_id}}-{{service}}-$(date +%Y%m%d-%H%M%S)"
+    echo "⚠️ Branch $CURRENT_BRANCH unsuitable for PR; creating $AUTO_BRANCH"
+    if ! git checkout -B "$AUTO_BRANCH" >/dev/null 2>&1; then
+      echo "❌ Failed to create fallback branch $AUTO_BRANCH"
+      return
+    fi
+    CURRENT_BRANCH="$AUTO_BRANCH"
+  fi
+
+  git add .
+  if git diff --cached --quiet --exit-code; then
+    echo "ℹ️ No staged changes detected after auto-staging"
+  else
+    COMMIT_MSG="chore({{service}}): auto-commit for task {{task_id}}"
+    if ! git commit -m "$COMMIT_MSG" >/dev/null 2>&1; then
+      echo "⚠️ Failed to commit staged changes automatically"
+    else
+      echo "✅ Auto-committed staged changes"
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  if ! git push -u origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
+    echo "⚠️ Failed to push branch $CURRENT_BRANCH; skipping auto PR creation"
+    return
+  fi
+
+  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  git fetch origin "$CURRENT_BRANCH" >/dev/null 2>&1 || true
+  AHEAD_COUNT=$(git rev-list --left-right "origin/$BASE_BRANCH...origin/$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+  if [ "${AHEAD_COUNT:-0}" -eq 0 ]; then
+    echo "⚠️ Branch $CURRENT_BRANCH has no commits ahead of $BASE_BRANCH; skipping PR creation"
+    return
+  fi
+
+  RUN_LABEL="run-{{workflow_name}}"
+  if [ "${RUN_LABEL#run-}" = "" ]; then
+    RUN_LABEL="run-unknown"
+  fi
+
+  PR_TITLE="feat({{service}}): complete task {{task_id}}"
+  read -r -d '' PR_BODY <<EOF || true
+## Summary
+- Auto-generated fallback PR because the Codex agent finished without opening one
+- Task {{task_id}} for service {{service}} is ready for review
+
+## Metadata
+- Agent: {{github_app}}
+- Workflow: {{workflow_name}}
+- Branch: \\`$CURRENT_BRANCH\\` → \\`$BASE_BRANCH\\`
+
+_This PR was created automatically by the Codex container._
+EOF
+
+  if gh pr create \
+    --title "$PR_TITLE" \
+    --body "$PR_BODY" \
+    --base "$BASE_BRANCH" \
+    --head "$CURRENT_BRANCH" \
+    --label "task-{{task_id}}" \
+    --label "service-{{service}}" \
+    --label "$RUN_LABEL"; then
+    echo "✅ Auto-created pull request for $CURRENT_BRANCH"
+  else
+    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+  fi
+}
+
 git config --global --add safe.directory /workspace
 GITHUB_APP="{{github_app}}"
 GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Codex CLI)"
@@ -367,7 +478,7 @@ if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow.name}}.\n\n---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
 
 if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
@@ -408,6 +519,13 @@ set -e
 
 if [ $EXIT_CODE -ne 0 ]; then
   echo "⚠️ Codex exited with status $EXIT_CODE"
+fi
+
+if [ $EXIT_CODE -eq 0 ]; then
+  echo "🔍 Verifying pull request status"
+  ensure_pr_created
+else
+  echo "⚠️ Skipping auto PR enforcement due to Codex exit status $EXIT_CODE"
 fi
 
 touch /workspace/.agent_done 2>/dev/null || true
