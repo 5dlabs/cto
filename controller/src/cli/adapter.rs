@@ -433,6 +433,15 @@ impl CommandBuilder {
                     vec!["codex".to_string(), task.to_string()]
                 }
             }
+            CLIType::Cursor => {
+                // TODO(cursor): Finalise print/force flags once Cursor adapter wiring is complete.
+                vec![
+                    "cursor-agent".to_string(),
+                    "--print".to_string(),
+                    "--force".to_string(),
+                    task.to_string(),
+                ]
+            }
             CLIType::OpenCode => {
                 vec!["opencode".to_string(), task.to_string()]
             }
@@ -446,6 +455,7 @@ impl CommandBuilder {
         match self.cli_type {
             CLIType::Claude => vec!["claude-code".to_string(), "--version".to_string()],
             CLIType::Codex => vec!["codex".to_string(), "--version".to_string()],
+            CLIType::Cursor => vec!["cursor-agent".to_string(), "--version".to_string()],
             CLIType::OpenCode => vec!["opencode".to_string(), "--version".to_string()],
             _ => vec!["echo".to_string(), "unknown".to_string()],
         }
@@ -457,6 +467,7 @@ impl CommandBuilder {
         match self.cli_type {
             CLIType::Claude => vec!["claude-code".to_string(), "--help".to_string()],
             CLIType::Codex => vec!["codex".to_string(), "--help".to_string()],
+            CLIType::Cursor => vec!["cursor-agent".to_string(), "--help".to_string()],
             CLIType::OpenCode => vec!["opencode".to_string(), "--help".to_string()],
             _ => vec!["echo".to_string(), "help not available".to_string()],
         }
@@ -494,6 +505,9 @@ impl ResultProcessor {
             }
             CLIType::Codex => {
                 self.process_codex_output(result, &mut processed);
+            }
+            CLIType::Cursor => {
+                self.process_generic_output(result, &mut processed);
             }
             CLIType::OpenCode => {
                 self.process_opencode_output(result, &mut processed);
@@ -713,9 +727,20 @@ mod tests {
     }
 
     #[test]
+    fn test_command_builder_cursor_print_mode() {
+        let builder = CommandBuilder::new(CLIType::Cursor);
+        let cmd = builder.build_task_command("implement auth", true);
+        assert_eq!(
+            cmd,
+            vec!["cursor-agent", "--print", "--force", "implement auth"]
+        );
+    }
+
+    #[test]
     fn test_version_commands() {
         let claude_builder = CommandBuilder::new(CLIType::Claude);
         let codex_builder = CommandBuilder::new(CLIType::Codex);
+        let cursor_builder = CommandBuilder::new(CLIType::Cursor);
 
         assert_eq!(
             claude_builder.build_version_command(),
@@ -724,6 +749,10 @@ mod tests {
         assert_eq!(
             codex_builder.build_version_command(),
             vec!["codex", "--version"]
+        );
+        assert_eq!(
+            cursor_builder.build_version_command(),
+            vec!["cursor-agent", "--version"]
         );
     }
 

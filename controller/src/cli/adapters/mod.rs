@@ -4,10 +4,12 @@
 
 pub mod claude;
 pub mod codex;
+pub mod cursor;
 
 // Re-export adapter implementations
 pub use claude::ClaudeAdapter;
 pub use codex::CodexAdapter;
+pub use cursor::CursorAdapter;
 
 pub mod opencode {
     //! OpenCode CLI adapter (placeholder for future task)
@@ -27,11 +29,6 @@ pub mod grok {
 pub mod qwen {
     //! Qwen CLI adapter (placeholder for future task)
     // TODO: Implement QwenAdapter
-}
-
-pub mod cursor {
-    //! Cursor CLI adapter (placeholder for future task)
-    // TODO: Implement CursorAdapter
 }
 
 pub mod openhands {

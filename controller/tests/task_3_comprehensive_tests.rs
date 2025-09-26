@@ -410,7 +410,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let supported = factory.get_supported_clis();
     assert_eq!(
         supported.len(),
-        2,
+        3,
         "Factory must return correct supported CLI count"
     );
     assert!(
@@ -420,6 +420,10 @@ async fn test_fr4_adapter_factory_implementation() {
     assert!(
         supported.contains(&CLIType::Codex),
         "Factory must include default Codex CLI"
+    );
+    assert!(
+        supported.contains(&CLIType::Cursor),
+        "Factory must include default Cursor CLI"
     );
 
     // ✅ Test adapter creation
@@ -451,7 +455,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        2,
+        3,
         "Factory must provide health summary"
     );
     assert_eq!(
@@ -465,6 +469,10 @@ async fn test_fr4_adapter_factory_implementation() {
             HealthState::Healthy | HealthState::Warning
         ),
         "Codex adapter should be tracked in health summary"
+    );
+    assert!(
+        health_summary.contains_key(&CLIType::Cursor),
+        "Cursor adapter should appear in health summary"
     );
 
     // ✅ Test concurrent adapter creation
@@ -1138,7 +1146,7 @@ async fn test_factory_health_monitoring() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        2,
+        3,
         "Health summary must include all adapters"
     );
     assert_eq!(
@@ -1149,12 +1157,16 @@ async fn test_factory_health_monitoring() {
         health_summary[&CLIType::Codex].status,
         HealthState::Unhealthy
     );
+    assert!(
+        health_summary.contains_key(&CLIType::Cursor),
+        "Health summary must include Cursor"
+    );
 
     // ✅ Test factory statistics
     let stats = factory.get_factory_stats().await;
-    assert_eq!(stats.total_adapters, 2, "Stats must show correct total");
+    assert_eq!(stats.total_adapters, 3, "Stats must show correct total");
     assert_eq!(
-        stats.healthy_adapters, 1,
+        stats.healthy_adapters, 2,
         "Stats must show correct healthy count"
     );
     assert_eq!(
