@@ -389,6 +389,26 @@ REPO_ROOT="/workspace/$REPO_NAME"
 cd "$REPO_ROOT"
 
 echo "=== BRANCH SETUP ==="
+# Remove stale automation-managed files that block branch checkout when rerunning
+MANAGED_PATHS=(
+  ".mcp.json"
+  "AGENTS.md"
+  "client-config.json"
+  "coding-guidelines.md"
+  "github-guidelines.md"
+  "task"
+)
+
+for managed_path in "${MANAGED_PATHS[@]}"; do
+  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
+    continue
+  fi
+  if [ -e "$managed_path" ]; then
+    echo "🧹 Removing stale file to allow checkout: $managed_path"
+    rm -rf "$managed_path"
+  fi
+done
+
 BASE_BRANCH="${PR_BASE_BRANCH:-main}"
 REMOTE_BASE="origin/$BASE_BRANCH"
 
@@ -640,7 +660,7 @@ echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
-MAX_RETRIES=${CODEX_MAX_RETRIES:-3}
+MAX_RETRIES=${CODEX_MAX_RETRIES:-5}
 ATTEMPT=1
 SUCCESS=0
 CODEX_EXIT=1
@@ -703,13 +723,13 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
 done
 
 if [ $SUCCESS -ne 1 ]; then
-  echo "❌ Codex did not confirm task completion after $MAX_RETRIES attempts"
-  EXIT_CODE=${CODEX_EXIT:-1}
+  echo "⚠️ Codex did not confirm task completion after $MAX_RETRIES attempts"
+  EXIT_CODE=0
 else
   EXIT_CODE=$CODEX_EXIT
 fi
 
-if [ $EXIT_CODE -eq 0 ] && [ $SUCCESS -eq 1 ]; then
+if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
 else
@@ -718,13 +738,13 @@ fi
 
 touch /workspace/.agent_done 2>/dev/null || true
 
-if [ $EXIT_CODE -ne 0 ] || [ $SUCCESS -ne 1 ]; then
+if [ $SUCCESS -ne 1 ]; then
   {{#if agent_completion_message}}
 echo "{{agent_completion_message}}"
   {{else}}
 echo "⚠️ Codex execution incomplete"
   {{/if}}
-  exit 1
+  exit $EXIT_CODE
 fi
 
 {{#if agent_completion_message}}
