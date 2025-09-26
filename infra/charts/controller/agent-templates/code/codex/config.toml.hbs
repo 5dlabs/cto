@@ -18,14 +18,11 @@ command = "toolman"
 args = [
   "--url",
   "{{toolman.url}}"
-  {{#if toolman.tools}}
-  {{#each toolman.tools}}
-  , "--tool"
-  , "{{this}}"
-  {{/each}}
-  {{/if}}
 ]
 env = { "TOOLMAN_SERVER_URL" = "{{toolman.url}}" }
+{{#if toolman.tools}}
+# Remote tools available via Toolman: {{#each toolman.tools}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+{{/if}}
 
 [model_providers.openai]
 name = "{{model_provider.name}}"

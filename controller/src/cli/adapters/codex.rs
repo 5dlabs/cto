@@ -466,7 +466,7 @@ mod tests {
         assert!(config.contains("sandbox_mode = \"workspace-write\""));
         assert!(config.contains("project_doc_max_bytes = 32768"));
         assert!(config.contains("[mcp_servers.toolman]"));
-        assert!(config.contains("--tool"));
+        assert!(config.contains("--url"));
         assert!(config.contains("memory_create_entities"));
         assert!(config.contains("[model_providers.openai]"));
     }

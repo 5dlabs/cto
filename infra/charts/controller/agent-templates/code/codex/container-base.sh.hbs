@@ -288,18 +288,26 @@ fi
 
 if [ -f /task-files/coding-guidelines.md ]; then
   cp /task-files/coding-guidelines.md "$CODEX_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
 fi
 
 if [ -f /task-files/github-guidelines.md ]; then
   cp /task-files/github-guidelines.md "$CODEX_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
 fi
 
 if [ -f /task-files/client-config.json ]; then
   cp /task-files/client-config.json "$CODEX_WORK_DIR/"
+  echo "✓ Copied client-config.json to working directory"
 fi
 
 if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$CODEX_WORK_DIR/.mcp.json"
+fi
+
+if [ ! -f "$CODEX_WORK_DIR/client-config.json" ]; then
+  echo "❌ client-config.json missing from workspace; required for MCP/toolman"
+  exit 1
 fi
 
 mkdir -p "$HOME/.codex"
@@ -309,6 +317,23 @@ if [ -f /task-files/codex-config.toml ]; then
 else
   echo "⚠️ codex-config.toml not provided; falling back to defaults"
 fi
+
+echo "=== MCP PRECHECKS ==="
+if ! command -v toolman >/dev/null 2>&1; then
+  echo "❌ 'toolman' CLI not found in PATH; required for MCP"
+  exit 1
+fi
+
+TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
+echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
+if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_URL" >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
+  cat /tmp/toolman-ping.log >&2 || true
+  rm -f /tmp/toolman-ping.log
+  exit 1
+fi
+rm -f /tmp/toolman-ping.log
+echo "✓ Toolman endpoint reachable"
 
 if [ -z "${OPENAI_API_KEY:-}" ]; then
   echo "❌ OPENAI_API_KEY is not set; Codex cannot authenticate"
@@ -339,7 +364,20 @@ fi
 
 PROMPT_PREFIX=""
 if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
-  PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+fi
+
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR with task-specific labels via \`gh pr create\`.\n\n---\n\n"
+
+if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
+  if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md\n"
+  fi
+  if [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md\n"
+  fi
+  PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
 fi
 
 PROMPT_FILE="$CODEX_WORK_DIR/task/prompt.md"
@@ -351,7 +389,11 @@ fi
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
 set +e
-codex exec --full-auto --cd "$CODEX_WORK_DIR" "$PROMPT_CONTENT"
+codex exec \
+  --dangerously-bypass-approvals-and-sandbox \
+  --skip-git-repo-check \
+  --cd "$CODEX_WORK_DIR" \
+  "$PROMPT_CONTENT"
 EXIT_CODE=$?
 set -e
 
