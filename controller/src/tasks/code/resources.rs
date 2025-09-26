@@ -1277,8 +1277,7 @@ impl<'a> CodeResourceManager<'a> {
         if let Ok(agent_name) = classifier.extract_agent_name(github_app) {
             info!(
                 "🔍 Preparing CLI configuration for agent '{}' ({})",
-                agent_name,
-                github_app
+                agent_name, github_app
             );
         }
 

@@ -443,7 +443,7 @@ mod tests {
             }),
             cli_config: Some(json!({
                 "model": "gpt-5-codex",
-                "maxTokens": 16000,
+                "maxTokens": 64000,
                 "temperature": 0.72,
                 "approvalPolicy": "on-request",
                 "sandboxPreset": "workspace-write",
@@ -471,7 +471,7 @@ mod tests {
         let config = adapter.generate_config(&agent_config).await.unwrap();
 
         assert!(config.contains(&format!("model = \"{expected_model}\"")));
-        assert!(config.contains("model_max_output_tokens = 16000"));
+        assert!(config.contains("model_max_output_tokens = 64000"));
         assert!(config.contains("temperature = 0.72"));
         assert!(config.contains("approval_policy = \"on-request\""));
         assert!(config.contains("sandbox_mode = \"workspace-write\""));
