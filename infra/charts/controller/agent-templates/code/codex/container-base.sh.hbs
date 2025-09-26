@@ -657,7 +657,6 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   codex exec \
     --dangerously-bypass-approvals-and-sandbox \
     --skip-git-repo-check \
-    --experimental-json \
     --output-last-message "$LAST_MESSAGE_FILE" \
     --cd "$CODEX_WORK_DIR" \
     "$PROMPT_CONTENT" | tee "$RUN_LOG"
@@ -678,7 +677,6 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   codex exec \
     --dangerously-bypass-approvals-and-sandbox \
     --skip-git-repo-check \
-    --experimental-json \
     --output-last-message "$COMPLETION_LAST_MESSAGE" \
     --cd "$CODEX_WORK_DIR" \
     "$COMPLETION_PROMPT" | tee "$COMPLETION_LOG"
