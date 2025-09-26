@@ -8,9 +8,12 @@
 use controller::tasks::template_paths::{
     CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
     CODE_CODEX_AGENTS_TEMPLATE, CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
-    CODE_CODEX_CONTAINER_TEMPLATE, DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE,
-    DOCS_CLAUDE_CONTAINER_TEMPLATE, DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE,
-    DOCS_CLAUDE_SETTINGS_TEMPLATE, DOCS_CLAUDE_TOOLMAN_TEMPLATE,
+    CODE_CODEX_CONTAINER_TEMPLATE, CODE_CURSOR_AGENTS_TEMPLATE,
+    CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_CURSOR_CONTAINER_TEMPLATE,
+    CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
+    DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE, DOCS_CLAUDE_CONTAINER_TEMPLATE,
+    DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE, DOCS_CLAUDE_SETTINGS_TEMPLATE,
+    DOCS_CLAUDE_TOOLMAN_TEMPLATE,
 };
 use handlebars::Handlebars;
 use serde_json::json;
@@ -251,6 +254,103 @@ fn test_code_templates(
             let template_content = std::fs::read_to_string(&template_path)?;
             handlebars.register_template_string(template_name, &template_content)?;
             let result = handlebars.render(template_name, &codex_data)?;
+            println!("    ✅ Rendered successfully ({} chars)", result.len());
+            for line in result.lines().take(3) {
+                println!("    │ {line}");
+            }
+            if result.lines().count() > 3 {
+                println!("    │ ... ({} total lines)", result.lines().count());
+            }
+            println!();
+        } else {
+            println!("  ⚠️  Template not found: {}", template_path.display());
+        }
+    }
+
+    let cursor_data = json!({
+        "task_id": 42,
+        "service": "simple-api",
+        "repository_url": "https://github.com/5dlabs/cto",
+        "docs_repository_url": "https://github.com/5dlabs/cto-docs",
+        "docs_branch": "main",
+        "docs_project_directory": "_projects/simple-api",
+        "working_directory": "simple-api",
+        "continue_session": false,
+        "overwrite_memory": false,
+        "github_app": "5DLabs-Rex",
+        "workflow_name": "play-task-42-workflow",
+        "cli": {
+            "type": "cursor",
+            "model": "gpt-5-cursor",
+            "settings": json!({
+                "sandboxMode": "danger-full-access",
+                "approvalPolicy": "never",
+                "editor": { "vimMode": true }
+            }),
+            "remote_tools": [
+                "memory_create_entities",
+                "rustdocs_query_rust_docs"
+            ]
+        },
+        "cli_config": {
+            "cliType": "cursor",
+            "model": "gpt-5-cursor",
+            "maxTokens": 64000,
+            "temperature": 0.7,
+            "settings": {
+                "sandboxMode": "danger-full-access",
+                "approvalPolicy": "never",
+                "editor": { "vimMode": true }
+            }
+        },
+        "model": "gpt-5-cursor",
+        "temperature": 0.7,
+        "max_output_tokens": 64000,
+        "approval_policy": "never",
+        "sandbox_mode": "danger-full-access",
+        "project_doc_max_bytes": 32768,
+        "editor_vim_mode": true,
+        "toolman": {
+            "url": "http://toolman.test",
+            "tools": [
+                "memory_create_entities",
+                "rustdocs_query_rust_docs"
+            ]
+        },
+        "raw_additional_json": "{}",
+        "client_config": {
+            "remoteTools": [
+                "memory_create_entities",
+                "rustdocs_query_rust_docs"
+            ],
+            "localServers": {}
+        }
+    });
+
+    let cursor_base_template_path = template_dir.join(CODE_CURSOR_CONTAINER_BASE_TEMPLATE);
+    if cursor_base_template_path.exists() {
+        let base_template_content = std::fs::read_to_string(&cursor_base_template_path)?;
+        handlebars.register_partial("cursor_container_base", base_template_content)?;
+    } else {
+        println!(
+            "  ⚠️  Cursor base container partial missing: {}",
+            cursor_base_template_path.display()
+        );
+    }
+
+    for template_name in [
+        CODE_CURSOR_CONTAINER_TEMPLATE,
+        CODE_CURSOR_AGENTS_TEMPLATE,
+        CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE,
+        CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
+    ] {
+        let template_path = template_dir.join(template_name);
+
+        if template_path.exists() {
+            println!("  Testing {template_name}...");
+            let template_content = std::fs::read_to_string(&template_path)?;
+            handlebars.register_template_string(template_name, &template_content)?;
+            let result = handlebars.render(template_name, &cursor_data)?;
             println!("    ✅ Rendered successfully ({} chars)", result.len());
             for line in result.lines().take(3) {
                 println!("    │ {line}");

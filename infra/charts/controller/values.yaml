@@ -31,6 +31,9 @@ agent:
     claude:
       repository: ghcr.io/5dlabs/claude
       tag: "latest"
+    cursor:
+      repository: ghcr.io/5dlabs/cursor
+      tag: "latest"
 
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
@@ -104,7 +107,7 @@ agents:
   rex:
     name: "Rex"
     githubApp: "5DLabs-Rex"
-    cli: "Codex"
+    cli: "Cursor"
     model: "gpt-5-codex"
     maxTokens: 64000
     temperature: 0.7

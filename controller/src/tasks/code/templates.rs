@@ -4,7 +4,9 @@ use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
     CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
     CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
-    CODE_CODING_GUIDELINES_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+    CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
+    CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
+    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
 };
 use crate::tasks::types::Result;
 use crate::tasks::workflow::extract_workflow_name;
@@ -19,6 +21,22 @@ use tracing::debug;
 // Template base path (mounted from ConfigMap)
 const AGENT_TEMPLATES_PATH: &str = "/agent-templates";
 
+#[derive(Debug, Clone)]
+struct CliRenderSettings {
+    model: String,
+    temperature: Option<f64>,
+    max_output_tokens: Option<u32>,
+    approval_policy: String,
+    sandbox_mode: String,
+    project_doc_max_bytes: u64,
+    reasoning_effort: Option<String>,
+    editor_vim_mode: bool,
+    toolman_url: String,
+    model_provider: Value,
+    raw_additional_toml: Option<String>,
+    raw_additional_json: Option<String>,
+}
+
 pub struct CodeTemplateGenerator;
 
 impl CodeTemplateGenerator {
@@ -29,7 +47,7 @@ impl CodeTemplateGenerator {
     ) -> Result<BTreeMap<String, String>> {
         match Self::determine_cli_type(code_run) {
             CLIType::Codex => Self::generate_codex_templates(code_run, config),
-            CLIType::Cursor => Self::generate_cursor_templates(),
+            CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -84,10 +102,259 @@ impl CodeTemplateGenerator {
         Ok(templates)
     }
 
-    fn generate_cursor_templates() -> Result<BTreeMap<String, String>> {
-        Err(crate::tasks::types::Error::ConfigError(
-            "Cursor CLI templates are not implemented yet".to_string(),
-        ))
+    fn generate_cursor_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_cursor_container_script(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "AGENTS.md".to_string(),
+            Self::generate_cursor_memory(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "cursor-cli-config.json".to_string(),
+            Self::generate_cursor_global_config(
+                code_run,
+                &cli_config_value,
+                &client_config_value,
+                &remote_tools,
+            )?,
+        );
+
+        templates.insert(
+            "cursor-cli.json".to_string(),
+            Self::generate_cursor_project_permissions()?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    fn generate_cursor_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let base_template = Self::load_template(CODE_CURSOR_CONTAINER_BASE_TEMPLATE)?;
+        handlebars
+            .register_partial("cursor_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Cursor container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_cursor_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("cursor_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Cursor container template {template_path}: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "continue_session": Self::get_continue_session(code_run),
+            "overwrite_memory": code_run.spec.overwrite_memory,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": code_run
+                    .spec
+                    .cli_config
+                    .as_ref()
+                    .map(|cfg| cfg.model.as_str())
+                    .unwrap_or(&code_run.spec.model),
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+        });
+
+        handlebars
+            .render("cursor_container", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Cursor container template: {e}"
+                ))
+            })
+    }
+
+    fn generate_cursor_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template_path = Self::get_cursor_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("cursor_agents", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Cursor AGENTS.md template {template_path}: {e}"
+                ))
+            })?;
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let context = json!({
+            "cli_config": cli_config,
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "model": code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .map(|cfg| cfg.model.as_str())
+                .unwrap_or(&code_run.spec.model),
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "working_directory": Self::get_working_directory(code_run),
+            "workflow_name": workflow_name,
+            "toolman": {
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars.render("cursor_agents", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Cursor AGENTS.md template: {e}"
+            ))
+        })
+    }
+
+    fn generate_cursor_global_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        _client_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("cursor_cli_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Cursor CLI config template: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let mut context = json!({
+            "model": render_settings.model,
+            "temperature": render_settings.temperature,
+            "max_output_tokens": render_settings.max_output_tokens,
+            "approval_policy": render_settings.approval_policy,
+            "sandbox_mode": render_settings.sandbox_mode,
+            "project_doc_max_bytes": render_settings.project_doc_max_bytes,
+            "editor_vim_mode": render_settings.editor_vim_mode,
+            "toolman": {
+                "url": render_settings.toolman_url,
+                "tools": remote_tools,
+            },
+        });
+
+        if let Some(raw_json) = &render_settings.raw_additional_json {
+            context
+                .as_object_mut()
+                .expect("context is an object")
+                .insert(
+                    "raw_additional_json".to_string(),
+                    Value::String(raw_json.clone()),
+                );
+        }
+
+        // Cursor CLI does not currently expose reasoning-effort toggles; ignore any value supplied.
+
+        handlebars
+            .render("cursor_cli_config", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Cursor CLI config template: {e}"
+                ))
+            })
+    }
+
+    fn generate_cursor_project_permissions() -> Result<String> {
+        Self::load_template(CODE_CURSOR_PROJECT_CONFIG_TEMPLATE)
     }
 
     fn generate_container_script(code_run: &CodeRun) -> Result<String> {
@@ -401,25 +668,7 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_codex_config(
-        code_run: &CodeRun,
-        cli_config: &Value,
-        client_config: &Value,
-        remote_tools: &[String],
-    ) -> Result<String> {
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(false);
-
-        let template = Self::load_template(CODE_CODEX_CONFIG_TEMPLATE)?;
-
-        handlebars
-            .register_template_string("codex_config", template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Codex config template: {e}"
-                ))
-            })?;
-
+    fn build_cli_render_settings(code_run: &CodeRun, cli_config: &Value) -> CliRenderSettings {
         let settings = cli_config
             .get("settings")
             .cloned()
@@ -428,7 +677,8 @@ impl CodeTemplateGenerator {
         let model = cli_config
             .get("model")
             .and_then(Value::as_str)
-            .unwrap_or(&code_run.spec.model);
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
 
         let max_output_tokens = cli_config
             .get("maxTokens")
@@ -448,23 +698,44 @@ impl CodeTemplateGenerator {
         let approval_policy = settings
             .get("approvalPolicy")
             .and_then(Value::as_str)
-            .unwrap_or("never");
+            .unwrap_or("never")
+            .to_string();
 
         let sandbox_mode = settings
             .get("sandboxPreset")
             .or_else(|| settings.get("sandboxMode"))
             .or_else(|| settings.get("sandbox"))
             .and_then(Value::as_str)
-            .unwrap_or("danger-full-access");
+            .unwrap_or("danger-full-access")
+            .to_string();
 
         let project_doc_max_bytes = settings
             .get("projectDocMaxBytes")
             .and_then(Value::as_u64)
             .unwrap_or(32_768);
 
-        let toolman_url = std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
-        });
+        let reasoning_effort = cli_config
+            .get("reasoningEffort")
+            .and_then(Value::as_str)
+            .or_else(|| settings.get("reasoningEffort").and_then(Value::as_str))
+            .or_else(|| settings.get("modelReasoningEffort").and_then(Value::as_str))
+            .map(|s| s.to_string());
+
+        let editor_vim_mode = settings
+            .get("editor")
+            .and_then(Value::as_object)
+            .and_then(|editor| editor.get("vimMode").and_then(Value::as_bool))
+            .unwrap_or(false);
+
+        let toolman_url = settings
+            .get("toolmanUrl")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                })
+            });
 
         let model_provider = settings
             .get("modelProvider")
@@ -510,21 +781,81 @@ impl CodeTemplateGenerator {
                     .map(|s| s.to_string())
             });
 
+        let raw_additional_json = settings
+            .get("rawJson")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string())
+            .or_else(|| {
+                settings
+                    .get("raw_json")
+                    .and_then(Value::as_str)
+                    .map(|s| s.to_string())
+            });
+
+        CliRenderSettings {
+            model,
+            temperature,
+            max_output_tokens,
+            approval_policy,
+            sandbox_mode,
+            project_doc_max_bytes,
+            reasoning_effort,
+            editor_vim_mode,
+            toolman_url,
+            model_provider,
+            raw_additional_toml,
+            raw_additional_json,
+        }
+    }
+
+    fn extract_remote_tools(client_config_value: &Value) -> Vec<String> {
+        client_config_value
+            .get("remoteTools")
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn generate_codex_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        client_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_CODEX_CONFIG_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("codex_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Codex config template: {e}"
+                ))
+            })?;
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
         let context = json!({
-            "model": model,
-            "temperature": temperature,
-            "max_output_tokens": max_output_tokens,
-            "approval_policy": approval_policy,
-            "sandbox_mode": sandbox_mode,
-            "project_doc_max_bytes": project_doc_max_bytes,
+            "model": render_settings.model,
+            "temperature": render_settings.temperature,
+            "max_output_tokens": render_settings.max_output_tokens,
+            "model_reasoning_effort": render_settings.reasoning_effort,
+            "approval_policy": render_settings.approval_policy,
+            "sandbox_mode": render_settings.sandbox_mode,
+            "project_doc_max_bytes": render_settings.project_doc_max_bytes,
             "toolman": {
-                "url": toolman_url,
+                "url": render_settings.toolman_url,
                 "tools": remote_tools,
             },
-            "model_provider": model_provider,
+            "model_provider": render_settings.model_provider,
             "cli_config": cli_config,
             "client_config": client_config,
-            "raw_additional_toml": raw_additional_toml,
+            "raw_additional_toml": render_settings.raw_additional_toml,
         });
 
         handlebars.render("codex_config", &context).map_err(|e| {
@@ -550,15 +881,7 @@ impl CodeTemplateGenerator {
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
-        let remote_tools: Vec<String> = client_config_value
-            .get("remoteTools")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
 
         templates.insert("client-config.json".to_string(), client_config);
 
@@ -1150,6 +1473,30 @@ impl CodeTemplateGenerator {
         template_name.to_string()
     }
 
+    fn get_cursor_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/cursor/container-rex.sh.hbs",
+            "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
+            _ => "code/cursor/container.sh.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_cursor_memory_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/cursor/agents-rex.md.hbs",
+            "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
+            "5DLabs-Tess" => "code/cursor/agents-tess.md.hbs",
+            _ => "code/cursor/agents.md.hbs",
+        };
+
+        template_name.to_string()
+    }
+
     /// Extract agent name from GitHub app identifier
     #[allow(dead_code)]
     fn extract_agent_name_from_github_app(github_app: &str) -> Result<String> {
@@ -1429,6 +1776,20 @@ mod tests {
         let server_a = &local_servers["serverA"];
         assert_eq!(server_a["command"], "npx");
         assert!(server_a["tools"].is_array());
+    }
+
+    #[test]
+    fn test_cursor_container_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Rex".to_string()));
+        let template_path = CodeTemplateGenerator::get_cursor_container_template(&code_run);
+        assert_eq!(template_path, "code/cursor/container-rex.sh.hbs");
+    }
+
+    #[test]
+    fn test_cursor_memory_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Cleo".to_string()));
+        let template_path = CodeTemplateGenerator::get_cursor_memory_template(&code_run);
+        assert_eq!(template_path, "code/cursor/agents-cleo.md.hbs");
     }
 
     #[test]
