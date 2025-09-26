@@ -702,6 +702,7 @@ cleanup:
                 model: Some("gpt-5-codex".to_string()),
                 max_tokens: Some(16000),
                 temperature: Some(0.65),
+                reasoning_effort: None,
                 tools: None,
                 client_config: None,
             },
