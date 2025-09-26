@@ -57,7 +57,7 @@ pub struct AgentConfig {
     pub image: ImageConfig,
 
     /// CLI-specific image configurations
-    #[serde(default)]
+    #[serde(default, alias = "cliImages")]
     pub cli_images: HashMap<String, ImageConfig>,
 
     /// Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
