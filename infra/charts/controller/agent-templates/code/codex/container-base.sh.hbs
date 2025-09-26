@@ -230,9 +230,14 @@ ensure_pr_created() {
     fi
   fi
 
-  refresh_token_if_needed || true
-  if ! git push -u origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
-    echo "⚠️ Failed to push branch $CURRENT_BRANCH; skipping auto PR creation"
+  if git rev-parse --verify --quiet "$CURRENT_BRANCH" >/dev/null 2>&1; then
+    refresh_token_if_needed || true
+    if ! git push -u origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
+      echo "⚠️ Failed to push branch $CURRENT_BRANCH; skipping auto PR creation"
+      return
+    fi
+  else
+    echo "⚠️ Unable to verify branch $CURRENT_BRANCH; skipping auto PR creation"
     return
   fi
 
@@ -263,14 +268,25 @@ ensure_pr_created() {
 _This PR was created automatically by the Codex container._
 EOF
 
-  if gh pr create \
-    --title "$PR_TITLE" \
-    --body "$PR_BODY" \
-    --base "$BASE_BRANCH" \
-    --head "$CURRENT_BRANCH" \
-    --label "task-{{task_id}}" \
-    --label "service-{{service}}" \
-    --label "$RUN_LABEL"; then
+  LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
+
+  maybe_add_label() {
+    local label="$1"
+    if [ -z "$label" ]; then
+      return
+    fi
+    if gh label view "$label" >/dev/null 2>&1; then
+      LABEL_ARGS+=("--label" "$label")
+    else
+      echo "⚠️ Label '$label' not found; skipping"
+    fi
+  }
+
+  maybe_add_label "task-{{task_id}}"
+  maybe_add_label "service-{{service}}"
+  maybe_add_label "$RUN_LABEL"
+
+  if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
   else
     echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
