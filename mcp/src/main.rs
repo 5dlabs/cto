@@ -1130,7 +1130,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("testing-cli={testing_cli}"),
         format!("testing-model={testing_model}"),
         format!("testing-tools={testing_tools}"),
-        format!("model={model}"),
     ];
 
     // Load and encode requirements.yaml if it exists
@@ -1175,9 +1174,15 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             "docs_repository": docs_repository,
             "docs_project_directory": docs_project_directory,
             "implementation_agent": implementation_agent,
+            "implementation_cli": implementation_cli,
+            "implementation_model": implementation_model,
             "quality_agent": quality_agent,
+            "quality_cli": quality_cli,
+            "quality_model": quality_model,
             "testing_agent": testing_agent,
-            "model": model,
+            "testing_cli": testing_cli,
+            "testing_model": testing_model,
+            "model": implementation_model,
             "parameters": params
         })),
         Err(e) => Err(anyhow!("Failed to submit play workflow: {}", e)),
