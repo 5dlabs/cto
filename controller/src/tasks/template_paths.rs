@@ -17,6 +17,13 @@ pub const CODE_CODEX_CONTAINER_TEMPLATE: &str = "code/codex/container.sh.hbs";
 pub const CODE_CODEX_AGENTS_TEMPLATE: &str = "code/codex/agents.md.hbs";
 pub const CODE_CODEX_CONFIG_TEMPLATE: &str = "code/codex/config.toml.hbs";
 
+// Cursor code templates
+pub const CODE_CURSOR_CONTAINER_BASE_TEMPLATE: &str = "code/cursor/container-base.sh.hbs";
+pub const CODE_CURSOR_CONTAINER_TEMPLATE: &str = "code/cursor/container.sh.hbs";
+pub const CODE_CURSOR_AGENTS_TEMPLATE: &str = "code/cursor/agents.md.hbs";
+pub const CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE: &str = "code/cursor/cursor-cli-config.json.hbs";
+pub const CODE_CURSOR_PROJECT_CONFIG_TEMPLATE: &str = "code/cursor/cursor-cli.json.hbs";
+
 // Claude docs templates
 pub const DOCS_CLAUDE_CONTAINER_TEMPLATE: &str = "docs/claude/container.sh.hbs";
 pub const DOCS_CLAUDE_MEMORY_TEMPLATE: &str = "docs/claude/memory.md.hbs";

@@ -663,6 +663,12 @@ echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
+echo "🧾 Resolved prompt content (truncated to 2000 chars for log safety):"
+PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
+printf '%s\n' "$PROMPT_PREVIEW"
+PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
+echo "📏 Prompt size: $PROMPT_BYTES bytes"
+
 MAX_RETRIES=${CURSOR_MAX_RETRIES:-5}
 ATTEMPT=1
 SUCCESS=0
@@ -688,6 +694,11 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     CURSOR_CMD+=("$FORCE_FLAG")
   fi
   CURSOR_CMD+=("$PROMPT_CONTENT")
+
+  echo "🔧 cursor-agent invocation arguments (${#CURSOR_CMD[@]} entries):"
+  for idx in "${!CURSOR_CMD[@]}"; do
+    printf '    [%d] %s\n' "$idx" "${CURSOR_CMD[$idx]}"
+  done
 
   set +e
   set -o pipefail
@@ -721,6 +732,8 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   set -e
 
   printf '%s\n' "$COMPLETION_OUTPUT" > "$COMPLETION_LAST_MESSAGE"
+  echo "🧭 Completion probe response:"
+  printf '%s\n' "$COMPLETION_OUTPUT"
 
   if [ $COMPLETION_EXIT -ne 0 ]; then
     echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
