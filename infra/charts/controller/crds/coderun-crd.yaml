@@ -41,7 +41,7 @@ spec:
         properties:
           spec:
             type: object
-            required: ["taskId", "service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model"]
+            required: ["taskId", "service", "repositoryUrl", "docsRepositoryUrl", "workingDirectory", "model", "githubApp"]
             properties:
               taskId:
                 type: integer
@@ -67,7 +67,7 @@ spec:
                 description: "Working directory within target repository (defaults to service name if not specified)"
               model:
                 type: string
-                description: "Claude model to use (full model name like 'claude-3-5-sonnet-20241022')"
+                description: "Model identifier to use with the selected CLI (e.g., gpt-5-codex, claude-sonnet-4-20250514)"
               githubUser:
                 type: string
                 description: "GitHub username for authentication and commits (deprecated - use githubApp)"
@@ -129,6 +129,29 @@ spec:
               serviceAccountName:
                 type: string
                 description: "Optional Kubernetes ServiceAccount for Job pods. If omitted, the namespace default SA is used."
+              cliConfig:
+                type: object
+                description: "CLI-specific configuration for multi-CLI operation"
+                required: ["cliType", "model"]
+                properties:
+                  cliType:
+                    type: string
+                    description: "CLI type to use (claude, codex, cursor, etc.)"
+                  model:
+                    type: string
+                    description: "Model identifier for the selected CLI"
+                  settings:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                    description: "Arbitrary CLI-specific settings"
+                  maxTokens:
+                    type: integer
+                    format: int32
+                    description: "Maximum output tokens"
+                  temperature:
+                    type: number
+                    format: float
+                    description: "Sampling temperature"
           status:
             type: object
             properties:

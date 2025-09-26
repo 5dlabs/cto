@@ -7,10 +7,10 @@
 
 use controller::tasks::template_paths::{
     CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
-    CODE_CODEX_AGENTS_TEMPLATE, CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_TEMPLATE,
-    DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE, DOCS_CLAUDE_CONTAINER_TEMPLATE,
-    DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE, DOCS_CLAUDE_SETTINGS_TEMPLATE,
-    DOCS_CLAUDE_TOOLMAN_TEMPLATE,
+    CODE_CODEX_AGENTS_TEMPLATE, CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
+    CODE_CODEX_CONTAINER_TEMPLATE, DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE,
+    DOCS_CLAUDE_CONTAINER_TEMPLATE, DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE,
+    DOCS_CLAUDE_SETTINGS_TEMPLATE, DOCS_CLAUDE_TOOLMAN_TEMPLATE,
 };
 use handlebars::Handlebars;
 use serde_json::json;
@@ -226,6 +226,18 @@ fn test_code_templates(
             "localServers": {}
         }
     });
+
+    // Ensure Codex partials are available before rendering templates that depend on them
+    let codex_base_template_path = template_dir.join(CODE_CODEX_CONTAINER_BASE_TEMPLATE);
+    if codex_base_template_path.exists() {
+        let base_template_content = std::fs::read_to_string(&codex_base_template_path)?;
+        handlebars.register_partial("codex_container_base", base_template_content)?;
+    } else {
+        println!(
+            "  ⚠️  Codex base container partial missing: {}",
+            codex_base_template_path.display()
+        );
+    }
 
     for template_name in [
         CODE_CODEX_CONTAINER_TEMPLATE,
