@@ -1367,3 +1367,86 @@ impl<'a> CodeResourceManager<'a> {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    fn cli_config_with_settings(settings: HashMap<String, serde_json::Value>) -> CLIConfig {
+        CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "".to_string(),
+            settings,
+            max_tokens: None,
+            temperature: None,
+        }
+    }
+
+    #[test]
+    fn merge_cli_config_adds_missing_fields_and_reasoning_effort() {
+        let mut existing = cli_config_with_settings(HashMap::new());
+
+        let mut defaults_settings = HashMap::new();
+        defaults_settings.insert("reasoningEffort".to_string(), json!("high"));
+        defaults_settings.insert("approvalPolicy".to_string(), json!("never"));
+
+        let defaults = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "gpt-5-codex".to_string(),
+            settings: defaults_settings,
+            max_tokens: Some(16_000),
+            temperature: Some(0.7_f32),
+        };
+
+        CodeResourceManager::merge_cli_config(&mut existing, &defaults);
+
+        assert_eq!(existing.model, "gpt-5-codex");
+        assert_eq!(existing.max_tokens, Some(16_000));
+        assert_eq!(existing.temperature, Some(0.7_f32));
+        assert_eq!(
+            existing.settings.get("reasoningEffort"),
+            Some(&json!("high"))
+        );
+        assert_eq!(
+            existing.settings.get("approvalPolicy"),
+            Some(&json!("never"))
+        );
+    }
+
+    #[test]
+    fn merge_cli_config_preserves_existing_values() {
+        let mut existing_settings = HashMap::new();
+        existing_settings.insert("reasoningEffort".to_string(), json!("medium"));
+
+        let mut existing = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "custom-model".to_string(),
+            settings: existing_settings,
+            max_tokens: Some(8_192),
+            temperature: Some(0.3_f32),
+        };
+
+        let mut defaults_settings = HashMap::new();
+        defaults_settings.insert("reasoningEffort".to_string(), json!("high"));
+
+        let defaults = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "gpt-5-codex".to_string(),
+            settings: defaults_settings,
+            max_tokens: Some(16_000),
+            temperature: Some(0.9_f32),
+        };
+
+        CodeResourceManager::merge_cli_config(&mut existing, &defaults);
+
+        assert_eq!(existing.model, "custom-model");
+        assert_eq!(existing.max_tokens, Some(8_192));
+        assert_eq!(existing.temperature, Some(0.3_f32));
+        assert_eq!(
+            existing.settings.get("reasoningEffort"),
+            Some(&json!("medium"))
+        );
+    }
+}
