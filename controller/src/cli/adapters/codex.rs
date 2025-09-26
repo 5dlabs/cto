@@ -440,6 +440,9 @@ mod tests {
                 "approvalPolicy": "on-request",
                 "sandboxPreset": "workspace-write",
                 "instructions": "Follow team standards",
+                "settings": {
+                    "reasoningEffort": "medium"
+                }
             })),
         }
     }
@@ -465,6 +468,7 @@ mod tests {
         assert!(config.contains("approval_policy = \"on-request\""));
         assert!(config.contains("sandbox_mode = \"workspace-write\""));
         assert!(config.contains("project_doc_max_bytes = 32768"));
+        assert!(config.contains("model_reasoning_effort = \"medium\""));
         assert!(config.contains("[mcp_servers.toolman]"));
         assert!(config.contains("--url"));
         assert!(config.contains("memory_create_entities"));

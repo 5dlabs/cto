@@ -702,7 +702,7 @@ cleanup:
                 model: Some("gpt-5-codex".to_string()),
                 max_tokens: Some(16000),
                 temperature: Some(0.65),
-                reasoning_effort: None,
+                reasoning_effort: Some("high".to_string()),
                 tools: None,
                 client_config: None,
             },
@@ -719,6 +719,10 @@ cleanup:
         assert_eq!(entry.cli_type, CLIType::Codex);
         assert_eq!(entry.max_tokens, Some(16000));
         assert_eq!(entry.temperature, Some(0.65));
+        assert_eq!(
+            entry.settings.get("reasoningEffort"),
+            Some(&JsonValue::String("high".to_string()))
+        );
     }
 
     #[test]

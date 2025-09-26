@@ -41,6 +41,9 @@ data:
             {{- if hasKey $agent "temperature" }}
               {{- $_ := set $cliCfg "temperature" $agent.temperature }}
             {{- end }}
+            {{- if hasKey $agent "reasoningEffort" }}
+              {{- $_ := set $cliCfg "settings" (dict "reasoningEffort" $agent.reasoningEffort) }}
+            {{- end }}
             {{- $_ := set $fromAgents $agent.githubApp $cliCfg }}
           {{- end }}
         {{- end }}
@@ -142,6 +145,9 @@ data:
         {{- end }}
         {{- if hasKey $agent "temperature" }}
         temperature: {{ $agent.temperature }}
+        {{- end }}
+        {{- if hasKey $agent "reasoningEffort" }}
+        reasoningEffort: {{ $agent.reasoningEffort | quote }}
         {{- end }}
         {{- if $agent.tools }}
         tools:
