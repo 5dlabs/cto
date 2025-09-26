@@ -91,14 +91,11 @@ if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+export GH_HOST="github.com"
 
 git config --global --replace-all credential.helper store
 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-
-# Prevent interactive GitHub CLI prompts (gh v2.57+ will block when GITHUB_TOKEN is set)
-if ! echo "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname github.com --git-protocol https >/dev/null 2>&1; then
-  echo "⚠️ gh auth login timed out or failed; continuing with credential.helper store"
-fi
 
 git config --global --add safe.directory /workspace
 GITHUB_APP="{{github_app}}"
@@ -111,6 +108,9 @@ export GIT_AUTHOR_NAME
 export GIT_AUTHOR_EMAIL
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
 
 # =========================================================================
 # Repository checkout
@@ -154,6 +154,58 @@ git status --short || true
 echo "🧱 Syncing task assets"
 mkdir -p "$CODEX_WORK_DIR/task"
 cp -R /task-files/task/* "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{docs_branch}}"
+DOCS_PROJECT_DIRECTORY="{{docs_project_directory}}"
+
+if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
+  if [ -z "$DOCS_BRANCH" ] || [ "$DOCS_BRANCH" = "null" ]; then
+    DOCS_BRANCH="main"
+  fi
+
+  echo "📚 Syncing docs repository: $DOCS_REPO_URL (branch: $DOCS_BRANCH)"
+  DOCS_CLONE_DIR="/tmp/docs-repo"
+  rm -rf "$DOCS_CLONE_DIR"
+
+  read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
+  DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
+
+  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
+    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    fi
+
+    echo "🔍 Docs base path: $DOCS_BASE_PATH"
+    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+
+    if [ -d "$TASK_DIR" ]; then
+      echo "✓ Copying task definition from $TASK_DIR"
+      cp -R "$TASK_DIR"/. "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+    else
+      echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
+    fi
+
+    if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
+      cp "$DOCS_BASE_PATH/tasks.json" "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+    fi
+  fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
+fi
 
 if [ -f /task-files/AGENTS.md ]; then
   cp /task-files/AGENTS.md "$CODEX_WORK_DIR/AGENTS.md"
