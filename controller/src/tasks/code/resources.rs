@@ -150,7 +150,9 @@ impl<'a> CodeResourceManager<'a> {
         info!("✅ Job creation completed");
 
         // Ensure headless Service exists for input bridge discovery
-        if self.config.agent.input_bridge.enabled {
+        let cli_type = Self::code_run_cli_type(code_run_ref);
+
+        if self.config.agent.input_bridge.enabled && cli_type != CLIType::Codex {
             let job_name = self.generate_job_name(code_run_ref);
             self.ensure_headless_service_exists(code_run_ref, &job_name)
                 .await?;
@@ -772,7 +774,7 @@ impl<'a> CodeResourceManager<'a> {
         let mut containers = vec![container_spec];
 
         // Add sidecar for live JSONL input via HTTP and future tools (if enabled)
-        if self.config.agent.input_bridge.enabled {
+        if self.config.agent.input_bridge.enabled && cli_type != CLIType::Codex {
             let input_bridge_image = format!(
                 "{}:{}",
                 self.config.agent.input_bridge.image.repository,
