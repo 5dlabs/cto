@@ -1449,6 +1449,7 @@ mod tests {
                 model: None,
                 max_tokens: None,
                 temperature: None,
+                reasoning_effort: None,
                 tools: Some(helm_tools),
                 client_config: None,
             },
