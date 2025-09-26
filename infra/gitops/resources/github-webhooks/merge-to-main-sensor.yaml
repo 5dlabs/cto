@@ -611,6 +611,12 @@ spec:
                           IMPL_AGENT="5DLabs-Rex"
                           QUALITY_AGENT="5DLabs-Cleo"
                           TESTING_AGENT="5DLabs-Tess"
+                          IMPL_CLI="codex"
+                          IMPL_MODEL="gpt-5-codex"
+                          QUALITY_CLI="claude"
+                          QUALITY_MODEL="claude-sonnet-4-20250514"
+                          TESTING_CLI="claude"
+                          TESTING_MODEL="claude-sonnet-4-20250514"
                           DOCS_REPO="$REPO_PATH"  # Default to same as main repository
                           DOCS_DIR="docs"
                         else
@@ -626,6 +632,12 @@ spec:
                             IMPL_AGENT="5DLabs-Rex"
                             QUALITY_AGENT="5DLabs-Cleo"
                             TESTING_AGENT="5DLabs-Tess"
+                            IMPL_CLI="codex"
+                            IMPL_MODEL="gpt-5-codex"
+                            QUALITY_CLI="claude"
+                            QUALITY_MODEL="claude-sonnet-4-20250514"
+                            TESTING_CLI="claude"
+                            TESTING_MODEL="claude-sonnet-4-20250514"
                             DOCS_REPO="$REPO_PATH"  # Default to same as main repository
                             DOCS_DIR="docs"
                           else
@@ -635,6 +647,44 @@ spec:
                             IMPL_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-agent" // "5DLabs-Rex"')
                             QUALITY_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."quality-agent" // "5DLabs-Cleo"')
                             TESTING_AGENT=$(echo "$INITIAL_PARAMS" | jq -r '."testing-agent" // "5DLabs-Tess"')
+                            IMPL_CLI=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-cli" // ""')
+                            IMPL_MODEL=$(echo "$INITIAL_PARAMS" | jq -r '."implementation-model" // ""')
+                            QUALITY_CLI=$(echo "$INITIAL_PARAMS" | jq -r '."quality-cli" // ""')
+                            QUALITY_MODEL=$(echo "$INITIAL_PARAMS" | jq -r '."quality-model" // ""')
+                            TESTING_CLI=$(echo "$INITIAL_PARAMS" | jq -r '."testing-cli" // ""')
+                            TESTING_MODEL=$(echo "$INITIAL_PARAMS" | jq -r '."testing-model" // ""')
+
+                            # Backward compatibility: fall back to historical model if CLI/model not stored yet
+                            if [ -z "$IMPL_CLI" ] || [ "$IMPL_CLI" = "null" ]; then
+                              IMPL_CLI="codex"
+                            fi
+                            if [ -z "$IMPL_MODEL" ] || [ "$IMPL_MODEL" = "null" ]; then
+                              if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+                                IMPL_MODEL="$MODEL"
+                              else
+                                IMPL_MODEL="gpt-5-codex"
+                              fi
+                            fi
+                            if [ -z "$QUALITY_CLI" ] || [ "$QUALITY_CLI" = "null" ]; then
+                              QUALITY_CLI="claude"
+                            fi
+                            if [ -z "$QUALITY_MODEL" ] || [ "$QUALITY_MODEL" = "null" ]; then
+                              if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+                                QUALITY_MODEL="$MODEL"
+                              else
+                                QUALITY_MODEL="claude-sonnet-4-20250514"
+                              fi
+                            fi
+                            if [ -z "$TESTING_CLI" ] || [ "$TESTING_CLI" = "null" ]; then
+                              TESTING_CLI="claude"
+                            fi
+                            if [ -z "$TESTING_MODEL" ] || [ "$TESTING_MODEL" = "null" ]; then
+                              if [ -n "$MODEL" ] && [ "$MODEL" != "null" ]; then
+                                TESTING_MODEL="$MODEL"
+                              else
+                                TESTING_MODEL="claude-sonnet-4-20250514"
+                              fi
+                            fi
 
                             # Update repository and service if they were stored
                             STORED_REPO=$(echo "$INITIAL_PARAMS" | jq -r '.repository // ""')
@@ -663,9 +713,14 @@ spec:
                         fi
 
                         echo "📝 Using parameters:"
-                        echo "  Model: $MODEL"
+                        echo "  Implementation CLI: $IMPL_CLI"
+                        echo "  Implementation Model: $IMPL_MODEL"
                         echo "  Implementation Agent: $IMPL_AGENT"
+                        echo "  Quality CLI: $QUALITY_CLI"
+                        echo "  Quality Model: $QUALITY_MODEL"
                         echo "  Quality Agent: $QUALITY_AGENT"
+                        echo "  Testing CLI: $TESTING_CLI"
+                        echo "  Testing Model: $TESTING_MODEL"
                         echo "  Testing Agent: $TESTING_AGENT"
                         echo "  Repository: $REPO_PATH"
                         echo "  Service: $SERVICE_NAME"
@@ -688,10 +743,15 @@ spec:
                             # Forward parameters to next task
                             platform.agents/initial-params: |
                               {
-                                "model": "$MODEL",
                                 "implementation-agent": "$IMPL_AGENT",
+                                "implementation-cli": "$IMPL_CLI",
+                                "implementation-model": "$IMPL_MODEL",
                                 "quality-agent": "$QUALITY_AGENT",
+                                "quality-cli": "$QUALITY_CLI",
+                                "quality-model": "$QUALITY_MODEL",
                                 "testing-agent": "$TESTING_AGENT",
+                                "testing-cli": "$TESTING_CLI",
+                                "testing-model": "$TESTING_MODEL",
                                 "repository": "$REPO_PATH",
                                 "service": "$SERVICE_NAME",
                                 "docs-repository": "$DOCS_REPO",
@@ -708,14 +768,24 @@ spec:
                                 value: "$REPO_PATH"
                               - name: service
                                 value: "$SERVICE_NAME"
-                              - name: model
-                                value: "$MODEL"
                               - name: implementation-agent
                                 value: "$IMPL_AGENT"
+                              - name: implementation-cli
+                                value: "$IMPL_CLI"
+                              - name: implementation-model
+                                value: "$IMPL_MODEL"
                               - name: quality-agent
                                 value: "$QUALITY_AGENT"
+                              - name: quality-cli
+                                value: "$QUALITY_CLI"
+                              - name: quality-model
+                                value: "$QUALITY_MODEL"
                               - name: testing-agent
                                 value: "$TESTING_AGENT"
+                              - name: testing-cli
+                                value: "$TESTING_CLI"
+                              - name: testing-model
+                                value: "$TESTING_MODEL"
                               - name: docs-repository
                                 value: "$DOCS_REPO"
                               - name: docs-project-directory
