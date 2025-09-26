@@ -16,13 +16,17 @@ USER root
 RUN set -eux; \
   curl https://cursor.com/install -fsS | bash; \
   export PATH="$HOME/.local/bin:$PATH"; \
-  if [ -f "$HOME/.local/bin/cursor-agent" ]; then \
-    install -m 0755 "$HOME/.local/bin/cursor-agent" /usr/local/bin/cursor-agent; \
-  fi; \
+  CURSOR_SHARE="$HOME/.local/share/cursor-agent"; \
+  VERSION_DIR="$(cd "$CURSOR_SHARE/versions" && ls -1 | sort | tail -n1)"; \
+  install -d /usr/local/lib/cursor-agent; \
+  cp -r "$CURSOR_SHARE/versions/$VERSION_DIR"/. /usr/local/lib/cursor-agent/; \
+  install -m 0755 "$HOME/.local/bin/cursor-agent" /usr/local/lib/cursor-agent/cursor-agent; \
+  ln -sf ../lib/cursor-agent/cursor-agent /usr/local/bin/cursor-agent; \
+  chown -R 1000:1000 /usr/local/lib/cursor-agent; \
+  rm -rf "$CURSOR_SHARE"; \
   command -v cursor-agent; \
   cursor-agent --help >/dev/null 2>&1 || true
 
 USER node
 
 # Cursor CLI is now available via `cursor-agent`
-
