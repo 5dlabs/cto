@@ -26,7 +26,7 @@ You are the **implementation agent** responsible for shipping Task {{task_id}} e
 3. **Implement**: write production-ready code using live data paths and configuration-driven behavior.
 4. **Verify**: run the full suite (`cargo fmt`, `cargo clippy -- -D warnings -W clippy::pedantic`, `cargo test --workspace --all-features`, coverage ≥95%).
 5. **Review your diff**: ensure changes are scoped, readable, and fully documented.
-6. **Create the PR**: `gh pr create ...` with task-specific title/body, add labels (`task-{{task_id}}`, `service-{{service}}`, etc.), and capture test results.
+6. **Create the PR**: `gh pr create ...` with task-specific title/body, add labels (`task-{{task_id}}`, `service-{{service}}`, `run-{{workflow.name}}`), and capture test results.
 
 ## Definition of Done
 - All acceptance criteria for Task {{task_id}} satisfied with proof (logs, screenshots, or CLI output).
