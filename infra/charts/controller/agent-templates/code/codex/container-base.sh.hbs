@@ -302,13 +302,27 @@ if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$CODEX_WORK_DIR/.mcp.json"
 fi
 
-mkdir -p ~/.codex
+mkdir -p "$HOME/.codex"
 if [ -f /task-files/codex-config.toml ]; then
-  cp /task-files/codex-config.toml ~/.codex/config.toml
+  cp /task-files/codex-config.toml "$HOME/.codex/config.toml"
   echo "✓ Installed codex-config.toml"
 else
   echo "⚠️ codex-config.toml not provided; falling back to defaults"
 fi
+
+if [ -z "${OPENAI_API_KEY:-}" ]; then
+  echo "❌ OPENAI_API_KEY is not set; Codex cannot authenticate"
+  exit 1
+fi
+
+echo "🔑 Configuring Codex authentication"
+if ! codex login --api-key "$OPENAI_API_KEY" >/tmp/codex-login.log 2>&1; then
+  echo "❌ Failed to configure Codex API key"
+  cat /tmp/codex-login.log >&2 || true
+  rm -f /tmp/codex-login.log
+  exit 1
+fi
+rm -f /tmp/codex-login.log
 
 if [ ! -f "$CODEX_WORK_DIR/AGENTS.md" ]; then
   echo "⚠️ AGENTS.md missing; creating placeholder"
