@@ -15,7 +15,7 @@
 2. **Real Systems Only** – integrations must hit real APIs/databases; parameterize everything (env vars/config/CLI flags).
 3. **Quality Gates** – `cargo fmt`, `cargo clippy -- -D warnings -W clippy::pedantic`, full test suite, and coverage ≥95% (language equivalents acceptable).
 4. **Documentation** – keep task docs (`task/*.md`) and project READMEs accurate as you go; leave breadcrumbs for the next agent.
-5. **Feature Branch Only** – the controller has already checked out `feature/task-{{task_id}}-implementation`; confirm with `git status` before committing and never push directly to `main`/`master`.
+5. **Feature Branch Only** – the controller has already checked out `feature/task-{{task_id}}-implementation`. Do not run `git push origin main` or any command that targets the default branch. Always inspect `git status` before committing, and when you publish changes use `git push origin HEAD` (or `git push origin $CURRENT_BRANCH`).
 6. **Pull Request Discipline** – ensure a PR exists, carries labels `task-{{task_id}}`, `service-{{service}}`, and `run-{{workflow_name}}`, and includes a summary of tests/coverage before you consider the task complete.
 
 {{#if cli_config.instructions}}
