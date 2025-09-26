@@ -7,6 +7,7 @@ use crate::tasks::template_paths::{
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
 };
 use crate::tasks::types::Result;
+use crate::tasks::workflow::extract_workflow_name;
 use handlebars::Handlebars;
 
 use serde_json::{json, Value};
@@ -299,6 +300,9 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -314,6 +318,7 @@ impl CodeTemplateGenerator {
                 .as_deref()
                 .unwrap_or(""),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
                 "model": code_run
@@ -353,6 +358,9 @@ impl CodeTemplateGenerator {
                 ))
             })?;
 
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -373,6 +381,7 @@ impl CodeTemplateGenerator {
                 .as_deref()
                 .unwrap_or(""),
             "working_directory": Self::get_working_directory(code_run),
+            "workflow_name": workflow_name,
             "toolman": {
                 "tools": remote_tools,
             },

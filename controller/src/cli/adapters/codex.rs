@@ -260,6 +260,13 @@ impl CliAdapter for CodexAdapter {
                     .map(str::to_string)
             });
 
+        let reasoning_effort = cli_config
+            .get("settings")
+            .and_then(Value::as_object)
+            .and_then(|settings| settings.get("reasoningEffort"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+
         let context = json!({
             "model": model,
             "github_app": agent_config.github_app,
@@ -277,6 +284,7 @@ impl CliAdapter for CodexAdapter {
             },
             "model_provider": model_provider,
             "cli_config": cli_config,
+            "model_reasoning_effort": reasoning_effort,
             "raw_additional_toml": raw_additional_toml,
         });
 
@@ -435,11 +443,14 @@ mod tests {
             }),
             cli_config: Some(json!({
                 "model": "gpt-5-codex",
-                "maxTokens": 16000,
+                "maxTokens": 64000,
                 "temperature": 0.72,
                 "approvalPolicy": "on-request",
                 "sandboxPreset": "workspace-write",
                 "instructions": "Follow team standards",
+                "settings": {
+                    "reasoningEffort": "medium"
+                }
             })),
         }
     }
@@ -460,11 +471,12 @@ mod tests {
         let config = adapter.generate_config(&agent_config).await.unwrap();
 
         assert!(config.contains(&format!("model = \"{expected_model}\"")));
-        assert!(config.contains("model_max_output_tokens = 16000"));
+        assert!(config.contains("model_max_output_tokens = 64000"));
         assert!(config.contains("temperature = 0.72"));
         assert!(config.contains("approval_policy = \"on-request\""));
         assert!(config.contains("sandbox_mode = \"workspace-write\""));
         assert!(config.contains("project_doc_max_bytes = 32768"));
+        assert!(config.contains("model_reasoning_effort = \"medium\""));
         assert!(config.contains("[mcp_servers.toolman]"));
         assert!(config.contains("--url"));
         assert!(config.contains("memory_create_entities"));

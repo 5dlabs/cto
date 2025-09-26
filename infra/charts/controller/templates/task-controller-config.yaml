@@ -30,7 +30,31 @@ data:
         {}
         {{- end }}
       agentCliConfigs:
-        {{- $legacy := default dict .Values.agent.agentCliConfigs }}
+        {{- $legacy := dict }}
+        {{- if .Values.agent.agentCliConfigs }}
+          {{- range $app, $cfg := .Values.agent.agentCliConfigs }}
+            {{- $normalized := dict }}
+            {{- if hasKey $cfg "cliType" }}
+              {{- $_ := set $normalized "cliType" $cfg.cliType }}
+            {{- else if hasKey $cfg "cli_type" }}
+              {{- $_ := set $normalized "cliType" $cfg.cli_type }}
+            {{- end }}
+            {{- if hasKey $cfg "model" }}
+              {{- $_ := set $normalized "model" $cfg.model }}
+            {{- end }}
+            {{- if hasKey $cfg "maxTokens" }}
+              {{- $_ := set $normalized "maxTokens" $cfg.maxTokens }}
+            {{- end }}
+            {{- if hasKey $cfg "temperature" }}
+              {{- $_ := set $normalized "temperature" $cfg.temperature }}
+            {{- end }}
+            {{- if hasKey $cfg "settings" }}
+              {{- $_ := set $normalized "settings" $cfg.settings }}
+            {{- end }}
+            {{- $_ := set $legacy $app $normalized }}
+          {{- end }}
+        {{- end }}
+
         {{- $fromAgents := dict }}
         {{- range $name, $agent := .Values.agents }}
           {{- if and $agent.githubApp $agent.cli $agent.model }}
@@ -41,10 +65,26 @@ data:
             {{- if hasKey $agent "temperature" }}
               {{- $_ := set $cliCfg "temperature" $agent.temperature }}
             {{- end }}
+            {{- if hasKey $agent "reasoningEffort" }}
+              {{- $_ := set $cliCfg "settings" (dict "reasoningEffort" $agent.reasoningEffort) }}
+            {{- end }}
             {{- $_ := set $fromAgents $agent.githubApp $cliCfg }}
           {{- end }}
         {{- end }}
+
         {{- $merged := merge $legacy $fromAgents }}
+        {{- range $name, $agent := .Values.agents }}
+          {{- if and $agent.githubApp $agent.reasoningEffort (hasKey $merged $agent.githubApp) }}
+            {{- $cfg := index $merged $agent.githubApp }}
+            {{- if not (hasKey $cfg "settings") }}
+              {{- $_ := set $cfg "settings" (dict) }}
+            {{- end }}
+            {{- if not (hasKey $cfg.settings "reasoningEffort") }}
+              {{- $_ := set $cfg.settings "reasoningEffort" $agent.reasoningEffort }}
+            {{- end }}
+            {{- $_ := set $merged $agent.githubApp $cfg }}
+          {{- end }}
+        {{- end }}
         {{- if gt (len $merged) 0 }}
         {{- toYaml $merged | nindent 8 }}
         {{- else }}
@@ -142,6 +182,9 @@ data:
         {{- end }}
         {{- if hasKey $agent "temperature" }}
         temperature: {{ $agent.temperature }}
+        {{- end }}
+        {{- if hasKey $agent "reasoningEffort" }}
+        reasoningEffort: {{ $agent.reasoningEffort | quote }}
         {{- end }}
         {{- if $agent.tools }}
         tools:

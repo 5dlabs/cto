@@ -1,7 +1,7 @@
 use super::agent::AgentClassifier;
 use super::naming::ResourceNaming;
 use crate::cli::types::CLIType;
-use crate::crds::CodeRun;
+use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
@@ -1264,54 +1264,64 @@ impl<'a> CodeResourceManager<'a> {
     /// Select the appropriate Docker image based on the CLI type specified in the CodeRun
     /// Auto-populate CLI config based on agent GitHub app (if not already specified)
     async fn populate_cli_config_if_needed(&self, code_run: &Arc<CodeRun>) -> Result<Arc<CodeRun>> {
-        // If CLI config is already specified, return as-is
-        if code_run.spec.cli_config.is_some() {
+        // If we have no GitHub app context, we cannot enrich the CLI config
+        let Some(github_app) = &code_run.spec.github_app else {
+            if code_run.spec.cli_config.is_none() {
+                info!("No CLI config or GitHub app specified, using defaults");
+            }
             return Ok(code_run.clone());
+        };
+
+        // Extract agent name for logging only—we still continue even if this fails
+        let classifier = AgentClassifier::new();
+        if let Ok(agent_name) = classifier.extract_agent_name(github_app) {
+            info!(
+                "🔍 Preparing CLI configuration for agent '{}' ({})",
+                agent_name, github_app
+            );
         }
 
-        // If no GitHub app is specified, we can't look up agent CLI config
-        let github_app = match &code_run.spec.github_app {
-            Some(app) => app,
+        let Some(agent_cli_config) = self.config.agent.agent_cli_configs.get(github_app) else {
+            // Nothing to merge, fall back to whatever the CodeRun already provided
+            return Ok(code_run.clone());
+        };
+
+        let mut new_code_run = (**code_run).clone();
+
+        match new_code_run.spec.cli_config.as_mut() {
+            Some(existing) => {
+                Self::merge_cli_config(existing, agent_cli_config);
+            }
             None => {
-                info!("No CLI config or GitHub app specified, using defaults");
-                return Ok(code_run.clone());
-            }
-        };
-
-        // Extract agent name from GitHub app (for future use if needed)
-        let classifier = AgentClassifier::new();
-        let _agent_name = match classifier.extract_agent_name(github_app) {
-            Ok(name) => name.to_lowercase(),
-            Err(_) => {
                 info!(
-                    "Could not extract agent name from {}, using defaults",
-                    github_app
+                    "🔧 Auto-populating CLI config for agent {}: {} ({})",
+                    github_app, agent_cli_config.cli_type, agent_cli_config.model
                 );
-                return Ok(code_run.clone());
+                new_code_run.spec.cli_config = Some(agent_cli_config.clone());
             }
-        };
+        }
 
-        // Look up CLI config from loaded configuration (no hardcoded values)
-        if let Some(agent_cli_config) = self.config.agent.agent_cli_configs.get(github_app) {
-            info!(
-                "🔧 Auto-populating CLI config for agent {}: {} ({})",
-                github_app, agent_cli_config.cli_type, agent_cli_config.model
-            );
+        Ok(Arc::new(new_code_run))
+    }
 
-            // Create a new CodeRun with the CLI config populated
-            let mut new_spec = code_run.spec.clone();
-            new_spec.cli_config = Some(agent_cli_config.clone());
+    fn merge_cli_config(existing: &mut CLIConfig, defaults: &CLIConfig) {
+        if existing.model.trim().is_empty() {
+            existing.model = defaults.model.clone();
+        }
 
-            let mut new_code_run = (**code_run).clone();
-            new_code_run.spec = new_spec;
+        if existing.max_tokens.is_none() {
+            existing.max_tokens = defaults.max_tokens;
+        }
 
-            Ok(Arc::new(new_code_run))
-        } else {
-            info!(
-                "No CLI config found for agent {} in configuration, using defaults",
-                github_app
-            );
-            Ok(code_run.clone())
+        if existing.temperature.is_none() {
+            existing.temperature = defaults.temperature;
+        }
+
+        for (key, value) in &defaults.settings {
+            existing
+                .settings
+                .entry(key.clone())
+                .or_insert_with(|| value.clone());
         }
     }
 
@@ -1354,5 +1364,88 @@ impl<'a> CodeResourceManager<'a> {
         Err(Error::ConfigError(
             "No CLI configuration provided and agent.image fallback is not set.".to_string(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    fn cli_config_with_settings(settings: HashMap<String, serde_json::Value>) -> CLIConfig {
+        CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "".to_string(),
+            settings,
+            max_tokens: None,
+            temperature: None,
+        }
+    }
+
+    #[test]
+    fn merge_cli_config_adds_missing_fields_and_reasoning_effort() {
+        let mut existing = cli_config_with_settings(HashMap::new());
+
+        let mut defaults_settings = HashMap::new();
+        defaults_settings.insert("reasoningEffort".to_string(), json!("high"));
+        defaults_settings.insert("approvalPolicy".to_string(), json!("never"));
+
+        let defaults = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "gpt-5-codex".to_string(),
+            settings: defaults_settings,
+            max_tokens: Some(16_000),
+            temperature: Some(0.7_f32),
+        };
+
+        CodeResourceManager::merge_cli_config(&mut existing, &defaults);
+
+        assert_eq!(existing.model, "gpt-5-codex");
+        assert_eq!(existing.max_tokens, Some(16_000));
+        assert_eq!(existing.temperature, Some(0.7_f32));
+        assert_eq!(
+            existing.settings.get("reasoningEffort"),
+            Some(&json!("high"))
+        );
+        assert_eq!(
+            existing.settings.get("approvalPolicy"),
+            Some(&json!("never"))
+        );
+    }
+
+    #[test]
+    fn merge_cli_config_preserves_existing_values() {
+        let mut existing_settings = HashMap::new();
+        existing_settings.insert("reasoningEffort".to_string(), json!("medium"));
+
+        let mut existing = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "custom-model".to_string(),
+            settings: existing_settings,
+            max_tokens: Some(8_192),
+            temperature: Some(0.3_f32),
+        };
+
+        let mut defaults_settings = HashMap::new();
+        defaults_settings.insert("reasoningEffort".to_string(), json!("high"));
+
+        let defaults = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "gpt-5-codex".to_string(),
+            settings: defaults_settings,
+            max_tokens: Some(16_000),
+            temperature: Some(0.9_f32),
+        };
+
+        CodeResourceManager::merge_cli_config(&mut existing, &defaults);
+
+        assert_eq!(existing.model, "custom-model");
+        assert_eq!(existing.max_tokens, Some(8_192));
+        assert_eq!(existing.temperature, Some(0.3_f32));
+        assert_eq!(
+            existing.settings.get("reasoningEffort"),
+            Some(&json!("medium"))
+        );
     }
 }

@@ -198,7 +198,7 @@ fn test_code_templates(
         "cli_config": {
             "cliType": "codex",
             "model": "gpt-5-codex",
-            "maxTokens": 16000,
+            "maxTokens": 64000,
             "temperature": 0.7,
             "settings": {
                 "sandboxPreset": "workspace-write",
@@ -207,7 +207,7 @@ fn test_code_templates(
         },
         "model": "gpt-5-codex",
         "temperature": 0.7,
-        "max_output_tokens": 16000,
+        "max_output_tokens": 64000,
         "approval_policy": "never",
         "sandbox_mode": "workspace-write",
         "project_doc_max_bytes": 32768,

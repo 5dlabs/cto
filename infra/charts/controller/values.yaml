@@ -106,7 +106,7 @@ agents:
     githubApp: "5DLabs-Rex"
     cli: "Codex"
     model: "gpt-5-codex"
-    maxTokens: 16000
+    maxTokens: 64000
     temperature: 0.7
     reasoningEffort: "high"
     appId: "1724452"
@@ -205,7 +205,7 @@ agents:
     githubApp: "5DLabs-Blaze"
     cli: "Codex"
     model: "gpt-5-codex"
-    maxTokens: 16000
+    maxTokens: 64000
     temperature: 0.6
     reasoningEffort: "high"
     appId: "1724451"
@@ -234,7 +234,7 @@ agents:
     githubApp: "5DLabs-Cipher"
     cli: "Codex"
     model: "gpt-5-codex"
-    maxTokens: 16000
+    maxTokens: 64000
     temperature: 0.6
     reasoningEffort: "high"
     appId: "1724450"
