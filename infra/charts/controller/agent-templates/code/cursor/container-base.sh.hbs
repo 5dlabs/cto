@@ -29,9 +29,25 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+CURSOR_RUNTIME_BIN="/tmp/cursor-agent-bin"
+mkdir -p "$CURSOR_RUNTIME_BIN"
+cat >"$CURSOR_RUNTIME_BIN/cursor-agent" <<'WRAPPER'
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ Node.js binary not found in PATH"
+  exit 1
+fi
+
+NODE_BIN="$(command -v node)"
+exec "$NODE_BIN" /usr/local/bin/index.js "$@"
+WRAPPER
+chmod +x "$CURSOR_RUNTIME_BIN/cursor-agent"
+export PATH="$CURSOR_RUNTIME_BIN:$PATH"
+
 if [ ! -x "/usr/local/bin/node" ]; then
-  mkdir -p /usr/local/bin
-  cp "$(command -v node)" /usr/local/bin/node 2>/dev/null || ln -sf "$(command -v node)" /usr/local/bin/node
+  echo "ℹ️ Falling back to cursor-agent wrapper; /usr/local/bin/node missing"
 fi
 
 echo "PATH: $PATH"
