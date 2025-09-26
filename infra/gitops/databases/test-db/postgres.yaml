@@ -3,7 +3,7 @@ apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
   name: test-db
-  namespace: test-db
+  namespace: databases
   labels:
     team: platform
     app.kubernetes.io/name: test-db
@@ -73,7 +73,4 @@ spec:
         pgcrypto: "public"
 
   enableConnectionPooler: false
-
-  maintenanceWindows:
-    - "02:00-03:00"
 
