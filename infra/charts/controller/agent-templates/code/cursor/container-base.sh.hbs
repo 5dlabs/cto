@@ -23,6 +23,17 @@ if command -v rustup >/dev/null 2>&1; then
   rustup default stable 2>/dev/null || true
 fi
 
+# Ensure Node.js is available at the path expected by cursor-agent
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ Node.js binary not found; cursor-agent cannot run"
+  exit 1
+fi
+
+if [ ! -x "/usr/local/bin/node" ]; then
+  mkdir -p /usr/local/bin
+  cp "$(command -v node)" /usr/local/bin/node 2>/dev/null || ln -sf "$(command -v node)" /usr/local/bin/node
+fi
+
 echo "PATH: $PATH"
 
 # =========================================================================
