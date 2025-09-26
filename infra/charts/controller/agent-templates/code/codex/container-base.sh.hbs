@@ -94,7 +94,11 @@ export GITHUB_TOKEN
 
 git config --global --replace-all credential.helper store
 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-echo "$GITHUB_TOKEN" | gh auth login --with-token >/dev/null
+
+# Prevent interactive GitHub CLI prompts (gh v2.57+ will block when GITHUB_TOKEN is set)
+if ! echo "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname github.com --git-protocol https >/dev/null 2>&1; then
+  echo "⚠️ gh auth login timed out or failed; continuing with credential.helper store"
+fi
 
 git config --global --add safe.directory /workspace
 GITHUB_APP="{{github_app}}"
