@@ -8,6 +8,7 @@ use crate::crds::coderun::CLIConfig;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{api::Api, Client};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use std::collections::{BTreeSet, HashMap};
 use tracing::warn;
 
@@ -327,6 +328,10 @@ pub struct AgentDefinition {
     #[serde(default)]
     pub temperature: Option<f32>,
 
+    /// Optional reasoning effort setting for this agent
+    #[serde(default, rename = "reasoningEffort")]
+    pub reasoning_effort: Option<String>,
+
     /// Tool configuration for this agent
     #[serde(default)]
     pub tools: Option<AgentTools>,
@@ -403,10 +408,18 @@ impl ControllerConfig {
 
             match CLIType::from_str_ci(cli_str) {
                 Some(cli_type) => {
+                    let mut settings: HashMap<String, JsonValue> = HashMap::new();
+                    if let Some(reasoning) = agent.reasoning_effort.as_ref() {
+                        settings.insert(
+                            "reasoningEffort".to_string(),
+                            JsonValue::String(reasoning.clone()),
+                        );
+                    }
+
                     let config = CLIConfig {
                         cli_type,
                         model: model.clone(),
-                        settings: HashMap::new(),
+                        settings,
                         max_tokens: agent.max_tokens,
                         temperature: agent.temperature,
                     };

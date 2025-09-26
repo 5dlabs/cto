@@ -1353,6 +1353,7 @@ mod tests {
                 model: None,
                 max_tokens: None,
                 temperature: None,
+                reasoning_effort: None,
                 tools: Some(agent_tools.clone()),
                 client_config: None,
             },
@@ -1374,6 +1375,7 @@ mod tests {
                 model: None,
                 max_tokens: None,
                 temperature: None,
+                reasoning_effort: None,
                 tools: Some(agent_tools),
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_web_search"],
