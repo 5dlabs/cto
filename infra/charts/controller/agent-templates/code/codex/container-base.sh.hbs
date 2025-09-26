@@ -94,8 +94,12 @@ export GITHUB_TOKEN
 export GH_TOKEN="$GITHUB_TOKEN"
 export GH_HOST="github.com"
 
-git config --global --replace-all credential.helper store
-echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
+CREDENTIALS_FILE=/workspace/.git-credentials
+mkdir -p /workspace
+
+git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
+echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
 
 TOKEN_GENERATED_AT=$(date +%s)
 
@@ -138,7 +142,7 @@ refresh_github_token() {
     export GITHUB_TOKEN="$NEW_TOKEN"
     export GH_TOKEN="$NEW_TOKEN"
     TOKEN_GENERATED_AT=$(date +%s)
-    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
     echo "✅ Token refreshed"
     return 0
   fi
