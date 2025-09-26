@@ -92,10 +92,12 @@ mod tests {
         let codex_upper: CLIType = serde_json::from_str("\"Codex\"").unwrap();
         let codex_lower: CLIType = serde_json::from_str("\"codex\"").unwrap();
         let claude_mixed: CLIType = serde_json::from_str("\"ClAuDe\"").unwrap();
+        let cursor_mixed: CLIType = serde_json::from_str("\"CuRsOr\"").unwrap();
 
         assert_eq!(codex_upper, CLIType::Codex);
         assert_eq!(codex_lower, CLIType::Codex);
         assert_eq!(claude_mixed, CLIType::Claude);
+        assert_eq!(cursor_mixed, CLIType::Cursor);
     }
 
     #[test]

@@ -45,7 +45,12 @@ impl CLIRouter {
         Self {
             discovery: DiscoveryService::new(),
             bridge: ConfigurationBridge::new(),
-            default_fallback_chain: vec![CLIType::Claude, CLIType::Codex, CLIType::OpenCode],
+            default_fallback_chain: vec![
+                CLIType::Claude,
+                CLIType::Codex,
+                CLIType::Cursor,
+                CLIType::OpenCode,
+            ],
         }
     }
 
@@ -191,6 +196,9 @@ impl CLIRouter {
                 env.insert("HOME".to_string(), "/home/node".to_string());
                 // OPENAI_API_KEY will be added from required_vars
             }
+            CLIType::Cursor => {
+                env.insert("HOME".to_string(), "/home/node".to_string());
+            }
             CLIType::OpenCode => {
                 env.insert("HOME".to_string(), "/home/node".to_string());
             }
@@ -284,6 +292,7 @@ mod tests {
         let supported = router.supported_clis();
         assert!(supported.contains(&CLIType::Claude));
         assert!(supported.contains(&CLIType::Codex));
+        assert!(supported.contains(&CLIType::Cursor));
     }
 
     #[test]
@@ -301,6 +310,8 @@ mod tests {
         assert_eq!(candidates[0], CLIType::Codex);
         assert_eq!(candidates[1], CLIType::OpenCode);
         // Default fallbacks should follow
+        assert!(candidates.contains(&CLIType::Claude));
+        assert!(candidates.contains(&CLIType::Cursor));
     }
 
     #[test]
@@ -310,5 +321,9 @@ mod tests {
 
         assert_eq!(env.get("HOME").unwrap(), "/home/node");
         // OPENAI_API_KEY would be added if available in actual environment
+
+        let cursor_env =
+            router.prepare_environment(CLIType::Cursor, &["CURSOR_API_KEY".to_string()]);
+        assert_eq!(cursor_env.get("HOME").unwrap(), "/home/node");
     }
 }
