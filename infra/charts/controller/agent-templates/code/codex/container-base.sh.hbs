@@ -275,6 +275,26 @@ ensure_pr_created() {
     RUN_LABEL="run-unknown"
   fi
 
+  TASK_LABEL="task-{{task_id}}"
+  SERVICE_LABEL="service-{{service}}"
+  REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+
+  echo "🔍 Ensuring PR correlation labels exist"
+  for label in "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"; do
+    if [ -z "$label" ]; then
+      continue
+    fi
+    if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
+      case "$label" in
+        task-*) COLOR="f29513"; DESC="Task correlation" ;;
+        service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+        run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
+        *) COLOR="ededed"; DESC="Automation label" ;;
+      esac
+      gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+    fi
+  done
+
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
   read -r -d '' PR_BODY <<'EOF' || true
 ## Summary
@@ -303,8 +323,8 @@ EOF
     fi
   }
 
-  maybe_add_label "task-{{task_id}}"
-  maybe_add_label "service-{{service}}"
+  maybe_add_label "$TASK_LABEL"
+  maybe_add_label "$SERVICE_LABEL"
   maybe_add_label "$RUN_LABEL"
 
   if gh pr create "${LABEL_ARGS[@]}"; then
