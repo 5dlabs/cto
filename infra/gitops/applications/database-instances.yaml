@@ -46,7 +46,7 @@ spec:
 
     # Directory configuration - Deploy all database instances
     directory:
-      recurse: false  # Don't recurse into subdirectories (excludes examples/)
+      recurse: true  # Deploy nested database resources (includes test-db subdir)
       exclude: "{README.md,examples/**}"  # Only exclude docs and examples directory
 
   # Destination configuration

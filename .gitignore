@@ -40,6 +40,8 @@ kubeconfig*
 # Test and Debug Files
 test-*.yaml
 debug-*.yaml
+!infra/gitops/applications/test-db.yaml
+!infra/gitops/rbac/test-db-access.yaml
 
 # Helm Files
 *.tgz
