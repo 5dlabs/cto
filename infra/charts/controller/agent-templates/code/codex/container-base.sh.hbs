@@ -590,7 +590,7 @@ if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
 
 if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
@@ -601,6 +601,15 @@ if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding
     PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md\n"
   fi
   PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
+fi
+
+if [ -f "$CODEX_WORK_DIR/AGENTS.md" ]; then
+  if AGENT_GUIDANCE=$(jq -Rs @json "$CODEX_WORK_DIR/AGENTS.md" 2>/dev/null); then
+    if [ "${#AGENT_GUIDANCE}" -gt 2 ]; then
+      AGENT_GUIDANCE=${AGENT_GUIDANCE:1:-1}
+      PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${AGENT_GUIDANCE}\n\n---\n\n"
+    fi
+  fi
 fi
 
 echo "🔍 DEBUG: About to check for prompt.md at: $CODEX_WORK_DIR/task/prompt.md"
