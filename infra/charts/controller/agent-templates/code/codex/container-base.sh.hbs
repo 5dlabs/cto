@@ -284,15 +284,26 @@ ensure_pr_created() {
     if [ -z "$label" ]; then
       continue
     fi
-    if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
-      case "$label" in
-        task-*) COLOR="f29513"; DESC="Task correlation" ;;
-        service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
-        run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
-        *) COLOR="ededed"; DESC="Automation label" ;;
-      esac
-      gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      echo "   ✓ Label '$label' already exists"
+      continue
     fi
+
+    case "$label" in
+      task-*) COLOR="f29513"; DESC="Task correlation" ;;
+      service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+      run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
+      *) COLOR="ededed"; DESC="Automation label" ;;
+    esac
+
+    if gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
+      echo "   ✅ Created label '$label'"
+    else
+      echo "   ❌ Failed to create label '$label'"
+      cat /tmp/gh-label-create.log >&2 || true
+    fi
+    rm -f /tmp/gh-label-create.log
   done
 
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
@@ -316,7 +327,7 @@ EOF
     if [ -z "$label" ]; then
       return
     fi
-    if gh label view "$label" >/dev/null 2>&1; then
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
       LABEL_ARGS+=("--label" "$label")
     else
       echo "⚠️ Label '$label' not found; skipping"
