@@ -91,14 +91,76 @@ if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+export GH_HOST="github.com"
 
 git config --global --replace-all credential.helper store
 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
 
-# Prevent interactive GitHub CLI prompts (gh v2.57+ will block when GITHUB_TOKEN is set)
-if ! echo "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname github.com --git-protocol https >/dev/null 2>&1; then
-  echo "⚠️ gh auth login timed out or failed; continuing with credential.helper store"
-fi
+TOKEN_GENERATED_AT=$(date +%s)
+
+refresh_github_token() {
+  echo "🔄 Refreshing GitHub App token..."
+
+  TEMP_KEY_FILE="/tmp/github-app-key-$$"
+  printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+  chmod 600 "$TEMP_KEY_FILE"
+
+  JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  NOW=$(date +%s)
+  EXP=$((NOW + 600))
+  JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+  rm -f "$TEMP_KEY_FILE"
+
+  NEW_INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+  if [ "$NEW_INSTALLATION_ID" = "null" ] || [ -z "$NEW_INSTALLATION_ID" ]; then
+    NEW_INSTALLATION_ID=$(curl -s -L \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+  fi
+
+  TOKEN_RESPONSE=$(curl -s -X POST \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/app/installations/$NEW_INSTALLATION_ID/access_tokens")
+
+  NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+  if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+    export GITHUB_TOKEN="$NEW_TOKEN"
+    export GH_TOKEN="$NEW_TOKEN"
+    TOKEN_GENERATED_AT=$(date +%s)
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+    echo "✅ Token refreshed"
+    return 0
+  fi
+
+  echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+  return 1
+}
+
+refresh_token_if_needed() {
+  if [ -z "$TOKEN_GENERATED_AT" ]; then
+    refresh_github_token
+    return
+  fi
+
+  NOW=$(date +%s)
+  TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+  if [ $TOKEN_AGE -gt 3000 ]; then
+    echo "🔄 Token age: $((TOKEN_AGE / 60)) minutes — refreshing"
+    refresh_github_token
+  fi
+}
 
 git config --global --add safe.directory /workspace
 GITHUB_APP="{{github_app}}"
@@ -111,6 +173,9 @@ export GIT_AUTHOR_NAME
 export GIT_AUTHOR_EMAIL
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
 
 # =========================================================================
 # Repository checkout
@@ -128,9 +193,11 @@ cd /workspace
 if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
   cd "$REPO_NAME"
+  refresh_token_if_needed
   git fetch --all --prune
 else
   echo "⬇️  Cloning repository"
+  refresh_token_if_needed
   git clone "$REPO_HTTP_URL"
   cd "$REPO_NAME"
 fi
@@ -145,6 +212,7 @@ cd "$CODEX_WORK_DIR"
 echo "✓ Working directory: $CODEX_WORK_DIR"
 
 echo "📦 git status"
+refresh_token_if_needed
 git status --short || true
 
 # =========================================================================
@@ -154,6 +222,61 @@ git status --short || true
 echo "🧱 Syncing task assets"
 mkdir -p "$CODEX_WORK_DIR/task"
 cp -R /task-files/task/* "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{docs_branch}}"
+DOCS_PROJECT_DIRECTORY="{{docs_project_directory}}"
+
+if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
+  refresh_token_if_needed
+  if [ -z "$DOCS_BRANCH" ] || [ "$DOCS_BRANCH" = "null" ]; then
+    DOCS_BRANCH="main"
+  fi
+
+  echo "📚 Syncing docs repository: $DOCS_REPO_URL (branch: $DOCS_BRANCH)"
+  DOCS_CLONE_DIR="/tmp/docs-repo"
+  rm -rf "$DOCS_CLONE_DIR"
+
+  read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
+  DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
+
+  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
+    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    fi
+
+    echo "🔍 Docs base path: $DOCS_BASE_PATH"
+    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+
+  if [ -d "$TASK_DIR" ]; then
+    echo "✓ Copying task definition from $TASK_DIR"
+    refresh_token_if_needed
+    cp -R "$TASK_DIR"/. "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+    else
+      echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
+    fi
+
+    if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
+      refresh_token_if_needed
+      cp "$DOCS_BASE_PATH/tasks.json" "$CODEX_WORK_DIR/task/" 2>/dev/null || true
+    fi
+  fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
+fi
 
 if [ -f /task-files/AGENTS.md ]; then
   cp /task-files/AGENTS.md "$CODEX_WORK_DIR/AGENTS.md"
