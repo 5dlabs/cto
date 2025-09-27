@@ -670,7 +670,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 4);
+        assert_eq!(health_summary.len(), 5);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -680,6 +680,7 @@ mod tests {
             HealthState::Unhealthy
         );
         assert!(health_summary.contains_key(&CLIType::Cursor));
+        assert!(health_summary.contains_key(&CLIType::OpenCode));
     }
 
     #[tokio::test]
@@ -698,8 +699,8 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 4);
-        assert_eq!(stats.healthy_adapters, 4);
+        assert_eq!(stats.total_adapters, 5);
+        assert_eq!(stats.healthy_adapters, 5);
         assert_eq!(stats.warning_adapters, 0);
         assert_eq!(stats.unhealthy_adapters, 0);
     }
