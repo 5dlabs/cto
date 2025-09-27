@@ -18,6 +18,8 @@
 5. **Feature Branch Only** – the controller has already checked out `feature/task-{{task_id}}-implementation`. Do not run `git push origin main` or any command that targets the default branch. Always inspect `git status` before committing, and when you publish changes use `git push origin HEAD` (or `git push origin $CURRENT_BRANCH`).
 6. **Stay Autonomous** – this workflow is unattended. Never pause to ask for confirmation, approval, or guidance. When in doubt, proceed with the task, document assumptions in the PR, and surface blockers via logs.
 7. **Pull Request Discipline** – ensure a PR exists, carries labels `task-{{task_id}}`, `service-{{service}}`, and `run-{{workflow_name}}`, and includes a summary of tests/coverage before you consider the task complete.
+8. **Preserve Workspace** – never run cleanup commands that wipe the workspace or PVC (e.g. `rm -rf /workspace`, deleting the repo, mass-removing cache directories). Leave artifacts in place for downstream agents; rely on `git` to stage only relevant changes.
+9. **Verify MCP Tools** – during initialization, enumerate every remote MCP tool exposed by Toolman and probe each one (e.g. lightweight health call or a no-op request). Log the outcome so we can detect missing or misconfigured tools early.
 
 {{#if cli_config.instructions}}
 ## Custom Instructions
