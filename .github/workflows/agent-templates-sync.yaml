@@ -8,6 +8,7 @@ on:
       - 'infra/charts/controller/templates/agent-templates-static.yaml'
       - 'scripts/generate-templates-configmap.sh'
       - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
+      - 'scripts/apply-agent-templates-configmap.sh'
 
 jobs:
   sync-configmap:
@@ -23,9 +24,8 @@ jobs:
       - name: Regenerate agent templates ConfigMap
         run: ./scripts/generate-templates-configmap.sh
 
-      - name: Apply ConfigMap to cluster
-        run: |
-          kubectl apply -n agent-platform -f infra/charts/controller/templates/agent-templates-static.yaml
+      - name: Render and apply ConfigMap to cluster
+        run: ./scripts/apply-agent-templates-configmap.sh
 
       - name: Restart controller deployment
         run: |
