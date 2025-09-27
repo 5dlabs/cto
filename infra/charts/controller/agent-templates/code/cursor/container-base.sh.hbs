@@ -728,6 +728,9 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   RUN_LOG="/tmp/cursor-run-${ATTEMPT}.jsonl"
 
   CURSOR_CMD=("cursor-agent" "--print" "--output-format" "$OUTPUT_FORMAT")
+  {{#if model}}
+  CURSOR_CMD+=("--model" "{{model}}")
+  {{/if}}
   if [ -n "$FORCE_FLAG" ]; then
     CURSOR_CMD+=("$FORCE_FLAG")
   fi
@@ -760,7 +763,11 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   COMPLETION_LAST_MESSAGE="/tmp/cursor-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/cursor-completion-${ATTEMPT}.log"
 
-  COMPLETION_CMD=("cursor-agent" "--print" "--output-format" "text" "$COMPLETION_PROMPT")
+  COMPLETION_CMD=("cursor-agent" "--print" "--output-format" "text")
+  {{#if model}}
+  COMPLETION_CMD+=("--model" "{{model}}")
+  {{/if}}
+  COMPLETION_CMD+=("$COMPLETION_PROMPT")
 
   set +e
   set -o pipefail
