@@ -1,0 +1,11 @@
+#!/bin/bash
+set -euo pipefail
+
+cat <<'MESSAGE'
+⚠️ OpenCode container entrypoint is not implemented yet.
+This job was launched before the OpenCode runtime command wiring was completed.
+Please update infra/charts/controller/agent-templates/code/opencode/container-base.sh.hbs
+with the appropriate OpenCode automation flow before scheduling production runs.
+MESSAGE
+
+exit 1

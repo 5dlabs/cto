@@ -8,7 +8,7 @@ use crate::tasks::template_paths::{
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
     CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
-    CODE_MCP_CONFIG_TEMPLATE,
+    CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
 use crate::tasks::types::Result;
 use crate::tasks::workflow::extract_workflow_name;
@@ -53,6 +53,7 @@ impl CodeTemplateGenerator {
             CLIType::Codex => Self::generate_codex_templates(code_run, config),
             CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
             CLIType::Factory => Self::generate_factory_templates(code_run, config),
+            CLIType::OpenCode => Self::generate_opencode_templates(code_run, config),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -150,6 +151,67 @@ impl CodeTemplateGenerator {
         templates.insert(
             "cursor-cli.json".to_string(),
             Self::generate_cursor_project_permissions()?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    fn generate_opencode_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_opencode_container_script(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "OPENCODE.md".to_string(),
+            Self::generate_opencode_memory(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "opencode-config.json".to_string(),
+            Self::generate_opencode_config(
+                code_run,
+                &cli_config_value,
+                &client_config_value,
+                &remote_tools,
+            )?,
         );
 
         templates.insert(
@@ -1522,6 +1584,230 @@ impl CodeTemplateGenerator {
         })
     }
 
+    fn generate_opencode_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let base_template = Self::load_template(CODE_OPENCODE_CONTAINER_BASE_TEMPLATE)?;
+        handlebars
+            .register_partial("opencode_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register OpenCode container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_opencode_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("opencode_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register OpenCode container template {template_path}: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "continue_session": Self::get_continue_session(code_run),
+            "overwrite_memory": code_run.spec.overwrite_memory,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "model": render_settings.model,
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": render_settings.model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+        });
+
+        handlebars
+            .render("opencode_container", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render OpenCode container template: {e}"
+                ))
+            })
+    }
+
+    fn generate_opencode_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template_path = Self::get_opencode_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("opencode_agents", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register OpenCode memory template {template_path}: {e}"
+                ))
+            })?;
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let context = json!({
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "model": code_run
+                .spec
+                .cli_config
+                .as_ref()
+                .map(|cfg| cfg.model.as_str())
+                .unwrap_or(&code_run.spec.model),
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "workflow_name": workflow_name,
+            "toolman": {
+                "tools": remote_tools,
+            },
+            "cli_config": cli_config,
+        });
+
+        handlebars.render("opencode_agents", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render OpenCode OPENCODE.md template: {e}"
+            ))
+        })
+    }
+
+    fn generate_opencode_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        client_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_OPENCODE_CONFIG_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("opencode_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register OpenCode config template: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let provider_obj = render_settings
+            .model_provider
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let provider_name = provider_obj
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("openai")
+            .to_string();
+        let provider_env_key = provider_obj
+            .get("env_key")
+            .or_else(|| provider_obj.get("envKey"))
+            .and_then(Value::as_str)
+            .unwrap_or("OPENAI_API_KEY")
+            .to_string();
+        let provider_base_url = provider_obj
+            .get("base_url")
+            .or_else(|| provider_obj.get("baseUrl"))
+            .and_then(Value::as_str)
+            .map(|s| s.to_string());
+
+        let instructions_plain = cli_config
+            .get("instructions")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string())
+            .or_else(|| {
+                cli_config
+                    .get("memory")
+                    .and_then(Value::as_str)
+                    .map(|s| s.to_string())
+            });
+
+        let local_servers_value = client_config
+            .get("localServers")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        let local_servers_serialized = if local_servers_value
+            .as_object()
+            .map(|map| map.is_empty())
+            .unwrap_or(true)
+        {
+            None
+        } else {
+            Some(
+                serde_json::to_string_pretty(&local_servers_value)
+                    .unwrap_or_else(|_| "{}".to_string()),
+            )
+        };
+
+        let correlation_id = format!("task-{}", code_run.spec.task_id);
+
+        let context = json!({
+            "metadata": {
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "correlation_id": correlation_id,
+                "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+                "cli": Self::determine_cli_type(code_run).to_string(),
+            },
+            "agent": {
+                "model": render_settings.model,
+                "temperature": render_settings.temperature,
+                "max_output_tokens": render_settings.max_output_tokens,
+                "instructions": instructions_plain,
+                "remote_tools": remote_tools,
+                "local_servers": local_servers_serialized,
+                "provider": {
+                    "name": provider_name,
+                    "envKey": provider_env_key,
+                    "base_url": provider_base_url,
+                },
+            },
+        });
+
+        handlebars.render("opencode_config", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render OpenCode config template: {e}"
+            ))
+        })
+    }
+
     fn generate_coding_guidelines(code_run: &CodeRun) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -1743,6 +2029,34 @@ impl CodeTemplateGenerator {
             "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/codex/agents-tess.md.hbs",
             _ => "code/codex/agents.md.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_opencode_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
+                "code/opencode/container-rex.sh.hbs"
+            }
+            "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
+            _ => "code/opencode/container.sh.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_opencode_memory_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
+                "code/opencode/agents-rex.md.hbs"
+            }
+            "5DLabs-Cleo" => "code/opencode/agents-cleo.md.hbs",
+            "5DLabs-Tess" => "code/opencode/agents-tess.md.hbs",
+            _ => "code/opencode/agents.md.hbs",
         };
 
         template_name.to_string()

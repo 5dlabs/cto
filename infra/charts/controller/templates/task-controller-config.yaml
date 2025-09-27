@@ -29,6 +29,12 @@ data:
         {{- else }}
         {}
         {{- end }}
+      cliProviders:
+        {{- if .Values.agent.cliProviders }}
+        {{- toYaml .Values.agent.cliProviders | nindent 8 }}
+        {{- else }}
+        {}
+        {{- end }}
       agentCliConfigs:
         {{- $legacy := dict }}
         {{- if .Values.agent.agentCliConfigs }}
@@ -124,6 +130,21 @@ data:
         {{- if .Values.secrets.cliApiKeys }}
         {{- range $cli, $secret := .Values.secrets.cliApiKeys }}
         {{ $cli }}:
+          secretKey: {{ $secret.secretKey | quote }}
+          {{- if $secret.secretName }}
+          secretName: {{ $secret.secretName | quote }}
+          {{- end }}
+          {{- if $secret.envVar }}
+          envVar: {{ $secret.envVar | quote }}
+          {{- end }}
+        {{- end }}
+        {{- else }}
+        {}
+        {{- end }}
+      providerApiKeys:
+        {{- if .Values.secrets.providerApiKeys }}
+        {{- range $provider, $secret := .Values.secrets.providerApiKeys }}
+        {{ $provider }}:
           secretKey: {{ $secret.secretKey | quote }}
           {{- if $secret.secretName }}
           secretName: {{ $secret.secretName | quote }}
