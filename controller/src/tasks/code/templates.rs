@@ -32,6 +32,8 @@ struct CliRenderSettings {
     sandbox_mode: String,
     project_doc_max_bytes: u64,
     reasoning_effort: Option<String>,
+    auto_level: Option<String>,
+    output_format: Option<String>,
     editor_vim_mode: bool,
     toolman_url: String,
     model_provider: Value,
@@ -482,6 +484,8 @@ impl CodeTemplateGenerator {
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "workflow_name": workflow_name,
             "model": render_settings.model,
+            "auto_level": render_settings.auto_level,
+            "output_format": render_settings.output_format,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
                 "model": render_settings.model,
@@ -580,6 +584,7 @@ impl CodeTemplateGenerator {
             "project_doc_max_bytes": render_settings.project_doc_max_bytes,
             "editor_vim_mode": render_settings.editor_vim_mode,
             "reasoning_effort": render_settings.reasoning_effort,
+            "auto_level": render_settings.auto_level,
             "toolman": {
                 "url": render_settings.toolman_url,
                 "tools": remote_tools,
@@ -975,6 +980,20 @@ impl CodeTemplateGenerator {
             .or_else(|| settings.get("modelReasoningEffort").and_then(Value::as_str))
             .map(|s| s.to_string());
 
+        let auto_level = settings
+            .get("autoLevel")
+            .and_then(Value::as_str)
+            .or_else(|| cli_config.get("autoLevel").and_then(Value::as_str))
+            .map(|value| value.to_string())
+            .or_else(|| reasoning_effort.clone());
+
+        let output_format = settings
+            .get("outputFormat")
+            .or_else(|| settings.get("output_format"))
+            .or_else(|| cli_config.get("outputFormat"))
+            .and_then(Value::as_str)
+            .map(|value| value.to_string());
+
         let editor_vim_mode = settings
             .get("editor")
             .and_then(Value::as_object)
@@ -1054,6 +1073,8 @@ impl CodeTemplateGenerator {
             sandbox_mode,
             project_doc_max_bytes,
             reasoning_effort,
+            auto_level,
+            output_format,
             editor_vim_mode,
             toolman_url,
             model_provider,

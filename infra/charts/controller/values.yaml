@@ -34,6 +34,9 @@ agent:
     cursor:
       repository: ghcr.io/5dlabs/cursor
       tag: "latest"
+    factory:
+      repository: ghcr.io/5dlabs/factory
+      tag: "latest"
 
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""

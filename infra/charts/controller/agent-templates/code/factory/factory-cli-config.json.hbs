@@ -8,7 +8,7 @@
   },
   "autoRun": {
     "enabled": true,
-    "level": "{{#if reasoning_effort}}{{reasoning_effort}}{{else}}high{{/if}}"
+    "level": "{{#if auto_level}}{{auto_level}}{{else if reasoning_effort}}{{reasoning_effort}}{{else}}high{{/if}}"
   },
   "specificationMode": {
     "default": true
@@ -50,6 +50,6 @@
       }
     }
   }{{#if raw_additional_json}},
-  {{raw_additional_json}}
+  {{{raw_additional_json}}}
   {{/if}}
 }
