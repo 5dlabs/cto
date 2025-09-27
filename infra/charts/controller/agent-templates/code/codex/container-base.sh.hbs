@@ -632,34 +632,6 @@ rm -f /tmp/toolman-ping.log
 echo "✓ Toolman endpoint reachable"
 
 # Refresh Toolman remote tools so the MCP client sees the full catalog (Codex filters aggressively)
-if command -v jq >/dev/null 2>&1; then
-  echo "🔄 Syncing Toolman tool catalog into client-config.json"
-  if TOOLMAN_RESPONSE=$(curl -s -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
-    "$TOOLMAN_URL"); then
-    if echo "$TOOLMAN_RESPONSE" | jq -e '.result.tools?' >/dev/null 2>&1; then
-      TOOLMAN_TOOLS_JSON=$(echo "$TOOLMAN_RESPONSE" | jq '[.result.tools[].name] // []')
-      if [ "$(echo "$TOOLMAN_TOOLS_JSON" | jq 'length')" -gt 0 ]; then
-        TMP_CLIENT_CFG=$(mktemp)
-        jq --argjson discovered "$TOOLMAN_TOOLS_JSON" '
-          .remoteTools = ((.remoteTools // []) + $discovered)
-            | map(select(type == "string"))
-            | unique
-        ' "$CODEX_WORK_DIR/client-config.json" > "$TMP_CLIENT_CFG" && mv "$TMP_CLIENT_CFG" "$CODEX_WORK_DIR/client-config.json"
-        echo "✓ Updated client-config.json with $(echo "$TOOLMAN_TOOLS_JSON" | jq 'length') Toolman tools"
-      else
-        echo "⚠️ Toolman response did not include any tools; keeping existing client-config.json"
-      fi
-    else
-      echo "⚠️ Unable to parse Toolman response; skipping tool merge"
-    fi
-  else
-    echo "⚠️ Failed to query Toolman server; skipping tool merge"
-  fi
-else
-  echo "⚠️ jq not available; skipping Toolman tool merge"
-fi
-
 if [ -z "${OPENAI_API_KEY:-}" ]; then
   echo "❌ OPENAI_API_KEY is not set; Codex cannot authenticate"
   exit 1
@@ -692,7 +664,7 @@ if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
 
 if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"

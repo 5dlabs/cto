@@ -636,6 +636,9 @@ impl<'a> CodeResourceManager<'a> {
 
         // Select image based on CLI type (if specified) or fallback to default
         let image = self.select_image_for_cli(code_run)?;
+        let cli_type_str = cli_type.to_string();
+        let cli_model = code_run.spec.model.clone();
+        let container_name = Self::container_name_for_cli(&cli_type, &cli_model);
 
         // Resolve CLI-specific API key binding (env var + secret reference)
         let provider = self
@@ -710,6 +713,22 @@ impl<'a> CodeResourceManager<'a> {
                     }
                 }
             }),
+            json!({
+                "name": "CLI_TYPE",
+                "value": cli_type_str
+            }),
+            json!({
+                "name": "CLI_MODEL",
+                "value": cli_model
+            }),
+            json!({
+                "name": "CLI_CONTAINER_NAME",
+                "value": container_name.clone()
+            }),
+            json!({
+                "name": "MCP_CLIENT_CONFIG",
+                "value": "/workspace/client-config.json"
+            }),
         ];
 
         // Comprehensive deduplication: remove all duplicates by name, keeping the last occurrence
@@ -767,7 +786,7 @@ impl<'a> CodeResourceManager<'a> {
 
         // Build the job spec with environment configuration
         let mut container_spec = json!({
-            "name": "claude-code",
+            "name": container_name,
             "image": image,
             "env": final_env_vars,
             "command": ["/bin/bash"],
@@ -1084,6 +1103,8 @@ impl<'a> CodeResourceManager<'a> {
 
     fn create_task_labels(&self, code_run: &CodeRun) -> BTreeMap<String, String> {
         let mut labels = BTreeMap::new();
+        let cli_type = Self::code_run_cli_type(code_run);
+        let container_label = Self::container_name_for_cli(&cli_type, &code_run.spec.model);
 
         // Update legacy orchestrator label to controller
         labels.insert("app".to_string(), "controller".to_string());
@@ -1119,6 +1140,20 @@ impl<'a> CodeResourceManager<'a> {
         labels.insert(
             "service".to_string(),
             self.sanitize_label_value(&code_run.spec.service),
+        );
+        labels.insert(
+            "cli-type".to_string(),
+            self.sanitize_label_value(&cli_type.to_string()),
+        );
+        if !code_run.spec.model.trim().is_empty() {
+            labels.insert(
+                "cli-model".to_string(),
+                self.sanitize_label_value(&code_run.spec.model),
+            );
+        }
+        labels.insert(
+            "cli-container".to_string(),
+            self.sanitize_label_value(&container_label),
         );
 
         labels
@@ -1265,6 +1300,58 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         sanitized
+    }
+
+    fn container_name_for_cli(cli_type: &CLIType, model: &str) -> String {
+        let mut name = cli_type.to_string();
+
+        if !model.trim().is_empty() {
+            let sanitized_model: String = model
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_lowercase() || c.is_ascii_digit() {
+                        c
+                    } else if c.is_ascii_uppercase() {
+                        c.to_ascii_lowercase()
+                    } else if c == '-' {
+                        '-'
+                    } else {
+                        '-'
+                    }
+                })
+                .collect();
+
+            let sanitized_model = sanitized_model.trim_matches('-');
+            if !sanitized_model.is_empty() {
+                name.push('-');
+                name.push_str(sanitized_model);
+            }
+        }
+
+        let collapsed = name
+            .split('-')
+            .filter(|segment| !segment.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+
+        let mut final_name = if collapsed.is_empty() {
+            cli_type.to_string()
+        } else {
+            collapsed
+        };
+
+        if final_name.len() > 63 {
+            final_name.truncate(63);
+            while final_name.ends_with('-') {
+                final_name.pop();
+            }
+        }
+
+        if final_name.is_empty() {
+            "cli".to_string()
+        } else {
+            final_name
+        }
     }
 
     fn code_run_cli_type(code_run: &CodeRun) -> CLIType {
