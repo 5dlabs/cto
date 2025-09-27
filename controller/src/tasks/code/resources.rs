@@ -1308,16 +1308,11 @@ impl<'a> CodeResourceManager<'a> {
         if !model.trim().is_empty() {
             let sanitized_model: String = model
                 .chars()
-                .map(|c| {
-                    if c.is_ascii_lowercase() || c.is_ascii_digit() {
-                        c
-                    } else if c.is_ascii_uppercase() {
-                        c.to_ascii_lowercase()
-                    } else if c == '-' {
-                        '-'
-                    } else {
-                        '-'
-                    }
+                .map(|c| match c {
+                    'a'..='z' | '0'..='9' => c,
+                    'A'..='Z' => c.to_ascii_lowercase(),
+                    '-' => '-',
+                    _ => '-',
                 })
                 .collect();
 
