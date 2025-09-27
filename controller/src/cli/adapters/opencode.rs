@@ -107,10 +107,7 @@ impl OpenCodeAdapter {
             .cloned()
             .unwrap_or_else(|| json!({"name": DEFAULT_PROVIDER_NAME}));
 
-        let mut provider_map = provider
-            .as_object()
-            .cloned()
-            .unwrap_or_else(JsonMap::new);
+        let mut provider_map = provider.as_object().cloned().unwrap_or_else(JsonMap::new);
 
         provider_map
             .entry("name".to_string())
@@ -421,7 +418,10 @@ mod tests {
         let rendered = adapter.generate_config(&agent).await.unwrap();
         let parsed: Value = serde_json::from_str(&rendered).unwrap();
 
-        assert_eq!(parsed["model"].as_str().unwrap(), "anthropic/opencode-sonnet");
+        assert_eq!(
+            parsed["model"].as_str().unwrap(),
+            "anthropic/opencode-sonnet"
+        );
         assert_eq!(parsed["max_tokens"].as_u64().unwrap(), 16384);
         assert!((parsed["temperature"].as_f64().unwrap() - 0.65).abs() < 1e-6);
         assert_eq!(
