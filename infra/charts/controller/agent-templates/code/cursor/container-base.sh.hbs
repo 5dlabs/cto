@@ -30,6 +30,9 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 CURSOR_RUNTIME_BIN="/tmp/cursor-agent-bin"
+CURSOR_AGENT_ROOT="/usr/local/lib/cursor-agent"
+CURSOR_AGENT_ENTRY="$CURSOR_AGENT_ROOT/index.js"
+
 mkdir -p "$CURSOR_RUNTIME_BIN"
 cat >"$CURSOR_RUNTIME_BIN/cursor-agent" <<'WRAPPER'
 #!/bin/bash
@@ -41,7 +44,15 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 NODE_BIN="$(command -v node)"
-exec "$NODE_BIN" /usr/local/bin/index.js "$@"
+CURSOR_AGENT_ROOT="/usr/local/lib/cursor-agent"
+CURSOR_AGENT_ENTRY="$CURSOR_AGENT_ROOT/index.js"
+
+if [ ! -f "$CURSOR_AGENT_ENTRY" ]; then
+  echo "❌ Cursor agent entrypoint not found at $CURSOR_AGENT_ENTRY"
+  exit 1
+fi
+
+exec "$NODE_BIN" "$CURSOR_AGENT_ENTRY" "$@"
 WRAPPER
 chmod +x "$CURSOR_RUNTIME_BIN/cursor-agent"
 export PATH="$CURSOR_RUNTIME_BIN:$PATH"
