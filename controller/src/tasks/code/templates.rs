@@ -201,7 +201,7 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
-        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
         let model = render_settings.model.clone();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
