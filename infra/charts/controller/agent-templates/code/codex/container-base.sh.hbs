@@ -564,6 +564,38 @@ if [ ! -f "$CODEX_WORK_DIR/client-config.json" ]; then
   exit 1
 fi
 
+echo "=== MCP CLIENT CONFIG ==="
+WORKSPACE_CFG="$CODEX_WORK_DIR/client-config.json"
+SOURCE_CFG="/task-files/client-config.json"
+
+is_valid_cfg() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e 'type=="object" and length>=0' "$path" >/dev/null 2>&1
+  else
+    [ -s "$path" ]
+  fi
+}
+
+if is_valid_cfg "$WORKSPACE_CFG"; then
+  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Using workspace MCP client config: $MCP_CLIENT_CONFIG"
+elif is_valid_cfg "$SOURCE_CFG"; then
+  cp "$SOURCE_CFG" "$WORKSPACE_CFG"
+  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Restored workspace MCP client config from source: $MCP_CLIENT_CONFIG"
+else
+  echo "❌ No valid MCP client config available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace contents preview:"; head -c 200 "$WORKSPACE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source contents preview:"; head -c 200 "$SOURCE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  exit 1
+fi
+
 mkdir -p "$HOME/.codex"
 if [ -f /task-files/codex-config.toml ]; then
   cp /task-files/codex-config.toml "$HOME/.codex/config.toml"
