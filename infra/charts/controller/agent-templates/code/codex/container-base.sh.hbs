@@ -584,9 +584,18 @@ guard_rm() {
     fi
   fi
 
-  command rm "$@"
+  return 0
 }
-alias rm='guard_rm'
+
+rm() {
+  if guard_rm "$@"; then
+    command rm "$@"
+  else
+    return 1
+  fi
+}
+
+export -f guard_rm rm
 
 if [ ! -f "$CODEX_WORK_DIR/client-config.json" ]; then
   echo "❌ client-config.json missing from workspace; required for MCP/toolman"
