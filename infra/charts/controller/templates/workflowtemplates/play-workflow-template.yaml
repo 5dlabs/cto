@@ -305,6 +305,14 @@ spec:
                   value: "waiting-pr-created"
                 - name: verify-update
                   value: "true"
+        - - name: wait-for-pr-created
+            template: suspend-for-event
+            arguments:
+              parameters:
+                - name: event-type
+                  value: "pr-created"
+                - name: stage-name
+                  value: "waiting-pr-created"
         - - name: quality-work
             template: agent-coderun
             arguments:
@@ -333,6 +341,14 @@ spec:
                   value: "waiting-ready-for-qa"
                 - name: verify-update
                   value: "true"
+        - - name: wait-for-ready-for-qa
+            template: suspend-for-event
+            arguments:
+              parameters:
+                - name: event-type
+                  value: "ready-for-qa"
+                - name: stage-name
+                  value: "waiting-ready-for-qa"
         - - name: testing-work
             template: agent-coderun
             arguments:
