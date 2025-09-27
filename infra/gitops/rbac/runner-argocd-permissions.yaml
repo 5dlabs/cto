@@ -1,45 +1,8 @@
 ---
-# ClusterRole for GitHub Actions runners to update ArgoCD applications
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: github-runner-argocd-access
-rules:
-- apiGroups: ["argoproj.io"]
-  resources: ["applications"]
-  verbs: ["get", "list", "patch", "update"]
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list"]
-  resourceNames: ["argocd-initial-admin-secret"]
-
-  # Allow runners to manage Helm release secrets in target namespaces
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: [""]
-  resources: ["pods", "services", "deployments"]
-  verbs: ["get", "list", "watch"]
-
-# Allow runners to read cluster node information for diagnostics (e.g., kubectl cluster-info)
-- apiGroups: [""]
-  resources: ["nodes"]
-  verbs: ["get", "list", "watch"]
-
-# Allow runners to manage namespaces for environment setup via kubectl apply
-- apiGroups: [""]
-  resources: ["namespaces"]
-  verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "replicasets"]
-  verbs: ["get", "list", "watch"]
-
----
-# ClusterRoleBinding to grant permissions to the runner service account
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: github-runner-argocd-access
+  name: arc-runner-argocd-access
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
