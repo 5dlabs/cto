@@ -21,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.0
+
       - name: Regenerate agent templates ConfigMap
         run: ./scripts/generate-templates-configmap.sh
 
