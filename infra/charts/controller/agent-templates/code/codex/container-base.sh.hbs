@@ -696,6 +696,13 @@ CODEX_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
 
+SESSION_DIR="$HOME/.codex/sessions"
+RESUME_ARGS=()
+if [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
+  echo "ℹ️  Existing Codex sessions found; will resume most recent"
+  RESUME_ARGS=("resume" "--last")
+fi
+
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "🚀 Codex execution attempt $ATTEMPT/$MAX_RETRIES"
   LAST_MESSAGE_FILE="/tmp/codex-last-message-${ATTEMPT}.txt"
@@ -703,13 +710,18 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
 
   set +e
   set -o pipefail
-  codex exec \
-    --ask-for-approval never \
-    --dangerously-bypass-approvals-and-sandbox \
-    --skip-git-repo-check \
-    --output-last-message "$LAST_MESSAGE_FILE" \
-    --cd "$CODEX_WORK_DIR" \
-    "$PROMPT_CONTENT" | tee "$RUN_LOG"
+  CODEX_CMD=("codex" "--ask-for-approval" "never" "exec")
+  if [ ${#RESUME_ARGS[@]} -gt 0 ]; then
+    CODEX_CMD+=("${RESUME_ARGS[@]}")
+  fi
+  CODEX_CMD+=(
+    "--dangerously-bypass-approvals-and-sandbox"
+    "--skip-git-repo-check"
+    "--output-last-message" "$LAST_MESSAGE_FILE"
+    "--cd" "$CODEX_WORK_DIR"
+    "$PROMPT_CONTENT"
+  )
+  "${CODEX_CMD[@]}" | tee "$RUN_LOG"
   CODEX_EXIT=${PIPESTATUS[0]}
   set +o pipefail
   set -e
@@ -718,19 +730,23 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
   fi
 
+  # Ensure subsequent attempts reuse the active session
+  RESUME_ARGS=("resume" "--last")
+
   COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
   COMPLETION_LAST_MESSAGE="/tmp/codex-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/codex-completion-${ATTEMPT}.jsonl"
 
   set +e
   set -o pipefail
-  codex exec \
-    --ask-for-approval never \
-    --dangerously-bypass-approvals-and-sandbox \
-    --skip-git-repo-check \
-    --output-last-message "$COMPLETION_LAST_MESSAGE" \
-    --cd "$CODEX_WORK_DIR" \
-    "$COMPLETION_PROMPT" | tee "$COMPLETION_LOG"
+  COMPLETION_CMD=("codex" "--ask-for-approval" "never" "exec" "resume" "--last"
+    "--dangerously-bypass-approvals-and-sandbox"
+    "--skip-git-repo-check"
+    "--output-last-message" "$COMPLETION_LAST_MESSAGE"
+    "--cd" "$CODEX_WORK_DIR"
+    "$COMPLETION_PROMPT"
+  )
+  "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
   COMPLETION_EXIT=${PIPESTATUS[0]}
   set +o pipefail
   set -e
