@@ -596,6 +596,16 @@ else
   exit 1
 fi
 
+if [ -f "$WORKSPACE_CFG" ]; then
+  cp "$WORKSPACE_CFG" "/workspace/client-config.json" 2>/dev/null || true
+  if command -v jq >/dev/null 2>&1; then
+    echo "[client-config] summary:"
+    if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$WORKSPACE_CFG" 2>/dev/null; then
+      echo "  (not valid JSON)"
+    fi
+  fi
+fi
+
 mkdir -p "$HOME/.codex"
 if [ -f /task-files/codex-config.toml ]; then
   cp /task-files/codex-config.toml "$HOME/.codex/config.toml"
@@ -774,17 +784,19 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
 
   set +e
   set -o pipefail
-  CODEX_CMD=("codex" "--ask-for-approval" "never" "exec")
-  if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
-    CODEX_CMD+=("${SESSION_FLAGS[@]}")
-  fi
-  CODEX_CMD+=(
+  CODEX_CMD=(
+    "codex"
+    "--ask-for-approval" "never"
+    "exec"
     "--dangerously-bypass-approvals-and-sandbox"
     "--skip-git-repo-check"
     "--output-last-message" "$LAST_MESSAGE_FILE"
     "--cd" "$CODEX_WORK_DIR"
-    "$PROMPT_PAYLOAD"
   )
+  if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
+    CODEX_CMD+=("${SESSION_FLAGS[@]}")
+  fi
+  CODEX_CMD+=("$PROMPT_PAYLOAD")
 
   if command -v timeout >/dev/null 2>&1; then
     timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" | tee "$RUN_LOG"
@@ -834,11 +846,15 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
 
   set +e
   set -o pipefail
-  COMPLETION_CMD=("codex" "--ask-for-approval" "never" "exec" "resume" "--last"
+  COMPLETION_CMD=(
+    "codex"
+    "--ask-for-approval" "never"
+    "exec"
     "--dangerously-bypass-approvals-and-sandbox"
     "--skip-git-repo-check"
     "--output-last-message" "$COMPLETION_LAST_MESSAGE"
     "--cd" "$CODEX_WORK_DIR"
+    "resume" "--last"
     "$COMPLETION_PROMPT"
   )
   "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"

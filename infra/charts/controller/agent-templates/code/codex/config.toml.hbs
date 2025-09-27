@@ -17,9 +17,13 @@ project_doc_max_bytes = {{project_doc_max_bytes}}
 command = "toolman"
 args = [
   "--url",
-  "{{toolman.url}}"
+  "{{toolman.url}}",
+  "--working-dir",
+  "/workspace"
 ]
 env = { "TOOLMAN_SERVER_URL" = "{{toolman.url}}" }
+startup_timeout_sec = 30
+tool_timeout_sec = 120
 {{#if toolman.tools}}
 # Remote tools available via Toolman: {{#each toolman.tools}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
 {{/if}}
