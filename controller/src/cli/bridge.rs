@@ -5,6 +5,9 @@
 
 use crate::cli::types::*;
 use async_trait::async_trait;
+use serde_json::json;
+use std::collections::HashSet;
+use std::env;
 
 /// Trait for CLI-specific configuration translators
 #[async_trait]
@@ -304,19 +307,126 @@ pub struct FactoryCLIAdapter;
 #[async_trait]
 impl CLIAdapter for FactoryCLIAdapter {
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
-        let factory_config = serde_json::json!({
-            "model": universal.settings.model,
-            "autoRun": { "enabled": true, "level": "high" },
-            "notes": "TODO(factory): populate CLI configuration",
+        let sandbox_mode = universal.settings.sandbox_mode.to_string();
+        let auto_level = match sandbox_mode.as_str() {
+            "danger-full-access" => "high",
+            "workspace-write" => "medium",
+            _ => "low",
+        };
+
+        let reasoning_effort = match auto_level {
+            "high" => Some("high"),
+            "medium" => Some("medium"),
+            _ => None,
+        };
+
+        let tool_names: HashSet<String> = universal
+            .tools
+            .iter()
+            .map(|tool| tool.name.clone())
+            .collect();
+
+        let mut mcp_servers_json = serde_json::Map::new();
+        let mut toolman_endpoint: Option<String> = None;
+
+        if let Some(mcp_config) = &universal.mcp_config {
+            for server in &mcp_config.servers {
+                if server.name.eq_ignore_ascii_case("toolman") {
+                    toolman_endpoint =
+                        server.env.get("TOOLMAN_SERVER_URL").cloned().or_else(|| {
+                            server
+                                .args
+                                .iter()
+                                .position(|arg| arg == "--url")
+                                .and_then(|idx| server.args.get(idx + 1).cloned())
+                        });
+                }
+
+                mcp_servers_json.insert(
+                    server.name.clone(),
+                    json!({
+                        "command": server.command,
+                        "args": server.args,
+                        "env": server.env,
+                    }),
+                );
+            }
+        }
+
+        let toolman_url = toolman_endpoint.unwrap_or_else(|| {
+            env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+                "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+            })
+        });
+
+        let tool_list: Vec<String> = {
+            let mut list: Vec<String> = tool_names.into_iter().collect();
+            list.sort();
+            list
+        };
+
+        let mut model_json = json!({
+            "default": universal.settings.model,
+            "temperature": universal.settings.temperature,
+            "maxOutputTokens": universal.settings.max_tokens,
+        });
+        if let Some(effort) = reasoning_effort {
+            model_json
+                .as_object_mut()
+                .expect("model json is object")
+                .insert("reasoningEffort".to_string(), json!(effort));
+        }
+
+        let factory_config = json!({
+            "version": 1,
+            "model": model_json,
+            "autoRun": {
+                "enabled": true,
+                "level": auto_level,
+            },
+            "specificationMode": {
+                "default": true,
+            },
+            "execution": {
+                "approvalPolicy": "never",
+                "sandboxMode": sandbox_mode,
+                "projectDocMaxBytes": 65536,
+            },
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)"],
+                "deny": []
+            },
+            "toolman": {
+                "endpoint": toolman_url,
+                "tools": tool_list,
+            },
+            "mcp": {
+                "servers": serde_json::Value::Object(mcp_servers_json)
+            }
         });
 
         let config_content = serde_json::to_string_pretty(&factory_config)
             .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
 
+        let project_permissions = json!({
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)"],
+                "deny": []
+            }
+        });
+
+        let project_permissions_content = serde_json::to_string_pretty(&project_permissions)
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
+
         let config_files = vec![
             ConfigFile {
-                path: "/workspace/.factory/cli.json".to_string(),
+                path: "/home/node/.factory/cli-config.json".to_string(),
                 content: config_content.clone(),
+                permissions: Some("0644".to_string()),
+            },
+            ConfigFile {
+                path: "/workspace/.factory/cli.json".to_string(),
+                content: project_permissions_content,
                 permissions: Some("0644".to_string()),
             },
             ConfigFile {
@@ -333,10 +443,20 @@ impl CLIAdapter for FactoryCLIAdapter {
         })
     }
 
-    async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
+    async fn generate_command(&self, task: &str, config: &UniversalConfig) -> Result<Vec<String>> {
+        let auto_level = match config.settings.sandbox_mode.as_str() {
+            "danger-full-access" => "high",
+            "workspace-write" => "medium",
+            _ => "low",
+        };
+
         Ok(vec![
             "droid".to_string(),
             "exec".to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
+            "--auto".to_string(),
+            auto_level.to_string(),
             task.to_string(),
         ])
     }
@@ -464,6 +584,8 @@ pub type Result<T> = std::result::Result<T, BridgeError>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
+    use std::collections::HashMap;
 
     #[tokio::test]
     async fn test_claude_adapter() {
@@ -631,7 +753,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_factory_adapter_placeholder() {
+    async fn test_factory_adapter_generates_config() {
         let adapter = FactoryCLIAdapter;
         let universal = UniversalConfig {
             context: ContextConfig {
@@ -640,11 +762,16 @@ mod tests {
                 architecture_notes: String::new(),
                 constraints: vec![],
             },
-            tools: vec![],
+            tools: vec![ToolDefinition {
+                name: "memory_create_entities".to_string(),
+                description: "Create memory entities".to_string(),
+                parameters: json!({}),
+                implementations: HashMap::new(),
+            }],
             settings: SettingsConfig {
-                model: "gpt-5-codex".to_string(),
-                temperature: 0.1,
-                max_tokens: 1000,
+                model: "gpt-5-factory-high".to_string(),
+                temperature: 0.42,
+                max_tokens: 64000,
                 timeout: 300,
                 sandbox_mode: "workspace-write".to_string(),
             },
@@ -653,21 +780,65 @@ mod tests {
                 capabilities: vec![],
                 instructions: "Factory instructions".to_string(),
             },
-            mcp_config: None,
+            mcp_config: Some(UniversalMCPConfig {
+                servers: vec![MCPServer {
+                    name: "toolman".to_string(),
+                    command: "toolman".to_string(),
+                    args: vec!["--url".to_string(), "http://localhost:3000/mcp".to_string()],
+                    env: HashMap::from([(
+                        String::from("TOOLMAN_SERVER_URL"),
+                        String::from("http://localhost:3000/mcp"),
+                    )]),
+                }],
+            }),
         };
 
         let result = adapter.to_cli_config(&universal).await.unwrap();
         assert!(result
             .config_files
             .iter()
-            .any(|f| f.path.ends_with(".factory/cli.json")));
+            .any(|f| f.path == "/home/node/.factory/cli-config.json"));
+        assert!(result
+            .config_files
+            .iter()
+            .any(|f| f.path == "/workspace/.factory/cli.json"));
+        assert!(result
+            .config_files
+            .iter()
+            .any(|f| f.path == "/workspace/AGENTS.md"));
         assert!(result.env_vars.contains(&"FACTORY_API_KEY".to_string()));
+
+        let parsed: Value = serde_json::from_str(&result.content).unwrap();
+        assert_eq!(
+            parsed
+                .get("model")
+                .and_then(|model| model.get("default"))
+                .and_then(Value::as_str)
+                .unwrap(),
+            "gpt-5-factory-high"
+        );
+        assert_eq!(
+            parsed
+                .get("autoRun")
+                .and_then(|auto| auto.get("level"))
+                .and_then(Value::as_str)
+                .unwrap(),
+            "medium"
+        );
+        let tool_list = parsed
+            .get("toolman")
+            .and_then(|toolman| toolman.get("tools"))
+            .and_then(Value::as_array)
+            .unwrap();
+        assert!(tool_list.contains(&Value::String("memory_create_entities".to_string())));
 
         let command = adapter
             .generate_command("implement feature", &universal)
             .await
             .unwrap();
         assert_eq!(command[0], "droid");
-        assert!(command.contains(&"exec".to_string()));
+        assert!(command.contains(&"--auto".to_string()));
+        assert!(command.contains(&"medium".to_string()));
+        assert!(command.contains(&"implement feature".to_string()));
     }
 }

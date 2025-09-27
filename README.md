@@ -479,7 +479,7 @@ docs({
 ```
 
 ### 2. **`code()` - Rex & Blaze in Action**
-Deploys an autonomous CLI agent (Claude or Codex, depending on configuration) to implement a specific task from your Task Master project.
+Deploys an autonomous CLI agent (Factory, Codex, or Claude, depending on configuration) to implement a specific task from your Task Master project.
 
 ```javascript
 // Minimal call - let Rex/Blaze work their magic!
@@ -538,7 +538,7 @@ play({
 ```
 
 **What the team does:**
-✅ **Phase 1 - Implementation**: Rex/Blaze agent implements the core functionality (Codex or Claude)  
+✅ **Phase 1 - Implementation**: Rex/Blaze agent implements the core functionality (Factory, Codex, or Claude)  
 ✅ **Phase 2 - Quality Assurance**: Cleo agent reviews, refactors, and improves the code (Claude)  
 ✅ **Phase 3 - Testing**: Tess agent creates comprehensive tests and validates the implementation (Claude)  
 ✅ **Event-Driven Coordination**: Each phase triggers the next automatically  
@@ -562,7 +562,7 @@ play({
 
 **Optional (with config defaults):**
 - `agent` - Agent name to use (defaults to `defaults.docs.githubApp` mapping)
-- `model` - Claude model to use (defaults to `defaults.docs.model`)
+- `model` - Model to use for the docs agent (defaults to `defaults.docs.model`)
 - `source_branch` - Source branch to work from (defaults to `defaults.docs.sourceBranch`)
 - `include_codebase` - Include existing codebase as context (defaults to `defaults.docs.includeCodebase`)
 
@@ -578,7 +578,7 @@ play({
 - `docs_project_directory` - Project directory within docs repository (defaults to `defaults.code.docsProjectDirectory`)
 - `working_directory` - Working directory within target repository (defaults to `defaults.code.workingDirectory`)
 - `agent` - Agent name for task assignment (defaults to `defaults.code.githubApp` mapping)
-- `model` - Claude model to use (defaults to `defaults.code.model`)
+- `model` - Model to use for the implementation agent (defaults to `defaults.code.model`)
 - `continue_session` - Whether to continue a previous session (defaults to `defaults.code.continueSession`)
 - `overwrite_memory` - Whether to overwrite CLAUDE.md memory file (defaults to `defaults.code.overwriteMemory`)
 - `env` - Environment variables to set in the container (object with key-value pairs)
@@ -597,7 +597,7 @@ play({
 - `implementation_agent` - Agent for implementation work (defaults to `defaults.play.implementationAgent`)
 - `quality_agent` - Agent for quality assurance (defaults to `defaults.play.qualityAgent`)
 - `testing_agent` - Agent for testing and validation (defaults to `defaults.play.testingAgent`)
-- `model` - Claude model to use for all agents (defaults to `defaults.play.model`)
+- `model` - Model to use for play-phase agents (defaults to `defaults.play.model`)
 
 ---
 
@@ -605,7 +605,7 @@ play({
 
 The platform uses a template system to customize agent behavior, settings, and prompts. Templates are Handlebars (`.hbs`) files rendered with task-specific data at runtime. Multi-CLI support lives alongside these templates so Claude, Codex, and future CLIs follow the same structure.
 
-**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). We ship presets for Claude (`claude-sonnet-4-20250514`) and Codex (`gpt-5-codex`), but any supported model for a CLI can be supplied via configuration.
+**Model Defaults**: Models are configured through `cto-config.json` defaults (and can be overridden via MCP parameters). We ship presets for Claude (`claude-sonnet-4-20250514`), Codex (`gpt-5-codex`), and Factory (`gpt-5-factory-high`), but any supported model for a CLI can be supplied via configuration.
 
 ### Template Architecture
 
@@ -626,6 +626,10 @@ All templates now live under `infra/charts/controller/agent-templates/` with CLI
   - Agents memory: `code/codex/agents.md.hbs`
   - Config: `code/codex/config.toml.hbs`
   - Container scripts: `code/codex/container*.sh.hbs`
+- **Factory**: `code/factory/**`
+  - Agents memory: `code/factory/agents*.md.hbs`
+  - Config: `code/factory/factory-cli-config.json.hbs`
+  - Container scripts: `code/factory/container*.sh.hbs`
 - **Shared assets**: `code/mcp.json.hbs`, `code/coding-guidelines.md.hbs`, and `code/github-guidelines.md.hbs`
 
 **Play Workflows**: Multi-agent orchestration with event-driven coordination

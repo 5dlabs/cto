@@ -22,9 +22,9 @@ This document captures the working agreement for bringing Factory’s `droid` CL
 | Templates | Handlebars under `agent-templates/code/<cli>/` with base + per-agent wrappers, config, MCP JSON | Same structure: create `factory` subtree mirroring Cursor (containers, agents docs, CLI configs) | Duplicate layout, reusing partials + shared logic (no hard-coded tool lists). |
 | Controller | `cursor.rs` adapter builds template context, passes model/approval/sandbox, writes CLI configs, mounts MCP | New `factory.rs` adapter replicates pattern and plumbs Factory-specific flags (auto-run, spec mode toggles as needed) | Use new `CliType::Factory` and extend enums in template selection + tests. |
 | Config delivery | ConfigMap built from `generate-agent-templates-configmap.sh` | Add Factory templates to same generator (just new files) | Already handled once templates exist; ensure file names conform to sort order. |
-| CLI invocation | Cursor container wraps binary, ensures Node shim, passes `--model`, `--print --force --output-format stream-json` | Factory script must pass the equivalents: identify `--auto-run`, `--non-interactive`, `--model <id>`, `--output json/stream` flags from docs | Confirm CLI syntax during binary inspection; update container wrappers accordingly. |
-| Completion probes | Cursor reruns CLI with summarised question | Implement same logic; confirm Factory supports stream output for quick yes/no (may use `--output text`). |
-| Secret injection | ExternalSecret supplies API key, exported as env var (Cursor: `CURSOR_API_KEY`) | Determine Factory’s token env (`FACTORY_API_KEY` or similar). Update `infra/charts/controller/templates/secret.yaml` + values to mount. |
+| CLI invocation | Cursor container wraps binary, ensures Node shim, passes `--model`, `--print --force --output-format stream-json` | Factory script must pass the equivalents: identify `--auto-run`, `--non-interactive`, `--model <id>`, `--output json/stream` flags from docs | ✅ Container now wires `droid exec --auto <level> --model <id> --output-format <format>` based on Helm + CLI config, with retries + completion probe. |
+| Completion probes | Cursor reruns CLI with summarised question | Implement same logic; confirm Factory supports stream output for quick yes/no (may use `--output text`). | ✅ Completion probe implemented via follow-up `droid exec --auto low --output-format text`. |
+| Secret injection | ExternalSecret supplies API key, exported as env var (Cursor: `CURSOR_API_KEY`) | Determine Factory’s token env (`FACTORY_API_KEY` or similar). Update `infra/charts/controller/templates/secret.yaml` + values to mount. | ✅ Helm values expose `cliApiKeys.factory.secretKey = FACTORY_API_KEY`; controller maps it automatically. |
 | Image build | Cursor image had Node path mismatch fixed via symlink + wrapper | Build `ghcr.io/5dlabs/factory:latest` based on upstream requirements. Expose binary at `/usr/local/bin`, include Node/Python if CLI scripts depend on them (docs mention spec mode requiring Node?). Validate via test pod before shipping. |
 | GitHub behavior | Auto PR logic, labels creation, workspace cleanup | Reuse same auto-PR script. Ensure instructions emphasise “never push to main”. |
 | RBAC/apply | ConfigMap updates handled via server-side apply + RBAC | No change. Just confirm runners can access config in `agent-platform`. |
@@ -41,6 +41,7 @@ Create the following under `infra/charts/controller/agent-templates/`:
     - Copy MCP config to `/workspace/.factory/mcp.json` or equivalent (confirm path).
     - Run droid with forced model + auto-run flags, log to `/tmp/factory-run-*.jsonl` (for debugging).
     - Implement retry loop + completion probe.
+    - Honour `outputFormat` and `autoLevel` from CLI config.
   - `container.sh.hbs`, `container-rex.sh.hbs`, `container-cleo.sh.hbs`, `container-tess.sh.hbs`, `container-rex-remediation.sh.hbs` – thin wrappers referencing the base partial with agent-specific banners/prompts.
   - `agents.md.hbs` + per-agent variants if Factory requires separate memos (check docs; may leverage spec mode instructions).
   - `factory-cli-config.json.hbs` – global CLI config template exposing:
