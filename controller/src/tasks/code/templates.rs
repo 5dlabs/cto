@@ -2317,7 +2317,7 @@ mod tests {
             AgentTools {
                 remote: vec![
                     "memory_create_entities".to_string(),
-                    "brave_search_brave_web_search".to_string(),
+                    "brave-search_brave_web_search".to_string(),
                 ],
                 local_servers: Some(servers),
             }
@@ -2356,7 +2356,7 @@ mod tests {
                 reasoning_effort: None,
                 tools: Some(agent_tools),
                 client_config: Some(serde_json::json!({
-                    "remoteTools": ["memory_create_entities", "brave_search_brave_web_search"],
+                    "remoteTools": ["memory_create_entities", "brave-search_brave_web_search"],
                     "localServers": {
                         "serverA": {
                             "command": "npx",
@@ -2381,7 +2381,7 @@ mod tests {
         let remote_tools = client_config["remoteTools"].as_array().unwrap();
         assert_eq!(remote_tools.len(), 2);
         assert!(remote_tools.contains(&serde_json::json!("memory_create_entities")));
-        assert!(remote_tools.contains(&serde_json::json!("brave_search_brave_web_search")));
+        assert!(remote_tools.contains(&serde_json::json!("brave-search_brave_web_search")));
 
         // Verify local servers (generic server names)
         let local_servers = client_config["localServers"].as_object().unwrap();

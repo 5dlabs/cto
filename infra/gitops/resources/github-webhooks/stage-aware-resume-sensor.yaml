@@ -172,7 +172,10 @@ spec:
                             }'
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n agent-platform
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            -p '{"spec":{"suspend":false}}'
 
                           echo "✅ Workflow resumed successfully"
                         else
@@ -251,7 +254,10 @@ spec:
                           echo "Found workflow at correct stage, resuming..."
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n agent-platform
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            -p '{"spec":{"suspend":false}}'
 
                           echo "✅ Workflow resumed successfully"
                         else
@@ -365,7 +371,10 @@ spec:
                             }'
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n agent-platform
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            -p '{"spec":{"suspend":false}}'
 
                           echo "✅ Workflow resumed successfully"
                         else
@@ -480,7 +489,10 @@ spec:
                             }'
 
                           # Resume the workflow
-                          argo resume $WORKFLOW_NAME -n agent-platform
+                          kubectl patch workflow $WORKFLOW_NAME \
+                            -n agent-platform \
+                            --type='merge' \
+                            -p '{"spec":{"suspend":false}}'
 
                           echo "✅ Workflow resumed successfully"
                         else
