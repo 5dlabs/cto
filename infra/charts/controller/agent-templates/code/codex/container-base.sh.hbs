@@ -564,6 +564,38 @@ if [ ! -f "$CODEX_WORK_DIR/client-config.json" ]; then
   exit 1
 fi
 
+echo "=== MCP CLIENT CONFIG ==="
+WORKSPACE_CFG="$CODEX_WORK_DIR/client-config.json"
+SOURCE_CFG="/task-files/client-config.json"
+
+is_valid_cfg() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e 'type=="object" and length>=0' "$path" >/dev/null 2>&1
+  else
+    [ -s "$path" ]
+  fi
+}
+
+if is_valid_cfg "$WORKSPACE_CFG"; then
+  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Using workspace MCP client config: $MCP_CLIENT_CONFIG"
+elif is_valid_cfg "$SOURCE_CFG"; then
+  cp "$SOURCE_CFG" "$WORKSPACE_CFG"
+  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
+  echo "✓ Restored workspace MCP client config from source: $MCP_CLIENT_CONFIG"
+else
+  echo "❌ No valid MCP client config available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
+  if [ -f "$WORKSPACE_CFG" ]; then
+    echo "   Workspace contents preview:"; head -c 200 "$WORKSPACE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  if [ -f "$SOURCE_CFG" ]; then
+    echo "   Source contents preview:"; head -c 200 "$SOURCE_CFG" 2>/dev/null || echo "   <unreadable>"
+  fi
+  exit 1
+fi
+
 mkdir -p "$HOME/.codex"
 if [ -f /task-files/codex-config.toml ]; then
   cp /task-files/codex-config.toml "$HOME/.codex/config.toml"
@@ -689,6 +721,12 @@ echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
+ORIGINAL_PROMPT="$PROMPT_CONTENT"
+PREVIOUS_MESSAGE_FILE=""
+TOKEN_LIMIT=${CODEX_TOKEN_LIMIT:-240000}
+CODEX_TIMEOUT=${CODEX_EXEC_TIMEOUT:-1800}
+RESET_SESSION_ON_RETRY=${CODEX_RESET_SESSION_ON_RETRY:-1}
+
 MAX_RETRIES=${CODEX_MAX_RETRIES:-5}
 ATTEMPT=1
 SUCCESS=0
@@ -708,30 +746,87 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   LAST_MESSAGE_FILE="/tmp/codex-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/codex-run-${ATTEMPT}.jsonl"
 
+  SESSION_FLAGS=()
+  if [ $ATTEMPT -eq 1 ] && [ ${#RESUME_ARGS[@]} -gt 0 ]; then
+    SESSION_FLAGS=("${RESUME_ARGS[@]}")
+  else
+    SESSION_FLAGS=()
+    if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
+      find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+    fi
+  fi
+
+  if [ $ATTEMPT -eq 1 ]; then
+    PROMPT_PAYLOAD="$ORIGINAL_PROMPT"
+  else
+    if [ -n "$PREVIOUS_MESSAGE_FILE" ] && [ -s "$PREVIOUS_MESSAGE_FILE" ]; then
+      PREVIOUS_SNIPPET=$(tail -n 40 "$PREVIOUS_MESSAGE_FILE" 2>/dev/null | sed 's/^/    /')
+    else
+      PREVIOUS_SNIPPET="    <no previous Codex summary available>"
+    fi
+    PROMPT_PAYLOAD="Continuing Task {{task_id}} for service {{service}} (attempt $ATTEMPT).
+
+Previous Codex summary:
+$PREVIOUS_SNIPPET
+
+Focus on unresolved work, avoid repeating completed steps, and progress toward completion."
+  fi
+
   set +e
   set -o pipefail
   CODEX_CMD=("codex" "--ask-for-approval" "never" "exec")
-  if [ ${#RESUME_ARGS[@]} -gt 0 ]; then
-    CODEX_CMD+=("${RESUME_ARGS[@]}")
+  if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
+    CODEX_CMD+=("${SESSION_FLAGS[@]}")
   fi
   CODEX_CMD+=(
     "--dangerously-bypass-approvals-and-sandbox"
     "--skip-git-repo-check"
     "--output-last-message" "$LAST_MESSAGE_FILE"
     "--cd" "$CODEX_WORK_DIR"
-    "$PROMPT_CONTENT"
+    "$PROMPT_PAYLOAD"
   )
-  "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+  else
+    "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+  fi
   CODEX_EXIT=${PIPESTATUS[0]}
   set +o pipefail
   set -e
+
+  if [ $CODEX_EXIT -eq 124 ]; then
+    echo "⏱️ Codex command exceeded ${CODEX_TIMEOUT}s timeout; terminating session"
+    pkill -f "codex" 2>/dev/null || true
+    PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
+    ATTEMPT=$((ATTEMPT + 1))
+    continue
+  fi
 
   if [ $CODEX_EXIT -ne 0 ]; then
     echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
   fi
 
-  # Ensure subsequent attempts reuse the active session
-  RESUME_ARGS=("resume" "--last")
+  # Ensure subsequent attempts start fresh unless we explicitly resume again
+  RESUME_ARGS=()
+
+  PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
+
+  if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ -f "$RUN_LOG" ]; then
+    LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" | tail -n1 | awk '{print $3}' | tr -d ',')
+    if [ -n "$LAST_TOKENS" ]; then
+      echo "📊 Codex tokens used this attempt: $LAST_TOKENS"
+      if [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ] 2>/dev/null; then
+        echo "⚠️ Token usage $LAST_TOKENS exceeds limit $TOKEN_LIMIT; forcing clean session before retry"
+        if [ -d "$SESSION_DIR" ]; then
+          find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+        fi
+        PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
+        ATTEMPT=$((ATTEMPT + 1))
+        continue
+      fi
+    fi
+  fi
 
   COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
   COMPLETION_LAST_MESSAGE="/tmp/codex-completion-${ATTEMPT}.txt"
