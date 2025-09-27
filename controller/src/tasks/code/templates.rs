@@ -1062,15 +1062,18 @@ impl CodeTemplateGenerator {
             .and_then(|editor| editor.get("vimMode").and_then(Value::as_bool))
             .unwrap_or(false);
 
-        let toolman_url = settings
+        let mut toolman_url = settings
             .get("toolmanUrl")
             .and_then(Value::as_str)
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string()
                 })
             });
+        if !toolman_url.ends_with('/') {
+            toolman_url.push('/');
+        }
 
         let model_provider = settings
             .get("modelProvider")
@@ -2316,7 +2319,7 @@ mod tests {
             AgentTools {
                 remote: vec![
                     "memory_create_entities".to_string(),
-                    "brave_web_search".to_string(),
+                    "brave_search_brave_web_search".to_string(),
                 ],
                 local_servers: Some(servers),
             }
@@ -2355,7 +2358,7 @@ mod tests {
                 reasoning_effort: None,
                 tools: Some(agent_tools),
                 client_config: Some(serde_json::json!({
-                    "remoteTools": ["memory_create_entities", "brave_web_search"],
+                    "remoteTools": ["memory_create_entities", "brave_search_brave_web_search"],
                     "localServers": {
                         "serverA": {
                             "command": "npx",
@@ -2380,7 +2383,7 @@ mod tests {
         let remote_tools = client_config["remoteTools"].as_array().unwrap();
         assert_eq!(remote_tools.len(), 2);
         assert!(remote_tools.contains(&serde_json::json!("memory_create_entities")));
-        assert!(remote_tools.contains(&serde_json::json!("brave_web_search")));
+        assert!(remote_tools.contains(&serde_json::json!("brave_search_brave_web_search")));
 
         // Verify local servers (generic server names)
         let local_servers = client_config["localServers"].as_object().unwrap();

@@ -117,9 +117,12 @@ impl CliAdapter for FactoryAdapter {
         let raw_additional_json = first_string(&settings, &["rawJson", "raw_json"]) // legacy & snake_case
             .map(|value| value.to_string());
 
-        let toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        let mut toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string()
         });
+        if !toolman_url.ends_with('/') {
+            toolman_url.push('/');
+        }
 
         let remote_tools = agent_config
             .tools
