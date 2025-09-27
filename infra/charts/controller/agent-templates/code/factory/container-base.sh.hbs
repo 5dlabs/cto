@@ -599,6 +599,34 @@ fi
 rm -f /tmp/toolman-ping.log
 echo "✓ Toolman endpoint reachable"
 
+if command -v jq >/dev/null 2>&1; then
+  echo "🔄 Syncing Toolman tool catalog into client-config.json"
+  if TOOLMAN_RESPONSE=$(curl -s -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+    "$TOOLMAN_URL"); then
+    if echo "$TOOLMAN_RESPONSE" | jq -e '.result.tools?' >/dev/null 2>&1; then
+      TOOLMAN_TOOLS_JSON=$(echo "$TOOLMAN_RESPONSE" | jq '[.result.tools[].name] // []')
+      if [ "$(echo "$TOOLMAN_TOOLS_JSON" | jq 'length')" -gt 0 ]; then
+        TMP_CLIENT_CFG=$(mktemp)
+        jq --argjson discovered "$TOOLMAN_TOOLS_JSON" '
+          .remoteTools = ((.remoteTools // []) + $discovered)
+            | map(select(type == "string"))
+            | unique
+        ' "$FACTORY_WORK_DIR/client-config.json" > "$TMP_CLIENT_CFG" && mv "$TMP_CLIENT_CFG" "$FACTORY_WORK_DIR/client-config.json"
+        echo "✓ Updated client-config.json with $(echo "$TOOLMAN_TOOLS_JSON" | jq 'length') Toolman tools"
+      else
+        echo "⚠️ Toolman response did not include any tools; keeping existing client-config.json"
+      fi
+    else
+      echo "⚠️ Unable to parse Toolman response; skipping tool merge"
+    fi
+  else
+    echo "⚠️ Failed to query Toolman server; skipping tool merge"
+  fi
+else
+  echo "⚠️ jq not available; skipping Toolman tool merge"
+fi
+
 if [ -z "${FACTORY_API_KEY:-}" ]; then
   echo "❌ FACTORY_API_KEY is not set; Factory cannot authenticate"
   exit 1
