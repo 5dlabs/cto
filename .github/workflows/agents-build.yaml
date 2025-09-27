@@ -168,6 +168,11 @@ jobs:
             file: ./infra/images/codex/Dockerfile
             version_type: npm
             version_pkg: "@openai/codex"
+          - id: cursor
+            image: cursor
+            context: ./infra/images/cursor
+            file: ./infra/images/cursor/Dockerfile
+            version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
 
