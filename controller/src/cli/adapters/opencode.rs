@@ -110,7 +110,7 @@ impl OpenCodeAdapter {
         let mut provider_map = provider
             .as_object()
             .cloned()
-            .unwrap_or_else(|| JsonMap::new());
+            .unwrap_or_else(JsonMap::new);
 
         provider_map
             .entry("name".to_string())
