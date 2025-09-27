@@ -559,6 +559,35 @@ if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$CODEX_WORK_DIR/.mcp.json"
 fi
 
+# Guard against destructive workspace cleanup
+guard_rm() {
+  if [ "$#" -ge 2 ]; then
+    local flags=()
+    local targets=()
+    for arg in "$@"; do
+      case "$arg" in
+        -*) flags+=("$arg") ;;
+        *) targets+=("$arg") ;;
+      esac
+    done
+
+    if printf '%s\n' "${flags[@]}" | grep -Eq '--|^-r.*-f|-f.*-r'; then
+      for target in "${targets[@]}"; do
+        [ -z "$target" ] && continue
+        local resolved
+        resolved=$(realpath -m "$target" 2>/dev/null || printf '%s' "$target")
+        if [ "$resolved" = "$CODEX_WORK_DIR" ] || [ "$resolved" = "/workspace" ]; then
+          echo "❌ Guard: destructive rm blocked (target=$target)" >&2
+          return 1
+        fi
+      done
+    fi
+  fi
+
+  command rm "$@"
+}
+alias rm='guard_rm'
+
 if [ ! -f "$CODEX_WORK_DIR/client-config.json" ]; then
   echo "❌ client-config.json missing from workspace; required for MCP/toolman"
   exit 1
@@ -567,6 +596,7 @@ fi
 echo "=== MCP CLIENT CONFIG ==="
 WORKSPACE_CFG="$CODEX_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
+TARGET_CFG="${MCP_CLIENT_CONFIG:-/workspace/client-config.json}"
 
 is_valid_cfg() {
   local path="$1"
@@ -579,12 +609,12 @@ is_valid_cfg() {
 }
 
 if is_valid_cfg "$WORKSPACE_CFG"; then
-  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
-  echo "✓ Using workspace MCP client config: $MCP_CLIENT_CONFIG"
+  cp "$WORKSPACE_CFG" "$TARGET_CFG"
+  echo "✓ Using MCP client config from workspace: $TARGET_CFG"
 elif is_valid_cfg "$SOURCE_CFG"; then
   cp "$SOURCE_CFG" "$WORKSPACE_CFG"
-  export MCP_CLIENT_CONFIG="$WORKSPACE_CFG"
-  echo "✓ Restored workspace MCP client config from source: $MCP_CLIENT_CONFIG"
+  cp "$SOURCE_CFG" "$TARGET_CFG"
+  echo "✓ Restored MCP client config from source: $TARGET_CFG"
 else
   echo "❌ No valid MCP client config available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
   if [ -f "$WORKSPACE_CFG" ]; then
@@ -596,11 +626,13 @@ else
   exit 1
 fi
 
-if [ -f "$WORKSPACE_CFG" ]; then
-  cp "$WORKSPACE_CFG" "/workspace/client-config.json" 2>/dev/null || true
+MCP_CLIENT_CONFIG="$TARGET_CFG"
+export MCP_CLIENT_CONFIG
+
+if [ -f "$MCP_CLIENT_CONFIG" ]; then
   if command -v jq >/dev/null 2>&1; then
     echo "[client-config] summary:"
-    if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$WORKSPACE_CFG" 2>/dev/null; then
+    if ! jq -r '"remoteTools=" + ((.remoteTools // []) | length | tostring) + ", localServers=" + ((.localServers // {} | keys) | join(","))' "$MCP_CLIENT_CONFIG" 2>/dev/null; then
       echo "  (not valid JSON)"
     fi
   fi
