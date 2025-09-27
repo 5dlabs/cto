@@ -11,9 +11,11 @@ use controller::tasks::template_paths::{
     CODE_CODEX_CONTAINER_TEMPLATE, CODE_CURSOR_AGENTS_TEMPLATE,
     CODE_CURSOR_CONTAINER_BASE_TEMPLATE, CODE_CURSOR_CONTAINER_TEMPLATE,
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
-    DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE, DOCS_CLAUDE_CONTAINER_TEMPLATE,
-    DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE, DOCS_CLAUDE_SETTINGS_TEMPLATE,
-    DOCS_CLAUDE_TOOLMAN_TEMPLATE,
+    CODE_FACTORY_AGENTS_TEMPLATE, CODE_FACTORY_CONTAINER_BASE_TEMPLATE,
+    CODE_FACTORY_CONTAINER_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
+    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, DOCS_CLAUDE_CLIENT_CONFIG_TEMPLATE,
+    DOCS_CLAUDE_CONTAINER_TEMPLATE, DOCS_CLAUDE_MEMORY_TEMPLATE, DOCS_CLAUDE_PROMPT_TEMPLATE,
+    DOCS_CLAUDE_SETTINGS_TEMPLATE, DOCS_CLAUDE_TOOLMAN_TEMPLATE,
 };
 use handlebars::Handlebars;
 use serde_json::json;
@@ -351,6 +353,124 @@ fn test_code_templates(
             let template_content = std::fs::read_to_string(&template_path)?;
             handlebars.register_template_string(template_name, &template_content)?;
             let result = handlebars.render(template_name, &cursor_data)?;
+            println!("    ✅ Rendered successfully ({} chars)", result.len());
+            for line in result.lines().take(3) {
+                println!("    │ {line}");
+            }
+            if result.lines().count() > 3 {
+                println!("    │ ... ({} total lines)", result.lines().count());
+            }
+            println!();
+        } else {
+            println!("  ⚠️  Template not found: {}", template_path.display());
+        }
+    }
+
+    let factory_data = json!({
+        "task_id": 42,
+        "service": "simple-api",
+        "repository_url": "https://github.com/5dlabs/cto",
+        "docs_repository_url": "https://github.com/5dlabs/cto-docs",
+        "docs_branch": "main",
+        "docs_project_directory": "_projects/simple-api",
+        "working_directory": "simple-api",
+        "continue_session": false,
+        "overwrite_memory": false,
+        "github_app": "5DLabs-Rex",
+        "workflow_name": "play-task-42-workflow",
+        "model": "gpt-5-factory",
+        "cli": {
+            "type": "factory",
+            "model": "gpt-5-factory",
+            "settings": json!({
+                "approvalPolicy": "never",
+                "sandboxMode": "danger-full-access",
+                "projectDocMaxBytes": 65536,
+                "reasoningEffort": "high",
+                "toolmanUrl": "http://toolman.test",
+                "editor": { "vimMode": true },
+                "modelProvider": {
+                    "name": "Factory",
+                    "baseUrl": "https://api.factory.ai/v1",
+                    "envKey": "FACTORY_API_KEY",
+                    "wireApi": "chat"
+                },
+                "rawJson": "{\"extra\":\"value\"}"
+            }),
+            "remote_tools": [
+                "memory_create_entities",
+                "rustdocs_query_rust_docs"
+            ]
+        },
+        "cli_config": {
+            "cliType": "factory",
+            "model": "gpt-5-factory",
+            "maxTokens": 64000,
+            "temperature": 0.5,
+            "reasoningEffort": "high",
+            "settings": json!({
+                "approvalPolicy": "never",
+                "sandboxMode": "danger-full-access",
+                "projectDocMaxBytes": 65536,
+                "reasoningEffort": "high",
+                "toolmanUrl": "http://toolman.test",
+                "editor": { "vimMode": true },
+                "modelProvider": {
+                    "name": "Factory",
+                    "baseUrl": "https://api.factory.ai/v1",
+                    "envKey": "FACTORY_API_KEY",
+                    "wireApi": "chat"
+                },
+                "rawJson": "{\"extra\":\"value\"}"
+            })
+        },
+        "temperature": 0.5,
+        "max_output_tokens": 64000,
+        "approval_policy": "never",
+        "sandbox_mode": "danger-full-access",
+        "project_doc_max_bytes": 65536,
+        "reasoning_effort": "high",
+        "editor_vim_mode": true,
+        "toolman": {
+            "url": "http://toolman.test",
+            "tools": [
+                "memory_create_entities",
+                "rustdocs_query_rust_docs"
+            ]
+        },
+        "client_config": {
+            "remoteTools": [
+                "memory_create_entities",
+                "rustdocs_query_rust_docs"
+            ],
+            "localServers": json!({})
+        }
+    });
+
+    let factory_base_template_path = template_dir.join(CODE_FACTORY_CONTAINER_BASE_TEMPLATE);
+    if factory_base_template_path.exists() {
+        let base_template_content = std::fs::read_to_string(&factory_base_template_path)?;
+        handlebars.register_partial("factory_container_base", base_template_content)?;
+    } else {
+        println!(
+            "  ⚠️  Factory base container partial missing: {}",
+            factory_base_template_path.display()
+        );
+    }
+
+    for template_name in [
+        CODE_FACTORY_CONTAINER_TEMPLATE,
+        CODE_FACTORY_AGENTS_TEMPLATE,
+        CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
+        CODE_FACTORY_PROJECT_CONFIG_TEMPLATE,
+    ] {
+        let template_path = template_dir.join(template_name);
+
+        if template_path.exists() {
+            println!("  Testing {template_name}...");
+            let template_content = std::fs::read_to_string(&template_path)?;
+            handlebars.register_template_string(template_name, &template_content)?;
+            let result = handlebars.render(template_name, &factory_data)?;
             println!("    ✅ Rendered successfully ({} chars)", result.len());
             for line in result.lines().take(3) {
                 println!("    │ {line}");

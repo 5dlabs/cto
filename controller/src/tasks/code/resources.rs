@@ -155,6 +155,7 @@ impl<'a> CodeResourceManager<'a> {
         if self.config.agent.input_bridge.enabled
             && cli_type != CLIType::Codex
             && cli_type != CLIType::Cursor
+            && cli_type != CLIType::Factory
         {
             let job_name = self.generate_job_name(code_run_ref);
             self.ensure_headless_service_exists(code_run_ref, &job_name)
@@ -780,6 +781,7 @@ impl<'a> CodeResourceManager<'a> {
         if self.config.agent.input_bridge.enabled
             && cli_type != CLIType::Codex
             && cli_type != CLIType::Cursor
+            && cli_type != CLIType::Factory
         {
             let input_bridge_image = format!(
                 "{}:{}",

@@ -173,6 +173,11 @@ jobs:
             context: ./infra/images/cursor
             file: ./infra/images/cursor/Dockerfile
             version_type: dir_hash
+          - id: factory
+            image: factory
+            context: ./infra/images/factory
+            file: ./infra/images/factory/Dockerfile
+            version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
 

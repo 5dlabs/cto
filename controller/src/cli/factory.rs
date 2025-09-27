@@ -4,7 +4,7 @@
 //! and dynamic adapter discovery.
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
-use crate::cli::adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter};
+use crate::cli::adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter};
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
 #[cfg(test)]
@@ -173,6 +173,10 @@ impl AdapterFactory {
 
         let cursor_adapter = Arc::new(CursorAdapter::new().await?);
         self.register_adapter(CLIType::Cursor, cursor_adapter)
+            .await?;
+
+        let factory_adapter = Arc::new(FactoryAdapter::new().await?);
+        self.register_adapter(CLIType::Factory, factory_adapter)
             .await?;
 
         Ok(())
@@ -529,6 +533,7 @@ mod tests {
             match self.cli_type {
                 CLIType::Claude => "CLAUDE.md",
                 CLIType::Codex => "AGENTS.md",
+                CLIType::Factory => "FACTORY.md",
                 _ => "MOCK.md",
             }
         }
@@ -537,6 +542,7 @@ mod tests {
             match self.cli_type {
                 CLIType::Claude => "claude",
                 CLIType::Codex => "codex",
+                CLIType::Factory => "droid",
                 _ => "mock",
             }
         }
@@ -579,10 +585,11 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 3);
+        assert_eq!(factory.get_supported_clis().len(), 4);
         assert!(factory.supports_cli(CLIType::Claude));
         assert!(factory.supports_cli(CLIType::Codex));
         assert!(factory.supports_cli(CLIType::Cursor));
+        assert!(factory.supports_cli(CLIType::Factory));
     }
 
     #[tokio::test]
@@ -599,7 +606,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 3);
+        assert_eq!(factory.get_supported_clis().len(), 4);
     }
 
     #[tokio::test]
@@ -656,7 +663,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 3);
+        assert_eq!(health_summary.len(), 4);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -684,8 +691,8 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 3);
-        assert_eq!(stats.healthy_adapters, 3);
+        assert_eq!(stats.total_adapters, 4);
+        assert_eq!(stats.healthy_adapters, 4);
         assert_eq!(stats.warning_adapters, 0);
         assert_eq!(stats.unhealthy_adapters, 0);
     }
