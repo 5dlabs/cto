@@ -410,6 +410,8 @@ secrets:
       secretKey: "OPENAI_API_KEY"
     cursor:
       secretKey: "CURSOR_API_KEY"
+    factory:
+      secretKey: "FACTORY_API_KEY"
   # Note: GitHub secrets (SSH keys + tokens) are managed externally per agent
   # See infra/scripts/setup-agent-secrets.sh for setup instructions
 

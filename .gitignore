@@ -11,6 +11,7 @@ node_modules/
 
 # Environment variables
 .env
+*.env
 
 # Agent secrets (SSH keys and tokens)
 agents/
@@ -92,6 +93,9 @@ sol.env
 
 # Cloudflare credentials
 cloudflare.env
+
+# Factory credentials
+factory.env
 
 # Charts repository (for local development)
 charts-repo/
