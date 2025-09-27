@@ -397,6 +397,7 @@ impl CLIExecutionAdapter {
                 "Creates cache directory at ~/.cache/opencode/".to_string(),
                 "Supports multiple AI providers".to_string(),
                 "Uses Bun runtime for execution".to_string(),
+                "Requires OPENAI_API_KEY environment variable".to_string(),
             ],
             CLIType::Factory => vec![
                 "AGENTS.md and factory-cli config files will be generated".to_string(),

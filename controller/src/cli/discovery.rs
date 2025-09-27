@@ -119,7 +119,7 @@ impl DiscoveryService {
             CLIType::OpenCode => Ok(CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/home/node/.config/opencode/config.json".to_string(),
-                required_env_vars: vec![],
+                required_env_vars: vec!["OPENAI_API_KEY".to_string()],
                 init_commands: vec![],
                 cleanup_commands: vec![],
             }),

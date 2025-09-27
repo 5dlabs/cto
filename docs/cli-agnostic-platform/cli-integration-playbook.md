@@ -11,6 +11,7 @@ This document captures the end-to-end checklist for introducing a new CLI into t
 - **Baseline research**
   - Scrape/collect the vendor documentation into `docs/<cli-name>/` for offline reference.
   - Identify authentication model (API key, OAuth, session token) and whether secrets can be reused from existing ExternalSecrets.
+  - Wire the new CLI into `infra/charts/controller/values.yaml` (`agent.cliProviders`, `secrets.cliApiKeys`, `secrets.providerApiKeys`) so BYOK mappings are in place from the start.
 - **Capabilities profile**
   - Update `controller/src/cli/discovery.rs` with the new CLI’s configuration format, required env vars, and capability matrix (`CLICapabilities`, `CLIConfiguration`).
   - Add the CLI to `CLIType` (`controller/src/cli/types.rs`) and ensure display/serde helpers cover the new variant.

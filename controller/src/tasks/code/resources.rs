@@ -638,7 +638,14 @@ impl<'a> CodeResourceManager<'a> {
         let image = self.select_image_for_cli(code_run)?;
 
         // Resolve CLI-specific API key binding (env var + secret reference)
-        let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type);
+        let provider = self
+            .config
+            .agent
+            .cli_providers
+            .get(&cli_type.to_string().to_lowercase())
+            .map(|value| value.as_str());
+
+        let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type, provider);
         let ResolvedSecretBinding {
             env_var: api_env_var,
             secret_name: api_secret_name,
@@ -1299,6 +1306,7 @@ impl<'a> CodeResourceManager<'a> {
         match new_code_run.spec.cli_config.as_mut() {
             Some(existing) => {
                 Self::merge_cli_config(existing, agent_cli_config);
+                self.apply_cli_provider(existing);
             }
             None => {
                 info!(
@@ -1306,6 +1314,9 @@ impl<'a> CodeResourceManager<'a> {
                     github_app, agent_cli_config.cli_type, agent_cli_config.model
                 );
                 new_code_run.spec.cli_config = Some(agent_cli_config.clone());
+                if let Some(existing) = new_code_run.spec.cli_config.as_mut() {
+                    self.apply_cli_provider(existing);
+                }
             }
         }
 
@@ -1330,6 +1341,16 @@ impl<'a> CodeResourceManager<'a> {
                 .settings
                 .entry(key.clone())
                 .or_insert_with(|| value.clone());
+        }
+    }
+
+    fn apply_cli_provider(&self, existing: &mut CLIConfig) {
+        let cli_key = existing.cli_type.to_string().to_lowercase();
+        if let Some(provider) = self.config.agent.cli_providers.get(&cli_key) {
+            existing
+                .settings
+                .entry("provider".to_string())
+                .or_insert_with(|| serde_json::Value::String(provider.clone()));
         }
     }
 

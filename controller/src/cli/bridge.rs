@@ -228,7 +228,7 @@ impl CLIAdapter for JsonCLIAdapter {
                 content: json_config,
                 permissions: Some("0644".to_string()),
             }],
-            env_vars: vec![], // OpenCode uses its own auth
+            env_vars: vec!["OPENAI_API_KEY".to_string()],
         })
     }
 
@@ -237,7 +237,7 @@ impl CLIAdapter for JsonCLIAdapter {
     }
 
     fn required_env_vars(&self) -> Vec<String> {
-        vec![] // OpenCode handles auth internally
+        vec!["OPENAI_API_KEY".to_string()]
     }
 
     fn cli_type(&self) -> CLIType {

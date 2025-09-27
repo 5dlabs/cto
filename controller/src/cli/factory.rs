@@ -4,7 +4,9 @@
 //! and dynamic adapter discovery.
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
-use crate::cli::adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter};
+use crate::cli::adapters::{
+    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, OpenCodeAdapter,
+};
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
 #[cfg(test)]
@@ -177,6 +179,10 @@ impl AdapterFactory {
 
         let factory_adapter = Arc::new(FactoryAdapter::new().await?);
         self.register_adapter(CLIType::Factory, factory_adapter)
+            .await?;
+
+        let opencode_adapter = Arc::new(OpenCodeAdapter::new().await?);
+        self.register_adapter(CLIType::OpenCode, opencode_adapter)
             .await?;
 
         Ok(())
@@ -585,11 +591,12 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 4);
+        assert_eq!(factory.get_supported_clis().len(), 5);
         assert!(factory.supports_cli(CLIType::Claude));
         assert!(factory.supports_cli(CLIType::Codex));
         assert!(factory.supports_cli(CLIType::Cursor));
         assert!(factory.supports_cli(CLIType::Factory));
+        assert!(factory.supports_cli(CLIType::OpenCode));
     }
 
     #[tokio::test]
@@ -606,7 +613,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 4);
+        assert_eq!(factory.get_supported_clis().len(), 5);
     }
 
     #[tokio::test]

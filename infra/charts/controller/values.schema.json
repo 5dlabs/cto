@@ -117,6 +117,12 @@
             }
           }
         },
+        "cliProviders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "inputBridge": {
           "type": "object",
           "properties": {
@@ -241,6 +247,18 @@
           "type": "string"
         },
         "cliApiKeys": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "secretKey": {"type": "string"},
+              "secretName": {"type": "string"},
+              "envVar": {"type": "string"}
+            },
+            "required": ["secretKey"]
+          }
+        },
+        "providerApiKeys": {
           "type": "object",
           "additionalProperties": {
             "type": "object",

@@ -23,7 +23,7 @@ pub use adapter::{
     ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
     ParsedResponse, ResponseMetadata, StreamingDelta, ToolCall,
 };
-pub use adapters::ClaudeAdapter;
+pub use adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, OpenCodeAdapter};
 pub use base_adapter::{AdapterConfig, AdapterMetrics, BaseAdapter};
 pub use factory::{AdapterFactory, FactoryConfig, FactoryStats};
 

@@ -37,7 +37,12 @@ agent:
     factory:
       repository: ghcr.io/5dlabs/factory
       tag: "latest"
-
+  cliProviders:
+    claude: anthropic
+    codex: openai
+    cursor: anthropic
+    factory: openai
+    opencode: openai
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
@@ -415,6 +420,13 @@ secrets:
       secretKey: "CURSOR_API_KEY"
     factory:
       secretKey: "FACTORY_API_KEY"
+    opencode:
+      secretKey: "OPENAI_API_KEY"
+  providerApiKeys:
+    anthropic:
+      secretKey: "ANTHROPIC_API_KEY"
+    openai:
+      secretKey: "OPENAI_API_KEY"
   # Note: GitHub secrets (SSH keys + tokens) are managed externally per agent
   # See infra/scripts/setup-agent-secrets.sh for setup instructions
 

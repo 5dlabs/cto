@@ -61,6 +61,10 @@ pub struct AgentConfig {
     #[serde(default, alias = "cliImages")]
     pub cli_images: HashMap<String, ImageConfig>,
 
+    /// CLI provider configuration (maps CLI type to provider identifier)
+    #[serde(default, rename = "cliProviders")]
+    pub cli_providers: HashMap<String, String>,
+
     /// Agent-specific CLI configurations (maps GitHub app names to default CLI configs)
     #[serde(default, rename = "agentCliConfigs")]
     pub agent_cli_configs: HashMap<String, CLIConfig>,
@@ -158,6 +162,10 @@ pub struct SecretsConfig {
     /// Optional CLI-specific secret overrides
     #[serde(default, rename = "cliApiKeys")]
     pub cli_api_keys: HashMap<String, CLISecretConfig>,
+
+    /// Provider-specific secret overrides
+    #[serde(default, rename = "providerApiKeys")]
+    pub provider_api_keys: HashMap<String, CLISecretConfig>,
 }
 
 /// CLI specific secret override configuration
@@ -186,7 +194,11 @@ pub struct ResolvedSecretBinding {
 
 impl SecretsConfig {
     /// Resolve the secret binding (env var + secret key/name) for a given CLI
-    pub fn resolve_cli_binding(&self, cli_type: &CLIType) -> ResolvedSecretBinding {
+    pub fn resolve_cli_binding(
+        &self,
+        cli_type: &CLIType,
+        provider: Option<&str>,
+    ) -> ResolvedSecretBinding {
         let cli_key = cli_type.to_string().to_lowercase();
 
         if let Some(override_cfg) = self.cli_api_keys.get(&cli_key) {
@@ -203,6 +215,24 @@ impl SecretsConfig {
                 secret_name,
                 secret_key: override_cfg.secret_key.clone(),
             };
+        }
+
+        if let Some(provider_key) = provider.map(|p| p.to_lowercase()) {
+            if let Some(provider_cfg) = self.provider_api_keys.get(&provider_key) {
+                let env_var = provider_cfg
+                    .env_var
+                    .clone()
+                    .unwrap_or_else(|| provider_cfg.secret_key.clone());
+                let secret_name = provider_cfg
+                    .secret_name
+                    .clone()
+                    .unwrap_or_else(|| self.api_key_secret_name.clone());
+                return ResolvedSecretBinding {
+                    env_var,
+                    secret_name,
+                    secret_key: provider_cfg.secret_key.clone(),
+                };
+            }
         }
 
         ResolvedSecretBinding {
@@ -532,6 +562,7 @@ impl Default for ControllerConfig {
             agent: AgentConfig {
                 image: default_agent_image(),
                 cli_images: HashMap::new(),
+                cli_providers: HashMap::new(),
                 agent_cli_configs: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
                 input_bridge: InputBridgeConfig {
@@ -560,6 +591,7 @@ impl Default for ControllerConfig {
                     );
                     overrides
                 },
+                provider_api_keys: HashMap::new(),
             },
             permissions: PermissionsConfig {
                 agent_tools_override: false,
@@ -749,10 +781,11 @@ cleanup:
             api_key_secret_name: "agent-platform-secrets".to_string(),
             api_key_secret_key: "ANTHROPIC_API_KEY".to_string(),
             cli_api_keys: HashMap::new(),
+            provider_api_keys: HashMap::new(),
         };
 
         // Default binding should return Anthropic settings
-        let claude_binding = secrets.resolve_cli_binding(&CLIType::Claude);
+        let claude_binding = secrets.resolve_cli_binding(&CLIType::Claude, None);
         assert_eq!(claude_binding.env_var, "ANTHROPIC_API_KEY");
         assert_eq!(claude_binding.secret_key, "ANTHROPIC_API_KEY");
         assert_eq!(claude_binding.secret_name, "agent-platform-secrets");
@@ -767,7 +800,7 @@ cleanup:
             },
         );
 
-        let codex_binding = secrets.resolve_cli_binding(&CLIType::Codex);
+        let codex_binding = secrets.resolve_cli_binding(&CLIType::Codex, None);
         assert_eq!(codex_binding.env_var, "OPENAI_API_KEY");
         assert_eq!(codex_binding.secret_key, "OPENAI_API_KEY");
         assert_eq!(codex_binding.secret_name, "agent-platform-secrets");

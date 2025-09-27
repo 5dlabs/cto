@@ -31,6 +31,11 @@ pub const CODE_FACTORY_AGENTS_TEMPLATE: &str = "code/factory/agents.md.hbs";
 pub const CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE: &str = "code/factory/factory-cli-config.json.hbs";
 pub const CODE_FACTORY_PROJECT_CONFIG_TEMPLATE: &str = "code/factory/factory-cli.json.hbs";
 
+// OpenCode code templates
+pub const CODE_OPENCODE_CONTAINER_BASE_TEMPLATE: &str = "code/opencode/container-base.sh.hbs";
+pub const CODE_OPENCODE_MEMORY_TEMPLATE: &str = "code/opencode/memory.md.hbs";
+pub const CODE_OPENCODE_CONFIG_TEMPLATE: &str = "code/opencode/config.json.hbs";
+
 // Claude docs templates
 pub const DOCS_CLAUDE_CONTAINER_TEMPLATE: &str = "docs/claude/container.sh.hbs";
 pub const DOCS_CLAUDE_MEMORY_TEMPLATE: &str = "docs/claude/memory.md.hbs";
