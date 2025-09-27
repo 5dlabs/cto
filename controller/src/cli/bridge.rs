@@ -353,14 +353,12 @@ impl CLIAdapter for FactoryCLIAdapter {
             }
         }
 
-        let mut toolman_url = toolman_endpoint.unwrap_or_else(|| {
+        let toolman_url = toolman_endpoint.unwrap_or_else(|| {
             env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string()
+                "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
             })
         });
-        if !toolman_url.ends_with('/') {
-            toolman_url.push('/');
-        }
+        let toolman_url = toolman_url.trim_end_matches('/').to_string();
 
         let tool_list: Vec<String> = {
             let mut list: Vec<String> = tool_names.into_iter().collect();
@@ -666,7 +664,7 @@ mod tests {
         let mut toolman_env = std::collections::HashMap::new();
         toolman_env.insert(
             "TOOLMAN_SERVER_URL".to_string(),
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string(),
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string(),
         );
 
         let universal = UniversalConfig {

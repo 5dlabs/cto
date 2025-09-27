@@ -64,12 +64,10 @@ impl ClaudeAdapter {
         let mut mcp_servers = json!({});
 
         // Get MCP server URL from environment variables (configurable, not hardcoded)
-        let mut toolman_url = std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string()
+        let toolman_url = std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
         });
-        if !toolman_url.ends_with('/') {
-            toolman_url.push('/');
-        }
+        let toolman_url = toolman_url.trim_end_matches('/').to_string();
 
         if let Some(tool_config) = tools {
             // Add remote tools (MCP servers) using a uniform Toolman invocation

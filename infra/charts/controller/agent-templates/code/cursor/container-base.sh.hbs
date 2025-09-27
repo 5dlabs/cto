@@ -665,12 +665,14 @@ fi
 MCP_CLIENT_CONFIG="$TARGET_CFG"
 export MCP_CLIENT_CONFIG
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp/"}
-TOOLMAN_URL="${TOOLMAN_URL%/}/"
-TOOLMAN_HEALTH_URL="${TOOLMAN_URL%/}"
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_HEALTH_URL"
-if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_HEALTH_URL" >/tmp/toolman-ping.log 2>&1; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_HEALTH_URL"
+TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLMAN_URL="${TOOLMAN_URL%/}"
+echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
+if ! curl -sSf --connect-timeout 2 --max-time 6 \
+  -X POST "$TOOLMAN_URL" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
   exit 1
