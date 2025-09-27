@@ -195,9 +195,12 @@ impl CliAdapter for CodexAdapter {
         let project_doc_max_bytes =
             first_u64(&cli_config, &["projectDocMaxBytes"]).unwrap_or(32_768);
 
-        let toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-            "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+        let mut toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+            "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string()
         });
+        if !toolman_url.ends_with('/') {
+            toolman_url.push('/');
+        }
 
         let toolman_tools = agent_config
             .tools

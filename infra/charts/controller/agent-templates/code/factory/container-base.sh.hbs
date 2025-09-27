@@ -590,10 +590,12 @@ if ! command -v toolman >/dev/null 2>&1; then
   exit 1
 fi
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_URL" >/tmp/toolman-ping.log 2>&1; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
+TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp/"}
+TOOLMAN_URL="${TOOLMAN_URL%/}/"
+TOOLMAN_HEALTH_URL="${TOOLMAN_URL%/}"
+echo "🔍 Checking Toolman endpoint: $TOOLMAN_HEALTH_URL"
+if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_HEALTH_URL" >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_HEALTH_URL"
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
   exit 1

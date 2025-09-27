@@ -58,8 +58,8 @@
       "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": [
-          "brave_web_search",
-          "context7_get_library_docs",
+          "brave_search_brave_web_search",
+          "context7_get-library-docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -78,8 +78,8 @@
       "model": "gpt-5-codex",
       "tools": {
         "remote": [
-          "brave_web_search",
-          "context7_get_library_docs",
+          "brave_search_brave_web_search",
+          "context7_get-library-docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -98,8 +98,8 @@
       "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": [
-          "brave_web_search",
-          "context7_get_library_docs",
+          "brave_search_brave_web_search",
+          "context7_get-library-docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -118,8 +118,8 @@
       "model": "claude-sonnet-4-20250514",
       "tools": {
         "remote": [
-          "brave_web_search",
-          "context7_get_library_docs",
+          "brave_search_brave_web_search",
+          "context7_get-library-docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -138,8 +138,8 @@
       "model": "gpt-5-codex",
       "tools": {
         "remote": [
-          "brave_web_search",
-          "context7_get_library_docs",
+          "brave_search_brave_web_search",
+          "context7_get-library-docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
           "agent_docs_opencode_query",
@@ -157,8 +157,8 @@
       "model": "gpt-5-codex",
       "tools": {
         "remote": [
-          "brave_web_search",
-          "context7_get_library_docs",
+          "brave_search_brave_web_search",
+          "context7_get-library-docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",

@@ -23,6 +23,11 @@ if command -v rustup >/dev/null 2>&1; then
   rustup default stable 2>/dev/null || true
 fi
 
+# Preemptively prune stale Rustup downloads to avoid Codex issuing bulk cleanup commands later
+if [ -d "$HOME/.rustup/downloads" ]; then
+  find "$HOME/.rustup/downloads" -mindepth 1 -delete 2>/dev/null || true
+fi
+
 echo "PATH: $PATH"
 
 # =========================================================================
@@ -559,7 +564,7 @@ if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$CODEX_WORK_DIR/.mcp.json"
 fi
 
-# Guard against destructive workspace cleanup
+# Guard against destructive workspace cleanup (workspace root, repository root, or Rustup cache)
 guard_rm() {
   if [ "$#" -ge 2 ]; then
     local flags=()
@@ -571,12 +576,28 @@ guard_rm() {
       esac
     done
 
-    if printf '%s\n' "${flags[@]}" | grep -Eq '--|^-r.*-f|-f.*-r'; then
+    local has_recursive=0
+    local has_force=0
+    for flag in "${flags[@]}"; do
+      case "$flag" in
+        -*)
+          [[ "$flag" == *r* || "$flag" == *R* ]] && has_recursive=1
+          [[ "$flag" == *f* || "$flag" == *F* ]] && has_force=1
+          ;;
+      esac
+    done
+
+    if ((has_recursive && has_force)); then
       for target in "${targets[@]}"; do
         [ -z "$target" ] && continue
+        local expanded="$target"
+        case "$target" in
+          ~*) expanded="${target/#\~/$HOME}" ;;
+        esac
         local resolved
-        resolved=$(realpath -m "$target" 2>/dev/null || printf '%s' "$target")
-        if [ "$resolved" = "$CODEX_WORK_DIR" ] || [ "$resolved" = "/workspace" ]; then
+        resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
+        if [ "$resolved" = "$CODEX_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||
+           [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
           echo "❌ Guard: destructive rm blocked (target=$target)" >&2
           return 1
         fi
@@ -661,10 +682,12 @@ if ! command -v toolman >/dev/null 2>&1; then
   exit 1
 fi
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_URL" >/tmp/toolman-ping.log 2>&1; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
+TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp/"}
+TOOLMAN_URL="${TOOLMAN_URL%/}/"
+TOOLMAN_HEALTH_URL="${TOOLMAN_URL%/}"
+echo "🔍 Checking Toolman endpoint: $TOOLMAN_HEALTH_URL"
+if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_HEALTH_URL" >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_HEALTH_URL"
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
   exit 1
