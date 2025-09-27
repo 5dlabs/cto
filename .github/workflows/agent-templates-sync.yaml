@@ -1,0 +1,33 @@
+name: Sync Agent Templates ConfigMap
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/charts/controller/agent-templates/**'
+      - 'infra/charts/controller/templates/agent-templates-static.yaml'
+      - 'scripts/generate-templates-configmap.sh'
+      - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
+
+jobs:
+  sync-configmap:
+    runs-on: [k8s-runner]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate agent templates ConfigMap
+        run: ./scripts/generate-templates-configmap.sh
+
+      - name: Apply ConfigMap to cluster
+        run: |
+          kubectl apply -n agent-platform -f infra/charts/controller/templates/agent-templates-static.yaml
+
+      - name: Restart controller deployment
+        run: |
+          kubectl rollout restart deployment/controller -n agent-platform
+          kubectl rollout status deployment/controller -n agent-platform --timeout=120s
