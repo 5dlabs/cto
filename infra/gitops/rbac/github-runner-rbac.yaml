@@ -8,11 +8,19 @@ rules:
   resources: ["applications"]
   verbs: ["get", "list", "patch", "update"]
 - apiGroups: [""]
-  resources: ["pods", "services", "nodes", "namespaces", "secrets", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
+  resources: ["secrets"]
+  resourceNames: ["argocd-initial-admin-secret"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources:
+    ["pods", "services", "nodes", "namespaces", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["apps"]
   resources: ["deployments", "replicasets"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list", "watch", "update", "patch"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
