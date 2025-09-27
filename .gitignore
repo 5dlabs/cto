@@ -93,6 +93,9 @@ sol.env
 # Cloudflare credentials
 cloudflare.env
 
+# Factory credentials
+factory.env
+
 # Charts repository (for local development)
 charts-repo/
 
