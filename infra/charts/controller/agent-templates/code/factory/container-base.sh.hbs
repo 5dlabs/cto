@@ -1,0 +1,782 @@
+#!/bin/bash
+set -euo pipefail
+
+# =========================================================================
+# Environment bootstrapping
+# =========================================================================
+
+{{#if agent_banner}}
+echo "{{agent_banner}}"
+{{else}}
+echo "🔧 Initialising Factory environment"
+{{/if}}
+
+if [ -f "$HOME/.cargo/env" ]; then
+  . "$HOME/.cargo/env"
+fi
+
+if [ -f "/root/.cargo/env" ]; then
+  . "/root/.cargo/env"
+fi
+
+if command -v rustup >/dev/null 2>&1; then
+  rustup default stable 2>/dev/null || true
+fi
+
+echo "PATH: $PATH"
+
+# =========================================================================
+# GitHub App authentication
+# =========================================================================
+
+REPO_URL="{{repository_url}}"
+
+if [ -z "${GITHUB_APP_PRIVATE_KEY:-}" ] || [ -z "${GITHUB_APP_ID:-}" ]; then
+  echo "❌ Missing GitHub App credentials"
+  exit 1
+fi
+
+echo "🔐 Authenticating with GitHub App"
+TEMP_KEY_FILE="/tmp/github-app-key.pem"
+printf '%b' "$GITHUB_APP_PRIVATE_KEY" >"$TEMP_KEY_FILE"
+chmod 600 "$TEMP_KEY_FILE"
+
+JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+NOW=$(date +%s)
+EXP=$((NOW + 600))
+JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+rm -f "$TEMP_KEY_FILE"
+
+parse_repo() {
+  local input="$1"
+  if echo "$input" | grep -qE '^https://github.com/'; then
+    echo "$input" | sed -E 's|https://github.com/([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  elif echo "$input" | grep -qE '^git@github.com:'; then
+    echo "$input" | sed -E 's|git@github.com:([^/]+)/([^/]+?)(\.git)?$|\1 \2|'
+  else
+    echo "$input" | sed -E 's|\.git$||' | sed -E 's|([^/]+)/([^/]+)|\1 \2|'
+  fi
+}
+
+read REPO_OWNER REPO_NAME <<<"$(parse_repo "$REPO_URL")"
+REPO_HTTP_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+
+INSTALLATION_ID=$(curl -s -L \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+fi
+
+if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+  echo "❌ Unable to resolve installation ID for $REPO_OWNER/$REPO_NAME"
+  exit 1
+fi
+
+GITHUB_TOKEN=$(curl -s -X POST \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+  echo "❌ Unable to obtain installation token"
+  exit 1
+fi
+
+export GITHUB_TOKEN
+export GH_TOKEN="$GITHUB_TOKEN"
+export GH_HOST="github.com"
+
+export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
+CREDENTIALS_FILE=/workspace/.git-credentials
+mkdir -p /workspace
+
+git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
+echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+
+TOKEN_GENERATED_AT=$(date +%s)
+
+refresh_github_token() {
+  echo "🔄 Refreshing GitHub App token..."
+
+  TEMP_KEY_FILE="/tmp/github-app-key-$$"
+  printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+  chmod 600 "$TEMP_KEY_FILE"
+
+  JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  NOW=$(date +%s)
+  EXP=$((NOW + 600))
+  JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+  JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+  rm -f "$TEMP_KEY_FILE"
+
+  NEW_INSTALLATION_ID=$(curl -s -L \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+  if [ "$NEW_INSTALLATION_ID" = "null" ] || [ -z "$NEW_INSTALLATION_ID" ]; then
+    NEW_INSTALLATION_ID=$(curl -s -L \
+      -H "Authorization: Bearer $JWT_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/orgs/$REPO_OWNER/installation" | jq -r '.id')
+  fi
+
+  TOKEN_RESPONSE=$(curl -s -X POST \
+    -H "Authorization: Bearer $JWT_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/app/installations/$NEW_INSTALLATION_ID/access_tokens")
+
+  NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+  if [ "$NEW_TOKEN" != "null" ] && [ -n "$NEW_TOKEN" ]; then
+    export GITHUB_TOKEN="$NEW_TOKEN"
+    export GH_TOKEN="$NEW_TOKEN"
+    TOKEN_GENERATED_AT=$(date +%s)
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+    echo "✅ Token refreshed"
+    return 0
+  fi
+
+  echo "❌ Failed to refresh token: $TOKEN_RESPONSE"
+  return 1
+}
+
+refresh_token_if_needed() {
+  if [ -z "$TOKEN_GENERATED_AT" ]; then
+    refresh_github_token
+    return
+  fi
+
+  NOW=$(date +%s)
+  TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+  if [ $TOKEN_AGE -gt 3000 ]; then
+    echo "🔄 Token age: $((TOKEN_AGE / 60)) minutes — refreshing"
+    refresh_github_token
+  fi
+}
+
+ensure_pr_created() {
+  if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
+    echo "⏭️  Auto PR creation disabled via SKIP_AUTO_PR=1"
+    return
+  fi
+
+  if [ ! -d .git ]; then
+    echo "⚠️ Repository not initialised; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI not available; skipping auto PR creation"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ jq not available; skipping auto PR creation"
+    return
+  fi
+
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "⚠️ GITHUB_TOKEN not set; skipping auto PR creation"
+    return
+  fi
+
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
+  if [ -z "$CURRENT_BRANCH" ]; then
+    echo "⚠️ Unable to determine current branch; skipping auto PR creation"
+    return
+  fi
+
+  PR_DATA=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>/dev/null || echo "[]")
+  if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
+    echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
+    return
+  fi
+
+  BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+  REMOTE_BASE="origin/$BASE_BRANCH"
+  if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+      BASE_BRANCH="master"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+      if [ -n "$DEFAULT_REMOTE" ]; then
+        BASE_BRANCH="$DEFAULT_REMOTE"
+        REMOTE_BASE="origin/$BASE_BRANCH"
+      else
+        REMOTE_BASE=""
+      fi
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  if [ -n "$BASE_BRANCH" ]; then
+    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  fi
+
+  if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
+    AUTO_BRANCH="task-{{task_id}}-{{service}}-$(date +%Y%m%d-%H%M%S)"
+    echo "⚠️ Branch $CURRENT_BRANCH unsuitable for PR; creating $AUTO_BRANCH"
+    if ! git checkout -B "$AUTO_BRANCH" >/dev/null 2>&1; then
+      echo "❌ Failed to create fallback branch $AUTO_BRANCH"
+      return
+    fi
+    CURRENT_BRANCH="$AUTO_BRANCH"
+  fi
+
+  git add .
+  if git diff --cached --quiet --exit-code; then
+    echo "ℹ️ No staged changes detected after auto-staging"
+  else
+    COMMIT_MSG="chore({{service}}): auto-commit for task {{task_id}}"
+    if ! git commit -m "$COMMIT_MSG" >/dev/null 2>&1; then
+      echo "⚠️ Failed to commit staged changes automatically"
+    else
+      echo "✅ Auto-committed staged changes"
+    fi
+  fi
+
+  if git rev-parse --verify --quiet "$CURRENT_BRANCH" >/dev/null 2>&1; then
+    refresh_token_if_needed || true
+    if ! git push -u origin "$CURRENT_BRANCH" >/dev/null 2>&1; then
+      echo "⚠️ Failed to push branch $CURRENT_BRANCH; skipping auto PR creation"
+      return
+    fi
+  else
+    echo "⚠️ Unable to verify branch $CURRENT_BRANCH; skipping auto PR creation"
+    return
+  fi
+
+  git fetch origin "$CURRENT_BRANCH" >/dev/null 2>&1 || true
+  if [ -n "$REMOTE_BASE" ]; then
+    AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+  else
+    AHEAD_COUNT=1
+  fi
+  if [ "${AHEAD_COUNT:-0}" -eq 0 ]; then
+    echo "⚠️ Branch $CURRENT_BRANCH has no commits ahead of $BASE_BRANCH; skipping PR creation"
+    return
+  fi
+
+  RUN_LABEL="run-{{workflow_name}}"
+  if [ "${RUN_LABEL#run-}" = "" ]; then
+    RUN_LABEL="run-unknown"
+  fi
+
+  TASK_LABEL="task-{{task_id}}"
+  SERVICE_LABEL="service-{{service}}"
+  REPO_SLUG="${REPO_OWNER}/${REPO_NAME}"
+
+  echo "🔍 Ensuring PR correlation labels exist"
+  for label in "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"; do
+    if [ -z "$label" ]; then
+      continue
+    fi
+
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      echo "   ✓ Label '$label' already exists"
+      continue
+    fi
+
+    case "$label" in
+      task-*) COLOR="f29513"; DESC="Task correlation" ;;
+      service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
+      run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
+      *) COLOR="ededed"; DESC="Automation label" ;;
+    esac
+
+    if gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
+      echo "   ✅ Created label '$label'"
+    else
+      echo "   ❌ Failed to create label '$label'"
+      cat /tmp/gh-label-create.log >&2 || true
+    fi
+    rm -f /tmp/gh-label-create.log
+  done
+
+  PR_TITLE="feat({{service}}): complete task {{task_id}}"
+  read -r -d '' PR_BODY <<'EOF' || true
+## Summary
+- Auto-generated fallback PR because the Factory agent finished without opening one
+- Task {{task_id}} for service {{service}} is ready for review
+
+## Metadata
+- Agent: {{github_app}}
+- Workflow: {{workflow_name}}
+- Branch: \\`$CURRENT_BRANCH\\` → \\`$BASE_BRANCH\\`
+
+_This PR was created automatically by the Factory container._
+EOF
+
+  LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
+
+  maybe_add_label() {
+    local label="$1"
+    if [ -z "$label" ]; then
+      return
+    fi
+    if gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
+      LABEL_ARGS+=("--label" "$label")
+    else
+      echo "⚠️ Label '$label' not found; skipping"
+    fi
+  }
+
+  maybe_add_label "$TASK_LABEL"
+  maybe_add_label "$SERVICE_LABEL"
+  maybe_add_label "$RUN_LABEL"
+
+  if gh pr create "${LABEL_ARGS[@]}"; then
+    echo "✅ Auto-created pull request for $CURRENT_BRANCH"
+  else
+    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+  fi
+}
+
+git config --global --add safe.directory /workspace
+GITHUB_APP="{{github_app}}"
+GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Factory CLI)"
+GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+
+git config --global user.name "$GIT_AUTHOR_NAME"
+git config --global user.email "$GIT_AUTHOR_EMAIL"
+export GIT_AUTHOR_NAME
+export GIT_AUTHOR_EMAIL
+export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# =========================================================================
+# Repository checkout
+# =========================================================================
+
+WORK_DIR="{{working_directory}}"
+if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  WORK_DIR="{{service}}"
+fi
+
+TARGET_DIR="/workspace/$WORK_DIR"
+mkdir -p "$TARGET_DIR"
+cd /workspace
+
+if [ -d "$REPO_NAME/.git" ]; then
+  echo "🔁 Repository already cloned, fetching latest"
+  cd "$REPO_NAME"
+  refresh_token_if_needed
+  git fetch --all --prune
+else
+  echo "⬇️  Cloning repository"
+  refresh_token_if_needed
+  git clone "$REPO_HTTP_URL"
+  cd "$REPO_NAME"
+fi
+
+REPO_ROOT="/workspace/$REPO_NAME"
+cd "$REPO_ROOT"
+
+echo "=== BRANCH SETUP ==="
+# Remove stale automation-managed files that block branch checkout when rerunning
+MANAGED_PATHS=(
+  ".mcp.json"
+  "AGENTS.md"
+  "client-config.json"
+  "coding-guidelines.md"
+  "github-guidelines.md"
+  "task"
+)
+
+for managed_path in "${MANAGED_PATHS[@]}"; do
+  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
+    continue
+  fi
+  if [ -e "$managed_path" ]; then
+    echo "🧹 Removing stale file to allow checkout: $managed_path"
+    rm -rf "$managed_path"
+  fi
+done
+
+BASE_BRANCH="${PR_BASE_BRANCH:-main}"
+REMOTE_BASE="origin/$BASE_BRANCH"
+
+if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+  # Fall back to origin/master or the remote HEAD if main is absent
+  if git show-ref --verify --quiet "refs/remotes/origin/master"; then
+    BASE_BRANCH="master"
+    REMOTE_BASE="origin/$BASE_BRANCH"
+  else
+    DEFAULT_REMOTE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    if [ -n "$DEFAULT_REMOTE" ]; then
+      BASE_BRANCH="$DEFAULT_REMOTE"
+      REMOTE_BASE="origin/$BASE_BRANCH"
+    else
+      REMOTE_BASE=""
+    fi
+  fi
+fi
+
+if [ -n "$BASE_BRANCH" ]; then
+  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+fi
+
+FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
+  echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  git checkout "$FEATURE_BRANCH"
+  if [ -n "$REMOTE_BASE" ]; then
+    echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
+    if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
+      echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; creating fresh branch from $REMOTE_BASE"
+      NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+      git checkout -B "$NEW_BRANCH" "$REMOTE_BASE"
+      FEATURE_BRANCH="$NEW_BRANCH"
+    fi
+  fi
+else
+  echo "Creating new feature branch '$FEATURE_BRANCH'"
+  if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
+    git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+  else
+    git checkout -b "$FEATURE_BRANCH"
+  fi
+fi
+
+git config --local user.name "$GIT_AUTHOR_NAME"
+git config --local user.email "$GIT_AUTHOR_EMAIL"
+git config --local push.autoSetupRemote true
+export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
+echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
+
+FACTORY_WORK_DIR="$REPO_ROOT"
+if [ "$WORK_DIR" != "$REPO_NAME" ]; then
+  FACTORY_WORK_DIR="$FACTORY_WORK_DIR/$WORK_DIR"
+  mkdir -p "$FACTORY_WORK_DIR"
+fi
+
+cd "$FACTORY_WORK_DIR"
+echo "✓ Working directory: $FACTORY_WORK_DIR"
+
+echo "📦 git status"
+refresh_token_if_needed
+git status --short || true
+
+# =========================================================================
+# Materialise task context
+# =========================================================================
+
+echo "🧱 Syncing task assets"
+mkdir -p "$FACTORY_WORK_DIR/task"
+mkdir -p "$FACTORY_WORK_DIR/.factory"
+mkdir -p "$HOME/.factory"
+cp -R /task-files/task/* "$FACTORY_WORK_DIR/task/" 2>/dev/null || true
+
+DOCS_REPO_URL="{{docs_repository_url}}"
+DOCS_BRANCH="{{docs_branch}}"
+DOCS_PROJECT_DIRECTORY="{{docs_project_directory}}"
+
+if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
+  refresh_token_if_needed
+  if [ -z "$DOCS_BRANCH" ] || [ "$DOCS_BRANCH" = "null" ]; then
+    DOCS_BRANCH="main"
+  fi
+
+  echo "📚 Syncing docs repository: $DOCS_REPO_URL (branch: $DOCS_BRANCH)"
+  DOCS_CLONE_DIR="/tmp/docs-repo"
+  rm -rf "$DOCS_CLONE_DIR"
+
+  read DOCS_OWNER DOCS_NAME <<<"$(parse_repo "$DOCS_REPO_URL")"
+  DOCS_HTTP_URL="https://github.com/${DOCS_OWNER}/${DOCS_NAME}.git"
+
+  if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+    echo "✓ Docs repository cloned"
+  else
+    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
+    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
+      echo "✓ Docs repository cloned using default branch"
+    else
+      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
+      DOCS_CLONE_DIR=""
+    fi
+  fi
+
+  if [ -n "$DOCS_CLONE_DIR" ]; then
+    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    fi
+
+    echo "🔍 Docs base path: $DOCS_BASE_PATH"
+    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+
+    if [ -d "$TASK_DIR" ]; then
+      echo "✓ Copying task definition from $TASK_DIR"
+      refresh_token_if_needed
+      cp -R "$TASK_DIR"/. "$FACTORY_WORK_DIR/task/" 2>/dev/null || true
+    else
+      echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
+    fi
+
+    if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
+      refresh_token_if_needed
+      cp "$DOCS_BASE_PATH/tasks.json" "$FACTORY_WORK_DIR/task/" 2>/dev/null || true
+    fi
+  fi
+else
+  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
+fi
+
+if [ -f /task-files/AGENTS.md ]; then
+  cp /task-files/AGENTS.md "$FACTORY_WORK_DIR/AGENTS.md"
+fi
+
+if [ -f /task-files/coding-guidelines.md ]; then
+  cp /task-files/coding-guidelines.md "$FACTORY_WORK_DIR/"
+  echo "✓ Copied coding-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/github-guidelines.md ]; then
+  cp /task-files/github-guidelines.md "$FACTORY_WORK_DIR/"
+  echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/client-config.json ]; then
+  cp /task-files/client-config.json "$FACTORY_WORK_DIR/"
+  echo "✓ Copied client-config.json to working directory"
+fi
+
+if [ -f /task-files/mcp.json ]; then
+  cp /task-files/mcp.json "$FACTORY_WORK_DIR/.mcp.json"
+fi
+
+if [ -f /task-files/factory-cli.json ]; then
+  mkdir -p "$FACTORY_WORK_DIR/.factory"
+  cp /task-files/factory-cli.json "$FACTORY_WORK_DIR/.factory/cli.json"
+  echo "✓ Installed project-level factory CLI permissions"
+else
+  echo "⚠️ factory-cli.json not provided; using default project permissions"
+fi
+
+if [ -f /task-files/factory-cli-config.json ]; then
+  mkdir -p "$HOME/.factory"
+  cp /task-files/factory-cli-config.json "$HOME/.factory/cli-config.json"
+  echo "✓ Installed global factory CLI config"
+else
+  echo "⚠️ factory-cli-config.json not provided; using existing global Factory config"
+fi
+
+if [ ! -f "$FACTORY_WORK_DIR/client-config.json" ]; then
+  echo "❌ client-config.json missing from workspace; required for MCP/toolman"
+  exit 1
+fi
+
+echo "=== MCP PRECHECKS ==="
+if ! command -v toolman >/dev/null 2>&1; then
+  echo "❌ 'toolman' CLI not found in PATH; required for MCP"
+  exit 1
+fi
+
+TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
+echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
+if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_URL" >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
+  cat /tmp/toolman-ping.log >&2 || true
+  rm -f /tmp/toolman-ping.log
+  exit 1
+fi
+rm -f /tmp/toolman-ping.log
+echo "✓ Toolman endpoint reachable"
+
+if [ -z "${FACTORY_API_KEY:-}" ]; then
+  echo "❌ FACTORY_API_KEY is not set; Factory cannot authenticate"
+  exit 1
+fi
+
+echo "🔑 Using provided FACTORY_API_KEY for authentication"
+
+if [ ! -f "$FACTORY_WORK_DIR/AGENTS.md" ]; then
+  echo "⚠️ AGENTS.md missing; creating placeholder"
+  cat <<'PLACEHOLDER' > "$FACTORY_WORK_DIR/AGENTS.md"
+# Project Guidance
+
+This Factory run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give Factory richer instructions.
+PLACEHOLDER
+fi
+
+# =========================================================================
+# Prompt assembly and Factory execution
+# =========================================================================
+
+PROMPT_PREFIX=""
+if [ -f "$FACTORY_WORK_DIR/task/toolman-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$FACTORY_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
+fi
+
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n\n---\n\n"
+
+if [ -f "$FACTORY_WORK_DIR/github-guidelines.md" ] || [ -f "$FACTORY_WORK_DIR/coding-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
+  if [ -f "$FACTORY_WORK_DIR/github-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md\n"
+  fi
+  if [ -f "$FACTORY_WORK_DIR/coding-guidelines.md" ]; then
+    PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md\n"
+  fi
+  PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
+fi
+
+if [ -f "$FACTORY_WORK_DIR/AGENTS.md" ]; then
+  if AGENT_GUIDANCE=$(jq -Rs @json "$FACTORY_WORK_DIR/AGENTS.md" 2>/dev/null); then
+    if [ "${#AGENT_GUIDANCE}" -gt 2 ]; then
+      AGENT_GUIDANCE=${AGENT_GUIDANCE:1:-1}
+      PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${AGENT_GUIDANCE}\n\n---\n\n"
+    fi
+  fi
+fi
+
+echo "🔍 DEBUG: About to check for prompt.md at: $FACTORY_WORK_DIR/task/prompt.md"
+echo "🔍 DEBUG: Contents of task directory:"
+ls -la "$FACTORY_WORK_DIR/task/" || echo "Task directory not found or empty"
+echo "🔍 DEBUG: Current working directory contents:"
+ls -la "$FACTORY_WORK_DIR/" || echo "Working directory not accessible"
+
+PROMPT_FILE="$FACTORY_WORK_DIR/task/prompt.md"
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "❌ prompt.md not found at $PROMPT_FILE"
+  exit 1
+fi
+
+echo "startingTask:{{task_id}}"
+echo ""
+
+PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+
+echo "🧾 Resolved prompt content (truncated to 2000 chars for log safety):"
+PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
+printf '%s\n' "$PROMPT_PREVIEW"
+PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
+echo "📏 Prompt size: $PROMPT_BYTES bytes"
+
+MAX_RETRIES=${FACTORY_MAX_RETRIES:-5}
+ATTEMPT=1
+SUCCESS=0
+FACTORY_EXIT=1
+LAST_MESSAGE_FILE=""
+RUN_LOG=""
+
+FORCE_WRITES="{{#if force_writes}}true{{else}}false{{/if}}"
+OUTPUT_FORMAT="{{#if output_format}}{{output_format}}{{else}}stream-json{{/if}}"
+
+AUTO_LEVEL="medium"
+if [ "${FORCE_WRITES,,}" = "true" ]; then
+  AUTO_LEVEL="high"
+fi
+
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
+  LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
+  RUN_LOG="/tmp/factory-run-${ATTEMPT}.jsonl"
+
+  FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
+  {{#if model}}
+  FACTORY_CMD+=("--model" "{{model}}")
+  {{/if}}
+  FACTORY_CMD+=("$PROMPT_CONTENT")
+
+  echo "🔧 droid exec invocation arguments (${#FACTORY_CMD[@]} entries):"
+  for idx in "${!FACTORY_CMD[@]}"; do
+    printf '    [%d] %s\n' "$idx" "${FACTORY_CMD[$idx]}"
+  done
+
+  set +e
+  set -o pipefail
+  "${FACTORY_CMD[@]}" | tee "$RUN_LOG"
+  FACTORY_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  if [ $FACTORY_EXIT -ne 0 ]; then
+    echo "⚠️ Factory exited with status $FACTORY_EXIT on attempt $ATTEMPT"
+  fi
+
+  if [ -s "$RUN_LOG" ]; then
+    RESULT_TEXT=$(jq -r 'select(.type == "result") | .result // empty' "$RUN_LOG" 2>/dev/null | tail -n1)
+    printf '%s\n' "$RESULT_TEXT" > "$LAST_MESSAGE_FILE"
+  else
+    : > "$LAST_MESSAGE_FILE"
+  fi
+
+  COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
+  COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
+  COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
+
+  COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "low" "$COMPLETION_PROMPT")
+
+  set +e
+  set -o pipefail
+  COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set +o pipefail
+  set -e
+
+  printf '%s\n' "$COMPLETION_OUTPUT" > "$COMPLETION_LAST_MESSAGE"
+  echo "🧭 Completion probe response:"
+  printf '%s\n' "$COMPLETION_OUTPUT"
+
+  if [ $COMPLETION_EXIT -ne 0 ]; then
+    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+  fi
+
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  if [ "$COMPLETION_RESPONSE" = "yes" ]; then
+    SUCCESS=1
+    break
+  fi
+
+  echo "⚠️ Factory reported task incomplete; retrying..."
+  ATTEMPT=$((ATTEMPT + 1))
+done
+
+if [ $SUCCESS -ne 1 ]; then
+  echo "⚠️ Factory did not confirm task completion after $MAX_RETRIES attempts"
+  EXIT_CODE=0
+else
+  EXIT_CODE=$FACTORY_EXIT
+fi
+
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔍 Verifying pull request status"
+  ensure_pr_created
+else
+  echo "⚠️ Skipping auto PR enforcement due to Factory completion status"
+fi
+
+touch /workspace/.agent_done 2>/dev/null || true
+
+if [ $SUCCESS -ne 1 ]; then
+  {{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+  {{else}}
+echo "⚠️ Factory execution incomplete"
+  {{/if}}
+  exit $EXIT_CODE
+fi
+
+{{#if agent_completion_message}}
+echo "{{agent_completion_message}}"
+{{else}}
+echo "✅ Factory execution complete"
+{{/if}}
+exit $EXIT_CODE

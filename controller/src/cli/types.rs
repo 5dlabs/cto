@@ -16,6 +16,8 @@ pub enum CLIType {
     OpenCode,
     /// Cursor Agent
     Cursor,
+    /// Factory Droid CLI
+    Factory,
     /// OpenHands
     OpenHands,
     /// Grok CLI
@@ -33,6 +35,7 @@ impl std::fmt::Display for CLIType {
             CLIType::Codex => write!(f, "codex"),
             CLIType::OpenCode => write!(f, "opencode"),
             CLIType::Cursor => write!(f, "cursor"),
+            CLIType::Factory => write!(f, "factory"),
             CLIType::OpenHands => write!(f, "openhands"),
             CLIType::Grok => write!(f, "grok"),
             CLIType::Gemini => write!(f, "gemini"),
@@ -51,6 +54,7 @@ impl CLIType {
             "codex" => Some(CLIType::Codex),
             "opencode" | "open-code" => Some(CLIType::OpenCode),
             "cursor" => Some(CLIType::Cursor),
+            "factory" => Some(CLIType::Factory),
             "openhands" | "open-hands" => Some(CLIType::OpenHands),
             "grok" => Some(CLIType::Grok),
             "gemini" => Some(CLIType::Gemini),
@@ -72,6 +76,7 @@ impl<'de> Deserialize<'de> for CLIType {
             "codex",
             "opencode",
             "cursor",
+            "factory",
             "openhands",
             "grok",
             "gemini",
@@ -93,11 +98,13 @@ mod tests {
         let codex_lower: CLIType = serde_json::from_str("\"codex\"").unwrap();
         let claude_mixed: CLIType = serde_json::from_str("\"ClAuDe\"").unwrap();
         let cursor_mixed: CLIType = serde_json::from_str("\"CuRsOr\"").unwrap();
+        let factory_mixed: CLIType = serde_json::from_str("\"FaCtOrY\"").unwrap();
 
         assert_eq!(codex_upper, CLIType::Codex);
         assert_eq!(codex_lower, CLIType::Codex);
         assert_eq!(claude_mixed, CLIType::Claude);
         assert_eq!(cursor_mixed, CLIType::Cursor);
+        assert_eq!(factory_mixed, CLIType::Factory);
     }
 
     #[test]

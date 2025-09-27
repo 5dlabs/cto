@@ -5,11 +5,13 @@
 pub mod claude;
 pub mod codex;
 pub mod cursor;
+pub mod factory;
 
 // Re-export adapter implementations
 pub use claude::ClaudeAdapter;
 pub use codex::CodexAdapter;
 pub use cursor::CursorAdapter;
+pub use factory::FactoryAdapter;
 
 pub mod opencode {
     //! OpenCode CLI adapter (placeholder for future task)

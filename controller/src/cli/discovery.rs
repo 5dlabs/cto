@@ -109,6 +109,13 @@ impl DiscoveryService {
                 init_commands: vec![],
                 cleanup_commands: vec![],
             }),
+            CLIType::Factory => Ok(CLIConfiguration {
+                config_format: ConfigFormat::JSON,
+                config_location: "/workspace/.factory/cli.json".to_string(),
+                required_env_vars: vec!["FACTORY_API_KEY".to_string()],
+                init_commands: vec![],
+                cleanup_commands: vec![],
+            }),
             CLIType::OpenCode => Ok(CLIConfiguration {
                 config_format: ConfigFormat::JSON,
                 config_location: "/home/node/.config/opencode/config.json".to_string(),
@@ -157,6 +164,15 @@ impl DiscoveryService {
                 supports_file_operations: true,
                 session_persistence: SessionType::Persistent,
             }),
+            CLIType::Factory => Ok(CLICapabilities {
+                max_context_window: 128_000,
+                supports_tools: true,
+                supports_vision: false,
+                supports_web_search: true,
+                supports_code_execution: true,
+                supports_file_operations: true,
+                session_persistence: SessionType::Persistent,
+            }),
             CLIType::OpenCode => Ok(CLICapabilities {
                 max_context_window: 128_000,
                 supports_tools: true,
@@ -197,6 +213,11 @@ impl DiscoveryService {
                 output_token_cost: 0.006,
                 free_tier_tokens: None,
             }),
+            CLIType::Factory => Ok(CostModel {
+                input_token_cost: 0.0015,
+                output_token_cost: 0.006,
+                free_tier_tokens: None,
+            }),
             CLIType::OpenCode => Ok(CostModel {
                 input_token_cost: 0.003,
                 output_token_cost: 0.015,
@@ -217,6 +238,7 @@ impl DiscoveryService {
             CLIType::Codex => ("codex", vec!["--version"]),
             CLIType::OpenCode => ("opencode", vec!["--version"]),
             CLIType::Cursor => ("cursor-agent", vec!["--version"]),
+            CLIType::Factory => ("droid", vec!["--version"]),
             CLIType::OpenHands => (
                 "python3",
                 vec!["-c", "import openhands; print(openhands.__version__)"],

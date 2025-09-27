@@ -398,6 +398,11 @@ impl CLIExecutionAdapter {
                 "Supports multiple AI providers".to_string(),
                 "Uses Bun runtime for execution".to_string(),
             ],
+            CLIType::Factory => vec![
+                "AGENTS.md and factory-cli config files will be generated".to_string(),
+                "Requires FACTORY_API_KEY environment variable".to_string(),
+                "Supports droid exec auto-run levels for headless workflows".to_string(),
+            ],
             _ => vec!["CLI execution will use default settings".to_string()],
         }
     }
@@ -442,6 +447,15 @@ impl CommandBuilder {
                     task.to_string(),
                 ]
             }
+            CLIType::Factory => {
+                let mut cmd = vec!["droid".to_string(), "exec".to_string()];
+                if auto_mode {
+                    cmd.push("--auto".to_string());
+                    cmd.push("high".to_string());
+                }
+                cmd.push(task.to_string());
+                cmd
+            }
             CLIType::OpenCode => {
                 vec!["opencode".to_string(), task.to_string()]
             }
@@ -457,6 +471,7 @@ impl CommandBuilder {
             CLIType::Codex => vec!["codex".to_string(), "--version".to_string()],
             CLIType::Cursor => vec!["cursor-agent".to_string(), "--version".to_string()],
             CLIType::OpenCode => vec!["opencode".to_string(), "--version".to_string()],
+            CLIType::Factory => vec!["droid".to_string(), "--version".to_string()],
             _ => vec!["echo".to_string(), "unknown".to_string()],
         }
     }
@@ -469,6 +484,7 @@ impl CommandBuilder {
             CLIType::Codex => vec!["codex".to_string(), "--help".to_string()],
             CLIType::Cursor => vec!["cursor-agent".to_string(), "--help".to_string()],
             CLIType::OpenCode => vec!["opencode".to_string(), "--help".to_string()],
+            CLIType::Factory => vec!["droid".to_string(), "--help".to_string()],
             _ => vec!["echo".to_string(), "help not available".to_string()],
         }
     }

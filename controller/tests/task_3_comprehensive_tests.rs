@@ -69,6 +69,7 @@ impl CliAdapter for TestAdapter {
             CLIType::Grok => "GROK.md",
             CLIType::Qwen => "QWEN.md",
             CLIType::Cursor => "CURSOR.md",
+            CLIType::Factory => "AGENTS.md",
             CLIType::OpenHands => "OPENHANDS.md",
         }
     }
@@ -82,19 +83,20 @@ impl CliAdapter for TestAdapter {
             CLIType::Grok => "grok",
             CLIType::Qwen => "qwen",
             CLIType::Cursor => "cursor",
+            CLIType::Factory => "droid",
             CLIType::OpenHands => "openhands",
         }
     }
 
     fn get_capabilities(&self) -> CliCapabilities {
         CliCapabilities {
-            supports_streaming: self.cli_type == CLIType::Claude,
+            supports_streaming: matches!(self.cli_type, CLIType::Claude | CLIType::Factory),
             supports_multimodal: matches!(self.cli_type, CLIType::Gemini | CLIType::Grok),
             supports_function_calling: true,
             supports_system_prompts: true,
             max_context_tokens: match self.cli_type {
                 CLIType::Claude => 200_000,
-                CLIType::Codex => 128_000,
+                CLIType::Codex | CLIType::Factory => 128_000,
                 _ => 4096,
             },
             memory_strategy: MemoryStrategy::MarkdownFile(self.get_memory_filename().to_string()),
@@ -104,7 +106,7 @@ impl CliAdapter for TestAdapter {
             },
             authentication_methods: vec![match self.cli_type {
                 CLIType::Claude => AuthMethod::SessionToken,
-                CLIType::Codex | CLIType::Gemini => AuthMethod::ApiKey,
+                CLIType::Codex | CLIType::Gemini | CLIType::Factory => AuthMethod::ApiKey,
                 _ => AuthMethod::None,
             }],
         }
@@ -231,7 +233,7 @@ async fn test_fr2_supporting_type_system() {
 
     println!("🧪 FR-2: Testing Supporting Type System");
 
-    // ✅ Test CLIType enum includes all 8 CLI types
+    // ✅ Test CLIType enum includes all 9 CLI types
     let cli_types = vec![
         CLIType::Claude,
         CLIType::Codex,
@@ -240,12 +242,13 @@ async fn test_fr2_supporting_type_system() {
         CLIType::Grok,
         CLIType::Qwen,
         CLIType::Cursor,
+        CLIType::Factory,
         CLIType::OpenHands,
     ];
     assert_eq!(
         cli_types.len(),
-        8,
-        "CLIType enum must include exactly 8 CLI types"
+        9,
+        "CLIType enum must include exactly 9 CLI types"
     );
 
     // ✅ Test ParsedResponse structure
@@ -410,7 +413,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let supported = factory.get_supported_clis();
     assert_eq!(
         supported.len(),
-        3,
+        4,
         "Factory must return correct supported CLI count"
     );
     assert!(
@@ -424,6 +427,10 @@ async fn test_fr4_adapter_factory_implementation() {
     assert!(
         supported.contains(&CLIType::Cursor),
         "Factory must include default Cursor CLI"
+    );
+    assert!(
+        supported.contains(&CLIType::Factory),
+        "Factory must include default Factory CLI"
     );
 
     // ✅ Test adapter creation
@@ -455,7 +462,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        3,
+        4,
         "Factory must provide health summary"
     );
     assert_eq!(
@@ -473,6 +480,10 @@ async fn test_fr4_adapter_factory_implementation() {
     assert!(
         health_summary.contains_key(&CLIType::Cursor),
         "Cursor adapter should appear in health summary"
+    );
+    assert!(
+        health_summary.contains_key(&CLIType::Factory),
+        "Factory adapter should appear in health summary"
     );
 
     // ✅ Test concurrent adapter creation
@@ -891,6 +902,7 @@ async fn test_nfr4_extensibility() {
         CLIType::Grok,
         CLIType::Qwen,
         CLIType::Cursor,
+        CLIType::Factory,
         CLIType::OpenHands,
     ];
 
@@ -924,6 +936,7 @@ async fn test_nfr4_extensibility() {
                 CLIType::Grok => "grok",
                 CLIType::Qwen => "qwen",
                 CLIType::Cursor => "cursor",
+                CLIType::Factory => "droid",
                 CLIType::OpenHands => "openhands",
             },
             "Created adapter must match CLI type"
@@ -933,15 +946,15 @@ async fn test_nfr4_extensibility() {
     let supported_clis = factory.get_supported_clis();
     assert_eq!(
         supported_clis.len(),
-        8,
-        "Factory must support all 8 CLI types"
+        9,
+        "Factory must support all 9 CLI types"
     );
 
     // ✅ Test minimal boilerplate for new adapters (via TestAdapter)
     // TestAdapter demonstrates the minimal implementation required
 
     println!("✅ NFR-4: Extensibility requirements satisfied");
-    println!("   - All 8 CLI types successfully registered");
+    println!("   - All 9 CLI types successfully registered");
     println!("   - Dynamic adapter registration works");
     println!("   - Minimal boilerplate demonstrated via TestAdapter");
 }
@@ -1146,7 +1159,7 @@ async fn test_factory_health_monitoring() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        3,
+        4,
         "Health summary must include all adapters"
     );
     assert_eq!(
@@ -1161,12 +1174,16 @@ async fn test_factory_health_monitoring() {
         health_summary.contains_key(&CLIType::Cursor),
         "Health summary must include Cursor"
     );
+    assert!(
+        health_summary.contains_key(&CLIType::Factory),
+        "Health summary must include Factory"
+    );
 
     // ✅ Test factory statistics
     let stats = factory.get_factory_stats().await;
-    assert_eq!(stats.total_adapters, 3, "Stats must show correct total");
+    assert_eq!(stats.total_adapters, 4, "Stats must show correct total");
     assert_eq!(
-        stats.healthy_adapters, 2,
+        stats.healthy_adapters, 3,
         "Stats must show correct healthy count"
     );
     assert_eq!(

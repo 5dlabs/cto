@@ -49,6 +49,7 @@ impl CLIRouter {
                 CLIType::Claude,
                 CLIType::Codex,
                 CLIType::Cursor,
+                CLIType::Factory,
                 CLIType::OpenCode,
             ],
         }
@@ -199,6 +200,9 @@ impl CLIRouter {
             CLIType::Cursor => {
                 env.insert("HOME".to_string(), "/home/node".to_string());
             }
+            CLIType::Factory => {
+                env.insert("HOME".to_string(), "/home/node".to_string());
+            }
             CLIType::OpenCode => {
                 env.insert("HOME".to_string(), "/home/node".to_string());
             }
@@ -293,6 +297,7 @@ mod tests {
         assert!(supported.contains(&CLIType::Claude));
         assert!(supported.contains(&CLIType::Codex));
         assert!(supported.contains(&CLIType::Cursor));
+        assert!(supported.contains(&CLIType::Factory));
     }
 
     #[test]
@@ -312,6 +317,7 @@ mod tests {
         // Default fallbacks should follow
         assert!(candidates.contains(&CLIType::Claude));
         assert!(candidates.contains(&CLIType::Cursor));
+        assert!(candidates.contains(&CLIType::Factory));
     }
 
     #[test]
@@ -325,5 +331,9 @@ mod tests {
         let cursor_env =
             router.prepare_environment(CLIType::Cursor, &["CURSOR_API_KEY".to_string()]);
         assert_eq!(cursor_env.get("HOME").unwrap(), "/home/node");
+
+        let factory_env =
+            router.prepare_environment(CLIType::Factory, &["FACTORY_API_KEY".to_string()]);
+        assert_eq!(factory_env.get("HOME").unwrap(), "/home/node");
     }
 }

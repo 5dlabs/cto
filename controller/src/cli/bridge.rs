@@ -298,6 +298,58 @@ impl CLIAdapter for CursorCLIAdapter {
     }
 }
 
+/// Factory CLI adapter (placeholder)
+pub struct FactoryCLIAdapter;
+
+#[async_trait]
+impl CLIAdapter for FactoryCLIAdapter {
+    async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
+        let factory_config = serde_json::json!({
+            "model": universal.settings.model,
+            "autoRun": { "enabled": true, "level": "high" },
+            "notes": "TODO(factory): populate CLI configuration",
+        });
+
+        let config_content = serde_json::to_string_pretty(&factory_config)
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
+
+        let config_files = vec![
+            ConfigFile {
+                path: "/workspace/.factory/cli.json".to_string(),
+                content: config_content.clone(),
+                permissions: Some("0644".to_string()),
+            },
+            ConfigFile {
+                path: "/workspace/AGENTS.md".to_string(),
+                content: universal.agent.instructions.clone(),
+                permissions: Some("0644".to_string()),
+            },
+        ];
+
+        Ok(TranslationResult {
+            content: config_content,
+            config_files,
+            env_vars: vec!["FACTORY_API_KEY".to_string()],
+        })
+    }
+
+    async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
+        Ok(vec![
+            "droid".to_string(),
+            "exec".to_string(),
+            task.to_string(),
+        ])
+    }
+
+    fn required_env_vars(&self) -> Vec<String> {
+        vec!["FACTORY_API_KEY".to_string()]
+    }
+
+    fn cli_type(&self) -> CLIType {
+        CLIType::Factory
+    }
+}
+
 /// Main configuration bridge
 pub struct ConfigurationBridge {
     adapters: std::collections::HashMap<CLIType, Box<dyn CLIAdapter>>,
@@ -323,6 +375,10 @@ impl ConfigurationBridge {
         adapters.insert(
             CLIType::Cursor,
             Box::new(CursorCLIAdapter) as Box<dyn CLIAdapter>,
+        );
+        adapters.insert(
+            CLIType::Factory,
+            Box::new(FactoryCLIAdapter) as Box<dyn CLIAdapter>,
         );
 
         Self { adapters }
@@ -572,5 +628,46 @@ mod tests {
             .unwrap();
         assert_eq!(command[0], "cursor-agent");
         assert!(command.contains(&"--print".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_factory_adapter_placeholder() {
+        let adapter = FactoryCLIAdapter;
+        let universal = UniversalConfig {
+            context: ContextConfig {
+                project_name: "Factory Project".to_string(),
+                project_description: "Testing factory adapter".to_string(),
+                architecture_notes: String::new(),
+                constraints: vec![],
+            },
+            tools: vec![],
+            settings: SettingsConfig {
+                model: "gpt-5-codex".to_string(),
+                temperature: 0.1,
+                max_tokens: 1000,
+                timeout: 300,
+                sandbox_mode: "workspace-write".to_string(),
+            },
+            agent: AgentConfig {
+                role: "developer".to_string(),
+                capabilities: vec![],
+                instructions: "Factory instructions".to_string(),
+            },
+            mcp_config: None,
+        };
+
+        let result = adapter.to_cli_config(&universal).await.unwrap();
+        assert!(result
+            .config_files
+            .iter()
+            .any(|f| f.path.ends_with(".factory/cli.json")));
+        assert!(result.env_vars.contains(&"FACTORY_API_KEY".to_string()));
+
+        let command = adapter
+            .generate_command("implement feature", &universal)
+            .await
+            .unwrap();
+        assert_eq!(command[0], "droid");
+        assert!(command.contains(&"exec".to_string()));
     }
 }

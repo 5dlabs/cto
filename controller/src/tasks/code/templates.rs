@@ -6,7 +6,9 @@ use crate::tasks::template_paths::{
     CODE_CODEX_CONFIG_TEMPLATE, CODE_CODEX_CONTAINER_BASE_TEMPLATE,
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
-    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+    CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
+    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
+    CODE_MCP_CONFIG_TEMPLATE,
 };
 use crate::tasks::types::Result;
 use crate::tasks::workflow::extract_workflow_name;
@@ -48,6 +50,7 @@ impl CodeTemplateGenerator {
         match Self::determine_cli_type(code_run) {
             CLIType::Codex => Self::generate_codex_templates(code_run, config),
             CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
+            CLIType::Factory => Self::generate_factory_templates(code_run, config),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -356,6 +359,256 @@ impl CodeTemplateGenerator {
 
     fn generate_cursor_project_permissions() -> Result<String> {
         Self::load_template(CODE_CURSOR_PROJECT_CONFIG_TEMPLATE)
+    }
+
+    fn generate_factory_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_factory_container_script(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "AGENTS.md".to_string(),
+            Self::generate_factory_memory(code_run, &cli_config_value, &remote_tools)?,
+        );
+
+        templates.insert(
+            "factory-cli-config.json".to_string(),
+            Self::generate_factory_global_config(
+                code_run,
+                &cli_config_value,
+                &client_config_value,
+                &remote_tools,
+            )?,
+        );
+
+        templates.insert(
+            "factory-cli.json".to_string(),
+            Self::generate_factory_project_permissions()?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    fn generate_factory_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let base_template = Self::load_template(CODE_FACTORY_CONTAINER_BASE_TEMPLATE)?;
+        handlebars
+            .register_partial("factory_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Factory container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_factory_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("factory_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Factory container template {template_path}: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "continue_session": Self::get_continue_session(code_run),
+            "overwrite_memory": code_run.spec.overwrite_memory,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "model": render_settings.model,
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": render_settings.model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+        });
+
+        handlebars
+            .render("factory_container", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Factory container template: {e}"
+                ))
+            })
+    }
+
+    fn generate_factory_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template_path = Self::get_factory_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("factory_agents", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Factory AGENTS.md template {template_path}: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let context = json!({
+            "cli_config": cli_config,
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "model": render_settings.model,
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "working_directory": Self::get_working_directory(code_run),
+            "workflow_name": workflow_name,
+            "cli_type": Self::determine_cli_type(code_run).to_string(),
+            "toolman": {
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars.render("factory_agents", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Factory AGENTS.md template: {e}"
+            ))
+        })
+    }
+
+    fn generate_factory_global_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        client_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE)?;
+        handlebars
+            .register_template_string("factory_cli_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Factory CLI config template: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let mut context = json!({
+            "model": render_settings.model,
+            "temperature": render_settings.temperature,
+            "max_output_tokens": render_settings.max_output_tokens,
+            "approval_policy": render_settings.approval_policy,
+            "sandbox_mode": render_settings.sandbox_mode,
+            "project_doc_max_bytes": render_settings.project_doc_max_bytes,
+            "editor_vim_mode": render_settings.editor_vim_mode,
+            "reasoning_effort": render_settings.reasoning_effort,
+            "toolman": {
+                "url": render_settings.toolman_url,
+                "tools": remote_tools,
+            },
+            "cli_config": cli_config,
+            "client_config": client_config,
+        });
+
+        if let Some(raw_json) = &render_settings.raw_additional_json {
+            context
+                .as_object_mut()
+                .expect("context is an object")
+                .insert(
+                    "raw_additional_json".to_string(),
+                    Value::String(raw_json.clone()),
+                );
+        }
+
+        handlebars
+            .render("factory_cli_config", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Factory CLI config template: {e}"
+                ))
+            })
+    }
+
+    fn generate_factory_project_permissions() -> Result<String> {
+        Self::load_template(CODE_FACTORY_PROJECT_CONFIG_TEMPLATE)
     }
 
     fn generate_container_script(code_run: &CodeRun) -> Result<String> {
@@ -1493,6 +1746,31 @@ impl CodeTemplateGenerator {
             "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/cursor/agents-tess.md.hbs",
             _ => "code/cursor/agents.md.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_factory_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/factory/container-rex.sh.hbs",
+            "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
+            "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
+            _ => "code/factory/container.sh.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_factory_memory_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Blaze" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
+            "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
+            "5DLabs-Tess" => "code/factory/agents-tess.md.hbs",
+            _ => "code/factory/agents.md.hbs",
         };
 
         template_name.to_string()
