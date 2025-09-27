@@ -704,6 +704,7 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   set +e
   set -o pipefail
   codex exec \
+    --ask-for-approval never \
     --dangerously-bypass-approvals-and-sandbox \
     --skip-git-repo-check \
     --output-last-message "$LAST_MESSAGE_FILE" \
@@ -724,6 +725,7 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   set +e
   set -o pipefail
   codex exec \
+    --ask-for-approval never \
     --dangerously-bypass-approvals-and-sandbox \
     --skip-git-repo-check \
     --output-last-message "$COMPLETION_LAST_MESSAGE" \
