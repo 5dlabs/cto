@@ -602,8 +602,8 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/workspace"
         }));
 
-        // Docker-in-Docker volumes (disabled by default, can be enabled by setting enableDocker: true)
-        let enable_docker = code_run.spec.enable_docker.unwrap_or(false);
+        // Docker-in-Docker volumes (enabled by default, can be disabled via enableDocker: false)
+        let enable_docker = code_run.spec.enable_docker.unwrap_or(true);
         if enable_docker {
             volumes.push(json!({
                 "name": "docker-sock-dir",
@@ -693,7 +693,7 @@ impl<'a> CodeResourceManager<'a> {
 
         // Critical system variables that must not be overridden
         // Add these AFTER requirements processing to ensure they take precedence
-        let critical_env_vars = vec![
+        let mut critical_env_vars = vec![
             json!({
                 "name": "CODERUN_NAME",
                 "value": code_run.name_any()
@@ -730,6 +730,17 @@ impl<'a> CodeResourceManager<'a> {
                 "value": "/workspace/client-config.json"
             }),
         ];
+
+        if cli_type == CLIType::Codex {
+            critical_env_vars.push(json!({
+                "name": "HOME",
+                "value": "/root"
+            }));
+            critical_env_vars.push(json!({
+                "name": "XDG_CONFIG_HOME",
+                "value": "/root/.config"
+            }));
+        }
 
         // Comprehensive deduplication: remove all duplicates by name, keeping the last occurrence
         // This ensures that later additions (like critical system vars) take precedence
@@ -891,28 +902,37 @@ impl<'a> CodeResourceManager<'a> {
 
         // Build Pod spec and set ServiceAccountName (required by CRD)
         let mut pod_spec = json!({
-                        "shareProcessNamespace": true,
-                        "restartPolicy": "Never",
-                        "securityContext": {
-                            "runAsUser": 1000,
-                            "runAsGroup": 1000,
-                            "fsGroup": 1000,
-                            "fsGroupChangePolicy": "OnRootMismatch"
-                        },
-                        "initContainers": [{
-                            "name": "fix-workspace-perms",
-                            "image": "busybox:1.36",
-                            "command": ["/bin/sh", "-lc", "chown -R 1000:1000 /workspace && chmod -R ug+rwX /workspace || true"],
-                            "securityContext": {
-                                "runAsUser": 0,
-                                "runAsGroup": 0,
-                                "allowPrivilegeEscalation": false
-                            },
-                            "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ]
-                        }],
-                        "containers": containers,
-                        "volumes": volumes
+            "shareProcessNamespace": true,
+            "restartPolicy": "Never",
+            "securityContext": {
+                "runAsUser": 1000,
+                "runAsGroup": 1000,
+                "fsGroup": 1000,
+                "fsGroupChangePolicy": "OnRootMismatch"
+            },
+            "initContainers": [{
+                "name": "fix-workspace-perms",
+                "image": "busybox:1.36",
+                "command": ["/bin/sh", "-lc", "chown -R 1000:1000 /workspace && chmod -R ug+rwX /workspace || true"],
+                "securityContext": {
+                    "runAsUser": 0,
+                    "runAsGroup": 0,
+                    "allowPrivilegeEscalation": false
+                },
+                "volumeMounts": [ {"name": "workspace", "mountPath": "/workspace"} ]
+            }],
+            "containers": containers,
+            "volumes": volumes
         });
+
+        if cli_type == CLIType::Codex {
+            pod_spec["securityContext"] = json!({
+                "runAsUser": 0,
+                "runAsGroup": 0,
+                "fsGroupChangePolicy": "OnRootMismatch"
+            });
+            pod_spec["initContainers"] = json!([]);
+        }
 
         // Prefer CRD-provided ServiceAccountName; else use controller default if set
         if let Some(sa_name) = code_run
