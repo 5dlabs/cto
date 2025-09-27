@@ -1068,12 +1068,10 @@ impl CodeTemplateGenerator {
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp/".to_string()
+                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
                 })
             });
-        if !toolman_url.ends_with('/') {
-            toolman_url.push('/');
-        }
+        toolman_url = toolman_url.trim_end_matches('/').to_string();
 
         let model_provider = settings
             .get("modelProvider")

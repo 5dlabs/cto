@@ -682,12 +682,14 @@ if ! command -v toolman >/dev/null 2>&1; then
   exit 1
 fi
 
-TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp/"}
-TOOLMAN_URL="${TOOLMAN_URL%/}/"
-TOOLMAN_HEALTH_URL="${TOOLMAN_URL%/}"
-echo "🔍 Checking Toolman endpoint: $TOOLMAN_HEALTH_URL"
-if ! curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 4 "$TOOLMAN_HEALTH_URL" >/tmp/toolman-ping.log 2>&1; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_HEALTH_URL"
+TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
+TOOLMAN_URL="${TOOLMAN_URL%/}"
+echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
+if ! curl -sSf --connect-timeout 2 --max-time 6 \
+  -X POST "$TOOLMAN_URL" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
   exit 1
@@ -772,6 +774,7 @@ PREVIOUS_MESSAGE_FILE=""
 TOKEN_LIMIT=${CODEX_TOKEN_LIMIT:-240000}
 CODEX_TIMEOUT=${CODEX_EXEC_TIMEOUT:-1800}
 RESET_SESSION_ON_RETRY=${CODEX_RESET_SESSION_ON_RETRY:-1}
+CONTINUE_SESSION=${CODEX_CONTINUE_SESSION:-0}
 
 MAX_RETRIES=${CODEX_MAX_RETRIES:-5}
 ATTEMPT=1
@@ -782,9 +785,14 @@ RUN_LOG=""
 
 SESSION_DIR="$HOME/.codex/sessions"
 RESUME_ARGS=()
-if [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
+
+if [ "$CONTINUE_SESSION" = "1" ] && [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
   echo "ℹ️  Existing Codex sessions found; will resume most recent"
   RESUME_ARGS=("resume" "--last")
+else
+  if [ -d "$SESSION_DIR" ]; then
+    find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+  fi
 fi
 
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
