@@ -59,7 +59,7 @@
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "context7_get-library-docs",
+          "context7_get_library_docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -79,7 +79,7 @@
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "context7_get-library-docs",
+          "context7_get_library_docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -99,7 +99,7 @@
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "context7_get-library-docs",
+          "context7_get_library_docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -119,7 +119,7 @@
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "context7_get-library-docs",
+          "context7_get_library_docs",
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
@@ -139,7 +139,7 @@
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "context7_get-library-docs",
+          "context7_get_library_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",
           "agent_docs_opencode_query",
@@ -158,7 +158,7 @@
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
-          "context7_get-library-docs"
+          "context7_get_library_docs"
           "rustdocs_query_rust_docs",
           "agent_docs_codex_query",
           "agent_docs_cursor_query",

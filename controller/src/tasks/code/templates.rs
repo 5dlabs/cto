@@ -1314,10 +1314,12 @@ impl CodeTemplateGenerator {
                 .unwrap_or_else(|| json!([]));
             let local_servers =
                 sanitize_local_servers(tools_value.get("localServers").unwrap_or(&json!({})));
-            json!({
+            let mut client = json!({
                 "remoteTools": remote_tools,
                 "localServers": local_servers
-            })
+            });
+            Self::normalize_remote_tools(&mut client);
+            client
         };
 
         // Sanitize helper for full client-config objects (drop null/non-object server entries)
@@ -1355,14 +1357,16 @@ impl CodeTemplateGenerator {
                 }
             }
 
-            Value::Object(
+            let mut client = Value::Object(
                 vec![
                     ("remoteTools".to_string(), remote_tools),
                     ("localServers".to_string(), Value::Object(local_servers_obj)),
                 ]
                 .into_iter()
                 .collect(),
-            )
+            );
+            Self::normalize_remote_tools(&mut client);
+            client
         };
 
         // Small helpers for merge logic
@@ -1508,6 +1512,7 @@ impl CodeTemplateGenerator {
                             let mut merged = merge_client_configs(&base_client, &overlay_client);
                             // Final sanitize of merged result
                             sanitize_client_local_servers(&mut merged);
+                            Self::normalize_remote_tools(&mut merged);
                             return to_string_pretty(&merged).map_err(|e| {
                                 crate::tasks::types::Error::ConfigError(format!(
                                     "Failed to serialize merged clientConfig: {e}"
@@ -1541,6 +1546,7 @@ impl CodeTemplateGenerator {
                 debug!("code: using verbatim clientConfig for '{}'", github_app);
                 let mut cfg = client_cfg.clone();
                 sanitize_client_local_servers(&mut cfg);
+                Self::normalize_remote_tools(&mut cfg);
                 return to_string_pretty(&cfg).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize clientConfig: {e}"
@@ -1560,6 +1566,7 @@ impl CodeTemplateGenerator {
                 // Build client-config including only explicitly enabled local servers
                 let mut client = client_from_agent_tools(tools);
                 sanitize_client_local_servers(&mut client);
+                Self::normalize_remote_tools(&mut client);
                 return to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize tools-based clientConfig: {e}"
@@ -1576,13 +1583,39 @@ impl CodeTemplateGenerator {
         );
         // Always emit at least the two top-level keys so downstream validators don't treat it as empty
         // Do not inject any local servers by default; rely on Helm defaults or client config.
-        let minimal_client = json!({ "remoteTools": [], "localServers": {} });
+        let mut minimal_client = json!({ "remoteTools": [], "localServers": {} });
+        Self::normalize_remote_tools(&mut minimal_client);
 
         to_string_pretty(&minimal_client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
                 "Failed to serialize empty clientConfig: {e}"
             ))
         })
+    }
+
+    fn normalize_remote_tools(config: &mut Value) {
+        if let Some(Value::Array(remote_tools)) = config.get_mut("remoteTools") {
+            for tool in remote_tools.iter_mut() {
+                if let Some(name) = tool.as_str() {
+                    if let Some(canonical) = Self::canonical_tool_name(name) {
+                        *tool = Value::String(canonical.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    fn canonical_tool_name(name: &str) -> Option<&'static str> {
+        match name {
+            "brave-search_brave_web_search" | "brave-search-brave_web_search" => {
+                Some("brave_search_brave_web_search")
+            }
+            "context7_get-library-docs" | "context7_get-library_docs" => {
+                Some("context7_get_library_docs")
+            }
+            other if other.contains(' ') => None,
+            _ => None,
+        }
     }
 
     fn generate_opencode_container_script(
