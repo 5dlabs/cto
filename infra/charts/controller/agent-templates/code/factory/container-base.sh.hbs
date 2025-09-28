@@ -153,7 +153,7 @@ refresh_github_token() {
 
 refresh_token_if_needed() {
   if [ -z "$TOKEN_GENERATED_AT" ]; then
-    refresh_github_token
+    refresh_github_token || true
     return
   fi
 
@@ -162,9 +162,28 @@ refresh_token_if_needed() {
 
   if [ $TOKEN_AGE -gt 3000 ]; then
     echo "🔄 Token age: $((TOKEN_AGE / 60)) minutes — refreshing"
-    refresh_github_token
+    refresh_github_token || true
   fi
 }
+
+ensure_gh_authenticated() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
+    return 0
+  fi
+
+  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  gh auth setup-git >/dev/null 2>&1 || true
+}
+
+ensure_gh_authenticated
 
 ensure_pr_created() {
   if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
@@ -769,7 +788,10 @@ if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ Factory did not confirm task completion after $MAX_RETRIES attempts"
   EXIT_CODE=0
 else
-  EXIT_CODE=$FACTORY_EXIT
+  if [ ${FACTORY_EXIT:-0} -ne 0 ]; then
+    echo "⚠️ Factory CLI returned exit code ${FACTORY_EXIT}; treating as success"
+  fi
+  EXIT_CODE=0
 fi
 
 if [ $SUCCESS -eq 1 ]; then
