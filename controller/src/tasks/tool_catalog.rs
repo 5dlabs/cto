@@ -22,7 +22,25 @@ pub fn resolve_tool_name(name: &str) -> Option<String> {
     match TOOL_CATALOG.resolve(trimmed) {
         Some(canonical) => Some(canonical),
         None if !TOOL_CATALOG.is_loaded() => Some(trimmed.to_string()),
-        None => None,
+        None => {
+            let mut variants = Vec::new();
+            variants.push(trimmed.replace('-', "_"));
+            variants.push(trimmed.replace('_', "-"));
+
+            for variant in variants {
+                if variant != trimmed {
+                    if let Some(found) = TOOL_CATALOG.resolve(&variant) {
+                        return Some(found);
+                    }
+                }
+            }
+
+            warn!(
+                tool = trimmed,
+                "remote tool not present in Toolman catalog; leaving name unchanged"
+            );
+            Some(trimmed.to_string())
+        }
     }
 }
 
