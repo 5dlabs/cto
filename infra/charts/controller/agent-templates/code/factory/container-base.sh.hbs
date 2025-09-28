@@ -185,6 +185,8 @@ stop_docker_sidecar() {
   fi
 }
 
+trap 'stop_docker_sidecar || true' EXIT
+
 ensure_gh_authenticated() {
   if ! command -v gh >/dev/null 2>&1; then
     echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
@@ -836,5 +838,4 @@ echo "{{agent_completion_message}}"
 {{else}}
 echo "✅ Factory execution complete"
 {{/if}}
-stop_docker_sidecar
 exit $EXIT_CODE
