@@ -10,15 +10,16 @@ use crate::tasks::template_paths::{
     CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
     CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
+use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
 use crate::tasks::workflow::extract_workflow_name;
 use handlebars::Handlebars;
 
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
-use tracing::debug;
+use tracing::{debug, warn};
 
 // Template base path (mounted from ConfigMap)
 const AGENT_TEMPLATES_PATH: &str = "/agent-templates";
@@ -1595,26 +1596,39 @@ impl CodeTemplateGenerator {
 
     fn normalize_remote_tools(config: &mut Value) {
         if let Some(Value::Array(remote_tools)) = config.get_mut("remoteTools") {
-            for tool in remote_tools.iter_mut() {
-                if let Some(name) = tool.as_str() {
-                    if let Some(canonical) = Self::canonical_tool_name(name) {
-                        *tool = Value::String(canonical.to_string());
+            let mut normalized = Vec::new();
+            let mut seen = HashSet::new();
+            let mut dropped = Vec::new();
+
+            for tool in remote_tools.iter() {
+                let Some(name) = tool.as_str() else {
+                    continue;
+                };
+
+                match resolve_tool_name(name) {
+                    Some(canonical) => {
+                        if seen.insert(canonical.clone()) {
+                            if canonical != name {
+                                debug!(
+                                    original = name,
+                                    canonical, "Normalized remote tool name using Toolman catalog"
+                                );
+                            }
+                            normalized.push(Value::String(canonical));
+                        }
                     }
+                    None => dropped.push(name.to_string()),
                 }
             }
-        }
-    }
 
-    fn canonical_tool_name(name: &str) -> Option<&'static str> {
-        match name {
-            "brave-search_brave_web_search" | "brave-search-brave_web_search" => {
-                Some("brave_search_brave_web_search")
+            if !dropped.is_empty() {
+                warn!(
+                    tools = ?dropped,
+                    "Removed unknown remote tools; not present in Toolman catalog"
+                );
             }
-            "context7_get-library-docs" | "context7_get-library_docs" => {
-                Some("context7_get_library_docs")
-            }
-            other if other.contains(' ') => None,
-            _ => None,
+
+            *remote_tools = normalized;
         }
     }
 
