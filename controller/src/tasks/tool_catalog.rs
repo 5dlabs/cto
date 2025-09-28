@@ -23,9 +23,7 @@ pub fn resolve_tool_name(name: &str) -> Option<String> {
         Some(canonical) => Some(canonical),
         None if !TOOL_CATALOG.is_loaded() => Some(trimmed.to_string()),
         None => {
-            let mut variants = Vec::new();
-            variants.push(trimmed.replace('-', "_"));
-            variants.push(trimmed.replace('_', "-"));
+            let variants = vec![trimmed.replace('-', "_"), trimmed.replace('_', "-")];
 
             for variant in variants {
                 if variant != trimmed {
@@ -168,7 +166,7 @@ fn variant_matrix(
     let mut variants = Vec::new();
     for server in server_variants {
         for tool in tool_variants {
-            variants.push(format!("{}_{}", server, tool));
+            variants.push(format!("{server}_{tool}"));
         }
     }
     variants
