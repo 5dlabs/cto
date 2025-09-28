@@ -39,6 +39,10 @@ fn default_overwrite_memory() -> bool {
     false
 }
 
+fn default_enable_docker() -> Option<bool> {
+    Some(true)
+}
+
 /// CLI-specific configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
 pub struct CLIConfig {
@@ -131,8 +135,8 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "envFromSecrets")]
     pub env_from_secrets: Vec<SecretEnvVar>,
 
-    /// Whether to enable Docker-in-Docker support for this CodeRun (defaults to false)
-    #[serde(default, rename = "enableDocker")]
+    /// Whether to enable Docker-in-Docker support for this CodeRun (defaults to true)
+    #[serde(default = "default_enable_docker", rename = "enableDocker")]
     pub enable_docker: Option<bool>,
 
     /// Base64-encoded YAML containing task requirements (secrets and environment variables)
