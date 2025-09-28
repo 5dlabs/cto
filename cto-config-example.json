@@ -60,7 +60,7 @@
         "remote": [
           "memory_create_entities",
           "memory_add_observations",
-          "brave-search_brave_web_search",
+          "brave_search_brave_web_search",
           "rustdocs_query_rust_docs"
         ],
         "localServers": {
