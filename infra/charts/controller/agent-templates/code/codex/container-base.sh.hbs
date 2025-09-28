@@ -691,6 +691,14 @@ if [ -f "$MCP_CLIENT_CONFIG" ]; then
   fi
 fi
 
+echo "=== client-config.json ==="
+if command -v jq >/dev/null 2>&1; then
+  jq '.' "$MCP_CLIENT_CONFIG" 2>/dev/null || cat "$MCP_CLIENT_CONFIG"
+else
+  cat "$MCP_CLIENT_CONFIG"
+fi
+echo "=========================="
+
 mkdir -p "$HOME/.codex"
 if [ -f /task-files/codex-config.toml ]; then
   cp /task-files/codex-config.toml "$HOME/.codex/config.toml"
