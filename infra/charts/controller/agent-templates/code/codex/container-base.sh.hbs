@@ -108,25 +108,6 @@ echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
 
 TOKEN_GENERATED_AT=$(date +%s)
 
-ensure_gh_authenticated() {
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
-    return 0
-  fi
-
-  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
-    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
-    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
-      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
-    fi
-  fi
-
-  refresh_token_if_needed || true
-  gh auth setup-git >/dev/null 2>&1 || true
-}
-
-ensure_gh_authenticated
-
 refresh_github_token() {
   echo "🔄 Refreshing GitHub App token..."
 
@@ -195,6 +176,25 @@ refresh_token_if_needed() {
     refresh_github_token || true
   fi
 }
+
+ensure_gh_authenticated() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
+    return 0
+  fi
+
+  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
+    fi
+  fi
+
+  refresh_token_if_needed || true
+  gh auth setup-git >/dev/null 2>&1 || true
+}
+
+ensure_gh_authenticated
 
 ensure_pr_created() {
   if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
