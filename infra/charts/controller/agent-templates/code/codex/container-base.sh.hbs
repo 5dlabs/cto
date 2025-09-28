@@ -177,6 +177,25 @@ refresh_token_if_needed() {
   fi
 }
 
+stop_docker_sidecar() {
+  if [ ! -S /var/run/docker.sock ]; then
+    return
+  fi
+
+  echo "🛑 Stopping Docker sidecar"
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill dockerd >/dev/null 2>&1 || true
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+  else
+    PID=$(pidof dockerd 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+      kill "$PID" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 ensure_gh_authenticated() {
   if ! command -v gh >/dev/null 2>&1; then
     echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
@@ -1045,4 +1064,5 @@ echo "{{agent_completion_message}}"
 {{else}}
 echo "✅ Codex execution complete"
 {{/if}}
+stop_docker_sidecar
 exit $EXIT_CODE
