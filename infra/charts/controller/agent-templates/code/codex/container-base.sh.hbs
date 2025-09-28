@@ -108,6 +108,27 @@ echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
 
 TOKEN_GENERATED_AT=$(date +%s)
 
+ensure_gh_authenticated() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "⚠️ GitHub CLI (gh) not found; skipping authentication"
+    return 0
+  fi
+
+  if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
+    echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+      echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
+    fi
+  refresh_token_if_needed || true
+  ensure_gh_authenticated
+
+  fi
+
+  gh auth setup-git >/dev/null 2>&1 || true
+}
+
+ensure_gh_authenticated
+
 refresh_github_token() {
   echo "🔄 Refreshing GitHub App token..."
 
@@ -148,6 +169,7 @@ refresh_github_token() {
     export GH_TOKEN="$NEW_TOKEN"
     TOKEN_GENERATED_AT=$(date +%s)
     echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+    ensure_gh_authenticated
     echo "✅ Token refreshed"
     return 0
   fi
@@ -159,6 +181,7 @@ refresh_github_token() {
 refresh_token_if_needed() {
   if [ -z "$TOKEN_GENERATED_AT" ]; then
     refresh_github_token
+    ensure_gh_authenticated
     return
   fi
 
@@ -774,7 +797,7 @@ PREVIOUS_MESSAGE_FILE=""
 TOKEN_LIMIT=${CODEX_TOKEN_LIMIT:-240000}
 CODEX_TIMEOUT=${CODEX_EXEC_TIMEOUT:-1800}
 RESET_SESSION_ON_RETRY=${CODEX_RESET_SESSION_ON_RETRY:-1}
-CONTINUE_SESSION=${CODEX_CONTINUE_SESSION:-0}
+CONTINUE_SESSION=${CODEX_CONTINUE_SESSION:-1}
 
 MAX_RETRIES=${CODEX_MAX_RETRIES:-5}
 ATTEMPT=1
@@ -785,14 +808,50 @@ RUN_LOG=""
 
 SESSION_DIR="$HOME/.codex/sessions"
 RESUME_ARGS=()
+SESSION_FILE="$CODEX_WORK_DIR/.codex-session"
+CURRENT_SESSION_ID=""
 
-if [ "$CONTINUE_SESSION" = "1" ] && [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
-  echo "ℹ️  Existing Codex sessions found; will resume most recent"
-  RESUME_ARGS=("resume" "--last")
+if [ -f "$SESSION_FILE" ]; then
+  CURRENT_SESSION_ID=$(tr -d '\r\n ' < "$SESSION_FILE" 2>/dev/null || true)
+fi
+
+extract_session_id() {
+  local log_file="$1"
+  [ -f "$log_file" ] || return 1
+  awk '
+    {
+      gsub(/\033\[[0-9;]*[mK]/, "");
+      if ($0 ~ /codex session[[:space:]]+[0-9a-fA-F-]{4,}/) {
+        match($0, /codex session[[:space:]]+([0-9a-fA-F-]+)/, a);
+        if (a[1] != "") last=a[1];
+      }
+    }
+    END {
+      if (last != "") print last;
+    }
+  ' "$log_file" 2>/dev/null
+}
+
+persist_session_id() {
+  local session_id="$1"
+  if [ -n "$session_id" ]; then
+    printf '%s\n' "$session_id" > "$SESSION_FILE"
+  fi
+}
+
+if [ "$CONTINUE_SESSION" = "1" ]; then
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    echo "ℹ️  Resuming Codex session from breadcrumb: $CURRENT_SESSION_ID"
+    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+  elif [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
+    echo "ℹ️  Existing Codex sessions found; will resume most recent"
+    RESUME_ARGS=("resume" "--last")
+  fi
 else
   if [ -d "$SESSION_DIR" ]; then
     find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
   fi
+  rm -f "$SESSION_FILE"
 fi
 
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
@@ -807,6 +866,8 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     SESSION_FLAGS=()
     if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
       find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+      rm -f "$SESSION_FILE"
+      CURRENT_SESSION_ID=""
     fi
   fi
 
@@ -863,8 +924,20 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
   fi
 
-  # Ensure subsequent attempts start fresh unless we explicitly resume again
-  RESUME_ARGS=()
+  NEW_SESSION_ID=$(extract_session_id "$RUN_LOG")
+  if [ -n "$NEW_SESSION_ID" ]; then
+    if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
+      echo "ℹ️  Captured Codex session ID: $NEW_SESSION_ID"
+      CURRENT_SESSION_ID="$NEW_SESSION_ID"
+      persist_session_id "$CURRENT_SESSION_ID"
+    fi
+  fi
+
+  if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then
+    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+  else
+    RESUME_ARGS=()
+  fi
 
   PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
 
@@ -898,9 +971,14 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     "--skip-git-repo-check"
     "--output-last-message" "$COMPLETION_LAST_MESSAGE"
     "--cd" "$CODEX_WORK_DIR"
-    "resume" "--last"
-    "$COMPLETION_PROMPT"
+    "resume"
   )
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    COMPLETION_CMD+=("$CURRENT_SESSION_ID")
+  else
+    COMPLETION_CMD+=("--last")
+  fi
+  COMPLETION_CMD+=("$COMPLETION_PROMPT")
   "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
   COMPLETION_EXIT=${PIPESTATUS[0]}
   set +o pipefail
