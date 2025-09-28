@@ -2,7 +2,7 @@
   "localServers": {},
   "remoteTools": [
     "brave_search_brave_web_search",
-    "context7_get_library_docs",
+    "context7_get-library-docs",
     "memory_create_entities",
     "memory_add_observations",
     "memory_read_graph",
