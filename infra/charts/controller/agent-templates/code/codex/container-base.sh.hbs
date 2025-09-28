@@ -119,11 +119,9 @@ ensure_gh_authenticated() {
     if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
       echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
     fi
-  refresh_token_if_needed || true
-  ensure_gh_authenticated
-
   fi
 
+  refresh_token_if_needed || true
   gh auth setup-git >/dev/null 2>&1 || true
 }
 
@@ -169,7 +167,12 @@ refresh_github_token() {
     export GH_TOKEN="$NEW_TOKEN"
     TOKEN_GENERATED_AT=$(date +%s)
     echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
-    ensure_gh_authenticated
+
+    if command -v gh >/dev/null 2>&1; then
+      printf '%s\n' "$NEW_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1 || true
+      gh auth setup-git >/dev/null 2>&1 || true
+    fi
+
     echo "✅ Token refreshed"
     return 0
   fi
@@ -180,8 +183,7 @@ refresh_github_token() {
 
 refresh_token_if_needed() {
   if [ -z "$TOKEN_GENERATED_AT" ]; then
-    refresh_github_token
-    ensure_gh_authenticated
+    refresh_github_token || true
     return
   fi
 
@@ -190,7 +192,7 @@ refresh_token_if_needed() {
 
   if [ $TOKEN_AGE -gt 3000 ]; then
     echo "🔄 Token age: $((TOKEN_AGE / 60)) minutes — refreshing"
-    refresh_github_token
+    refresh_github_token || true
   fi
 }
 
@@ -1014,7 +1016,10 @@ if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ Codex did not confirm task completion after $MAX_RETRIES attempts"
   EXIT_CODE=0
 else
-  EXIT_CODE=$CODEX_EXIT
+  if [ ${CODEX_EXIT:-0} -ne 0 ]; then
+    echo "⚠️ Codex returned exit code ${CODEX_EXIT}; treating as success"
+  fi
+  EXIT_CODE=0
 fi
 
 if [ $SUCCESS -eq 1 ]; then
