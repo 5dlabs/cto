@@ -6,7 +6,7 @@ use crate::tasks::template_paths::{
 };
 use crate::tasks::types::Result;
 use handlebars::Handlebars;
-use serde_json::json;
+use serde_json::{json, to_string_pretty, Value};
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -200,8 +200,6 @@ impl DocsTemplateGenerator {
     /// 2) agents.<agent>.tools (convert to client-config.json structure generically)
     /// 3) fallback to empty object {}
     fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
-        use serde_json::{json, to_string_pretty, Value};
-
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
         debug!(
             "docs: generating client-config.json for githubApp='{}'",
@@ -326,6 +324,7 @@ impl DocsTemplateGenerator {
                     }
                 }
 
+                Self::normalize_remote_tools(&mut client);
                 let rendered = to_string_pretty(&client).map_err(|e| {
                     crate::tasks::types::Error::ConfigError(format!(
                         "Failed to serialize tools-based clientConfig: {e}"
@@ -356,11 +355,36 @@ impl DocsTemplateGenerator {
             }
             client["localServers"] = Value::Object(ls);
         }
+        Self::normalize_remote_tools(&mut client);
         to_string_pretty(&client).map_err(|e| {
             crate::tasks::types::Error::ConfigError(format!(
                 "Failed to serialize empty clientConfig: {e}"
             ))
         })
+    }
+
+    fn normalize_remote_tools(config: &mut Value) {
+        if let Some(Value::Array(remote_tools)) = config.get_mut("remoteTools") {
+            for tool in remote_tools.iter_mut() {
+                if let Some(name) = tool.as_str() {
+                    if let Some(canonical) = Self::canonical_tool_name(name) {
+                        *tool = Value::String(canonical.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    fn canonical_tool_name(name: &str) -> Option<&'static str> {
+        match name {
+            "brave-search_brave_web_search" | "brave-search-brave_web_search" => {
+                Some("brave_search_brave_web_search")
+            }
+            "context7_get-library-docs" | "context7_get-library_docs" => {
+                Some("context7_get_library_docs")
+            }
+            _ => None,
+        }
     }
 
     fn generate_hook_scripts(docs_run: &DocsRun) -> Result<BTreeMap<String, String>> {
