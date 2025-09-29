@@ -402,6 +402,11 @@ EOF
 
   maybe_add_label "$TASK_LABEL"
   maybe_add_label "$SERVICE_LABEL"
+if [ -d "$REPO_ROOT/.factory" ]; then
+  echo "🧹 Removing stale .factory directory before Codex run"
+  rm -rf "$REPO_ROOT/.factory"
+fi
+
   maybe_add_label "$RUN_LABEL"
 
   if gh pr create "${LABEL_ARGS[@]}"; then
