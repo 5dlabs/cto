@@ -455,7 +455,7 @@ impl CLIAdapter for FactoryCLIAdapter {
             "droid".to_string(),
             "exec".to_string(),
             "--output-format".to_string(),
-            "stream-json".to_string(),
+            "json".to_string(),
             "--auto".to_string(),
             auto_level.to_string(),
             task.to_string(),
