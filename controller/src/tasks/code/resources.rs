@@ -864,7 +864,11 @@ impl<'a> CodeResourceManager<'a> {
                 "name": "docker-daemon",
                 "image": "docker:dind",
                 "securityContext": {
-                    "privileged": true
+                    "privileged": true,
+                    "allowPrivilegeEscalation": true,
+                    "runAsUser": 0,
+                    "runAsGroup": 0,
+                    "runAsNonRoot": false
                 },
                 "env": [
                     {
