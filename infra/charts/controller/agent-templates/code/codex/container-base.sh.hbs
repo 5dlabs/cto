@@ -104,7 +104,16 @@ CREDENTIALS_FILE=/workspace/.git-credentials
 mkdir -p /workspace
 
 git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
-echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+
+write_git_credentials() {
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    return
+  fi
+  printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$CREDENTIALS_FILE"
+  chmod 600 "$CREDENTIALS_FILE" 2>/dev/null || true
+}
+
+write_git_credentials
 
 TOKEN_GENERATED_AT=$(date +%s)
 
@@ -147,7 +156,7 @@ refresh_github_token() {
     export GITHUB_TOKEN="$NEW_TOKEN"
     export GH_TOKEN="$NEW_TOKEN"
     TOKEN_GENERATED_AT=$(date +%s)
-    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
+    write_git_credentials
 
     if command -v gh >/dev/null 2>&1; then
       printf '%s\n' "$NEW_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1 || true
