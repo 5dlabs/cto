@@ -263,7 +263,7 @@ spec:
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
 
-    # Run a full remediation iteration (Rex → Cleo → Tess) with automatic retries
+    # Run a full remediation iteration (Rex → Tess → Cleo) with automatic retries
     - name: remediation-iteration
       outputs:
         parameters:
@@ -313,42 +313,6 @@ spec:
                   value: "pr-created"
                 - name: stage-name
                   value: "waiting-pr-created"
-        - - name: quality-work
-            template: agent-coderun
-            arguments:
-              parameters:
-                - name: github-app
-                  value: "{{`{{workflow.parameters.quality-agent}}`}}"
-                - name: task-id
-                  value: "{{`{{workflow.parameters.task-id}}`}}"
-                - name: stage
-                  value: "quality"
-                - name: cli-type
-                  value: "{{`{{workflow.parameters.quality-cli}}`}}"
-                - name: model
-                  value: "{{`{{workflow.parameters.quality-model}}`}}"
-                - name: tools-config
-                  value: "{{`{{workflow.parameters.quality-tools}}`}}"
-                - name: pr-url
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
-                - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
-        - - name: update-to-waiting-qa
-            template: update-workflow-stage
-            arguments:
-              parameters:
-                - name: new-stage
-                  value: "waiting-ready-for-qa"
-                - name: verify-update
-                  value: "true"
-        - - name: wait-for-ready-for-qa
-            template: suspend-for-event
-            arguments:
-              parameters:
-                - name: event-type
-                  value: "ready-for-qa"
-                - name: stage-name
-                  value: "waiting-ready-for-qa"
         - - name: testing-work
             template: agent-coderun
             arguments:
@@ -371,6 +335,58 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: qa-ready
                   value: "true"
+        - - name: update-to-waiting-testing-complete
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "waiting-testing-complete"
+                - name: verify-update
+                  value: "true"
+        - - name: wait-for-testing-complete
+            template: suspend-for-event
+            arguments:
+              parameters:
+                - name: event-type
+                  value: "testing-complete"
+                - name: stage-name
+                  value: "waiting-testing-complete"
+        - - name: quality-work
+            template: agent-coderun
+            arguments:
+              parameters:
+                - name: github-app
+                  value: "{{`{{workflow.parameters.quality-agent}}`}}"
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+                - name: stage
+                  value: "quality"
+                - name: cli-type
+                  value: "{{`{{workflow.parameters.quality-cli}}`}}"
+                - name: model
+                  value: "{{`{{workflow.parameters.quality-model}}`}}"
+                - name: tools-config
+                  value: "{{`{{workflow.parameters.quality-tools}}`}}"
+                - name: pr-url
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+                - name: pr-number
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+        - - name: update-to-waiting-ready-for-qa
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "waiting-ready-for-qa"
+                - name: verify-update
+                  value: "true"
+        - - name: wait-for-ready-for-qa
+            template: suspend-for-event
+            arguments:
+              parameters:
+                - name: event-type
+                  value: "ready-for-qa"
+                - name: stage-name
+                  value: "waiting-ready-for-qa"
         - - name: evaluate-remediation
             template: assess-remediation-outcome
             arguments:
@@ -932,12 +948,15 @@ spec:
               return 0
             fi
 
-            # Define valid transitions
+            # Define valid transitions (Rex → Tess → Cleo flow)
             case $current_stage in
               "pending")
                 [[ $new_stage == "waiting-pr-created" ]] && return 0
                 ;;
               "waiting-pr-created")
+                [[ $new_stage == "waiting-testing-complete" ]] && return 0
+                ;;
+              "waiting-testing-complete")
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-ready-for-qa")
