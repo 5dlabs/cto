@@ -333,8 +333,6 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
-                - name: qa-ready
-                  value: "true"
         - - name: update-to-waiting-testing-complete
             template: update-workflow-stage
             arguments:
@@ -371,6 +369,8 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: testing-complete
+                  value: "true"
         - - name: update-to-waiting-ready-for-qa
             template: update-workflow-stage
             arguments:
