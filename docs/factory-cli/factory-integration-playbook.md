@@ -22,8 +22,8 @@ This document captures the working agreement for bringing Factory’s `droid` CL
 | Templates | Handlebars under `agent-templates/code/<cli>/` with base + per-agent wrappers, config, MCP JSON | Same structure: create `factory` subtree mirroring Cursor (containers, agents docs, CLI configs) | Duplicate layout, reusing partials + shared logic (no hard-coded tool lists). |
 | Controller | `cursor.rs` adapter builds template context, passes model/approval/sandbox, writes CLI configs, mounts MCP | New `factory.rs` adapter replicates pattern and plumbs Factory-specific flags (auto-run, spec mode toggles as needed) | Use new `CliType::Factory` and extend enums in template selection + tests. |
 | Config delivery | ConfigMap built from `generate-agent-templates-configmap.sh` | Add Factory templates to same generator (just new files) | Already handled once templates exist; ensure file names conform to sort order. |
-| CLI invocation | Cursor container wraps binary, ensures Node shim, passes `--model`, `--print --force --output-format stream-json` | Factory script must pass the equivalents: identify `--auto-run`, `--non-interactive`, `--model <id>`, `--output json/stream` flags from docs | ✅ Container now wires `droid exec --auto <level> --model <id> --output-format <format>` based on Helm + CLI config, with retries + completion probe. |
-| Completion probes | Cursor reruns CLI with summarised question | Implement same logic; confirm Factory supports stream output for quick yes/no (may use `--output text`). | ✅ Completion probe implemented via follow-up `droid exec --auto low --output-format text`. |
+| CLI invocation | Cursor container wraps binary, ensures Node shim, passes `--model`, `--print --force --output-format stream-json` | Factory script must pass the equivalents: `droid exec --output-format <format> --auto <level> --model <id> <prompt>`. Valid formats: `text`, `json`, `debug` | ✅ Container now wires `droid exec --auto <level> --model <id> --output-format json` based on Helm + CLI config, with retries + completion probe. |
+| Completion probes | Cursor reruns CLI with summarised question | Implement same logic using text output for simple yes/no responses. | ✅ Completion probe implemented via follow-up `droid exec --auto low --output-format text`. |
 | Secret injection | ExternalSecret supplies API key, exported as env var (Cursor: `CURSOR_API_KEY`) | Determine Factory’s token env (`FACTORY_API_KEY` or similar). Update `infra/charts/controller/templates/secret.yaml` + values to mount. | ✅ Helm values expose `cliApiKeys.factory.secretKey = FACTORY_API_KEY`; controller maps it automatically. |
 | Image build | Cursor image had Node path mismatch fixed via symlink + wrapper | Build `ghcr.io/5dlabs/factory:latest` based on upstream requirements. Expose binary at `/usr/local/bin`, include Node/Python if CLI scripts depend on them (docs mention spec mode requiring Node?). Validate via test pod before shipping. |
 | GitHub behavior | Auto PR logic, labels creation, workspace cleanup | Reuse same auto-PR script. Ensure instructions emphasise “never push to main”. |
@@ -100,7 +100,10 @@ Create the following under `infra/charts/controller/agent-templates/`:
 
 ## 8. Edge Cases & Open Questions
 
-1. **CLI flag parity**: need to confirm exact flags for auto-run, output modes, model selection. Update this doc once verified against the binary.
+1. **CLI flag parity**: ✅ **VERIFIED** - `droid exec` flags confirmed:
+   - `--output-format`: accepts `text`, `json`, or `debug` (NOT `stream-json`)
+   - `--auto`: accepts automation level (`low`, `medium`, `high`)
+   - `--model`: accepts model ID string
 2. **Permission schema**: docs show custom commands and agents; confirm whether project config mandates `permissions.allow/deny` or different schema. Adjust templates accordingly.
 3. **Spec mode**: Factory emphasises “Specification Mode”; determine if we should default Rex to spec mode vs implementation mode. Possibly controlled via template flag or additional CLI config entry.
 4. **Observability**: confirm CLI emits structured logs similar to Cursor. If not, adapt completion parsing logic.
