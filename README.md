@@ -72,7 +72,7 @@
 ⚡ **Superpower:** Lightning-fast Rust implementation  
 💬 **Motto:** *"Zero-cost abstractions, max performance!"*
 
-**Rex builds APIs, services, and backend infrastructure through `code()` workflows, specializing in Rust and high-performance systems.**
+**Rex builds APIs, services, and backend infrastructure through `play()` workflows, specializing in Rust and high-performance systems.**
 
 </td>
 <td align="center" width="33%">
@@ -171,7 +171,7 @@ requirements & architecture
 **Rex & Blaze** build in parallel  
 *(backend, frontend, or both)*
 
-*via `code()` or `play()` workflows*
+*via `play()` multi-agent workflows*
 
 </td>
 <td align="center" width="33%">
@@ -222,7 +222,7 @@ Cleo reviews, Tess tests, Cipher secures
 
 ## **⚡ What CTO Does**
 
-The Cognitive Task Orchestrator provides three main superpowers:
+The Cognitive Task Orchestrator provides powerful tools for AI-driven development:
 
 ### **📝 Documentation Generation (`docs()`)**
 **Morgan** analyzes your Task Master projects and creates comprehensive documentation automatically.
@@ -232,14 +232,6 @@ The Cognitive Task Orchestrator provides three main superpowers:
 - Architecture documentation
 - Automatic GitHub PR submission
 
-### **🚀 Code Implementation (`code()`)**
-**Rex** or **Blaze** deploy as autonomous agents to implement specific tasks from your project.
-
-- Reads generated documentation for context
-- Implements code following best practices
-- Runs tests and validation
-- Submits polished GitHub PRs
-
 ### **🎮 Multi-Agent Play Workflows (`play()`)**
 **The entire team** orchestrates complex multi-agent workflows with event-driven coordination.
 
@@ -248,6 +240,22 @@ The Cognitive Task Orchestrator provides three main superpowers:
 - **Phase 3 - Testing & Security**: Tess validates, Cipher secures
 - **Event-Driven Coordination**: Automatic handoffs between phases
 - **GitHub Integration**: Each phase submits detailed PRs
+
+### **🚀 Project Intake (`intake_prd()`)**
+Automatically process PRDs and create structured TaskMaster projects.
+
+- Reads project requirements and architecture
+- Generates comprehensive task breakdown
+- Creates TaskMaster structure with tasks.json
+- Submits project setup as GitHub PR
+
+### **🔧 Workflow Management**
+Control and monitor your AI development workflows:
+
+- **`jobs()`** - List all running workflows with status
+- **`stop_job()`** - Stop any running workflow gracefully
+- **`input()`** - Send live messages to running AI agents
+- **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
 
 All operations run as **Kubernetes jobs** with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup.
 
@@ -275,12 +283,12 @@ This is an integrated platform with crystal-clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-1. Cursor calls `docs()`, `code()`, or `play()` via MCP protocol
+1. Cursor/Claude calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
-6. Controllers deploy Claude agents as Jobs with workspace isolation
+6. Controllers deploy CLI agents (Claude Code, Cursor, Codex, OpenCode, Factory) as Jobs with workspace isolation
 7. Agents authenticate via GitHub Apps and complete work
 8. Agents submit GitHub PRs with automatic cleanup
 
@@ -363,49 +371,137 @@ cto-mcp --help   # MCP server for Cursor/Claude integration
 
 ### Configure Project Settings
 
-Create a `cto-config.json` file in your project root to configure agents, models, and defaults:
+Create a `cto-config.json` file in your project root to configure agents, models, tool access, and workflow defaults:
 
 ```json
 {
   "version": "1.0",
   "defaults": {
     "docs": {
-      "model": "claude-opus-4-20250514",
+      "model": "claude-opus-4-1-20250805",
       "githubApp": "5DLabs-Morgan",
       "includeCodebase": false,
       "sourceBranch": "main"
     },
-    "code": {
-      "model": "claude-opus-4-20250514",
-      "githubApp": "5DLabs-Rex",
-      "continueSession": false,
-      "workingDirectory": ".",
-      "overwriteMemory": false,
-      "docsRepository": "https://github.com/your-org/your-docs-repo",
-      "docsProjectDirectory": "projects/your-project",
-      "service": "your-service-name"
-    },
     "play": {
-      "model": "claude-3-5-sonnet-20241022",
+      "model": "claude-sonnet-4-20250514",
+      "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
       "testingAgent": "5DLabs-Tess",
-      "repository": "5dlabs/cto",
-      "service": "cto",
-      "docsRepository": "5dlabs/cto",
+      "repository": "your-org/your-repo",
+      "service": "your-service",
+      "docsRepository": "your-org/your-docs-repo",
       "docsProjectDirectory": "docs"
+    },
+    "intake": {
+      "githubApp": "5DLabs-Morgan",
+      "primary": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "research": {
+        "model": "opus",
+        "provider": "claude-code"
+      },
+      "fallback": {
+        "model": "gpt-5",
+        "provider": "openai"
+      }
+    },
+    "docs_ingest": {
+      "model": "claude-sonnet-4-20250514",
+      "docServerUrl": "http://doc-server-agent-docs-server.mcp.svc.cluster.local:80"
     }
   },
   "agents": {
-    "morgan": "5DLabs-Morgan",
-    "rex": "5DLabs-Rex",
-    "blaze": "5DLabs-Blaze",
-    "cipher": "5DLabs-Cipher",
-    "cleo": "5DLabs-Cleo",
-    "tess": "5DLabs-Tess"
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "brave_search_brave_web_search",
+          "rustdocs_query_rust_docs"
+        ],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "codex",
+      "model": "gpt-5-codex",
+      "tools": {
+        "remote": [
+          "memory_create_entities",
+          "memory_add_observations",
+          "rustdocs_query_rust_docs"
+        ],
+        "localServers": {
+          "filesystem": {
+            "enabled": true,
+            "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+          },
+          "git": {
+            "enabled": true,
+            "tools": ["git_status", "git_diff", "git_log", "git_show"]
+          }
+        }
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations", "rustdocs_query_rust_docs"],
+        "localServers": {
+          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
+          "git": {"enabled": true, "tools": ["git_status", "git_diff", "git_log", "git_show"]}
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["memory_create_entities", "memory_add_observations"],
+        "localServers": {
+          "filesystem": {"enabled": true, "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]},
+          "git": {"enabled": true, "tools": ["git_status", "git_diff"]}
+        }
+      }
+    }
   }
 }
 ```
+
+**Agent Configuration Fields:**
+- **`githubApp`**: GitHub App name for authentication
+- **`cli`**: Which CLI to use (`claude`, `cursor`, `codex`, `opencode`, `factory`)
+- **`model`**: Model identifier for the CLI
+- **`tools`** (optional): Fine-grained tool access control
+  - **`remote`**: Array of remote tool names from Toolman
+  - **`localServers`**: Local MCP server configurations
+    - Each server specifies `enabled` and which `tools` the agent can access
+
+**Benefits:**
+- **CLI Flexibility**: Different agents can use different CLIs
+- **Model Selection**: Each agent can use its optimal model
+- **Tool Profiles**: Customize tool access per agent
+- **Security**: Restrict agent capabilities as needed
 
 ### Configure Cursor MCP Integration
 
@@ -427,7 +523,7 @@ After creating your configuration file, configure Cursor to use the MCP server b
 1. Create the `cto-config.json` file in your project root with your specific settings
 2. Create the `.cursor/mcp.json` file to enable MCP integration
 3. Restart Cursor to load the MCP server
-4. The `docs()`, `code()`, and `play()` functions will be available with your configured defaults
+4. All MCP tools will be available with your configured defaults
 
 **Benefits of Configuration-Driven Approach:**
 - **Simplified MCP Calls**: Most parameters have sensible defaults from your config
@@ -437,15 +533,129 @@ After creating your configuration file, configure Cursor to use the MCP server b
 
 ---
 
+## **🎨 Multi-CLI Support**
+
+The platform supports multiple AI coding assistants with the same unified architecture. Choose the CLI that best fits your workflow:
+
+<table>
+<tr>
+<td align="center" width="20%">
+
+### **Claude Code**
+Official Anthropic CLI
+- **Native Integration**
+- Best for Claude models
+- Enterprise-ready
+
+</td>
+<td align="center" width="20%">
+
+### **Cursor**
+Popular AI editor
+- **VS Code-based**
+- Rich IDE features
+- Excellent UX
+
+</td>
+<td align="center" width="20%">
+
+### **Codex**
+Multi-model support
+- **Provider Agnostic**
+- Flexible configuration
+- OpenAI, Anthropic, more
+
+</td>
+<td align="center" width="20%">
+
+### **OpenCode**
+Open-source CLI
+- **Community Driven**
+- Extensible architecture
+- Full transparency
+
+</td>
+<td align="center" width="20%">
+
+### **Factory**
+Autonomous AI CLI
+- **Auto-Run Mode**
+- Unattended execution
+- CI/CD optimized
+
+</td>
+</tr>
+</table>
+
+**How It Works:**
+- Each agent in `cto-config.json` specifies its `cli` and `model`
+- Controllers automatically use the correct CLI for each agent
+- All CLIs follow the same template structure
+- Seamless switching between CLIs per-agent
+
+**Example Multi-CLI Configuration:**
+```json
+{
+  "agents": {
+    "morgan": {
+      "githubApp": "5DLabs-Morgan",
+      "cli": "claude",
+      "model": "claude-opus-4-20250514",
+      "tools": {
+        "remote": ["brave_search_brave_web_search", "rustdocs_query_rust_docs"]
+      }
+    },
+    "rex": {
+      "githubApp": "5DLabs-Rex",
+      "cli": "factory",
+      "model": "gpt-5-factory-high",
+      "tools": {
+        "remote": ["memory_create_entities", "rustdocs_query_rust_docs"]
+      }
+    },
+    "blaze": {
+      "githubApp": "5DLabs-Blaze",
+      "cli": "opencode",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": ["brave_search_brave_web_search"]
+      }
+    },
+    "cleo": {
+      "githubApp": "5DLabs-Cleo",
+      "cli": "cursor",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "localServers": {
+          "filesystem": {"enabled": true, "tools": ["read_file", "write_file"]}
+        }
+      }
+    },
+    "tess": {
+      "githubApp": "5DLabs-Tess",
+      "cli": "codex",
+      "model": "gpt-4o",
+      "tools": {
+        "remote": ["memory_add_observations"]
+      }
+    }
+  }
+}
+```
+
+Each agent independently configured with its own CLI, model, and tool access.
+
+---
+
 ## **🔧 MCP Tools Reference**
 
-The platform exposes three primary MCP tools that connect directly to your AI dream team:
+The platform exposes 7 powerful MCP tools for AI-driven development:
 
 ### 1. **`docs()` - Morgan's Documentation Magic**
 Analyzes your Task Master project and creates comprehensive documentation.
 
 ```javascript
-// Minimal call using config defaults - Morgan takes care of the rest!
+// Minimal call using config defaults
 docs({
   working_directory: "projects/my-app"
 });
@@ -454,102 +664,155 @@ docs({
 docs({
   working_directory: "projects/my-app",
   agent: "morgan",
-  model: "claude-3-5-sonnet-20241022"
+  model: "claude-opus-4-20250514",
+  include_codebase: true
 });
 ```
 
 **What Morgan does:**
-✅ Creates a Claude agent with your project context  
 ✅ Analyzes all tasks in your Task Master project  
 ✅ Generates comprehensive documentation  
-✅ Submits a GitHub PR with the docs
+✅ Creates implementation guidance for other agents  
+✅ Submits a GitHub PR with all documentation
 
-**Generated Documents:**
-```
-.taskmaster/docs/
-├── task-1/
-│   ├── task.md           # Comprehensive task documentation
-│   ├── acceptance-criteria.md  # Clear success criteria
-│   └── prompt.md         # Implementation guidance for agents
-├── task-2/
-│   ├── task.md
-│   ├── acceptance-criteria.md
-│   └── prompt.md
-└── ...
-```
-
-### 2. **`code()` - Rex & Blaze in Action**
-Deploys an autonomous CLI agent (Factory, Codex, or Claude, depending on configuration) to implement a specific task from your Task Master project.
+### 2. **`play()` - Multi-Agent Orchestration**
+Executes complex multi-agent workflows with event-driven coordination.
 
 ```javascript
-// Minimal call - let Rex/Blaze work their magic!
-code({
-  task_id: 5,
-  repository: "https://github.com/myorg/my-project"
-});
-
-// Customize the implementation agent
-code({
-  task_id: 5,
-  repository: "https://github.com/myorg/my-project",
-  agent: "rex",        // or "blaze" for frontend work
-  service: "custom-service",
-  working_directory: "services/api-server"
-});
-
-// Continue working on a partially completed task
-code({
-  task_id: 5,
-  repository: "https://github.com/myorg/my-project",
-  continue_session: true
-});
-```
-
-**What Rex/Blaze do:**
-✅ Creates a CLI agent with the generated docs as context  
-✅ Loads the specific task details from Task Master  
-✅ Implements the code autonomously  
-✅ Runs tests and validation  
-✅ Submits a GitHub PR with the implementation
-
-### 3. **`play()` - The Full Team Experience**
-Executes complex multi-agent workflows with event-driven coordination. Perfect for large features that require implementation, quality assurance, and testing phases.
-
-```javascript
-// Minimal call - let the whole team collaborate!
+// Minimal call - the whole team collaborates!
 play({
   task_id: 1
 });
 
-// Customize agent assignments for your workflow
+// Customize agent assignments
 play({
   task_id: 1,
-  implementation_agent: "blaze",  // Frontend-focused implementation
-  quality_agent: "cleo",          // Quality assurance
-  testing_agent: "tess"           // Comprehensive testing
-});
-
-// Override model and repository
-play({
-  task_id: 1,
-  model: "claude-opus-4-1-20250805",
-  repository: "myorg/my-custom-repo"
+  implementation_agent: "rex",
+  quality_agent: "cleo",
+  testing_agent: "tess",
+  repository: "myorg/my-project"
 });
 ```
 
 **What the team does:**
-✅ **Phase 1 - Implementation**: Rex/Blaze agent implements the core functionality (Factory, Codex, or Claude)  
-✅ **Phase 2 - Quality Assurance**: Cleo agent reviews, refactors, and improves the code (Claude)  
-✅ **Phase 3 - Testing**: Tess agent creates comprehensive tests and validates the implementation (Claude)  
-✅ **Event-Driven Coordination**: Each phase triggers the next automatically  
-✅ **GitHub Integration**: All phases submit PRs with detailed explanations
+✅ **Phase 1 - Implementation**: Rex/Blaze builds the feature  
+✅ **Phase 2 - Quality**: Cleo reviews and refactors  
+✅ **Phase 3 - Testing**: Tess validates and tests  
+✅ **Event-Driven**: Automatic phase transitions  
+✅ **GitHub Integration**: PRs from each phase
 
-**Play Workflow Benefits:**
-- **Multi-Phase Approach**: Breaks complex tasks into implementation → QA → testing phases
-- **Agent Specialization**: Different agents handle different aspects of development
-- **Quality Assurance**: Dedicated QA phase ensures code quality and best practices
-- **Comprehensive Testing**: Automated testing phase validates functionality
-- **Event-Driven**: Seamless handoffs between phases with automatic triggering
+### 3. **`intake_prd()` - Project Intake Automation**
+Process PRDs and create structured TaskMaster projects.
+
+```javascript
+// Process a new project
+intake_prd({
+  project_name: "my-awesome-app"
+});
+
+// Customize models and agents
+intake_prd({
+  project_name: "my-awesome-app",
+  github_app: "5DLabs-Morgan",
+  primary_model: "claude-opus-4-20250514"
+});
+```
+
+**What intake does:**
+✅ Reads PRD from `{project_name}/intake/prd.txt`  
+✅ Analyzes requirements and architecture  
+✅ Generates comprehensive task breakdown  
+✅ Creates TaskMaster structure with tasks.json  
+✅ Submits project setup as GitHub PR
+
+### 4. **`jobs()` - Workflow Status**
+List all running Argo workflows with simplified status info.
+
+```javascript
+// List all workflows
+jobs();
+
+// Filter by type
+jobs({
+  include: ["play", "intake"]
+});
+
+// Specify namespace
+jobs({
+  namespace: "agent-platform"
+});
+```
+
+**Returns:** List of active workflows with type, name, phase, and status
+
+### 5. **`stop_job()` - Workflow Control**
+Stop any running Argo workflow gracefully.
+
+```javascript
+// Stop a specific workflow
+stop_job({
+  job_type: "play",
+  name: "play-workflow-abc123"
+});
+
+// Stop with explicit namespace
+stop_job({
+  job_type: "intake",
+  name: "intake-workflow-xyz789",
+  namespace: "agent-platform"
+});
+```
+
+**Workflow types:** `intake`, `play`, `workflow`
+
+### 6. **`input()` - Live Agent Communication**
+Send messages to running AI agents in real-time.
+
+```javascript
+// Send message to active job
+input({
+  text: "Please add error handling for edge cases"
+});
+
+// Route by specific job name
+input({
+  text: "Update the API endpoint to use /v2",
+  name: "code-5dlabs-cto-task-5",
+  job_type: "code"
+});
+
+// Route by user label
+input({
+  text: "Can you explain your approach?",
+  user: "jonathon"
+});
+```
+
+**Use cases:** Provide guidance, answer questions, steer implementation
+
+### 7. **`docs_ingest()` - Documentation Analysis**
+Intelligently analyze GitHub repos and ingest documentation.
+
+```javascript
+// Ingest repository documentation
+docs_ingest({
+  repository_url: "https://github.com/cilium/cilium",
+  doc_type: "cilium"
+});
+
+// Custom doc server
+docs_ingest({
+  repository_url: "https://github.com/solana-labs/solana",
+  doc_type: "solana",
+  doc_server_url: "http://my-doc-server:80"
+});
+```
+
+**What it does:**
+✅ Uses Claude to analyze repository structure  
+✅ Determines optimal ingestion strategy  
+✅ Processes documentation intelligently  
+✅ Stores in searchable format for agents
 
 ---
 
@@ -565,24 +828,6 @@ play({
 - `model` - Model to use for the docs agent (defaults to `defaults.docs.model`)
 - `source_branch` - Source branch to work from (defaults to `defaults.docs.sourceBranch`)
 - `include_codebase` - Include existing codebase as context (defaults to `defaults.docs.includeCodebase`)
-
-### `code` Tool Parameters
-
-**Required:**
-- `task_id` - Task ID to implement from task files (integer, minimum 1)
-- `repository` - Target repository URL (e.g., `"https://github.com/5dlabs/cto"`)
-
-**Optional (with config defaults):**
-- `service` - Target service name, creates workspace-{service} PVC (defaults to `defaults.code.service`)
-- `docs_repository` - Documentation repository URL (defaults to `defaults.code.docsRepository`)
-- `docs_project_directory` - Project directory within docs repository (defaults to `defaults.code.docsProjectDirectory`)
-- `working_directory` - Working directory within target repository (defaults to `defaults.code.workingDirectory`)
-- `agent` - Agent name for task assignment (defaults to `defaults.code.githubApp` mapping)
-- `model` - Model to use for the implementation agent (defaults to `defaults.code.model`)
-- `continue_session` - Whether to continue a previous session (defaults to `defaults.code.continueSession`)
-- `overwrite_memory` - Whether to overwrite CLAUDE.md memory file (defaults to `defaults.code.overwriteMemory`)
-- `env` - Environment variables to set in the container (object with key-value pairs)
-- `env_from_secrets` - Environment variables from secrets (array of objects with `name`, `secretName`, `secretKey`)
 
 ### `play` Tool Parameters
 
@@ -741,17 +986,18 @@ Common variables available in templates:
 
 ## **💡 Best Practices**
 
-1. **Configure `cto-config.json` first** to set up your agents, models, and repository defaults
-2. **Always generate docs first** to establish baseline documentation
+1. **Configure `cto-config.json` first** to set up your agents, models, tool profiles, and repository defaults
+2. **Always generate docs first** to establish baseline documentation using `docs()`
 3. **Choose the right tool for the job**:
    - Use `docs()` for documentation generation
-   - Use `code()` for single-agent implementation tasks
-   - Use `play()` for complex multi-phase features requiring implementation, QA, and testing
-4. **Implement tasks sequentially** based on dependencies
-5. **Use minimal MCP calls** - let configuration defaults handle most parameters
-6. **Use `continue_session: true`** for retries on the same task
+   - Use `play()` for full-cycle development (implementation → QA → testing)
+   - Use `intake_prd()` for new project setup from PRDs
+   - Use `jobs()` / `stop_job()` / `input()` for workflow management
+4. **Mix and match CLIs** - assign the best CLI to each agent based on task requirements
+5. **Customize tool access** - use the `tools` configuration to control agent capabilities
+6. **Use minimal MCP calls** - let configuration defaults handle most parameters
 7. **Review GitHub PRs promptly** - agents provide detailed logs and explanations
-8. **Update config file** when adding new agents or changing project structure
+8. **Update config file** when adding new agents, tools, or changing project structure
 
 ---
 
@@ -802,7 +1048,7 @@ For more details, see the [LICENSE](LICENSE) file.
 
 ## **🔗 Related Projects**
 
-- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this agent-platform platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `code()` and `play()` MCP tools.
+- **[Task Master AI](https://github.com/eyaltoledano/claude-task-master)** - The AI-powered task management system that works perfectly with this platform. Task Master AI helps you break down complex projects into manageable tasks, which can then be implemented using this platform's `play()` and `intake_prd()` MCP tools.
 
 ---
 
