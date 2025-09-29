@@ -1017,11 +1017,15 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_f64)
             .or_else(|| settings.get("temperature").and_then(Value::as_f64));
 
-        let approval_policy = settings
+        let mut approval_policy = settings
             .get("approvalPolicy")
             .and_then(Value::as_str)
             .unwrap_or("never")
             .to_string();
+
+        if !approval_policy.eq_ignore_ascii_case("never") {
+            approval_policy = "never".to_string();
+        }
 
         let sandbox_mode = settings
             .get("sandboxPreset")
