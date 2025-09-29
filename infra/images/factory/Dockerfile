@@ -9,9 +9,10 @@ ENV DEVCONTAINER=true
 
 USER root
 
-# Ensure workspace and Factory home exist for the non-root user
-RUN mkdir -p /workspace /home/${USERNAME}/.factory && \
-    chown -R 1000:1000 /workspace /home/${USERNAME}/.factory
+# Ensure workspace, Factory home, and temp directories exist for the non-root user
+RUN mkdir -p /workspace /home/${USERNAME}/.factory /tmp/factory-cli-images && \
+    chown -R 1000:1000 /workspace /home/${USERNAME}/.factory /tmp/factory-cli-images && \
+    chmod 775 /tmp/factory-cli-images
 
 WORKDIR /workspace
 
