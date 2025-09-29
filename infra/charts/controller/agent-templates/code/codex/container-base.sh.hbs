@@ -439,6 +439,9 @@ TARGET_DIR="/workspace/$WORK_DIR"
 mkdir -p "$TARGET_DIR"
 cd /workspace
 
+REPO_ROOT="/workspace/$REPO_NAME"
+git config --global --add safe.directory "$REPO_ROOT"
+
 if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
   cd "$REPO_NAME"
@@ -451,11 +454,8 @@ else
   cd "$REPO_NAME"
 fi
 
-REPO_ROOT="/workspace/$REPO_NAME"
 git config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
-
-echo "=== BRANCH SETUP ==="
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
