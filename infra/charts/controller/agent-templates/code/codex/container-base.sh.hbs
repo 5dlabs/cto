@@ -966,11 +966,16 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     continue
   fi
 
+  echo "[codex-debug] Attempt $ATTEMPT finished with exit code $CODEX_EXIT"
+
   if [ $CODEX_EXIT -ne 0 ]; then
     echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
   fi
 
-  NEW_SESSION_ID=$(extract_session_id "$RUN_LOG")
+  NEW_SESSION_ID=""
+  if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+    NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
+  fi
   if [ -n "$NEW_SESSION_ID" ]; then
     if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
       echo "ℹ️  Captured Codex session ID: $NEW_SESSION_ID"
@@ -988,10 +993,10 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
   PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
 
   if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ -f "$RUN_LOG" ]; then
-    LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" | tail -n1 | awk '{print $3}' | tr -d ',')
-    if [ -n "$LAST_TOKENS" ]; then
+    LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" 2>/dev/null | tail -n1 | awk '{print $3}' | tr -d ',' | tr -d '\n' || true)
+    if [[ "$LAST_TOKENS" =~ ^[0-9]+$ ]]; then
       echo "📊 Codex tokens used this attempt: $LAST_TOKENS"
-      if [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ] 2>/dev/null; then
+      if [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ]; then
         echo "⚠️ Token usage $LAST_TOKENS exceeds limit $TOKEN_LIMIT; forcing clean session before retry"
         if [ -d "$SESSION_DIR" ]; then
           find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
@@ -1034,6 +1039,8 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
   fi
 
+  echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+
   if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
     COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
   else
@@ -1043,6 +1050,8 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     SUCCESS=1
     break
   fi
+
+  echo "[codex-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
 
   echo "⚠️ Codex reported task incomplete; retrying..."
   ATTEMPT=$((ATTEMPT + 1))
