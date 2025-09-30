@@ -1976,16 +1976,8 @@ $FAILED_DETAILS
 
 **Note**: Will re-evaluate once CI issues are resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 
-    if $HAVE_PR_REF; then
-      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
-        "$STATUS_LABEL_NEEDS_TESS" \
-        "$STATUS_LABEL_NEEDS_CLEO" \
-        "$STATUS_LABEL_APPROVED" \
-        "$STATUS_LABEL_FAILED" \
-        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
-      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
-    fi
-    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
+    # Label manipulation removed - using GitHub PR reviews only
+    update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   elif [ "$PENDING_CHECKS" -gt 0 ]; then
     echo "⏳ CI checks still pending - posting REQUEST CHANGES review"
     # Get details of pending checks
@@ -2011,15 +2003,8 @@ $PENDING_DETAILS
 
 **Note**: Will re-evaluate once all CI checks are complete." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 
-    if $HAVE_PR_REF; then
-      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
-        "$STATUS_LABEL_NEEDS_FIXES" \
-        "$STATUS_LABEL_APPROVED" \
-        "$STATUS_LABEL_FAILED" \
-        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
-      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_TESS"
-    fi
-    update_coderun_status "$STATUS_LABEL_NEEDS_TESS" "pending" "$PR_URL"
+    # Label manipulation removed - using GitHub PR reviews only
+    update_coderun_status "needs-tess" "pending" "$PR_URL"
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
     echo "✅ All CI checks passing - posting APPROVE review"
     # Get details of successful checks
@@ -2051,17 +2036,8 @@ $SUCCESS_DETAILS
 
 **APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 
-    if $HAVE_PR_REF; then
-      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
-        "$STATUS_LABEL_NEEDS_FIXES" \
-        "$STATUS_LABEL_NEEDS_TESS" \
-        "$STATUS_LABEL_NEEDS_CLEO" \
-        "$STATUS_LABEL_FIXING" \
-        "$STATUS_LABEL_FAILED" \
-        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
-      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_APPROVED"
-    fi
-    update_coderun_status "$STATUS_LABEL_APPROVED" "approved" "$PR_URL"
+    # Label manipulation removed - using GitHub PR reviews only
+    update_coderun_status "approved" "approved" "$PR_URL"
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
     timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
@@ -2085,15 +2061,8 @@ $SUCCESS_DETAILS
 
 **Note**: Will re-evaluate once CI status is clear." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 
-    if $HAVE_PR_REF; then
-      pr_remove_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" \
-        "$STATUS_LABEL_NEEDS_TESS" \
-        "$STATUS_LABEL_NEEDS_CLEO" \
-        "$STATUS_LABEL_APPROVED" \
-        "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
-      pr_add_labels "$REPO_SLUG" "$PR_NUM" "$PR_URL" "$STATUS_LABEL_NEEDS_FIXES"
-    fi
-    update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" "$PR_URL"
+    # Label manipulation removed - using GitHub PR reviews only
+    update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   fi
 
 else

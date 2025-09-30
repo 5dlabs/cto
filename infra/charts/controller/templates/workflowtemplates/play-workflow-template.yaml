@@ -2,6 +2,7 @@
 ---
 # Multi-Agent Play Workflow Template
 # Orchestrates Rex/Blaze → Cleo → Tess through event-driven coordination
+# Rex implements → Cleo ensures quality → Tess validates E2E in Kubernetes
 # Supports parameterized agent selection and suspend/resume patterns
 
 apiVersion: argoproj.io/v1alpha1
@@ -333,22 +334,22 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
-        - - name: update-to-waiting-qa
+        - - name: update-to-waiting-quality-complete
             template: update-workflow-stage
             arguments:
               parameters:
                 - name: new-stage
-                  value: "waiting-ready-for-qa"
+                  value: "waiting-quality-complete"
                 - name: verify-update
                   value: "true"
-        - - name: wait-for-ready-for-qa
+        - - name: wait-for-quality-complete
             template: suspend-for-event
             arguments:
               parameters:
                 - name: event-type
-                  value: "ready-for-qa"
+                  value: "quality-complete"
                 - name: stage-name
-                  value: "waiting-ready-for-qa"
+                  value: "waiting-quality-complete"
         - - name: testing-work
             template: agent-coderun
             arguments:
@@ -369,8 +370,22 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
-                - name: qa-ready
+        - - name: update-to-waiting-qa
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "waiting-ready-for-qa"
+                - name: verify-update
                   value: "true"
+        - - name: wait-for-ready-for-qa
+            template: suspend-for-event
+            arguments:
+              parameters:
+                - name: event-type
+                  value: "ready-for-qa"
+                - name: stage-name
+                  value: "waiting-ready-for-qa"
         - - name: evaluate-remediation
             template: assess-remediation-outcome
             arguments:
@@ -932,12 +947,15 @@ spec:
               return 0
             fi
 
-            # Define valid transitions
+            # Define valid transitions (Rex → Cleo → Tess flow)
             case $current_stage in
               "pending")
                 [[ $new_stage == "waiting-pr-created" ]] && return 0
                 ;;
               "waiting-pr-created")
+                [[ $new_stage == "waiting-quality-complete" ]] && return 0
+                ;;
+              "waiting-quality-complete")
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-ready-for-qa")
