@@ -809,6 +809,9 @@ impl<'a> CodeResourceManager<'a> {
         if enable_docker {
             container_spec["securityContext"] = json!({
                 "allowPrivilegeEscalation": true,
+                "runAsUser": 0,
+                "runAsGroup": 0,
+                "runAsNonRoot": false,
                 "capabilities": {
                     "add": ["KILL"]
                 }
