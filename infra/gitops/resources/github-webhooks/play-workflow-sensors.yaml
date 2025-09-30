@@ -122,12 +122,91 @@ spec:
                               --type='merge' -p "$PATCH_JSON"
                           fi
 
-                          # Resume the workflow
-                          echo "Resuming workflow $WORKFLOW_NAME"
-                          kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                            --type='merge' -p '{"spec":{"suspend":false}}'
+                        ensure_argo_cli() {
+                          if command -v argo >/dev/null 2>&1; then
+                            ARGO_BIN=$(command -v argo)
+                            return 0
+                          fi
 
-                          echo "✅ Workflow resumed successfully"
+                          ARGO_VERSION="${ARGO_VERSION:-v3.7.1}"
+                          ARGO_BIN="/tmp/argo"
+
+                          if [ ! -x "$ARGO_BIN" ]; then
+                            echo "Downloading argo CLI ($ARGO_VERSION)..."
+                            if command -v wget >/dev/null 2>&1; then
+                              wget -qO "$ARGO_BIN" "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-linux-amd64"
+                            elif command -v curl >/dev/null 2>&1; then
+                              curl -sSL -o "$ARGO_BIN" "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-linux-amd64"
+                            else
+                              echo "Neither wget nor curl is available"
+                              return 1
+                            fi
+                            chmod +x "$ARGO_BIN"
+                          fi
+                        }
+
+                        build_kubeconfig() {
+                          KUBECONFIG_PATH="/tmp/argo-kubeconfig"
+                          if [ -f "$KUBECONFIG_PATH" ]; then
+                            echo "$KUBECONFIG_PATH"
+                            return 0
+                          fi
+
+                          CA_CERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                          TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+                          if [ ! -f "$TOKEN_FILE" ]; then
+                            echo "Service account token not found"
+                            return 1
+                          fi
+
+                          SERVER="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+                          TOKEN=$(cat "$TOKEN_FILE")
+
+                          cat <<EOF > "$KUBECONFIG_PATH"
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ${CA_CERT}
+    server: ${SERVER}
+  name: in-cluster
+contexts:
+- context:
+    cluster: in-cluster
+    namespace: agent-platform
+    user: sensor-sa
+  name: in-cluster
+current-context: in-cluster
+users:
+- name: sensor-sa
+  user:
+    token: ${TOKEN}
+EOF
+
+                          echo "$KUBECONFIG_PATH"
+                        }
+
+                        resume_workflow() {
+                          ensure_argo_cli || return 1
+                          KUBECONFIG_PATH=$(build_kubeconfig) || return 1
+
+                          # Resume all suspended nodes within the workflow
+                          if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$KUBECONFIG_PATH" \
+                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            echo "✅ Workflow resumed successfully"
+                          else
+                            echo "⚠️ Failed to resume via argo CLI; output:"
+                            cat /tmp/argo-resume.log
+                            return 1
+                          fi
+                        }
+
+                        echo "Resuming workflow $WORKFLOW_NAME"
+                        if ! resume_workflow; then
+                          echo "⚠️ Resume attempt failed for $WORKFLOW_NAME"
+                          continue
+                        fi
                         done
 
                         echo "Finished processing waiting workflows"
