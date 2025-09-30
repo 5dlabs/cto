@@ -776,6 +776,9 @@ if [ "${FORCE_WRITES,,}" = "true" ]; then
   AUTO_LEVEL="high"
 fi
 
+SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}true{{/if}}"
+SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
+
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
   LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
@@ -785,7 +788,11 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   fi
   RUN_LOG="/tmp/factory-run-${ATTEMPT}.${RUN_LOG_EXT}"
 
-  FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
+  if [ "$SKIP_PERMISSIONS_UNSAFE" = "true" ]; then
+    FACTORY_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "$OUTPUT_FORMAT")
+  else
+    FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
+  fi
   {{#if model}}
   FACTORY_CMD+=("--model" "{{model}}")
   {{/if}}
