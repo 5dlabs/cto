@@ -111,26 +111,26 @@ spec:
                           SERVER="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
                           TOKEN=$(cat "$TOKEN_FILE")
 
-                          cat <<EOF | sed 's/^ \{26\}//' > "$KUBECONFIG_PATH"
-                          apiVersion: v1
-                          kind: Config
-                          clusters:
-                          - cluster:
-                              certificate-authority: ${CA_CERT}
-                              server: ${SERVER}
-                            name: in-cluster
-                          contexts:
-                          - context:
-                              cluster: in-cluster
-                              namespace: agent-platform
-                              user: sensor-sa
-                            name: in-cluster
-                          current-context: in-cluster
-                          users:
-                          - name: sensor-sa
-                            user:
-                              token: ${TOKEN}
-                          EOF
+                          {
+                            echo "apiVersion: v1"
+                            echo "kind: Config"
+                            echo "clusters:"
+                            echo "  - cluster:"
+                            printf '      certificate-authority: %s\n' "${CA_CERT}"
+                            printf '      server: %s\n' "${SERVER}"
+                            echo "    name: in-cluster"
+                            echo "contexts:"
+                            echo "  - context:"
+                            echo "      cluster: in-cluster"
+                            echo "      namespace: agent-platform"
+                            echo "      user: sensor-sa"
+                            echo "    name: in-cluster"
+                            echo "current-context: in-cluster"
+                            echo "users:"
+                            echo "  - name: sensor-sa"
+                            echo "    user:"
+                            printf '      token: %s\n' "${TOKEN}"
+                          } > "$KUBECONFIG_PATH"
 
                           echo "$KUBECONFIG_PATH"
                         }
