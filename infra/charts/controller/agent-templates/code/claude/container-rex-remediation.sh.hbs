@@ -1082,7 +1082,7 @@ fi
 echo "✓ Code implementation environment ready"
 
 # Build Claude command
-CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+CLAUDE_CMD="claude -p --output-format text --input-format stream-json --verbose"
 
 # Look for Rex-specific system prompt file (remediation uses same Rex prompt)
 # Rex container always uses rex-system-prompt.md
@@ -1194,7 +1194,7 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
 
 **Remember**: Focus on thorough implementation and verification.'
 
-echo "Starting Claude execution (stream-json via FIFO)..."
+echo "Starting Claude execution (text output via FIFO)..."
 echo "=========================="
 
 # Safe mode toggle for debugging (prevents token consumption)
