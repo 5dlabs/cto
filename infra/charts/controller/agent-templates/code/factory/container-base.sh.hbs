@@ -432,6 +432,7 @@ else
 fi
 
 REPO_ROOT="/workspace/$REPO_NAME"
+git config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 
 echo "=== BRANCH SETUP ==="
