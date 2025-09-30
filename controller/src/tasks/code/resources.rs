@@ -806,6 +806,15 @@ impl<'a> CodeResourceManager<'a> {
             "volumeMounts": volume_mounts
         });
 
+        if enable_docker {
+            container_spec["securityContext"] = json!({
+                "allowPrivilegeEscalation": true,
+                "capabilities": {
+                    "add": ["KILL"]
+                }
+            });
+        }
+
         // Add envFrom if we have secrets to mount
         if !env_from.is_empty() {
             container_spec["envFrom"] = json!(env_from);
