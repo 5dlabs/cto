@@ -478,6 +478,11 @@ fi
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  # Stash any local changes from previous runs to avoid checkout conflicts
+  if ! git diff-index --quiet HEAD --; then
+    echo "🔄 Stashing local changes before checkout"
+    git stash push -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" || true
+  fi
   git checkout "$FEATURE_BRANCH"
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
