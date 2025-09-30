@@ -70,58 +70,6 @@ spec:
                           exit 0
                         fi
 
-                        # Process each waiting workflow
-                        for WORKFLOW_NAME in $WAITING_WORKFLOWS; do
-                          echo "Processing workflow: $WORKFLOW_NAME"
-
-                          # Get task ID from workflow
-                          TASK_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform \
-                            -o jsonpath='{.metadata.labels.task-id}')
-
-                          if [ -z "$TASK_ID" ]; then
-                            echo "No task ID found for workflow, skipping"
-                            continue
-                          fi
-
-                          echo "Task ID: $TASK_ID"
-
-                          # Check if there's a recent succeeded implementation CodeRun for this task
-                          CODERUN=$(kubectl get coderun -n agent-platform \
-                            -l task-id=$TASK_ID,workflow-stage=implementation \
-                            --field-selector=status.phase=Succeeded \
-                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-
-                          if [ -z "$CODERUN" ]; then
-                            echo "No succeeded implementation CodeRun for task $TASK_ID, skipping"
-                            continue
-                          fi
-
-                          echo "Found CodeRun: $CODERUN"
-
-                          # Get PR URL from the CodeRun status
-                          PR_URL=$(kubectl get coderun $CODERUN -n agent-platform \
-                            -o jsonpath='{.status.pullRequestUrl}' 2>/dev/null || echo "")
-
-                          if [ -z "$PR_URL" ]; then
-                            echo "No PR URL in CodeRun status, skipping"
-                            continue
-                          fi
-
-                          # Extract PR number from URL
-                          PR_NUMBER=$(echo "$PR_URL" | sed 's/.*\/pull\///' | sed 's/[^0-9].*//')
-
-                          echo "PR URL: $PR_URL"
-                          echo "PR Number: $PR_NUMBER"
-
-                          # Update workflow parameters with PR info
-                          if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
-                            PATCH_JSON="{\"spec\":{\"arguments\":{\"parameters\":["
-                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-url\",\"value\":\"$PR_URL\"},"
-                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-number\",\"value\":\"$PR_NUMBER\"}]}}}"
-                            kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
-                              --type='merge' -p "$PATCH_JSON"
-                          fi
-
                         ensure_argo_cli() {
                           if command -v argo >/dev/null 2>&1; then
                             ARGO_BIN=$(command -v argo)
@@ -191,7 +139,6 @@ EOF
                           ensure_argo_cli || return 1
                           KUBECONFIG_PATH=$(build_kubeconfig) || return 1
 
-                          # Resume all suspended nodes within the workflow
                           if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$KUBECONFIG_PATH" \
                             -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
                             echo "✅ Workflow resumed successfully"
@@ -201,6 +148,58 @@ EOF
                             return 1
                           fi
                         }
+
+                        # Process each waiting workflow
+                        for WORKFLOW_NAME in $WAITING_WORKFLOWS; do
+                          echo "Processing workflow: $WORKFLOW_NAME"
+
+                          # Get task ID from workflow
+                          TASK_ID=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform \
+                            -o jsonpath='{.metadata.labels.task-id}')
+
+                          if [ -z "$TASK_ID" ]; then
+                            echo "No task ID found for workflow, skipping"
+                            continue
+                          fi
+
+                          echo "Task ID: $TASK_ID"
+
+                          # Check if there's a recent succeeded implementation CodeRun for this task
+                          CODERUN=$(kubectl get coderun -n agent-platform \
+                            -l task-id=$TASK_ID,workflow-stage=implementation \
+                            --field-selector=status.phase=Succeeded \
+                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -z "$CODERUN" ]; then
+                            echo "No succeeded implementation CodeRun for task $TASK_ID, skipping"
+                            continue
+                          fi
+
+                          echo "Found CodeRun: $CODERUN"
+
+                          # Get PR URL from the CodeRun status
+                          PR_URL=$(kubectl get coderun $CODERUN -n agent-platform \
+                            -o jsonpath='{.status.pullRequestUrl}' 2>/dev/null || echo "")
+
+                          if [ -z "$PR_URL" ]; then
+                            echo "No PR URL in CodeRun status, skipping"
+                            continue
+                          fi
+
+                          # Extract PR number from URL
+                          PR_NUMBER=$(echo "$PR_URL" | sed 's/.*\/pull\///' | sed 's/[^0-9].*//')
+
+                          echo "PR URL: $PR_URL"
+                          echo "PR Number: $PR_NUMBER"
+
+                          # Update workflow parameters with PR info
+                          if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
+                            PATCH_JSON="{\"spec\":{\"arguments\":{\"parameters\":["
+                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-url\",\"value\":\"$PR_URL\"},"
+                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-number\",\"value\":\"$PR_NUMBER\"}]}}}"
+                            kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                              --type='merge' -p "$PATCH_JSON"
+                          fi
 
                         echo "Resuming workflow $WORKFLOW_NAME"
                         if ! resume_workflow; then
