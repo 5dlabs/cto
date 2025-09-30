@@ -201,6 +201,11 @@ spec:
                               --type='merge' -p "$PATCH_JSON"
                           fi
 
+                        # Advance stage label so main workflow can move to quality gate
+                        STAGE_PATCH='{"metadata":{"labels":{"previous-stage":"waiting-pr-created","current-stage":"waiting-quality-complete"}}}'
+                        kubectl patch workflow $WORKFLOW_NAME -n agent-platform \
+                          --type='merge' -p "$STAGE_PATCH"
+
                         echo "Resuming workflow $WORKFLOW_NAME"
                         if ! resume_workflow; then
                           echo "⚠️ Resume attempt failed for $WORKFLOW_NAME"
