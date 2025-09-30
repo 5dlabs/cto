@@ -27,24 +27,8 @@ spec:
             type: string
             value: ["opened"]
 
-    # Ready-for-QA Label Added - Resume workflows waiting for this
-    - name: ready-for-qa-event
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          - path: headers.X-Github-Event
-            type: string
-            value: ["pull_request"]
-          - path: body.action
-            type: string
-            value: ["labeled"]
-          - path: body.label.name
-            type: string
-            value: ["ready-for-qa"]
-
-    # PR Approved - Resume workflows waiting for this
-    - name: pr-approved-event
+    # Cleo Approved PR - Resume workflows waiting for quality review complete
+    - name: cleo-approved-event
       eventSourceName: github
       eventName: org
       filters:
@@ -58,6 +42,28 @@ spec:
           - path: body.review.state
             type: string
             value: ["approved"]
+          - path: body.review.user.login
+            type: string
+            value: ["5dlabs-cleo[bot]"]
+
+    # Tess Approved PR - Resume workflows waiting for testing complete
+    - name: tess-approved-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-Github-Event
+            type: string
+            value: ["pull_request_review"]
+          - path: body.action
+            type: string
+            value: ["submitted"]
+          - path: body.review.state
+            type: string
+            value: ["approved"]
+          - path: body.review.user.login
+            type: string
+            value: ["5dlabs-tess[bot]"]
 
     # PR Merged - Resume workflows waiting for this
     - name: pr-merged-event
@@ -269,10 +275,10 @@ spec:
         duration: "10s"
         factor: 2
 
-    # Resume workflows at waiting-ready-for-qa stage
+    # Resume workflows after Cleo approval (waiting-quality-complete stage)
     - template:
-        name: resume-waiting-ready-for-qa
-        conditions: "ready-for-qa-event"
+        name: resume-after-cleo-approval
+        conditions: "cleo-approved-event"
         k8s:
           operation: create
           source:
@@ -280,11 +286,11 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: stage-resume-ready-qa-
-                namespace: argo
+                generateName: stage-resume-cleo-approved-
+                namespace: agent-platform
                 labels:
                   type: stage-resume
-                  target-stage: waiting-ready-for-qa
+                  target-stage: waiting-quality-complete
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
@@ -297,7 +303,7 @@ spec:
                         #!/bin/bash
                         set -e
 
-                        # Ensure jq is available (some downstream commands/scripts rely on it)
+                        # Ensure jq is available
                         if ! command -v jq >/dev/null 2>&1; then
                           if command -v apk >/dev/null 2>&1; then
                             apk add --no-cache jq
@@ -311,18 +317,11 @@ spec:
                         fi
 
                         echo "=== Stage-Aware Workflow Resume ==="
-                        echo "Target Stage: waiting-ready-for-qa"
-                        echo "Label Added: {{ .Input.body.label.name }}"
-                        echo "Added By: {{ .Input.body.sender.login }}"
+                        echo "Target Stage: waiting-quality-complete"
+                        echo "Reviewer: {{ .Input.body.review.user.login }}"
+                        echo "Review State: {{ .Input.body.review.state }}"
 
-                        # Verify label was added by Cleo
-                        SENDER="{{ .Input.body.sender.login }}"
-                        if [[ ! "$SENDER" =~ 5DLabs-Cleo ]]; then
-                          echo "Label not added by Cleo, ignoring..."
-                          exit 0
-                        fi
-
-                        # Extract task ID from PR labels using jq (JSON-encode + case-insensitive)
+                        # Extract task ID from PR labels using jq
                         TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
                         TASK_ID=$(echo "$TASK_LABELS_JSON" \
                           | jq -r '.[] | (.name // "") | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' \
@@ -335,7 +334,7 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        # Find workflow by labels (since actual names have random suffixes)
+                        # Find workflow by labels
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -347,28 +346,14 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow exists and is at correct stage
+                        # Check if workflow is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
                           -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
-                        if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
+                        if [ "$CURRENT_STAGE" = "waiting-quality-complete" ]; then
                           echo "Found workflow at correct stage, resuming..."
-
-                          # Update workflow parameters
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='merge' \
-                            --patch='{
-                              "spec": {
-                                "arguments": {
-                                  "parameters": [
-                                    {"name": "qa-status", "value": "ready"}
-                                  ]
-                                }
-                              }
-                            }'
 
                           # Resume the workflow
                           kubectl patch workflow $WORKFLOW_NAME \
@@ -386,10 +371,10 @@ spec:
         duration: "10s"
         factor: 2
 
-    # Resume workflows at waiting-pr-approved stage
+    # Resume workflows after Tess approval (waiting-ready-for-qa stage)
     - template:
-        name: resume-waiting-pr-approved
-        conditions: "pr-approved-event"
+        name: resume-after-tess-approval
+        conditions: "tess-approved-event"
         k8s:
           operation: create
           source:
@@ -397,11 +382,11 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: stage-resume-pr-approved-
-                namespace: argo
+                generateName: stage-resume-tess-approved-
+                namespace: agent-platform
                 labels:
                   type: stage-resume
-                  target-stage: waiting-pr-approved
+                  target-stage: waiting-ready-for-qa
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
@@ -414,7 +399,7 @@ spec:
                         #!/bin/bash
                         set -e
 
-                        # Ensure jq is available (some downstream commands/scripts rely on it)
+                        # Ensure jq is available
                         if ! command -v jq >/dev/null 2>&1; then
                           if command -v apk >/dev/null 2>&1; then
                             apk add --no-cache jq
@@ -428,16 +413,9 @@ spec:
                         fi
 
                         echo "=== Stage-Aware Workflow Resume ==="
-                        echo "Target Stage: waiting-pr-approved"
+                        echo "Target Stage: waiting-ready-for-qa"
                         echo "Reviewer: {{ .Input.body.review.user.login }}"
                         echo "Review State: {{ .Input.body.review.state }}"
-
-                        # Verify approval is from Tess
-                        REVIEWER="{{ .Input.body.review.user.login }}"
-                        if [[ ! "$REVIEWER" =~ 5DLabs-Tess ]]; then
-                          echo "Approval not from Tess, ignoring..."
-                          exit 0
-                        fi
 
                         # Extract task ID from PR labels using jq
                         TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
@@ -452,7 +430,7 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        # Find workflow by labels (since actual names have random suffixes)
+                        # Find workflow by labels
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
                           -l task-id=$TASK_ID,workflow-type=play-orchestration \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
@@ -464,29 +442,14 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow exists and is at correct stage
+                        # Check if workflow is at correct stage
                         CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
                           -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' \
                           2>/dev/null || echo "")
 
-                        if [ "$CURRENT_STAGE" = "waiting-pr-approved" ]; then
+                        if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
                           echo "Found workflow at correct stage, resuming..."
-
-                          # Update workflow parameters
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='merge' \
-                            --patch='{
-                              "spec": {
-                                "arguments": {
-                                  "parameters": [
-                                    {"name": "qa-status", "value": "approved"},
-                                    {"name": "merge-sha", "value": "{{ .Input.body.pull_request.merge_commit_sha }}"}
-                                  ]
-                                }
-                              }
-                            }'
 
                           # Resume the workflow
                           kubectl patch workflow $WORKFLOW_NAME \
