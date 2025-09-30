@@ -1051,7 +1051,7 @@ echo "════════════════════════�
 cd "$CLAUDE_WORK_DIR"
 
 # Build Claude command (continue flag disabled due to cache_control API bug)
-CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+CLAUDE_CMD="claude -p --output-format text --input-format stream-json --verbose"
 
 # Look for Tess-specific system prompt file
 if [ -f "/task-files/tess-system-prompt.md" ]; then

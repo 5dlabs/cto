@@ -483,9 +483,9 @@ FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
   # Stash any local changes from previous runs to avoid checkout conflicts
-  if ! git diff-index --quiet HEAD --; then
-    echo "🔄 Stashing local changes before checkout"
-    git stash push -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" || true
+  if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo "🔄 Stashing local changes and untracked files before checkout"
+    git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" || true
   fi
   git checkout "$FEATURE_BRANCH"
   if [ -n "$REMOTE_BASE" ]; then
@@ -744,9 +744,10 @@ LAST_MESSAGE_FILE=""
 RUN_LOG=""
 
 FORCE_WRITES="{{#if force_writes}}true{{else}}false{{/if}}"
-OUTPUT_FORMAT="{{#if output_format}}{{output_format}}{{else}}json{{/if}}"
+OUTPUT_FORMAT="{{#if output_format}}{{output_format}}{{else}}text{{/if}}"
+OUTPUT_FORMAT="${OUTPUT_FORMAT,,}"
 
-AUTO_LEVEL="{{#if auto_level}}{{auto_level}}{{else}}medium{{/if}}"
+AUTO_LEVEL="{{#if auto_level}}{{auto_level}}{{else}}high{{/if}}"
 AUTO_LEVEL="${AUTO_LEVEL,,}"
 if [ "${FORCE_WRITES,,}" = "true" ]; then
   AUTO_LEVEL="high"
@@ -755,7 +756,11 @@ fi
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
   LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
-  RUN_LOG="/tmp/factory-run-${ATTEMPT}.jsonl"
+  RUN_LOG_EXT="log"
+  if [ "$OUTPUT_FORMAT" = "json" ] || [ "$OUTPUT_FORMAT" = "debug" ]; then
+    RUN_LOG_EXT="jsonl"
+  fi
+  RUN_LOG="/tmp/factory-run-${ATTEMPT}.${RUN_LOG_EXT}"
 
   FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
   {{#if model}}
@@ -780,7 +785,15 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   fi
 
   if [ -s "$RUN_LOG" ]; then
-    RESULT_TEXT=$(jq -r 'select(.type == "result") | .result // empty' "$RUN_LOG" 2>/dev/null | tail -n1)
+    if [ "$OUTPUT_FORMAT" = "json" ] || [ "$OUTPUT_FORMAT" = "debug" ]; then
+      if command -v jq >/dev/null 2>&1; then
+        RESULT_TEXT=$(jq -r 'select(.type == "result") | .result // empty' "$RUN_LOG" 2>/dev/null | tail -n1)
+      else
+        RESULT_TEXT=$(tail -n 40 "$RUN_LOG" 2>/dev/null | sed 's/\r$//')
+      fi
+    else
+      RESULT_TEXT=$(tail -n 40 "$RUN_LOG" 2>/dev/null | sed 's/\r$//')
+    fi
     printf '%s\n' "$RESULT_TEXT" > "$LAST_MESSAGE_FILE"
   else
     : > "$LAST_MESSAGE_FILE"

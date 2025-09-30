@@ -980,7 +980,7 @@ fi
 echo "✓ Code implementation environment ready"
 
 # Build Claude command
-CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+CLAUDE_CMD="claude -p --output-format text --input-format stream-json --verbose"
 
 # Add MCP configuration if available
 if [ -f "/workspace/.mcp.json" ]; then
@@ -1121,7 +1121,7 @@ COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
 # Ensure we pass the combined system prompt
 CLAUDE_CMD="$CLAUDE_CMD --system-prompt $COMBINED_SYS_PROMPT"
 
-echo "Starting Claude execution (stream-json via FIFO)..."
+echo "Starting Claude execution (text output via FIFO)..."
 echo "=========================="
 
 # Safe mode toggle for debugging (prevents token consumption)
