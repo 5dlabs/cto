@@ -111,26 +111,26 @@ spec:
                           SERVER="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
                           TOKEN=$(cat "$TOKEN_FILE")
 
-                          cat <<EOF > "$KUBECONFIG_PATH"
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority: ${CA_CERT}
-    server: ${SERVER}
-  name: in-cluster
-contexts:
-- context:
-    cluster: in-cluster
-    namespace: agent-platform
-    user: sensor-sa
-  name: in-cluster
-current-context: in-cluster
-users:
-- name: sensor-sa
-  user:
-    token: ${TOKEN}
-EOF
+                          cat <<EOF | sed 's/^ \{26\}//' > "$KUBECONFIG_PATH"
+                          apiVersion: v1
+                          kind: Config
+                          clusters:
+                          - cluster:
+                              certificate-authority: ${CA_CERT}
+                              server: ${SERVER}
+                            name: in-cluster
+                          contexts:
+                          - context:
+                              cluster: in-cluster
+                              namespace: agent-platform
+                              user: sensor-sa
+                            name: in-cluster
+                          current-context: in-cluster
+                          users:
+                          - name: sensor-sa
+                            user:
+                              token: ${TOKEN}
+                          EOF
 
                           echo "$KUBECONFIG_PATH"
                         }
