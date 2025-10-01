@@ -74,7 +74,7 @@ spec:
                             break
                           fi
 
-                          echo "No workflows waiting for PR creation (attempt $ATTEMPT/$MAX_WAIT_ATTEMPTS); waiting $WAIT_INTERVALs"
+                          echo "No workflows waiting for PR creation (attempt $ATTEMPT/$MAX_WAIT_ATTEMPTS); waiting ${WAIT_INTERVAL}s"
                           sleep $WAIT_INTERVAL
                           ATTEMPT=$((ATTEMPT+1))
                         done
