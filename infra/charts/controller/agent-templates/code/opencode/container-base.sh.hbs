@@ -804,12 +804,12 @@ fi
 
 echo "🔑 Configuring OpenCode authentication (provider key: $PROVIDER_ENV_KEY)"
 
-if [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
-  echo "⚠️ AGENTS.md missing; creating placeholder"
-  cat <<'PLACEHOLDER' > "$OPENCODE_WORK_DIR/AGENTS.md"
+if [ ! -f "$OPENCODE_WORK_DIR/OPENCODE.md" ] && [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ] && [ ! -f "$OPENCODE_WORK_DIR/open-code.md" ]; then
+  echo "⚠️ No OpenCode guidance file detected; creating placeholder OPENCODE.md"
+  cat <<'PLACEHOLDER' > "$OPENCODE_WORK_DIR/OPENCODE.md"
 # Project Guidance
 
-This OpenCode run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give OpenCode richer instructions.
+This OpenCode run was triggered without OPENCODE.md content. Provide project context in OPENCODE.md to give OpenCode richer instructions.
 PLACEHOLDER
 fi
 
@@ -835,8 +835,17 @@ if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ] || [ -f "$OPENCODE_WORK_DIR/
   PROMPT_PREFIX="${PROMPT_PREFIX}\n---\n\n"
 fi
 
-if [ -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
-  PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n@AGENTS.md\n\n---\n\n"
+GUIDANCE_TOKEN=""
+if [ -f "$OPENCODE_WORK_DIR/OPENCODE.md" ]; then
+  GUIDANCE_TOKEN="@OPENCODE.md"
+elif [ -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
+  GUIDANCE_TOKEN="@AGENTS.md"
+elif [ -f "$OPENCODE_WORK_DIR/open-code.md" ]; then
+  GUIDANCE_TOKEN="@open-code.md"
+fi
+
+if [ -n "$GUIDANCE_TOKEN" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${GUIDANCE_TOKEN}\n\n---\n\n"
 fi
 
 echo "🔍 DEBUG: About to check for prompt.md at: $OPENCODE_WORK_DIR/task/prompt.md"
@@ -873,6 +882,21 @@ RUN_LOG=""
 SESSION_DIR="$HOME/.opencode/sessions"
 LATEST_SESSION_ID=""
 
+has_existing_sessions() {
+  local session_dir="$1"
+  if [ ! -d "$session_dir" ]; then
+    return 1
+  fi
+
+  for session_file in "$session_dir"/*.json; do
+    if [ -f "$session_file" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 extract_session_id() {
   local log_file="$1"
   [ -f "$log_file" ] || return 1
@@ -896,6 +920,13 @@ extract_session_id() {
     ' "$log_file" 2>/dev/null
   fi
 }
+
+if [ "$CONTINUE_SESSION" = "1" ]; then
+  if ! has_existing_sessions "$SESSION_DIR"; then
+    echo "ℹ️ No existing OpenCode sessions detected; starting new session"
+    CONTINUE_SESSION=0
+  fi
+fi
 
 write_last_message() {
   local log_file="$1"
@@ -964,7 +995,11 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     "json"
   )
   if [ "$CONTINUE_SESSION" = "1" ]; then
-    OPENCODE_CMD+=("--continue")
+    if [ -n "$LATEST_SESSION_ID" ]; then
+      OPENCODE_CMD+=("--session" "$LATEST_SESSION_ID")
+    else
+      OPENCODE_CMD+=("--continue")
+    fi
   fi
   OPENCODE_CMD+=("$PROMPT_PAYLOAD")
 
@@ -1002,6 +1037,7 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
       echo "ℹ️  Captured OpenCode session ID: $NEW_SESSION_ID"
       LATEST_SESSION_ID="$NEW_SESSION_ID"
     fi
+    CONTINUE_SESSION=1
   fi
 
   PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
@@ -1035,9 +1071,13 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
       "run"
       "--format"
       "json"
-      "--continue"
-      "$COMPLETION_PROMPT"
     )
+    if [ -n "$LATEST_SESSION_ID" ]; then
+      COMPLETION_CMD+=("--session" "$LATEST_SESSION_ID")
+    else
+      COMPLETION_CMD+=("--continue")
+    fi
+    COMPLETION_CMD+=("$COMPLETION_PROMPT")
     "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
     COMPLETION_EXIT=${PIPESTATUS[0]}
     set +o pipefail

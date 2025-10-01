@@ -156,6 +156,7 @@ impl<'a> CodeResourceManager<'a> {
             && cli_type != CLIType::Codex
             && cli_type != CLIType::Cursor
             && cli_type != CLIType::Factory
+            && cli_type != CLIType::OpenCode
         {
             let job_name = self.generate_job_name(code_run_ref);
             self.ensure_headless_service_exists(code_run_ref, &job_name)
