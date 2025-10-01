@@ -149,6 +149,11 @@ spec:
                             | {spec:{arguments:{parameters:.spec.arguments.parameters}}}
                           ')
 
+                          if [ -z "$PATCH_JSON" ]; then
+                            echo "ERROR: Failed to construct PR metadata patch payload for $workflow_name"
+                            return 1
+                          fi
+
                           kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$PATCH_JSON"
                         }
 
