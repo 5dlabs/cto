@@ -134,7 +134,7 @@ spec:
                             return 1
                           fi
 
-                          PATCH_JSON=$(echo "$WORKFLOW_JSON" | jq --arg prUrl "$pr_url" --arg prNumber "$pr_number" '
+                          if ! PATCH_JSON=$(echo "$WORKFLOW_JSON" | jq --arg prUrl "$pr_url" --arg prNumber "$pr_number" '
                             .spec.arguments.parameters = (
                               ( .spec.arguments.parameters // [] )
                               | (if (map(.name) | index("pr-url")) != null
@@ -147,7 +147,10 @@ spec:
                                  end)
                             )
                             | {spec:{arguments:{parameters:.spec.arguments.parameters}}}
-                          ')
+                          '); then
+                            echo "ERROR: jq failed while constructing PR metadata patch for $workflow_name"
+                            return 1
+                          fi
 
                           if [ -z "$PATCH_JSON" ]; then
                             echo "ERROR: Failed to construct PR metadata patch payload for $workflow_name"
