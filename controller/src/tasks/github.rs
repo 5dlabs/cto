@@ -43,17 +43,18 @@ pub async fn check_github_for_pr_by_branch(
         .await
         .with_context(|| format!("Failed to search for PRs in {owner}/{repo}"))?;
 
+    let expected_full_name = format!("{owner}/{repo}");
+
     loop {
-        if let Some(pr) = page
-            .items
-            .iter()
-            .find(|pr| branch_matches(task_id, &pr.head.ref_field))
-        {
+        if let Some(pr) = page.items.iter().find(|pr| {
+            branch_matches(task_id, &pr.head.ref_field)
+                && pr_origin_matches(pr, &owner, &repo, &expected_full_name)
+        }) {
             let pr_url = pr
                 .html_url
                 .as_ref()
                 .map(|url| url.to_string())
-                .unwrap_or_else(|| pr.url.clone());
+                .unwrap_or_else(|| format!("https://github.com/{owner}/{repo}/pull/{}", pr.number));
             info!("Found PR via GitHub API for task {}: {}", task_id, pr_url);
             return Ok(Some(pr_url));
         }
@@ -85,6 +86,51 @@ fn branch_matches(task_id: u32, head_ref: &str) -> bool {
         || head_ref == format!("feature/{base}")
         || head_ref.starts_with(&format!("{base}-"))
         || head_ref.starts_with(&format!("feature/{base}-"))
+}
+
+fn pr_origin_matches(
+    pr: &PullRequest,
+    expected_owner: &str,
+    expected_repo: &str,
+    expected_full_name: &str,
+) -> bool {
+    pr.head
+        .repo
+        .as_ref()
+        .map(|repo| {
+            repo_identity_matches(
+                repo.owner.as_ref().map(|owner| owner.login.as_str()),
+                repo.name.as_str(),
+                repo.full_name.as_deref(),
+                expected_owner,
+                expected_repo,
+                expected_full_name,
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn repo_identity_matches(
+    owner_login: Option<&str>,
+    repo_name: &str,
+    full_name: Option<&str>,
+    expected_owner: &str,
+    expected_repo: &str,
+    expected_full_name: &str,
+) -> bool {
+    let owner_matches = owner_login
+        .map(|login| login.eq_ignore_ascii_case(expected_owner))
+        .unwrap_or(false);
+
+    if !owner_matches {
+        return false;
+    }
+
+    if let Some(full) = full_name {
+        full.eq_ignore_ascii_case(expected_full_name)
+    } else {
+        repo_name.eq_ignore_ascii_case(expected_repo)
+    }
 }
 
 /// Parse repository URL to extract owner and repo name
@@ -197,5 +243,41 @@ mod tests {
         assert!(!branch_matches(1, "task-10"));
         assert!(!branch_matches(1, "feature/task-10-implementation"));
         assert!(!branch_matches(1, "main"));
+    }
+
+    #[test]
+    fn test_repo_identity_matches_full_name() {
+        assert!(repo_identity_matches(
+            Some("5dlabs"),
+            "rust-basic-api-2",
+            Some("5dlabs/rust-basic-api-2"),
+            "5dlabs",
+            "rust-basic-api-2",
+            "5dlabs/rust-basic-api-2"
+        ));
+    }
+
+    #[test]
+    fn test_repo_identity_matches_repo_name_only() {
+        assert!(repo_identity_matches(
+            Some("5dlabs"),
+            "rust-basic-api-2",
+            None,
+            "5dlabs",
+            "rust-basic-api-2",
+            "5dlabs/rust-basic-api-2"
+        ));
+    }
+
+    #[test]
+    fn test_repo_identity_matches_owner_mismatch() {
+        assert!(!repo_identity_matches(
+            Some("someone-else"),
+            "rust-basic-api-2",
+            Some("someone-else/rust-basic-api-2"),
+            "5dlabs",
+            "rust-basic-api-2",
+            "5dlabs/rust-basic-api-2"
+        ));
     }
 }
