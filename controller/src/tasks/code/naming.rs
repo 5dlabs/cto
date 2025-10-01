@@ -36,8 +36,7 @@ impl ResourceNaming {
             .spec
             .cli_config
             .as_ref()
-            .map(|config| config.cli_type.to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), |config| config.cli_type.to_string());
 
         let base_name = format!(
             "code-{agent}-{cli}-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}"
