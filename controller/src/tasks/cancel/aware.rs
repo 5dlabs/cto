@@ -87,6 +87,8 @@ impl StateAwareCancellation {
         task_id: &str,
         pr_number: i32,
     ) -> Result<CancellationResult, CancellationError> {
+        // Allow SystemTime::now() for generating unique correlation ID (not time-dependent logic)
+        #[allow(clippy::disallowed_methods)]
         let correlation_id = format!(
             "cancel-{}-{}",
             task_id,

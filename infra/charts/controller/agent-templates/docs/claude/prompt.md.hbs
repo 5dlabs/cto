@@ -4,122 +4,55 @@
 {{#unless (eq "false" "true")}}
 
 **🚨 MANDATORY COMPLETION REQUIREMENT 🚨**
-You MUST complete ALL steps in this process. Partial completion is not acceptable. This is especially critical for large projects with many tasks.
+You must finish every step below for each task that still needs documentation. Partial completion is not acceptable.
 
 ## Task Overview
-Generate comprehensive documentation for {{#if task_id}}task {{task_id}}{{else}}**ALL Task Master tasks**{{/if}}.
+Generate complete documentation for {{#if task_id}}task {{task_id}}{{else}}every Task Master task that is missing required files{{/if}}. For large projects (10+ tasks) announce total scope, provide progress updates after every 5 tasks, and keep working until all incomplete tasks are covered.
 
-**If this is a large project with many tasks (10+ tasks), you MUST:**
-- Process ALL tasks without stopping
-- Show progress updates as you work through each task
-- Complete the ENTIRE git workflow including PR creation
-- Do NOT stop partway through - finish everything
+## Step 0: MCP Tool Discovery and Usage Plan (Required)
+- List the available MCP tools/servers (for example via `tools/list`).
+- Draft a short plan mapping tools to actions during documentation:
+  - `filesystem`: open precise source files, capture accurate APIs, note file paths.
+  - `git`: gather commit history or rationale when it clarifies intent.
+  - `rustdocs_query_rust_docs`: quote authoritative Rust API snippets with identifiers.
+  - `brave_web_search`: pull external standards/examples only when local sources are insufficient.
+- Execute this plan throughout all later steps.
 
-## Required Process
-
-### Step 0: MCP Tool Discovery and Usage Plan (REQUIRED)
-Before reading project files, discover and plan how to use available MCP tools:
-- List available MCP tools/servers (e.g., via tools/list). Summarize what you have.
-- Form a brief plan mapping tools → actions during documentation:
-  - filesystem: read source files to extract accurate APIs, types, and code snippets. Always include file path(s) and concise snippets.
-  - git: inspect history/blame to explain design choices or provide commit references when helpful.
-  - rustdocs_query_rust_docs: fetch Rust API docs for referenced crates/modules; include short, relevant quotes and link/identifier names.
-  - brave_web_search: gather external references, standards, or examples; cite URLs and summarize key points.
-- Execute this plan throughout steps 1–3. Prefer primary sources (repo, Rust docs). Use web search when local sources are insufficient.
-
-### Available CLI Tools for Documentation
-
-**Mermaid CLI** - Generate architecture and sequence diagrams:
-```bash
-# Create architecture diagram from Mermaid markdown
-mmdc -i architecture.mmd -o architecture.png
-
-# Generate SVG format
-mmdc -i diagram.mmd -o diagram.svg
-
-# Generate multiple formats
-mmdc -i diagram.mmd -o diagram.png -o diagram.svg
-```
-
-**When to use Mermaid diagrams:**
-- System architecture overviews
-- Component interaction diagrams
-- Workflow/sequence diagrams for complex processes
-- Database schema visualizations
-- State machine diagrams
-
-**Mermaid diagram examples for task documentation:**
-- Create `.taskmaster/docs/task-{id}/architecture.mmd` files
-- Generate both `.png` and `.svg` outputs for flexibility
-- Include generated images in task.md documentation
-
-### Step 1: Context Analysis (REQUIRED)
-1. Read CLAUDE.md for project context and standards
-2. **Use individual task files:**
-   - Individual task files have been pre-copied to `.taskmaster/docs/task-{id}/task.txt`
-   - Each `task.txt` contains complete task information including subtasks and implementation details
-3. Review architecture.md and prd.txt for context
+## Step 1: Context Analysis
+1. Read `CLAUDE.md` for project conventions.
+2. Use individual task files at `.taskmaster/docs/task-{id}/task.txt`; each contains the full task brief.
+3. Review `.taskmaster/docs/architecture.md` and `.taskmaster/docs/prd.txt` for system context.
 {{#if include_codebase}}
-4. **EXISTING PROJECT CONTEXT:**
-   - **READ `.taskmaster/docs/codebase.md`** - This contains the complete existing codebase
-   - Understand the current implementation state and architecture
-   - Identify gaps between current code and task requirements
-   - Focus on building upon existing patterns and code structure
-   - Consider what's already implemented vs. what needs to be added
-5. **For large projects: Announce total task count and confirm you will process ALL of them**
-{{else}}
-4. **For large projects: Announce total task count and confirm you will process ALL of them**
+4. Read `.taskmaster/docs/codebase.md` to understand the current implementation, reuse patterns, and note deltas required by upcoming tasks.
 {{/if}}
 
-**🎯 IMPORTANT: Use individual `task.txt` files for each task**
-- Individual task files are available at: `.taskmaster/docs/task-{id}/task.txt`
-- Example: task 1 → `.taskmaster/docs/task-1/task.txt`, task 15 → `.taskmaster/docs/task-15/task.txt`
-- These files contain complete task information including subtasks and implementation details
-- This approach allows efficient processing of large projects with many tasks
-
-### Step 2: Documentation Generation (MANDATORY FOR ALL TASKS)
-{{#if task_id}}
-Focus specifically on task {{task_id}} and create:
-{{else}}
-**IMPORTANT: SKIP TASKS THAT ALREADY HAVE COMPLETE DOCUMENTATION**
-
-Before processing any task, check if ALL required files already exist:
+## Step 2: Determine Workload
+Before starting any task, check whether all four required artifacts already exist with substantial content:
 - `task.md`
 - `prompt.md`
 - `acceptance-criteria.md`
 - `task.xml`
 
-If ALL four files exist and have substantial content (not just stubs), SKIP that task to save tokens and time.
+If every file is present and meaningful, skip that task. Otherwise, process it fully. Announce each task when you begin ("📝 Processing Task [ID]: [Title]") and confirm when done ("✅ Completed Task [ID]").
 
-**YOU MUST CREATE DOCUMENTATION FOR EVERY TASK THAT NEEDS IT. DO NOT SKIP ANY INCOMPLETE TASKS.**
+## Step 3: Produce Documentation (Per Task)
+Create or update all four deliverables inside `.taskmaster/docs/task-{id}/`:
 
-For each task that needs documentation (process ALL incomplete tasks, no exceptions):
-{{/if}}
-- `task.md` - Comprehensive task overview and implementation guide
-- `prompt.md` - Autonomous prompt for AI agents
-- `acceptance-criteria.md` - Clear acceptance criteria and test cases
-- `task.xml` - XML-structured prompt optimized for LLM consumption (agent-generated)
+### 3.1 `task.md`
+- Summarize objectives, context, dependencies, and implementation plan.
+- Reference specific source files or modules (≤30 line excerpts) discovered via MCP tools.
+- Highlight architectural considerations and risks.
 
-While generating documents, actively use MCP tools to deepen technical detail:
-- Use filesystem to open the most relevant files and include minimal, correct code excerpts (≤30 lines) with paths and brief explanations.
-- Use git to reference meaningful commits or evolution where it clarifies intent or constraints.
-- Use rustdocs_query_rust_docs for API semantics and correct type usage; include function/type names and brief quotes (≤25 words) with identifiers.
-- Use brave_web_search for specs and external references; list top 1–3 links with one‑line takeaways when relevant.
+### 3.2 `prompt.md`
+- Craft a standalone agent prompt that captures task intent, constraints, available tools, and success definition.
+- Keep instructions concise and action-oriented so future agents can execute autonomously.
 
-**Progress Requirements:**
-- Announce each task as you start it: "📝 Processing Task [ID]: [Title]"
-- Confirm completion of each task: "✅ Completed Task [ID]"
-- **For large projects: Provide periodic updates (every 5 tasks): "Progress: [X] of [Y] tasks completed"**
+### 3.3 `acceptance-criteria.md`
+- List clear, testable criteria (bulleted).
+- Include manual/automated validation steps and relevant commands.
 
-Place all documentation in `.taskmaster/docs/task-{id}/` directories.
-
-### Step 2.4: XML Prompt Generation (MANDATORY)
-
-**🔧 CRITICAL: Generate XML-Structured Prompt for LLM Consumption**
-
-For each task, you MUST create a `task.xml` file that combines all task information into an XML structure optimized for LLM processing. This single file will contain all the technical specifications, acceptance criteria, and implementation guidance needed for coding agents.
-
-**REQUIRED XML STRUCTURE:**
+### 3.4 `task.xml`
+- Generate the XML prompt using the structure below. Populate every element with task-specific information.
 ```xml
 <prompt>
     <role>You are a senior coding agent specializing in [technology stack from task].</role>
@@ -132,60 +65,45 @@ For each task, you MUST create a `task.xml` file that combines all task informat
         <dependencies>[comma-separated dependency IDs]</dependencies>
     </task>
     <technical_specifications>
-        <spec>[Technical requirement 1]</spec>
-        <spec>[Technical requirement 2]</spec>
-        <spec>[Technical requirement N]</spec>
+        <spec>[Technical requirement]</spec>
     </technical_specifications>
     <implementation_details>
-        [Detailed implementation guidance from task.txt]
+        [Detailed implementation guidance from task.txt and analysis]
     </implementation_details>
     <acceptance_criteria>
-        <criterion>[Acceptance criterion 1]</criterion>
-        <criterion>[Acceptance criterion 2]</criterion>
-        <criterion>[Acceptance criterion N]</criterion>
+        <criterion>[Acceptance criterion]</criterion>
     </acceptance_criteria>
     <test_strategy>
-        [Testing approach and requirements]
+        [Testing approach and required commands]
     </test_strategy>
     <instructions>
-        Think step-by-step about the implementation approach. Consider the existing codebase structure and patterns.
-        Provide complete, production-ready code that follows best practices. Include necessary imports,
-        error handling, and documentation. Test your solution thoroughly before finalizing.
-        Where appropriate, incorporate insights gathered via MCP tools (filesystem, git, rustdocs, web) to ensure correctness.
+        Think step-by-step, follow existing patterns, include necessary imports, error handling, and tests. Apply insights gathered via MCP tools to ensure correctness.
     </instructions>
 </prompt>
 ```
 
-### Step 3: Complete Documentation Generation
-**⚠️ CRITICAL: You MUST generate ALL documentation files as specified above.**
+### 3.5 Diagrams (When Helpful)
+- If a task benefits from visualisation, create `.taskmaster/docs/task-{id}/diagrams.mmd` with Mermaid definitions (one file per task).
+- Optionally render assets alongside the source, e.g. `mmdc -i diagrams.mmd -o diagrams.svg` or `.png`.
+- Keep diagram notes concise and reference them from `task.md` where appropriate.
 
-**Git Workflow:** The orchestrator post-completion hook will automatically handle:
-- Creating and checking out the feature branch: `docs-gen-{{source_branch}}`
-- Staging all documentation files
-- Committing with proper message
-- Pushing to origin
-- Creating pull request to target branch: `{{source_branch}}`
+### 3.6 Reflection Checkpoint (After Each Task)
+Immediately after finishing the required outputs (including diagrams if created):
+1. Review the artifacts you just produced.
+2. Note at least one improvement or insight to apply on the next task (e.g., missing code reference, unclear criteria).
+3. State how you will adjust before beginning the next task and follow through.
 
-**Your Job:** Focus ONLY on generating the documentation files. Do NOT run any git commands.
+## Step 4: Completion and Handoff
+- Do **not** run git commands; the orchestrator handles branch, commit, push, and PR creation (`docs-gen-{{source_branch}}`).
+- When all incomplete tasks are processed, confirm: "✅ DOCUMENTATION FILES GENERATED - Hook will handle git workflow and PR creation".
 
-✅ **Final Confirmation Required:** "✅ DOCUMENTATION FILES GENERATED - Hook will handle git workflow and PR creation"
+## Quality and Error Handling
+- Ensure documents are technically accurate, well-formatted, and consistent.
+- Include targeted code snippets, links, and references derived from MCP tools.
+- If any step fails, report the issue, fix it, and continue until resolved.
 
-## Error Handling
-- If documentation generation fails, report the error and retry
-- If file creation fails, check permissions and retry
-- **DO NOT give up - complete the documentation generation**
-- **Note:** Git workflow and PR creation are handled by the hook, not the agent
-
-## Quality Standards
-- Well-structured and comprehensive content
-- Actionable implementation guidance
-- Proper markdown formatting
-- Code examples where relevant
-- Clear cross-references between documents
-- Maintain consistency across ALL documents
-
-## Final Confirmation Required
-**YOU MUST END WITH THIS EXACT MESSAGE:**
+## Final Confirmation (Mandatory)
+End with exactly:
 ```
 🎉 DOCUMENTATION GENERATION COMPLETE 🎉
 ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
@@ -195,7 +113,7 @@ For each task, you MUST create a `task.xml` file that combines all task informat
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook
 ```
 
-**If you cannot provide this final confirmation, the task is NOT complete and you must continue working until it is done.**
+If you cannot provide this message, continue working until you can.
 
 {{else}}
 

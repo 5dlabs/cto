@@ -14,23 +14,3 @@ pub use codex::CodexAdapter;
 pub use cursor::CursorAdapter;
 pub use factory::FactoryAdapter;
 pub use opencode::OpenCodeAdapter;
-
-pub mod gemini {
-    //! Gemini CLI adapter (placeholder for future task)
-    // TODO: Implement GeminiAdapter
-}
-
-pub mod grok {
-    //! Grok CLI adapter (placeholder for future task)
-    // TODO: Implement GrokAdapter
-}
-
-pub mod qwen {
-    //! Qwen CLI adapter (placeholder for future task)
-    // TODO: Implement QwenAdapter
-}
-
-pub mod openhands {
-    //! OpenHands CLI adapter (placeholder for future task)
-    // TODO: Implement OpenHandsAdapter
-}

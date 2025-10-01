@@ -300,7 +300,7 @@ ENV CC=clang \
 # Note: RUSTC_WRAPPER intentionally not set to avoid sccache path issues
 
 # Prepare npm global and permissions
-RUN mkdir -p /usr/local/share/npm-global && chown -R 1000:1000 /usr/local/share
+RUN mkdir -p /usr/local/share/npm-global/lib && chown -R 1000:1000 /usr/local/share/npm-global
 
 # Persist bash history for convenience
 ARG USERNAME=node
@@ -345,27 +345,55 @@ RUN curl -fsSL https://qlty.sh | bash \
 # Install security scanning tools for agent-generated code
 USER root
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    set -eux; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+        amd64) DL_ARCH=amd64; GITLEAKS_CANDIDATES="x64 amd64"; HADOLINT_CANDIDATES="x86_64 amd64" ;; \
+        arm64) DL_ARCH=arm64; GITLEAKS_CANDIDATES="arm64 aarch64"; HADOLINT_CANDIDATES="arm64 aarch64" ;; \
+        *) DL_ARCH="$ARCH"; GITLEAKS_CANDIDATES="$ARCH"; HADOLINT_CANDIDATES="$ARCH" ;; \
+    esac; \
     # Install gitleaks (secret scanning)
-    GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r '.tag_name') && \
-    curl -fsSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_${DL_ARCH}.tar.gz" && \
-    tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks && \
-    chmod +x /usr/local/bin/gitleaks && \
-    rm -f /tmp/gitleaks.tar.gz && \
+    GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r '.tag_name'); \
+    if [ -z "$GITLEAKS_VERSION" ] || [ "$GITLEAKS_VERSION" = "null" ]; then GITLEAKS_VERSION="v8.18.2"; fi; \
+    DOWNLOAD_SUCCESS=0; \
+    for candidate in $GITLEAKS_CANDIDATES; do \
+        if curl -fsSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_${candidate}.tar.gz"; then \
+            DOWNLOAD_SUCCESS=1; \
+            break; \
+        else \
+            rm -f /tmp/gitleaks.tar.gz; \
+        fi; \
+    done; \
+    if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then \
+        echo "Failed to download gitleaks for architecture $ARCH"; \
+        exit 1; \
+    fi; \
+    tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks; \
+    chmod +x /usr/local/bin/gitleaks; \
+    rm -f /tmp/gitleaks.tar.gz; \
     # Install trivy (vulnerability scanning)
-    curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin && \
+    curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin; \
     # Install hadolint (Dockerfile linting)
-    curl -fsSL -o /usr/local/bin/hadolint "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${DL_ARCH}" && \
+    DOWNLOAD_SUCCESS=0; \
+    for candidate in $HADOLINT_CANDIDATES; do \
+        if curl -fsSL -o /usr/local/bin/hadolint "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${candidate}"; then \
+            DOWNLOAD_SUCCESS=1; \
+            break; \
+        fi; \
+    done; \
+    if [ "$DOWNLOAD_SUCCESS" -ne 1 ]; then \
+        echo "Failed to download hadolint for architecture $ARCH"; \
+        exit 1; \
+    fi; \
     chmod +x /usr/local/bin/hadolint
+
+# Configure npm globals before installing CLI tooling as non-root
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 
 # Install mermaid-cli for diagram generation (docs/architecture work)
 USER node
 RUN npm install -g @mermaid-js/mermaid-cli
-
-# Global npm config and PATH
-ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 
 # Go environment for non-root user
 ENV GOPATH=/home/node/go

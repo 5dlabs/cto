@@ -1464,11 +1464,25 @@ impl<'a> CodeResourceManager<'a> {
 
     fn apply_cli_provider(&self, existing: &mut CLIConfig) {
         let cli_key = existing.cli_type.to_string().to_lowercase();
-        if let Some(provider) = self.config.agent.cli_providers.get(&cli_key) {
+        if let Some(provider_name) = self.config.agent.cli_providers.get(&cli_key) {
+            // Set simple provider string for backward compatibility
             existing
                 .settings
                 .entry("provider".to_string())
-                .or_insert_with(|| serde_json::Value::String(provider.clone()));
+                .or_insert_with(|| serde_json::Value::String(provider_name.clone()));
+
+            // Build full modelProvider object with env_key from secrets config
+            let provider_key = provider_name.to_lowercase();
+            if let Some(provider_cfg) = self.config.secrets.provider_api_keys.get(&provider_key) {
+                let provider_obj = serde_json::json!({
+                    "name": provider_name,
+                    "envKey": &provider_cfg.secret_key,
+                });
+                existing
+                    .settings
+                    .entry("modelProvider".to_string())
+                    .or_insert(provider_obj);
+            }
         }
     }
 
