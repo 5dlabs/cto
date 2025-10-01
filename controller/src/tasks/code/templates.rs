@@ -201,7 +201,7 @@ impl CodeTemplateGenerator {
         );
 
         templates.insert(
-            "OPENCODE.md".to_string(),
+            "AGENTS.md".to_string(),
             Self::generate_opencode_memory(code_run, &cli_config_value, &remote_tools)?,
         );
 
@@ -1845,6 +1845,7 @@ impl CodeTemplateGenerator {
                 "instructions": instructions_plain,
                 "remote_tools": remote_tools,
                 "local_servers": local_servers_serialized,
+                "toolman_url": render_settings.toolman_url,
                 "provider": {
                     "name": provider_name,
                     "envKey": provider_env_key,
