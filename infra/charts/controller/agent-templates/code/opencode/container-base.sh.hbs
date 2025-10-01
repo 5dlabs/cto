@@ -606,17 +606,22 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
 
   if git clone --quiet --branch "$DOCS_BRANCH" --single-branch "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
     echo "✓ Docs repository cloned"
-  else
-    echo "⚠️ Failed to clone docs branch '$DOCS_BRANCH'; attempting default branch"
-    if git clone --quiet "$DOCS_HTTP_URL" "$DOCS_CLONE_DIR"; then
-      echo "✓ Docs repository cloned using default branch"
-    else
-      echo "❌ Unable to clone docs repository: $DOCS_HTTP_URL"
-      DOCS_CLONE_DIR=""
-    fi
+  if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
+    find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
+    rm -f "$SESSION_FILE"
+    CURRENT_SESSION_ID=""
+    HAS_EXISTING_OPENCODE_SESSION=0
   fi
 
-  if [ -n "$DOCS_CLONE_DIR" ]; then
+  ACTIVE_SESSION_FLAGS=()
+  if [ "$CONTINUE_SESSION" = "1" ]; then
+    if [ -n "$CURRENT_SESSION_ID" ]; then
+      ACTIVE_SESSION_FLAGS=("--session" "$CURRENT_SESSION_ID")
+    elif [ $ATTEMPT -eq 1 ] && [ "$HAS_EXISTING_OPENCODE_SESSION" -eq 1 ]; then
+      ACTIVE_SESSION_FLAGS=("--continue")
+      HAS_EXISTING_OPENCODE_SESSION=0
+    fi
+  fi
     DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
     if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
       DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
@@ -638,12 +643,12 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
       cp "$DOCS_BASE_PATH/tasks.json" "$OPENCODE_WORK_DIR/task/" 2>/dev/null || true
     fi
   fi
+PROMPT_PAYLOAD=""
+if [ -f "$OPENCODE_WORK_DIR/task/prompt.md" ]; then
+  PROMPT_PAYLOAD="$(cat "$OPENCODE_WORK_DIR/task/prompt.md")"
 else
-  echo "⚠️ Docs repository URL not provided; skipping task docs sync"
-fi
-
-if [ -f /task-files/AGENTS.md ]; then
-  cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
+  echo "❌ prompt.md not found at $OPENCODE_WORK_DIR/task/prompt.md"
+  exit 1
 fi
 
 if [ -f /task-files/coding-guidelines.md ]; then
@@ -905,18 +910,25 @@ fi
 extract_session_id() {
   local log_file="$1"
   [ -f "$log_file" ] || return 1
-  awk '
-    {
-      gsub(/\033\[[0-9;]*[mK]/, "");
-      if ($0 ~ /opencode session[[:space:]]+[0-9a-fA-F-]{4,}/) {
-        match($0, /opencode session[[:space:]]+([0-9a-fA-F-]+)/, a);
-        if (a[1] != "") last=a[1];
+  if command -v jq >/dev/null 2>&1; then
+    jq -r 'select(.sessionID != null) | .sessionID' "$log_file" 2>/dev/null | tail -n1 | tr -d '\r' | tr -d '\n'
+  else
+    awk '
+      {
+        gsub(/\033\[[0-9;]*[mK]/, "");
+        if ($0 ~ /sessionID"[[:space:]]*:[[:space:]]*"[0-9a-fA-F-]{4,}/) {
+          match($0, /sessionID"[[:space:]]*:[[:space:]]*"([0-9a-fA-F-]+)/, a);
+          if (a[1] != "") last=a[1];
+        } else if ($0 ~ /opencode session[[:space:]]+[0-9a-fA-F-]{4,}/) {
+          match($0, /opencode session[[:space:]]+([0-9a-fA-F-]+)/, a);
+          if (a[1] != "") last=a[1];
+        }
       }
-    }
-    END {
-      if (last != "") print last;
-    }
-  ' "$log_file" 2>/dev/null
+      END {
+        if (last != "") print last;
+      }
+    ' "$log_file" 2>/dev/null
+  fi
 }
 
 persist_session_id() {
@@ -926,27 +938,51 @@ persist_session_id() {
   fi
 }
 
+write_last_message() {
+  local log_file="$1"
+  local dest_file="$2"
+  [ -f "$log_file" ] || return 1
+
+  if command -v jq >/dev/null 2>&1; then
+    local last_text
+    last_text=$(jq -r '
+      select(.type == "text")
+      | (if (.text | type) == "object" then .text.text
+         else if (.part | type) == "object" then .part.text
+         else .text end)
+      | select(. != null and . != "")
+    ' "$log_file" 2>/dev/null | tail -n1)
+
+    if [ -n "$last_text" ]; then
+      printf '%s\n' "$last_text" > "$dest_file"
+      return 0
+    fi
+  fi
+
+  tail -n 100 "$log_file" 2>/dev/null > "$dest_file"
+  return 0
+}
+
 if [ "$CONTINUE_SESSION" = "1" ]; then
   if [ -n "$CURRENT_SESSION_ID" ]; then
     echo "ℹ️  Resuming OpenCode session from breadcrumb: $CURRENT_SESSION_ID"
     RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
+HAS_EXISTING_OPENCODE_SESSION=0
+if [ "$CONTINUE_SESSION" = "1" ]; then
+  if [ -n "$CURRENT_SESSION_ID" ]; then
+    echo "ℹ️  Resuming OpenCode session from breadcrumb: $CURRENT_SESSION_ID"
   elif [ -d "$SESSION_DIR" ] && [ -n "$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -print -quit 2>/dev/null)" ]; then
     echo "ℹ️  Existing OpenCode sessions found; will resume most recent"
-    RESUME_ARGS=("resume" "--last")
+    HAS_EXISTING_OPENCODE_SESSION=1
   fi
 else
   if [ -d "$SESSION_DIR" ]; then
     find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
   fi
+
   rm -f "$SESSION_FILE"
+  CURRENT_SESSION_ID=""
 fi
-
-while [ $ATTEMPT -le $MAX_RETRIES ]; do
-  echo "🚀 OpenCode execution attempt $ATTEMPT/$MAX_RETRIES"
-  LAST_MESSAGE_FILE="/tmp/opencode-last-message-${ATTEMPT}.txt"
-  RUN_LOG="/tmp/opencode-run-${ATTEMPT}.jsonl"
-
-  SESSION_FLAGS=()
   if [ $ATTEMPT -eq 1 ] && [ ${#RESUME_ARGS[@]} -gt 0 ]; then
     SESSION_FLAGS=("${RESUME_ARGS[@]}")
   else
@@ -978,17 +1014,14 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
   set -o pipefail
   OPENCODE_CMD=(
     "opencode"
-    "exec"
-    "--no-approval"
-    "--output-last-message" "$LAST_MESSAGE_FILE"
-    "--cwd" "$OPENCODE_WORK_DIR"
+    "run"
+    "--format"
+    "json"
   )
-  if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
-    OPENCODE_CMD+=("${SESSION_FLAGS[@]}")
+  if [ ${#ACTIVE_SESSION_FLAGS[@]} -gt 0 ]; then
+    OPENCODE_CMD+=("${ACTIVE_SESSION_FLAGS[@]}")
   fi
   OPENCODE_CMD+=("$PROMPT_PAYLOAD")
-
-  if command -v timeout >/dev/null 2>&1; then
     timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
   else
     "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
@@ -1011,6 +1044,8 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     echo "⚠️ OpenCode exited with status $OPENCODE_EXIT on attempt $ATTEMPT"
   fi
 
+  write_last_message "$RUN_LOG" "$LAST_MESSAGE_FILE" || true
+
   NEW_SESSION_ID=""
   if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
@@ -1021,12 +1056,7 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
       CURRENT_SESSION_ID="$NEW_SESSION_ID"
       persist_session_id "$CURRENT_SESSION_ID"
     fi
-  fi
-
-  if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then
-    RESUME_ARGS=("resume" "$CURRENT_SESSION_ID")
-  else
-    RESUME_ARGS=()
+    HAS_EXISTING_OPENCODE_SESSION=0
   fi
 
   PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
@@ -1051,38 +1081,46 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
   COMPLETION_LAST_MESSAGE="/tmp/opencode-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/opencode-completion-${ATTEMPT}.jsonl"
 
-  set +e
-  set -o pipefail
-  COMPLETION_CMD=(
-    "opencode"
-    "exec"
-    "--no-approval"
-    "--output-last-message" "$COMPLETION_LAST_MESSAGE"
-    "--cwd" "$OPENCODE_WORK_DIR"
-    "resume"
-  )
+  COMPLETION_RESPONSE=""
+  COMPLETION_EXIT=0
+  COMPLETION_SESSION_FLAGS=()
   if [ -n "$CURRENT_SESSION_ID" ]; then
-    COMPLETION_CMD+=("$CURRENT_SESSION_ID")
+    COMPLETION_SESSION_FLAGS=("--session" "$CURRENT_SESSION_ID")
+  elif [ "$CONTINUE_SESSION" = "1" ]; then
+    COMPLETION_SESSION_FLAGS=("--continue")
+  fi
+
+  if [ ${#COMPLETION_SESSION_FLAGS[@]} -eq 0 ]; then
+    echo "⚠️ No session context available for completion probe; skipping"
   else
-    COMPLETION_CMD+=("--last")
-  fi
-  COMPLETION_CMD+=("$COMPLETION_PROMPT")
-  "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
-  COMPLETION_EXIT=${PIPESTATUS[0]}
-  set +o pipefail
-  set -e
+    set +e
+    set -o pipefail
+    COMPLETION_CMD=(
+      "opencode"
+      "run"
+      "--format"
+      "json"
+      ${COMPLETION_SESSION_FLAGS[@]}
+      "$COMPLETION_PROMPT"
+    )
+    "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
+    COMPLETION_EXIT=${PIPESTATUS[0]}
+    set +o pipefail
+    set -e
 
-  if [ $COMPLETION_EXIT -ne 0 ]; then
-    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+    if [ $COMPLETION_EXIT -ne 0 ]; then
+      echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+    fi
+
+    write_last_message "$COMPLETION_LOG" "$COMPLETION_LAST_MESSAGE" || true
+
+    echo "[opencode-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+
+    if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
+      COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
+    fi
   fi
 
-  echo "[opencode-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
-
-  if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
-    COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
-  else
-    COMPLETION_RESPONSE=""
-  fi
   if echo "$COMPLETION_RESPONSE" | grep -Eq '^yes'; then
     SUCCESS=1
     break

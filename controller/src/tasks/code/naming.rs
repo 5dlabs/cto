@@ -23,8 +23,25 @@ impl ResourceNaming {
         let task_id = code_run.spec.task_id;
         let context_version = code_run.spec.context_version;
 
-        let base_name =
-            format!("code-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}");
+        // Extract agent name if available
+        let agent = code_run
+            .spec
+            .github_app
+            .as_ref()
+            .and_then(|app| Self::extract_agent_name(app).ok())
+            .unwrap_or_else(|| "default".to_string());
+
+        // Extract CLI type if available
+        let cli = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|config| config.cli_type.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let base_name = format!(
+            "code-{agent}-{cli}-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}"
+        );
 
         Self::ensure_k8s_name_length(&base_name)
     }
@@ -63,10 +80,41 @@ impl ResourceNaming {
         if name.len() <= MAX_K8S_NAME_LENGTH {
             name.to_string()
         } else {
-            // Intelligent truncation: preserve the meaningful suffix
-            // Keep the pattern: {uid}-t{task}-v{version} (last 3 parts)
+            // Intelligent truncation: preserve the meaningful parts
+            // Format: code-{agent}-{cli}-{namespace}-{name}-{uid}-t{task}-v{version}
+            // Priority: agent, cli, uid, task_id, version > namespace, name
             let parts: Vec<&str> = name.split('-').collect();
-            if parts.len() >= 4 {
+            
+            if parts.len() >= 8 {
+                // New format with agent and CLI
+                // Preserve: code-{agent}-{cli}-...-{uid}-t{task}-v{version}
+                let agent = parts[1];
+                let cli = parts[2];
+                let uid = parts[parts.len() - 3];
+                let task = parts[parts.len() - 2];
+                let version = parts[parts.len() - 1];
+                
+                // Build compact name with hash for middle parts if needed
+                let suffix = format!("{uid}-{task}-{version}");
+                let prefix = format!("code-{agent}-{cli}");
+                let available_space = MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len() + suffix.len() + 2);
+                
+                if available_space > 8 {
+                    // Room for some of the middle parts
+                    let middle_parts = &parts[3..parts.len() - 3];
+                    let middle = middle_parts.join("-");
+                    let truncated_middle = if middle.len() > available_space {
+                        format!("{}-{}", &middle[..available_space.saturating_sub(9)], Self::hash_string(&middle))
+                    } else {
+                        middle
+                    };
+                    format!("{prefix}-{truncated_middle}-{suffix}")
+                } else {
+                    // Very tight space, just use essential parts
+                    format!("{prefix}-{suffix}")
+                }
+            } else if parts.len() >= 4 {
+                // Legacy format without agent/CLI
                 // Preserve the last 3 parts: {uid}-t{task}-v{version}
                 let preserved_suffix = parts[parts.len() - 3..].join("-");
                 let available_space =
