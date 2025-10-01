@@ -180,11 +180,20 @@ spec:
                           local now exp hdr pay sig jwt installation_id token
                           now=$(date +%s)
                           exp=$((now + 600))
-                          hdr=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
+                          hdr=$( \
+                            printf '{"alg":"RS256","typ":"JWT"}' | base64 -w0 2>/dev/null \
+                              || printf '{"alg":"RS256","typ":"JWT"}' | base64
+                          )
                           hdr=$(echo -n "$hdr" | tr '+/' '-_' | tr -d '=')
-                          pay=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$now" "$exp" "$GITHUB_APP_ID" | base64 -w0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$now" "$exp" "$GITHUB_APP_ID" | base64)
+                          pay=$( \
+                            printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$now" "$exp" "$GITHUB_APP_ID" | base64 -w0 2>/dev/null \
+                              || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$now" "$exp" "$GITHUB_APP_ID" | base64
+                          )
                           pay=$(echo -n "$pay" | tr '+/' '-_' | tr -d '=')
-                          sig=$(printf '%s.%s' "$hdr" "$pay" | openssl dgst -sha256 -sign "$temp_key" -binary | base64 -w0 2>/dev/null || openssl dgst -sha256 -sign "$temp_key" -binary | base64)
+                          sig=$( \
+                            printf '%s.%s' "$hdr" "$pay" | openssl dgst -sha256 -sign "$temp_key" -binary | base64 -w0 2>/dev/null \
+                              || openssl dgst -sha256 -sign "$temp_key" -binary | base64
+                          )
                           sig=$(echo -n "$sig" | tr '+/' '-_' | tr -d '=')
                           jwt="$hdr.$pay.$sig"
 
@@ -297,10 +306,21 @@ spec:
                             return 1
                           fi
 
-                          patch_json=$(cat <<EOF
-{"metadata":{"resourceVersion":"$resource_version","labels":{"previous-stage":"waiting-pr-created","current-stage":"waiting-quality-complete","task-id":"$task_id","repository":"$repo_label"}}}
-EOF
-)
+                          patch_json=$(jq -n \
+                            --arg rv "$resource_version" \
+                            --arg task "$task_id" \
+                            --arg repo "$repo_label" \
+                            '{
+                              metadata: {
+                                resourceVersion: $rv,
+                                labels: {
+                                  "previous-stage": "waiting-pr-created",
+                                  "current-stage": "waiting-quality-complete",
+                                  "task-id": $task,
+                                  repository: $repo
+                                }
+                              }
+                            }')
 
                           kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$patch_json"
                         }
@@ -386,12 +406,18 @@ EOF
 
                           WORKFLOW_NAME=""
                           if [ -n "$WORKFLOW_JSON" ]; then
-                            WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | jq -r '.items[0].metadata.name // ""' 2>/dev/null || echo "")
+                            WORKFLOW_NAME=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '.items[0].metadata.name // ""' 2>/dev/null || echo "")
                           fi
 
                           if [ -n "$WORKFLOW_NAME" ]; then
-                            CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.items[0].metadata.labels["current-stage"] // ""' 2>/dev/null || echo "")
-                            SUSPEND_PHASE=$(echo "$WORKFLOW_JSON" | jq -r '(.items[0].status.nodes // {}) | to_entries[]? | select(.value.displayName == "wait-for-pr-created") | .value.phase' 2>/dev/null || echo "")
+                            CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '.items[0].metadata.labels["current-stage"] // ""' 2>/dev/null || echo "")
+                            SUSPEND_PHASE=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '(.items[0].status.nodes // {})
+                                | to_entries[]?
+                                | select(.value.displayName == "wait-for-pr-created")
+                                | .value.phase' 2>/dev/null || echo "")
 
                             if [ "$CURRENT_STAGE" = "waiting-pr-created" ] && [ "$SUSPEND_PHASE" = "Running" ]; then
                               SUSPEND_READY=true
@@ -399,7 +425,8 @@ EOF
                               break
                             fi
 
-                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE suspend-phase=${SUSPEND_PHASE:-none}; waiting ${WORKFLOW_WAIT_SECONDS}s"
+                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE suspend-phase=${SUSPEND_PHASE:-none};"
+                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           else
                             echo "⏳ No workflow discovered for task-id=$TASK_ID yet; waiting ${WORKFLOW_WAIT_SECONDS}s"
                           fi
