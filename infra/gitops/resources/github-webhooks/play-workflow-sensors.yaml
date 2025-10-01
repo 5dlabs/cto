@@ -70,6 +70,15 @@ spec:
                           exit 0
                         fi
 
+                        if ! command -v jq >/dev/null 2>&1; then
+                          echo "Installing jq"
+                          if ! apk add --no-cache jq >/tmp/jq-install.log 2>&1; then
+                            echo "❌ Failed to install jq"
+                            cat /tmp/jq-install.log
+                            exit 1
+                          fi
+                        fi
+
                         ensure_argo_cli() {
                           if command -v argo >/dev/null 2>&1; then
                             ARGO_BIN=$(command -v argo)
@@ -167,8 +176,8 @@ spec:
                           # Check if there's a recent succeeded implementation CodeRun for this task
                           CODERUN=$(kubectl get coderun -n agent-platform \
                             -l task-id=$TASK_ID,workflow-stage=implementation \
-                            --field-selector=status.phase=Succeeded \
-                            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                            -o json 2>/dev/null | \
+                            jq -r '.items[] | select(.status.phase=="Succeeded") | .metadata.name' | head -n1 || echo "")
 
                           if [ -z "$CODERUN" ]; then
                             echo "No succeeded implementation CodeRun for task $TASK_ID, skipping"
