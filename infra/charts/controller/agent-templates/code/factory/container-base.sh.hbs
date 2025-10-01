@@ -825,6 +825,15 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
       RESULT_TEXT=$(tail -n 40 "$RUN_LOG" 2>/dev/null | sed 's/\r$//')
     fi
     printf '%s\n' "$RESULT_TEXT" > "$LAST_MESSAGE_FILE"
+    if printf '%s\n' "$RESULT_TEXT" | grep -qi '# Summary'; then
+      if printf '%s\n' "$RESULT_TEXT" | grep -qi '## Testing'; then
+        if printf '%s\n' "$RESULT_TEXT" | grep -qi '## Pull Request'; then
+          echo "✅ Detected summary, testing, and pull request sections; marking task complete"
+          SUCCESS=1
+          break
+        fi
+      fi
+    fi
   else
     : > "$LAST_MESSAGE_FILE"
   fi
