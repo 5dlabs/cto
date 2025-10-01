@@ -193,15 +193,6 @@ hadolint --ignore DL3008 Dockerfile
 hadolint --format json Dockerfile
 ```
 
-**Mermaid CLI - Diagram Generation:**
-```bash
-# Generate PNG from Mermaid file
-mmdc -i architecture.mmd -o architecture.png
-
-# Generate SVG
-mmdc -i diagram.mmd -o diagram.svg
-```
-
 ### Quality Tool Usage Workflow
 
 ```
@@ -250,9 +241,6 @@ qlty check --since HEAD~1
 - **trivy**: Scan dependencies and containers for CVEs (run when adding/updating deps)
 - **hadolint**: Lint Dockerfiles for security best practices (run when modifying Dockerfiles)
 - **cargo deny**: Rust dependency security and license checks (run regularly)
-
-**Documentation:**
-- **mmdc** (mermaid-cli): Generate architecture diagrams from Mermaid markdown
 
 ### Tool Failure Handling
 
