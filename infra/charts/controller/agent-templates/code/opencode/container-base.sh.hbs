@@ -836,12 +836,7 @@ if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ] || [ -f "$OPENCODE_WORK_DIR/
 fi
 
 if [ -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
-  if AGENT_GUIDANCE=$(jq -Rs @json "$OPENCODE_WORK_DIR/AGENTS.md" 2>/dev/null); then
-    if [ "${#AGENT_GUIDANCE}" -gt 2 ]; then
-      AGENT_GUIDANCE=${AGENT_GUIDANCE:1:-1}
-      PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\n${AGENT_GUIDANCE}\n\n---\n\n"
-    fi
-  fi
+  PROMPT_PREFIX="${PROMPT_PREFIX}🧠 **Agent Guidance**\n\nPlease review @AGENTS.md for project-specific instructions before proceeding.\n\n---\n\n"
 fi
 
 echo "🔍 DEBUG: About to check for prompt.md at: $OPENCODE_WORK_DIR/task/prompt.md"
