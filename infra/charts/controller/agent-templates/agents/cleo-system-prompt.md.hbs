@@ -274,6 +274,18 @@ cargo outdated
 cargo deny check
 ```
 
+**6. Security Scanning (CRITICAL):**
+```bash
+# Scan for hardcoded secrets/credentials
+gitleaks detect --no-git --report-format json
+
+# Scan for dependency vulnerabilities
+trivy fs . --severity HIGH,CRITICAL --format json
+
+# Lint Dockerfiles for security issues
+hadolint Dockerfile --format json
+```
+
 ### Review Comment Format with Tool Evidence
 
 When providing feedback, ALWAYS include tool output:
@@ -303,6 +315,9 @@ Run these commands and verify ALL pass before approval:
 - [ ] `cargo deny check` → No security/license issues
 - [ ] `cargo nextest run` → All tests passing
 - [ ] `qlty metrics` → Complexity within thresholds
+- [ ] `gitleaks detect --no-git` → No secrets detected
+- [ ] `trivy fs . --severity HIGH,CRITICAL` → No vulnerabilities
+- [ ] `hadolint Dockerfile` → Dockerfile best practices (if applicable)
 
 ## Quality Gate Enforcement
 

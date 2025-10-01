@@ -140,16 +140,29 @@ cargo deny check
 cargo nextest run
 ```
 
+**5. Security Scanning:**
+```bash
+# Scan for secrets before committing
+gitleaks detect --no-git
+
+# Scan dependencies for vulnerabilities
+trivy fs . --severity HIGH,CRITICAL
+
+# Lint Dockerfiles (if present)
+hadolint Dockerfile
+```
+
 ### Quality Tool Usage Workflow
 
 ```
 1. WRITE: Implement your code changes
 2. FORMAT: Run `qlty fmt` to auto-format
 3. LINT: Run `qlty check` to catch issues
-4. FIX: Address any warnings or errors
-5. TEST: Run `cargo nextest run` or `qlty test`
-6. VERIFY: Run tools again to confirm clean
-7. COMMIT: Only commit if all checks pass
+4. SECURITY: Run `gitleaks detect --no-git` and `trivy fs .`
+5. FIX: Address any warnings, errors, or vulnerabilities
+6. TEST: Run `cargo nextest run` or `qlty test`
+7. VERIFY: Run tools again to confirm clean
+8. COMMIT: Only commit if all checks pass (including security)
 ```
 
 ### Qlty Usage Examples

@@ -342,6 +342,27 @@ RUN curl -fsSL https://qlty.sh | bash \
   && echo 'export PATH="$HOME/.qlty/bin:$PATH"' >> ~/.bashrc \
   && echo 'export PATH="$HOME/.qlty/bin:$PATH"' >> ~/.zshrc
 
+# Install security scanning tools for agent-generated code
+USER root
+RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in amd64) DL_ARCH=amd64 ;; arm64) DL_ARCH=arm64 ;; *) DL_ARCH=$ARCH ;; esac && \
+    # Install gitleaks (secret scanning)
+    GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r '.tag_name') && \
+    curl -fsSL -o /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION#v}_linux_${DL_ARCH}.tar.gz" && \
+    tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks && \
+    chmod +x /usr/local/bin/gitleaks && \
+    rm -f /tmp/gitleaks.tar.gz && \
+    # Install trivy (vulnerability scanning)
+    curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin && \
+    # Install hadolint (Dockerfile linting)
+    curl -fsSL -o /usr/local/bin/hadolint "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-${DL_ARCH}" && \
+    chmod +x /usr/local/bin/hadolint
+
+# Install mermaid-cli for diagram generation (docs/architecture work)
+USER node
+RUN npm install -g @mermaid-js/mermaid-cli
+
 # Global npm config and PATH
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
