@@ -49,12 +49,14 @@ jobs:
           set -euo pipefail
           git config user.name "5DLabs Automation"
           git config user.email "automation@5dlabs.ai"
+          git fetch origin "$BRANCH"
           git add infra/charts/controller/templates/agent-templates-static.yaml
           if git diff --cached --quiet; then
             echo "No staged changes to commit after regeneration."
             exit 0
           fi
           git commit -m 'chore(chart): regenerate agent templates static ConfigMap'
+          git pull --rebase origin "$BRANCH"
           git push origin HEAD:"$BRANCH"
           echo "Auto-healed drift by committing regenerated ConfigMap."
       - name: Fail if drift remains
