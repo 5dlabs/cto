@@ -335,8 +335,61 @@ spec:
                         PR_API_URL="https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}"
                         TARGET_LABEL="needs-cleo"
 
+                        AUTH_HEADER=""
+                        INSTALLATION_TOKEN=""
+                        if INSTALLATION_TOKEN=$(get_installation_token); then
+                          AUTH_HEADER="Authorization: Bearer $INSTALLATION_TOKEN"
+                          echo "Using GitHub App installation token for API calls"
+                        else
+                          echo "ℹ️ Proceeding without GitHub App token (unauthenticated GitHub API)"
+                        fi
+
                         extract_task_id() {
                           echo "$1" | tr '[:upper:]' '[:lower:]' | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || true
+                        }
+
+                        fetch_task_id_via_api() {
+                          local response label_name candidate title body
+
+                          if [ -n "$AUTH_HEADER" ]; then
+                            response=$(curl -s -L -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$PR_API_URL")
+                          else
+                            response=$(curl -s -L -H "Accept: application/vnd.github+json" "$PR_API_URL")
+                          fi
+
+                          if [ -z "$response" ] || [ "$response" = "null" ]; then
+                            echo ""
+                            return 1
+                          fi
+
+                          while IFS= read -r label_name; do
+                            candidate=$(extract_task_id "$label_name")
+                            if [ -n "$candidate" ]; then
+                              echo "$candidate"
+                              return 0
+                            fi
+                          done < <(echo "$response" | jq -r '(.labels // [])[]?.name // ""')
+
+                          title=$(echo "$response" | jq -r '.title // ""')
+                          if [ -n "$title" ]; then
+                            candidate=$(extract_task_id "$title")
+                            if [ -n "$candidate" ]; then
+                              echo "$candidate"
+                              return 0
+                            fi
+                          fi
+
+                          body=$(echo "$response" | jq -r '.body // ""')
+                          if [ -n "$body" ]; then
+                            candidate=$(extract_task_id "$body")
+                            if [ -n "$candidate" ]; then
+                              echo "$candidate"
+                              return 0
+                            fi
+                          fi
+
+                          echo ""
+                          return 1
                         }
 
                         TASK_ID=""
@@ -355,20 +408,16 @@ spec:
                         fi
 
                         if [ -z "$TASK_ID" ]; then
+                          echo "ℹ️ Task ID not present in webhook payload; querying GitHub API for labels/title/body"
+                          TASK_ID=$(fetch_task_id_via_api || true)
+                        fi
+
+                        if [ -z "$TASK_ID" ]; then
                           echo "❌ Unable to determine task ID from PR payload"
                           exit 1
                         fi
 
                         echo "Task ID: $TASK_ID"
-
-                        AUTH_HEADER=""
-                        INSTALLATION_TOKEN=""
-                        if INSTALLATION_TOKEN=$(get_installation_token); then
-                          AUTH_HEADER="Authorization: Bearer $INSTALLATION_TOKEN"
-                          echo "Using GitHub App installation token for API calls"
-                        else
-                          echo "ℹ️ Proceeding without GitHub App token (unauthenticated GitHub API)"
-                        fi
 
                         echo "Waiting for Rex to apply '$TARGET_LABEL' label to PR #$PR_NUMBER..."
                         MAX_LABEL_ATTEMPTS=90
