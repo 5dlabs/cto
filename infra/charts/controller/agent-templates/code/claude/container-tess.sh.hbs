@@ -386,7 +386,7 @@ derive_bot_identity() {
 
     if [ -n "${GITHUB_TOKEN:-}" ]; then
         local encoded_login
-        encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/\%5B/g; s/\]/\%5D/g')
+        encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/%5B/g; s/\]/%5D/g')
         local bot_response
         bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
         local bot_id
