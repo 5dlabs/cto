@@ -387,13 +387,13 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     fi; \
     chmod +x /usr/local/bin/hadolint
 
+# Configure npm globals before installing CLI tooling as non-root
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
+
 # Install mermaid-cli for diagram generation (docs/architecture work)
 USER node
 RUN npm install -g @mermaid-js/mermaid-cli
-
-# Global npm config and PATH
-ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 
 # Go environment for non-root user
 ENV GOPATH=/home/node/go
