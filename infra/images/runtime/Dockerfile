@@ -332,6 +332,11 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   && . $HOME/.cargo/env \
   && rustup component add rustfmt clippy rust-analyzer
 
+# Install cursor-rust-tools MCP server for AI agent Rust analysis
+RUN --mount=type=cache,target=/home/node/.cargo,uid=1000,gid=1000,mode=0777 \
+    . $HOME/.cargo/env \
+  && cargo install --git https://github.com/terhechte/cursor-rust-tools
+
 # Global npm config and PATH
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin

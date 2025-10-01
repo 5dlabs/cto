@@ -121,6 +121,14 @@ spec:
               args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
               workingDirectory: "/tmp"
 
+            rust-tools:
+              name: "Rust Development Tools"
+              description: "Rust analyzer integration with type info, documentation, and cargo commands for AI-assisted development"
+              transport: "stdio"
+              command: "/home/node/.cargo/bin/cursor-rust-tools"
+              args: ["--no-ui"]
+              workingDirectory: "/workspace"
+
         # Secret store integration (External Secrets will inject these)
         secretRefs:
           - name: toolman-brave-search-secrets
