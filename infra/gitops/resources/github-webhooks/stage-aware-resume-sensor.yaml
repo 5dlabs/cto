@@ -127,14 +127,27 @@ spec:
                         echo "Target Stage: waiting-pr-created"
                         echo "PR Number: {{ .Input.body.pull_request.number }}"
 
-                        # Extract task ID from PR labels using jq (JSON-encode + case-insensitive)
+                        extract_task_id() {
+                          echo "$1" | tr '[:upper:]' '[:lower:]' | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || true
+                        }
+
+                        TASK_ID=""
                         TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        TASK_ID=$(echo "$TASK_LABELS_JSON" \
-                          | jq -r '.[] | (.name // "") | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' \
-                          | head -1)
+                        if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
+                          TASK_ID=$(echo "$TASK_LABELS_JSON" |
+                            jq -er '.[] | (.name // "") | ascii_downcase | capture("task[-_/ ]*(?<id>[0-9]+)") | .id' 2>/dev/null | head -1 || true)
+                        fi
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "ERROR: No task-* label found on PR"
+                          TASK_ID=$(extract_task_id '{{ .Input.body.pull_request.head.ref }}')
+                        fi
+
+                        if [ -z "$TASK_ID" ]; then
+                          TASK_ID=$(extract_task_id '{{ .Input.body.pull_request.title }}')
+                        fi
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ERROR: Unable to determine task ID from PR data"
                           exit 1
                         fi
 
