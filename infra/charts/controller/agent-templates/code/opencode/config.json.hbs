@@ -22,5 +22,15 @@
   }{{#if agent.remote_tools}},
   "tools": {
     "remote": [{{#each agent.remote_tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
-  }{{/if}}
+  }{{/if}},
+  "mcp": {
+    "toolman": {
+      "type": "local",
+      "command": ["toolman", "--url", "{{agent.toolman_url}}", "--working-dir", "/workspace"],
+      "enabled": true,
+      "env": {
+        "TOOLMAN_SERVER_URL": "{{agent.toolman_url}}"
+      }
+    }
+  }
 }

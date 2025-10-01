@@ -1,7 +1,7 @@
 {{- if .Values.argo.enabled }}
 ---
 # Multi-Agent Play Workflow Template
-# Orchestrates Rex/Blaze → Cleo → Tess through event-driven coordination
+# Orchestrates Rex → Cleo → Tess through event-driven coordination
 # Rex implements → Cleo ensures quality → Tess validates E2E in Kubernetes
 # Supports parameterized agent selection and suspend/resume patterns
 
@@ -53,7 +53,7 @@ spec:
     parameters:
       # Agent selection parameters (no hardcoded names)
       - name: implementation-agent
-        description: "Agent to use for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)"
+        description: "Agent to use for implementation work (e.g., 5DLabs-Rex)"
         value: ""  # Must be provided by MCP client
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
