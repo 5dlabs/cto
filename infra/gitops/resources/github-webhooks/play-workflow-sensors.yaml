@@ -60,13 +60,27 @@ spec:
                         # This sensor was triggered by a PR creation
                         # We need to find the most recent implementation workflow waiting for PR
 
-                        # Find workflows waiting for PR creation
-                        WAITING_WORKFLOWS=$(kubectl get workflows -n agent-platform \
-                          -l current-stage=waiting-pr-created,workflow-type=play-orchestration \
-                          -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+                        # Find workflows waiting for PR creation (with retry to avoid race with stage update)
+                        MAX_WAIT_ATTEMPTS=6
+                        WAIT_INTERVAL=10
+                        ATTEMPT=1
+                        WAITING_WORKFLOWS=""
+                        while [ $ATTEMPT -le $MAX_WAIT_ATTEMPTS ]; do
+                          WAITING_WORKFLOWS=$(kubectl get workflows -n agent-platform \
+                            -l current-stage=waiting-pr-created,workflow-type=play-orchestration \
+                            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+
+                          if [ -n "$WAITING_WORKFLOWS" ]; then
+                            break
+                          fi
+
+                          echo "No workflows waiting for PR creation (attempt $ATTEMPT/$MAX_WAIT_ATTEMPTS); waiting ${WAIT_INTERVAL}s"
+                          sleep $WAIT_INTERVAL
+                          ATTEMPT=$((ATTEMPT+1))
+                        done
 
                         if [ -z "$WAITING_WORKFLOWS" ]; then
-                          echo "No workflows waiting for PR creation"
+                          echo "No workflows waiting for PR creation after polling"
                           exit 0
                         fi
 
