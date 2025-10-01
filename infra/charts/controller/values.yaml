@@ -42,7 +42,7 @@ agent:
     codex: openai
     cursor: anthropic
     factory: openai
-    opencode: openai
+    opencode: xai  # Primary provider for OpenCode (Grok)
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
@@ -421,12 +421,18 @@ secrets:
     factory:
       secretKey: "FACTORY_API_KEY"
     opencode:
-      secretKey: "OPENAI_API_KEY"
+      secretKey: "XAI_API_KEY"  # OpenCode uses xAI (Grok) as primary provider
   providerApiKeys:
     anthropic:
       secretKey: "ANTHROPIC_API_KEY"
     openai:
       secretKey: "OPENAI_API_KEY"
+    xai:
+      secretKey: "XAI_API_KEY"
+    google:
+      secretKey: "GOOGLE_API_KEY"  # For Google Gemini models
+    gemini:
+      secretKey: "GEMINI_API_KEY"  # Alternative Gemini key if different from GOOGLE_API_KEY
   # Note: GitHub secrets (SSH keys + tokens) are managed externally per agent
   # See infra/scripts/setup-agent-secrets.sh for setup instructions
 
