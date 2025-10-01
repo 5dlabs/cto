@@ -210,7 +210,8 @@ spec:
                         CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform \
                           -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "")
                         if [ "$CURRENT_STAGE" != "waiting-pr-created" ]; then
-                          echo "ℹ️ Workflow $WORKFLOW_NAME not in waiting-pr-created (found '$CURRENT_STAGE'); skipping stage update"
+                          echo "ℹ️ Workflow $WORKFLOW_NAME not in waiting-pr-created (found '$CURRENT_STAGE'); skipping stage update and resume"
+                          continue
                         else
                           STAGE_PATCH='{"metadata":{"labels":{"previous-stage":"waiting-pr-created","current-stage":"waiting-quality-complete"}}}'
                           if ! kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
