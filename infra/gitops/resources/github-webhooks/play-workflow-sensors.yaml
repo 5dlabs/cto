@@ -86,6 +86,24 @@ spec:
                           return 1
                         }
 
+                        ensure_openssl() {
+                          if command -v openssl >/dev/null 2>&1; then
+                            return 0
+                          fi
+
+                          if command -v apk >/dev/null 2>&1; then
+                            apk add --no-cache openssl >/dev/null 2>&1 && return 0
+                          elif command -v apt-get >/dev/null 2>&1; then
+                            apt-get update >/dev/null 2>&1 && apt-get install -y openssl >/dev/null 2>&1 && rm -rf /var/lib/apt/lists/*
+                            return 0
+                          elif command -v microdnf >/dev/null 2>&1; then
+                            microdnf -y install openssl >/dev/null 2>&1 && return 0
+                          fi
+
+                          echo "❌ Failed to install openssl"
+                          return 1
+                        }
+
                         ensure_argo_cli() {
                           if command -v argo >/dev/null 2>&1; then
                             ARGO_BIN=$(command -v argo)
@@ -326,6 +344,7 @@ spec:
                         }
 
                         ensure_jq
+                        ensure_openssl
 
                         OWNER="{{ .Input.body.repository.owner.login }}"
                         REPO_NAME="{{ .Input.body.repository.name }}"
