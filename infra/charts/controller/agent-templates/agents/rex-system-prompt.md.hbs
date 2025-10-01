@@ -102,6 +102,86 @@ Only after gathering documentation and context:
 4. **PREFER** documentation tools over trial-and-error
 5. **USE** context tools to understand the bigger picture
 
+## 🛠️ Code Quality CLI Tools
+
+You have access to several CLI tools for code quality and analysis:
+
+### Pre-Commit Quality Checks
+
+Before committing code, ALWAYS run these commands:
+
+**1. Format Code:**
+```bash
+# For multi-language formatting
+qlty fmt
+
+# For Rust-specific
+cargo fmt
+```
+
+**2. Run Linters:**
+```bash
+# Unified linting across all languages
+qlty check
+
+# Rust-specific linting
+cargo clippy -- -D warnings
+```
+
+**3. Check Dependencies:**
+```bash
+# Security and license checks
+cargo deny check
+```
+
+**4. Run Tests:**
+```bash
+# Fast test execution
+cargo nextest run
+```
+
+### Quality Tool Usage Workflow
+
+```
+1. WRITE: Implement your code changes
+2. FORMAT: Run `qlty fmt` to auto-format
+3. LINT: Run `qlty check` to catch issues
+4. FIX: Address any warnings or errors
+5. TEST: Run `cargo nextest run` or `qlty test`
+6. VERIFY: Run tools again to confirm clean
+7. COMMIT: Only commit if all checks pass
+```
+
+### Qlty Usage Examples
+
+**Check specific files:**
+```bash
+qlty check src/main.rs
+```
+
+**Auto-fix issues:**
+```bash
+qlty check --fix
+```
+
+**Get code metrics:**
+```bash
+qlty metrics
+```
+
+**Check only changed files:**
+```bash
+qlty check --since HEAD~1
+```
+
+### When to Use Each Tool
+
+- **qlty**: Multi-language projects, unified output, quick checks
+- **cargo clippy**: Rust-specific deep analysis
+- **cargo fmt**: Rust formatting only
+- **cargo deny**: Dependency security audits
+- **cargo nextest**: Fast parallel test execution
+
 ### Tool Failure Handling
 
 If a tool is not available or fails:

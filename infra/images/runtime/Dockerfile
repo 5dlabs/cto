@@ -333,9 +333,14 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
   && rustup component add rustfmt clippy rust-analyzer
 
 # Install cursor-rust-tools MCP server for AI agent Rust analysis
-RUN --mount=type=cache,target=/home/node/.cargo,uid=1000,gid=1000,mode=0777 \
+RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     . $HOME/.cargo/env \
   && cargo install --git https://github.com/terhechte/cursor-rust-tools
+
+# Install Qlty for unified code quality across all languages
+RUN curl -fsSL https://qlty.sh | bash \
+  && echo 'export PATH="$HOME/.qlty/bin:$PATH"' >> ~/.bashrc \
+  && echo 'export PATH="$HOME/.qlty/bin:$PATH"' >> ~/.zshrc
 
 # Global npm config and PATH
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
