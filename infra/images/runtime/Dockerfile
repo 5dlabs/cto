@@ -300,7 +300,7 @@ ENV CC=clang \
 # Note: RUSTC_WRAPPER intentionally not set to avoid sccache path issues
 
 # Prepare npm global and permissions
-RUN mkdir -p /usr/local/share/npm-global && chown -R 1000:1000 /usr/local/share
+RUN mkdir -p /usr/local/share/npm-global/lib && chown -R 1000:1000 /usr/local/share/npm-global
 
 # Persist bash history for convenience
 ARG USERNAME=node
