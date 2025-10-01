@@ -2,21 +2,80 @@
 
 This document provides coding standards and best practices for Rust development in this project.
 
+## Clippy Configuration
+
+This project uses a **clippy.toml** configuration file based on **AWS SDK Rust (smithy-rs) best practices**:
+- **Disallowed time APIs**: Use `Clock` abstraction instead of `SystemTime::now()` for testability (wall-clock time)
+- **Performance measurement**: `Instant::now()` is allowed for duration measurements
+- **Disallowed macros**: Use `tracing::*!` instead of `println!`, `eprintln!`, or `dbg!`
+- **Test flexibility**: `unwrap()` and `expect()` are allowed in test code only
+- **Complexity limits**: Max 30 cognitive complexity, 7 function args, 100 lines per function
+
+**The clippy.toml file is project-specific** - if one doesn't exist, create it in the repository root.
+
 ## Pre-PR Quality Gates (MANDATORY)
 
 Before opening any pull request or requesting merge:
 
-- Ensure formatting passes:
-  - Run: `cargo fmt --all -- --check`
-- Ensure Clippy passes with pedantic lints and no warnings:
-  - Run: `cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic`
-  - If a pedantic lint must be allowed, use the narrowest scope with `#[allow(clippy::lint_name)]` and include a short justification above the code. Avoid crate-wide allows.
-- Ensure tests pass and coverage is very high (strive for ~100% on critical code paths):
-  - Run: `cargo test --workspace --all-features`
-  - Recommended coverage tools:
-    - If available: `cargo llvm-cov --workspace --all-features --fail-under-lines 95`
-    - Alternatively: `cargo tarpaulin --all --fail-under 95`
-- Do not create a PR until all gates above are green locally.
+1. **Ensure formatting passes:**
+   ```bash
+   cargo fmt --all -- --check
+   ```
+
+2. **Ensure Clippy passes with pedantic lints and no warnings:**
+   ```bash
+   cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+   ```
+   - If a pedantic lint must be allowed, use the narrowest scope with `#[allow(clippy::lint_name)]` and include a short justification above the code
+   - Avoid crate-wide allows
+
+3. **Ensure tests pass and coverage is very high (strive for ~100% on critical code paths):**
+   ```bash
+   cargo test --workspace --all-features
+   ```
+   - Recommended coverage tools:
+     - If available: `cargo llvm-cov --workspace --all-features --fail-under-lines 95`
+     - Alternatively: `cargo tarpaulin --all --fail-under 95`
+
+4. **Do not create a PR until all gates above are green locally.**
+
+### Recommended clippy.toml Template
+
+If the project doesn't have a `clippy.toml` file, create one in the repository root with these AWS-inspired settings:
+
+```toml
+# Clippy configuration for consistent linting
+# Based on AWS SDK Rust (smithy-rs) best practices
+
+# Set the maximum cognitive complexity allowed
+cognitive-complexity-threshold = 30
+
+# Set maximum function arguments
+too-many-arguments-threshold = 7
+
+# Set maximum lines for functions
+too-many-lines-threshold = 100
+
+# Allow unwrap/expect in tests (common practice)
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+
+# Disallow direct time APIs for better testability (AWS smithy-rs pattern)
+# Note: Only enforce for SystemTime (wall-clock time that needs mocking)
+# Instant is fine for performance measurements
+disallowed-methods = [
+    { path = "std::time::SystemTime::now", reason = "use a Clock abstraction for testability" },
+    { path = "std::time::SystemTime::elapsed", reason = "use a Clock abstraction for testability" },
+]
+
+# Disallow certain macros
+disallowed-macros = [
+    # We prefer tracing over println for logging
+    { path = "std::println", reason = "use tracing::info! instead" },
+    { path = "std::eprintln", reason = "use tracing::error! instead" },
+    { path = "std::dbg", reason = "use tracing::debug! instead; remove before committing" },
+]
+```
 
 ## Code Quality Standards
 

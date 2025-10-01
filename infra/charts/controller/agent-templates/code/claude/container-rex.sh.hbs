@@ -257,10 +257,42 @@ fi
 git config --global --add safe.directory /workspace
 
 # Set GitHub App attribution - use generic format for all agents
+derive_bot_identity() {
+    local app_name="$1"
+
+    if [ -z "$app_name" ] || [ "$app_name" = "null" ]; then
+        GIT_AUTHOR_NAME="automation[bot]"
+        GIT_AUTHOR_EMAIL="automation[bot]@users.noreply.github.com"
+        return
+    fi
+
+    local slug
+    slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g' | sed -E 's/^-+|-+$//g')
+    if [ -z "$slug" ]; then
+        slug=$(printf '%s' "$app_name" | tr '[:upper:]' '[:lower:]')
+    fi
+
+    local bot_login="${slug}[bot]"
+    local bot_email="${bot_login}@users.noreply.github.com"
+
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        local encoded_login
+        encoded_login=$(printf '%s' "$bot_login" | sed 's/\[/\%5B/g; s/\]/\%5D/g')
+        local bot_response
+        bot_response=$(curl -sS -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/users/${encoded_login}" 2>/dev/null || true)
+        local bot_id
+        bot_id=$(printf '%s' "$bot_response" | jq -r '.id // empty' 2>/dev/null || echo '')
+        if [ -n "$bot_id" ]; then
+            bot_email="${bot_id}+${bot_login}@users.noreply.github.com"
+        fi
+    fi
+
+    GIT_AUTHOR_NAME="$bot_login"
+    GIT_AUTHOR_EMAIL="$bot_email"
+}
+
 GITHUB_APP="{{github_app}}"
-# Generic attribution that works for any agent
-GIT_AUTHOR_NAME="${GITHUB_APP} Agent (Claude Code)"
-GIT_AUTHOR_EMAIL="${GITHUB_APP}[bot]@users.noreply.github.com"
+derive_bot_identity "$GITHUB_APP"
 
 # Configure git with proper GitHub App attribution
 git config --global user.name "$GIT_AUTHOR_NAME"
