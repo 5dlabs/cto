@@ -286,10 +286,44 @@ trivy fs . --severity HIGH,CRITICAL --format json
 hadolint Dockerfile --format json
 ```
 
+### Security Tool Usage for Reviews
+
+**When to Run Each Security Tool:**
+
+- **gitleaks**: ALWAYS run on every PR to catch secrets before merge
+  ```bash
+  gitleaks detect --no-git --report-format json --report-path gitleaks.json
+  ```
+  - Check for API keys, passwords, tokens
+  - Zero tolerance: Even one secret = REQUEST_CHANGES
+
+- **trivy**: Run when Cargo.toml, package.json, or Dockerfiles change
+  ```bash
+  # Scan Rust dependencies
+  trivy fs Cargo.lock --severity HIGH,CRITICAL --format json
+
+  # Scan entire filesystem
+  trivy fs . --severity HIGH,CRITICAL --format json
+
+  # Scan container images
+  trivy image <image-name>:latest --format json
+  ```
+  - HIGH/CRITICAL vulnerabilities = REQUEST_CHANGES
+  - MEDIUM vulnerabilities = suggest fixes in comments
+
+- **hadolint**: Run when Dockerfile is modified
+  ```bash
+  hadolint Dockerfile --format json
+  ```
+  - Check for security anti-patterns
+  - Verify minimal base images
+  - Ensure proper user permissions
+
 ### Review Comment Format with Tool Evidence
 
 When providing feedback, ALWAYS include tool output:
 
+**Example 1: Code Quality Issue**
 ```markdown
 **Issue: Unsafe unwrap() detected**
 
@@ -303,6 +337,55 @@ Documentation reference:
 $ rustdocs query "error handling best practices"
 
 Fix: Replace with proper error propagation using `?` operator
+```
+
+**Example 2: Security Issue**
+```markdown
+**Issue: Hardcoded API key detected**
+
+Tool evidence:
+\`\`\`json
+$ gitleaks detect --no-git --report-format json
+{
+  "Description": "Identified a Generic API Key",
+  "File": "src/config.rs",
+  "Line": 15,
+  "Secret": "api_key = \"sk-1234567890abcdef\""
+}
+\`\`\`
+
+Severity: 🔴 CRITICAL - Must fix before merge
+
+Fix:
+1. Remove hardcoded secret from code
+2. Use environment variable: `std::env::var("API_KEY")?`
+3. Add `.env` to `.gitignore`
+4. Rotate the exposed API key immediately
+```
+
+**Example 3: Vulnerability Issue**
+```markdown
+**Issue: High severity vulnerability in dependency**
+
+Tool evidence:
+\`\`\`json
+$ trivy fs Cargo.lock --severity HIGH,CRITICAL --format json
+{
+  "VulnerabilityID": "CVE-2024-1234",
+  "PkgName": "tokio",
+  "InstalledVersion": "1.35.0",
+  "FixedVersion": "1.36.0",
+  "Severity": "HIGH",
+  "Title": "Denial of Service in tokio runtime"
+}
+\`\`\`
+
+Severity: 🟠 HIGH
+
+Fix: Update Cargo.toml:
+\`\`\`toml
+tokio = "1.36.0"
+\`\`\`
 ```
 
 ### Quality Enforcement Checklist

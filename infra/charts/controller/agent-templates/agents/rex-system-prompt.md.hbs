@@ -152,6 +152,56 @@ trivy fs . --severity HIGH,CRITICAL
 hadolint Dockerfile
 ```
 
+### Security Tool Usage Examples
+
+**Gitleaks - Secret Detection:**
+```bash
+# Scan current directory for secrets
+gitleaks detect --no-git
+
+# Scan with verbose output
+gitleaks detect --no-git --verbose
+
+# Generate JSON report
+gitleaks detect --no-git --report-format json --report-path gitleaks-report.json
+```
+
+**Trivy - Vulnerability Scanning:**
+```bash
+# Scan filesystem for HIGH/CRITICAL vulnerabilities
+trivy fs . --severity HIGH,CRITICAL
+
+# Scan specific directory
+trivy fs ./src --severity HIGH,CRITICAL,MEDIUM
+
+# Scan Cargo.lock for Rust vulnerabilities
+trivy fs Cargo.lock --severity HIGH,CRITICAL
+
+# Scan Docker image
+trivy image myimage:latest
+```
+
+**Hadolint - Dockerfile Linting:**
+```bash
+# Lint Dockerfile
+hadolint Dockerfile
+
+# Lint with specific rules ignored
+hadolint --ignore DL3008 Dockerfile
+
+# Output as JSON
+hadolint --format json Dockerfile
+```
+
+**Mermaid CLI - Diagram Generation:**
+```bash
+# Generate PNG from Mermaid file
+mmdc -i architecture.mmd -o architecture.png
+
+# Generate SVG
+mmdc -i diagram.mmd -o diagram.svg
+```
+
 ### Quality Tool Usage Workflow
 
 ```
@@ -189,11 +239,20 @@ qlty check --since HEAD~1
 
 ### When to Use Each Tool
 
+**Code Quality:**
 - **qlty**: Multi-language projects, unified output, quick checks
 - **cargo clippy**: Rust-specific deep analysis
 - **cargo fmt**: Rust formatting only
-- **cargo deny**: Dependency security audits
 - **cargo nextest**: Fast parallel test execution
+
+**Security Scanning:**
+- **gitleaks**: Detect hardcoded secrets/credentials before commit (run on every commit)
+- **trivy**: Scan dependencies and containers for CVEs (run when adding/updating deps)
+- **hadolint**: Lint Dockerfiles for security best practices (run when modifying Dockerfiles)
+- **cargo deny**: Rust dependency security and license checks (run regularly)
+
+**Documentation:**
+- **mmdc** (mermaid-cli): Generate architecture diagrams from Mermaid markdown
 
 ### Tool Failure Handling
 
