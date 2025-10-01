@@ -495,6 +495,7 @@ cd "$REPO_ROOT"
 MANAGED_PATHS=(
   ".mcp.json"
   "AGENTS.md"
+  "OPENCODE.md"
   "client-config.json"
   "coding-guidelines.md"
   "github-guidelines.md"
@@ -636,6 +637,14 @@ fi
 if [ -f /task-files/github-guidelines.md ]; then
   cp /task-files/github-guidelines.md "$OPENCODE_WORK_DIR/"
   echo "✓ Copied github-guidelines.md to working directory"
+fi
+
+if [ -f /task-files/OPENCODE.md ]; then
+  cp /task-files/OPENCODE.md "$OPENCODE_WORK_DIR/OPENCODE.md"
+  echo "✓ Copied OPENCODE.md to working directory"
+elif [ -f /task-files/AGENTS.md ]; then
+  cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
+  echo "✓ Copied AGENTS.md to working directory"
 fi
 
 if [ -f /task-files/client-config.json ]; then
@@ -1028,6 +1037,13 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
 
   write_last_message "$RUN_LOG" "$LAST_MESSAGE_FILE" || true
 
+  if [ -s "$LAST_MESSAGE_FILE" ]; then
+    echo "📝 OpenCode summary (attempt $ATTEMPT):"
+    sed 's/^/    /' "$LAST_MESSAGE_FILE"
+  else
+    echo "ℹ️ No textual summary captured from OpenCode on attempt $ATTEMPT"
+  fi
+
   NEW_SESSION_ID=""
   if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
@@ -1093,6 +1109,7 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
 
     if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
       COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
+      echo "🧮 Completion probe response: $COMPLETION_RESPONSE"
     fi
   else
     echo "ℹ️ Completion probe skipped (session continuation disabled)"
