@@ -172,6 +172,48 @@ spec:
                           fi
                         }
 
+                        update_workflow_pr_metadata() {
+                          local workflow_name="$1"
+                          local pr_url="$2"
+                          local pr_number="$3"
+
+                          WORKFLOW_JSON=$(kubectl get workflow "$workflow_name" -n agent-platform -o json 2>/dev/null)
+                          if [ -z "$WORKFLOW_JSON" ]; then
+                            echo "⚠️ Unable to fetch workflow $workflow_name for PR metadata update"
+                            return 1
+                          fi
+
+                          set +e
+                          PATCH_JSON=$(echo "$WORKFLOW_JSON" | jq --arg prUrl "$pr_url" --arg prNumber "$pr_number" '
+                            .spec.arguments.parameters = (
+                              ( .spec.arguments.parameters // [] )
+                              | (if (map(.name) | index("pr-url")) != null
+                                   then map(if .name == "pr-url" then (.value = $prUrl) else . end)
+                                   else . + [{"name":"pr-url","value":$prUrl}]
+                                 end)
+                              | (if (map(.name) | index("pr-number")) != null
+                                   then map(if .name == "pr-number" then (.value = $prNumber) else . end)
+                                   else . + [{"name":"pr-number","value":$prNumber}]
+                                 end)
+                            )
+                            | {spec:{arguments:{parameters:.spec.arguments.parameters}}}
+                          ')
+                          JQ_EXIT=$?
+                          set -e
+
+                          if [ $JQ_EXIT -ne 0 ]; then
+                            echo "⚠️ jq failed while constructing PR metadata patch for $workflow_name"
+                            return 1
+                          fi
+
+                          if [ -z "$PATCH_JSON" ]; then
+                            echo "⚠️ Failed to construct PR metadata patch payload for $workflow_name"
+                            return 1
+                          fi
+
+                          kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$PATCH_JSON"
+                        }
+
                         # Process each waiting workflow
                         for WORKFLOW_NAME in $WAITING_WORKFLOWS; do
                           echo "Processing workflow: $WORKFLOW_NAME"
@@ -212,43 +254,38 @@ spec:
                           # Extract PR number from URL
                           PR_NUMBER=$(echo "$PR_URL" | sed 's/.*\/pull\///' | sed 's/[^0-9].*//')
 
+                          if [ -z "$PR_NUMBER" ]; then
+                            echo "⚠️ Unable to parse PR number from URL $PR_URL; skipping"
+                            continue
+                          fi
+
                           echo "PR URL: $PR_URL"
                           echo "PR Number: $PR_NUMBER"
 
-                          # Update workflow parameters with PR info
-                          if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
-                            PATCH_JSON="{\"spec\":{\"arguments\":{\"parameters\":["
-                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-url\",\"value\":\"$PR_URL\"},"
-                            PATCH_JSON="${PATCH_JSON}{\"name\":\"pr-number\",\"value\":\"$PR_NUMBER\"}]}}}"
-                          if ! kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
-                            --type='merge' -p "$PATCH_JSON"; then
+                          if ! update_workflow_pr_metadata "$WORKFLOW_NAME" "$PR_URL" "$PR_NUMBER"; then
                             echo "⚠️ Failed to update PR metadata for $WORKFLOW_NAME; skipping"
                             continue
                           fi
-                        else
-                          echo "⚠️ Missing PR metadata for $WORKFLOW_NAME; skipping stage advancement"
-                          continue
+
+                          CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform \
+                            -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "")
+                          if [ "$CURRENT_STAGE" != "waiting-pr-created" ]; then
+                            echo "ℹ️ Workflow $WORKFLOW_NAME not in waiting-pr-created (found '$CURRENT_STAGE'); skipping stage update and resume"
+                            continue
+                          else
+                            STAGE_PATCH='{"metadata":{"labels":{"previous-stage":"waiting-pr-created","current-stage":"waiting-quality-complete"}}}'
+                            if ! kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
+                              --type='merge' -p "$STAGE_PATCH"; then
+                              echo "⚠️ Failed to advance stage for $WORKFLOW_NAME; skipping resume"
+                              continue
+                            fi
                           fi
 
-                        CURRENT_STAGE=$(kubectl get workflow "$WORKFLOW_NAME" -n agent-platform \
-                          -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "")
-                        if [ "$CURRENT_STAGE" != "waiting-pr-created" ]; then
-                          echo "ℹ️ Workflow $WORKFLOW_NAME not in waiting-pr-created (found '$CURRENT_STAGE'); skipping stage update and resume"
-                          continue
-                        else
-                          STAGE_PATCH='{"metadata":{"labels":{"previous-stage":"waiting-pr-created","current-stage":"waiting-quality-complete"}}}'
-                          if ! kubectl patch workflow "$WORKFLOW_NAME" -n agent-platform \
-                            --type='merge' -p "$STAGE_PATCH"; then
-                            echo "⚠️ Failed to advance stage for $WORKFLOW_NAME; skipping resume"
+                          echo "Resuming workflow $WORKFLOW_NAME"
+                          if ! resume_workflow; then
+                            echo "⚠️ Resume attempt failed for $WORKFLOW_NAME"
                             continue
                           fi
-                        fi
-
-                        echo "Resuming workflow $WORKFLOW_NAME"
-                        if ! resume_workflow; then
-                          echo "⚠️ Resume attempt failed for $WORKFLOW_NAME"
-                          continue
-                        fi
                         done
 
                         echo "Finished processing waiting workflows"
