@@ -27,6 +27,32 @@ Before reading project files, discover and plan how to use available MCP tools:
   - brave_web_search: gather external references, standards, or examples; cite URLs and summarize key points.
 - Execute this plan throughout steps 1–3. Prefer primary sources (repo, Rust docs). Use web search when local sources are insufficient.
 
+### Available CLI Tools for Documentation
+
+**Mermaid CLI** - Generate architecture and sequence diagrams:
+```bash
+# Create architecture diagram from Mermaid markdown
+mmdc -i architecture.mmd -o architecture.png
+
+# Generate SVG format
+mmdc -i diagram.mmd -o diagram.svg
+
+# Generate multiple formats
+mmdc -i diagram.mmd -o diagram.png -o diagram.svg
+```
+
+**When to use Mermaid diagrams:**
+- System architecture overviews
+- Component interaction diagrams
+- Workflow/sequence diagrams for complex processes
+- Database schema visualizations
+- State machine diagrams
+
+**Mermaid diagram examples for task documentation:**
+- Create `.taskmaster/docs/task-{id}/architecture.mmd` files
+- Generate both `.png` and `.svg` outputs for flexibility
+- Include generated images in task.md documentation
+
 ### Step 1: Context Analysis (REQUIRED)
 1. Read CLAUDE.md for project context and standards
 2. **Use individual task files:**
