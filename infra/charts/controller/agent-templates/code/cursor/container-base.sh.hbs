@@ -748,32 +748,33 @@ guard_rm() {
       esac
     done
 
-' "${flags[@]}" | grep -Eq '--|^-r.*-f|-f.*-r'; then
-    local has_recursive=0
-    local has_force=0
-    for flag in "${flags[@]}"; do
-      case "$flag" in
-        -*)
-          [[ "$flag" == *r* || "$flag" == *R* ]] && has_recursive=1
-          [[ "$flag" == *f* || "$flag" == *F* ]] && has_force=1
-          ;;
-      esac
-    done
-
-    if ((has_recursive && has_force)); then
-      for target in "${targets[@]}"; do
-        [ -z "$target" ] && continue
-        local expanded="$target"
-        case "$target" in
-          ~*) expanded="${target/#\~/$HOME}" ;;
+    if printf '%s\n' "${flags[@]}" | grep -Eq '--|^-r.*-f|-f.*-r'; then
+      local has_recursive=0
+      local has_force=0
+      for flag in "${flags[@]}"; do
+        case "$flag" in
+          -*)
+            [[ "$flag" == *r* || "$flag" == *R* ]] && has_recursive=1
+            [[ "$flag" == *f* || "$flag" == *F* ]] && has_force=1
+            ;;
         esac
-        local resolved
-        resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
-        if [ "$resolved" = "$CURSOR_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
-          echo "❌ Guard: destructive rm blocked (target=$target)" >&2
-          return 1
-        fi
       done
+
+      if ((has_recursive && has_force)); then
+        for target in "${targets[@]}"; do
+          [ -z "$target" ] && continue
+          local expanded="$target"
+          case "$target" in
+            ~*) expanded="${target/#\~/$HOME}" ;;
+          esac
+          local resolved
+          resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
+          if [ "$resolved" = "$CURSOR_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
+            echo "❌ Guard: destructive rm blocked (target=$target)" >&2
+            return 1
+          fi
+        done
+      fi
     fi
   fi
 
