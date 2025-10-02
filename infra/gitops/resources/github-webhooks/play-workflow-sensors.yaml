@@ -410,20 +410,43 @@ spec:
                         }
 
                         TASK_ID=""
-                        TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
-                          TASK_ID=$(echo "$TASK_LABELS_JSON" |
-                            jq -er '.[] | (.name // "") | ascii_downcase | capture("task[-_/ ]*(?<id>[0-9]+)") | .id' 2>/dev/null | head -1 || true)
+                        
+                        # Debug: Show what we received
+                        BRANCH_REF='{{ .Input.body.pull_request.head.ref }}'
+                        PR_TITLE='{{ .Input.body.pull_request.title }}'
+                        echo "🔍 Debug - Branch ref: '$BRANCH_REF'"
+                        echo "🔍 Debug - PR title: '$PR_TITLE'"
+                        
+                        # Try extracting from branch name first (most reliable)
+                        if [ -n "$BRANCH_REF" ]; then
+                          TASK_ID=$(extract_task_id "$BRANCH_REF")
+                          if [ -n "$TASK_ID" ]; then
+                            echo "✅ Extracted task ID from branch: $TASK_ID"
+                          fi
                         fi
 
+                        # Try labels if branch didn't work
                         if [ -z "$TASK_ID" ]; then
-                          TASK_ID=$(extract_task_id '{{ .Input.body.pull_request.head.ref }}')
+                          TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
+                          echo "🔍 Debug - Labels JSON: '$TASK_LABELS_JSON'"
+                          if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
+                            TASK_ID=$(echo "$TASK_LABELS_JSON" |
+                              jq -er '.[] | (.name // "") | ascii_downcase | capture("task[-_/ ]*(?<id>[0-9]+)") | .id' 2>/dev/null | head -1 || true)
+                            if [ -n "$TASK_ID" ]; then
+                              echo "✅ Extracted task ID from labels: $TASK_ID"
+                            fi
+                          fi
                         fi
 
+                        # Try title as fallback
                         if [ -z "$TASK_ID" ]; then
-                          TASK_ID=$(extract_task_id '{{ .Input.body.pull_request.title }}')
+                          TASK_ID=$(extract_task_id "$PR_TITLE")
+                          if [ -n "$TASK_ID" ]; then
+                            echo "✅ Extracted task ID from title: $TASK_ID"
+                          fi
                         fi
 
+                        # Final fallback to API
                         if [ -z "$TASK_ID" ]; then
                           echo "ℹ️ Task ID not present in webhook payload; querying GitHub API for labels/title/body"
                           TASK_ID=$(fetch_task_id_via_api || true)
