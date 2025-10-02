@@ -868,6 +868,10 @@ CURSOR_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
 
+# Circuit breaker: track repeated command failures
+declare -A FAILED_COMMANDS
+MAX_SAME_COMMAND_FAILURES=3
+
 FORCE_WRITES="{{#if force_writes}}true{{else}}false{{/if}}"
 OUTPUT_FORMAT="{{#if output_format}}{{output_format}}{{else}}stream-json{{/if}}"
 
@@ -902,8 +906,62 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   set +o pipefail
   set -e
 
+  echo "[cursor-debug] Attempt $ATTEMPT finished with exit code $CURSOR_EXIT"
+
   if [ $CURSOR_EXIT -ne 0 ]; then
     echo "⚠️ Cursor exited with status $CURSOR_EXIT on attempt $ATTEMPT"
+  fi
+
+  # Circuit breaker: detect repeated failing bash commands
+  if [ -f "$RUN_LOG" ] && command -v jq >/dev/null 2>&1; then
+    # Try to extract failed bash/shell commands from JSON log
+    # Cursor format: look for shell tool failures
+    FAILED_CMD=$(jq -r 'select(.type=="tool_call" and .subtype=="completed" and (.tool_call.shellToolCall.result.exitCode // 0) != 0) | .tool_call.shellToolCall.args.command' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100)
+    
+    if [ -n "$FAILED_CMD" ]; then
+      # Track how many times this command has failed
+      FAILED_COMMANDS["$FAILED_CMD"]=$((${FAILED_COMMANDS["$FAILED_CMD"]:-0} + 1))
+      FAIL_COUNT=${FAILED_COMMANDS["$FAILED_CMD"]}
+      
+      if [ $FAIL_COUNT -ge $MAX_SAME_COMMAND_FAILURES ]; then
+        echo "🔴 CIRCUIT BREAKER TRIGGERED: Command has failed $FAIL_COUNT times in a row:"
+        echo "   Command: $FAILED_CMD"
+        echo "   This indicates the agent is stuck in a loop."
+        
+        # Inject intervention prompt for next attempt
+        PROMPT_CONTENT="${PROMPT_CONTENT}
+
+⚠️ **LOOP DETECTED**: You tried this command $FAIL_COUNT times:
+\`\`\`bash
+$FAILED_CMD
+\`\`\`
+
+It keeps failing. **STOP REPEATING THIS COMMAND.**
+
+Try instead:
+1. Check working directory: \`pwd\`
+2. List files: \`ls -la\`
+3. Use a completely different approach
+4. Create files/directories step-by-step"
+        
+        # Reset counter
+        FAILED_COMMANDS["$FAILED_CMD"]=0
+      fi
+    fi
+  fi
+
+  # Extract token usage for cost tracking
+  if [ -f "$RUN_LOG" ] && command -v jq >/dev/null 2>&1; then
+    TOKENS_IN=$(jq -r 'select(.metadata.usage.inputTokens != null) | .metadata.usage.inputTokens' "$RUN_LOG" 2>/dev/null | tail -n1)
+    TOKENS_OUT=$(jq -r 'select(.metadata.usage.outputTokens != null) | .metadata.usage.outputTokens' "$RUN_LOG" 2>/dev/null | tail -n1)
+    
+    if [[ "$TOKENS_IN" =~ ^[0-9]+$ ]] && [[ "$TOKENS_OUT" =~ ^[0-9]+$ ]]; then
+      TOKENS_TOTAL=$((TOKENS_IN + TOKENS_OUT))
+      echo "📊 Cursor tokens this attempt: input=$TOKENS_IN, output=$TOKENS_OUT, total=$TOKENS_TOTAL"
+      
+      # Store for metrics (future: send to backend)
+      echo "{\"attempt\":$ATTEMPT,\"task_id\":\"{{task_id}}\",\"service\":\"{{service}}\",\"cli\":\"cursor\",\"tokens_in\":$TOKENS_IN,\"tokens_out\":$TOKENS_OUT,\"tokens_total\":$TOKENS_TOTAL}" >> /tmp/cursor-metrics.jsonl
+    fi
   fi
 
   if [ -s "$RUN_LOG" ]; then
