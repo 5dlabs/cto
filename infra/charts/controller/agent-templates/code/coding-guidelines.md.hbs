@@ -13,6 +13,40 @@ This project uses a **clippy.toml** configuration file based on **AWS SDK Rust (
 
 **The clippy.toml file is project-specific** - if one doesn't exist, create it in the repository root.
 
+## Development Tools Available
+
+Your environment includes comprehensive Rust development tooling:
+
+### **rust-analyzer** (Language Server)
+- **Installed and ready to use** - Provides real-time code intelligence
+- **Inline diagnostics** - See errors and warnings as you write code
+- **Type inference** - Get type information for any expression
+- **Code completion** - Auto-complete for types, methods, traits
+- **Go to definition** - Navigate to type/function definitions
+- **Find references** - Locate all usages of a symbol
+
+**Usage:**
+- LSP is automatically available when editing `.rs` files
+- Check diagnostics before compiling to catch errors early
+- Use type hints to understand complex generic code
+
+### **Cargo Toolchain**
+- `cargo fmt` - Auto-formatting (rustfmt)
+- `cargo clippy` - Linting with pedantic checks
+- `cargo test` - Unit and integration testing
+- `cargo build --release` - Optimized builds
+- `cargo doc` - Generate documentation
+
+### **Security & Quality Tools**
+- `gitleaks` - Scan for secrets in git history
+- `trivy` - Container and dependency vulnerability scanning
+- `cargo-deny` - Check licenses and advisories
+- `cargo-nextest` - Enhanced test runner (if available)
+
+**Pro tip:** Run `rust-analyzer --version` to verify LSP availability. Use it to catch type errors, borrow checker issues, and API misuse before running `cargo check`.
+
+---
+
 ## Pre-PR Quality Gates (MANDATORY)
 
 Before opening any pull request or requesting merge:
