@@ -937,16 +937,21 @@ fi
 # Set OPENCODE_VERBOSE=1 to use markdown format for readability
 if [ "${OPENCODE_VERBOSE:-0}" = "1" ]; then
   OPENCODE_FORMAT="markdown"
-  OPENCODE_LOG_LEVEL="INFO"
-  echo "📢 Verbose mode enabled - using markdown format with INFO log level for readability"
-  echo "   To see even more detail, set OPENCODE_LOG_LEVEL=DEBUG"
+  # Only set log level if not explicitly provided by user
+  if [ -z "${OPENCODE_LOG_LEVEL:-}" ]; then
+    OPENCODE_LOG_LEVEL="INFO"
+  fi
+  echo "📢 Verbose mode enabled - using markdown format with ${OPENCODE_LOG_LEVEL} log level for readability"
+  if [ "${OPENCODE_LOG_LEVEL}" != "DEBUG" ]; then
+    echo "   To see even more detail, set OPENCODE_LOG_LEVEL=DEBUG"
+  fi
 else
   OPENCODE_FORMAT=${OPENCODE_FORMAT:-json}
-  OPENCODE_LOG_LEVEL="DEBUG"
+  # Only set log level if not explicitly provided by user
+  if [ -z "${OPENCODE_LOG_LEVEL:-}" ]; then
+    OPENCODE_LOG_LEVEL="DEBUG"
+  fi
 fi
-
-# Allow explicit override of log level
-OPENCODE_LOG_LEVEL=${OPENCODE_LOG_LEVEL:-DEBUG}
 
 ATTEMPT=1
 SUCCESS=0
