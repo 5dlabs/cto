@@ -1241,7 +1241,49 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
     fi
   fi
 
-  COMPLETION_PROMPT="Task {{task_id}} completion verification.
+  # Rex-specific completion criteria (implementation-focused, not quality-focused)
+  if [[ "{{github_app}}" == *"Rex"* ]] || [[ "{{github_app}}" == *"rex"* ]]; then
+    COMPLETION_PROMPT="Task {{task_id}} completion verification — Rex Implementation Agent
+
+**Your Role**: You are Rex, the IMPLEMENTATION agent. Cleo will handle code quality in the next stage.
+
+**FIRST**: Review the FUNCTIONAL requirements in task/acceptance-criteria.md
+
+**Then answer 'yes' if ALL of these are true:**
+
+1. **FUNCTIONAL acceptance criteria implemented** (features exist and basically work)
+2. Code COMPILES successfully (\`cargo build\` passes)
+3. All code changes are committed to git
+4. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
+5. A pull request exists (with at least task-{{task_id}} label)
+
+**Code quality issues are OK for Rex - Cleo will fix:**
+- ⚠️ Clippy warnings? OK - Cleo will fix
+- ⚠️ Formatting issues? OK - Cleo will fix  
+- ⚠️ Some tests failing? OK if basic functionality works - Cleo/Tess will fix
+- ⚠️ Unused functions/variables? OK - Cleo will clean up
+
+**Focus on**: Does the implementation work? Are the features there?
+
+**Response format:**
+
+If functionally complete (features work, code compiles, PR created), respond with: yes
+
+If features incomplete or code doesn't compile, respond with:
+no
+REASON: <specific FUNCTIONAL issue>
+
+Example 'yes' response (even with warnings):
+yes
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 incomplete - health endpoint not yet implemented. Feature work remains.
+
+Your response:"
+  else
+    # Default completion prompt for other agents (Cleo, Tess)
+    COMPLETION_PROMPT="Task {{task_id}} completion verification.
 
 **FIRST**: Review the acceptance criteria in task/acceptance-criteria.md
 
@@ -1280,6 +1322,7 @@ no
 REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
 
 Your response:"
+  fi
   COMPLETION_LAST_MESSAGE="/tmp/opencode-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/opencode-completion-${ATTEMPT}.jsonl"
 
