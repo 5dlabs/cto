@@ -8,7 +8,9 @@
   },
   "model": "{{agent.provider.name}}/{{agent.model}}"{{#if agent.temperature}},
   "temperature": {{agent.temperature}}{{/if}}{{#if agent.max_output_tokens}},
-  "max_tokens": {{agent.max_output_tokens}}{{/if}},
+  "max_tokens": {{agent.max_output_tokens}}{{else}},
+  "max_tokens": 16384{{/if}},
+  "contextWindow": 256000,
   "provider": {
     "name": "{{agent.provider.name}}"{{#if agent.provider.base_url}},
     "base_url": "{{agent.provider.base_url}}"{{/if}},
