@@ -32,8 +32,17 @@ You are the **implementation agent** responsible for shipping Task {{task_id}} e
 7. **Create the PR**: Use `gh pr create` with a comprehensive description following this template:
 
 ```bash
+# Create labels first if they don't exist
+gh label create "task-{{task_id}}" --color "f29513" --description "Task correlation" 2>/dev/null || true
+gh label create "service-{{service}}" --color "0e8a16" --description "Service correlation" 2>/dev/null || true
+gh label create "run-{{workflow_name}}" --color "0366d6" --description "Workflow correlation" 2>/dev/null || true
+
+# Create PR with labels
 gh pr create \
   --title "feat({{service}}): implement task {{task_id}} - [brief description]" \
+  --label "task-{{task_id}}" \
+  --label "service-{{service}}" \
+  --label "run-{{workflow_name}}" \
   --body "## Implementation Summary
 
 ### Objective
@@ -64,12 +73,15 @@ gh pr create \
 [Anything the downstream agents should know about implementation decisions, edge cases, or testing considerations]
 
 ---
-**Labels**: task-{{task_id}}, service-{{service}}, run-{{workflow_name}}
 **Agent**: {{github_app}}
 **Branch**: feature/task-{{task_id}}-implementation → main"
 ```
 
-**CRITICAL**: The PR description is documentation for Cleo (code quality), Tess (QA), and human reviewers. Be thorough and specific.
+**CRITICAL**: 
+- The PR **MUST** include labels: `task-{{task_id}}`, `service-{{service}}`, `run-{{workflow_name}}`
+- These labels enable multi-agent workflow coordination (Cleo finds PRs by task label, sensors track by run label)
+- The PR description is documentation for Cleo (code quality), Tess (QA), and human reviewers
+- Be thorough and specific in your implementation summary
 
 ## Definition of Done
 - All acceptance criteria for Task {{task_id}} satisfied with proof (logs, screenshots, or CLI output).
