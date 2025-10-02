@@ -910,7 +910,7 @@ RESET_SESSION_ON_RETRY=${OPENCODE_RESET_SESSION_ON_RETRY:-1}
 CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
 
 # Reasonable retries for Grok - not too many to waste tokens
-MAX_RETRIES=${OPENCODE_MAX_RETRIES:-6}
+MAX_RETRIES=${OPENCODE_MAX_RETRIES:-10}
 
 # Output format: json (structured, parseable) or default (human-readable)
 # Keep json for automated parsing (session IDs, circuit breaker, token tracking)
