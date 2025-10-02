@@ -1257,10 +1257,12 @@ done
 
 if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
-  EXIT_CODE=0
+  echo "❌ Task incomplete - marking as FAILED"
+  EXIT_CODE=1  # FAIL the job so it doesn't appear successful
 else
+  echo "✅ OpenCode confirmed task completion"
   if [ ${OPENCODE_EXIT:-0} -ne 0 ]; then
-    echo "⚠️ OpenCode returned exit code ${OPENCODE_EXIT}; treating as success"
+    echo "⚠️ OpenCode returned non-zero exit code ${OPENCODE_EXIT}, but completion probe passed"
   fi
   EXIT_CODE=0
 fi
