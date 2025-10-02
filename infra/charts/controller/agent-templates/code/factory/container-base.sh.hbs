@@ -872,7 +872,30 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     : > "$LAST_MESSAGE_FILE"
   fi
 
-  COMPLETION_PROMPT="You previously worked on Task {{task_id}} for service {{service}}. Respond with a single word (yes/no) indicating whether the implementation is complete and ready for QA. Do not perform any file modifications or shell commands."
+  COMPLETION_PROMPT="Task {{task_id}} completion verification.
+
+**FIRST**: Review the acceptance criteria in task/acceptance-criteria.md
+
+**Then answer 'yes' ONLY if ALL of these are true:**
+
+1. **EVERY acceptance criterion is fully implemented** (not just started, but DONE)
+2. All code changes are committed to git
+3. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
+4. A pull request exists (with at least task-{{task_id}} label; other labels are optional)
+5. Quality gates passed (cargo fmt, cargo clippy with no warnings, tests pass)
+
+**Be honest**: If ANY acceptance criterion is incomplete or partially implemented, answer 'no' and continue working.
+
+**To verify:**
+- Review: cat task/acceptance-criteria.md
+- Git status: git status
+- Commits pushed: git log origin/main..HEAD
+- PR exists: gh pr view
+- Tests pass: Check your test results
+
+Based on your honest assessment of acceptance criteria completion, answer with a single word: yes or no
+
+Response (one word only):"
   COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
 
@@ -905,10 +928,12 @@ done
 
 if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ Factory did not confirm task completion after $MAX_RETRIES attempts"
-  EXIT_CODE=0
+  echo "❌ Task incomplete - marking as FAILED"
+  EXIT_CODE=1  # Fail the job so it doesn't appear successful
 else
+  echo "✅ Factory confirmed task completion"
   if [ ${FACTORY_EXIT:-0} -ne 0 ]; then
-    echo "⚠️ Factory CLI returned exit code ${FACTORY_EXIT}; treating as success"
+    echo "⚠️ Factory returned non-zero exit code ${FACTORY_EXIT}, but completion probe passed"
   fi
   EXIT_CODE=0
 fi
