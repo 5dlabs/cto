@@ -1103,6 +1103,10 @@ Remaining work:
     
     set +e
     set -o pipefail
+    # Write prompt to temp file to avoid "Argument list too long" error
+    PROMPT_FILE="/tmp/opencode-prompt-${ATTEMPT}-${CONTINUATION_ATTEMPT}.txt"
+    printf '%s' "$PROMPT_PAYLOAD" > "$PROMPT_FILE"
+    
     OPENCODE_CMD=(
       "opencode"
       "run"
@@ -1118,16 +1122,19 @@ Remaining work:
         OPENCODE_CMD+=("--continue")
       fi
     fi
-    OPENCODE_CMD+=("$PROMPT_PAYLOAD")
-
+    
+    # Pass prompt via stdin to handle large prompts
     if command -v timeout >/dev/null 2>&1; then
-      timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+      timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
     else
-      "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+      "${OPENCODE_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
     fi
     OPENCODE_EXIT=${PIPESTATUS[0]}
     set +o pipefail
     set -e
+    
+    # Clean up prompt file
+    rm -f "$PROMPT_FILE"
     
     # Check if this run had tool calls
     if has_tool_calls "$RUN_LOG"; then
