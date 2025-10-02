@@ -392,6 +392,9 @@ ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
 
 # Install mermaid-cli for diagram generation (docs/architecture work)
+USER root
+RUN mkdir -p /usr/local/share/npm-global/lib/node_modules && \
+    chown -R 1000:1000 /usr/local/share/npm-global
 USER node
 RUN npm install -g @mermaid-js/mermaid-cli
 
