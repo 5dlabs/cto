@@ -410,13 +410,13 @@ spec:
                         }
 
                         TASK_ID=""
-                        
+
                         # Debug: Show what we received
                         BRANCH_REF='{{ .Input.body.pull_request.head.ref }}'
                         PR_TITLE='{{ .Input.body.pull_request.title }}'
                         echo "🔍 Debug - Branch ref: '$BRANCH_REF'"
                         echo "🔍 Debug - PR title: '$PR_TITLE'"
-                        
+
                         # Try extracting from branch name first (most reliable)
                         if [ -n "$BRANCH_REF" ]; then
                           TASK_ID=$(extract_task_id "$BRANCH_REF")
