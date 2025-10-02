@@ -374,12 +374,13 @@ spec:
                   value: "waiting-ready-for-qa"
                 - name: verify-update
                   value: "true"
-        - - name: wait-for-ready-for-qa
+        # Tess approval happens via GitHub PR review - sensor resumes at waiting-ready-for-qa
+        - - name: wait-for-tess-approval
             template: suspend-for-event
             arguments:
               parameters:
                 - name: event-type
-                  value: "ready-for-qa"
+                  value: "tess-approval"
                 - name: stage-name
                   value: "waiting-ready-for-qa"
         - - name: evaluate-remediation
@@ -671,11 +672,9 @@ spec:
               exit 1
             fi
 
-            if echo "$LABELS" | grep -q '^needs-tess$'; then
-              echo "⏳ Waiting for Tess decision..."
-            elif echo "$LABELS" | grep -q '^needs-cleo$'; then
-              echo "⏳ Waiting for Cleo to finish checks..."
-            elif [ -z "$LABELS" ]; then
+            # Note: Stage transitions are now driven by GitHub PR reviews (Cleo/Tess approvals)
+            # Labels are only used for correlation (task-*, service-*, run-*) and remediation (needs-fixes)
+            if [ -z "$LABELS" ]; then
               echo "ℹ️ PR currently has no workflow labels; waiting"
             else
               echo "ℹ️ Current labels: $LABELS"
