@@ -29,6 +29,8 @@ struct AgentConfig {
     #[serde(default)]
     #[allow(dead_code)]
     tools: Option<AgentTools>,
+    #[serde(default, rename = "maxRetries")]
+    max_retries: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -108,6 +110,9 @@ struct CodeDefaults {
     docs_project_directory: Option<String>,
     #[allow(dead_code)]
     service: Option<String>,
+    #[serde(rename = "maxRetries")]
+    #[allow(dead_code)]
+    max_retries: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -173,6 +178,8 @@ struct PlayDefaults {
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
+    #[serde(rename = "maxRetries")]
+    max_retries: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -870,13 +877,14 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.implementation_agent.clone());
 
+    let implementation_agent_cfg = config
+        .agents
+        .values()
+        .find(|a| a.github_app == implementation_agent_input);
+
     // Resolve agent name and extract CLI/model/tools if it's a short alias
     let (implementation_agent, implementation_cli, implementation_model, implementation_tools) =
-        if let Some(agent_config) = config
-            .agents
-            .values()
-            .find(|a| a.github_app == implementation_agent_input)
-        {
+        if let Some(agent_config) = implementation_agent_cfg {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
                 cli.clone()
@@ -922,6 +930,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 "{}".to_string(),
             )
         };
+
+    let implementation_agent_max_retries = implementation_agent_cfg.and_then(|cfg| cfg.max_retries);
 
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
@@ -1057,7 +1067,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Play workflow submitting with task_id: {task_id}");
     eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
     eprintln!("🐛 DEBUG: Play workflow service: {service}");
-    eprintln!("🐛 DEBUG: Implementation agent: {implementation_agent} (CLI: {implementation_cli}, Model: {implementation_model})");
+    eprintln!(
+        "🐛 DEBUG: Implementation agent: {implementation_agent} (CLI: {implementation_cli}, Model: {implementation_model})"
+    );
     eprintln!("🐛 DEBUG: Implementation tools: {implementation_tools}");
     eprintln!(
         "🐛 DEBUG: Quality agent: {quality_agent} (CLI: {quality_cli}, Model: {quality_model})"
@@ -1075,6 +1087,22 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Implementation agent input: '{implementation_agent_input}'");
     eprintln!("🐛 DEBUG: Quality agent input: '{quality_agent_input}'");
     eprintln!("🐛 DEBUG: Testing agent input: '{testing_agent_input}'");
+
+    let opencode_max_retries_override =
+        arguments
+            .get("opencode_max_retries")
+            .and_then(|value| match value {
+                Value::Number(num) => num.as_u64().map(|v| v as u32),
+                Value::String(s) => s.parse::<u32>().ok(),
+                _ => None,
+            });
+
+    let opencode_max_retries = opencode_max_retries_override
+        .or(implementation_agent_max_retries)
+        .or(config.defaults.play.max_retries)
+        .unwrap_or(10);
+
+    eprintln!("🐛 DEBUG: OpenCode max retries: {opencode_max_retries}");
 
     // Check for requirements.yaml file
     // Try to determine workspace directory, but don't fail if we can't
@@ -1131,6 +1159,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("testing-model={testing_model}"),
         format!("testing-tools={testing_tools}"),
     ];
+
+    params.push(format!("opencode-max-retries={opencode_max_retries}"));
 
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {

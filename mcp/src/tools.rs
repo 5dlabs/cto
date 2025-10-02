@@ -120,6 +120,10 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "type": "string",
                     "description": "Claude model to use for all agents (optional, defaults to configuration)"
                 },
+                "opencode_max_retries": {
+                    "type": "integer",
+                    "description": "Override maximum retry attempts for OpenCode runs (defaults to configuration)"
+                },
                 "cli": {
                     "type": "string",
                     "description": "CLI tool to use for all agents (optional, defaults to configuration)"
