@@ -911,6 +911,11 @@ CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
 
 # Reasonable retries for Grok - not too many to waste tokens
 MAX_RETRIES=${OPENCODE_MAX_RETRIES:-6}
+
+# Output format: json (structured, parseable) or default (human-readable)
+# Keep json for automated parsing (session IDs, circuit breaker, token tracking)
+OPENCODE_FORMAT=${OPENCODE_FORMAT:-json}
+
 ATTEMPT=1
 SUCCESS=0
 OPENCODE_EXIT=1
@@ -1066,7 +1071,7 @@ Focus on meeting EVERY acceptance criterion, not just some of them."
     "opencode"
     "run"
     "--format"
-    "json"
+    "$OPENCODE_FORMAT"
     "--log-level"
     "DEBUG"
   )
@@ -1213,7 +1218,7 @@ Response (one word only):"
       "opencode"
       "run"
       "--format"
-      "json"
+      "$OPENCODE_FORMAT"
       "--log-level"
       "DEBUG"
     )
