@@ -1204,9 +1204,24 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
 - PR exists: \`gh pr view\`
 - Tests pass: Check your test results
 
-Based on your honest assessment of acceptance criteria completion, answer with a single word: yes or no
+**Response format:**
 
-Response (one word only):"
+If complete, respond with: yes
+
+If incomplete, respond with:
+no
+REASON: <specific reason why not complete>
+
+For 'no' responses, REASON must specify:
+- Which acceptance criteria are incomplete (list them by number/name)
+- What specific work remains (be concrete)
+- Any blockers or issues encountered
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
+
+Your response:"
   COMPLETION_LAST_MESSAGE="/tmp/opencode-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/opencode-completion-${ATTEMPT}.jsonl"
 
@@ -1244,6 +1259,17 @@ Response (one word only):"
     if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
       COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
       echo "🧮 Completion probe response: $COMPLETION_RESPONSE"
+      
+      # Extract reason if response is 'no'
+      if echo "$COMPLETION_RESPONSE" | grep -Eq '^no'; then
+        COMPLETION_REASON=$(echo "$COMPLETION_RESPONSE" | grep -A 100 "reason:" | tail -n +1 | sed 's/^reason:\s*//' | head -n 20)
+        if [ -n "$COMPLETION_REASON" ]; then
+          echo "📋 Incompletion details:"
+          echo "$COMPLETION_REASON"
+        else
+          echo "⚠️ No reason provided for incomplete status"
+        fi
+      fi
     fi
   else
     echo "ℹ️ Completion probe skipped (session continuation disabled)"
@@ -1263,6 +1289,14 @@ done
 if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
   echo "❌ Task incomplete - marking as FAILED"
+  
+  # Display the last recorded reason for incompletion
+  if [ -n "$COMPLETION_REASON" ]; then
+    echo ""
+    echo "💡 Last reported reason for incompletion:"
+    echo "$COMPLETION_REASON"
+  fi
+  
   EXIT_CODE=1  # FAIL the job so it doesn't appear successful
 else
   echo "✅ OpenCode confirmed task completion"
