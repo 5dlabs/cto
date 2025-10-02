@@ -19,7 +19,7 @@
       "repository": "https://github.com/your-org/your-target-repo",
       "docsRepository": "https://github.com/your-org/your-docs-repo",
       "docsProjectDirectory": "projects/your-project",
-      "service": "your-service-name",
+      "service": "cto",
       "cli": "codex"
     },
     "_comment_intake": "Default values for intake() tool - project intake workflows",
@@ -49,7 +49,8 @@
       "service": "your-test-service",
       "docsRepository": "your-org/your-test-repo",
       "docsProjectDirectory": "docs",
-      "workingDirectory": "/path/to/your/test/workspace"
+      "workingDirectory": "/path/to/your/test/workspace",
+      "maxRetries": 10
     },
     "_comment_docs_ingest": "Default values for docs ingest workflows",
     "docs_ingest": {
