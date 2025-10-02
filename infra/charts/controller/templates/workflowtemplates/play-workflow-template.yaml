@@ -140,16 +140,6 @@ spec:
   # Workflow instance naming pattern
   onExit: cleanup-handler
 
-  # Volume claim templates for shared workspace
-  volumeClaimTemplates:
-    - metadata:
-        name: workspace
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
-
   templates:
     # Main DAG with sequential task execution and suspend points
     - name: main
@@ -1201,9 +1191,6 @@ spec:
           echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
           echo ""
           echo "Note: Next task will be started automatically by webhook system"
-        volumeMounts:
-          - name: workspace
-            mountPath: /work
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
