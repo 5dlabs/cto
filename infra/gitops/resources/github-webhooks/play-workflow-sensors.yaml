@@ -193,7 +193,7 @@ spec:
                           printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$temp_key"
                           chmod 600 "$temp_key"
 
-                          local now exp hdr pay sig jwt installation_id token
+                          local now exp hdr pay sig jwt installation_id token=""
                           now=$(date +%s)
                           exp=$((now + 600))
                           hdr=$( \
