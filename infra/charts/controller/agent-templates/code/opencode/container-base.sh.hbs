@@ -922,7 +922,14 @@ RESET_SESSION_ON_RETRY=${OPENCODE_RESET_SESSION_ON_RETRY:-1}
 CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
 
 # Reasonable retries for Grok - not too many to waste tokens
+# Special case: 0 means unlimited (keep going until acceptance criteria met)
 MAX_RETRIES=${OPENCODE_MAX_RETRIES:-10}
+if [ "$MAX_RETRIES" = "0" ]; then
+  echo "🔄 Unlimited retries enabled - will continue until acceptance criteria met"
+  UNLIMITED_RETRIES=1
+else
+  UNLIMITED_RETRIES=0
+fi
 
 # Output format: json (structured, parseable) or default (human-readable)
 # Keep json for automated parsing (session IDs, circuit breaker, token tracking)
@@ -1037,8 +1044,12 @@ else
   fi
 fi
 
-while [ $ATTEMPT -le $MAX_RETRIES ]; do
-  echo "🚀 OpenCode execution attempt $ATTEMPT/$MAX_RETRIES"
+while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
+  if [ "$UNLIMITED_RETRIES" = "1" ]; then
+    echo "🚀 OpenCode execution attempt $ATTEMPT (unlimited mode)"
+  else
+    echo "🚀 OpenCode execution attempt $ATTEMPT/$MAX_RETRIES"
+  fi
   LAST_MESSAGE_FILE="/tmp/opencode-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/opencode-run-${ATTEMPT}.jsonl"
 
@@ -1327,7 +1338,11 @@ Your response:"
 done
 
 if [ $SUCCESS -ne 1 ]; then
-  echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
+  if [ "$UNLIMITED_RETRIES" = "1" ]; then
+    echo "⚠️ OpenCode did not confirm task completion after $ATTEMPT attempts (unlimited mode)"
+  else
+    echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
+  fi
   echo "❌ Task incomplete - marking as FAILED"
   
   # Display the last recorded reason for incompletion
