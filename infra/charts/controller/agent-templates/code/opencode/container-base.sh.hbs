@@ -1328,6 +1328,10 @@ Your response:"
 
   COMPLETION_RESPONSE=""
   if [ "$CONTINUE_SESSION" = "1" ]; then
+    # Write completion prompt to file (same pattern as main prompt)
+    COMPLETION_PROMPT_FILE="/tmp/opencode-completion-prompt-${ATTEMPT}.txt"
+    printf '%s' "$COMPLETION_PROMPT" > "$COMPLETION_PROMPT_FILE"
+    
     set +e
     set -o pipefail
     COMPLETION_CMD=(
@@ -1343,11 +1347,15 @@ Your response:"
     else
       COMPLETION_CMD+=("--continue")
     fi
-    COMPLETION_CMD+=("$COMPLETION_PROMPT")
-    "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
+    
+    # Pass completion prompt via stdin
+    "${COMPLETION_CMD[@]}" < "$COMPLETION_PROMPT_FILE" | tee "$COMPLETION_LOG"
     COMPLETION_EXIT=${PIPESTATUS[0]}
     set +o pipefail
     set -e
+    
+    # Clean up prompt file
+    rm -f "$COMPLETION_PROMPT_FILE"
 
     if [ $COMPLETION_EXIT -ne 0 ]; then
       echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
