@@ -621,31 +621,31 @@ else
 fi
 
 if [ -f /task-files/AGENTS.md ]; then
-  cp /task-files/AGENTS.md "$CURSOR_WORK_DIR/AGENTS.md"
+  cp -f /task-files/AGENTS.md "$CURSOR_WORK_DIR/AGENTS.md"
 fi
 
 if [ -f /task-files/coding-guidelines.md ]; then
-  cp /task-files/coding-guidelines.md "$CURSOR_WORK_DIR/"
+  cp -f /task-files/coding-guidelines.md "$CURSOR_WORK_DIR/"
   echo "✓ Copied coding-guidelines.md to working directory"
 fi
 
 if [ -f /task-files/github-guidelines.md ]; then
-  cp /task-files/github-guidelines.md "$CURSOR_WORK_DIR/"
+  cp -f /task-files/github-guidelines.md "$CURSOR_WORK_DIR/"
   echo "✓ Copied github-guidelines.md to working directory"
 fi
 
 if [ -f /task-files/client-config.json ]; then
-  cp /task-files/client-config.json "$CURSOR_WORK_DIR/"
+  cp -f /task-files/client-config.json "$CURSOR_WORK_DIR/"
   echo "✓ Copied client-config.json to working directory"
 fi
 
 if [ -f /task-files/mcp.json ]; then
-  cp /task-files/mcp.json "$CURSOR_WORK_DIR/.mcp.json"
+  cp -f /task-files/mcp.json "$CURSOR_WORK_DIR/.mcp.json"
 fi
 
 if [ -f /task-files/cursor-cli.json ]; then
   mkdir -p "$CURSOR_WORK_DIR/.cursor"
-  cp /task-files/cursor-cli.json "$CURSOR_WORK_DIR/.cursor/cli.json"
+  cp -f /task-files/cursor-cli.json "$CURSOR_WORK_DIR/.cursor/cli.json"
   echo "✓ Installed project-level cursor CLI permissions"
 else
   echo "⚠️ cursor-cli.json not provided; using default project permissions"
@@ -653,7 +653,7 @@ fi
 
 if [ -f /task-files/cursor-cli-config.json ]; then
   mkdir -p "$HOME/.cursor"
-  cp /task-files/cursor-cli-config.json "$HOME/.cursor/cli-config.json"
+  cp -f /task-files/cursor-cli-config.json "$HOME/.cursor/cli-config.json"
   echo "✓ Installed global cursor CLI config"
 else
   echo "⚠️ cursor-cli-config.json not provided; using existing global Cursor config"
