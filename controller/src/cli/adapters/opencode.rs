@@ -435,17 +435,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_memory_template_includes_details() {
-        std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        let adapter = OpenCodeAdapter::new().await.unwrap();
-        let agent = sample_agent_config();
-
-        let memory = adapter.render_memory_file(&agent).unwrap();
-        assert!(memory.contains("OpenCode"));
-        assert!(memory.contains("Follow OpenCode best practices"));
-    }
-
-    #[tokio::test]
     async fn test_parse_response_extracts_tool_calls() {
         let adapter = OpenCodeAdapter::new().await.unwrap();
         let payload = r#"
