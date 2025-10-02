@@ -941,6 +941,23 @@ LATEST_SESSION_ID=""
 declare -A FAILED_COMMANDS
 MAX_SAME_COMMAND_FAILURES=3
 
+# Session continuation: retry within same session when no tools used
+MAX_CONTINUATION_RETRIES=5
+
+# Helper: Check if response had any tool calls
+has_tool_calls() {
+  local log_file="$1"
+  if [ ! -f "$log_file" ]; then
+    return 1
+  fi
+  
+  # Check for tool_use events in the JSON log
+  if grep -q '"type":"tool_use"' "$log_file" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
 has_existing_sessions() {
   local session_dir="$1"
   if [ ! -d "$session_dir" ]; then
@@ -1029,6 +1046,9 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
   fi
 
+  # Inner continuation loop counter
+  CONTINUATION_ATTEMPT=0
+
   if [ $ATTEMPT -eq 1 ]; then
     PROMPT_PAYLOAD="$ORIGINAL_PROMPT"
   else
@@ -1052,33 +1072,66 @@ $PREVIOUS_SNIPPET
 Continue working on the incomplete items."
   fi
 
-  set +e
-  set -o pipefail
-  OPENCODE_CMD=(
-    "opencode"
-    "run"
-    "--format"
-    "$OPENCODE_FORMAT"
-    "--log-level"
-    "DEBUG"
-  )
-  if [ "$CONTINUE_SESSION" = "1" ]; then
-    if [ -n "$LATEST_SESSION_ID" ]; then
-      OPENCODE_CMD+=("--session" "$LATEST_SESSION_ID")
-    else
-      OPENCODE_CMD+=("--continue")
-    fi
-  fi
-  OPENCODE_CMD+=("$PROMPT_PAYLOAD")
+  # Inner loop: keep session alive when model returns text-only (no tools)
+  while [ $CONTINUATION_ATTEMPT -le $MAX_CONTINUATION_RETRIES ]; do
+    if [ $CONTINUATION_ATTEMPT -gt 0 ]; then
+      echo "🔄 Continuation $CONTINUATION_ATTEMPT/$MAX_CONTINUATION_RETRIES (keeping session alive)"
+      PROMPT_PAYLOAD="The task is not complete yet. **Use tools** to continue working on the remaining requirements.
 
-  if command -v timeout >/dev/null 2>&1; then
-    timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
-  else
-    "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
-  fi
-  OPENCODE_EXIT=${PIPESTATUS[0]}
-  set +o pipefail
-  set -e
+Remaining work:
+- Review acceptance criteria: \`cat task/acceptance-criteria.md\`  
+- Check what's been done: \`git status\` and \`git log\`
+- Fix any errors or incomplete implementations
+- Run quality gates (cargo fmt, cargo clippy, cargo test)
+- Commit and push changes
+- Create or update PR
+
+**Important:** Do not just explain - take action with tools to complete the task."
+      RUN_LOG="/tmp/opencode-run-${ATTEMPT}-cont${CONTINUATION_ATTEMPT}.jsonl"
+    fi
+    
+    set +e
+    set -o pipefail
+    OPENCODE_CMD=(
+      "opencode"
+      "run"
+      "--format"
+      "$OPENCODE_FORMAT"
+      "--log-level"
+      "DEBUG"
+    )
+    if [ "$CONTINUE_SESSION" = "1" ]; then
+      if [ -n "$LATEST_SESSION_ID" ]; then
+        OPENCODE_CMD+=("--session" "$LATEST_SESSION_ID")
+      else
+        OPENCODE_CMD+=("--continue")
+      fi
+    fi
+    OPENCODE_CMD+=("$PROMPT_PAYLOAD")
+
+    if command -v timeout >/dev/null 2>&1; then
+      timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+    else
+      "${OPENCODE_CMD[@]}" | tee "$RUN_LOG"
+    fi
+    OPENCODE_EXIT=${PIPESTATUS[0]}
+    set +o pipefail
+    set -e
+    
+    # Check if this run had tool calls
+    if has_tool_calls "$RUN_LOG"; then
+      echo "✅ Session produced tool calls - good progress"
+      break
+    else
+      echo "⚠️ No tool calls detected - model stuck in explanation mode"
+      if [ $CONTINUATION_ATTEMPT -ge $MAX_CONTINUATION_RETRIES ]; then
+        echo "❌ Max continuation retries reached - moving to next attempt"
+        break
+      fi
+    fi
+    
+    CONTINUATION_ATTEMPT=$((CONTINUATION_ATTEMPT + 1))
+  done
 
   if [ $OPENCODE_EXIT -eq 124 ]; then
     echo "⏱️ OpenCode command exceeded ${OPENCODE_TIMEOUT}s timeout; terminating session"
