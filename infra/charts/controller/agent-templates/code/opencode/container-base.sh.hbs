@@ -1033,6 +1033,8 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     "run"
     "--format"
     "json"
+    "--log-level"
+    "DEBUG"
   )
   if [ "$CONTINUE_SESSION" = "1" ]; then
     if [ -n "$LATEST_SESSION_ID" ]; then
@@ -1170,6 +1172,8 @@ Response (one word only):"
       "run"
       "--format"
       "json"
+      "--log-level"
+      "DEBUG"
     )
     if [ -n "$LATEST_SESSION_ID" ]; then
       COMPLETION_CMD+=("--session" "$LATEST_SESSION_ID")
