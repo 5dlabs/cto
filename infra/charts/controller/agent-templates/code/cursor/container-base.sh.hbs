@@ -685,11 +685,11 @@ is_valid_cfg() {
 }
 
 if is_valid_cfg "$WORKSPACE_CFG"; then
-  cp "$WORKSPACE_CFG" "$TARGET_CFG"
+  cp -f "$WORKSPACE_CFG" "$TARGET_CFG"
   echo "✓ Using MCP client config from workspace: $TARGET_CFG"
 elif is_valid_cfg "$SOURCE_CFG"; then
-  cp "$SOURCE_CFG" "$WORKSPACE_CFG"
-  cp "$SOURCE_CFG" "$TARGET_CFG"
+  cp -f "$SOURCE_CFG" "$WORKSPACE_CFG"
+  cp -f "$SOURCE_CFG" "$TARGET_CFG"
   echo "✓ Restored MCP client config from source: $TARGET_CFG"
 else
   echo "❌ No valid client-config.json available (checked $WORKSPACE_CFG and $SOURCE_CFG)"
