@@ -902,6 +902,10 @@ RESUME_ARGS=()
 SESSION_FILE="$CODEX_WORK_DIR/.codex-session"
 CURRENT_SESSION_ID=""
 
+# Circuit breaker: track repeated command failures
+declare -A FAILED_COMMANDS
+MAX_SAME_COMMAND_FAILURES=3
+
 if [ -f "$SESSION_FILE" ]; then
   CURRENT_SESSION_ID=$(tr -d '\r\n ' < "$SESSION_FILE" 2>/dev/null || true)
 fi
@@ -1017,6 +1021,50 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
     echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
   fi
 
+  # Circuit breaker: detect repeated failing bash commands
+  if [ -f "$RUN_LOG" ] && command -v jq >/dev/null 2>&1; then
+    # Codex format: look for bash tool failures in JSON log
+    # Note: Codex may output text, so this only works if JSON logging is enabled
+    FAILED_CMD=$(jq -r 'select(.type=="bash" and (.exit_code // 0) != 0) | .command' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100)
+    
+    # Fallback: grep for common error patterns in plain text logs
+    if [ -z "$FAILED_CMD" ] && [ -f "$RUN_LOG" ]; then
+      # Try to extract from text output (less reliable but better than nothing)
+      FAILED_CMD=$(grep -oP '(?<=\$ ).*?(?= \(exit)' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100 || true)
+    fi
+    
+    if [ -n "$FAILED_CMD" ]; then
+      # Track how many times this command has failed
+      FAILED_COMMANDS["$FAILED_CMD"]=$((${FAILED_COMMANDS["$FAILED_CMD"]:-0} + 1))
+      FAIL_COUNT=${FAILED_COMMANDS["$FAILED_CMD"]}
+      
+      if [ $FAIL_COUNT -ge $MAX_SAME_COMMAND_FAILURES ]; then
+        echo "🔴 CIRCUIT BREAKER TRIGGERED: Command has failed $FAIL_COUNT times in a row:"
+        echo "   Command: $FAILED_CMD"
+        echo "   This indicates the agent is stuck in a loop."
+        
+        # Inject intervention prompt for next attempt
+        PROMPT_CONTENT="${PROMPT_CONTENT}
+
+⚠️ **LOOP DETECTED**: You tried this command $FAIL_COUNT times:
+\`\`\`bash
+$FAILED_CMD
+\`\`\`
+
+It keeps failing. **STOP REPEATING THIS COMMAND.**
+
+Try instead:
+1. Check working directory: \`pwd\`
+2. List files: \`ls -la\`
+3. Use a completely different approach
+4. Create files/directories step-by-step"
+        
+        # Reset counter
+        FAILED_COMMANDS["$FAILED_CMD"]=0
+      fi
+    fi
+  fi
+
   NEW_SESSION_ID=""
   if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
@@ -1037,11 +1085,34 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
 
   PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
 
-  if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ -f "$RUN_LOG" ]; then
+  # Enhanced token tracking with metrics storage
+  if [ -f "$RUN_LOG" ]; then
+    # Try multiple extraction methods for robustness
     LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" 2>/dev/null | tail -n1 | awk '{print $3}' | tr -d ',' | tr -d '\n' || true)
+    
+    # Also try JSON format if available
+    if [ -z "$LAST_TOKENS" ] && command -v jq >/dev/null 2>&1; then
+      TOKENS_IN=$(jq -r 'select(.tokens.input != null) | .tokens.input' "$RUN_LOG" 2>/dev/null | tail -n1)
+      TOKENS_OUT=$(jq -r 'select(.tokens.output != null) | .tokens.output' "$RUN_LOG" 2>/dev/null | tail -n1)
+      
+      if [[ "$TOKENS_IN" =~ ^[0-9]+$ ]] && [[ "$TOKENS_OUT" =~ ^[0-9]+$ ]]; then
+        LAST_TOKENS=$((TOKENS_IN + TOKENS_OUT))
+        echo "📊 Codex tokens this attempt: input=$TOKENS_IN, output=$TOKENS_OUT, total=$LAST_TOKENS"
+        
+        # Store detailed metrics for cost analysis
+        echo "{\"attempt\":$ATTEMPT,\"task_id\":\"{{task_id}}\",\"service\":\"{{service}}\",\"cli\":\"codex\",\"tokens_in\":$TOKENS_IN,\"tokens_out\":$TOKENS_OUT,\"tokens_total\":$LAST_TOKENS}" >> /tmp/codex-metrics.jsonl
+      fi
+    fi
+    
     if [[ "$LAST_TOKENS" =~ ^[0-9]+$ ]]; then
-      echo "📊 Codex tokens used this attempt: $LAST_TOKENS"
-      if [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ]; then
+      if [ -z "$TOKENS_IN" ]; then
+        # Only total available from text format
+        echo "📊 Codex tokens used this attempt: $LAST_TOKENS"
+        echo "{\"attempt\":$ATTEMPT,\"task_id\":\"{{task_id}}\",\"service\":\"{{service}}\",\"cli\":\"codex\",\"tokens_total\":$LAST_TOKENS}" >> /tmp/codex-metrics.jsonl
+      fi
+      
+      # Check token limit if configured
+      if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ]; then
         echo "⚠️ Token usage $LAST_TOKENS exceeds limit $TOKEN_LIMIT; forcing clean session before retry"
         if [ -d "$SESSION_DIR" ]; then
           find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
