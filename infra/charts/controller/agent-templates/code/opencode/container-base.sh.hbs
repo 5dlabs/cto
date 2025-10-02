@@ -931,9 +931,22 @@ else
   UNLIMITED_RETRIES=0
 fi
 
-# Output format: json (structured, parseable) or default (human-readable)
-# Keep json for automated parsing (session IDs, circuit breaker, token tracking)
-OPENCODE_FORMAT=${OPENCODE_FORMAT:-json}
+# Output format: json (structured, parseable) or markdown (human-readable)
+# JSON is better for automated parsing (session IDs, circuit breaker, token tracking)
+# MARKDOWN is better for human observation during development/debugging
+# Set OPENCODE_VERBOSE=1 to use markdown format for readability
+if [ "${OPENCODE_VERBOSE:-0}" = "1" ]; then
+  OPENCODE_FORMAT="markdown"
+  OPENCODE_LOG_LEVEL="INFO"
+  echo "📢 Verbose mode enabled - using markdown format with INFO log level for readability"
+  echo "   To see even more detail, set OPENCODE_LOG_LEVEL=DEBUG"
+else
+  OPENCODE_FORMAT=${OPENCODE_FORMAT:-json}
+  OPENCODE_LOG_LEVEL="DEBUG"
+fi
+
+# Allow explicit override of log level
+OPENCODE_LOG_LEVEL=${OPENCODE_LOG_LEVEL:-DEBUG}
 
 ATTEMPT=1
 SUCCESS=0
@@ -1113,7 +1126,7 @@ Remaining work:
       "--format"
       "$OPENCODE_FORMAT"
       "--log-level"
-      "DEBUG"
+      "$OPENCODE_LOG_LEVEL"
     )
     if [ "$CONTINUE_SESSION" = "1" ]; then
       if [ -n "$LATEST_SESSION_ID" ]; then
@@ -1340,7 +1353,7 @@ Your response:"
       "--format"
       "$OPENCODE_FORMAT"
       "--log-level"
-      "DEBUG"
+      "$OPENCODE_LOG_LEVEL"
     )
     if [ -n "$LATEST_SESSION_ID" ]; then
       COMPLETION_CMD+=("--session" "$LATEST_SESSION_ID")

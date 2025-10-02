@@ -134,8 +134,11 @@ spec:
         description: "Base64-encoded requirements.yaml content for all agents"
         value: ""
       - name: opencode-max-retries
-        description: "Maximum retry attempts for OpenCode agent executions"
+        description: "Maximum retry attempts for OpenCode agent executions (0 = unlimited)"
         value: "10"
+      - name: opencode-verbose
+        description: "Enable verbose output for OpenCode agents (1 = markdown format, 0 = json)"
+        value: "0"
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
@@ -825,6 +828,7 @@ spec:
               RUN_NAME: "{{`{{workflow.name}}`}}"
               TASK_ID: "{{`{{inputs.parameters.task-id}}`}}"
               OPENCODE_MAX_RETRIES: "{{`{{workflow.parameters.opencode-max-retries}}`}}"
+              OPENCODE_VERBOSE: "{{`{{workflow.parameters.opencode-verbose}}`}}"
 
     # Helper to reliably resolve the created CodeRun name before waiting for completion
     - name: resolve-coderun-name
