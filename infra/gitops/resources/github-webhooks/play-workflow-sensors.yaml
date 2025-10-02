@@ -46,22 +46,6 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
-                arguments:
-                  parameters:
-                    - name: pr-branch-ref
-                      value: "{{ .Input.body.pull_request.head.ref }}"
-                    - name: pr-title
-                      value: "{{ .Input.body.pull_request.title }}"
-                    - name: pr-number
-                      value: "{{ .Input.body.pull_request.number }}"
-                    - name: pr-url
-                      value: "{{ .Input.body.pull_request.html_url }}"
-                    - name: pr-labels
-                      value: '{{ .Input.body.pull_request.labels | toJson }}'
-                    - name: repo-owner
-                      value: "{{ .Input.body.repository.owner.login }}"
-                    - name: repo-name
-                      value: "{{ .Input.body.repository.name }}"
                 templates:
                   - name: resume-workflow
                     script:
@@ -360,22 +344,21 @@ spec:
                         ensure_jq
                         ensure_openssl
 
-                        # Debug: Print all workflow parameters to diagnose template evaluation
-                        echo "=== DEBUG: Workflow Parameters ==="
-                        echo "pr-branch-ref: {{workflow.parameters.pr-branch-ref}}"
-                        echo "pr-title: {{workflow.parameters.pr-title}}"
-                        echo "pr-number: {{workflow.parameters.pr-number}}"
-                        echo "pr-url: {{workflow.parameters.pr-url}}"
-                        echo "pr-labels: {{workflow.parameters.pr-labels}}"
-                        echo "repo-owner: {{workflow.parameters.repo-owner}}"
-                        echo "repo-name: {{workflow.parameters.repo-name}}"
+                        # Debug: Print values from sensor event payload
+                        echo "=== DEBUG: PR Event Data ==="
+                        echo "pr-branch-ref: {{ .Input.body.pull_request.head.ref }}"
+                        echo "pr-title: {{ .Input.body.pull_request.title }}"
+                        echo "pr-number: {{ .Input.body.pull_request.number }}"
+                        echo "pr-url: {{ .Input.body.pull_request.html_url }}"
+                        echo "repo-owner: {{ .Input.body.repository.owner.login }}"
+                        echo "repo-name: {{ .Input.body.repository.name }}"
                         echo "=================================="
 
-                        OWNER="{{workflow.parameters.repo-owner}}"
-                        REPO_NAME="{{workflow.parameters.repo-name}}"
+                        OWNER="{{ .Input.body.repository.owner.login }}"
+                        REPO_NAME="{{ .Input.body.repository.name }}"
                         REPO="${OWNER}/${REPO_NAME}"
-                        PR_NUMBER="{{workflow.parameters.pr-number}}"
-                        PR_URL="{{workflow.parameters.pr-url}}"
+                        PR_NUMBER="{{ .Input.body.pull_request.number }}"
+                        PR_URL="{{ .Input.body.pull_request.html_url }}"
                         PR_API_URL="https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}"
                         TARGET_LABEL="needs-cleo"
 
@@ -439,8 +422,8 @@ spec:
                         TASK_ID=""
 
                         # Debug: Show what we received
-                        BRANCH_REF='{{workflow.parameters.pr-branch-ref}}'
-                        PR_TITLE='{{workflow.parameters.pr-title}}'
+                        BRANCH_REF='{{ .Input.body.pull_request.head.ref }}'
+                        PR_TITLE='{{ .Input.body.pull_request.title }}'
                         echo "🔍 Debug - Branch ref: '$BRANCH_REF'"
                         echo "🔍 Debug - PR title: '$PR_TITLE'"
 
@@ -454,7 +437,7 @@ spec:
 
                         # Try labels if branch didn't work
                         if [ -z "$TASK_ID" ]; then
-                          TASK_LABELS_JSON='{{workflow.parameters.pr-labels}}'
+                          TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
                           echo "🔍 Debug - Labels JSON: '$TASK_LABELS_JSON'"
                           if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
                             TASK_ID=$(echo "$TASK_LABELS_JSON" |
