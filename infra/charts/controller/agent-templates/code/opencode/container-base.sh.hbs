@@ -843,7 +843,7 @@ fi
 
 PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Project already initialized**: You are already in the project root. Check for existing Cargo.toml or project structure before running initialization commands.\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **GitHub auth ready**: the GitHub App token (\`GH_TOKEN\`) is already configured; skip manual \`gh auth login\` flows and avoid hitting user-only endpoints like \`/user\`.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
 
-PROMPT_PREFIX="${PROMPT_PREFIX}🚦 **Autonomy Rules**\n\n- Continue iterating until the task is fully implemented and validated—do not exit early or defer work.\n- Use available tools (bash, edit, toolman) proactively; permissions are pre-approved.\n- Provide concrete code changes and verification results every cycle instead of repeating summaries.\n\n---\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}🚦 **Autonomy Rules**\n\n- Continue iterating until the task is fully implemented and validated—do not exit early or defer work.\n- Use available tools (bash, edit, toolman) proactively; permissions are pre-approved.\n- Provide concrete code changes and verification results every cycle instead of repeating summaries.\n- **CRITICAL**: If a bash command fails, DO NOT repeat the exact same command. Analyze the error, adjust your approach, or use alternative commands (e.g., create directories one at a time, verify with \`ls\`, check \`pwd\`).\n- **Working Directory**: All bash commands run in \`/workspace\` (your repository root). Verify with \`pwd\` if unsure.\n\n---\n\n"
 
 PROMPT_PREFIX="${PROMPT_PREFIX}📝 **Git & PR Workflow (MANDATORY)**\n\n1. **Commit your work**: After implementing changes, run \`git add .\` and \`git commit -m \"descriptive message\"\`\n2. **Push to remote**: Run \`git push origin HEAD\` to push your feature branch\n3. **Create PR**: Use \`gh pr create --title \"...\" --body \"...\" --base main --head \$CURRENT_BRANCH\`\n4. **Add labels**: Ensure PR has labels: \`task-{{task_id}}\`, \`service-{{service}}\`, \`run-{{workflow_name}}\`\n5. **Verify**: Run \`gh pr view\` to confirm PR was created successfully\n\n**You are NOT done until the PR exists.** The completion check will verify this.\n\n---\n\n"
 
@@ -883,6 +883,17 @@ echo "startingTask:{{task_id}}"
 echo ""
 
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+
+# Print prompt preview (similar to Factory/Claude CLIs)
+echo "📤 Sending prompt to OpenCode/Grok (truncated to 2000 chars for log safety):"
+echo "=================================================================================="
+PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
+printf '%s\n' "$PROMPT_PREVIEW"
+echo "..."
+echo "=================================================================================="
+PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
+echo "📏 Total prompt size: $PROMPT_BYTES bytes"
+echo ""
 
 ORIGINAL_PROMPT="$PROMPT_CONTENT"
 PREVIOUS_MESSAGE_FILE=""
