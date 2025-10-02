@@ -32,11 +32,10 @@ impl ResourceNaming {
             .unwrap_or_else(|| "default".to_string());
 
         // Extract CLI type if available
-        let cli = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .map_or_else(|| "unknown".to_string(), |config| config.cli_type.to_string());
+        let cli = code_run.spec.cli_config.as_ref().map_or_else(
+            || "unknown".to_string(),
+            |config| config.cli_type.to_string(),
+        );
 
         let base_name = format!(
             "code-{agent}-{cli}-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}"
@@ -83,7 +82,7 @@ impl ResourceNaming {
             // Format: code-{agent}-{cli}-{namespace}-{name}-{uid}-t{task}-v{version}
             // Priority: agent, cli, uid, task_id, version > namespace, name
             let parts: Vec<&str> = name.split('-').collect();
-            
+
             if parts.len() >= 8 {
                 // New format with agent and CLI
                 // Preserve: code-{agent}-{cli}-...-{uid}-t{task}-v{version}
@@ -92,18 +91,23 @@ impl ResourceNaming {
                 let uid = parts[parts.len() - 3];
                 let task = parts[parts.len() - 2];
                 let version = parts[parts.len() - 1];
-                
+
                 // Build compact name with hash for middle parts if needed
                 let suffix = format!("{uid}-{task}-{version}");
                 let prefix = format!("code-{agent}-{cli}");
-                let available_space = MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len() + suffix.len() + 2);
-                
+                let available_space =
+                    MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len() + suffix.len() + 2);
+
                 if available_space > 8 {
                     // Room for some of the middle parts
                     let middle_parts = &parts[3..parts.len() - 3];
                     let middle = middle_parts.join("-");
                     let truncated_middle = if middle.len() > available_space {
-                        format!("{}-{}", &middle[..available_space.saturating_sub(9)], Self::hash_string(&middle))
+                        format!(
+                            "{}-{}",
+                            &middle[..available_space.saturating_sub(9)],
+                            Self::hash_string(&middle)
+                        )
                     } else {
                         middle
                     };
