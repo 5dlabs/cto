@@ -360,6 +360,17 @@ spec:
                         ensure_jq
                         ensure_openssl
 
+                        # Debug: Print all workflow parameters to diagnose template evaluation
+                        echo "=== DEBUG: Workflow Parameters ==="
+                        echo "pr-branch-ref: {{workflow.parameters.pr-branch-ref}}"
+                        echo "pr-title: {{workflow.parameters.pr-title}}"
+                        echo "pr-number: {{workflow.parameters.pr-number}}"
+                        echo "pr-url: {{workflow.parameters.pr-url}}"
+                        echo "pr-labels: {{workflow.parameters.pr-labels}}"
+                        echo "repo-owner: {{workflow.parameters.repo-owner}}"
+                        echo "repo-name: {{workflow.parameters.repo-name}}"
+                        echo "=================================="
+
                         OWNER="{{workflow.parameters.repo-owner}}"
                         REPO_NAME="{{workflow.parameters.repo-name}}"
                         REPO="${OWNER}/${REPO_NAME}"
