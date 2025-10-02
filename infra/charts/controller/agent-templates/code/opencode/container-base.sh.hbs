@@ -897,12 +897,18 @@ echo ""
 
 ORIGINAL_PROMPT="$PROMPT_CONTENT"
 PREVIOUS_MESSAGE_FILE=""
-TOKEN_LIMIT=${OPENCODE_TOKEN_LIMIT:-240000}
-OPENCODE_TIMEOUT=${OPENCODE_EXEC_TIMEOUT:-1800}
+
+# Grok Code Fast 1 has 256k context window - MAX IT OUT
+TOKEN_LIMIT=${OPENCODE_TOKEN_LIMIT:-256000}
+
+# Grok is fast (190 tokens/sec) so can handle longer timeouts
+OPENCODE_TIMEOUT=${OPENCODE_EXEC_TIMEOUT:-2400}  # 40 minutes (was 30)
+
 RESET_SESSION_ON_RETRY=${OPENCODE_RESET_SESSION_ON_RETRY:-1}
 CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
 
-MAX_RETRIES=${OPENCODE_MAX_RETRIES:-8}
+# More retries for Grok since it's fast
+MAX_RETRIES=${OPENCODE_MAX_RETRIES:-10}
 ATTEMPT=1
 SUCCESS=0
 OPENCODE_EXIT=1
@@ -911,6 +917,10 @@ RUN_LOG=""
 
 SESSION_DIR="$HOME/.opencode/sessions"
 LATEST_SESSION_ID=""
+
+# Circuit breaker: track repeated command failures
+declare -A FAILED_COMMANDS
+MAX_SAME_COMMAND_FAILURES=3
 
 has_existing_sessions() {
   local session_dir="$1"
@@ -1054,6 +1064,43 @@ Focus on unresolved work, avoid repeating completed steps, and progress toward c
 
   if [ $OPENCODE_EXIT -ne 0 ]; then
     echo "⚠️ OpenCode exited with status $OPENCODE_EXIT on attempt $ATTEMPT"
+  fi
+
+  # Circuit breaker: detect repeated failing bash commands
+  if [ -f "$RUN_LOG" ]; then
+    # Extract failed bash commands from the log
+    FAILED_CMD=$(jq -r 'select(.type=="tool_use" and .part.tool=="bash" and .part.state.status=="completed" and .part.state.metadata.exit!=0) | .part.state.input.command' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100)
+    
+    if [ -n "$FAILED_CMD" ]; then
+      # Track how many times this command has failed
+      FAILED_COMMANDS["$FAILED_CMD"]=$((${FAILED_COMMANDS["$FAILED_CMD"]:-0} + 1))
+      FAIL_COUNT=${FAILED_COMMANDS["$FAILED_CMD"]}
+      
+      if [ $FAIL_COUNT -ge $MAX_SAME_COMMAND_FAILURES ]; then
+        echo "🔴 CIRCUIT BREAKER TRIGGERED: Command has failed $FAIL_COUNT times in a row:"
+        echo "   Command: $FAILED_CMD"
+        echo "   This indicates the agent is stuck in a loop. Adding explicit guidance..."
+        
+        # Force a stronger prompt for next retry
+        PROMPT_PAYLOAD="⚠️ **LOOP DETECTED**: You have tried this command $FAIL_COUNT times:
+\`\`\`bash
+$FAILED_CMD
+\`\`\`
+
+It keeps failing with the same error. **STOP REPEATING THIS COMMAND.**
+
+Instead:
+1. Check your working directory with \`pwd\`
+2. List files with \`ls -la\`
+3. Try a completely different approach (create files one at a time, use different syntax, etc.)
+4. If directories don't exist, create them step-by-step and verify each step
+
+Continuing Task {{task_id}} - focus on solving the underlying issue, not repeating the same failed command."
+        
+        # Reset the counter to give it a fresh chance with new guidance
+        FAILED_COMMANDS["$FAILED_CMD"]=0
+      fi
+    fi
   fi
 
   write_last_message "$RUN_LOG" "$LAST_MESSAGE_FILE" || true
