@@ -1263,17 +1263,38 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
     elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
       echo "🔍 Running integration and E2E tests..."
       
-      # For testing stage, we still need Codex to have completed successfully
-      # as it indicates acceptance criteria validation
+      # Run the same quality gates as quality stage, plus acceptance criteria validation
+      echo "  ➤ Checking code formatting (cargo fmt)..."
+      if ! cargo fmt --all -- --check >/tmp/fmt-check.log 2>&1; then
+        echo "    ❌ Formatting check failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Formatting check passed"
+      fi
+      
+      echo "  ➤ Checking lints (cargo clippy)..."
+      if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic >/tmp/clippy-check.log 2>&1; then
+        echo "    ❌ Clippy check failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Clippy check passed"
+      fi
+      
+      echo "  ➤ Running tests (cargo test)..."
+      if ! cargo test --workspace --all-features >/tmp/test-check.log 2>&1; then
+        echo "    ❌ Tests failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Tests passed"
+      fi
+      
+      # Validate acceptance criteria completion
       if [ $SUCCESS -ne 1 ]; then
         echo "    ❌ Codex did not confirm acceptance criteria completion"
         QUALITY_GATES_PASSED=0
       else
         echo "    ✅ Acceptance criteria validated by Codex"
       fi
-      
-      # Additional testing stage checks can be added here
-      # (e.g., integration tests, E2E tests, load tests, etc.)
     fi
 
     if [ $QUALITY_GATES_PASSED -eq 1 ]; then
