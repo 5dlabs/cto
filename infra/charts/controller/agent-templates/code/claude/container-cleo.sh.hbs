@@ -1272,7 +1272,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    - NOTE: Do NOT write tests - Tess handles all testing
 5. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
    - Check if .github/workflows/ci.yml exists (or similar CI workflow)
-   - If not, create using these PROVEN TEMPLATES:
+   - If not, create using these PROVEN TEMPLATES from our production platform:
 
    **a) Dockerfile (Runtime-only, expects pre-built binary):**
    \\\`\\\`\\\`dockerfile
@@ -1291,7 +1291,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    CMD ["./binary-name"]
    \\\`\\\`\\\`
 
-   **b) CI Workflow (.github/workflows/ci.yml):**
+   **b) CI Workflow (.github/workflows/ci.yml) - Fast Builds with Caching:**
    \\\`\\\`\\\`yaml
    name: Continuous Integration
    on:
@@ -1309,6 +1309,7 @@ CLEO_PROMPT="$CLEO_PROMPT
            with:
              toolchain: stable
              components: rustfmt, clippy
+         # 🚀 CRITICAL: Use Swatinem/rust-cache for intelligent dependency caching
          - uses: Swatinem/rust-cache@v2
            with:
              workspaces: . -> target
@@ -1333,7 +1334,7 @@ CLEO_PROMPT="$CLEO_PROMPT
            run: cargo test --all-features --all-targets
    \\\`\\\`\\\`
 
-   **c) Deploy Workflow (.github/workflows/deploy.yml) for k8s-runner:**
+   **c) Deploy Workflow (.github/workflows/deploy.yml) - Arc Runner with Ultra-Fast Builds:**
    \\\`\\\`\\\`yaml
    name: Deploy
    on:
@@ -1346,37 +1347,75 @@ CLEO_PROMPT="$CLEO_PROMPT
 
    jobs:
      build:
-       runs-on: [k8s-runner]  # Use self-hosted runner for speed
+       # 🚀 CRITICAL: Use Arc runner (k8s-runner) for 5-10x faster builds
+       # Arc runners have pre-installed: sccache, mold linker, pre-warmed dependencies
+       runs-on: [k8s-runner]
        permissions:
          contents: read
          packages: write
        steps:
          - uses: actions/checkout@v4
+         
+         # 🚀 Build with ULTRA-FAST caching mechanisms
          - name: Build binary
            env:
+             # Use sccache for compiler-level caching (pre-installed on k8s-runner)
              RUSTC_WRAPPER: "sccache"
+             # Build to persistent cache directory for multi-run speed
              CARGO_TARGET_DIR: "\$HOME/cache/target"
+             # Optimize for speed
+             CARGO_INCREMENTAL: "0"
+             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+             CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
            run: |
-             cargo build --release
-             cp \$HOME/cache/target/release/<binary> ./<binary>
+             # Pre-warm sccache (already installed on k8s-runner)
+             sccache --start-server || true
+             echo "📊 Initial sccache stats:"
+             sccache --show-stats
+             
+             # Build with persistent cache directory
+             mkdir -p \$HOME/cache/target
+             cargo build --release --bin <binary-name>
+             
+             # Show cache hit rates
+             echo "📊 Final sccache stats:"
+             sccache --show-stats
+             
+             # Copy from cache dir to workspace
+             cp \$HOME/cache/target/release/<binary-name> ./<binary-name>
+         
          - uses: docker/setup-buildx-action@v3
+           with:
+             driver: docker
+             install: true
+         
          - uses: docker/login-action@v3
            with:
              registry: ghcr.io
              username: ${{ github.actor }}
              password: ${{ secrets.GITHUB_TOKEN }}
+         
          - uses: docker/build-push-action@v5
            with:
              context: .
              file: ./Dockerfile
-             platforms: linux/amd64,linux/arm64
+             platforms: linux/amd64  # Can add arm64 with docker-container driver
              push: true
              tags: |
                ghcr.io/${{ github.repository }}:latest
                ghcr.io/${{ github.repository }}:${{ github.sha }}
+             # Use GitHub Actions cache for Docker layers
              cache-from: type=gha
              cache-to: type=gha,mode=max
    \\\`\\\`\\\`
+
+   **KEY PERFORMANCE OPTIMIZATIONS:**
+   - ✅ **Arc Runners (k8s-runner)**: 5-10x faster than ubuntu-latest, pre-warmed dependencies
+   - ✅ **sccache**: Compiler-level caching, massive speedup on incremental builds
+   - ✅ **CARGO_TARGET_DIR**: Persistent cache across builds in \$HOME/cache/target
+   - ✅ **Swatinem/rust-cache**: Intelligent Cargo dependency caching for CI jobs
+   - ✅ **mold linker**: Ultra-fast linking (pre-installed on k8s-runner)
+   - ✅ **GitHub Actions Cache**: Docker layer caching with cache-from/cache-to
 
    - Commit and push the CI configuration
    - Push any code fixes you made locally
