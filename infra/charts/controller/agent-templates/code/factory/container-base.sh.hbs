@@ -814,7 +814,7 @@ if [ "${FORCE_WRITES,,}" = "true" ]; then
   AUTO_LEVEL="high"
 fi
 
-SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}false{{/if}}"
+SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}true{{/if}}"
 SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
 
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
