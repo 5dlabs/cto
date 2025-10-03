@@ -294,22 +294,17 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-cli}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.implementation-model}}`}}"
-        - - name: update-to-waiting-pr-created
+        # Note: No longer suspending for PR created event - implementation-cycle already
+        # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
+        # creating race conditions where PR webhook fired before suspend point was reached.
+        - - name: update-to-waiting-quality
             template: update-workflow-stage
             arguments:
               parameters:
                 - name: new-stage
-                  value: "waiting-pr-created"
+                  value: "waiting-quality-complete"
                 - name: verify-update
                   value: "true"
-        - - name: wait-for-pr-created
-            template: suspend-for-event
-            arguments:
-              parameters:
-                - name: event-type
-                  value: "pr-created"
-                - name: stage-name
-                  value: "waiting-pr-created"
         - - name: quality-work
             template: agent-coderun
             arguments:
@@ -947,6 +942,8 @@ spec:
             # Define valid transitions (Rex → Cleo → Tess flow)
             case $current_stage in
               "pending")
+                # Allow direct transition to waiting-quality-complete (skipping waiting-pr-created)
+                [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 [[ $new_stage == "waiting-pr-created" ]] && return 0
                 ;;
               "waiting-pr-created")
