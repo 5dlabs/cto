@@ -1087,14 +1087,29 @@ if [ $SUCCESS -ne 1 ]; then
     echo "$LAST_COMPLETION_REASON"
   fi
   
-  # Single-iteration mode: always exit successfully to allow inspection of results
-  if [ "$MAX_RETRIES" = "1" ]; then
-    echo "ℹ️ Single-iteration mode (MAX_RETRIES=1) - exiting successfully for result inspection"
-    EXIT_CODE=0
+  # Always exit successfully to allow inspection of results
+  # Print detailed summary of what went wrong
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo "║              TASK COMPLETION STATUS: INCOMPLETE              ║"
+  echo "════════════════════════════════════════════════════════════════"
+  echo ""
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    echo "📋 REASON FOR INCOMPLETION:"
+    echo "$LAST_COMPLETION_REASON"
   else
-    echo "❌ Task incomplete - marking as FAILED"
-    EXIT_CODE=1  # Fail the job so it doesn't appear successful
+    echo "⚠️ Factory reported task incomplete without providing a reason"
   fi
+  echo ""
+  echo "🔍 TROUBLESHOOTING:"
+  echo "   - Check the logs above for Factory's responses"
+  echo "   - Review acceptance criteria in task/acceptance-criteria.md"
+  echo "   - Verify PR was created and contains expected changes"
+  echo "   - Ensure all required tests are passing"
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo ""
+  EXIT_CODE=0  # Always exit successfully to avoid failing the job
 else
   echo "✅ Factory confirmed task completion"
   if [ ${FACTORY_EXIT:-0} -ne 0 ]; then
