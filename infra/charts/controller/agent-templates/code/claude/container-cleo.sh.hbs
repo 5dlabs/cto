@@ -43,6 +43,52 @@ echo "🔍 Focus: Code quality, CI/CD setup, and Docker image building"
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: Perfect code quality AND working CI/CD pipeline with Docker builds"
 
+# Docker sidecar cleanup function
+stop_docker_sidecar() {
+  if [ ! -S /var/run/docker.sock ]; then
+    return
+  fi
+
+  echo "🛑 Stopping Docker sidecar"
+
+  if command -v pkill >/dev/null 2>&1; then
+    pkill dockerd >/dev/null 2>&1 || true
+    sleep 1
+    if pidof dockerd >/dev/null 2>&1; then
+      pkill -9 dockerd >/dev/null 2>&1 || true
+    fi
+    if pidof docker-init >/dev/null 2>&1; then
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
+  elif command -v killall >/dev/null 2>&1; then
+    killall dockerd >/dev/null 2>&1 || true
+  else
+    PID=$(pidof dockerd 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+      kill "$PID" >/dev/null 2>&1 || true
+    fi
+    PID_INIT=$(pidof docker-init 2>/dev/null || true)
+    if [ -n "$PID_INIT" ]; then
+      kill "$PID_INIT" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  for _ in 1 2 3 4 5; do
+    if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
+      echo "✅ Docker sidecar stopped"
+      return
+    fi
+    sleep 1
+  done
+
+  REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
+  REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
+  echo "⚠️ Docker sidecar still running (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+}
+
+# Set up EXIT trap to ensure Docker sidecar cleanup
+trap 'stop_docker_sidecar || true' EXIT
+
 # Clean up any leftover completion marker from previous runs
 # This prevents issues with sequential task executions on the same PVC
 if [ -f /workspace/.cleo-complete ]; then
@@ -1220,9 +1266,10 @@ You are Cleo, a rigorous code quality enforcement agent. Your mission is to ensu
 ## Your Role
 - **Primary Focus**: Code quality enforcement AND CI/CD pipeline setup
 - **Quality Tools**: Clippy (pedantic), cargo fmt, cargo test, YAML linting
-- **DevOps Setup**: GitHub Actions workflows, Docker image building, CI verification
+- **DevOps Setup**: GitHub Actions workflows, Docker image building, permissions configuration, CI verification
+- **Permissions**: MUST fix workflow permissions (packages:write, contents:write, etc.) - don't skip!
 - **Decision Authority**: Add 'ready-for-qa' label only when ALL quality checks AND CI builds pass
-- **Standards**: Zero warnings, perfect formatting, 100% test pass rate, working Docker builds
+- **Standards**: Zero warnings, perfect formatting, 100% test pass rate, working Docker builds with successful registry push
 
 ## Current Context
 
@@ -1272,7 +1319,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    - NOTE: Do NOT write tests - Tess handles all testing
 5. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
    - Check if .github/workflows/ci.yml exists (or similar CI workflow)
-   - If not, create using these PROVEN TEMPLATES:
+   - If not, create using these PROVEN TEMPLATES from our production platform:
 
    **a) Dockerfile (Runtime-only, expects pre-built binary):**
    \\\`\\\`\\\`dockerfile
@@ -1291,7 +1338,7 @@ CLEO_PROMPT="$CLEO_PROMPT
    CMD ["./binary-name"]
    \\\`\\\`\\\`
 
-   **b) CI Workflow (.github/workflows/ci.yml):**
+   **b) CI Workflow (.github/workflows/ci.yml) - Fast Builds with Caching:**
    \\\`\\\`\\\`yaml
    name: Continuous Integration
    on:
@@ -1309,6 +1356,7 @@ CLEO_PROMPT="$CLEO_PROMPT
            with:
              toolchain: stable
              components: rustfmt, clippy
+         # 🚀 CRITICAL: Use Swatinem/rust-cache for intelligent dependency caching
          - uses: Swatinem/rust-cache@v2
            with:
              workspaces: . -> target
@@ -1333,7 +1381,7 @@ CLEO_PROMPT="$CLEO_PROMPT
            run: cargo test --all-features --all-targets
    \\\`\\\`\\\`
 
-   **c) Deploy Workflow (.github/workflows/deploy.yml) for k8s-runner:**
+   **c) Deploy Workflow (.github/workflows/deploy.yml) - Arc Runner with Ultra-Fast Builds:**
    \\\`\\\`\\\`yaml
    name: Deploy
    on:
@@ -1346,37 +1394,75 @@ CLEO_PROMPT="$CLEO_PROMPT
 
    jobs:
      build:
-       runs-on: [k8s-runner]  # Use self-hosted runner for speed
+       # 🚀 CRITICAL: Use Arc runner (k8s-runner) for 5-10x faster builds
+       # Arc runners have pre-installed: sccache, mold linker, pre-warmed dependencies
+       runs-on: [k8s-runner]
        permissions:
          contents: read
          packages: write
        steps:
          - uses: actions/checkout@v4
+         
+         # 🚀 Build with ULTRA-FAST caching mechanisms
          - name: Build binary
            env:
+             # Use sccache for compiler-level caching (pre-installed on k8s-runner)
              RUSTC_WRAPPER: "sccache"
+             # Build to persistent cache directory for multi-run speed
              CARGO_TARGET_DIR: "\$HOME/cache/target"
+             # Optimize for speed
+             CARGO_INCREMENTAL: "0"
+             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+             CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
            run: |
-             cargo build --release
-             cp \$HOME/cache/target/release/<binary> ./<binary>
+             # Pre-warm sccache (already installed on k8s-runner)
+             sccache --start-server || true
+             echo "📊 Initial sccache stats:"
+             sccache --show-stats
+             
+             # Build with persistent cache directory
+             mkdir -p \$HOME/cache/target
+             cargo build --release --bin <binary-name>
+             
+             # Show cache hit rates
+             echo "📊 Final sccache stats:"
+             sccache --show-stats
+             
+             # Copy from cache dir to workspace
+             cp \$HOME/cache/target/release/<binary-name> ./<binary-name>
+         
          - uses: docker/setup-buildx-action@v3
+           with:
+             driver: docker
+             install: true
+         
          - uses: docker/login-action@v3
            with:
              registry: ghcr.io
              username: ${{ github.actor }}
              password: ${{ secrets.GITHUB_TOKEN }}
+         
          - uses: docker/build-push-action@v5
            with:
              context: .
              file: ./Dockerfile
-             platforms: linux/amd64,linux/arm64
+             platforms: linux/amd64  # Can add arm64 with docker-container driver
              push: true
              tags: |
                ghcr.io/${{ github.repository }}:latest
                ghcr.io/${{ github.repository }}:${{ github.sha }}
+             # Use GitHub Actions cache for Docker layers
              cache-from: type=gha
              cache-to: type=gha,mode=max
    \\\`\\\`\\\`
+
+   **KEY PERFORMANCE OPTIMIZATIONS:**
+   - ✅ **Arc Runners (k8s-runner)**: 5-10x faster than ubuntu-latest, pre-warmed dependencies
+   - ✅ **sccache**: Compiler-level caching, massive speedup on incremental builds
+   - ✅ **CARGO_TARGET_DIR**: Persistent cache across builds in \$HOME/cache/target
+   - ✅ **Swatinem/rust-cache**: Intelligent Cargo dependency caching for CI jobs
+   - ✅ **mold linker**: Ultra-fast linking (pre-installed on k8s-runner)
+   - ✅ **GitHub Actions Cache**: Docker layer caching with cache-from/cache-to
 
    - Commit and push the CI configuration
    - Push any code fixes you made locally
@@ -1403,10 +1489,22 @@ CLEO_PROMPT="$CLEO_PROMPT
      * Remove invalid actions or fix version tags
      * Ensure workflow file is in .github/workflows/
      * Check if workflow needs to be enabled in Actions settings
+   - **CRITICAL: Fix CI/CD Permissions Issues** (YOU MUST FIX THESE, DON'T SKIP!):
+     * If Docker push to GHCR fails with "write_package" error:
+       - Add 'permissions:' block to the job: 'contents: read' and 'packages: write'
+       - Example: See deploy workflow template above (lines with 'permissions:')
+       - This is REQUIRED for pushing to ghcr.io (GitHub Container Registry)
+     * If workflow can't create PRs/comments:
+       - Add 'pull-requests: write' permission
+     * If workflow can't push commits:
+       - Add 'contents: write' permission
+     * **ALWAYS** include proper permissions block - it's part of CI setup!
+     * Use 'gh run view <run-id>' to see permission errors
    - Specifically verify 'cargo clippy -- -D warnings -W clippy::pedantic' passes in CI (when workflows exist)
    - **VERIFY NO #[allow(clippy::...)] BYPASSES**: Check that no warnings are suppressed
+   - **VERIFY DOCKER PUSH SUCCESS**: If workflow includes Docker build, ensure images push to registry successfully
    - SUCCESS = Code quality checks pass + CI passes (if workflows exist) OR code quality checks pass (if no workflows)
-   - Do NOT proceed until quality standards are met
+   - Do NOT proceed until quality standards are met AND Docker images can be pushed (if applicable)
 7. **Review against task requirements**: Verify implementation matches acceptance criteria
 8. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
 9. **Success criteria**: Quality checks must pass for approval. CI/CD validation required only when workflows exist.
@@ -1418,8 +1516,10 @@ CLEO_PROMPT="$CLEO_PROMPT
 - **Perfect formatting** required (cargo fmt --check must pass in CI if workflows exist, locally otherwise)
 - **All tests pass** (cargo test must succeed in CI if workflows exist, locally otherwise)
 - **Clean YAML** syntax and structure
-- **CI/CD Pipeline** SHOULD be working with successful Docker image build (when workflows exist)
-- **GitHub Actions** SHOULD show green checks for ALL quality gates (when workflows exist)
+- **CI/CD Pipeline** MUST be working with successful Docker image build AND push (when workflows exist)
+- **Permissions** MUST be configured correctly (packages:write for GHCR, contents:write for commits, etc.)
+- **Docker Registry** MUST accept image pushes (no "write_package" errors or permission failures)
+- **GitHub Actions** MUST show green checks for ALL quality gates (when workflows exist)
 - **Task compliance** (implementation should meet acceptance criteria)
 - **NO MOCKS ALLOWED** (all implementations must use live data and real APIs - no hard-coded or mock values)
 - **Parameterized Configuration** (trading pairs, endpoints, and business logic must be configurable, not hard-coded)
