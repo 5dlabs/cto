@@ -2249,8 +2249,6 @@ async fn rpc_loop() -> Result<()> {
             Ok(req) => req,
             Err(e) => {
                 eprintln!("Invalid JSON request: {e}");
-
-                let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
                 continue;
             }
         };

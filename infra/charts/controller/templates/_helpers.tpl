@@ -113,3 +113,40 @@ Define volume mounts for agent prompts
   mountPath: /etc/agents
   readOnly: true
 {{- end }}
+
+{{/*
+Define volume mounts for agent templates (all mounted to /agent-templates)
+Note: Kubernetes projected volumes allow merging multiple ConfigMaps into one directory
+*/}}
+{{- define "platform.agentTemplateVolumeMounts" -}}
+- name: agent-templates
+  mountPath: /agent-templates
+  readOnly: true
+{{- end }}
+
+{{/*
+Define projected volume for agent templates (merges all ConfigMaps)
+*/}}
+{{- define "platform.agentTemplateProjectedVolume" -}}
+- name: agent-templates
+  projected:
+    sources:
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-shared
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-claude
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-codex
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-cursor
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-factory
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-opencode
+        optional: true
+{{- end }}
