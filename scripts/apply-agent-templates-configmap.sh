@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Render the agent templates ConfigMap via Helm and apply it to the cluster.
+# Render the agent templates ConfigMaps via Helm and apply them to the cluster.
+# This script handles multiple split ConfigMaps (shared, claude, codex, cursor, factory, opencode).
 # Optional environment overrides:
 #   RELEASE_NAME  - Helm release name (default: controller)
 #   NAMESPACE     - Kubernetes namespace (default: agent-platform)
@@ -17,6 +18,16 @@ RELEASE_NAME=${RELEASE_NAME:-controller}
 NAMESPACE=${NAMESPACE:-agent-platform}
 VALUES_FILE_DEFAULT="$CHART_DIR/values.yaml"
 VALUES_FILE=${VALUES_FILE:-$VALUES_FILE_DEFAULT}
+
+# Split ConfigMap template names
+CONFIGMAP_TEMPLATES=(
+  "agent-templates-shared.yaml"
+  "agent-templates-claude.yaml"
+  "agent-templates-codex.yaml"
+  "agent-templates-cursor.yaml"
+  "agent-templates-factory.yaml"
+  "agent-templates-opencode.yaml"
+)
 
 # Split optional extra Helm args after "--"
 HELM_ARGS=()
@@ -38,24 +49,37 @@ if [[ $# -gt 0 ]]; then
 fi
 
 if ! command -v helm >/dev/null 2>&1; then
-  echo "❌ Helm must be installed to render the ConfigMap" >&2
+  echo "❌ Helm must be installed to render the ConfigMaps" >&2
   exit 1
 fi
 
-TMP_FILE=$(mktemp)
-trap 'rm -f "$TMP_FILE"' EXIT
+echo "🚀 Rendering and applying agent templates ConfigMaps..."
+echo ""
 
-if [[ ${#HELM_ARGS[@]} -gt 0 ]]; then
-  helm template "$RELEASE_NAME" "$CHART_DIR" \
-    --namespace "$NAMESPACE" \
-    --values "$VALUES_FILE" \
-    --show-only templates/agent-templates-static.yaml \
-    "${HELM_ARGS[@]}" > "$TMP_FILE"
-else
-  helm template "$RELEASE_NAME" "$CHART_DIR" \
-    --namespace "$NAMESPACE" \
-    --values "$VALUES_FILE" \
-    --show-only templates/agent-templates-static.yaml > "$TMP_FILE"
-fi
+# Process each ConfigMap
+for template in "${CONFIGMAP_TEMPLATES[@]}"; do
+  TMP_FILE=$(mktemp)
+  
+  echo "📦 Processing: $template"
+  
+  if [[ ${#HELM_ARGS[@]} -gt 0 ]]; then
+    helm template "$RELEASE_NAME" "$CHART_DIR" \
+      --namespace "$NAMESPACE" \
+      --values "$VALUES_FILE" \
+      --show-only "templates/$template" \
+      "${HELM_ARGS[@]}" > "$TMP_FILE"
+  else
+    helm template "$RELEASE_NAME" "$CHART_DIR" \
+      --namespace "$NAMESPACE" \
+      --values "$VALUES_FILE" \
+      --show-only "templates/$template" > "$TMP_FILE"
+  fi
+  
+  kubectl apply --server-side --force-conflicts -f "$TMP_FILE"
+  echo "✅ Applied: $template"
+  echo ""
+  
+  rm -f "$TMP_FILE"
+done
 
-kubectl apply --server-side --force-conflicts -f "$TMP_FILE"
+echo "✅ All agent templates ConfigMaps applied successfully!"

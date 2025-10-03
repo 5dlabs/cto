@@ -30,7 +30,7 @@ package: ## Package the Helm chart
 .PHONY: update-templates
 update-templates: generate-templates ## Update templates and prepare for commit
 	@echo "Templates updated. Don't forget to commit the changes!"
-	@git status templates/agent-templates-static.yaml
+	@git status templates/agent-templates-*.yaml
 
 .PHONY: validate
 validate: lint template ## Validate the chart (lint + template generation)
