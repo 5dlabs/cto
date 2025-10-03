@@ -827,7 +827,7 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   RUN_LOG="/tmp/factory-run-${ATTEMPT}.${RUN_LOG_EXT}"
 
   if [ "$SKIP_PERMISSIONS_UNSAFE" = "true" ]; then
-    FACTORY_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "$OUTPUT_FORMAT")
+    FACTORY_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
   else
     FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
   fi
