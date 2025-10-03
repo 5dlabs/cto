@@ -1636,9 +1636,9 @@ echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
 echo "🔍 Full FIFO JSON structure:"
 echo "$FIFO_JSON" | jq . 2>/dev/null || echo "❌ FIFO JSON parsing failed: $FIFO_JSON"
 
+# Keep FIFO writer open until Claude exits to prevent premature EOF
 exec 9>"$FIFO_PATH"
 printf '%s\n' "$FIFO_JSON" >&9
-exec 9>&-  # Close immediately to send EOF to Claude
 echo "✅ Initial QA guidance sent via FIFO"
 
 # Simple wait like Cleo - no complex monitoring
@@ -1653,6 +1653,9 @@ echo "🔍 Claude PID: $CLAUDE_PID"
 echo "⏳ Waiting for Claude process to complete..."
 wait "$CLAUDE_PID" 2>/dev/null || true
 CLAUDE_EXIT_CODE=$?
+
+# Close FIFO writer now that Claude has exited
+exec 9>&- 2>/dev/null || true
 
 # Stop token refresh background process
 if [ -n "$TOKEN_REFRESH_PID" ]; then

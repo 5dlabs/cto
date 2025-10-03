@@ -1284,9 +1284,9 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
 
         # Send directly via FIFO (sidecar phased out)
+        # Keep FIFO writer open until Claude exits to prevent premature EOF
         exec 9>"$FIFO_PATH"
         printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-        exec 9>&-  # Close immediately to send EOF to Claude
         echo "✓ Initial prompt sent via FIFO"
 
         # Optional debug: dump FIFO holders if requested
