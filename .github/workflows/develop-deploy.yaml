@@ -490,24 +490,33 @@ jobs:
           cd infra/charts/controller
           
           # Regenerate templates again to ensure consistency
-          ./scripts/generate-templates-configmap.sh
+          ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Create a patch file if templates differ from Git
-          if ! git diff --quiet templates/claude-templates-static.yaml; then
+          TEMPLATES_CHANGED=false
+          for file in templates/agent-templates-*.yaml; do
+            if ! git diff --quiet "$file"; then
+              TEMPLATES_CHANGED=true
+              break
+            fi
+          done
+          
+          if [ "$TEMPLATES_CHANGED" = "true" ]; then
             echo "templates-changed=true" >> $GITHUB_OUTPUT
             echo "📝 Creating template update patch..."
-            git diff templates/claude-templates-static.yaml > /tmp/templates-update.patch
+            git diff templates/agent-templates-*.yaml > /tmp/templates-update.patch
             
-            # Also save the full updated file
-            cp templates/claude-templates-static.yaml /tmp/claude-templates-static.yaml
+            # Also save the full updated files
+            mkdir -p /tmp/templates-backup
+            cp templates/agent-templates-*.yaml /tmp/templates-backup/
             
             echo "⚠️ IMPORTANT: Templates have been updated!"
             echo "The regenerated templates will be used by ArgoCD for this deployment."
             echo ""
             echo "To make these changes permanent, apply this patch to your main branch:"
             echo "   git apply /tmp/templates-update.patch"
-            echo "   git add infra/charts/controller/templates/claude-templates-static.yaml"
-            echo "   git commit -m 'chore: update claude-templates ConfigMap'"
+            echo "   git add infra/charts/controller/templates/agent-templates-*.yaml"
+            echo "   git commit -m 'chore: update agent templates ConfigMaps'"
             echo "   git push"
           else
             echo "templates-changed=false" >> $GITHUB_OUTPUT
