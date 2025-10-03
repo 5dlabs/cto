@@ -1303,6 +1303,12 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
       CHECKS_PASSED="- Code formatting verified
 - Linting passed
 - Unit tests successful
+    if [ $SUCCESS -eq 1 ]; then
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      CHECKS_PASSED="- Code formatting verified
+- Linting passed
+- Unit tests successful
 - Quality standards met"
       NEXT_STAGE="end-to-end testing"
       if [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
@@ -1316,13 +1322,15 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
       fi
 
       echo "✅ $STAGE_NAME approved - posting APPROVE review"
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --approve --body "### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
-
+      REVIEW_BODY=$(cat <<EOF
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All checks have passed:
 $CHECKS_PASSED
-
-Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
+Ready for $NEXT_STAGE.
+EOF
+)
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
     else
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"
@@ -1335,13 +1343,22 @@ Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
       if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
         # Collect failure details from logs
         if [ -f /tmp/fmt-check.log ]; then
-          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Formatting Issues</summary>\n\n\`\`\`\n$(cat /tmp/fmt-check.log | head -n 50)\n\`\`\`\n</details>"
+          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Formatting Issues</summary>\n\n\n```
+$(cat /tmp/fmt-check.log | head -n 50)
+```
+</details>"
         fi
         if [ -f /tmp/clippy-check.log ]; then
-          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Clippy Warnings</summary>\n\n\`\`\`\n$(cat /tmp/clippy-check.log | head -n 50)\n\`\`\`\n</details>"
+          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Clippy Warnings</summary>\n\n\n```
+$(cat /tmp/clippy-check.log | head -n 50)
+```
+</details>"
         fi
         if [ -f /tmp/test-check.log ]; then
-          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Test Failures</summary>\n\n\`\`\`\n$(cat /tmp/test-check.log | tail -n 100)\n\`\`\`\n</details>"
+          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Test Failures</summary>\n\n\n```
+$(cat /tmp/test-check.log | tail -n 100)
+```
+</details>"
         fi
       elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
         STAGE_NAME="QA Testing"
@@ -1353,31 +1370,16 @@ Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
       fi
 
       echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
-
+      REVIEW_BODY=$(cat <<EOF
+### 🔴 Required Changes
 $STAGE_NAME issues detected. Please address the following:
 $ISSUES_DESC
-$FAILURE_LOGS" 2>&1 || echo "⚠️ PR review command failed"
+$FAILURE_LOGS
+EOF
+)
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
     fi
-  else
-    echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
-  fi
-fi
-
-touch /workspace/.agent_done 2>/dev/null || true
-
-if [ $SUCCESS -ne 1 ]; then
-  {{#if agent_completion_message}}
-echo "{{agent_completion_message}}"
-  {{else}}
-echo "⚠️ Codex execution incomplete"
-  {{/if}}
-  exit $EXIT_CODE
-fi
-
-{{#if agent_completion_message}}
-echo "{{agent_completion_message}}"
 {{else}}
 echo "✅ Codex execution complete"
 {{/if}}

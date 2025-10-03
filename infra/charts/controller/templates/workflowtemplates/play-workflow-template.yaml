@@ -788,6 +788,8 @@ spec:
             default: ""
           - name: qa-ready
             default: "false"
+          - name: max-retries
+            default: ""
       outputs:
         parameters:
           - name: name
