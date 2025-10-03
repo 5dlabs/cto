@@ -142,7 +142,7 @@ pub struct InputBridgeConfig {
 }
 
 fn default_input_bridge_enabled() -> bool {
-    true
+    false
 }
 fn default_input_bridge_port() -> u16 {
     8080
