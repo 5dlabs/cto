@@ -159,71 +159,81 @@ jobs:
           echo "🔄 Validating and regenerating Helm templates before deployment..."
           cd infra/charts/controller
           
-          # Store original for comparison
-          cp templates/claude-templates-static.yaml templates/claude-templates-static.yaml.orig 2>/dev/null || true
+          # Store originals for comparison
+          for file in templates/agent-templates-*.yaml; do
+            [ -f "$file" ] && cp "$file" "$file.orig"
+          done
           
           # Regenerate the templates
           ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Check if templates were updated
-          if [ -f templates/claude-templates-static.yaml.orig ]; then
-            if ! diff -q templates/claude-templates-static.yaml.orig templates/claude-templates-static.yaml >/dev/null 2>&1; then
-              echo "⚠️ WARNING: Templates were out of sync and have been regenerated!"
-              echo "📄 Template changes detected:"
-              diff -u templates/claude-templates-static.yaml.orig templates/claude-templates-static.yaml | head -50 || true
-              echo ""
-              echo "🔧 Using regenerated templates for this deployment"
-              echo "📋 ACTION REQUIRED: Commit the template updates to avoid this in future deployments:"
-              echo "   cd infra/charts/controller"
-              echo "   ./scripts/generate-templates-configmap.sh"
-              echo "   git add templates/claude-templates-static.yaml"
-              echo "   git commit -m 'chore: update claude-templates ConfigMap'"
-              echo ""
-              
-              # For workflow_dispatch (manual deploys), this is critical
-              if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                echo "⚠️ MANUAL DEPLOYMENT: Proceeding with regenerated templates"
+          TEMPLATES_CHANGED=false
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
+            ORIG="$file.orig"
+            if [ -f "$ORIG" ]; then
+              if ! diff -q "$ORIG" "$file" >/dev/null 2>&1; then
+                TEMPLATES_CHANGED=true
+                echo "⚠️ WARNING: $(basename $file) was out of sync and has been regenerated!"
               fi
-            else
-              echo "✅ Templates are up to date"
+              rm -f "$ORIG"
             fi
-            rm -f templates/claude-templates-static.yaml.orig
+          done
+          
+          if [ "$TEMPLATES_CHANGED" = "true" ]; then
+            echo "🔧 Using regenerated templates for this deployment"
+            echo "📋 ACTION REQUIRED: Commit the template updates to avoid this in future deployments:"
+            echo "   cd infra/charts/controller"
+            echo "   ./scripts/generate-agent-templates-configmaps-split.sh"
+            echo "   git add templates/agent-templates-*.yaml"
+            echo "   git commit -m 'chore: update agent templates ConfigMaps'"
+            echo ""
+            
+            # For workflow_dispatch (manual deploys), this is critical
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "⚠️ MANUAL DEPLOYMENT: Proceeding with regenerated templates"
+            fi
           else
-            echo "✅ Templates generated successfully (no previous version to compare)"
+            echo "✅ Templates are up to date"
           fi
           
-          # Verify the generated ConfigMap is valid YAML
+          # Verify the generated ConfigMaps are valid YAML
           echo "🔍 Validating generated ConfigMap YAML..."
-          if command -v yamllint >/dev/null 2>&1; then
-            yamllint -d relaxed templates/claude-templates-static.yaml || {
-              echo "❌ ERROR: Generated ConfigMap is not valid YAML!"
-              exit 1
-            }
-          else
-            # Basic validation without yamllint - check for valid YAML structure
-            if [ ! -f templates/claude-templates-static.yaml ]; then
-              echo "❌ ERROR: Generated ConfigMap file does not exist!"
-              exit 1
-            fi
+          for file in templates/agent-templates-*.yaml; do
+            [ ! -f "$file" ] && continue
             
-            # Check file is not empty and has reasonable size
-            if [ ! -s templates/claude-templates-static.yaml ]; then
-              echo "❌ ERROR: Generated ConfigMap is empty!"
-              exit 1
-            fi
-            
-            # Check for valid YAML start patterns (comment, document separator, or apiVersion)
-            if head -n 5 templates/claude-templates-static.yaml | grep -qE "^(#|---|apiVersion:|kind:)"; then
-              echo "✅ Basic YAML structure validation passed"
+            if command -v yamllint >/dev/null 2>&1; then
+              yamllint -d relaxed "$file" || {
+                echo "❌ ERROR: $(basename $file) is not valid YAML!"
+                exit 1
+              }
             else
-              echo "❌ ERROR: Generated ConfigMap doesn't appear to be valid YAML!"
-              echo "First 5 lines:"
-              head -n 5 templates/claude-templates-static.yaml
-              exit 1
+              # Basic validation without yamllint - check for valid YAML structure
+              if [ ! -f "$file" ]; then
+                echo "❌ ERROR: ConfigMap file $(basename $file) does not exist!"
+                exit 1
+              fi
+              
+              # Check file is not empty and has reasonable size
+              if [ ! -s "$file" ]; then
+                echo "❌ ERROR: ConfigMap $(basename $file) is empty!"
+                exit 1
+              fi
+              
+              # Check for valid YAML start patterns (comment, document separator, or apiVersion)
+              if head -n 5 "$file" | grep -qE "^(#|---|apiVersion:|kind:)"; then
+                echo "✅ $(basename $file): Basic YAML structure validation passed"
+              else
+                echo "❌ ERROR: $(basename $file) doesn't appear to be valid YAML!"
+                echo "First 5 lines:"
+                head -n 5 "$file"
+                exit 1
+              fi
             fi
-          fi
+          done
           
-          echo "✅ Template ConfigMap is valid and ready for deployment"
+          echo "✅ All template ConfigMaps are valid and ready for deployment"
 
       - name: Build release binary (ultra-fast)
         working-directory: ./controller
