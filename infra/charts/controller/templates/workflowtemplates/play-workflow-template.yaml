@@ -847,6 +847,7 @@ spec:
               FACTORY_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               CODEX_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               CURSOR_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
+              CLAUDE_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               OPENCODE_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               OPENCODE_VERBOSE: "{{`{{workflow.parameters.opencode-verbose}}`}}"
 

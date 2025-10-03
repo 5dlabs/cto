@@ -180,6 +180,12 @@ struct PlayDefaults {
     docs_project_directory: Option<String>,
     #[serde(rename = "maxRetries")]
     max_retries: Option<u32>,
+    #[serde(rename = "implementationMaxRetries")]
+    implementation_max_retries: Option<u32>,
+    #[serde(rename = "qualityMaxRetries")]
+    quality_max_retries: Option<u32>,
+    #[serde(rename = "testingMaxRetries")]
+    testing_max_retries: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -954,54 +960,53 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .values()
         .find(|a| a.github_app == quality_agent_input);
 
-    let (quality_agent, quality_cli, quality_model, quality_tools) = if let Some(agent_config) =
-        quality_agent_cfg
-    {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() {
-            cli.clone()
-        } else {
-            agent_config.cli.clone()
-        };
-        let agent_model = if agent_config.model.is_empty() {
-            model.clone()
-        } else {
-            agent_config.model.clone()
-        };
-        let agent_tools = agent_config
-            .tools
-            .as_ref()
-            .map(|t| match serde_json::to_string(t) {
-                Ok(json) => {
-                    eprintln!("✅ Serialized quality agent tools: {json}");
-                    json
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to serialize quality agent tools: {e}");
-                    eprintln!("   Tools data: {t:?}");
+    let (quality_agent, quality_cli, quality_model, quality_tools) =
+        if let Some(agent_config) = quality_agent_cfg {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized quality agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize quality agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
                     "{}".to_string()
-                }
-            })
-            .unwrap_or_else(|| {
-                eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
-                "{}".to_string()
-            });
-        (
-            agent_config.github_app.clone(),
-            agent_cli,
-            agent_model,
-            agent_tools,
-        )
-    } else {
-        // Not a configured agent, use provided name with defaults
-        eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
-        (
-            quality_agent_input.clone(),
-            cli.clone(),
-            model.clone(),
-            "{}".to_string(),
-        )
-    };
+                });
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!("⚠️ Agent {quality_agent_input} not found in config, using defaults");
+            (
+                quality_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+            )
+        };
 
     let quality_agent_max_retries = quality_agent_cfg.and_then(|cfg| cfg.max_retries);
 
@@ -1018,54 +1023,53 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .values()
         .find(|a| a.github_app == testing_agent_input);
 
-    let (testing_agent, testing_cli, testing_model, testing_tools) = if let Some(agent_config) =
-        testing_agent_cfg
-    {
-        // Use the structured agent configuration
-        let agent_cli = if agent_config.cli.is_empty() {
-            cli.clone()
-        } else {
-            agent_config.cli.clone()
-        };
-        let agent_model = if agent_config.model.is_empty() {
-            model.clone()
-        } else {
-            agent_config.model.clone()
-        };
-        let agent_tools = agent_config
-            .tools
-            .as_ref()
-            .map(|t| match serde_json::to_string(t) {
-                Ok(json) => {
-                    eprintln!("✅ Serialized testing agent tools: {json}");
-                    json
-                }
-                Err(e) => {
-                    eprintln!("❌ Failed to serialize testing agent tools: {e}");
-                    eprintln!("   Tools data: {t:?}");
+    let (testing_agent, testing_cli, testing_model, testing_tools) =
+        if let Some(agent_config) = testing_agent_cfg {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized testing agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize testing agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
                     "{}".to_string()
-                }
-            })
-            .unwrap_or_else(|| {
-                eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
-                "{}".to_string()
-            });
-        (
-            agent_config.github_app.clone(),
-            agent_cli,
-            agent_model,
-            agent_tools,
-        )
-    } else {
-        // Not a configured agent, use provided name with defaults
-        eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
-        (
-            testing_agent_input.clone(),
-            cli.clone(),
-            model.clone(),
-            "{}".to_string(),
-        )
-    };
+                });
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!("⚠️ Agent {testing_agent_input} not found in config, using defaults");
+            (
+                testing_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+            )
+        };
 
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
@@ -1104,30 +1108,37 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let implementation_max_retries =
         parse_max_retries_argument(&arguments, "implementation_max_retries")
-            .or(parse_max_retries_argument(&arguments, "factory_max_retries"))
-            .or(parse_max_retries_argument(&arguments, "opencode_max_retries"))
+            .or(parse_max_retries_argument(
+                &arguments,
+                "factory_max_retries",
+            ))
+            .or(parse_max_retries_argument(
+                &arguments,
+                "opencode_max_retries",
+            ))
             .or(implementation_agent_max_retries)
-            .or(config.defaults.code.max_retries)
+            .or(config.defaults.play.implementation_max_retries)
             .or(config.defaults.play.max_retries)
+            .or(config.defaults.code.max_retries)
             .unwrap_or(10);
 
-    let quality_max_retries =
-        parse_max_retries_argument(&arguments, "quality_max_retries")
-            .or(quality_agent_max_retries)
-            .or(config.defaults.code.max_retries)
-            .or(config.defaults.play.max_retries)
-            .unwrap_or(10);
+    let quality_max_retries = parse_max_retries_argument(&arguments, "quality_max_retries")
+        .or(quality_agent_max_retries)
+        .or(config.defaults.play.quality_max_retries)
+        .or(config.defaults.play.max_retries)
+        .or(config.defaults.code.max_retries)
+        .unwrap_or(10);
 
-    let testing_max_retries =
-        parse_max_retries_argument(&arguments, "testing_max_retries")
-            .or(testing_agent_max_retries)
-            .or(config.defaults.code.max_retries)
-            .or(config.defaults.play.max_retries)
-            .unwrap_or(10);
+    let testing_max_retries = parse_max_retries_argument(&arguments, "testing_max_retries")
+        .or(testing_agent_max_retries)
+        .or(config.defaults.play.testing_max_retries)
+        .or(config.defaults.play.max_retries)
+        .or(config.defaults.code.max_retries)
+        .unwrap_or(10);
 
-    let opencode_max_retries_override = parse_max_retries_argument(&arguments, "opencode_max_retries");
-    let opencode_max_retries =
-        opencode_max_retries_override.unwrap_or(implementation_max_retries);
+    let opencode_max_retries_override =
+        parse_max_retries_argument(&arguments, "opencode_max_retries");
+    let opencode_max_retries = opencode_max_retries_override.unwrap_or(implementation_max_retries);
 
     eprintln!("🐛 DEBUG: Implementation max retries: {implementation_max_retries}");
     eprintln!("🐛 DEBUG: Quality max retries: {quality_max_retries}");
@@ -2239,7 +2250,7 @@ async fn rpc_loop() -> Result<()> {
             Err(e) => {
                 eprintln!("Invalid JSON request: {e}");
 
-    let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
+                let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
                 continue;
             }
         };

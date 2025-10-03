@@ -1593,20 +1593,27 @@ echo "✅ Cleaned INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE_CLEAN:0:100}..."
 
 # Wait for MCP sidecar to be ready (local Pod network)
 echo "⏳ Waiting for MCP server to be ready..."
-MAX_RETRIES=10
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+if [ "$MAX_RETRIES" = "0" ]; then
+    echo "🔄 MCP readiness check running in unlimited mode"
+fi
+
 RETRY_COUNT=0
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+while true; do
     if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
         echo "✓ MCP server is ready"
         break
     fi
-    sleep 1
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-done
 
-if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "⚠️ MCP server not ready after ${MAX_RETRIES}s, proceeding with fallback"
-fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+
+    if [ "$MAX_RETRIES" != "0" ] && [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "⚠️ MCP server not ready after ${MAX_RETRIES}s, proceeding with fallback"
+        break
+    fi
+
+    sleep 1
+done
 
 # =============================================================================
 # DEBUG LOGGING: SIDECAR JSON CONSTRUCTION
