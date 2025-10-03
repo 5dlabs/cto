@@ -381,7 +381,6 @@ spec:
                         PR_NUMBER="{{workflow.parameters.pr-number}}"
                         PR_URL="{{workflow.parameters.pr-url}}"
                         PR_API_URL="https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}"
-                        TARGET_LABEL="needs-cleo"
 
                         AUTH_HEADER=""
                         INSTALLATION_TOKEN=""
@@ -490,27 +489,9 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        echo "Waiting for Rex to apply '$TARGET_LABEL' label to PR #$PR_NUMBER..."
-                        MAX_LABEL_ATTEMPTS=90
-                        LABEL_WAIT_SECONDS=10
-                        LABEL_ATTEMPT=1
-                        LABEL_READY=false
-                        while [ $LABEL_ATTEMPT -le $MAX_LABEL_ATTEMPTS ]; do
-                          if pr_has_label "$TARGET_LABEL"; then
-                            LABEL_READY=true
-                            echo "✅ Detected label '$TARGET_LABEL' on PR"
-                            break
-                          fi
-
-                          echo "⏳ Label not present yet (attempt $LABEL_ATTEMPT/$MAX_LABEL_ATTEMPTS); waiting ${LABEL_WAIT_SECONDS}s"
-                          sleep $LABEL_WAIT_SECONDS
-                          LABEL_ATTEMPT=$((LABEL_ATTEMPT + 1))
-                        done
-
-                        if [ "$LABEL_READY" != true ]; then
-                          echo "⚠️ Timed out waiting for '$TARGET_LABEL' label; skipping resume"
-                          exit 0
-                        fi
+                        # Note: No longer waiting for status labels (needs-cleo, etc.)
+                        # System now uses GitHub PR reviews for stage transitions
+                        # PR creation event itself triggers the resume
 
                         echo "Polling for workflow reaching wait-for-pr-created suspend point..."
                         MAX_WORKFLOW_ATTEMPTS=90
