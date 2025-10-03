@@ -961,7 +961,7 @@ Response (one word only):"
   COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
 
-  COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "low" "$COMPLETION_PROMPT")
+  COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "high" "$COMPLETION_PROMPT")
 
   set +e
   set -o pipefail
