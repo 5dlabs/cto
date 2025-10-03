@@ -526,7 +526,7 @@ spec:
 
             pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
             pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
-            
+
             # Fallback: if implementation stage and not found with both labels, try just task label
             if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
               if [ "$STAGE" != "quality" ] && [ "$STAGE" != "testing" ]; then
@@ -854,6 +854,7 @@ spec:
               OPENCODE_VERBOSE: "{{`{{workflow.parameters.opencode-verbose}}`}}"
 
     # Helper to reliably resolve the created CodeRun name before waiting for completion
+    - name: resolve-coderun-name
       inputs:
         parameters:
           - name: stage
