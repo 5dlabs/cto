@@ -8,11 +8,19 @@ echo "============================="
 cd "$(dirname "$0")/../infra/charts/controller"
 
 # Regenerate templates
-echo "📝 Regenerating static ConfigMap..."
-./scripts/generate-agent-templates-configmap.sh
+echo "📝 Regenerating split ConfigMaps..."
+./scripts/generate-agent-templates-configmaps-split.sh
 
 # Check if there are changes
-if git diff --quiet templates/agent-templates-static.yaml; then
+TEMPLATES_CHANGED=false
+for template in templates/agent-templates-*.yaml; do
+    if ! git diff --quiet "$template" 2>/dev/null; then
+        TEMPLATES_CHANGED=true
+        break
+    fi
+done
+
+if [ "$TEMPLATES_CHANGED" = "false" ]; then
     echo "✅ Templates are already up to date"
     exit 0
 fi
@@ -20,18 +28,23 @@ fi
 # Show what changed
 echo ""
 echo "📄 Template changes detected:"
-git diff --stat templates/agent-templates-static.yaml
+git diff --stat templates/agent-templates-*.yaml
 
 echo ""
 echo "🔍 Summary of changes:"
 echo "- Updated templates from agent-templates/ source files"
-echo "- New checksum: $(grep 'templates-checksum:' templates/agent-templates-static.yaml | awk '{print $2}' | tr -d '"')"
+for template in templates/agent-templates-*.yaml; do
+    if ! git diff --quiet "$template" 2>/dev/null; then
+        checksum=$(grep 'templates-checksum:' "$template" | awk '{print $2}' | tr -d '"')
+        echo "- $(basename "$template"): checksum $checksum"
+    fi
+done
 
 # Add and commit changes
 echo ""
 echo "📝 Committing updated templates..."
-git add templates/agent-templates-static.yaml
-git commit -m "chore: update agent templates static ConfigMap
+git add templates/agent-templates-*.yaml
+git commit -m "chore: update agent templates ConfigMaps
 
 - Regenerated from agent-templates/ source files
 - Includes latest container script validation changes
