@@ -163,7 +163,7 @@ jobs:
           cp templates/claude-templates-static.yaml templates/claude-templates-static.yaml.orig 2>/dev/null || true
           
           # Regenerate the templates
-          ./scripts/generate-templates-configmap.sh
+          ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Check if templates were updated
           if [ -f templates/claude-templates-static.yaml.orig ]; then
