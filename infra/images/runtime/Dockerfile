@@ -58,32 +58,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && update-alternatives --install /usr/local/bin/bat bat /usr/bin/batcat 10
 
 # Create non-root user 'node' with stable UID/GID 1000 to match cache mounts
-RUN set -eux; \
-    # Create group if it doesn't exist
-    if ! getent group node >/dev/null 2>&1; then \
-      if getent group 1000 >/dev/null 2>&1; then \
-        # GID 1000 exists with different name, use it
-        GN=$(getent group 1000 | cut -d: -f1); \
-      else \
-        # Create node group with GID 1000
-        groupadd -g 1000 node; \
-        GN=node; \
-      fi; \
-    else \
-      GN=node; \
-    fi; \
-    # Create user if it doesn't exist
-    if ! id -u node >/dev/null 2>&1; then \
-      if getent passwd 1000 >/dev/null 2>&1; then \
-        # UID 1000 exists, create without specifying UID
-        useradd --shell /bin/bash --create-home -g "$GN" node; \
-      else \
-        # Create with UID 1000
-        useradd --shell /bin/bash --create-home -u 1000 -g "$GN" node; \
-      fi; \
-    fi; \
-    # Verify user and group exist
-    id node && getent group $(id -gn node)
+RUN groupadd -g 1000 node 2>/dev/null || groupadd node 2>/dev/null || true && \
+    useradd --shell /bin/bash --create-home -u 1000 -g 1000 node 2>/dev/null || \
+    useradd --shell /bin/bash --create-home -g 1000 node 2>/dev/null || \
+    useradd --shell /bin/bash --create-home node || true && \
+    id node && getent group node
 
 # Passwordless sudo for the non-root user (node)
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-node-nopasswd \
