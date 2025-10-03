@@ -1470,13 +1470,15 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
       fi
 
       echo "✅ $STAGE_NAME approved - posting APPROVE review"
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --approve --body "### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
-
+      REVIEW_BODY=$(cat <<EOF
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All checks have passed:
 $CHECKS_PASSED
-
-Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
+Ready for $NEXT_STAGE.
+EOF
+)
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
     else
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"
@@ -1488,11 +1490,14 @@ Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
       fi
 
       echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
-
+      REVIEW_BODY=$(cat <<EOF
+### 🔴 Required Changes
 $STAGE_NAME issues detected. Please address the following:
-$ISSUES_DESC" 2>&1 || echo "⚠️ PR review command failed"
+$ISSUES_DESC
+EOF
+)
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
     fi
   else
     echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
