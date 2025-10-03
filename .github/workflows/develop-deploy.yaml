@@ -530,7 +530,7 @@ jobs:
           name: template-updates-${{ github.run_id }}
           path: |
             /tmp/templates-update.patch
-            /tmp/claude-templates-static.yaml
+            /tmp/templates-backup/
           retention-days: 7
 
       - name: GitOps Update (Skipped)
