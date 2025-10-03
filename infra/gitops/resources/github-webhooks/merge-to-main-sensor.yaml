@@ -33,6 +33,10 @@ spec:
           - path: body.pull_request.base.ref
             type: string
             value: ["main"]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
       # NOTE: Argo Events has built-in deduplication that caches event IDs
       # for 5 minutes to prevent duplicate processing automatically
   triggers:

@@ -26,6 +26,10 @@ spec:
           - path: body.action
             type: string
             value: ["opened"]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
 
     # Cleo Approved PR - Resume workflows waiting for quality review complete
     - name: cleo-approved-event
@@ -45,6 +49,10 @@ spec:
           - path: body.review.user.login
             type: string
             value: ["5dlabs-cleo[bot]"]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
 
     # Tess Approved PR - Resume workflows waiting for testing complete
     - name: tess-approved-event
@@ -64,6 +72,10 @@ spec:
           - path: body.review.user.login
             type: string
             value: ["5dlabs-tess[bot]"]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
 
     # PR Merged - Resume workflows waiting for this
     - name: pr-merged-event
@@ -80,6 +92,10 @@ spec:
           - path: body.pull_request.merged
             type: string
             value: ["true"]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
 
   triggers:
     # Resume workflows at waiting-pr-created stage
