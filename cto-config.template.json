@@ -50,7 +50,10 @@
       "docsRepository": "your-org/your-test-repo",
       "docsProjectDirectory": "docs",
       "workingDirectory": "/path/to/your/test/workspace",
-      "maxRetries": 10
+      "maxRetries": 10,
+      "implementationMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "testingMaxRetries": 5
     },
     "_comment_docs_ingest": "Default values for docs ingest workflows",
     "docs_ingest": {

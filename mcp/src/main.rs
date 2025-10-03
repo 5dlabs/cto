@@ -302,6 +302,14 @@ fn extract_params(params: Option<&Value>) -> HashMap<String, Value> {
         .unwrap_or_default()
 }
 
+fn parse_max_retries_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<u32> {
+    arguments.get(key).and_then(|value| match value {
+        Value::Number(num) => num.as_u64().map(|v| v as u32),
+        Value::String(s) => s.parse::<u32>().ok(),
+        _ => None,
+    })
+}
+
 fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
     match method {
         "initialize" => Some(Ok(json!({
@@ -941,11 +949,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
+    let quality_agent_cfg = config
+        .agents
+        .values()
+        .find(|a| a.github_app == quality_agent_input);
+
     let (quality_agent, quality_cli, quality_model, quality_tools) = if let Some(agent_config) =
-        config
-            .agents
-            .values()
-            .find(|a| a.github_app == quality_agent_input)
+        quality_agent_cfg
     {
         // Use the structured agent configuration
         let agent_cli = if agent_config.cli.is_empty() {
@@ -993,6 +1003,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         )
     };
 
+    let quality_agent_max_retries = quality_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Handle testing agent - use provided value or config default
     let testing_agent_input = arguments
         .get("testing_agent")
@@ -1001,11 +1013,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
 
     // Resolve agent name and extract CLI/model/tools if it's a short alias
+    let testing_agent_cfg = config
+        .agents
+        .values()
+        .find(|a| a.github_app == testing_agent_input);
+
     let (testing_agent, testing_cli, testing_model, testing_tools) = if let Some(agent_config) =
-        config
-            .agents
-            .values()
-            .find(|a| a.github_app == testing_agent_input)
+        testing_agent_cfg
     {
         // Use the structured agent configuration
         let agent_cli = if agent_config.cli.is_empty() {
@@ -1088,20 +1102,36 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     eprintln!("🐛 DEBUG: Quality agent input: '{quality_agent_input}'");
     eprintln!("🐛 DEBUG: Testing agent input: '{testing_agent_input}'");
 
-    let opencode_max_retries_override =
-        arguments
-            .get("opencode_max_retries")
-            .and_then(|value| match value {
-                Value::Number(num) => num.as_u64().map(|v| v as u32),
-                Value::String(s) => s.parse::<u32>().ok(),
-                _ => None,
-            });
+    let implementation_max_retries =
+        parse_max_retries_argument(&arguments, "implementation_max_retries")
+            .or(parse_max_retries_argument(&arguments, "factory_max_retries"))
+            .or(parse_max_retries_argument(&arguments, "opencode_max_retries"))
+            .or(implementation_agent_max_retries)
+            .or(config.defaults.code.max_retries)
+            .or(config.defaults.play.max_retries)
+            .unwrap_or(10);
 
-    let opencode_max_retries = opencode_max_retries_override
-        .or(implementation_agent_max_retries)
-        .or(config.defaults.play.max_retries)
-        .unwrap_or(10);
+    let quality_max_retries =
+        parse_max_retries_argument(&arguments, "quality_max_retries")
+            .or(quality_agent_max_retries)
+            .or(config.defaults.code.max_retries)
+            .or(config.defaults.play.max_retries)
+            .unwrap_or(10);
 
+    let testing_max_retries =
+        parse_max_retries_argument(&arguments, "testing_max_retries")
+            .or(testing_agent_max_retries)
+            .or(config.defaults.code.max_retries)
+            .or(config.defaults.play.max_retries)
+            .unwrap_or(10);
+
+    let opencode_max_retries_override = parse_max_retries_argument(&arguments, "opencode_max_retries");
+    let opencode_max_retries =
+        opencode_max_retries_override.unwrap_or(implementation_max_retries);
+
+    eprintln!("🐛 DEBUG: Implementation max retries: {implementation_max_retries}");
+    eprintln!("🐛 DEBUG: Quality max retries: {quality_max_retries}");
+    eprintln!("🐛 DEBUG: Testing max retries: {testing_max_retries}");
     eprintln!("🐛 DEBUG: OpenCode max retries: {opencode_max_retries}");
 
     // Check for requirements.yaml file
@@ -1160,6 +1190,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("testing-tools={testing_tools}"),
     ];
 
+    params.push(format!(
+        "implementation-max-retries={implementation_max_retries}"
+    ));
+    params.push(format!("quality-max-retries={quality_max_retries}"));
+    params.push(format!("testing-max-retries={testing_max_retries}"));
     params.push(format!("opencode-max-retries={opencode_max_retries}"));
 
     // Load and encode requirements.yaml if it exists
@@ -2203,6 +2238,8 @@ async fn rpc_loop() -> Result<()> {
             Ok(req) => req,
             Err(e) => {
                 eprintln!("Invalid JSON request: {e}");
+
+    let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
                 continue;
             }
         };
