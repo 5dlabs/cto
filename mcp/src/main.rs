@@ -1071,6 +1071,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             )
         };
 
+    let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
 

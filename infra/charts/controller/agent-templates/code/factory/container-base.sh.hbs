@@ -970,7 +970,7 @@ no
 REASON: <specific FUNCTIONAL issue>
 
 Example 'yes' response (even with warnings):
-  COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
+yes
 
 Example 'no' response:
 no
@@ -1002,7 +1002,7 @@ Your response:"
 **Response format:**
 
 If complete, respond with:
-  COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
+yes
 
 If incomplete, respond with:
 no
@@ -1019,6 +1019,9 @@ REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but 
 
 Your response:"
   fi
+
+  COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
+  COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
 
   if [ "$SKIP_PERMISSIONS_UNSAFE" = "true" ]; then
     COMPLETION_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "text")
