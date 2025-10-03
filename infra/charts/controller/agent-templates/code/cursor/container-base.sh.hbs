@@ -1064,12 +1064,12 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
     if [ $SUCCESS -eq 1 ]; then
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"
-      CHECKS_PASSED="- Code formatting verified\n- Linting passed\n- Unit tests successful\n- Quality standards met"
+      CHECKS_PASSED=$'- Code formatting verified\n- Linting passed\n- Unit tests successful\n- Quality standards met'
       NEXT_STAGE="end-to-end testing"
       if [ "$WORKFLOW_STAGE" = "testing" ]; then
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
-        CHECKS_PASSED="- End-to-end tests passed\n- Integration tests successful\n- Acceptance criteria validated\n- Production readiness confirmed"
+        CHECKS_PASSED=$'- End-to-end tests passed\n- Integration tests successful\n- Acceptance criteria validated\n- Production readiness confirmed'
         NEXT_STAGE="human review and merge"
       fi
 
@@ -1084,11 +1084,11 @@ Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
     else
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"
-      ISSUES_DESC="- Review code formatting\n- Fix linting errors\n- Ensure unit tests pass\n- Meet quality standards"
+      ISSUES_DESC=$'- Review code formatting\n- Fix linting errors\n- Ensure unit tests pass\n- Meet quality standards'
       if [ "$WORKFLOW_STAGE" = "testing" ]; then
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
-        ISSUES_DESC="- Fix failing end-to-end tests\n- Address integration test failures\n- Validate acceptance criteria\n- Ensure production readiness"
+        ISSUES_DESC=$'- Fix failing end-to-end tests\n- Address integration test failures\n- Validate acceptance criteria\n- Ensure production readiness'
       fi
 
       echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
