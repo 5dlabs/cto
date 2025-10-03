@@ -814,7 +814,7 @@ if [ "${FORCE_WRITES,,}" = "true" ]; then
   AUTO_LEVEL="high"
 fi
 
-SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}true{{/if}}"
+SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}false{{/if}}"
 SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
 
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
@@ -827,7 +827,7 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   RUN_LOG="/tmp/factory-run-${ATTEMPT}.${RUN_LOG_EXT}"
 
   if [ "$SKIP_PERMISSIONS_UNSAFE" = "true" ]; then
-    FACTORY_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
+    FACTORY_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "$OUTPUT_FORMAT")
   else
     FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
   fi
@@ -961,7 +961,7 @@ Response (one word only):"
   COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
 
-  COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "low" "$COMPLETION_PROMPT")
+  COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "high" "$COMPLETION_PROMPT")
 
   set +e
   set -o pipefail
