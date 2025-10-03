@@ -446,14 +446,69 @@ echo "- Clean YAML syntax and structure"
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
-# Task files should already be present in the project repository at /task
-echo "📋 Checking for task files in project repository..."
+# Copy task files from docs repository if configured
+echo "📋 Preparing task documentation for quality review..."
+{{#if docsRepositoryUrl}}
+echo "📥 Cloning docs repository..."
+DOCS_REPO_URL="{{docsRepositoryUrl}}"
+# Build authenticated URL
+if [ -n "$REPO_HTTP_URL" ]; then
+    DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
+else
+    DOCS_HTTP_URL="$DOCS_REPO_URL"
+fi
+
+rm -rf /tmp/docs-repo
+if ! git clone "$DOCS_HTTP_URL" /tmp/docs-repo; then
+    echo "❌ Failed to clone docs repository"
+else
+    echo "✓ Docs repository cloned"
+    
+    # Determine docs path
+    {{#if docs_project_directory}}
+    if [ "{{docs_project_directory}}" = "." ]; then
+        DOCS_PATH="/tmp/docs-repo/.taskmaster"
+    else
+        DOCS_PATH="/tmp/docs-repo/{{docs_project_directory}}/.taskmaster"
+    fi
+    {{else}}
+    DOCS_PATH="/tmp/docs-repo/.taskmaster"
+    {{/if}}
+    
+    # Copy task files
+    mkdir -p "$CLAUDE_WORK_DIR/task"
+    TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+    
+    if [ -d "$TASK_DIR" ]; then
+        echo "✓ Copying task files from docs repository..."
+        [ -f "$TASK_DIR/task.md" ] && cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" && echo "  ✓ task.md"
+        [ -f "$TASK_DIR/acceptance-criteria.md" ] && cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" && echo "  ✓ acceptance-criteria.md"
+        [ -f "$TASK_DIR/prompt.md" ] && cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" && echo "  ✓ prompt.md"
+    else
+        echo "⚠️ Task directory not found at: $TASK_DIR"
+    fi
+    
+    # Copy architecture.md
+    ARCH_FILE="$DOCS_PATH/docs/architecture.md"
+    if [ -f "$ARCH_FILE" ]; then
+        cp "$ARCH_FILE" "$CLAUDE_WORK_DIR/task/"
+        echo "  ✓ architecture.md"
+    else
+        echo "⚠️ architecture.md not found at: $ARCH_FILE"
+    fi
+    
+    rm -rf /tmp/docs-repo
+fi
+{{else}}
+# Check if task files exist in project repository
 if [ -d "$CLAUDE_WORK_DIR/task" ]; then
     echo "✓ Found task directory in project repository"
     ls -la "$CLAUDE_WORK_DIR/task/"
 else
-    echo "⚠️ No /task directory found in project repository"
+    echo "⚠️ No /task directory found and no docs repository configured"
+    echo "Task documentation will not be available for quality review context"
 fi
+{{/if}}
 
 # Ensure we're in the git repository working directory
 echo "✓ Working directly in git repository at: $CLAUDE_WORK_DIR"
