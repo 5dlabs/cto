@@ -452,7 +452,7 @@ echo "📋 Preparing task documentation for quality review..."
 echo "📥 Cloning docs repository..."
 DOCS_REPO_URL="{{docsRepositoryUrl}}"
 # Build authenticated URL
-if [ -n "$REPO_HTTP_URL" ]; then
+if [ -n "$GITHUB_TOKEN" ]; then
     DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
 else
     DOCS_HTTP_URL="$DOCS_REPO_URL"

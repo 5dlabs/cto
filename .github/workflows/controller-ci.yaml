@@ -146,18 +146,18 @@ jobs:
           cd infra/charts/controller
           
           # Generate the ConfigMap
-          ./scripts/generate-agent-templates-configmap.sh
+          ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Check if there are any changes
-          if ! git diff --quiet templates/agent-templates-static.yaml; then
+          if ! git diff --quiet templates/agent-templates-*.yaml; then
             echo "templates-outdated=true" >> $GITHUB_OUTPUT
             echo "⚠️ Templates are outdated - will attempt auto-update"
             echo ""
             echo "The following changes were detected:"
-            git diff --stat templates/agent-templates-static.yaml
+            git diff --stat templates/agent-templates-*.yaml
           else
             echo "templates-outdated=false" >> $GITHUB_OUTPUT
-            echo "✅ agent-templates ConfigMap is up-to-date"
+            echo "✅ agent-templates ConfigMaps are up-to-date"
           fi
 
   # Auto-update templates for both PRs and main branch pushes
@@ -184,16 +184,16 @@ jobs:
           cd infra/charts/controller
           
           # Generate the ConfigMap
-          ./scripts/generate-agent-templates-configmap.sh
+          ./scripts/generate-agent-templates-configmaps-split.sh
           
           # Check if there are actual changes (double-check)
-          if ! git diff --quiet templates/agent-templates-static.yaml; then
+          if ! git diff --quiet templates/agent-templates-*.yaml; then
             # Configure git
             git config --local user.email "action@github.com"
             git config --local user.name "GitHub Action"
             
             # Commit the changes
-            git add templates/agent-templates-static.yaml
+            git add templates/agent-templates-*.yaml
             
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               # For PRs, commit to the PR branch
