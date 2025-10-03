@@ -1080,22 +1080,30 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
 All checks have passed:
 $CHECKS_PASSED
 
-Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
-    else
-      STAGE_NAME="Quality"
-      STAGE_EMOJI="🛡️"
-      ISSUES_DESC=$'- Review code formatting\n- Fix linting errors\n- Ensure unit tests pass\n- Meet quality standards'
-      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+      echo "✅ $STAGE_NAME approved - posting APPROVE review"
+      REVIEW_BODY=$(cat <<EOF
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+All checks have passed:
+$CHECKS_PASSED
+Ready for $NEXT_STAGE.
+EOF
+)
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
         ISSUES_DESC=$'- Fix failing end-to-end tests\n- Address integration test failures\n- Validate acceptance criteria\n- Ensure production readiness'
       fi
 
       echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
-
+      REVIEW_BODY=$(cat <<EOF
+### 🔴 Required Changes
 $STAGE_NAME issues detected. Please address the following:
+$ISSUES_DESC
+EOF
+)
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
 $ISSUES_DESC" 2>&1 || echo "⚠️ PR review command failed"
     fi
   else
