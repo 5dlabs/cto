@@ -722,6 +722,8 @@ spec:
             default: "false"
           - name: max-retries
             default: ""
+          - name: max-retries
+            default: ""
       outputs:
         parameters:
           - name: coderun-name
