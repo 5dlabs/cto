@@ -1627,29 +1627,19 @@ echo "📤 Sidecar JSON payload preview: ${SIDECAR_JSON:0:200}..."
 echo "🔍 Full sidecar JSON structure:"
 echo "$SIDECAR_JSON" | jq . 2>/dev/null || echo "❌ Sidecar JSON parsing failed: $SIDECAR_JSON"
 
-# Send via MCP sidecar HTTP endpoint - use raw text to avoid JSON formatting issues
-echo "📡 Sending to MCP server /input endpoint..."
-if printf '%s\n' "$SIDECAR_JSON" | \
-     curl -fsS -X POST http://127.0.0.1:8080/input \
-       -H 'Content-Type: application/json' \
-       --data-binary @- >/dev/null 2>&1; then
-  echo "✅ Initial QA guidance sent via MCP server /input"
-else
-  echo "⚠️ MCP server /input failed, falling back to direct FIFO write"
-  # Fallback: construct JSON properly to avoid cache_control errors
-  echo "🔧 Constructing FIFO JSON payload..."
-  FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
-              "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
-  echo "📤 FIFO JSON payload length: ${#FIFO_JSON} characters"
-  echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
-  echo "🔍 Full FIFO JSON structure:"
-  echo "$FIFO_JSON" | jq . 2>/dev/null || echo "❌ FIFO JSON parsing failed: $FIFO_JSON"
+# Send directly via FIFO (sidecar phased out)
+echo "🔧 Constructing FIFO JSON payload..."
+FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
+            "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
+echo "📤 FIFO JSON payload length: ${#FIFO_JSON} characters"
+echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
+echo "🔍 Full FIFO JSON structure:"
+echo "$FIFO_JSON" | jq . 2>/dev/null || echo "❌ FIFO JSON parsing failed: $FIFO_JSON"
 
-  exec 9>"$FIFO_PATH"
-  printf '%s\n' "$FIFO_JSON" >&9
-  exec 9>&-  # Close immediately to send EOF to Claude
-  echo "✅ Initial QA guidance sent via FIFO fallback"
-fi
+exec 9>"$FIFO_PATH"
+printf '%s\n' "$FIFO_JSON" >&9
+exec 9>&-  # Close immediately to send EOF to Claude
+echo "✅ Initial QA guidance sent via FIFO"
 
 # Simple wait like Cleo - no complex monitoring
 
