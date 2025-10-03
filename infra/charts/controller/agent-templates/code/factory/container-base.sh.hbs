@@ -1086,8 +1086,15 @@ if [ $SUCCESS -ne 1 ]; then
     echo "💡 Last reported reason for incompletion:"
     echo "$LAST_COMPLETION_REASON"
   fi
-  echo "❌ Task incomplete - marking as FAILED"
-  EXIT_CODE=1  # Fail the job so it doesn't appear successful
+  
+  # Single-iteration mode: always exit successfully to allow inspection of results
+  if [ "$MAX_RETRIES" = "1" ]; then
+    echo "ℹ️ Single-iteration mode (MAX_RETRIES=1) - exiting successfully for result inspection"
+    EXIT_CODE=0
+  else
+    echo "❌ Task incomplete - marking as FAILED"
+    EXIT_CODE=1  # Fail the job so it doesn't appear successful
+  fi
 else
   echo "✅ Factory confirmed task completion"
   if [ ${FACTORY_EXIT:-0} -ne 0 ]; then
@@ -1100,7 +1107,13 @@ if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
 else
-  echo "⚠️ Skipping auto PR enforcement due to Factory completion status"
+  # In single-iteration mode, still try to create PR for inspection
+  if [ "$MAX_RETRIES" = "1" ]; then
+    echo "🔍 Single-iteration mode - attempting PR creation for result inspection"
+    ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
+  else
+    echo "⚠️ Skipping auto PR enforcement due to Factory completion status"
+  fi
 fi
 
 # Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
