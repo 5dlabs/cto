@@ -17,7 +17,8 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "docs",
       "service": "cto",
-      "cli": "codex"
+      "cli": "codex",
+      "maxRetries": 10
     },
     "intake": {
       "githubApp": "5DLabs-Morgan",
@@ -45,7 +46,10 @@
       "docsRepository": "5dlabs/cto",
       "docsProjectDirectory": "cli-agnostic-platform",
       "workingDirectory": "cli-agnostic-platform",
-      "maxRetries": 10
+      "maxRetries": 10,
+      "implementationMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "testingMaxRetries": 5
     },
     "docs_ingest": {
       "model": "claude-sonnet-4-20250514",

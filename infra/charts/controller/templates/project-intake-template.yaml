@@ -233,9 +233,7 @@ spec:
         - name: intake-files
           configMap:
             name: "{{`{{inputs.parameters.configmap-name}}`}}"
-        - name: agent-templates
-          configMap:
-            name: {{ include "controller.fullname" . }}-agent-templates
+{{ include "platform.agentTemplateProjectedVolume" . | nindent 8 }}
         - name: agents-config
           configMap:
             name: {{ include "controller.fullname" . }}-agents

@@ -446,14 +446,405 @@ echo "- Clean YAML syntax and structure"
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
-# Task files should already be present in the project repository at /task
-echo "📋 Checking for task files in project repository..."
-if [ -d "$CLAUDE_WORK_DIR/task" ]; then
-    echo "✓ Found task directory in project repository"
-    ls -la "$CLAUDE_WORK_DIR/task/"
+# Copy task files from docs repository if configured
+echo "📋 Preparing task documentation for quality review..."
+echo "════════════════════════════════════════════════════════════════"
+
+{{#if docsRepositoryUrl}}
+# Initialize comprehensive tracking with explicit stage flags
+COPIED_FILES=""
+FAILED_FILES=""
+EXISTING_FILES=""
+DOCS_SETUP_SUCCESS=false
+DOCS_AUTH_VERIFIED=false
+DOCS_CLONE_SUCCESS=false
+DOCS_PATH_VALID=false
+
+# Prepare target directory (ensure it exists)
+if ! mkdir -p "$CLAUDE_WORK_DIR/task" 2>/tmp/mkdir_error.log; then
+    echo "❌ CRITICAL: Cannot create task directory"
+    echo "   Error: $(cat /tmp/mkdir_error.log 2>/dev/null || echo 'unknown')"
+    echo "   Aborting docs setup"
 else
-    echo "⚠️ No /task directory found in project repository"
+    echo "✓ Task directory prepared: $CLAUDE_WORK_DIR/task"
 fi
+
+# Validate GitHub token exists before proceeding
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "❌ CRITICAL: No GITHUB_TOKEN available"
+    echo "   Cannot authenticate to docs repository"
+    echo "   Aborting docs setup - agent will have limited context"
+    DOCS_AUTH_VERIFIED=false
+else
+    echo "✓ GitHub token available (${#GITHUB_TOKEN} chars)"
+    DOCS_AUTH_VERIFIED=true
+fi
+
+# Only proceed if we have authentication
+if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+    # Build authenticated docs URL
+    DOCS_REPO_URL="{{docsRepositoryUrl}}"
+    DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
+    
+    echo "📥 Docs Repository: $DOCS_REPO_URL"
+    
+    # Step 1: Verify repository access (fail fast if inaccessible)
+    echo ""
+    echo "🔍 Step 1/4: Verifying repository access..."
+    if ! git ls-remote "$DOCS_HTTP_URL" HEAD >/tmp/docs_access_test.out 2>&1; then
+        echo "❌ Repository access FAILED"
+        echo "   URL: $DOCS_REPO_URL"
+        echo "   Error: $(cat /tmp/docs_access_test.out 2>/dev/null | head -3)"
+        echo "   This is a blocking error - cannot proceed with docs setup"
+        DOCS_AUTH_VERIFIED=false
+    else
+        echo "✅ Repository access verified"
+        DOCS_AUTH_VERIFIED=true
+    fi
+fi
+
+# Step 2: Clone repository with explicit error handling
+if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+    echo ""
+    echo "📥 Step 2/4: Cloning docs repository..."
+    
+    # Clean up any existing docs clone
+    rm -rf /tmp/docs-repo /tmp/docs_clone_error.log 2>/dev/null || true
+    
+    MAX_ATTEMPTS=3
+    CLONE_SUCCEEDED=false
+    
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+        echo "   Clone attempt $attempt/$MAX_ATTEMPTS..."
+        
+        # Attempt clone with explicit error capture
+        if git clone --quiet --depth 1 "$DOCS_HTTP_URL" /tmp/docs-repo 2>/tmp/docs_clone_error.log; then
+            # Verify clone actually succeeded
+            if [ -d "/tmp/docs-repo/.git" ]; then
+                # Additional validation - check for at least some content
+                FILE_COUNT=$(find /tmp/docs-repo -type f 2>/dev/null | wc -l)
+                if [ "$FILE_COUNT" -gt 0 ]; then
+                    CLONE_SUCCEEDED=true
+                    DOCS_CLONE_SUCCESS=true
+                    echo "✅ Clone successful ($FILE_COUNT files)"
+                    break
+                else
+                    echo "❌ Clone succeeded but repository appears empty"
+                fi
+            else
+                echo "❌ Clone command succeeded but .git directory missing"
+            fi
+        else
+            CLONE_ERROR=$(cat /tmp/docs_clone_error.log 2>/dev/null | head -3)
+            echo "❌ Clone failed: ${CLONE_ERROR:-Unknown error}"
+        fi
+        
+        # Retry logic
+        if [ $attempt -lt $MAX_ATTEMPTS ]; then
+            echo "   Waiting 5 seconds before retry..."
+            sleep 5
+        fi
+    done
+    
+    if [ "$CLONE_SUCCEEDED" != "true" ]; then
+        echo "❌ FAILED to clone after $MAX_ATTEMPTS attempts"
+        echo "   Last error: $(cat /tmp/docs_clone_error.log 2>/dev/null || echo 'No error log available')"
+        DOCS_CLONE_SUCCESS=false
+    fi
+else
+    echo ""
+    echo "⏭️  Step 2/4: SKIPPED (authentication failed or not available)"
+fi
+
+# Step 3: Determine and validate paths with simplified logic
+if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
+    echo ""
+    echo "📂 Step 3/4: Validating documentation paths..."
+    
+    # Simplified path determination - single clear logic path
+    {{#if docs_project_directory}}
+    # docs_project_directory is specified
+    if [ "{{docs_project_directory}}" = "." ] || [ "{{docs_project_directory}}" = "" ]; then
+        # Root of repository
+        DOCS_BASE_PATH="/tmp/docs-repo"
+        echo "   Using repository root (docs_project_directory='{{docs_project_directory}}')"
+    else
+        # Subdirectory specified
+        DOCS_BASE_PATH="/tmp/docs-repo/{{docs_project_directory}}"
+        echo "   Using subdirectory: {{docs_project_directory}}"
+    fi
+    {{else}}
+    # No docs_project_directory specified - default to root
+    DOCS_BASE_PATH="/tmp/docs-repo"
+    echo "   Using repository root (no docs_project_directory specified)"
+    {{/if}}
+    
+    # Validate base path exists
+    if [ ! -d "$DOCS_BASE_PATH" ]; then
+        echo "❌ Base path does not exist: $DOCS_BASE_PATH"
+        echo "   Repository structure:"
+        ls -la /tmp/docs-repo 2>/dev/null | head -10 || echo "   Cannot list repository"
+        DOCS_PATH_VALID=false
+        DOCS_CLONE_SUCCESS=false
+    else
+        # Build and validate remaining paths
+        DOCS_PATH="$DOCS_BASE_PATH/.taskmaster"
+        TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+        
+        echo "✅ Base path exists: $DOCS_BASE_PATH"
+        echo "   Taskmaster directory: $DOCS_PATH"
+        echo "   Task directory: $TASK_DIR"
+        
+        # Validate .taskmaster directory
+        if [ ! -d "$DOCS_PATH" ]; then
+            echo "⚠️  .taskmaster directory not found at: $DOCS_PATH"
+            echo "   This likely indicates incorrect docs_project_directory configuration"
+            echo "   Available directories in base path:"
+            ls -d "$DOCS_BASE_PATH"/*/ 2>/dev/null | head -5 || echo "   None visible"
+            DOCS_PATH_VALID=false
+        else
+            echo "✅ .taskmaster directory found"
+            DOCS_PATH_VALID=true
+        fi
+        
+        # Check task directory (informational only, not blocking)
+        if [ ! -d "$TASK_DIR" ]; then
+            echo "⚠️  Task-specific directory not found: $TASK_DIR"
+            if [ -d "$DOCS_PATH/docs" ]; then
+                echo "   Available task directories:"
+                ls -d "$DOCS_PATH/docs/task-"* 2>/dev/null | head -5 || echo "   None found"
+            fi
+        else
+            echo "✅ Task directory found"
+        fi
+    fi
+else
+    echo ""
+    echo "⏭️  Step 3/4: SKIPPED (clone was not successful)"
+fi
+
+# Step 4: Copy documentation files with enhanced error tracking
+if [ "$DOCS_PATH_VALID" = "true" ]; then
+    echo ""
+    echo "📋 Step 4/4: Copying documentation files..."
+    
+    # Enhanced file copy helper with better error handling
+    safe_copy_file() {
+        local src="$1"
+        local dest="$2"
+        local filename="$3"
+        
+        # Validate source exists
+        if [ ! -f "$src" ]; then
+            echo "  ⊘ $filename - source not found"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+        
+        # Check if source is readable and has content
+        if [ ! -r "$src" ]; then
+            echo "  ❌ $filename - source not readable"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+        
+        local src_size=$(wc -c < "$src" 2>/dev/null || echo "0")
+        if [ "$src_size" = "0" ]; then
+            echo "  ⚠️  $filename - source is empty (0 bytes)"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+        
+        # Check if destination already exists with content
+        if [ -f "$dest" ] && [ -s "$dest" ]; then
+            local dest_size=$(wc -c < "$dest")
+            echo "  ↻ $filename - already exists (${dest_size}B), preserving"
+            EXISTING_FILES="$EXISTING_FILES $filename"
+            return 0
+        fi
+        
+        # Attempt copy with explicit error handling
+        if cp "$src" "$dest" 2>/tmp/copy_error_${filename}.log; then
+            # Verify copy succeeded and has content
+            if [ -f "$dest" ] && [ -s "$dest" ]; then
+                local copied_size=$(wc -c < "$dest")
+                # Verify size matches source
+                if [ "$copied_size" = "$src_size" ]; then
+                    echo "  ✅ $filename - copied successfully (${copied_size}B)"
+                    COPIED_FILES="$COPIED_FILES $filename"
+                    return 0
+                else
+                    echo "  ❌ $filename - size mismatch (src:${src_size}B dest:${copied_size}B)"
+                    rm -f "$dest"
+                    FAILED_FILES="$FAILED_FILES $filename"
+                    return 1
+                fi
+            else
+                echo "  ❌ $filename - copy succeeded but destination is empty"
+                rm -f "$dest"
+                FAILED_FILES="$FAILED_FILES $filename"
+                return 1
+            fi
+        else
+            local error=$(cat /tmp/copy_error_${filename}.log 2>/dev/null || echo "unknown error")
+            echo "  ❌ $filename - copy failed: $error"
+            FAILED_FILES="$FAILED_FILES $filename"
+            return 1
+        fi
+    }
+    
+    # Copy task-specific files (task.md is critical, others are optional)
+    CRITICAL_FILES_COPIED=0
+    if [ -d "$TASK_DIR" ]; then
+        echo "  📁 Processing task-specific files from: $TASK_DIR"
+        
+        # Critical file: task.md
+        if safe_copy_file "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/task.md" "task.md"; then
+            CRITICAL_FILES_COPIED=$((CRITICAL_FILES_COPIED + 1))
+        fi
+        
+        # Optional files
+        safe_copy_file "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" "acceptance-criteria.md" || true
+        safe_copy_file "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/prompt.md" "prompt.md" || true
+    else
+        echo "  ⚠️  Task directory not found: $TASK_DIR"
+        echo "  Skipping task-specific files (task.md, acceptance-criteria.md, prompt.md)"
+        FAILED_FILES="$FAILED_FILES task.md acceptance-criteria.md prompt.md"
+    fi
+    
+    # Copy architecture documentation (optional)
+    safe_copy_file "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/architecture.md" "architecture.md" || true
+    
+    # Determine overall success
+    # Success if at least one critical file was copied/exists OR any files were copied/exist
+    AVAILABLE_FILE_COUNT=$(ls -1 "$CLAUDE_WORK_DIR/task/" 2>/dev/null | wc -l)
+    if [ "$AVAILABLE_FILE_COUNT" -gt 0 ]; then
+        DOCS_SETUP_SUCCESS=true
+        echo "  ✅ Setup successful - $AVAILABLE_FILE_COUNT file(s) available"
+    else
+        echo "  ❌ Setup failed - no files available for agent"
+        DOCS_SETUP_SUCCESS=false
+    fi
+else
+    echo ""
+    echo "⏭️  Step 4/4: SKIPPED (path validation failed)"
+fi
+
+# Comprehensive final summary with clear status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "📊 TASK DOCUMENTATION SETUP SUMMARY"
+echo "════════════════════════════════════════════════════════════════"
+
+# Overall status with clear pass/fail
+if [ "$DOCS_SETUP_SUCCESS" = "true" ]; then
+    echo "✅ STATUS: SUCCESS"
+    echo "   Documentation is available for the agent"
+else
+    echo "❌ STATUS: FAILED"
+    echo "   Agent will proceed with limited context"
+fi
+
+# Detailed stage breakdown
+echo ""
+echo "Pipeline Stages:"
+printf "  1. Authentication:   %s\n" "$([ "$DOCS_AUTH_VERIFIED" = "true" ] && echo "✅ Verified" || echo "❌ Failed")"
+printf "  2. Clone:            %s\n" "$([ "$DOCS_CLONE_SUCCESS" = "true" ] && echo "✅ Success" || echo "❌ Failed")"
+printf "  3. Path Validation:  %s\n" "$([ "$DOCS_PATH_VALID" = "true" ] && echo "✅ Valid" || echo "❌ Invalid")"
+printf "  4. File Operations:  %s\n" "$([ "$DOCS_SETUP_SUCCESS" = "true" ] && echo "✅ Complete" || echo "❌ Incomplete")"
+
+# File status tracking
+if [ -n "$COPIED_FILES" ]; then
+    echo ""
+    echo "📄 Newly copied:$COPIED_FILES"
+fi
+
+if [ -n "$EXISTING_FILES" ]; then
+    echo "📄 Preserved existing:$EXISTING_FILES"
+fi
+
+if [ -n "$FAILED_FILES" ]; then
+    echo "❌ Failed/missing:$FAILED_FILES"
+fi
+
+# List actual available files in task directory
+echo ""
+echo "📁 Task documentation available:"
+if [ -d "$CLAUDE_WORK_DIR/task" ] && [ "$(ls -A "$CLAUDE_WORK_DIR/task" 2>/dev/null | wc -l)" -gt 0 ]; then
+    ls -lh "$CLAUDE_WORK_DIR/task/" 2>/dev/null | tail -n +2 | while read -r line; do
+        filename=$(echo "$line" | awk '{print $9}')
+        size=$(echo "$line" | awk '{print $5}')
+        printf "   ✓ %s (%s)\n" "$filename" "$size"
+    done
+else
+    echo "   (none available)"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+
+# Smart cleanup strategy - preserve debugging info on failure
+if [ "$DOCS_SETUP_SUCCESS" = "true" ] && [ -z "$FAILED_FILES" ]; then
+    # Full success - clean up everything
+    rm -rf /tmp/docs-repo /tmp/docs_access_test.out /tmp/docs_clone_error.log /tmp/copy_error_*.log 2>/dev/null || true
+    echo "✓ Temporary files cleaned (setup successful)"
+else
+    # Partial or complete failure - keep debugging info
+    echo "⚠️  Preserving temporary files for debugging"
+    echo ""
+    echo "Debug Information Available:"
+    [ -d "/tmp/docs-repo" ] && echo "   ✓ /tmp/docs-repo (cloned repository)"
+    [ -f "/tmp/docs_access_test.out" ] && echo "   ✓ /tmp/docs_access_test.out (access test output)"
+    [ -f "/tmp/docs_clone_error.log" ] && echo "   ✓ /tmp/docs_clone_error.log (clone errors)"
+    ls /tmp/copy_error_*.log 2>/dev/null | while read -r log; do
+        echo "   ✓ $log"
+    done || true
+    
+    # Provide specific troubleshooting guidance
+    echo ""
+    echo "Troubleshooting Steps:"
+    if [ "$DOCS_AUTH_VERIFIED" != "true" ]; then
+        echo "   1. Verify GITHUB_TOKEN is valid and has repository access"
+        echo "   2. Check repository URL: {{docsRepositoryUrl}}"
+    fi
+    if [ "$DOCS_CLONE_SUCCESS" != "true" ] && [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
+        echo "   1. Review clone error log: /tmp/docs_clone_error.log"
+        echo "   2. Verify repository exists and is accessible"
+    fi
+    if [ "$DOCS_PATH_VALID" != "true" ] && [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
+        echo "   1. Check docs_project_directory configuration: '{{docs_project_directory}}'"
+        echo "   2. Verify .taskmaster directory exists in configured path"
+        echo "   3. List repository structure: ls -la /tmp/docs-repo"
+    fi
+fi
+
+{{else}}
+# No docs repository configured - check for local task files
+echo "ℹ️  No docs repository configured"
+echo "Checking for local task files in repository..."
+
+if [ -d "$CLAUDE_WORK_DIR/task" ]; then
+    FILE_COUNT=$(ls -A "$CLAUDE_WORK_DIR/task" 2>/dev/null | wc -l)
+    if [ "$FILE_COUNT" -gt 0 ]; then
+        echo "✓ Found task directory with $FILE_COUNT file(s)"
+        echo ""
+        echo "📁 Available files:"
+        ls -lh "$CLAUDE_WORK_DIR/task/" 2>/dev/null | tail -n +2 | while read -r line; do
+            filename=$(echo "$line" | awk '{print $9}')
+            size=$(echo "$line" | awk '{print $5}')
+            printf "   ✓ %s (%s)\n" "$filename" "$size"
+        done
+    else
+        echo "⚠️  Task directory exists but is empty"
+        echo "   Agent will proceed with limited context"
+    fi
+else
+    echo "⚠️  No task documentation available"
+    echo "   - No docs repository configured (docsRepositoryUrl not set)"
+    echo "   - No local task/ directory found in repository"
+    echo "   Agent will proceed with minimal context"
+fi
+echo "════════════════════════════════════════════════════════════════"
+{{/if}}
 
 # Ensure we're in the git repository working directory
 echo "✓ Working directly in git repository at: $CLAUDE_WORK_DIR"

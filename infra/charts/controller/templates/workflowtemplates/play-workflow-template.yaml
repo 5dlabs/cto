@@ -139,6 +139,15 @@ spec:
       - name: opencode-verbose
         description: "Enable verbose output for OpenCode agents (1 = markdown format, 0 = json)"
         value: "0"
+      - name: implementation-max-retries
+        description: "Maximum retry attempts for implementation agent executions (0 = unlimited)"
+        value: "10"
+      - name: quality-max-retries
+        description: "Maximum retry attempts for quality agent executions (0 = unlimited)"
+        value: "10"
+      - name: testing-max-retries
+        description: "Maximum retry attempts for testing agent executions (0 = unlimited)"
+        value: "10"
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
@@ -224,6 +233,7 @@ spec:
           - name: stage
           - name: cli-type
           - name: model
+          - name: max-retries
       outputs:
         parameters:
           - name: pr-url
@@ -249,6 +259,8 @@ spec:
                   value: "{{`{{inputs.parameters.model}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.implementation-tools}}`}}"
+                - name: max-retries
+                  value: "{{`{{inputs.parameters.max-retries}}`}}"
         - - name: wait-for-pr
             template: check-or-wait-for-pr
             arguments:
@@ -294,6 +306,8 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-cli}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.implementation-model}}`}}"
+                - name: max-retries
+                  value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
@@ -325,6 +339,8 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: max-retries
+                  value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
         - - name: update-to-waiting-quality-complete
             template: update-workflow-stage
             arguments:
@@ -361,6 +377,8 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: max-retries
+                  value: "{{`{{workflow.parameters.testing-max-retries}}`}}"
         - - name: update-to-waiting-qa
             template: update-workflow-stage
             arguments:
@@ -702,6 +720,8 @@ spec:
             default: ""
           - name: qa-ready
             default: "false"
+          - name: max-retries
+            default: ""
       outputs:
         parameters:
           - name: coderun-name
@@ -730,6 +750,8 @@ spec:
                   value: "{{`{{inputs.parameters.pr-number}}`}}"
                 - name: qa-ready
                   value: "{{`{{inputs.parameters.qa-ready}}`}}"
+                - name: max-retries
+                  value: "{{`{{inputs.parameters.max-retries}}`}}"
         - - name: resolve-coderun-name
             template: resolve-coderun-name
             arguments:
@@ -821,11 +843,15 @@ spec:
               SERVICE_NAME: "{{`{{workflow.parameters.service}}`}}"
               RUN_NAME: "{{`{{workflow.name}}`}}"
               TASK_ID: "{{`{{inputs.parameters.task-id}}`}}"
-              OPENCODE_MAX_RETRIES: "{{`{{workflow.parameters.opencode-max-retries}}`}}"
+              EXECUTION_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
+              FACTORY_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
+              CODEX_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
+              CURSOR_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
+              CLAUDE_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
+              OPENCODE_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               OPENCODE_VERBOSE: "{{`{{workflow.parameters.opencode-verbose}}`}}"
 
     # Helper to reliably resolve the created CodeRun name before waiting for completion
-    - name: resolve-coderun-name
       inputs:
         parameters:
           - name: stage

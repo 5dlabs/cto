@@ -27,10 +27,6 @@ spec:
           - path: body.action
             type: string
             value: ["opened"]
-          # Filter for cto repository only
-          - path: body.repository.name
-            type: string
-            value: ["cto"]
   triggers:
     - template:
         name: resume-after-pr-created
@@ -483,8 +479,8 @@ spec:
                         fi
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "❌ Unable to determine task ID from PR payload"
-                          exit 1
+                          echo "ℹ️ No task ID found in PR payload (not a play workflow PR)"
+                          exit 0
                         fi
 
                         echo "Task ID: $TASK_ID"

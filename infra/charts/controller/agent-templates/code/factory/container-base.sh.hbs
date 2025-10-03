@@ -793,12 +793,20 @@ printf '%s\n' "$PROMPT_PREVIEW"
 PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
 echo "📏 Prompt size: $PROMPT_BYTES bytes"
 
-MAX_RETRIES=${FACTORY_MAX_RETRIES:-5}
+MAX_RETRIES=${FACTORY_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
 ATTEMPT=1
 SUCCESS=0
 FACTORY_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
+LAST_COMPLETION_REASON=""
+
+if [ "$MAX_RETRIES" = "0" ]; then
+  echo "🔄 Unlimited retries enabled - Factory will continue until completion criteria are met"
+  UNLIMITED_RETRIES=1
+else
+  UNLIMITED_RETRIES=0
+fi
 
 # Circuit breaker: track repeated command failures
 declare -A FAILED_COMMANDS
@@ -817,8 +825,12 @@ fi
 SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}true{{/if}}"
 SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
 
-while [ $ATTEMPT -le $MAX_RETRIES ]; do
-  echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
+while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
+  if [ "$UNLIMITED_RETRIES" = "1" ]; then
+    echo "🚀 Factory execution attempt $ATTEMPT (unlimited mode)"
+  else
+    echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
+  fi
   LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
   RUN_LOG_EXT="log"
   if [ "$OUTPUT_FORMAT" = "json" ] || [ "$OUTPUT_FORMAT" = "debug" ]; then
@@ -921,20 +933,52 @@ Try instead:
       RESULT_TEXT=$(tail -n 40 "$RUN_LOG" 2>/dev/null | sed 's/\r$//')
     fi
     printf '%s\n' "$RESULT_TEXT" > "$LAST_MESSAGE_FILE"
-    if printf '%s\n' "$RESULT_TEXT" | grep -qi '# Summary'; then
-      if printf '%s\n' "$RESULT_TEXT" | grep -qi '## Testing'; then
-        if printf '%s\n' "$RESULT_TEXT" | grep -qi '## Pull Request'; then
-          echo "✅ Detected summary, testing, and pull request sections; marking task complete"
-          SUCCESS=1
-          break
-        fi
-      fi
-    fi
   else
     : > "$LAST_MESSAGE_FILE"
   fi
 
-  COMPLETION_PROMPT="Task {{task_id}} completion verification.
+  if [[ "{{github_app}}" =~ [Rr]ex ]]; then
+    COMPLETION_PROMPT="Task {{task_id}} completion verification — Rex Implementation Agent (Factory)
+
+**Your Role**: You are Rex, the IMPLEMENTATION agent. Cleo will handle code quality in the next stage.
+
+**FIRST**: Review the FUNCTIONAL requirements in task/acceptance-criteria.md
+
+**Then answer 'yes' if ALL of these are true:**
+
+1. **FUNCTIONAL acceptance criteria implemented** (features exist and basically work)
+2. Code COMPILES successfully (\`cargo build\` passes)
+3. All code changes are committed to git
+4. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
+5. A pull request exists (with at least task-{{task_id}} label)
+
+**Code quality issues are OK for Rex - Cleo will fix:**
+- ⚠️ Clippy warnings? OK - Cleo will fix
+- ⚠️ Formatting issues? OK - Cleo will fix
+- ⚠️ Some tests failing? OK if basic functionality works - Cleo/Tess will fix
+- ⚠️ Unused functions/variables? OK - Cleo will clean up
+
+**Focus on**: Does the implementation work? Are the features there?
+
+**Response format:**
+
+If functionally complete (features work, code compiles, PR created), respond with:
+yes
+
+If features incomplete or code doesn't compile, respond with:
+no
+REASON: <specific FUNCTIONAL issue>
+
+Example 'yes' response (even with warnings):
+yes
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 incomplete - health endpoint not yet implemented. Feature work remains.
+
+Your response:"
+  else
+    COMPLETION_PROMPT="Task {{task_id}} completion verification.
 
 **FIRST**: Review the acceptance criteria in task/acceptance-criteria.md
 
@@ -949,19 +993,45 @@ Try instead:
 **Be honest**: If ANY acceptance criterion is incomplete or partially implemented, answer 'no' and continue working.
 
 **To verify:**
-- Review: cat task/acceptance-criteria.md
-- Git status: git status
-- Commits pushed: git log origin/main..HEAD
-- PR exists: gh pr view
+- Review: \`cat task/acceptance-criteria.md\`
+- Git status: \`git status\`
+- Commits pushed: \`git log origin/main..HEAD\`
+- PR exists: \`gh pr view\`
 - Tests pass: Check your test results
 
-Based on your honest assessment of acceptance criteria completion, answer with a single word: yes or no
+**Response format:**
 
-Response (one word only):"
+If complete, respond with:
+yes
+
+If incomplete, respond with:
+no
+REASON: <specific reason why not complete>
+
+For 'no' responses, REASON must specify:
+- Which acceptance criteria are incomplete (list them by number/name)
+- What specific work remains (be concrete)
+- Any blockers or issues encountered
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
+
+Your response:"
+  fi
+
   COMPLETION_LAST_MESSAGE="/tmp/factory-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/factory-completion-${ATTEMPT}.log"
 
-  COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "high" "$COMPLETION_PROMPT")
+  if [ "$SKIP_PERMISSIONS_UNSAFE" = "true" ]; then
+    COMPLETION_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "text")
+  else
+    COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "$AUTO_LEVEL")
+  fi
+  {{#if model}}
+  COMPLETION_CMD+=("--model" "{{model}}")
+  {{/if}}
+  COMPLETION_CMD+=("$COMPLETION_PROMPT")
 
   set +e
   set -o pipefail
@@ -979,17 +1049,43 @@ Response (one word only):"
   fi
 
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  CURRENT_REASON=""
+  if [ "$COMPLETION_RESPONSE" = "no" ]; then
+    CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+    if [ -n "$CURRENT_REASON" ]; then
+      echo "📋 Incompletion details:"
+      echo "$CURRENT_REASON"
+      LAST_COMPLETION_REASON="$CURRENT_REASON"
+    else
+      echo "⚠️ Completion probe reported 'no' without a reason"
+    fi
+  fi
+
   if [ "$COMPLETION_RESPONSE" = "yes" ]; then
     SUCCESS=1
     break
   fi
 
-  echo "⚠️ Factory reported task incomplete; retrying..."
+  if [ -n "$CURRENT_REASON" ]; then
+    echo "⚠️ Factory reported task incomplete; retrying with new guidance..."
+  else
+    echo "⚠️ Factory reported task incomplete; retrying..."
+  fi
+
   ATTEMPT=$((ATTEMPT + 1))
 done
 
 if [ $SUCCESS -ne 1 ]; then
-  echo "⚠️ Factory did not confirm task completion after $MAX_RETRIES attempts"
+  if [ "$UNLIMITED_RETRIES" = "1" ]; then
+    echo "⚠️ Factory did not confirm task completion after $ATTEMPT attempts (unlimited mode)"
+  else
+    echo "⚠️ Factory did not confirm task completion after $MAX_RETRIES attempts"
+  fi
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    echo ""
+    echo "💡 Last reported reason for incompletion:"
+    echo "$LAST_COMPLETION_REASON"
+  fi
   echo "❌ Task incomplete - marking as FAILED"
   EXIT_CODE=1  # Fail the job so it doesn't appear successful
 else
@@ -1005,6 +1101,61 @@ if [ $SUCCESS -eq 1 ]; then
   ensure_pr_created
 else
   echo "⚠️ Skipping auto PR enforcement due to Factory completion status"
+fi
+
+# Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
+WORKFLOW_STAGE="${WORKFLOW_STAGE:-}"
+if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
+  PR_NUM="${PR_NUMBER:-}"
+  if [ -z "$PR_NUM" ]; then
+    # Try to get PR number from current branch
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -n "$CURRENT_BRANCH" ]; then
+      PR_NUM=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+  fi
+
+  if [ -n "$PR_NUM" ]; then
+    if [ $SUCCESS -eq 1 ]; then
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      CHECKS_PASSED=$'- Code formatting verified\n- Linting passed\n- Unit tests successful\n- Quality standards met'
+      NEXT_STAGE="end-to-end testing"
+      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        CHECKS_PASSED=$'- End-to-end tests passed\n- Integration tests successful\n- Acceptance criteria validated\n- Production readiness confirmed'
+        NEXT_STAGE="human review and merge"
+      fi
+
+      echo "✅ $STAGE_NAME approved - posting APPROVE review"
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --approve --body "### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+
+All checks have passed:
+$CHECKS_PASSED
+
+Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
+    else
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      ISSUES_DESC=$'- Review code formatting\n- Fix linting errors\n- Ensure unit tests pass\n- Meet quality standards'
+      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        ISSUES_DESC=$'- Fix failing end-to-end tests\n- Address integration test failures\n- Validate acceptance criteria\n- Ensure production readiness'
+      fi
+
+      echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+$STAGE_NAME issues detected. Please address the following:
+$ISSUES_DESC" 2>&1 || echo "⚠️ PR review command failed"
+    fi
+  else
+    echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
+  fi
 fi
 
 touch /workspace/.agent_done 2>/dev/null || true

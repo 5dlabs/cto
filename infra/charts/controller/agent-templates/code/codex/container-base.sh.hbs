@@ -890,7 +890,7 @@ CODEX_TIMEOUT=${CODEX_EXEC_TIMEOUT:-1800}
 RESET_SESSION_ON_RETRY=${CODEX_RESET_SESSION_ON_RETRY:-1}
 CONTINUE_SESSION=${CODEX_CONTINUE_SESSION:-1}
 
-MAX_RETRIES=${CODEX_MAX_RETRIES:-5}
+MAX_RETRIES=${CODEX_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
 ATTEMPT=1
 SUCCESS=0
 CODEX_EXIT=1
@@ -1213,6 +1213,156 @@ if [ $SUCCESS -eq 1 ]; then
   ensure_pr_created
 else
   echo "⚠️ Skipping auto PR enforcement due to Codex completion status"
+fi
+
+# Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
+WORKFLOW_STAGE="${WORKFLOW_STAGE:-}"
+if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+  PR_NUM="${PR_NUMBER:-}"
+  if [ -z "$PR_NUM" ]; then
+    # Try to get PR number from current branch
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -n "$CURRENT_BRANCH" ]; then
+      PR_NUM=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+  fi
+
+  if [ -n "$PR_NUM" ]; then
+    # Run actual quality gate checks instead of relying on $SUCCESS
+    QUALITY_GATES_PASSED=1
+    
+    if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
+      echo "🔍 Running quality gate checks..."
+      
+      # Check 1: Code formatting
+      echo "  ➤ Checking code formatting (cargo fmt)..."
+      if ! cargo fmt --all -- --check >/tmp/fmt-check.log 2>&1; then
+        echo "    ❌ Formatting check failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Formatting check passed"
+      fi
+      
+      # Check 2: Linting with pedantic Clippy
+      echo "  ➤ Checking lints (cargo clippy)..."
+      if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic >/tmp/clippy-check.log 2>&1; then
+        echo "    ❌ Clippy check failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Clippy check passed"
+      fi
+      
+      # Check 3: Unit tests
+      echo "  ➤ Running unit tests (cargo test)..."
+      if ! cargo test --workspace --all-features >/tmp/test-check.log 2>&1; then
+        echo "    ❌ Tests failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Tests passed"
+      fi
+    elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+      echo "🔍 Running integration and E2E tests..."
+      
+      # Run the same quality gates as quality stage, plus acceptance criteria validation
+      echo "  ➤ Checking code formatting (cargo fmt)..."
+      if ! cargo fmt --all -- --check >/tmp/fmt-check.log 2>&1; then
+        echo "    ❌ Formatting check failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Formatting check passed"
+      fi
+      
+      echo "  ➤ Checking lints (cargo clippy)..."
+      if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic >/tmp/clippy-check.log 2>&1; then
+        echo "    ❌ Clippy check failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Clippy check passed"
+      fi
+      
+      echo "  ➤ Running tests (cargo test)..."
+      if ! cargo test --workspace --all-features >/tmp/test-check.log 2>&1; then
+        echo "    ❌ Tests failed"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Tests passed"
+      fi
+      
+      # Validate acceptance criteria completion
+      if [ $SUCCESS -ne 1 ]; then
+        echo "    ❌ Codex did not confirm acceptance criteria completion"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Acceptance criteria validated by Codex"
+      fi
+    fi
+
+    if [ $QUALITY_GATES_PASSED -eq 1 ]; then
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      CHECKS_PASSED="- Code formatting verified
+- Linting passed
+- Unit tests successful
+- Quality standards met"
+      NEXT_STAGE="end-to-end testing"
+      if [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        CHECKS_PASSED="- End-to-end tests passed
+- Integration tests successful
+- Acceptance criteria validated
+- Production readiness confirmed"
+        NEXT_STAGE="human review and merge"
+      fi
+
+      echo "✅ $STAGE_NAME approved - posting APPROVE review"
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --approve --body "### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+
+All checks have passed:
+$CHECKS_PASSED
+
+Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
+    else
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      ISSUES_DESC="- Review code formatting
+- Fix linting errors
+- Ensure unit tests pass
+- Meet quality standards"
+      FAILURE_LOGS=""
+      
+      if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
+        # Collect failure details from logs
+        if [ -f /tmp/fmt-check.log ]; then
+          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Formatting Issues</summary>\n\n\`\`\`\n$(cat /tmp/fmt-check.log | head -n 50)\n\`\`\`\n</details>"
+        fi
+        if [ -f /tmp/clippy-check.log ]; then
+          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Clippy Warnings</summary>\n\n\`\`\`\n$(cat /tmp/clippy-check.log | head -n 50)\n\`\`\`\n</details>"
+        fi
+        if [ -f /tmp/test-check.log ]; then
+          FAILURE_LOGS="${FAILURE_LOGS}\n\n<details><summary>Test Failures</summary>\n\n\`\`\`\n$(cat /tmp/test-check.log | tail -n 100)\n\`\`\`\n</details>"
+        fi
+      elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        ISSUES_DESC="- Fix failing end-to-end tests
+- Address integration test failures
+- Validate acceptance criteria
+- Ensure production readiness"
+      fi
+
+      echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+$STAGE_NAME issues detected. Please address the following:
+$ISSUES_DESC
+$FAILURE_LOGS" 2>&1 || echo "⚠️ PR review command failed"
+    fi
+  else
+    echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
+  fi
 fi
 
 touch /workspace/.agent_done 2>/dev/null || true

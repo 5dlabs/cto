@@ -5,9 +5,9 @@ on:
     branches: [main]
     paths:
       - 'infra/charts/controller/agent-templates/**'
-      - 'infra/charts/controller/templates/agent-templates-static.yaml'
+      - 'infra/charts/controller/templates/agent-templates-*.yaml'
       - 'scripts/generate-templates-configmap.sh'
-      - 'infra/charts/controller/scripts/generate-agent-templates-configmap.sh'
+      - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'
       - 'scripts/apply-agent-templates-configmap.sh'
 
 jobs:
@@ -26,8 +26,8 @@ jobs:
         with:
           version: v3.15.0
 
-      - name: Regenerate agent templates ConfigMap
-        run: ./scripts/generate-templates-configmap.sh
+      - name: Regenerate agent templates ConfigMaps
+        run: cd infra/charts/controller && ./scripts/generate-agent-templates-configmaps-split.sh
 
       - name: Render and apply ConfigMap to cluster
         run: ./scripts/apply-agent-templates-configmap.sh

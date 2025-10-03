@@ -1596,13 +1596,28 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   echo "📍 Repository: $REPO_SLUG"
 
   # Retry loop for PR detection (sometimes GitHub API takes a moment)
-  MAX_RETRIES=5
+  MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
+  if [ "$MAX_RETRIES" = "0" ]; then
+    echo "🔄 PR detection running in unlimited mode"
+    UNLIMITED_PR_CHECK=1
+  else
+    UNLIMITED_PR_CHECK=0
+  fi
+
   RETRY_COUNT=0
   PR_NUMBER=""
 
-  while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -z "$PR_NUMBER" ]; do
+  while true; do
+    if [ "$UNLIMITED_PR_CHECK" != "1" ] && [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+      break
+    fi
+
     if [ $RETRY_COUNT -gt 0 ]; then
-      echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES: Waiting for PR to appear in GitHub API..."
+      if [ "$UNLIMITED_PR_CHECK" = "1" ]; then
+        echo "⏳ Retry $RETRY_COUNT (unlimited mode): Waiting for PR to appear in GitHub API..."
+      else
+        echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES: Waiting for PR to appear in GitHub API..."
+      fi
       sleep 3
     fi
 
@@ -1617,6 +1632,10 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
         echo "🔍 Checking for PR on branch: $CURRENT_BRANCH"
         PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
       fi
+    fi
+
+    if [ -n "$PR_NUMBER" ]; then
+      break
     fi
 
     RETRY_COUNT=$((RETRY_COUNT + 1))
