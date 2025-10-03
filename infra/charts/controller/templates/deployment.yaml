@@ -15,13 +15,8 @@ spec:
   template:
     metadata:
       annotations:
-        # Force pod restart when agent-templates ConfigMaps change
-        agent-templates-shared/checksum: {{ include (print $.Template.BasePath "/agent-templates-shared.yaml") . | sha256sum }}
-        agent-templates-claude/checksum: {{ include (print $.Template.BasePath "/agent-templates-claude.yaml") . | sha256sum }}
-        agent-templates-codex/checksum: {{ include (print $.Template.BasePath "/agent-templates-codex.yaml") . | sha256sum }}
-        agent-templates-cursor/checksum: {{ include (print $.Template.BasePath "/agent-templates-cursor.yaml") . | sha256sum }}
-        agent-templates-factory/checksum: {{ include (print $.Template.BasePath "/agent-templates-factory.yaml") . | sha256sum }}
-        agent-templates-opencode/checksum: {{ include (print $.Template.BasePath "/agent-templates-opencode.yaml") . | sha256sum }}
+        # Force pod restart when agent-templates ConfigMap changes
+        agent-templates/checksum: {{ include (print $.Template.BasePath "/agent-templates-static.yaml") . | sha256sum }}
         # Force pod restart when controller config changes
         controller-config/checksum: {{ include (print $.Template.BasePath "/task-controller-config.yaml") . | sha256sum }}
         # Force pod restart when main config changes
@@ -105,8 +100,10 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        # Mount agent templates (projected from multiple ConfigMaps)
-{{ include "platform.agentTemplateProjectedVolume" . | nindent 8 }}
+        # Mount agent templates ConfigMap
+        - name: agent-templates
+          configMap:
+            name: {{ include "controller.fullname" . }}-agent-templates
         # Mount controller configuration ConfigMap
         - name: controller-config
           configMap:
