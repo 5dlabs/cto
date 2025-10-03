@@ -1527,20 +1527,21 @@ echo "════════════════════════�
 
 # Sentinel and completion marker cleanup already done at script start
 
-# Seed initial user turn via a FIFO with timeout protection
-FIFO_PATH="/workspace/agent-input.jsonl"
-rm -f "$FIFO_PATH" 2>/dev/null || true
+# Clean up initial guidance for JSON construction
+echo "🧹 Cleaning INITIAL_GUIDANCE (removing empty lines and trailing spaces)..."
+INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
+echo "✅ Cleaned INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE_CLEAN} characters"
 
-# Create FIFO with error handling
-if ! mkfifo "$FIFO_PATH" 2>/dev/null; then
-    echo "❌ Failed to create FIFO at $FIFO_PATH"
-    exit 1
-fi
-chmod 666 "$FIFO_PATH" || true
+# Construct JSON for direct stdin piping (no sidecar, no FIFO)
+echo "🔧 Constructing initial QA guidance JSON..."
+INITIAL_GUIDANCE_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
+            "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
+echo "📤 Initial guidance length: ${#INITIAL_GUIDANCE_JSON} characters"
 
-# Start Claude (simple approach like Cleo)
-$CLAUDE_CMD < "$FIFO_PATH" &
+# Start Claude with prompt piped directly to stdin
+printf '%s\n' "$INITIAL_GUIDANCE_JSON" | $CLAUDE_CMD &
 CLAUDE_PID=$!
+echo "✓ Started Claude with Tess QA guidance (PID: $CLAUDE_PID)"
 
 # Start background token refresh for long-running jobs
 (
@@ -1561,90 +1562,8 @@ CLAUDE_PID=$!
 TOKEN_REFRESH_PID=$!
 echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
 
-# Add timeout protection - if Claude doesn't start within 30 seconds, fail gracefully
-TIMEOUT=30
-COUNT=0
-while [ $COUNT -lt $TIMEOUT ]; do
-    if kill -0 "$CLAUDE_PID" 2>/dev/null; then
-        break
-    fi
-    sleep 1
-    COUNT=$((COUNT + 1))
-done
-
-if [ $COUNT -ge $TIMEOUT ]; then
-    echo "❌ Claude process failed to start within $TIMEOUT seconds"
-    kill "$CLAUDE_PID" 2>/dev/null || true
-    exit 1
-fi
-
 # =============================================================================
-# DEBUG LOGGING: JSON CONSTRUCTION PROCESS
-# =============================================================================
-echo "🔍 DEBUG: Starting JSON construction process..."
-echo "📝 Original INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE} characters"
-echo "📝 Original INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE:0:100}..."
-
-# Clean up initial guidance and send via sidecar - simplified approach
-echo "🧹 Cleaning INITIAL_GUIDANCE (removing empty lines and trailing spaces)..."
-INITIAL_GUIDANCE_CLEAN=$(printf "%s" "$INITIAL_GUIDANCE" | sed '/^[[:space:]]*$/d' | sed 's/[[:space:]]*$//')
-echo "✅ Cleaned INITIAL_GUIDANCE length: ${#INITIAL_GUIDANCE_CLEAN} characters"
-echo "✅ Cleaned INITIAL_GUIDANCE preview: ${INITIAL_GUIDANCE_CLEAN:0:100}..."
-
-# Wait for MCP sidecar to be ready (local Pod network)
-echo "⏳ Waiting for MCP server to be ready..."
-MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
-if [ "$MAX_RETRIES" = "0" ]; then
-    echo "🔄 MCP readiness check running in unlimited mode"
-fi
-
-RETRY_COUNT=0
-while true; do
-    if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
-        echo "✓ MCP server is ready"
-        break
-    fi
-
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-
-    if [ "$MAX_RETRIES" != "0" ] && [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-        echo "⚠️ MCP server not ready after ${MAX_RETRIES}s, proceeding with fallback"
-        break
-    fi
-
-    sleep 1
-done
-
-# =============================================================================
-# DEBUG LOGGING: SIDECAR JSON CONSTRUCTION
-# =============================================================================
-echo "🔧 Constructing JSON for sidecar transmission..."
-
-# Create the JSON payload for sidecar
-SIDECAR_JSON=$(printf '{"text":%s}' "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
-echo "📤 Sidecar JSON payload length: ${#SIDECAR_JSON} characters"
-echo "📤 Sidecar JSON payload preview: ${SIDECAR_JSON:0:200}..."
-echo "🔍 Full sidecar JSON structure:"
-echo "$SIDECAR_JSON" | jq . 2>/dev/null || echo "❌ Sidecar JSON parsing failed: $SIDECAR_JSON"
-
-# Send directly via FIFO (sidecar phased out)
-echo "🔧 Constructing FIFO JSON payload..."
-FIFO_JSON=$(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}' \
-            "$(jq -Rs . <<< "$INITIAL_GUIDANCE_CLEAN")")
-echo "📤 FIFO JSON payload length: ${#FIFO_JSON} characters"
-echo "📤 FIFO JSON payload preview: ${FIFO_JSON:0:200}..."
-echo "🔍 Full FIFO JSON structure:"
-echo "$FIFO_JSON" | jq . 2>/dev/null || echo "❌ FIFO JSON parsing failed: $FIFO_JSON"
-
-exec 9>"$FIFO_PATH"
-printf '%s\n' "$FIFO_JSON" >&9
-exec 9>&-  # Close immediately to send EOF to Claude
-echo "✅ Initial QA guidance sent via FIFO"
-
-# Simple wait like Cleo - no complex monitoring
-
-# =============================================================================
-# DEBUG LOGGING: CLAUDE EXECUTION MONITORING
+# CLAUDE EXECUTION MONITORING
 # =============================================================================
 echo "🤖 Monitoring Claude execution..."
 echo "🔍 Claude PID: $CLAUDE_PID"

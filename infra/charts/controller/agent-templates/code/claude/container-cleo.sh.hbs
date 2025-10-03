@@ -1468,15 +1468,13 @@ else
 fi
 echo "════════════════════════════════════════════════════════════════"
 
-# Send the static prompt to Claude
-FIFO_PATH="/workspace/agent-input.jsonl"
-rm -f "$FIFO_PATH" 2>/dev/null || true
-mkfifo "$FIFO_PATH"
-chmod 666 "$FIFO_PATH" || true
+# Compose initial user turn with the static prompt
+USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
 
-# Start Claude (reader) first in background
-$CLAUDE_CMD < "$FIFO_PATH" &
+# Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
+printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" | $CLAUDE_CMD &
 CLAUDE_PID=$!
+echo "✓ Started Claude with Cleo prompt (PID: $CLAUDE_PID)"
 
 # Start background token refresh for long-running jobs
 (
@@ -1496,15 +1494,6 @@ CLAUDE_PID=$!
 ) &
 TOKEN_REFRESH_PID=$!
 echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
-
-# Compose initial user turn with the static prompt
-USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
-
-# Send directly via FIFO (sidecar phased out)
-exec 9>"$FIFO_PATH"
-printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-exec 9>&- 2>/dev/null || true  # Close immediately
-echo "✓ Static Cleo prompt sent via FIFO"
 
 # Wait for Claude process to complete
 wait "$CLAUDE_PID"
