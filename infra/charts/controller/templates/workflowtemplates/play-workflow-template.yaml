@@ -297,12 +297,12 @@ spec:
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
-        - - name: update-to-waiting-quality
+        - - name: update-to-quality-in-progress
             template: update-workflow-stage
             arguments:
               parameters:
                 - name: new-stage
-                  value: "waiting-quality-complete"
+                  value: "quality-in-progress"
                 - name: verify-update
                   value: "true"
         - - name: quality-work
@@ -942,11 +942,17 @@ spec:
             # Define valid transitions (Rex → Cleo → Tess flow)
             case $current_stage in
               "pending")
-                # Allow direct transition to waiting-quality-complete (skipping waiting-pr-created)
+                # Primary path: pending → quality-in-progress
+                [[ $new_stage == "quality-in-progress" ]] && return 0
+                # Legacy paths for backward compatibility
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 [[ $new_stage == "waiting-pr-created" ]] && return 0
                 ;;
               "waiting-pr-created")
+                [[ $new_stage == "quality-in-progress" ]] && return 0
+                [[ $new_stage == "waiting-quality-complete" ]] && return 0
+                ;;
+              "quality-in-progress")
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 ;;
               "waiting-quality-complete")
