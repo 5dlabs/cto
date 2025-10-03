@@ -1283,14 +1283,17 @@ Before starting implementation, you MUST read and follow the task-specific tool 
 
 
         # Optional hang diagnostics without enforcing a timeout
+        # NOTE: FIFO diagnostics below are OBSOLETE after sidecar removal (no more agent-input.jsonl FIFO)
+        # This code is retained but will never find FIFO holders since we now pipe directly to stdin
         if [ -n "${HANG_DIAG_SECONDS:-}" ] && [ "$HANG_DIAG_SECONDS" -gt 0 ] 2>/dev/null; then
           (
             sleep "$HANG_DIAG_SECONDS"
             if kill -0 "$CLAUDE_PID" 2>/dev/null; then
-              echo "[DEBUG] Hang diag after ${HANG_DIAG_SECONDS}s: dumping FIFO holders and ps"
+              echo "[DEBUG] Hang diag after ${HANG_DIAG_SECONDS}s: dumping process info"
+              echo "[DEBUG] NOTE: FIFO holder diagnostics are obsolete (no FIFO used after sidecar removal)"
               for p in /proc/[0-9]*; do
                 pid=${p##*/}; [ -d "$p/fd" ] || continue
-                for fd in "$p"/fd/*; do tgt=$(readlink "$fd" 2>/dev/null || true); case "$tgt" in *agent-input.jsonl*) fdnum=${fd##*/}; comm=$(cat "$p/comm" 2>/dev/null || echo "?"); echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt";; esac; done
+                for fd in "$p"/fd/*; do tgt=$(readlink "$fd" 2>/dev/null || true); case "$tgt" in *agent-input.jsonl*) fdnum=${fd##*/}; comm=$(cat "$p/comm" 2>/dev/null || echo "?"); echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt (UNEXPECTED - FIFO should not exist)";; esac; done
               done
               ps -eo pid,ppid,comm,args | head -200 || true
             fi
