@@ -26,10 +26,6 @@ spec:
           - path: body.action
             type: string
             value: ["opened"]
-          # Filter for cto repository only
-          - path: body.repository.name
-            type: string
-            value: ["cto"]
 
     # Cleo Approved PR - Resume workflows waiting for quality review complete
     - name: cleo-approved-event
@@ -49,10 +45,6 @@ spec:
           - path: body.review.user.login
             type: string
             value: ["5dlabs-cleo[bot]"]
-          # Filter for cto repository only
-          - path: body.repository.name
-            type: string
-            value: ["cto"]
 
     # Tess Approved PR - Resume workflows waiting for testing complete
     - name: tess-approved-event
@@ -72,10 +64,6 @@ spec:
           - path: body.review.user.login
             type: string
             value: ["5dlabs-tess[bot]"]
-          # Filter for cto repository only
-          - path: body.repository.name
-            type: string
-            value: ["cto"]
 
     # PR Merged - Resume workflows waiting for this
     - name: pr-merged-event
@@ -92,10 +80,6 @@ spec:
           - path: body.pull_request.merged
             type: string
             value: ["true"]
-          # Filter for cto repository only
-          - path: body.repository.name
-            type: string
-            value: ["cto"]
 
   triggers:
     # Resume workflows at waiting-pr-created stage
@@ -205,8 +189,8 @@ spec:
                         fi
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "ERROR: Unable to determine task ID from PR data"
-                          exit 1
+                          echo "ℹ️ No task ID found in PR data (not a play workflow PR)"
+                          exit 0
                         fi
 
                         echo "Task ID: $TASK_ID"
@@ -217,8 +201,8 @@ spec:
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ERROR: No workflow found for task-id=$TASK_ID"
-                          exit 1
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          exit 0
                         fi
 
                         echo "Found workflow: $WORKFLOW_NAME"
@@ -294,8 +278,8 @@ spec:
                           | head -1)
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "ERROR: No task-* label found on PR"
-                          exit 1
+                          echo "ℹ️ No task-* label found on PR (not a play workflow PR)"
+                          exit 0
                         fi
 
                         echo "Task ID: $TASK_ID"
@@ -306,8 +290,8 @@ spec:
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ERROR: No workflow found for task-id=$TASK_ID"
-                          exit 1
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          exit 0
                         fi
 
                         echo "Found workflow: $WORKFLOW_NAME"
@@ -390,8 +374,8 @@ spec:
                           | head -1)
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "ERROR: No task-* label found on PR"
-                          exit 1
+                          echo "ℹ️ No task-* label found on PR (not a play workflow PR)"
+                          exit 0
                         fi
 
                         echo "Task ID: $TASK_ID"
@@ -402,8 +386,8 @@ spec:
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ERROR: No workflow found for task-id=$TASK_ID"
-                          exit 1
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          exit 0
                         fi
 
                         echo "Found workflow: $WORKFLOW_NAME"
@@ -486,8 +470,8 @@ spec:
                           | head -1)
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "ERROR: No task-* label found on PR"
-                          exit 1
+                          echo "ℹ️ No task-* label found on PR (not a play workflow PR)"
+                          exit 0
                         fi
 
                         echo "Task ID: $TASK_ID"
@@ -498,8 +482,8 @@ spec:
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ERROR: No workflow found for task-id=$TASK_ID"
-                          exit 1
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          exit 0
                         fi
 
                         echo "Found workflow: $WORKFLOW_NAME"
