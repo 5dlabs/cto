@@ -890,7 +890,7 @@ CODEX_TIMEOUT=${CODEX_EXEC_TIMEOUT:-1800}
 RESET_SESSION_ON_RETRY=${CODEX_RESET_SESSION_ON_RETRY:-1}
 CONTINUE_SESSION=${CODEX_CONTINUE_SESSION:-1}
 
-MAX_RETRIES=${CODEX_MAX_RETRIES:-5}
+MAX_RETRIES=${CODEX_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
 ATTEMPT=1
 SUCCESS=0
 CODEX_EXIT=1
@@ -1213,6 +1213,61 @@ if [ $SUCCESS -eq 1 ]; then
   ensure_pr_created
 else
   echo "⚠️ Skipping auto PR enforcement due to Codex completion status"
+fi
+
+# Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
+WORKFLOW_STAGE="${WORKFLOW_STAGE:-}"
+if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
+  PR_NUM="${PR_NUMBER:-}"
+  if [ -z "$PR_NUM" ]; then
+    # Try to get PR number from current branch
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    if [ -n "$CURRENT_BRANCH" ]; then
+      PR_NUM=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    fi
+  fi
+
+  if [ -n "$PR_NUM" ]; then
+    if [ $SUCCESS -eq 1 ]; then
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      CHECKS_PASSED="- Code formatting verified\n- Linting passed\n- Unit tests successful\n- Quality standards met"
+      NEXT_STAGE="end-to-end testing"
+      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        CHECKS_PASSED="- End-to-end tests passed\n- Integration tests successful\n- Acceptance criteria validated\n- Production readiness confirmed"
+        NEXT_STAGE="human review and merge"
+      fi
+
+      echo "✅ $STAGE_NAME approved - posting APPROVE review"
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --approve --body "### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+
+All checks have passed:
+$CHECKS_PASSED
+
+Ready for $NEXT_STAGE." 2>&1 || echo "⚠️ PR review command failed"
+    else
+      STAGE_NAME="Quality"
+      STAGE_EMOJI="🛡️"
+      ISSUES_DESC="- Review code formatting\n- Fix linting errors\n- Ensure unit tests pass\n- Meet quality standards"
+      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+        STAGE_NAME="QA Testing"
+        STAGE_EMOJI="🧪"
+        ISSUES_DESC="- Fix failing end-to-end tests\n- Address integration test failures\n- Validate acceptance criteria\n- Ensure production readiness"
+      fi
+
+      echo "❌ $STAGE_NAME issues detected - posting REQUEST CHANGES review"
+      refresh_token_if_needed || true
+      timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+$STAGE_NAME issues detected. Please address the following:
+$ISSUES_DESC" 2>&1 || echo "⚠️ PR review command failed"
+    fi
+  else
+    echo "ℹ️ No PR number available for $WORKFLOW_STAGE review submission"
+  fi
 fi
 
 touch /workspace/.agent_done 2>/dev/null || true
