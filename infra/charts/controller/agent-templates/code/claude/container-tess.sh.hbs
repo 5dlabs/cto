@@ -2036,7 +2036,7 @@ $PENDING_DETAILS
 **Note**: Will re-evaluate once all CI checks are complete." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 
     # Label manipulation removed - using GitHub PR reviews only
-    update_coderun_status "needs-tess" "pending" "$PR_URL"
+    # Note: No longer setting needs-tess status - GitHub PR review state is the source of truth
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
     echo "✅ All CI checks passing - posting APPROVE review"
     # Get details of successful checks

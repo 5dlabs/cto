@@ -1645,10 +1645,8 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       "$STATUS_LABEL_FAILED" \
       "$STATUS_LABEL_NEEDS_TESTS_LEGACY"
 
-    pr_add_labels "$REPO_SLUG" "$PR_NUMBER" "$PR_URL" "$STATUS_LABEL_NEEDS_CLEO"
-
-    echo "🔄 Recording remediation status (needs-cleo) for CodeRun"
-    update_coderun_status "$STATUS_LABEL_NEEDS_CLEO" "pending" "$PR_URL"
+    # Note: No longer adding needs-cleo label - stage transitions use GitHub PR reviews
+    # Correlation labels are added below (task-*, service-*, run-*)
 
     # Apply correlation labels with comprehensive debugging
     echo "🏷️ Adding correlation labels to PR #${PR_NUMBER}..."
