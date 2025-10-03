@@ -49,6 +49,10 @@ spec:
             type: string
             comparator: "!="
             value: [""]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
 
     # PR Review Remediation (NEW - Critical Fix)
     - name: pr-review-feedback
@@ -69,6 +73,10 @@ spec:
             type: string
             comparator: "regex"
             value: ["(?i)(🔴|required changes|fix required|changes requested|needs work)"]
+          # Filter for cto repository only
+          - path: body.repository.name
+            type: string
+            value: ["cto"]
 
     # Check Run Remediation (NEW - For Tess check runs)
     - name: check-run-feedback
