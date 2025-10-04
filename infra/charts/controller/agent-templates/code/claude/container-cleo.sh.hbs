@@ -1714,44 +1714,49 @@ fi
 if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
   echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
 else
-  echo "🔧 Attempting sidecar shutdown..."
-  shutdown_attempts=0
-  max_shutdown_attempts=3
+  # Check if sidecar is actually running before attempting shutdown
+  if ! pgrep -f "sidecar" > /dev/null 2>&1; then
+    echo "✅ Sidecar already stopped (no sidecar process found)"
+  else
+    echo "🔧 Attempting sidecar shutdown..."
+    shutdown_attempts=0
+    max_shutdown_attempts=3
 
-  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 5 2>/dev/null; then
-      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-      break
-    else
-      shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-        echo "Retrying in 2 seconds..."
-        sleep 2
+    while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
+      if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 5 2>/dev/null; then
+        echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
+        break
+      else
+        shutdown_attempts=$((shutdown_attempts + 1))
+        echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
+        if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
+          echo "Retrying in 2 seconds..."
+          sleep 2
+        fi
       fi
+    done
+
+    if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
+      echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
+      echo "🔧 Force terminating sidecar processes..."
+      pkill -f "sidecar" || echo "No sidecar processes found to kill"
     fi
-  done
 
-  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-    echo "🔧 Force terminating sidecar processes..."
-    pkill -f "sidecar" || echo "No sidecar processes found to kill"
-  fi
+    # Wait for sidecar to actually terminate
+    echo "⏳ Waiting for sidecar termination..."
+    timeout=10
+    while [ $timeout -gt 0 ]; do
+      if ! pgrep -f "sidecar" > /dev/null 2>&1; then
+        echo "✅ Sidecar terminated successfully"
+        break
+      fi
+      sleep 1
+      timeout=$((timeout - 1))
+    done
 
-# Wait for sidecar to actually terminate
-  echo "⏳ Waiting for sidecar termination..."
-  timeout=10
-  while [ $timeout -gt 0 ]; do
-    if ! pgrep -f "sidecar" > /dev/null 2>&1; then
-      echo "✅ Sidecar terminated successfully"
-      break
+    if [ $timeout -eq 0 ]; then
+      echo "⚠️ Sidecar still running after wait period"
     fi
-    sleep 1
-    timeout=$((timeout - 1))
-  done
-
-  if [ $timeout -eq 0 ]; then
-    echo "⚠️ Sidecar still running after wait period"
   fi
 fi
 
