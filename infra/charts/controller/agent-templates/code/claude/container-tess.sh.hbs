@@ -1857,7 +1857,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
 - [ ] Add branch protection rules
 
 **Note**: Cannot proceed with QA until CI is properly configured." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-else
+  else
   # Function to parse JSON without jq dependency
   parse_ci_json() {
     local json="$1"
