@@ -1241,6 +1241,21 @@ export SERVICE_NAME="{{service}}"
 export TASK_ID="{{task_id}}"
 export GITHUB_APP="{{github_app}}"
 
+# Initialize retry loop variables
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+ATTEMPT=1
+SUCCESS=0
+CLAUDE_EXIT_CODE=1
+
+echo "🔄 Cleo will retry up to $MAX_RETRIES times until quality standards are met"
+echo ""
+
+# Retry loop - Cleo will continue until quality checks pass or max retries reached
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "════════════════════════════════════════════════════════════════"
+  echo "🚀 Cleo Quality Review Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "════════════════════════════════════════════════════════════════"
+
 # Start Claude with Cleo-specific configuration
 cd "$CLAUDE_WORK_DIR"
 
@@ -1712,6 +1727,40 @@ fi
 
 # No sidecar shutdown needed - container will exit naturally when main process completes
 
+  # Check if quality review was successful
+  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "✅ Attempt $ATTEMPT: Quality checks passed"
+    SUCCESS=1
+    break
+  else
+    echo "⚠️ Attempt $ATTEMPT: Quality checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    
+    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
+      ATTEMPT=$((ATTEMPT + 1))
+      echo ""
+      # Brief pause before retry
+      sleep 2
+    else
+      echo "❌ Maximum retry attempts reached"
+      break
+    fi
+  fi
+done
+
+# Report final status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ CLEO QUALITY REVIEW SUCCESSFUL"
+  echo "   Completed after $ATTEMPT attempt(s)"
+else
+  echo "⚠️ CLEO QUALITY REVIEW INCOMPLETE"
+  echo "   Attempted $ATTEMPT time(s)"
+  echo "   Quality standards not yet met"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
 # Cleanup and exit
 echo "════════════════════════════════════════════════════════════════"
 echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
@@ -1735,7 +1784,12 @@ echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
 
-# Always exit successfully to keep workflow running
-echo "🔚 Force terminating container..."
-echo "📝 Note: Container always exits with code 0 to allow workflow continuation"
-exit 0
+# Exit with appropriate code based on success
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔚 Terminating container with success status..."
+  exit 0
+else
+  echo "🔚 Terminating container with failure status..."
+  echo "📝 Quality checks incomplete after $ATTEMPT attempt(s)"
+  exit 1
+fi

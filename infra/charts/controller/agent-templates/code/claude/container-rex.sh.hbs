@@ -1199,6 +1199,21 @@ COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
 # Ensure we pass the combined system prompt
 CLAUDE_CMD="$CLAUDE_CMD --system-prompt $COMBINED_SYS_PROMPT"
 
+# Initialize retry loop variables
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+ATTEMPT=1
+SUCCESS=0
+CLAUDE_EXIT_CODE=1
+
+echo "🔄 Rex will retry up to $MAX_RETRIES times until implementation is complete"
+echo ""
+
+# Retry loop - Rex will continue until PR is created with working code
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "════════════════════════════════════════════════════════════════"
+  echo "🚀 Rex Implementation Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "════════════════════════════════════════════════════════════════"
+
 echo "Starting Claude execution (text output via FIFO)..."
 echo "=========================="
 
@@ -1800,6 +1815,46 @@ fi
 # Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
 touch /workspace/.agent_done 2>/dev/null || true
 
+  # Check if implementation was successful
+  # Rex is successful if Claude exited cleanly (PR should be created)
+  if [ ${CLAUDE_PID:-0} -ne 0 ]; then
+    wait $CLAUDE_PID 2>/dev/null || true
+    CLAUDE_EXIT_CODE=$?
+  fi
+  
+  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "✅ Attempt $ATTEMPT: Implementation completed successfully"
+    SUCCESS=1
+    break
+  else
+    echo "⚠️ Attempt $ATTEMPT: Implementation incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    
+    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
+      ATTEMPT=$((ATTEMPT + 1))
+      echo ""
+      # Brief pause before retry
+      sleep 2
+    else
+      echo "❌ Maximum retry attempts reached"
+      break
+    fi
+  fi
+done
+
+# Report final status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ REX IMPLEMENTATION SUCCESSFUL"
+  echo "   Completed after $ATTEMPT attempt(s)"
+else
+  echo "⚠️ REX IMPLEMENTATION INCOMPLETE"
+  echo "   Attempted $ATTEMPT time(s)"
+  echo "   Implementation not completed"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
 # Final termination sequence
 echo '════════════════════════════════════════════════════════════════'
 echo '║                 REX CONTAINER TERMINATION                    ║'
@@ -1811,6 +1866,12 @@ ps aux | head -5
 # Write completion marker for workflow tracking
 echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
 
-# Force exit to terminate the pod
-echo "🔚 Force terminating container..."
-exit 0
+# Exit with appropriate code based on success
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔚 Terminating container with success status..."
+  exit 0
+else
+  echo "🔚 Terminating container with failure status..."
+  echo "📝 Implementation incomplete after $ATTEMPT attempt(s)"
+  exit 1
+fi
