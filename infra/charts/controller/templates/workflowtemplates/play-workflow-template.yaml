@@ -341,22 +341,8 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
-        - - name: update-to-waiting-quality-complete
-            template: update-workflow-stage
-            arguments:
-              parameters:
-                - name: new-stage
-                  value: "waiting-quality-complete"
-                - name: verify-update
-                  value: "true"
-        - - name: wait-for-quality-complete
-            template: suspend-for-event
-            arguments:
-              parameters:
-                - name: event-type
-                  value: "quality-complete"
-                - name: stage-name
-                  value: "waiting-quality-complete"
+        # No suspend needed after Cleo - proceed directly to Tess
+        # Cleo hands off via ready-for-qa label, Tess is final approver
         - - name: testing-work
             template: agent-coderun
             arguments:
