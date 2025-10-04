@@ -571,9 +571,11 @@ git config --local push.autoSetupRemote true
 export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
 echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
 
-CODEX_WORK_DIR="$REPO_ROOT"
-if [ "$WORK_DIR" != "$REPO_NAME" ]; then
-  CODEX_WORK_DIR="$CODEX_WORK_DIR/$WORK_DIR"
+# Set working directory: use repo root if working_directory is "." or empty
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  CODEX_WORK_DIR="$REPO_ROOT"
+else
+  CODEX_WORK_DIR="$REPO_ROOT/$WORK_DIR"
   mkdir -p "$CODEX_WORK_DIR"
 fi
 
