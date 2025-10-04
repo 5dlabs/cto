@@ -1241,6 +1241,21 @@ export SERVICE_NAME="{{service}}"
 export TASK_ID="{{task_id}}"
 export GITHUB_APP="{{github_app}}"
 
+# Initialize retry loop variables
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+ATTEMPT=1
+SUCCESS=0
+CLAUDE_EXIT_CODE=1
+
+echo "🔄 Cleo will retry up to $MAX_RETRIES times until quality standards are met"
+echo ""
+
+# Retry loop - Cleo will continue until quality checks pass or max retries reached
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "════════════════════════════════════════════════════════════════"
+  echo "🚀 Cleo Quality Review Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "════════════════════════════════════════════════════════════════"
+
 # Start Claude with Cleo-specific configuration
 cd "$CLAUDE_WORK_DIR"
 
@@ -1683,8 +1698,10 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    echo "✅ Cleo approved quality checks - posting APPROVE review"
-    timeout 30 gh pr review "$PR_NUMBER" --approve --body "### ✅ Code Quality Review - APPROVED
+    echo "✅ Cleo quality checks passed - handing off to Tess for E2E testing"
+    
+    # Post COMMENT (NOT APPROVE) - Tess has final approval authority
+    timeout 30 gh pr comment "$PR_NUMBER" --body "### ✅ Code Quality Review - PASSED
 
 All quality checks have passed:
 - Code formatting verified
@@ -1692,8 +1709,17 @@ All quality checks have passed:
 - Unit tests successful
 - Quality standards met
 
-Ready for end-to-end testing." || echo "⚠️ PR review command failed"
-    update_coderun_status "approved" "approved" "$PR_URL"
+**Status:** Ready for end-to-end testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Quality review by Cleo - 5DLabs Code Quality Agent*" || echo "⚠️ PR comment command failed"
+    
+    # Add ready-for-qa label to signal Tess
+    echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
+    timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-qa" || echo "⚠️ Failed to add ready-for-qa label"
+    
+    update_coderun_status "ready-for-qa" "quality-passed" "$PR_URL"
   else
     echo "❌ Quality issues detected - posting REQUEST CHANGES review"
     timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
@@ -1702,7 +1728,12 @@ Code quality issues detected. Please address the following:
 - Review code formatting
 - Fix linting errors
 - Ensure unit tests pass
-- Meet quality standards" || echo "⚠️ PR review command failed"
+- Meet quality standards
+
+Rex will address these issues and resubmit for review.
+
+---
+*Quality review by Cleo - 5DLabs Code Quality Agent*" || echo "⚠️ PR review command failed"
     update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   fi
 else
@@ -1710,50 +1741,41 @@ else
   update_coderun_status "$STATUS_LABEL_NEEDS_FIXES" "changes_requested" ""
 fi
 
-# Gracefully stop sidecar (with enhanced debugging and retries)
-if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
-  echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
-else
-  echo "🔧 Attempting sidecar shutdown..."
-  shutdown_attempts=0
-  max_shutdown_attempts=3
+# No sidecar shutdown needed - container will exit naturally when main process completes
 
-  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if curl -fsS -X POST http://127.0.0.1:8080/shutdown -m 5 2>/dev/null; then
-      echo "✓ Sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-      break
+  # Check if quality review was successful
+  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "✅ Attempt $ATTEMPT: Quality checks passed"
+    SUCCESS=1
+    break
+  else
+    echo "⚠️ Attempt $ATTEMPT: Quality checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    
+    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
+      ATTEMPT=$((ATTEMPT + 1))
+      echo ""
+      # Brief pause before retry
+      sleep 2
     else
-      shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ Sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-        echo "Retrying in 2 seconds..."
-        sleep 2
-      fi
-    fi
-  done
-
-  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown sidecar after $max_shutdown_attempts attempts"
-    echo "🔧 Force terminating sidecar processes..."
-    pkill -f "sidecar" || echo "No sidecar processes found to kill"
-  fi
-
-# Wait for sidecar to actually terminate
-  echo "⏳ Waiting for sidecar termination..."
-  timeout=10
-  while [ $timeout -gt 0 ]; do
-    if ! pgrep -f "sidecar" > /dev/null 2>&1; then
-      echo "✅ Sidecar terminated successfully"
+      echo "❌ Maximum retry attempts reached"
       break
     fi
-    sleep 1
-    timeout=$((timeout - 1))
-  done
-
-  if [ $timeout -eq 0 ]; then
-    echo "⚠️ Sidecar still running after wait period"
   fi
+done
+
+# Report final status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ CLEO QUALITY REVIEW SUCCESSFUL"
+  echo "   Completed after $ATTEMPT attempt(s)"
+else
+  echo "⚠️ CLEO QUALITY REVIEW INCOMPLETE"
+  echo "   Attempted $ATTEMPT time(s)"
+  echo "   Quality standards not yet met"
 fi
+echo "════════════════════════════════════════════════════════════════"
 
 # Cleanup and exit
 echo "════════════════════════════════════════════════════════════════"
@@ -1778,7 +1800,12 @@ echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
 
-# Always exit successfully to keep workflow running
-echo "🔚 Force terminating container..."
-echo "📝 Note: Container always exits with code 0 to allow workflow continuation"
-exit 0
+# Exit with appropriate code based on success
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔚 Terminating container with success status..."
+  exit 0
+else
+  echo "🔚 Terminating container with failure status..."
+  echo "📝 Quality checks incomplete after $ATTEMPT attempt(s)"
+  exit 1
+fi
