@@ -166,37 +166,9 @@ echo "Using GitHub App authentication for testing workflow"
 
 # Function to ensure MCP server shutdown
 shutdown_sidecar() {
-  # Allow tests or callers to skip shutdown entirely
-  if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
-    echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
-    return 0
-  fi
-
-  echo "🔧 Signaling MCP sidecar to shutdown..."
+  # No sidecar shutdown needed - container will exit naturally when main process completes
+  echo "🔧 Main container process complete"
   touch /workspace/.agent_done 2>/dev/null || true
-
-  echo "🔧 Attempting MCP sidecar shutdown (127.0.0.1:8080)..."
-  local shutdown_attempts=0
-  local max_shutdown_attempts=3
-
-  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ MCP sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-      break
-    else
-      shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ MCP sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-        echo "Retrying in 2 seconds..."
-        sleep 2
-      fi
-    fi
-  done
-
-  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown MCP sidecar after $max_shutdown_attempts attempts"
-    echo "⚠️ Sidecar may not be running; continuing"
-  fi
 }
 
 # Authenticate with GitHub App
