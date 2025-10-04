@@ -68,6 +68,25 @@ fi
 echo "PATH: $PATH"
 
 # =========================================================================
+# RETRY CONFIGURATION
+# =========================================================================
+MAX_RETRIES_CONFIG=${CURSOR_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${CURSOR_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: CURSOR_MAX_RETRIES environment variable"
+elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+# =========================================================================
 # GitHub App authentication
 # =========================================================================
 

@@ -86,6 +86,26 @@ echo '════════════════════════�
 echo '║              TESS TESTING WORKFLOW STARTING                  ║'
 echo '║         Quality Assurance & Deployment Testing Agent         ║'
 echo '════════════════════════════════════════════════════════════════'
+
+# =========================================================================
+# RETRY CONFIGURATION
+# =========================================================================
+MAX_RETRIES_CONFIG=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${CLAUDE_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: CLAUDE_MAX_RETRIES environment variable"
+elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
 echo "🎯 Agent: {{github_app}}"
 echo "🧪 Focus: Comprehensive testing, deployment validation, test coverage"
 echo "📋 Task ID: {{task_id}}"
