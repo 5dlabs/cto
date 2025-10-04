@@ -298,14 +298,20 @@ else
     exit 1
 fi
 
-# Target repository directory name - this is where the git repo will be
-TARGET_REPO_DIR="{{#if working_directory}}{{working_directory}}{{else}}{{service}}{{/if}}"
+# Extract repository name from URL (e.g., "5dlabs/rust-basic-api-2" -> "rust-basic-api-2")
+REPO_NAME=$(echo "{{repository_url}}" | sed -E 's|.*/([^/]+)$|\1|' | sed 's|\.git$||')
+REPO_ROOT="/workspace/$REPO_NAME"
 
-# Set working directory for the agent - should match the repository location
-CLAUDE_WORK_DIR="/workspace/$TARGET_REPO_DIR"
-mkdir -p "$CLAUDE_WORK_DIR"
-cd "$CLAUDE_WORK_DIR"
-echo "🔧 Working directory set to: $CLAUDE_WORK_DIR"
+# Determine working directory - use repo root if working_directory is "." or empty
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+  CLAUDE_WORK_DIR="$REPO_ROOT"
+else
+  CLAUDE_WORK_DIR="$REPO_ROOT/$WORK_DIR"
+fi
+
+echo "🔧 Repository: $REPO_NAME"
+echo "🔧 Working directory will be set to: $CLAUDE_WORK_DIR"
 
 # Prepare environment for QA checks
 echo "════════════════════════════════════════════════════════════════"
@@ -398,19 +404,27 @@ else
 fi
 
 # Clone or update repository
-if [ -d "$CLAUDE_WORK_DIR" ] && [ -d "$CLAUDE_WORK_DIR/.git" ]; then
-    echo "📁 Found existing repository at '$CLAUDE_WORK_DIR', updating..."
-    cd "$CLAUDE_WORK_DIR"
-    git fetch origin
+cd /workspace
+if [ -d "$REPO_NAME/.git" ]; then
+    echo "📁 Found existing repository at '$REPO_ROOT', updating..."
+    cd "$REPO_NAME"
+    git fetch origin --prune
 else
-    echo "📥 Cloning repository to '$CLAUDE_WORK_DIR'..."
-    # Use the REPO_HTTP_URL constructed in authentication verification section
-    if ! git clone "$REPO_HTTP_URL" "$CLAUDE_WORK_DIR"; then
+    echo "📥 Cloning repository to '$REPO_ROOT'..."
+    if ! git clone "$REPO_HTTP_URL" "$REPO_NAME"; then
         echo "❌ Failed to clone repository"
         exit 1
     fi
-    cd "$CLAUDE_WORK_DIR"
+    cd "$REPO_NAME"
 fi
+
+# Create working directory if it's a subdirectory
+if [ "$CLAUDE_WORK_DIR" != "$REPO_ROOT" ]; then
+    mkdir -p "$CLAUDE_WORK_DIR"
+fi
+
+cd "$CLAUDE_WORK_DIR"
+echo "✓ Working directory: $CLAUDE_WORK_DIR"
 
 # Derive repository slug for gh CLI operations
 REPO_SLUG=""
@@ -1224,7 +1238,7 @@ export CLAUDE_WORK_DIR
 export GITHUB_TOKEN
 export REPO_OWNER
 export REPO_NAME
-export TARGET_REPO_DIR
+export REPO_ROOT
 
 echo "════════════════════════════════════════════════════════════════"
 echo "✅ CLEO CODE QUALITY AGENT READY"
