@@ -166,37 +166,9 @@ echo "Using GitHub App authentication for testing workflow"
 
 # Function to ensure MCP server shutdown
 shutdown_sidecar() {
-  # Allow tests or callers to skip shutdown entirely
-  if [ "${SKIP_MCP_SHUTDOWN:-0}" = "1" ]; then
-    echo "⏭️  Skipping MCP sidecar shutdown (SKIP_MCP_SHUTDOWN=1)"
-    return 0
-  fi
-
-  echo "🔧 Signaling MCP sidecar to shutdown..."
+  # No sidecar shutdown needed - container will exit naturally when main process completes
+  echo "🔧 Main container process complete"
   touch /workspace/.agent_done 2>/dev/null || true
-
-  echo "🔧 Attempting MCP sidecar shutdown (127.0.0.1:8080)..."
-  local shutdown_attempts=0
-  local max_shutdown_attempts=3
-
-  while [ $shutdown_attempts -lt $max_shutdown_attempts ]; do
-    if timeout 5 curl -fsS -X POST http://127.0.0.1:8080/shutdown >/dev/null 2>&1; then
-      echo "✓ MCP sidecar shutdown request successful (attempt $((shutdown_attempts + 1)))"
-      break
-    else
-      shutdown_attempts=$((shutdown_attempts + 1))
-      echo "⚠️ MCP sidecar shutdown request failed (attempt $shutdown_attempts/$max_shutdown_attempts)"
-      if [ $shutdown_attempts -lt $max_shutdown_attempts ]; then
-        echo "Retrying in 2 seconds..."
-        sleep 2
-      fi
-    fi
-  done
-
-  if [ $shutdown_attempts -eq $max_shutdown_attempts ]; then
-    echo "❌ Failed to shutdown MCP sidecar after $max_shutdown_attempts attempts"
-    echo "⚠️ Sidecar may not be running; continuing"
-  fi
 }
 
 # Authenticate with GitHub App
@@ -1564,6 +1536,21 @@ TESS_EOF
 trap 'echo "🚨 EXIT TRAP TRIGGERED - Shutting down sidecars..."; stop_docker_sidecar || true; shutdown_sidecar' EXIT INT TERM
 echo "✅ EXIT trap set for sidecar shutdown (MCP + Docker)"
 
+# Initialize retry loop variables
+MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+ATTEMPT=1
+SUCCESS=0
+CLAUDE_EXIT_CODE=1
+
+echo "🔄 Tess will retry up to $MAX_RETRIES times until tests pass"
+echo ""
+
+# Retry loop - Tess will continue until tests pass
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+  echo "════════════════════════════════════════════════════════════════"
+  echo "🚀 Tess Testing Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "════════════════════════════════════════════════════════════════"
+
 # Start Claude with initial guidance
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    STARTING TESS QA EXECUTION                 ║"
@@ -2109,6 +2096,46 @@ cleanup_child_processes() {
 
 cleanup_child_processes
 
+  # Check if testing was successful
+  # Tess is successful if Claude exited cleanly (tests should pass)
+  if [ ${CLAUDE_PID:-0} -ne 0 ]; then
+    wait $CLAUDE_PID 2>/dev/null || true
+    CLAUDE_EXIT_CODE=$?
+  fi
+  
+  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "✅ Attempt $ATTEMPT: Testing completed successfully"
+    SUCCESS=1
+    break
+  else
+    echo "⚠️ Attempt $ATTEMPT: Testing incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    
+    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
+      ATTEMPT=$((ATTEMPT + 1))
+      echo ""
+      # Brief pause before retry
+      sleep 2
+    else
+      echo "❌ Maximum retry attempts reached"
+      break
+    fi
+  fi
+done
+
+# Report final status
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ TESS TESTING SUCCESSFUL"
+  echo "   Completed after $ATTEMPT attempt(s)"
+else
+  echo "⚠️ TESS TESTING INCOMPLETE"
+  echo "   Attempted $ATTEMPT time(s)"
+  echo "   Tests not passing"
+fi
+echo "════════════════════════════════════════════════════════════════"
+
 # Write completion marker for workflow tracking
 echo "tess-qa-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
 
@@ -2123,6 +2150,12 @@ ps aux | head -5
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
 
-# Force exit to terminate the pod
-echo "🔚 Force terminating container..."
-exit 0
+# Exit with appropriate code based on success
+if [ $SUCCESS -eq 1 ]; then
+  echo "🔚 Terminating container with success status..."
+  exit 0
+else
+  echo "🔚 Terminating container with failure status..."
+  echo "📝 Testing incomplete after $ATTEMPT attempt(s)"
+  exit 1
+fi

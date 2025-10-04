@@ -1310,8 +1310,10 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
 - Linting passed
 - Unit tests successful
 - Quality standards met"
-      NEXT_STAGE="end-to-end testing"
+      NEXT_STAGE="end-to-end testing by Tess"
+      
       if [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+        # Tess has final approval authority
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
         CHECKS_PASSED="- End-to-end tests passed
@@ -1319,18 +1321,41 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
 - Acceptance criteria validated
 - Production readiness confirmed"
         NEXT_STAGE="human review and merge"
-      fi
-
-      echo "✅ $STAGE_NAME approved - posting APPROVE review"
-      REVIEW_BODY=$(cat <<EOF
+        
+        echo "✅ $STAGE_NAME complete - posting APPROVE review (Tess final approval)"
+        REVIEW_BODY=$(cat <<EOF
 ### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All checks have passed:
 $CHECKS_PASSED
 Ready for $NEXT_STAGE.
+
+**Final Approval:** Tess has verified all acceptance criteria are met.
 EOF
 )
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
+        refresh_token_if_needed || true
+        timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
+      else
+        # Cleo hands off to Tess via comment and label (NOT approve)
+        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        REVIEW_BODY=$(cat <<EOF
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+All checks have passed:
+$CHECKS_PASSED
+
+**Status:** Ready for $NEXT_STAGE
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Quality review by Cleo*
+EOF
+)
+        refresh_token_if_needed || true
+        timeout 30 gh pr comment "$PR_NUM" --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR comment command failed"
+        
+        # Add ready-for-qa label to signal Tess
+        echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "ready-for-qa" 2>&1 || echo "⚠️ Failed to add ready-for-qa label"
+      fi
     else
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"

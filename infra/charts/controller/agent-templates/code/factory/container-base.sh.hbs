@@ -1151,8 +1151,10 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
 - Linting passed
 - Unit tests successful
 - Quality standards met'
-      NEXT_STAGE="end-to-end testing"
+      NEXT_STAGE="end-to-end testing by Tess"
+      
       if [ "$WORKFLOW_STAGE" = "testing" ]; then
+        # Tess has final approval authority
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
         CHECKS_PASSED=$'- End-to-end tests passed
@@ -1160,19 +1162,43 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
 - Acceptance criteria validated
 - Production readiness confirmed'
         NEXT_STAGE="human review and merge"
-      fi
-
-      echo "✅ $STAGE_NAME approved - posting APPROVE review"
-      REVIEW_BODY_FILE=$(mktemp)
-      cat <<EOF > "$REVIEW_BODY_FILE"
+        
+        echo "✅ $STAGE_NAME complete - posting APPROVE review (Tess final approval)"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
 ### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All checks have passed:
 $CHECKS_PASSED
 Ready for $NEXT_STAGE.
+
+**Final Approval:** Tess has verified all acceptance criteria are met.
 EOF
-      refresh_token_if_needed || true
-      timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
-      rm -f "$REVIEW_BODY_FILE"
+        refresh_token_if_needed || true
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
+        rm -f "$REVIEW_BODY_FILE"
+      else
+        # Cleo hands off to Tess via comment and label (NOT approve)
+        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+All checks have passed:
+$CHECKS_PASSED
+
+**Status:** Ready for $NEXT_STAGE
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Quality review by Cleo*
+EOF
+        refresh_token_if_needed || true
+        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        rm -f "$REVIEW_BODY_FILE"
+        
+        # Add ready-for-qa label to signal Tess
+        echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "ready-for-qa" 2>&1 || echo "⚠️ Failed to add ready-for-qa label"
+      fi
     else
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"
