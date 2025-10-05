@@ -42,7 +42,10 @@ spec:
           "repository": "{{`{{workflow.parameters.repository}}`}}",
           "service": "{{`{{workflow.parameters.service}}`}}",
           "docs-repository": "{{`{{workflow.parameters.docs-repository}}`}}",
-          "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}"
+          "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}",
+          "implementation-max-retries": "{{`{{workflow.parameters.implementation-max-retries}}`}}",
+          "quality-max-retries": "{{`{{workflow.parameters.quality-max-retries}}`}}",
+          "testing-max-retries": "{{`{{workflow.parameters.testing-max-retries}}`}}"
         }
 
   # Main entry point
