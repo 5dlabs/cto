@@ -86,6 +86,26 @@ echo '════════════════════════�
 echo '║              TESS TESTING WORKFLOW STARTING                  ║'
 echo '║         Quality Assurance & Deployment Testing Agent         ║'
 echo '════════════════════════════════════════════════════════════════'
+
+# =========================================================================
+# RETRY CONFIGURATION
+# =========================================================================
+MAX_RETRIES_CONFIG=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    RETRY CONFIGURATION                        ║"
+echo "════════════════════════════════════════════════════════════════"
+echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
+if [ -n "${CLAUDE_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: CLAUDE_MAX_RETRIES environment variable"
+elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
+else
+  echo "📍 Source: Default configuration"
+fi
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
 echo "🎯 Agent: {{github_app}}"
 echo "🧪 Focus: Comprehensive testing, deployment validation, test coverage"
 echo "📋 Task ID: {{task_id}}"
@@ -1132,7 +1152,7 @@ else
 fi
 
 # Prepare initial guidance for Tess
-INITIAL_GUIDANCE=$(cat <<'TESS_EOF'
+INITIAL_GUIDANCE=$(cat <<TESS_EOF
 🧪 **TESS ULTRA-STRICT QA TESTING WORKFLOW**
 
 You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to validate THIS SPECIFIC TASK, not the entire project.
@@ -1185,17 +1205,17 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 
 3. **Deploy to Kubernetes (MANDATORY FOR END-TO-END VALIDATION)**:
    - Tess must execute a full integration smoke test in the live Kubernetes environment.
-   - Use Toolman MCP Kubernetes commands (preferred) for all cluster operations. Fall back to local `kubectl` only if required.
+   - Use Toolman MCP Kubernetes commands (preferred) for all cluster operations. Fall back to local \`kubectl\` only if required.
    - Quick capability test:
-     * `toolman kubernetes_listResources --kind namespaces`
-     * `toolman kubernetes_getPodsLogs --namespace test-$TASK_ID --pod <pod>`
+     * \`toolman kubernetes_listResources --kind namespaces\`
+     * \`toolman kubernetes_getPodsLogs --namespace test-\$TASK_ID --pod <pod>\`
    - End-to-end expectations when cluster access exists:
-     a) **Create namespace** for the test (via Toolman `kubernetes_createResource` or `kubectl create ns test-$TASK_ID`).
+     a) **Create namespace** for the test (via Toolman \`kubernetes_createResource\` or \`kubectl create ns test-\$TASK_ID\`).
      b) **Deploy** the universal chart and wait for pods to become ready.
-     c) **Verify pod health** (Toolman list pods / `kubectl get pods`).
+     c) **Verify pod health** (Toolman list pods / \`kubectl get pods\`).
      d) **Exercise the service** (port-forward and hit health/test endpoints).
      e) **Teardown** namespace to avoid orphaned resources.
-   - If both Toolman and local `kubectl` are unavailable, record that in the PR review; otherwise a deployment check is required before approval.
+   - If both Toolman and local \`kubectl\` are unavailable, record that in the PR review; otherwise a deployment check is required before approval.
    - Always include the exact commands/tool invocations in the review summary so operators can audit the run.
 
 4. **Task $TASK_ID Acceptance Criteria (100% or REJECT)**:
@@ -1837,7 +1857,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
 - [ ] Add branch protection rules
 
 **Note**: Cannot proceed with QA until CI is properly configured." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-else
+  else
   # Function to parse JSON without jq dependency
   parse_ci_json() {
     local json="$1"
@@ -2042,6 +2062,7 @@ $SUCCESS_DETAILS
 
     # Label manipulation removed - using GitHub PR reviews only
     update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
+  fi
   fi
 
 else
