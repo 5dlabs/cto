@@ -10,6 +10,7 @@ pub struct ResourceNaming;
 
 impl ResourceNaming {
     /// Generate job name with guaranteed length compliance
+    /// Format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
     /// This is the single source of truth for job names
     pub fn job_name(code_run: &CodeRun) -> String {
         let namespace = code_run.namespace().unwrap_or("default".to_string());
@@ -38,7 +39,7 @@ impl ResourceNaming {
         );
 
         let base_name = format!(
-            "code-{agent}-{cli}-{namespace}-{name}-{uid_suffix}-t{task_id}-v{context_version}"
+            "task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid_suffix}-v{context_version}"
         );
 
         Self::ensure_k8s_name_length(&base_name)
@@ -79,28 +80,28 @@ impl ResourceNaming {
             name.to_string()
         } else {
             // Intelligent truncation: preserve the meaningful parts
-            // Format: code-{agent}-{cli}-{namespace}-{name}-{uid}-t{task}-v{version}
-            // Priority: agent, cli, uid, task_id, version > namespace, name
+            // Format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
+            // Priority: task_id, agent, cli, uid, version > namespace, name
             let parts: Vec<&str> = name.split('-').collect();
 
             if parts.len() >= 8 {
-                // New format with agent and CLI
-                // Preserve: code-{agent}-{cli}-...-{uid}-t{task}-v{version}
-                let agent = parts[1];
-                let cli = parts[2];
-                let uid = parts[parts.len() - 3];
-                let task = parts[parts.len() - 2];
+                // New format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
+                // Preserve: task-{task_id}-{agent}-{cli}-...-{uid}-v{version}
+                let task = parts[1]; // task_id is now at position 1
+                let agent = parts[2];
+                let cli = parts[3];
+                let uid = parts[parts.len() - 2];
                 let version = parts[parts.len() - 1];
 
                 // Build compact name with hash for middle parts if needed
-                let suffix = format!("{uid}-{task}-{version}");
-                let prefix = format!("code-{agent}-{cli}");
+                let suffix = format!("{uid}-{version}");
+                let prefix = format!("task-{task}-{agent}-{cli}");
                 let available_space =
                     MAX_K8S_NAME_LENGTH.saturating_sub(prefix.len() + suffix.len() + 2);
 
                 if available_space > 8 {
                     // Room for some of the middle parts
-                    let middle_parts = &parts[3..parts.len() - 3];
+                    let middle_parts = &parts[4..parts.len() - 2];
                     let middle = middle_parts.join("-");
                     let truncated_middle = if middle.len() > available_space {
                         format!(
@@ -146,11 +147,12 @@ impl ResourceNaming {
     }
 
     fn extract_task_id_from_job_name(job_name: &str) -> String {
-        // Extract task ID from job name pattern
+        // Extract task ID from job name pattern: task-{id}-...
         job_name
             .split('-')
-            .find(|part| part.starts_with('t') && part[1..].chars().all(|c| c.is_ascii_digit()))
-            .map(|part| part[1..].to_string())
+            .nth(1) // Task ID is now at position 1 after "task-"
+            .filter(|part| part.chars().all(|c| c.is_ascii_digit()))
+            .map(String::from)
             .unwrap_or_else(|| "unknown".to_string())
     }
 }
