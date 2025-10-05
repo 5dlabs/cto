@@ -218,7 +218,9 @@ spec:
                           echo "Found workflow at correct stage, resuming..."
 
                           # Update workflow parameters with PR details
-                          if ! update_workflow_pr_metadata "$WORKFLOW_NAME" "{{ .Input.body.pull_request.html_url }}" "{{ .Input.body.pull_request.number }}"; then
+                          if ! update_workflow_pr_metadata "$WORKFLOW_NAME" \
+                              "{{ .Input.body.pull_request.html_url }}" \
+                              "{{ .Input.body.pull_request.number }}"; then
                             echo "ERROR: Failed to update PR metadata on $WORKFLOW_NAME"
                             exit 1
                           fi
