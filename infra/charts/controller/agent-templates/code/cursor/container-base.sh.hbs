@@ -895,8 +895,10 @@ if [ "${FORCE_WRITES,,}" = "true" ]; then
   FORCE_FLAG="--force"
 fi
 
+COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "🚀 Cursor execution attempt $ATTEMPT/$MAX_RETRIES"
+  CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/cursor-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/cursor-run-${ATTEMPT}.jsonl"
 
@@ -1037,10 +1039,12 @@ Response (one word only):"
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
   if [ "$COMPLETION_RESPONSE" = "yes" ]; then
     SUCCESS=1
+    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     break
   fi
 
   echo "⚠️ Cursor reported task incomplete; retrying..."
+  COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
   ATTEMPT=$((ATTEMPT + 1))
 done
 
