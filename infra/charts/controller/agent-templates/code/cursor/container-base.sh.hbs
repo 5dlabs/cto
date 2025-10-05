@@ -460,12 +460,6 @@ export SSH_ASKPASS=/bin/true
 # =========================================================================
 
 WORK_DIR="{{working_directory}}"
-if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
-  WORK_DIR="{{service}}"
-fi
-
-TARGET_DIR="/workspace/$WORK_DIR"
-mkdir -p "$TARGET_DIR"
 cd /workspace
 
 if [ -d "$REPO_NAME/.git" ]; then
