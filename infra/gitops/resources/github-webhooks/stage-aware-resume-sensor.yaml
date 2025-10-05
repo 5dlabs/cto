@@ -63,7 +63,7 @@ spec:
             value: ["approved"]
           - path: body.review.user.login
             type: string
-            value: ["5dlabs-tess[bot]"]
+            value: ["tess-5dlabs"]
 
     # PR Merged - Resume workflows waiting for this
     - name: pr-merged-event
