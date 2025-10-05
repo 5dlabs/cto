@@ -840,12 +840,14 @@ fi
 SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}true{{/if}}"
 SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
 
+COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   if [ "$UNLIMITED_RETRIES" = "1" ]; then
     echo "🚀 Factory execution attempt $ATTEMPT (unlimited mode)"
   else
     echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
   fi
+  CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
   RUN_LOG_EXT="log"
   if [ "$OUTPUT_FORMAT" = "json" ] || [ "$OUTPUT_FORMAT" = "debug" ]; then
@@ -1078,6 +1080,7 @@ Your response:"
 
   if [ "$COMPLETION_RESPONSE" = "yes" ]; then
     SUCCESS=1
+    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     break
   fi
 
@@ -1087,6 +1090,7 @@ Your response:"
     echo "⚠️ Factory reported task incomplete; retrying..."
   fi
 
+  COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
   ATTEMPT=$((ATTEMPT + 1))
 done
 
