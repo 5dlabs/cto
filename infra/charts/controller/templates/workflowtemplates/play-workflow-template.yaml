@@ -969,6 +969,7 @@ spec:
                 ;;
               "quality-in-progress")
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
+                [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-quality-complete")
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
