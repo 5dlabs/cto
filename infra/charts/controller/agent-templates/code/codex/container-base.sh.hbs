@@ -519,9 +519,27 @@ MANAGED_PATHS=(
 )
 
 for managed_path in "${MANAGED_PATHS[@]}"; do
-  if git ls-files --error-unmatch "$managed_path" >/dev/null 2>&1; then
+  if git ls-files --error-unmatch -- "$managed_path" >/dev/null 2>&1; then
+    status_output=$(git status --short -- "$managed_path" 2>/dev/null || true)
+    untracked=false
+    while IFS= read -r line; do
+      case "$line" in
+        "?? "*)
+          untracked=true
+          break
+          ;;
+      esac
+    done <<EOF
+$status_output
+EOF
+
+    if [ "$untracked" = true ]; then
+      echo "🧹 Removing stale untracked files to allow checkout: $managed_path"
+      git clean -fd -- "$managed_path" >/dev/null 2>&1 || rm -rf "$managed_path"
+    fi
     continue
   fi
+
   if [ -e "$managed_path" ]; then
     echo "🧹 Removing stale file to allow checkout: $managed_path"
     rm -rf "$managed_path"
