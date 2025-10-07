@@ -234,6 +234,7 @@ ensure_gh_authenticated() {
 
   if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
     echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
+    refresh_github_token || true
     if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
       echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
     fi
@@ -283,7 +284,29 @@ ensure_pr_created() {
     return
   fi
 
-  PR_DATA=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>/dev/null || echo "[]")
+  refresh_token_if_needed || true
+  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  PR_EXIT_CODE=$?
+
+  if [ $PR_EXIT_CODE -ne 0 ] && printf '%s' "$PR_OUTPUT" | grep -qi "HTTP 401"; then
+    echo "⚠️ gh pr list returned HTTP 401; refreshing GitHub credentials"
+    refresh_github_token || true
+    ensure_gh_authenticated
+    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    PR_EXIT_CODE=$?
+  fi
+
+  if [ $PR_EXIT_CODE -ne 0 ]; then
+    printf '%s\n' "$PR_OUTPUT" >&2
+    PR_DATA="[]"
+  else
+    PR_DATA="$PR_OUTPUT"
+  fi
+
+  if [ -z "$PR_DATA" ]; then
+    PR_DATA="[]"
+  fi
+
   if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
     echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
     return
