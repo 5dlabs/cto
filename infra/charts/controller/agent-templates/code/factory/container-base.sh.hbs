@@ -185,6 +185,109 @@ refresh_token_if_needed() {
   fi
 }
 
+sanitize_status_message() {
+  printf '%s' "$1" | tr '\n' ' ' | tr '\r' ' '
+}
+
+resolve_pr_url() {
+  if [ -n "${PR_URL:-}" ]; then
+    printf '%s' "$PR_URL"
+    return
+  fi
+
+  if [ -n "${PR_NUMBER:-}" ] && [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ]; then
+    printf 'https://github.com/%s/%s/pull/%s' "$REPO_OWNER" "$REPO_NAME" "$PR_NUMBER"
+    return
+  fi
+
+  if command -v gh >/dev/null 2>&1; then
+    local current_branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')
+    if [ -n "$current_branch" ]; then
+      local pr_url
+      pr_url=$(gh pr list --state all --head "$current_branch" --json url --jq '.[0].url' 2>/dev/null || printf '')
+      if [ -n "$pr_url" ]; then
+        printf '%s' "$pr_url"
+        return
+      fi
+    fi
+  fi
+
+  printf ''
+}
+
+patch_coderun_status() {
+  local phase="$1"
+  local message="$2"
+  local remediation_status="${3:-}"
+  local qa_status="${4:-}"
+  local pr_url="${5:-}"
+  local work_completed_flag="${6:-false}"
+
+  if [ -z "${CODERUN_NAME:-}" ] || [ -z "${NAMESPACE:-}" ]; then
+    return
+  fi
+
+  local token_path="/var/run/secrets/kubernetes.io/serviceaccount/token"
+  local ca_path="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+  if [ ! -f "$token_path" ] || [ ! -f "$ca_path" ]; then
+    echo "ℹ️ Service account credentials unavailable; skipping CodeRun status update"
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "ℹ️ jq not available; skipping CodeRun status update"
+    return
+  fi
+
+  local work_completed="false"
+  if [ "$work_completed_flag" = "true" ]; then
+    work_completed="true"
+  fi
+
+  local payload
+  payload=$(jq -n \
+    --arg phase "$phase" \
+    --arg message "$(sanitize_status_message "$message")" \
+    --arg remediation "$remediation_status" \
+    --arg qa "$qa_status" \
+    --arg pr "$pr_url" \
+    --arg workCompleted "$work_completed" \
+    '{
+      status: (
+        {
+          phase: $phase,
+          message: $message,
+          workCompleted: ($workCompleted == "true")
+        }
+        + (if $remediation != "" then {remediationStatus: $remediation} else {} end)
+        + (if $qa != "" then {qaStatus: $qa} else {} end)
+        + (if $pr != "" then {pullRequestUrl: $pr} else {} end)
+      )
+    }'
+  ) || return
+
+  local api_host="${KUBERNETES_SERVICE_HOST:-}"
+  local api_port="${KUBERNETES_SERVICE_PORT_HTTPS:-${KUBERNETES_SERVICE_PORT:-443}}"
+
+  if [ -z "$api_host" ]; then
+    echo "ℹ️ Kubernetes API host unavailable; skipping CodeRun status update"
+    return
+  fi
+
+  local token
+  token=$(cat "$token_path")
+
+  curl -sS -X PATCH \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/merge-patch+json" \
+    --cacert "$ca_path" \
+    --data "$payload" \
+    "https://${api_host}:${api_port}/apis/agents.platform/v1/namespaces/${NAMESPACE}/coderuns/${CODERUN_NAME}/status" >/dev/null 2>&1 || \
+    echo "⚠️ Failed to patch CodeRun status"
+}
+
 stop_docker_sidecar() {
   if [ ! -S /var/run/docker.sock ]; then
     return
@@ -1268,6 +1371,31 @@ else
   else
     echo "⚠️ Skipping auto PR enforcement due to Factory completion status"
   fi
+fi
+
+RESOLVED_PR_URL="$(resolve_pr_url)"
+
+if [ $SUCCESS -eq 1 ]; then
+  patch_coderun_status \
+    "Running" \
+    "Implementation completed - ready for quality review" \
+    "ready-for-qa" \
+    "" \
+    "$RESOLVED_PR_URL" \
+    "false"
+else
+  STATUS_NOTE="$LAST_COMPLETION_REASON"
+  if [ -z "$STATUS_NOTE" ]; then
+    STATUS_NOTE="Implementation requires follow-up"
+  fi
+
+  patch_coderun_status \
+    "Running" \
+    "$STATUS_NOTE" \
+    "needs-fixes" \
+    "" \
+    "$RESOLVED_PR_URL" \
+    "false"
 fi
 
 # Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
