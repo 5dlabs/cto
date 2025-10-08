@@ -1,5 +1,6 @@
 use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
+use super::status::CodeStatusManager;
 use crate::crds::CodeRun;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
 use k8s_openapi::api::{
@@ -9,7 +10,7 @@ use k8s_openapi::api::{
 use kube::api::{DeleteParams, Patch, PatchParams};
 use kube::runtime::controller::Action;
 use kube::runtime::finalizer::{finalizer, Event as FinalizerEvent};
-use kube::{Api, ResourceExt};
+use kube::{Api, Error as KubeError, ResourceExt};
 use serde_json::json;
 use std::sync::Arc;
 use tracing::{info, instrument, warn};
@@ -187,11 +188,103 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         }
 
         CodeJobState::Completed => {
+            info!("Job completed - evaluating completion signals");
+
+            let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+            let latest_code_run = match coderuns_api.get(&code_run.name_any()).await {
+                Ok(cr) => cr,
+                Err(err) => {
+                    warn!(
+                        "Unable to fetch latest CodeRun {} after completion: {}. Falling back to cached object.",
+                        code_run.name_any(),
+                        err
+                    );
+                    code_run.as_ref().clone()
+                }
+            };
+
+            let stage = get_workflow_stage(&latest_code_run);
+            let retry_reason = determine_retry_reason(&latest_code_run, &stage);
+            let max_retries = extract_max_retries(&latest_code_run);
+            let current_retry_count = latest_code_run
+                .status
+                .as_ref()
+                .and_then(|s| s.retry_count)
+                .unwrap_or(0);
+
+            if let Some(reason) = retry_reason {
+                if max_retries == 0 || current_retry_count < max_retries {
+                    let allowed_display = if max_retries == 0 {
+                        "∞".to_string()
+                    } else {
+                        max_retries.to_string()
+                    };
+
+                    info!(
+                        "CodeRun {} (stage {:?}) completed without success signal: {}. Scheduling retry attempt {} of {}.",
+                        latest_code_run.name_any(),
+                        stage,
+                        reason,
+                        current_retry_count + 1,
+                        allowed_display
+                    );
+
+                    schedule_retry(
+                        &latest_code_run,
+                        ctx,
+                        &jobs,
+                        &job_name,
+                        current_retry_count,
+                        max_retries,
+                        &reason,
+                    )
+                    .await?;
+
+                    return Ok(Action::requeue(std::time::Duration::from_secs(10)));
+                } else {
+                    warn!(
+                        "Retry limit reached for CodeRun {} ({} attempts). Marking as failed: {}",
+                        latest_code_run.name_any(),
+                        current_retry_count,
+                        reason
+                    );
+
+                    update_code_status_with_completion(
+                        &latest_code_run,
+                        ctx,
+                        "Failed",
+                        &format!("Retry limit reached without completion: {}", reason),
+                        false,
+                    )
+                    .await?;
+
+                    handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
+
+                    if ctx.config.cleanup.enabled {
+                        let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
+                        if cleanup_delay_minutes == 0 {
+                            let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
+                            info!(
+                                "Deleted job {} after exhausting retries for CodeRun {}",
+                                job_name,
+                                latest_code_run.name_any()
+                            );
+                        } else {
+                            info!(
+                                "Delaying cleanup for {} minutes for failed CodeRun job {}",
+                                cleanup_delay_minutes, job_name
+                            );
+                        }
+                    }
+
+                    return Ok(Action::await_change());
+                }
+            }
+
             info!("Job completed successfully - marking work as completed");
 
-            // CRITICAL: Update with work_completed=true for TTL safety
             update_code_status_with_completion(
-                &code_run,
+                &latest_code_run,
                 ctx,
                 "Succeeded",
                 "Code implementation completed successfully",
@@ -199,10 +292,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             )
             .await?;
 
-            // Handle workflow resumption after successful completion
-            handle_workflow_resumption_on_completion(&code_run, ctx).await?;
+            handle_workflow_resumption_on_completion(&latest_code_run, ctx).await?;
 
-            // Cleanup per controller configuration
             if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
@@ -216,16 +307,68 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 }
             }
 
-            // Use await_change() to stop reconciliation
             Ok(Action::await_change())
         }
 
         CodeJobState::Failed => {
-            info!("Job failed - marking as failed");
+            info!("Job failed - evaluating retry policy");
 
-            // Update to failed status (no work_completed=true for failures)
+            let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+            let latest_code_run = match coderuns_api.get(&code_run.name_any()).await {
+                Ok(cr) => cr,
+                Err(err) => {
+                    warn!(
+                        "Unable to fetch latest CodeRun {} after failure: {}. Falling back to cached object.",
+                        code_run.name_any(),
+                        err
+                    );
+                    code_run.as_ref().clone()
+                }
+            };
+
+            let max_retries = extract_max_retries(&latest_code_run);
+            let current_retry_count = latest_code_run
+                .status
+                .as_ref()
+                .and_then(|s| s.retry_count)
+                .unwrap_or(0);
+
+            if max_retries == 0 || current_retry_count < max_retries {
+                let allowed_display = if max_retries == 0 {
+                    "∞".to_string()
+                } else {
+                    max_retries.to_string()
+                };
+
+                info!(
+                    "Scheduling retry for failed CodeRun {} (attempt {} of {}).",
+                    latest_code_run.name_any(),
+                    current_retry_count + 1,
+                    allowed_display
+                );
+
+                schedule_retry(
+                    &latest_code_run,
+                    ctx,
+                    &jobs,
+                    &job_name,
+                    current_retry_count,
+                    max_retries,
+                    "Job failed",
+                )
+                .await?;
+
+                return Ok(Action::requeue(std::time::Duration::from_secs(10)));
+            }
+
+            info!(
+                "Retry limit reached for failed CodeRun {} ({} attempts). Marking as failed.",
+                latest_code_run.name_any(),
+                current_retry_count
+            );
+
             update_code_status_with_completion(
-                &code_run,
+                &latest_code_run,
                 ctx,
                 "Failed",
                 "Code implementation failed",
@@ -233,10 +376,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             )
             .await?;
 
-            // Handle workflow resumption for failed jobs
-            handle_workflow_resumption_on_failure(&code_run, ctx).await?;
+            handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
 
-            // Cleanup per controller configuration (failed jobs)
             if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
@@ -250,7 +391,6 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 }
             }
 
-            // Use await_change() to stop reconciliation
             Ok(Action::await_change())
         }
     }
@@ -612,6 +752,173 @@ async fn handle_no_pr_timeout(
     {
         warn!("Failed to resume workflow with no-PR status: {}", e);
     }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum WorkflowStage {
+    Implementation,
+    Quality,
+    Testing,
+    Unknown(String),
+}
+
+fn get_workflow_stage(code_run: &CodeRun) -> WorkflowStage {
+    if let Some(labels) = &code_run.metadata.labels {
+        if let Some(stage) = labels.get("workflow-stage") {
+            return match stage.as_str() {
+                "implementation" => WorkflowStage::Implementation,
+                "quality" => WorkflowStage::Quality,
+                "testing" => WorkflowStage::Testing,
+                other => WorkflowStage::Unknown(other.to_string()),
+            };
+        }
+    }
+
+    WorkflowStage::Unknown("unspecified".to_string())
+}
+
+fn extract_max_retries(code_run: &CodeRun) -> u32 {
+    const RETRY_KEYS: [&str; 6] = [
+        "EXECUTION_MAX_RETRIES",
+        "FACTORY_MAX_RETRIES",
+        "CODEX_MAX_RETRIES",
+        "CURSOR_MAX_RETRIES",
+        "CLAUDE_MAX_RETRIES",
+        "OPENCODE_MAX_RETRIES",
+    ];
+
+    for key in RETRY_KEYS.iter() {
+        if let Some(value) = code_run.spec.env.get(*key) {
+            if let Ok(parsed) = value.trim().parse::<u32>() {
+                return parsed;
+            }
+        }
+    }
+
+    1
+}
+
+fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<String> {
+    let status = code_run.status.as_ref()?;
+
+    match stage {
+        WorkflowStage::Implementation => {
+            if matches!(
+                status.remediation_status.as_deref(),
+                Some("needs-fixes" | "failed-remediation")
+            ) {
+                return Some("Implementation agent requested fixes".to_string());
+            }
+
+            let has_pr = status
+                .pull_request_url
+                .as_ref()
+                .map(|url| {
+                    let trimmed = url.trim();
+                    !trimmed.is_empty() && trimmed != "no-pr"
+                })
+                .unwrap_or(false);
+
+            if !has_pr {
+                return Some("Implementation attempt did not produce a pull request".to_string());
+            }
+
+            None
+        }
+        WorkflowStage::Quality => {
+            if matches!(status.qa_status.as_deref(), Some("changes_requested")) {
+                return Some("Quality review requested changes".to_string());
+            }
+
+            if matches!(status.remediation_status.as_deref(), Some("needs-fixes")) {
+                return Some("Quality workflow reported remediation needed".to_string());
+            }
+
+            None
+        }
+        WorkflowStage::Testing => {
+            if matches!(status.qa_status.as_deref(), Some("changes_requested")) {
+                return Some("Testing agent requested changes".to_string());
+            }
+
+            if matches!(
+                status.remediation_status.as_deref(),
+                Some("needs-fixes" | "failed-remediation")
+            ) {
+                return Some("Testing workflow reported remediation needed".to_string());
+            }
+
+            None
+        }
+        WorkflowStage::Unknown(_) => None,
+    }
+}
+
+async fn schedule_retry(
+    code_run: &CodeRun,
+    ctx: &Context,
+    jobs: &Api<Job>,
+    job_name: &str,
+    current_retry_count: u32,
+    max_retries: u32,
+    reason: &str,
+) -> Result<()> {
+    if let Err(err) = jobs.delete(job_name, &DeleteParams::default()).await {
+        match err {
+            KubeError::Api(api_err) if api_err.code == 404 => {}
+            other => {
+                warn!(
+                    "Failed to delete job {} before scheduling retry for {}: {}",
+                    job_name,
+                    code_run.name_any(),
+                    other
+                );
+            }
+        }
+    }
+
+    let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let new_context_version = code_run.spec.context_version + 1;
+
+    let spec_patch = json!({
+        "spec": {
+            "contextVersion": new_context_version,
+            "continueSession": true
+        }
+    });
+
+    coderuns_api
+        .patch(
+            &code_run.name_any(),
+            &PatchParams::default(),
+            &Patch::Merge(&spec_patch),
+        )
+        .await?;
+
+    let next_attempt = current_retry_count + 1;
+    let allowed_display = if max_retries == 0 {
+        "∞".to_string()
+    } else {
+        max_retries.to_string()
+    };
+
+    let ctx_arc = Arc::new(ctx.clone());
+    let code_run_arc = Arc::new(code_run.clone());
+    CodeStatusManager::increment_retry_count(&code_run_arc, &ctx_arc).await?;
+
+    update_code_status_with_completion(
+        code_run,
+        ctx,
+        "Running",
+        &format!(
+            "Retry attempt {} scheduled (max {}): {}",
+            next_attempt, allowed_display, reason
+        ),
+        false,
+    )
+    .await?;
+
     Ok(())
 }
 
