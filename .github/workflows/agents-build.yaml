@@ -25,6 +25,11 @@ on:
         required: false
         default: false
         type: boolean
+      factory_version_override:
+        description: 'Override Factory CLI version (e.g., "1.2.3"). If not provided, auto-detection will be used.'
+        required: false
+        default: ''
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -204,25 +209,31 @@ jobs:
             # For Factory CLI, we need to install it and extract the actual version
             # because the CLI has its own auto-update mechanism that checks against real versions
             if [ "${{ matrix.id }}" = "factory" ]; then
-              # Install Factory CLI temporarily to get the version
-              echo "📦 Installing Factory CLI to extract version..."
-              curl -fsSL "${{ matrix.script_url }}" | sh
-              if [ -f "$HOME/.local/bin/droid" ]; then
-                # Extract version from droid --version output (format: "droid version X.Y.Z")
-                VERSION=$(FACTORY_DISABLE_TELEMETRY=1 "$HOME/.local/bin/droid" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-                if [ -z "$VERSION" ]; then
-                  # Fallback to script hash if version extraction fails
+              # Check if version override is provided
+              if [ -n "${{ inputs.factory_version_override }}" ]; then
+                VERSION="${{ inputs.factory_version_override }}"
+                echo "📦 Using Factory CLI version override: $VERSION"
+              else
+                # Install Factory CLI temporarily to get the version
+                echo "📦 Installing Factory CLI to extract version..."
+                curl -fsSL "${{ matrix.script_url }}" | sh
+                if [ -f "$HOME/.local/bin/droid" ]; then
+                  # Extract version from droid --version output (format: "droid version X.Y.Z")
+                  VERSION=$(FACTORY_DISABLE_TELEMETRY=1 "$HOME/.local/bin/droid" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+                  if [ -z "$VERSION" ]; then
+                    # Fallback to script hash if version extraction fails
+                    SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
+                    VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
+                    echo "⚠️ Failed to extract version, using script hash: $VERSION"
+                  else
+                    echo "📦 Extracted Factory CLI version: $VERSION"
+                  fi
+                else
+                  # Fallback to script hash if installation fails
                   SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
                   VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
-                  echo "⚠️ Failed to extract version, using script hash: $VERSION"
-                else
-                  echo "📦 Extracted Factory CLI version: $VERSION"
+                  echo "⚠️ Installation failed, using script hash: $VERSION"
                 fi
-              else
-                # Fallback to script hash if installation fails
-                SCRIPT_CONTENT=$(curl -fsSL "${{ matrix.script_url }}")
-                VERSION=$(echo "$SCRIPT_CONTENT" | sha256sum | cut -c1-8)
-                echo "⚠️ Installation failed, using script hash: $VERSION"
               fi
             else
               # For other script_hash types, use the old hash method
