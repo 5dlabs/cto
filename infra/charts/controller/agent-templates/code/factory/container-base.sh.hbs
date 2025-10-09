@@ -1004,6 +1004,33 @@ else
   UNLIMITED_RETRIES=0
 fi
 
+print_attempt_banner() {
+  local attempt="$1"
+  local max="$2"
+  local unlimited="$3"
+  local border="════════════════════════════════════════════════════════════════"
+  local label
+
+  if [ "$unlimited" = "1" ]; then
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt} (UNLIMITED MODE)"
+  elif [ -n "$max" ] && [ "$max" -gt 0 ]; then
+    label="║ 🚀 EXECUTION ATTEMPT ${attempt} / ${max}"
+  else
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
+  fi
+
+  local padding=$(( ${#border} - ${#label} ))
+  if [ $padding -lt 0 ]; then
+    padding=0
+  fi
+
+  echo ""
+  echo "$border"
+  printf '%s%*s║\n' "$label" "$padding" ""
+  echo "$border"
+  echo ""
+}
+
 # Circuit breaker: track repeated command failures
 declare -A FAILED_COMMANDS
 MAX_SAME_COMMAND_FAILURES=3
@@ -1023,11 +1050,7 @@ SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
 
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
-  if [ "$UNLIMITED_RETRIES" = "1" ]; then
-    echo "🚀 Factory execution attempt $ATTEMPT (unlimited mode)"
-  else
-    echo "🚀 Factory execution attempt $ATTEMPT/$MAX_RETRIES"
-  fi
+  print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"
   CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
   RUN_LOG_EXT="log"
@@ -1253,6 +1276,20 @@ Your response:"
     if [ -n "$CURRENT_REASON" ]; then
       echo "📋 Incompletion details:"
       echo "$CURRENT_REASON"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║ 🔁 NEXT ITERATION FOCUS (FROM COMPLETION PROBE)              ║"
+      echo "════════════════════════════════════════════════════════════════"
+      printf '%s\n' "$CURRENT_REASON"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      PROMPT_CONTENT="${PROMPT_CONTENT}
+
+🔁 **NEXT ITERATION FOCUS (from completion probe attempt $ATTEMPT)**
+
+${CURRENT_REASON}
+
+Address the items above before rerunning checks."
       LAST_COMPLETION_REASON="$CURRENT_REASON"
     else
       echo "⚠️ Completion probe reported 'no' without a reason"

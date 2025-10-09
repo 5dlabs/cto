@@ -1055,6 +1055,8 @@ SUCCESS=0
 CODEX_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
+LAST_COMPLETION_REASON=""
+NEXT_ITERATION_GUIDANCE=""
 
 SESSION_DIR="$HOME/.codex/sessions"
 RESUME_ARGS=()
@@ -1093,6 +1095,33 @@ persist_session_id() {
   fi
 }
 
+print_attempt_banner() {
+  local attempt="$1"
+  local max="$2"
+  local unlimited="$3"
+  local border="════════════════════════════════════════════════════════════════"
+  local label
+
+  if [ "$unlimited" = "1" ]; then
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt} (UNLIMITED MODE)"
+  elif [ -n "$max" ] && [ "$max" -gt 0 ]; then
+    label="║ 🚀 EXECUTION ATTEMPT ${attempt} / ${max}"
+  else
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
+  fi
+
+  local padding=$(( ${#border} - ${#label} ))
+  if [ $padding -lt 0 ]; then
+    padding=0
+  fi
+
+  echo ""
+  echo "$border"
+  printf '%s%*s║\n' "$label" "$padding" ""
+  echo "$border"
+  echo ""
+}
+
 if [ "$CONTINUE_SESSION" = "1" ]; then
   if [ -n "$CURRENT_SESSION_ID" ]; then
     echo "ℹ️  Resuming Codex session from breadcrumb: $CURRENT_SESSION_ID"
@@ -1110,7 +1139,7 @@ fi
 
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
-  echo "🚀 Codex execution attempt $ATTEMPT/$MAX_RETRIES"
+  print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
   CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/codex-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/codex-run-${ATTEMPT}.jsonl"
@@ -1141,6 +1170,11 @@ Previous Codex summary:
 $PREVIOUS_SNIPPET
 
 Focus on unresolved work, avoid repeating completed steps, and progress toward completion."
+    if [ -n "$NEXT_ITERATION_GUIDANCE" ]; then
+      PROMPT_PAYLOAD="${PROMPT_PAYLOAD}
+
+${NEXT_ITERATION_GUIDANCE}"
+    fi
   fi
 
   set +e
@@ -1299,8 +1333,6 @@ Try instead:
 4. A pull request exists (with at least task-{{task_id}} label; other labels are optional)
 5. Quality gates passed (cargo fmt, cargo clippy with no warnings, tests pass)
 
-**Be honest**: If ANY acceptance criterion is incomplete or partially implemented, answer 'no' and continue working.
-
 **To verify:**
 - Review: cat task/acceptance-criteria.md
 - Git status: git status
@@ -1308,9 +1340,20 @@ Try instead:
 - PR exists: gh pr view
 - Tests pass: Check your test results
 
-Based on your honest assessment of acceptance criteria completion, answer with a single word: yes or no
+If incomplete, respond with:
+no
+REASON: <specific reason why not complete>
 
-Response (one word only):"
+For 'no' responses, REASON must specify:
+- Which acceptance criteria are incomplete (list them by number/name)
+- What specific work remains (be concrete)
+- Any blockers or issues encountered
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
+
+Your response:"
   COMPLETION_LAST_MESSAGE="/tmp/codex-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/codex-completion-${ATTEMPT}.jsonl"
 
@@ -1332,7 +1375,7 @@ Response (one word only):"
     COMPLETION_CMD+=("--last")
   fi
   COMPLETION_CMD+=("$COMPLETION_PROMPT")
-  "${COMPLETION_CMD[@]}" | tee "$COMPLETION_LOG"
+  COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
   COMPLETION_EXIT=${PIPESTATUS[0]}
   set +o pipefail
   set -e
@@ -1343,20 +1386,47 @@ Response (one word only):"
 
   echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
 
-  if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
-    COMPLETION_RESPONSE=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE" | tr '[:upper:]' '[:lower:]')
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  CURRENT_REASON=""
+  if [ "$COMPLETION_RESPONSE" = "no" ]; then
+    CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+    if [ -n "$CURRENT_REASON" ]; then
+      echo "📋 Incompletion details:"
+      echo "$CURRENT_REASON"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║ 🔁 NEXT ITERATION FOCUS (FROM COMPLETION PROBE)              ║"
+      echo "════════════════════════════════════════════════════════════════"
+      printf '%s\n' "$CURRENT_REASON"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      NEXT_ITERATION_GUIDANCE="🔁 **NEXT ITERATION FOCUS (from completion probe attempt $ATTEMPT)**\n\n${CURRENT_REASON}\n\nAddress the items above before rerunning checks."
+      LAST_COMPLETION_REASON="$CURRENT_REASON"
+    else
+      echo "⚠️ Completion probe reported 'no' without a reason"
+      NEXT_ITERATION_GUIDANCE=""
+    fi
   else
-    COMPLETION_RESPONSE=""
+    NEXT_ITERATION_GUIDANCE=""
   fi
-  if echo "$COMPLETION_RESPONSE" | grep -Eq '^yes'; then
+
+  if [ "$COMPLETION_RESPONSE" = "yes" ]; then
     SUCCESS=1
     COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     break
   fi
 
-  echo "[codex-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
+  if [ -n "$COMPLETION_RESPONSE" ]; then
+    echo "[codex-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
+  else
+    echo "[codex-debug] Completion response on attempt $ATTEMPT: <none>"
+  fi
 
-  echo "⚠️ Codex reported task incomplete; retrying..."
+  if [ -n "$CURRENT_REASON" ]; then
+    echo "⚠️ Codex reported task incomplete; retrying with new guidance..."
+  else
+    echo "⚠️ Codex reported task incomplete; retrying..."
+  fi
   COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
   ATTEMPT=$((ATTEMPT + 1))
 done
@@ -1380,6 +1450,12 @@ if [ $SUCCESS -ne 1 ]; then
   
   # Prepare handoff content with proper variable expansion
   HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    REMAINING_WORK_SECTION="$LAST_COMPLETION_REASON"
+  else
+    REMAINING_WORK_SECTION=$'Review the completion probe responses in the logs above for details on what remains to be done.
+Compare current implementation against acceptance criteria in task/acceptance-criteria.md.'
+  fi
   
   cat > "$HANDOFF_FILE" << EOF
 # Rex Implementation Handoff
@@ -1394,8 +1470,7 @@ Rex made $FINAL_ATTEMPTS attempts to complete this task. Review the PR and commi
 
 ## Remaining Work
 
-Review the completion probe responses in the logs above for details on what remains to be done.
-Compare current implementation against acceptance criteria in task/acceptance-criteria.md.
+$REMAINING_WORK_SECTION
 
 ## Next Steps for Cleo
 
@@ -1470,6 +1545,10 @@ if [ "$WORKFLOW_STAGE" != "quality-in-progress" ] && [ "$WORKFLOW_STAGE" != "tes
     FINAL_REMEDIATION_STATUS="needs-fixes"
     FINAL_MESSAGE="Implementation requires follow-up"
   fi
+fi
+
+if [ $SUCCESS -ne 1 ] && [ -n "$LAST_COMPLETION_REASON" ]; then
+  FINAL_MESSAGE="$LAST_COMPLETION_REASON"
 fi
 
 # Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
