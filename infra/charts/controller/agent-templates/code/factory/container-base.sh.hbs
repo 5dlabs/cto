@@ -598,6 +598,40 @@ derive_bot_identity() {
 GITHUB_APP="{{github_app}}"
 derive_bot_identity "$GITHUB_APP"
 
+ensure_managed_paths_git_ignore() {
+  if [ -z "${REPO_ROOT:-}" ]; then
+    return
+  fi
+
+  local exclude_file="$REPO_ROOT/.git/info/exclude"
+  mkdir -p "$(dirname "$exclude_file")"
+  touch "$exclude_file"
+
+  for managed_path in "$@"; do
+    if git ls-files --error-unmatch -- "$managed_path" >/dev/null 2>&1; then
+      continue
+    fi
+
+    local pattern="$managed_path"
+    if [ -d "$REPO_ROOT/$pattern" ]; then
+      pattern="${pattern%%/}/"
+    fi
+
+    case "$pattern" in
+      task|task/)
+        pattern="task/"
+        ;;
+      .factory|.factory/)
+        pattern=".factory/"
+        ;;
+    esac
+
+    if ! grep -Fxq "$pattern" "$exclude_file"; then
+      echo "$pattern" >> "$exclude_file"
+    fi
+  done
+}
+
 git config --global user.name "$GIT_AUTHOR_NAME"
 git config --global user.email "$GIT_AUTHOR_EMAIL"
 export GIT_AUTHOR_NAME
@@ -639,6 +673,7 @@ MANAGED_PATHS=(
   "client-config.json"
   "coding-guidelines.md"
   "github-guidelines.md"
+  ".factory"
   "task"
 )
 
@@ -669,6 +704,8 @@ EOF
     rm -rf "$managed_path"
   fi
 done
+
+ensure_managed_paths_git_ignore "${MANAGED_PATHS[@]}"
 
 BASE_BRANCH="${PR_BASE_BRANCH:-main}"
 REMOTE_BASE="origin/$BASE_BRANCH"
