@@ -1048,6 +1048,8 @@ OUTPUT_FORMAT="${OUTPUT_FORMAT,,}"
 
 AUTO_LEVEL="{{#if auto_level}}{{auto_level}}{{else}}high{{/if}}"
 AUTO_LEVEL="${AUTO_LEVEL,,}"
+REASONING_EFFORT="{{#if reasoning_effort}}{{reasoning_effort}}{{/if}}"
+REASONING_EFFORT="${REASONING_EFFORT,,}"
 if [ "${FORCE_WRITES,,}" = "true" ]; then
   AUTO_LEVEL="high"
 fi
@@ -1079,6 +1081,9 @@ while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   {{#if model}}
   FACTORY_CMD+=("--model" "{{model}}")
   {{/if}}
+  if [ -n "$REASONING_EFFORT" ]; then
+    FACTORY_CMD+=("--reasoning-effort" "$REASONING_EFFORT")
+  fi
   FACTORY_CMD+=("$PROMPT_CONTENT")
 
   echo "🔧 droid exec invocation arguments (${#FACTORY_CMD[@]} entries):"
@@ -1264,6 +1269,9 @@ Your response:"
   {{#if model}}
   COMPLETION_CMD+=("--model" "{{model}}")
   {{/if}}
+  if [ -n "$REASONING_EFFORT" ]; then
+    COMPLETION_CMD+=("--reasoning-effort" "$REASONING_EFFORT")
+  fi
   COMPLETION_CMD+=("$COMPLETION_PROMPT")
 
   set +e
