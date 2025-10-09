@@ -1111,8 +1111,8 @@ print_attempt_banner() {
   fi
 
   local padding=$(( ${#border} - ${#label} - 1 ))
-  if [ $padding -lt 0 ]; then
-    padding=0
+  if [ $padding -lt 1 ]; then
+    padding=1
   fi
 
   echo ""
