@@ -1053,7 +1053,7 @@ print_attempt_banner() {
     label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
   fi
 
-  local base_padding=$(( ${#border} - ${#label} - 1 ))
+  local base_padding=$(( ${#border} - ${#label} - 2 ))
   local extra_width=0
 
   if [[ "$label" == *"🚀"* ]]; then
