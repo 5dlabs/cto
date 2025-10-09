@@ -1203,7 +1203,7 @@ print_attempt_banner() {
     label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
   fi
 
-  local padding=$(( ${#border} - ${#label} ))
+  local padding=$(( ${#border} - ${#label} - 1 ))
   if [ $padding -lt 0 ]; then
     padding=0
   fi
