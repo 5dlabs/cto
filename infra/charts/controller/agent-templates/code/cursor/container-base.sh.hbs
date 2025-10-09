@@ -1024,6 +1024,7 @@ SUCCESS=0
 CURSOR_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
+LAST_COMPLETION_REASON=""
 
 # Circuit breaker: track repeated command failures
 declare -A FAILED_COMMANDS
@@ -1037,9 +1038,47 @@ if [ "${FORCE_WRITES,,}" = "true" ]; then
   FORCE_FLAG="--force"
 fi
 
+print_attempt_banner() {
+  local attempt="$1"
+  local max="$2"
+  local unlimited="$3"
+  local border="════════════════════════════════════════════════════════════════"
+  local label
+
+  if [ "$unlimited" = "1" ]; then
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt} (UNLIMITED MODE)"
+  elif [ -n "$max" ] && [ "$max" -gt 0 ]; then
+    label="║ 🚀 EXECUTION ATTEMPT ${attempt} / ${max}"
+  else
+    label="║ 🚀 EXECUTION ATTEMPT #${attempt}"
+  fi
+
+  local base_padding=$(( ${#border} - ${#label} - 1 ))
+  local extra_width=0
+
+  if [[ "$label" == *"🚀"* ]]; then
+    extra_width=$((extra_width + 1))
+  fi
+
+  local padding=$((base_padding - extra_width))
+  if [ $padding -lt 0 ]; then
+    padding=0
+  fi
+
+  echo ""
+  echo "$border"
+  printf '%s%*s║\n' "$label" "$padding" ""
+  echo "$border"
+  echo ""
+}
+
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
-  echo "🚀 Cursor execution attempt $ATTEMPT/$MAX_RETRIES"
+  print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
+
+  # Refresh GitHub token at the start of each iteration to keep gh interactions authenticated
+  refresh_github_token || true
+
   CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/cursor-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/cursor-run-${ATTEMPT}.jsonl"
@@ -1142,8 +1181,6 @@ Try instead:
 4. A pull request exists (with at least task-{{task_id}} label; other labels are optional)
 5. Quality gates passed (cargo fmt, cargo clippy with no warnings, tests pass)
 
-**Be honest**: If ANY acceptance criterion is incomplete or partially implemented, answer 'no' and continue working.
-
 **To verify:**
 - Review: cat task/acceptance-criteria.md
 - Git status: git status
@@ -1151,9 +1188,20 @@ Try instead:
 - PR exists: gh pr view
 - Tests pass: Check your test results
 
-Based on your honest assessment of acceptance criteria completion, answer with a single word: yes or no
+If incomplete, respond with:
+no
+REASON: <specific reason why not complete>
 
-Response (one word only):"
+For 'no' responses, REASON must specify:
+- Which acceptance criteria are incomplete (list them by number/name)
+- What specific work remains (be concrete)
+- Any blockers or issues encountered
+
+Example 'no' response:
+no
+REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but not yet connected to database. PR created but tests failing due to missing error handling in user_controller.rs.
+
+Your response:"
   COMPLETION_LAST_MESSAGE="/tmp/cursor-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/cursor-completion-${ATTEMPT}.log"
 
@@ -1179,13 +1227,43 @@ Response (one word only):"
   fi
 
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  CURRENT_REASON=""
+  if [ "$COMPLETION_RESPONSE" = "no" ]; then
+    CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+    if [ -n "$CURRENT_REASON" ]; then
+      echo "📋 Incompletion details:"
+      echo "$CURRENT_REASON"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║ 🔁 NEXT ITERATION FOCUS (FROM COMPLETION PROBE)              ║"
+      echo "════════════════════════════════════════════════════════════════"
+      printf '%s\n' "$CURRENT_REASON"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      PROMPT_CONTENT="${PROMPT_CONTENT}
+
+🔁 **NEXT ITERATION FOCUS (from completion probe attempt $ATTEMPT)**
+
+${CURRENT_REASON}
+
+Address the items above before rerunning checks."
+      LAST_COMPLETION_REASON="$CURRENT_REASON"
+    else
+      echo "⚠️ Completion probe reported 'no' without a reason"
+    fi
+  fi
+
   if [ "$COMPLETION_RESPONSE" = "yes" ]; then
     SUCCESS=1
     COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     break
   fi
 
-  echo "⚠️ Cursor reported task incomplete; retrying..."
+  if [ -n "$CURRENT_REASON" ]; then
+    echo "⚠️ Cursor reported task incomplete; retrying with new guidance..."
+  else
+    echo "⚠️ Cursor reported task incomplete; retrying..."
+  fi
   COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
   ATTEMPT=$((ATTEMPT + 1))
 done
@@ -1200,6 +1278,11 @@ fi
 
 if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ Cursor did not confirm task completion after $MAX_RETRIES attempts"
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    echo ""
+    echo "💡 Last reported reason for incompletion:"
+    echo "$LAST_COMPLETION_REASON"
+  fi
   
   # Document remaining work for downstream agents (Cleo/Tess)
   echo ""
@@ -1209,6 +1292,12 @@ if [ $SUCCESS -ne 1 ]; then
   
   # Prepare handoff content with proper variable expansion
   HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    REMAINING_WORK_SECTION="$LAST_COMPLETION_REASON"
+  else
+    REMAINING_WORK_SECTION=$'Review the completion probe responses in the logs above for details on what remains to be done.
+Compare current implementation against acceptance criteria in task/acceptance-criteria.md.'
+  fi
   
   cat > "$HANDOFF_FILE" << EOF
 # Rex Implementation Handoff
@@ -1223,8 +1312,7 @@ Rex made $FINAL_ATTEMPTS attempts to complete this task. Review the PR and commi
 
 ## Remaining Work
 
-Review the completion probe responses in the logs above for details on what remains to be done.
-Compare current implementation against acceptance criteria in task/acceptance-criteria.md.
+$REMAINING_WORK_SECTION
 
 ## Next Steps for Cleo
 
@@ -1296,6 +1384,9 @@ if [ $SUCCESS -eq 1 ]; then
     "false"
 else
   STATUS_NOTE="Cursor reported task incomplete"
+  if [ -n "$LAST_COMPLETION_REASON" ]; then
+    STATUS_NOTE="$LAST_COMPLETION_REASON"
+  fi
   patch_coderun_status \
     "Running" \
     "$STATUS_NOTE" \
