@@ -1051,6 +1051,11 @@ SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"
+
+  # Always refresh GitHub credentials at the start of each iteration to prevent stale sessions
+  refresh_github_token || true
+  ensure_gh_authenticated
+
   CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/factory-last-message-${ATTEMPT}.txt"
   RUN_LOG_EXT="log"

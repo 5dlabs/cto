@@ -1140,6 +1140,11 @@ fi
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
+
+  # Refresh GitHub token every iteration to avoid expired credentials during long runs
+  refresh_github_token || true
+  ensure_gh_authenticated
+
   CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/codex-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/codex-run-${ATTEMPT}.jsonl"
