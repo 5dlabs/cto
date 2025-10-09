@@ -203,6 +203,80 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 }
             };
 
+            let remediation_status = latest_code_run
+                .status
+                .as_ref()
+                .and_then(|s| s.remediation_status.as_deref());
+
+            if matches!(
+                remediation_status,
+                Some("needs-fixes" | "failed-remediation")
+            ) {
+                let detail = latest_code_run
+                    .status
+                    .as_ref()
+                    .and_then(|s| s.message.as_deref())
+                    .filter(|msg| !msg.is_empty())
+                    .map(|msg| format!(": {msg}"))
+                    .unwrap_or_default();
+
+                let failure_message = format!(
+                    "Implementation agent requested manual intervention ({}){}",
+                    remediation_status.unwrap_or("needs-fixes"),
+                    detail
+                );
+
+                warn!(
+                    "{} for CodeRun {}",
+                    failure_message,
+                    latest_code_run.name_any()
+                );
+
+                update_code_status_with_completion(
+                    &latest_code_run,
+                    ctx,
+                    "Failed",
+                    &failure_message,
+                    false,
+                )
+                .await?;
+
+                handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
+
+                if ctx.config.cleanup.enabled {
+                    let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
+                    if cleanup_delay_minutes == 0 {
+                        if let Err(err) = jobs.delete(&job_name, &DeleteParams::default()).await {
+                            match err {
+                                KubeError::Api(api_err) if api_err.code == 404 => {}
+                                other => {
+                                    warn!(
+                                        "Failed to delete job {} after manual intervention required for CodeRun {}: {}",
+                                        job_name,
+                                        latest_code_run.name_any(),
+                                        other
+                                    );
+                                }
+                            }
+                        } else {
+                            info!(
+                                "Deleted job {} after manual intervention required for CodeRun {}",
+                                job_name,
+                                latest_code_run.name_any()
+                            );
+                        }
+                    } else {
+                        info!(
+                            "Delaying cleanup for {} minutes for CodeRun job {} requiring manual intervention",
+                            cleanup_delay_minutes,
+                            job_name
+                        );
+                    }
+                }
+
+                return Ok(Action::await_change());
+            }
+
             let stage = get_workflow_stage(&latest_code_run);
             let retry_reason = determine_retry_reason(&latest_code_run, &stage);
             let max_retries = extract_max_retries(&latest_code_run);
