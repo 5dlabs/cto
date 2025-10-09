@@ -1616,7 +1616,11 @@ Your response:"
           printf '%s\n' "$COMPLETION_REASON"
           echo "════════════════════════════════════════════════════════════════"
           echo ""
-          NEXT_ITERATION_GUIDANCE="🔁 **NEXT ITERATION FOCUS (from completion probe attempt $ATTEMPT)**\n\n${COMPLETION_REASON}\n\nAddress the items above before rerunning checks."
+          NEXT_ITERATION_GUIDANCE="🔁 **NEXT ITERATION FOCUS (from completion probe attempt $ATTEMPT)**
+
+${COMPLETION_REASON}
+
+Address the items above before rerunning checks."
           LAST_COMPLETION_REASON="$COMPLETION_REASON"
         else
           echo "⚠️ No reason provided for incomplete status"
