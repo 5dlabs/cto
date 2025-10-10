@@ -328,7 +328,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     &latest_code_run,
                     ctx,
                     "Failed",
-                    &format!("Retry limit reached without completion: {}", reason),
+                    &format!("Retry limit reached without completion: {reason}"),
                     false,
                 )
                 .await?;
@@ -986,8 +986,7 @@ async fn schedule_retry(
         ctx,
         "Running",
         &format!(
-            "Retry attempt {} scheduled (max {}): {}",
-            next_attempt, allowed_display, reason
+            "Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"
         ),
         false,
     )
