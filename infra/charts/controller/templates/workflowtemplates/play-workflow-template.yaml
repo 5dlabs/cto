@@ -718,6 +718,8 @@ spec:
             default: ""
           - name: model
             default: ""
+          - name: model-rotation
+            default: "[]"
           - name: tools-config
             default: "{}"
           - name: pr-url
@@ -748,6 +750,8 @@ spec:
                   value: "{{`{{inputs.parameters.cli-type}}`}}"
                 - name: model
                   value: "{{`{{inputs.parameters.model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{inputs.parameters.model-rotation}}`}}"
                 - name: tools-config
                   value: "{{`{{inputs.parameters.tools-config}}`}}"
                 - name: pr-url
@@ -786,6 +790,8 @@ spec:
             default: ""
           - name: model
             default: ""
+          - name: model-rotation
+            default: "[]"
           - name: tools-config
             default: "{}"
           - name: pr-url
