@@ -113,6 +113,17 @@ spec:
         description: "JSON string of tools config for testing agent"
         value: "{}"  # Defaults to empty, populated by MCP client
 
+      # Model rotation configurations (JSON arrays of model names)
+      - name: implementation-model-rotation
+        description: "JSON array of model names for implementation agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: quality-model-rotation
+        description: "JSON array of model names for quality agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: testing-model-rotation
+        description: "JSON array of model names for testing agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+
       # PR context (populated by suspend/resume)
       - name: pr-url
         description: "Pull request URL (populated after PR creation)"
@@ -822,6 +833,7 @@ spec:
             cliConfig:
               cliType: "{{`{{inputs.parameters.cli-type}}`}}"
               model: "{{`{{inputs.parameters.model}}`}}"
+              modelRotation: "{{`{{inputs.parameters.model-rotation}}`}}"
             # Pass task requirements if available
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             # Pass PR context as environment if available
