@@ -370,6 +370,23 @@ pub struct AgentDefinition {
     /// If provided, controller will embed it verbatim (no server/tool inference in code)
     #[serde(default, rename = "clientConfig")]
     pub client_config: Option<serde_json::Value>,
+
+    /// Optional model rotation configuration for this agent
+    /// Allows cycling through multiple models on retry attempts
+    #[serde(default, rename = "modelRotation")]
+    pub model_rotation: Option<ModelRotationConfig>,
+}
+
+/// Model rotation configuration for an agent
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelRotationConfig {
+    /// Whether model rotation is enabled
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Array of model identifiers to rotate through
+    #[serde(default)]
+    pub models: Vec<String>,
 }
 
 /// Tool configuration for an agent

@@ -1283,11 +1283,51 @@ CLAUDE_EXIT_CODE=1
 echo "🔄 Cleo will retry up to $MAX_RETRIES times until quality standards are met"
 echo ""
 
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
 # Retry loop - Cleo will continue until quality checks pass or max retries reached
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "════════════════════════════════════════════════════════════════"
   echo "🚀 Cleo Quality Review Attempt $ATTEMPT/$MAX_RETRIES"
   echo "════════════════════════════════════════════════════════════════"
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+    
+    # Update settings.json with current model
+    if [ -f "/etc/claude-code/managed-settings.json" ]; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' /etc/claude-code/managed-settings.json > /tmp/settings-rotated.json && \
+      mv /tmp/settings-rotated.json /etc/claude-code/managed-settings.json
+    fi
+  fi
 
 # Start Claude with Cleo-specific configuration
 cd "$CLAUDE_WORK_DIR"

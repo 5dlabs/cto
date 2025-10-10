@@ -1144,9 +1144,43 @@ else
   rm -f "$SESSION_FILE"
 fi
 
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+  fi
 
   # Refresh GitHub token every iteration to avoid expired credentials during long runs
   refresh_github_token || true
@@ -1200,6 +1234,9 @@ ${NEXT_ITERATION_GUIDANCE}"
     "--output-last-message" "$LAST_MESSAGE_FILE"
     "--cd" "$CODEX_WORK_DIR"
   )
+  if [ -n "$CURRENT_MODEL" ]; then
+    CODEX_CMD+=("--model" "$CURRENT_MODEL")
+  fi
   if [ ${#SESSION_FLAGS[@]} -gt 0 ]; then
     CODEX_CMD+=("${SESSION_FLAGS[@]}")
   fi

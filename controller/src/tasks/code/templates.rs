@@ -76,6 +76,15 @@ impl CodeTemplateGenerator {
     ) -> Result<BTreeMap<String, String>> {
         let mut templates = BTreeMap::new();
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+        let _enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         templates.insert(
             "container.sh".to_string(),
             Self::generate_container_script(code_run)?,
@@ -124,6 +133,9 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -133,19 +145,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_cursor_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_cursor_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_cursor_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_cursor_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "cursor-cli-config.json".to_string(),
             Self::generate_cursor_global_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -190,6 +202,9 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -199,19 +214,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_opencode_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_opencode_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_opencode_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_opencode_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "opencode-config.json".to_string(),
             Self::generate_opencode_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -441,6 +456,9 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -450,19 +468,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_factory_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_factory_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_factory_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_factory_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "factory-cli-config.json".to_string(),
             Self::generate_factory_global_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,
@@ -994,6 +1012,38 @@ impl CodeTemplateGenerator {
         })
     }
 
+    /// Enrich cli_config with agent-level configuration from ControllerConfig
+    /// This allows agent-level settings (like modelRotation) to be used as defaults
+    fn enrich_cli_config_from_agent(
+        cli_config: Value,
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Value {
+        let mut enriched = cli_config;
+
+        // Extract agent name from github_app field
+        let agent_name = code_run
+            .spec
+            .github_app
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+
+        if let Some(agent_config) = config.agents.get(&agent_name) {
+            // If agent has model rotation config, inject it into cli_config
+            if let Some(model_rotation) = &agent_config.model_rotation {
+                if model_rotation.enabled && !model_rotation.models.is_empty() {
+                    // Only inject if not already present in cli_config
+                    if enriched.get("modelRotation").is_none() {
+                        enriched["modelRotation"] = json!(model_rotation.models);
+                    }
+                }
+            }
+        }
+
+        enriched
+    }
+
     fn build_cli_render_settings(code_run: &CodeRun, cli_config: &Value) -> CliRenderSettings {
         let settings = cli_config
             .get("settings")
@@ -1259,6 +1309,9 @@ impl CodeTemplateGenerator {
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
 
+        // Enrich cli_config with agent-level settings (like modelRotation)
+        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
             .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
@@ -1268,19 +1321,19 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_codex_container_script(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_codex_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "AGENTS.md".to_string(),
-            Self::generate_codex_memory(code_run, &cli_config_value, &remote_tools)?,
+            Self::generate_codex_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
             "codex-config.toml".to_string(),
             Self::generate_codex_config(
                 code_run,
-                &cli_config_value,
+                &enriched_cli_config,
                 &client_config_value,
                 &remote_tools,
             )?,

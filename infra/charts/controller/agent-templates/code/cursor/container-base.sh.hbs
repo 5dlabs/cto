@@ -1072,9 +1072,43 @@ print_attempt_banner() {
   echo ""
 }
 
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+  fi
 
   # Refresh GitHub token at the start of each iteration to keep gh interactions authenticated
   refresh_github_token || true
@@ -1084,9 +1118,9 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   RUN_LOG="/tmp/cursor-run-${ATTEMPT}.jsonl"
 
   CURSOR_CMD=("cursor-agent" "--print" "--output-format" "$OUTPUT_FORMAT")
-  {{#if model}}
-  CURSOR_CMD+=("--model" "{{model}}")
-  {{/if}}
+  if [ -n "$CURRENT_MODEL" ]; then
+    CURSOR_CMD+=("--model" "$CURRENT_MODEL")
+  fi
   if [ -n "$FORCE_FLAG" ]; then
     CURSOR_CMD+=("$FORCE_FLAG")
   fi
