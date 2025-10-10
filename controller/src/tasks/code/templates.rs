@@ -83,25 +83,30 @@ impl CodeTemplateGenerator {
             .as_ref()
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
-        let _enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_container_script(code_run)?,
+            Self::generate_container_script(code_run, &enriched_cli_config)?,
         );
         templates.insert(
             "CLAUDE.md".to_string(),
-            Self::generate_claude_memory(code_run)?,
+            Self::generate_claude_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
         templates.insert(
             "settings.json".to_string(),
-            Self::generate_claude_settings(code_run, config)?,
+            Self::generate_claude_settings(code_run, config, &enriched_cli_config)?,
         );
         templates.insert(
             "mcp.json".to_string(),
             Self::generate_mcp_config(code_run, config)?,
         );
-        let client_config = Self::generate_client_config(code_run, config)?;
         templates.insert("client-config.json".to_string(), client_config);
 
         templates.insert(
@@ -134,7 +139,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
@@ -203,7 +209,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
@@ -214,7 +221,11 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_opencode_container_script(code_run, &enriched_cli_config, &remote_tools)?,
+            Self::generate_opencode_container_script(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+            )?,
         );
 
         templates.insert(
@@ -457,7 +468,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
@@ -701,7 +713,7 @@ impl CodeTemplateGenerator {
         Self::load_template(CODE_FACTORY_PROJECT_CONFIG_TEMPLATE)
     }
 
-    fn generate_container_script(code_run: &CodeRun) -> Result<String> {
+    fn generate_container_script(code_run: &CodeRun, cli_config: &Value) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -742,6 +754,7 @@ impl CodeTemplateGenerator {
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "model": code_run.spec.model,
+            "cli_config": cli_config,
         });
 
         handlebars
@@ -753,7 +766,11 @@ impl CodeTemplateGenerator {
             })
     }
 
-    fn generate_claude_memory(code_run: &CodeRun) -> Result<String> {
+    fn generate_claude_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -846,6 +863,10 @@ impl CodeTemplateGenerator {
             "workflow_env_vars": workflow_env_vars,
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
+            "cli_config": cli_config,
+            "toolman": {
+                "tools": remote_tools,
+            },
         });
 
         handlebars.render("claude_memory", &context).map_err(|e| {
@@ -853,7 +874,11 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_claude_settings(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
+    fn generate_claude_settings(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+        cli_config: &Value,
+    ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -872,7 +897,8 @@ impl CodeTemplateGenerator {
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "api_key_secret_name": config.secrets.api_key_secret_name,
             "api_key_secret_key": config.secrets.api_key_secret_key,
-            "working_directory": code_run.spec.working_directory.as_deref().unwrap_or(".")
+            "working_directory": code_run.spec.working_directory.as_deref().unwrap_or("."),
+            "cli_config": cli_config,
         });
 
         handlebars.render("claude_settings", &context).map_err(|e| {
@@ -1310,7 +1336,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
