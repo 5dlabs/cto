@@ -1529,21 +1529,24 @@ fi
 RESOLVED_PR_URL="$(resolve_pr_url)"
 
 if [ $SUCCESS -eq 1 ]; then
+  # Mark as Succeeded to allow workflow progression to Cleo
   patch_coderun_status \
-    "Running" \
+    "Succeeded" \
     "Implementation completed - ready for quality review" \
     "ready-for-qa" \
     "" \
     "$RESOLVED_PR_URL" \
-    "false"
+    "true"
 else
   STATUS_NOTE="$LAST_COMPLETION_REASON"
   if [ -z "$STATUS_NOTE" ]; then
     STATUS_NOTE="Implementation requires follow-up"
   fi
 
+  # Mark as Succeeded with needs-fixes to allow workflow to continue to Cleo
+  # The remediationStatus indicates follow-up work is needed
   patch_coderun_status \
-    "Running" \
+    "Succeeded" \
     "$STATUS_NOTE" \
     "needs-fixes" \
     "" \
