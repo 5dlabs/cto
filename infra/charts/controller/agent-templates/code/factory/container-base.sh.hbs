@@ -1345,7 +1345,7 @@ Your response:"
 
   CLEAN_COMPLETION_OUTPUT=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r')
   COMPLETION_RESPONSE=$(printf '%s\n' "$CLEAN_COMPLETION_OUTPUT" \
-    | grep -iEom1 '\byes\b|\bno\b' \
+    | awk 'BEGIN { FS="[^A-Za-z]+" } { for (i = 1; i <= NF; i++) { word=tolower(\$i); if (word == "yes") yes=1; if (word == "no") no=1 } } END { if (yes) { print "yes" } else if (no) { print "no" } }' \
     | head -n1 \
     | tr '[:upper:]' '[:lower:]' \
     | tr -d '[:space:]')
