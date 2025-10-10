@@ -1262,9 +1262,49 @@ else
   fi
 fi
 
+# =========================================================================
+# Model rotation configuration
+# =========================================================================
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"
+
+  # Calculate which model to use for this attempt
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+    
+    # Update opencode config with current model (format: provider/model)
+    if [ -f "$HOME/.opencode/config.json" ]; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "$HOME/.opencode/config.json" > /tmp/opencode-config-rotated.json && \
+      mv /tmp/opencode-config-rotated.json "$HOME/.opencode/config.json"
+    fi
+  fi
 
   # Always refresh the GitHub token before starting a new iteration to avoid credential expiry
   refresh_github_token || true
