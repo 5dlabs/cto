@@ -247,6 +247,8 @@ spec:
           - name: stage
           - name: cli-type
           - name: model
+          - name: model-rotation
+            default: "[]"
           - name: max-retries
       outputs:
         parameters:
@@ -271,6 +273,8 @@ spec:
                   value: "{{`{{inputs.parameters.cli-type}}`}}"
                 - name: model
                   value: "{{`{{inputs.parameters.model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{inputs.parameters.model-rotation}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.implementation-tools}}`}}"
                 - name: max-retries
@@ -320,6 +324,8 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-cli}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.implementation-model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{workflow.parameters.implementation-model-rotation}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
