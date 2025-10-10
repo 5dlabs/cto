@@ -1263,14 +1263,17 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("implementation-cli={implementation_cli}"),
         format!("implementation-model={implementation_model}"),
         format!("implementation-tools={implementation_tools}"),
+        format!("implementation-model-rotation={implementation_model_rotation}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
         format!("quality-tools={quality_tools}"),
+        format!("quality-model-rotation={quality_model_rotation}"),
         format!("testing-agent={testing_agent}"),
         format!("testing-cli={testing_cli}"),
         format!("testing-model={testing_model}"),
         format!("testing-tools={testing_tools}"),
+        format!("testing-model-rotation={testing_model_rotation}"),
     ];
 
     params.push(format!(
