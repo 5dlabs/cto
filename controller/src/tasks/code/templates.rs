@@ -83,7 +83,8 @@ impl CodeTemplateGenerator {
             .as_ref()
             .and_then(|cfg| serde_json::to_value(cfg).ok())
             .unwrap_or_else(|| json!({}));
-        let _enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let _enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         templates.insert(
             "container.sh".to_string(),
@@ -134,7 +135,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
@@ -203,7 +205,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
@@ -214,7 +217,11 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_opencode_container_script(code_run, &enriched_cli_config, &remote_tools)?,
+            Self::generate_opencode_container_script(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+            )?,
         );
 
         templates.insert(
@@ -457,7 +464,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
@@ -1310,7 +1318,8 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
 
         // Enrich cli_config with agent-level settings (like modelRotation)
-        let enriched_cli_config = Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
 
         let client_config = Self::generate_client_config(code_run, config)?;
         let client_config_value: Value = serde_json::from_str(&client_config)
