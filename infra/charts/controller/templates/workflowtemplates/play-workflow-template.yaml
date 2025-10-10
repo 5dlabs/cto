@@ -1008,8 +1008,19 @@ spec:
           RESOURCE_VERSION=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.resourceVersion')
           echo "Resource version: $RESOURCE_VERSION"
 
+          TARGET_STAGE="{{`{{inputs.parameters.new-stage}}`}}"
+
+          # Persist the current resource version for downstream steps even if we early-exit
+          echo "$RESOURCE_VERSION" > /tmp/resource-version.txt
+
+          if [ "$CURRENT_STAGE" = "$TARGET_STAGE" ]; then
+            echo "🔁 Stage is already set to $TARGET_STAGE; no update required"
+            echo "success" > /tmp/update-status.txt
+            exit 0
+          fi
+
           # Validate stage transition
-          if ! validate_stage_transition "$CURRENT_STAGE" "{{`{{inputs.parameters.new-stage}}`}}"; then
+          if ! validate_stage_transition "$CURRENT_STAGE" "$TARGET_STAGE"; then
             echo "❌ Stage transition validation failed"
             echo "failed" > /tmp/update-status.txt
             exit 1

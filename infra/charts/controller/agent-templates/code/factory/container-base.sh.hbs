@@ -1050,12 +1050,57 @@ AUTO_LEVEL="{{#if auto_level}}{{auto_level}}{{else}}high{{/if}}"
 AUTO_LEVEL="${AUTO_LEVEL,,}"
 REASONING_EFFORT="{{#if reasoning_effort}}{{reasoning_effort}}{{/if}}"
 REASONING_EFFORT="${REASONING_EFFORT,,}"
+DEFAULT_MODEL="{{model}}"
+MODEL_ROTATION=()
+MODEL_ROTATION_COUNT=0
+{{#if model_rotation}}
+MODEL_ROTATION=(
+{{#each model_rotation}}
+"{{this}}"
+{{/each}}
+)
+MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
+if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
+fi
+{{/if}}
+if [ -z "$DEFAULT_MODEL" ] && [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+  DEFAULT_MODEL="${MODEL_ROTATION[0]}"
+fi
+if [ -n "$DEFAULT_MODEL" ]; then
+  echo "🎯 Default model: $DEFAULT_MODEL"
+fi
+LIST_TOOLS_ON_START="{{#if list_tools_on_start}}{{list_tools_on_start}}{{else}}false{{/if}}"
+if [ -z "$LIST_TOOLS_ON_START" ]; then
+  LIST_TOOLS_ON_START="false"
+fi
+LIST_TOOLS_ON_START="${LIST_TOOLS_ON_START,,}"
 if [ "${FORCE_WRITES,,}" = "true" ]; then
   AUTO_LEVEL="high"
 fi
 
 SKIP_PERMISSIONS_UNSAFE="{{#if skip_permissions_unsafe}}{{skip_permissions_unsafe}}{{else}}true{{/if}}"
 SKIP_PERMISSIONS_UNSAFE="${SKIP_PERMISSIONS_UNSAFE,,}"
+
+if [ "$LIST_TOOLS_ON_START" = "true" ]; then
+  echo "🧰 Listing available Droid tools before execution"
+  LIST_CMD=("droid" "exec" "--list-tools" "--output-format" "$OUTPUT_FORMAT")
+  if [ -n "$DEFAULT_MODEL" ]; then
+    LIST_CMD+=("--model" "$DEFAULT_MODEL")
+  fi
+  if [ -n "$REASONING_EFFORT" ]; then
+    LIST_CMD+=("--reasoning-effort" "$REASONING_EFFORT")
+  fi
+  echo "🔍 Running: ${LIST_CMD[*]}"
+  set +e
+  "${LIST_CMD[@]}"
+  LIST_EXIT=$?
+  set -e
+  if [ $LIST_EXIT -ne 0 ]; then
+    echo "⚠️ Tool listing command exited with status $LIST_EXIT"
+  fi
+  echo ""
+fi
 
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
@@ -1073,14 +1118,23 @@ while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   fi
   RUN_LOG="/tmp/factory-run-${ATTEMPT}.${RUN_LOG_EXT}"
 
+  CURRENT_MODEL="$DEFAULT_MODEL"
+  if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
+    MODEL_INDEX=$(((ATTEMPT - 1) % MODEL_ROTATION_COUNT))
+    CURRENT_MODEL="${MODEL_ROTATION[$MODEL_INDEX]}"
+  fi
+  if [ -n "$CURRENT_MODEL" ]; then
+    echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
+  fi
+
   if [ "$SKIP_PERMISSIONS_UNSAFE" = "true" ]; then
     FACTORY_CMD=("droid" "exec" "--skip-permissions-unsafe" "--output-format" "$OUTPUT_FORMAT")
   else
     FACTORY_CMD=("droid" "exec" "--output-format" "$OUTPUT_FORMAT" "--auto" "$AUTO_LEVEL")
   fi
-  {{#if model}}
-  FACTORY_CMD+=("--model" "{{model}}")
-  {{/if}}
+  if [ -n "$CURRENT_MODEL" ]; then
+    FACTORY_CMD+=("--model" "$CURRENT_MODEL")
+  fi
   if [ -n "$REASONING_EFFORT" ]; then
     FACTORY_CMD+=("--reasoning-effort" "$REASONING_EFFORT")
   fi
@@ -1266,9 +1320,9 @@ Your response:"
   else
     COMPLETION_CMD=("droid" "exec" "--output-format" "text" "--auto" "$AUTO_LEVEL")
   fi
-  {{#if model}}
-  COMPLETION_CMD+=("--model" "{{model}}")
-  {{/if}}
+  if [ -n "$CURRENT_MODEL" ]; then
+    COMPLETION_CMD+=("--model" "$CURRENT_MODEL")
+  fi
   if [ -n "$REASONING_EFFORT" ]; then
     COMPLETION_CMD+=("--reasoning-effort" "$REASONING_EFFORT")
   fi
@@ -1289,15 +1343,15 @@ Your response:"
     echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
   fi
 
-  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" \
-    | tr -d '\r' \
-    | grep -Eio '\\b(yes|no)\\b' \
+  CLEAN_COMPLETION_OUTPUT=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r')
+  COMPLETION_RESPONSE=$(printf '%s\n' "$CLEAN_COMPLETION_OUTPUT" \
+    | awk 'BEGIN { FS="[^A-Za-z]+" } { for (i = 1; i <= NF; i++) { word=tolower(\$i); if (word == "yes") yes=1; if (word == "no") no=1 } } END { if (yes) { print "yes" } else if (no) { print "no" } }' \
     | head -n1 \
     | tr '[:upper:]' '[:lower:]' \
     | tr -d '[:space:]')
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
-    CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
+    CURRENT_REASON=$(printf '%s\n' "$CLEAN_COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
     if [ -n "$CURRENT_REASON" ]; then
       echo "📋 Incompletion details:"
       echo "$CURRENT_REASON"

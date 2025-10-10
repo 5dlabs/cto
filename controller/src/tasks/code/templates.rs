@@ -40,6 +40,8 @@ struct CliRenderSettings {
     model_provider: Value,
     raw_additional_toml: Option<String>,
     raw_additional_json: Option<String>,
+    model_rotation: Vec<String>,
+    list_tools_on_start: bool,
 }
 
 pub struct CodeTemplateGenerator;
@@ -549,6 +551,8 @@ impl CodeTemplateGenerator {
             "model": render_settings.model,
             "auto_level": render_settings.auto_level,
             "output_format": render_settings.output_format,
+            "model_rotation": render_settings.model_rotation,
+            "list_tools_on_start": render_settings.list_tools_on_start,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
                 "model": render_settings.model,
@@ -1132,6 +1136,38 @@ impl CodeTemplateGenerator {
                     .and_then(Value::as_str)
                     .map(|s| s.to_string())
             });
+        let model_rotation = settings
+            .get("modelRotation")
+            .or_else(|| settings.get("modelCycle"))
+            .or_else(|| cli_config.get("modelRotation"))
+            .or_else(|| cli_config.get("modelCycle"))
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(Value::as_str)
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let list_tools_on_start = settings
+            .get("listToolsOnStart")
+            .or_else(|| settings.get("listTools"))
+            .or_else(|| cli_config.get("listToolsOnStart"))
+            .or_else(|| cli_config.get("listTools"))
+            .and_then(|value| match value {
+                Value::Bool(flag) => Some(*flag),
+                Value::String(s) => {
+                    let normalized = s.trim().to_ascii_lowercase();
+                    match normalized.as_str() {
+                        "true" | "1" | "yes" | "on" => Some(true),
+                        "false" | "0" | "no" | "off" => Some(false),
+                        _ => None,
+                    }
+                }
+                Value::Number(num) => num.as_i64().map(|int_val| int_val != 0),
+                _ => None,
+            })
+            .unwrap_or(false);
 
         CliRenderSettings {
             model,
@@ -1148,6 +1184,8 @@ impl CodeTemplateGenerator {
             model_provider,
             raw_additional_toml,
             raw_additional_json,
+            model_rotation,
+            list_tools_on_start,
         }
     }
 
