@@ -2504,6 +2504,7 @@ mod tests {
                 reasoning_effort: None,
                 tools: Some(agent_tools.clone()),
                 client_config: None,
+                model_rotation: None,
             },
         );
 
@@ -2525,6 +2526,7 @@ mod tests {
                 temperature: None,
                 reasoning_effort: None,
                 tools: Some(agent_tools),
+                model_rotation: None,
                 client_config: Some(serde_json::json!({
                     "remoteTools": ["memory_create_entities", "brave_search_brave_web_search"],
                     "localServers": {
@@ -2614,6 +2616,7 @@ mod tests {
                 reasoning_effort: None,
                 tools: Some(helm_tools),
                 client_config: None,
+                model_rotation: None,
             },
         );
 
