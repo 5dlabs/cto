@@ -79,14 +79,14 @@
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "codex",
-      "model": "gpt-5-codex",
+      "cli": "factory",
+      "model": "MODEL_PLACEHOLDER_1",
       "modelRotation": {
         "enabled": true,
         "models": [
-          "gpt-5-codex",
-          "gpt-5-codex-preview",
-          "claude-sonnet-4-20250514"
+          "MODEL_PLACEHOLDER_1",
+          "MODEL_PLACEHOLDER_2",
+          "MODEL_PLACEHOLDER_3"
         ]
       },
       "tools": {
@@ -107,14 +107,14 @@
     },
     "cleo": {
       "githubApp": "5DLabs-Cleo",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "cursor",
+      "model": "MODEL_PLACEHOLDER_1",
       "modelRotation": {
         "enabled": true,
         "models": [
-          "claude-sonnet-4-20250514",
-          "claude-opus-4-1-20250805",
-          "claude-haiku-4-20250514"
+          "MODEL_PLACEHOLDER_1",
+          "MODEL_PLACEHOLDER_2",
+          "MODEL_PLACEHOLDER_3"
         ]
       },
       "tools": {
@@ -135,13 +135,14 @@
     },
     "tess": {
       "githubApp": "5DLabs-Tess",
-      "cli": "claude",
-      "model": "claude-sonnet-4-20250514",
+      "cli": "codex",
+      "model": "MODEL_PLACEHOLDER_1",
       "modelRotation": {
         "enabled": true,
         "models": [
-          "claude-sonnet-4-20250514",
-          "claude-opus-4-1-20250805"
+          "MODEL_PLACEHOLDER_1",
+          "MODEL_PLACEHOLDER_2",
+          "MODEL_PLACEHOLDER_3"
         ]
       },
       "tools": {
