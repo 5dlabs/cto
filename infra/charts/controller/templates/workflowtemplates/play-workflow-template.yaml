@@ -845,7 +845,6 @@ spec:
             cliConfig:
               cliType: "{{`{{inputs.parameters.cli-type}}`}}"
               model: "{{`{{inputs.parameters.model}}`}}"
-              modelRotation: "{{`{{inputs.parameters.model-rotation}}`}}"
             # Pass task requirements if available
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             # Pass PR context as environment if available
