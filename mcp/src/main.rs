@@ -2379,7 +2379,7 @@ async fn rpc_loop() -> Result<()> {
 
 #[allow(clippy::disallowed_macros)]
 fn main() -> Result<()> {
-    eprintln!("🚀 Starting 5D Labs MCP Server...");
+    eprintln!("🚀 Starting 5D Labs MCP Server... (built: {})", env!("BUILD_TIMESTAMP"));
 
     // Initialize configuration from JSON file
     let config = load_cto_config().context("Failed to load cto-config.json")?;
