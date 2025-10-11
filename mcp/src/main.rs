@@ -338,7 +338,8 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
             "serverInfo": {
                 "name": "agent-platform-mcp",
                 "title": "Agent Platform MCP Server",
-                "version": "1.0.0"
+                "version": "1.0.0",
+                "buildTimestamp": env!("BUILD_TIMESTAMP")
             }
         }))),
         "tools/list" => {
