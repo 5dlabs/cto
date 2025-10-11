@@ -908,7 +908,7 @@ guard_rm() {
       esac
     done
 
-    if printf '%s\n' "${flags[@]}" | grep -Eq '--|^-r.*-f|-f.*-r'; then
+    if printf '%s\n' "${flags[@]}" | grep -Eq -- '--|^-r.*-f|-f.*-r'; then
       local has_recursive=0
       local has_force=0
       for flag in "${flags[@]}"; do
