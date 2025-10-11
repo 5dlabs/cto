@@ -1076,17 +1076,50 @@ print_attempt_banner() {
 }
 
 # =========================================================================
-# Model rotation configuration
+# Model translation and rotation configuration
 # =========================================================================
-DEFAULT_MODEL="{{model}}"
+# Translate Claude model names to Cursor model names
+translate_model_name() {
+  local model="$1"
+  case "$model" in
+    claude-sonnet-4-*|sonnet-4-thinking)
+      echo "sonnet-4.5-thinking"
+      ;;
+    claude-sonnet-3.5-*|sonnet-3.5)
+      echo "sonnet-4.5"
+      ;;
+    claude-opus-4-*|opus-4)
+      echo "opus-4.1"
+      ;;
+    claude-haiku-*|haiku)
+      echo "cheetah"
+      ;;
+    gpt-5-codex*)
+      echo "gpt-5-codex"
+      ;;
+    gpt-5*)
+      echo "gpt-5"
+      ;;
+    *)
+      # If no translation needed, return as-is
+      echo "$model"
+      ;;
+  esac
+}
+
+DEFAULT_MODEL="$(translate_model_name "{{model}}")"
 MODEL_ROTATION=()
 MODEL_ROTATION_COUNT=0
 {{#if model_rotation}}
-MODEL_ROTATION=(
+# Translate model rotation array
+_RAW_MODELS=(
 {{#each model_rotation}}
 "{{this}}"
 {{/each}}
 )
+for _model in "${_RAW_MODELS[@]}"; do
+  MODEL_ROTATION+=("$(translate_model_name "$_model")")
+done
 MODEL_ROTATION_COUNT=${#MODEL_ROTATION[@]}
 if [ $MODEL_ROTATION_COUNT -gt 0 ]; then
   echo "🎯 Model rotation enabled (${MODEL_ROTATION_COUNT} models): ${MODEL_ROTATION[*]}"
