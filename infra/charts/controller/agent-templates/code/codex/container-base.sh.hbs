@@ -38,6 +38,8 @@ echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    RETRY CONFIGURATION                        ║"
 echo "════════════════════════════════════════════════════════════════"
+echo "🤖 CLI: {{cli_type}}"
+echo "🎯 Model: {{model}}"
 echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
 if [ -n "${CODEX_MAX_RETRIES:-}" ]; then
   echo "📍 Source: CODEX_MAX_RETRIES environment variable"
