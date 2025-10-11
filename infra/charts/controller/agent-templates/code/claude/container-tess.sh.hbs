@@ -95,6 +95,8 @@ echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    RETRY CONFIGURATION                        ║"
 echo "════════════════════════════════════════════════════════════════"
+echo "🤖 CLI: {{cli_type}}"
+echo "🎯 Model: {{model}}"
 echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
 if [ -n "${CLAUDE_MAX_RETRIES:-}" ]; then
   echo "📍 Source: CLAUDE_MAX_RETRIES environment variable"
@@ -2210,6 +2212,10 @@ ps aux | head -5
 
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
+
+# Explicitly stop Docker sidecar before exiting
+echo "🛑 Explicitly stopping Docker sidecar..."
+stop_docker_sidecar || true
 
 # Exit with appropriate code based on success
 if [ $SUCCESS -eq 1 ]; then

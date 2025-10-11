@@ -12,6 +12,6 @@ fn main() {
         .trim()
         .to_string();
     
-    println!("cargo:rustc-env=BUILD_TIMESTAMP={}", timestamp);
+    println!("cargo:rustc-env=BUILD_TIMESTAMP={timestamp}");
     println!("cargo:rerun-if-changed=build.rs");
 }
