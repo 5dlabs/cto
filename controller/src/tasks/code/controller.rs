@@ -315,44 +315,44 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     .await?;
 
                     return Ok(Action::requeue(std::time::Duration::from_secs(10)));
-                } else {
-                    warn!(
-                        "Retry limit reached for CodeRun {} ({} attempts). Marking as failed: {}",
-                        latest_code_run.name_any(),
-                        current_retry_count,
-                        reason
-                    );
-
-                    update_code_status_with_completion(
-                        &latest_code_run,
-                        ctx,
-                        "Failed",
-                        &format!("Retry limit reached without completion: {}", reason),
-                        false,
-                    )
-                    .await?;
-
-                    handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
-
-                    if ctx.config.cleanup.enabled {
-                        let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
-                        if cleanup_delay_minutes == 0 {
-                            let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
-                            info!(
-                                "Deleted job {} after exhausting retries for CodeRun {}",
-                                job_name,
-                                latest_code_run.name_any()
-                            );
-                        } else {
-                            info!(
-                                "Delaying cleanup for {} minutes for failed CodeRun job {}",
-                                cleanup_delay_minutes, job_name
-                            );
-                        }
-                    }
-
-                    return Ok(Action::await_change());
                 }
+                
+                warn!(
+                    "Retry limit reached for CodeRun {} ({} attempts). Marking as failed: {}",
+                    latest_code_run.name_any(),
+                    current_retry_count,
+                    reason
+                );
+
+                update_code_status_with_completion(
+                    &latest_code_run,
+                    ctx,
+                    "Failed",
+                    &format!("Retry limit reached without completion: {reason}"),
+                    false,
+                )
+                .await?;
+
+                handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
+
+                if ctx.config.cleanup.enabled {
+                    let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
+                    if cleanup_delay_minutes == 0 {
+                        let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
+                        info!(
+                            "Deleted job {} after exhausting retries for CodeRun {}",
+                            job_name,
+                            latest_code_run.name_any()
+                        );
+                    } else {
+                        info!(
+                            "Delaying cleanup for {} minutes for failed CodeRun job {}",
+                            cleanup_delay_minutes, job_name
+                        );
+                    }
+                }
+
+                return Ok(Action::await_change());
             }
 
             info!("Job completed successfully - marking work as completed");
@@ -986,8 +986,7 @@ async fn schedule_retry(
         ctx,
         "Running",
         &format!(
-            "Retry attempt {} scheduled (max {}): {}",
-            next_attempt, allowed_display, reason
+            "Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"
         ),
         false,
     )

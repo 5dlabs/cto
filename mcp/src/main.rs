@@ -31,6 +31,16 @@ struct AgentConfig {
     tools: Option<AgentTools>,
     #[serde(default, rename = "maxRetries")]
     max_retries: Option<u32>,
+    #[serde(default, rename = "modelRotation")]
+    model_rotation: Option<ModelRotationConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct ModelRotationConfig {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default)]
+    models: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -328,7 +338,8 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
             "serverInfo": {
                 "name": "agent-platform-mcp",
                 "title": "Agent Platform MCP Server",
-                "version": "1.0.0"
+                "version": "1.0.0",
+                "buildTimestamp": env!("BUILD_TIMESTAMP")
             }
         }))),
         "tools/list" => {
@@ -896,8 +907,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .values()
         .find(|a| a.github_app == implementation_agent_input);
 
-    // Resolve agent name and extract CLI/model/tools if it's a short alias
-    let (implementation_agent, implementation_cli, implementation_model, implementation_tools) =
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
+    let (implementation_agent, implementation_cli, implementation_model, implementation_tools, implementation_model_rotation) =
         if let Some(agent_config) = implementation_agent_cfg {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
@@ -928,11 +939,30 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for implementation agent {implementation_agent_input}");
                     "{}".to_string()
                 });
+            let agent_model_rotation = agent_config.model_rotation.as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for implementation agent: {json}");
+                                Some(json)
+                            },
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
             (
                 agent_config.github_app.clone(),
                 agent_cli,
                 agent_model,
                 agent_tools,
+                agent_model_rotation,
             )
         } else {
             // Not a configured agent, use provided name with defaults
@@ -942,6 +972,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 cli.clone(),
                 model.clone(),
                 "{}".to_string(),
+                "[]".to_string(),
             )
         };
 
@@ -954,13 +985,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.quality_agent.clone());
 
-    // Resolve agent name and extract CLI/model/tools if it's a short alias
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let quality_agent_cfg = config
         .agents
         .values()
         .find(|a| a.github_app == quality_agent_input);
 
-    let (quality_agent, quality_cli, quality_model, quality_tools) =
+    let (quality_agent, quality_cli, quality_model, quality_tools, quality_model_rotation) =
         if let Some(agent_config) = quality_agent_cfg {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
@@ -991,11 +1022,30 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
                     "{}".to_string()
                 });
+            let agent_model_rotation = agent_config.model_rotation.as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for quality agent: {json}");
+                                Some(json)
+                            },
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
             (
                 agent_config.github_app.clone(),
                 agent_cli,
                 agent_model,
                 agent_tools,
+                agent_model_rotation,
             )
         } else {
             // Not a configured agent, use provided name with defaults
@@ -1005,6 +1055,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 cli.clone(),
                 model.clone(),
                 "{}".to_string(),
+                "[]".to_string(),
             )
         };
 
@@ -1017,13 +1068,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map(String::from)
         .unwrap_or_else(|| config.defaults.play.testing_agent.clone());
 
-    // Resolve agent name and extract CLI/model/tools if it's a short alias
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
     let testing_agent_cfg = config
         .agents
         .values()
         .find(|a| a.github_app == testing_agent_input);
 
-    let (testing_agent, testing_cli, testing_model, testing_tools) =
+    let (testing_agent, testing_cli, testing_model, testing_tools, testing_model_rotation) =
         if let Some(agent_config) = testing_agent_cfg {
             // Use the structured agent configuration
             let agent_cli = if agent_config.cli.is_empty() {
@@ -1054,11 +1105,30 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
                     "{}".to_string()
                 });
+            let agent_model_rotation = agent_config.model_rotation.as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for testing agent: {json}");
+                                Some(json)
+                            },
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
             (
                 agent_config.github_app.clone(),
                 agent_cli,
                 agent_model,
                 agent_tools,
+                agent_model_rotation,
             )
         } else {
             // Not a configured agent, use provided name with defaults
@@ -1068,6 +1138,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 cli.clone(),
                 model.clone(),
                 "{}".to_string(),
+                "[]".to_string(),
             )
         };
 
@@ -1193,14 +1264,17 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("implementation-cli={implementation_cli}"),
         format!("implementation-model={implementation_model}"),
         format!("implementation-tools={implementation_tools}"),
+        format!("implementation-model-rotation={implementation_model_rotation}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
         format!("quality-tools={quality_tools}"),
+        format!("quality-model-rotation={quality_model_rotation}"),
         format!("testing-agent={testing_agent}"),
         format!("testing-cli={testing_cli}"),
         format!("testing-model={testing_model}"),
         format!("testing-tools={testing_tools}"),
+        format!("testing-model-rotation={testing_model_rotation}"),
     ];
 
     params.push(format!(
@@ -2305,7 +2379,7 @@ async fn rpc_loop() -> Result<()> {
 
 #[allow(clippy::disallowed_macros)]
 fn main() -> Result<()> {
-    eprintln!("🚀 Starting 5D Labs MCP Server...");
+    eprintln!("🚀 Starting 5D Labs MCP Server... (built: {})", env!("BUILD_TIMESTAMP"));
 
     // Initialize configuration from JSON file
     let config = load_cto_config().context("Failed to load cto-config.json")?;

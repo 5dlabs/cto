@@ -113,6 +113,17 @@ spec:
         description: "JSON string of tools config for testing agent"
         value: "{}"  # Defaults to empty, populated by MCP client
 
+      # Model rotation configurations (JSON arrays of model names)
+      - name: implementation-model-rotation
+        description: "JSON array of model names for implementation agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: quality-model-rotation
+        description: "JSON array of model names for quality agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: testing-model-rotation
+        description: "JSON array of model names for testing agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+
       # PR context (populated by suspend/resume)
       - name: pr-url
         description: "Pull request URL (populated after PR creation)"
@@ -236,6 +247,8 @@ spec:
           - name: stage
           - name: cli-type
           - name: model
+          - name: model-rotation
+            default: "[]"
           - name: max-retries
       outputs:
         parameters:
@@ -260,6 +273,8 @@ spec:
                   value: "{{`{{inputs.parameters.cli-type}}`}}"
                 - name: model
                   value: "{{`{{inputs.parameters.model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{inputs.parameters.model-rotation}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.implementation-tools}}`}}"
                 - name: max-retries
@@ -309,6 +324,8 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-cli}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.implementation-model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{workflow.parameters.implementation-model-rotation}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
@@ -701,6 +718,8 @@ spec:
             default: ""
           - name: model
             default: ""
+          - name: model-rotation
+            default: "[]"
           - name: tools-config
             default: "{}"
           - name: pr-url
@@ -731,6 +750,8 @@ spec:
                   value: "{{`{{inputs.parameters.cli-type}}`}}"
                 - name: model
                   value: "{{`{{inputs.parameters.model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{inputs.parameters.model-rotation}}`}}"
                 - name: tools-config
                   value: "{{`{{inputs.parameters.tools-config}}`}}"
                 - name: pr-url
@@ -769,6 +790,8 @@ spec:
             default: ""
           - name: model
             default: ""
+          - name: model-rotation
+            default: "[]"
           - name: tools-config
             default: "{}"
           - name: pr-url
@@ -822,6 +845,7 @@ spec:
             cliConfig:
               cliType: "{{`{{inputs.parameters.cli-type}}`}}"
               model: "{{`{{inputs.parameters.model}}`}}"
+              modelRotation: "{{`{{inputs.parameters.model-rotation}}`}}"
             # Pass task requirements if available
             taskRequirements: "{{`{{workflow.parameters.task-requirements}}`}}"
             # Pass PR context as environment if available

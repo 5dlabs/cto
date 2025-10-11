@@ -754,6 +754,7 @@ cleanup:
                 reasoning_effort: Some("high".to_string()),
                 tools: None,
                 client_config: None,
+                model_rotation: None,
             },
         );
         config.merge_agent_cli_defaults();
