@@ -316,7 +316,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
                     return Ok(Action::requeue(std::time::Duration::from_secs(10)));
                 }
-                
+
                 warn!(
                     "Retry limit reached for CodeRun {} ({} attempts). Marking as failed: {}",
                     latest_code_run.name_any(),
@@ -985,9 +985,7 @@ async fn schedule_retry(
         code_run,
         ctx,
         "Running",
-        &format!(
-            "Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"
-        ),
+        &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
         false,
     )
     .await?;

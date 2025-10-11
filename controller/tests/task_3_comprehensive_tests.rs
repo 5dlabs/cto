@@ -19,9 +19,9 @@ use controller::cli::adapter::{
     ContainerContext, FinishReason, HealthState, HealthStatus, LocalServerConfig, MemoryStrategy,
     ParsedResponse, ResponseMetadata, ToolCall, ToolConfiguration,
 };
+use controller::cli::adapter_factory::{AdapterFactory, FactoryConfig, HealthMonitorConfig};
 use controller::cli::adapters::claude::ClaudeAdapter;
 use controller::cli::base_adapter::AdapterConfig;
-use controller::cli::adapter_factory::{AdapterFactory, FactoryConfig, HealthMonitorConfig};
 use controller::cli::types::CLIType;
 use serde_json::{json, Value};
 use std::collections::HashMap;
