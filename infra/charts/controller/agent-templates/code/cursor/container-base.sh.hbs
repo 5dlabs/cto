@@ -818,7 +818,8 @@ else
   echo "⚠️ cursor-cli-config.json not provided; using existing global Cursor config"
 fi
 
-if [ ! -f "$MCP_CLIENT_CONFIG" ]; then
+# Check if client-config.json exists in working directory
+if [ ! -f "$CURSOR_WORK_DIR/client-config.json" ]; then
   echo "❌ client-config.json missing from workspace; required for MCP/toolman"
   exit 1
 fi
