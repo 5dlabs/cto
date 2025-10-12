@@ -1455,6 +1455,10 @@ impl<'a> CodeResourceManager<'a> {
             existing.temperature = defaults.temperature;
         }
 
+        if existing.model_rotation.is_none() {
+            existing.model_rotation = defaults.model_rotation.clone();
+        }
+
         for (key, value) in &defaults.settings {
             existing
                 .settings
@@ -1542,6 +1546,7 @@ mod tests {
             settings,
             max_tokens: None,
             temperature: None,
+            model_rotation: None,
         }
     }
 
@@ -1559,6 +1564,7 @@ mod tests {
             settings: defaults_settings,
             max_tokens: Some(16_000),
             temperature: Some(0.7_f32),
+            model_rotation: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -1587,6 +1593,7 @@ mod tests {
             settings: existing_settings,
             max_tokens: Some(8_192),
             temperature: Some(0.3_f32),
+            model_rotation: None,
         };
 
         let mut defaults_settings = HashMap::new();
@@ -1598,6 +1605,7 @@ mod tests {
             settings: defaults_settings,
             max_tokens: Some(16_000),
             temperature: Some(0.9_f32),
+            model_rotation: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -1608,6 +1616,46 @@ mod tests {
         assert_eq!(
             existing.settings.get("reasoningEffort"),
             Some(&json!("medium"))
+        );
+    }
+
+    #[test]
+    fn merge_cli_config_handles_model_rotation() {
+        // Test that model_rotation is merged when None
+        let mut existing = cli_config_with_settings(HashMap::new());
+        assert!(existing.model_rotation.is_none());
+
+        let defaults = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "gpt-5-codex".to_string(),
+            settings: HashMap::new(),
+            max_tokens: None,
+            temperature: None,
+            model_rotation: Some(json!(["model1", "model2", "model3"])),
+        };
+
+        CodeResourceManager::merge_cli_config(&mut existing, &defaults);
+
+        assert_eq!(
+            existing.model_rotation,
+            Some(json!(["model1", "model2", "model3"]))
+        );
+
+        // Test that existing model_rotation is preserved
+        let mut existing_with_rotation = CLIConfig {
+            cli_type: CLIType::Codex,
+            model: "custom-model".to_string(),
+            settings: HashMap::new(),
+            max_tokens: None,
+            temperature: None,
+            model_rotation: Some(json!(["existing-model"])),
+        };
+
+        CodeResourceManager::merge_cli_config(&mut existing_with_rotation, &defaults);
+
+        assert_eq!(
+            existing_with_rotation.model_rotation,
+            Some(json!(["existing-model"]))
         );
     }
 }

@@ -64,6 +64,10 @@ pub struct CLIConfig {
     /// Temperature setting
     #[serde(default)]
     pub temperature: Option<f32>,
+
+    /// Model rotation array for retry attempts (JSON array as string or Vec<String>)
+    #[serde(default, rename = "modelRotation", skip_serializing_if = "Option::is_none")]
+    pub model_rotation: Option<serde_json::Value>,
 }
 
 /// `CodeRun` CRD for code implementation tasks
@@ -247,6 +251,7 @@ mod tests {
             },
             max_tokens: Some(4096),
             temperature: Some(0.7),
+            model_rotation: None,
         };
 
         assert_eq!(cli_config.cli_type, CLIType::Codex);
