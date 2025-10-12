@@ -1,5 +1,6 @@
 use crate::cli::types::CLIType;
 use crate::crds::CodeRun;
+use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
     CODE_CLAUDE_CONTAINER_TEMPLATE, CODE_CLAUDE_MEMORY_TEMPLATE, CODE_CLAUDE_SETTINGS_TEMPLATE,
@@ -1047,13 +1048,14 @@ impl CodeTemplateGenerator {
     ) -> Value {
         let mut enriched = cli_config;
 
-        // Extract agent name from github_app field
+        // Extract agent name from github_app field using AgentClassifier
+        let classifier = AgentClassifier::new();
         let agent_name = code_run
             .spec
             .github_app
             .as_deref()
-            .unwrap_or("")
-            .to_lowercase();
+            .and_then(|app| classifier.extract_agent_name(app).ok())
+            .unwrap_or_default();
 
         if let Some(agent_config) = config.agents.get(&agent_name) {
             // If agent has model rotation config, inject it into cli_config
