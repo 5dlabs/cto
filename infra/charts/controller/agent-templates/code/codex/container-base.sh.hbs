@@ -1833,6 +1833,11 @@ patch_coderun_status \
   "false"
 
 {{else}}
+
+# Explicitly stop Docker sidecar before exiting
+echo "🛑 Explicitly stopping Docker sidecar..."
+stop_docker_sidecar || true
+
 echo "✅ Codex execution complete"
 {{/if}}
 exit $EXIT_CODE
