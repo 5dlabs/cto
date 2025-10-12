@@ -366,6 +366,11 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -383,6 +388,12 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -624,6 +635,11 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
@@ -641,6 +657,12 @@ impl CodeTemplateGenerator {
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
             "cli_type": Self::determine_cli_type(code_run).to_string(),
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": render_settings.model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -851,6 +873,12 @@ impl CodeTemplateGenerator {
         let requirements_env_vars: Vec<_> = req_env_set.into_iter().collect();
         let requirements_secret_sources: Vec<_> = req_src_set.into_iter().collect();
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -865,6 +893,13 @@ impl CodeTemplateGenerator {
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
             "cli_config": cli_config,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": code_run.spec.model.clone(),
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -1006,15 +1041,24 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|cfg| cfg.model.as_str())
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
         let context = json!({
             "cli_config": cli_config,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "model": code_run
-                .spec
-                .cli_config
-                .as_ref()
-                .map(|cfg| cfg.model.as_str())
-                .unwrap_or(&code_run.spec.model),
+            "model": model,
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -1027,6 +1071,13 @@ impl CodeTemplateGenerator {
                 .unwrap_or(""),
             "working_directory": Self::get_working_directory(code_run),
             "workflow_name": workflow_name,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
             "toolman": {
                 "tools": remote_tools,
             },
@@ -1859,14 +1910,23 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|cfg| cfg.model.as_str())
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
         let context = json!({
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "model": code_run
-                .spec
-                .cli_config
-                .as_ref()
-                .map(|cfg| cfg.model.as_str())
-                .unwrap_or(&code_run.spec.model),
+            "model": model,
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -1878,6 +1938,13 @@ impl CodeTemplateGenerator {
                 "tools": remote_tools,
             },
             "cli_config": cli_config,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
         });
 
         handlebars.render("opencode_agents", &context).map_err(|e| {
