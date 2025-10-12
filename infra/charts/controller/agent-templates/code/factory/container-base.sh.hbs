@@ -1281,7 +1281,7 @@ Your response:"
 1. **EVERY acceptance criterion is fully implemented** (not just started, but DONE)
 2. All code changes are committed to git
 3. Changes are pushed to remote branch feature/task-{{task_id}}-implementation
-4. A pull request exists (with at least task-{{task_id}} label; other labels are optional)
+4. An **OPEN** pull request exists (with at least task-{{task_id}} label; other labels are optional)
 5. Quality gates passed (cargo fmt, cargo clippy with no warnings, tests pass)
 
 **Be honest**: If ANY acceptance criterion is incomplete or partially implemented, answer 'no' and continue working.
@@ -1290,7 +1290,7 @@ Your response:"
 - Review: \`cat task/acceptance-criteria.md\`
 - Git status: \`git status\`
 - Commits pushed: \`git log origin/main..HEAD\`
-- PR exists: \`gh pr view\`
+- PR exists and is OPEN: \`gh pr list --state open --head $(git branch --show-current)\`
 - Tests pass: Check your test results
 
 **Response format:**
