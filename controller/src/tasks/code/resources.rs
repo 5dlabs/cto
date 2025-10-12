@@ -1455,6 +1455,10 @@ impl<'a> CodeResourceManager<'a> {
             existing.temperature = defaults.temperature;
         }
 
+        if existing.model_rotation.is_none() {
+            existing.model_rotation = defaults.model_rotation.clone();
+        }
+
         for (key, value) in &defaults.settings {
             existing
                 .settings
