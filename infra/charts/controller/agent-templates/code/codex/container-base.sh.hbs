@@ -1581,7 +1581,19 @@ else
   echo "⚠️ Skipping auto PR enforcement due to Codex completion status"
 fi
 
-WORKFLOW_STAGE="${WORKFLOW_STAGE:-}"
+# Map CodeRun stage values to workflow stage labels expected by container logic
+case "${WORKFLOW_STAGE:-}" in
+  "quality")
+    WORKFLOW_STAGE="quality-in-progress"
+    ;;
+  "testing")
+    WORKFLOW_STAGE="testing-in-progress"
+    ;;
+  *)
+    # Use existing value for other stages (implementation, etc.)
+    ;;
+esac
+
 RESOLVED_PR_URL="$(resolve_pr_url)"
 FINAL_PHASE="Running"
 FINAL_REMEDIATION_STATUS=""
