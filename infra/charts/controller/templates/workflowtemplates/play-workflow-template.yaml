@@ -355,6 +355,8 @@ spec:
                   value: "{{`{{workflow.parameters.quality-cli}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.quality-model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{workflow.parameters.quality-model-rotation}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.quality-tools}}`}}"
                 - name: pr-url
@@ -380,6 +382,8 @@ spec:
                   value: "{{`{{workflow.parameters.testing-cli}}`}}"
                 - name: model
                   value: "{{`{{workflow.parameters.testing-model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{workflow.parameters.testing-model-rotation}}`}}"
                 - name: tools-config
                   value: "{{`{{workflow.parameters.testing-tools}}`}}"
                 - name: pr-url
