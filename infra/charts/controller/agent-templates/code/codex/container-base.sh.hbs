@@ -979,7 +979,7 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
 fi
 
 echo "🔑 Configuring Codex authentication"
-if ! codex login --api-key "$OPENAI_API_KEY" >/tmp/codex-login.log 2>&1; then
+if ! printenv OPENAI_API_KEY | codex login --with-api-key >/tmp/codex-login.log 2>&1; then
   echo "❌ Failed to configure Codex API key"
   cat /tmp/codex-login.log >&2 || true
   rm -f /tmp/codex-login.log
