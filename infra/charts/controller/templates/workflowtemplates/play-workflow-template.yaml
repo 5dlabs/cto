@@ -377,7 +377,7 @@ spec:
                 - name: task-id
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
-                  value: "testing"
+                  value: "testing-in-progress"
                 - name: cli-type
                   value: "{{`{{workflow.parameters.testing-cli}}`}}"
                 - name: model
