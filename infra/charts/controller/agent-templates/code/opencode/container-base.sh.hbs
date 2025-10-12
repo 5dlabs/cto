@@ -1837,7 +1837,19 @@ else
 fi
 
 # Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
-WORKFLOW_STAGE="${WORKFLOW_STAGE:-}"
+# Map CodeRun stage values to workflow stage labels expected by container logic
+case "${WORKFLOW_STAGE:-}" in
+  "quality")
+    WORKFLOW_STAGE="quality-in-progress"
+    ;;
+  "testing")
+    WORKFLOW_STAGE="testing-in-progress"
+    ;;
+  *)
+    # Use existing value for other stages (implementation, etc.)
+    ;;
+esac
+
 if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
   PR_NUM="${PR_NUMBER:-}"
   if [ -z "$PR_NUM" ]; then

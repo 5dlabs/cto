@@ -986,6 +986,7 @@ impl<'a> CodeResourceManager<'a> {
             },
             "spec": {
                 "backoffLimit": 0,
+                "ttlSecondsAfterFinished": 3600, // Clean up completed jobs after 1 hour
                 "template": {
                     "metadata": { "labels": labels },
                     "spec": pod_spec
