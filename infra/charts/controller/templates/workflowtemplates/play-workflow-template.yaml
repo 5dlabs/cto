@@ -377,7 +377,7 @@ spec:
                 - name: task-id
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
-                  value: "testing-in-progress"
+                  value: "testing"
                 - name: cli-type
                   value: "{{`{{workflow.parameters.testing-cli}}`}}"
                 - name: model
@@ -860,7 +860,13 @@ spec:
               PR_URL: "{{`{{inputs.parameters.pr-url}}`}}"
               PR_NUMBER: "{{`{{inputs.parameters.pr-number}}`}}"
               QA_READY: "{{`{{inputs.parameters.qa-ready}}`}}"
+              {{#if (eq inputs.parameters.stage "quality")}}
+              WORKFLOW_STAGE: "quality-in-progress"
+              {{else if (eq inputs.parameters.stage "testing")}}
+              WORKFLOW_STAGE: "testing-in-progress"
+              {{else}}
               WORKFLOW_STAGE: "{{`{{inputs.parameters.stage}}`}}"
+              {{/if}}
               WORKFLOW_NAME: "{{`{{workflow.name}}`}}"
               SERVICE_NAME: "{{`{{workflow.parameters.service}}`}}"
               RUN_NAME: "{{`{{workflow.name}}`}}"
