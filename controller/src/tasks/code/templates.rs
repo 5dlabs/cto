@@ -1219,12 +1219,21 @@ impl CodeTemplateGenerator {
             .or_else(|| settings.get("modelCycle"))
             .or_else(|| cli_config.get("modelRotation"))
             .or_else(|| cli_config.get("modelCycle"))
-            .and_then(Value::as_array)
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(Value::as_str)
-                    .map(|s| s.to_string())
-                    .collect::<Vec<_>>()
+            .and_then(|value| {
+                // Handle both JSON array and JSON string representations
+                match value {
+                    Value::Array(arr) => Some(
+                        arr.iter()
+                            .filter_map(Value::as_str)
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>(),
+                    ),
+                    Value::String(s) => {
+                        // Try to parse as JSON array
+                        serde_json::from_str::<Vec<String>>(s).ok()
+                    }
+                    _ => None,
+                }
             })
             .unwrap_or_default();
         let list_tools_on_start = settings
