@@ -1597,4 +1597,9 @@ echo "{{agent_completion_message}}"
 {{else}}
 echo "✅ Cursor execution complete"
 {{/if}}
+
+# Explicitly stop Docker sidecar before exiting
+echo "🛑 Explicitly stopping Docker sidecar..."
+stop_docker_sidecar || true
+
 exit $EXIT_CODE
