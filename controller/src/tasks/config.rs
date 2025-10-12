@@ -469,6 +469,7 @@ impl ControllerConfig {
                         settings,
                         max_tokens: agent.max_tokens,
                         temperature: agent.temperature,
+                        model_rotation: None,
                     };
 
                     self.agent
@@ -734,6 +735,7 @@ cleanup:
                 settings: HashMap::new(),
                 max_tokens: None,
                 temperature: None,
+                model_rotation: None,
             },
         );
 

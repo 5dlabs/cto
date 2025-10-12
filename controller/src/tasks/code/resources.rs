@@ -1542,6 +1542,7 @@ mod tests {
             settings,
             max_tokens: None,
             temperature: None,
+            model_rotation: None,
         }
     }
 
@@ -1559,6 +1560,7 @@ mod tests {
             settings: defaults_settings,
             max_tokens: Some(16_000),
             temperature: Some(0.7_f32),
+            model_rotation: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
@@ -1587,6 +1589,7 @@ mod tests {
             settings: existing_settings,
             max_tokens: Some(8_192),
             temperature: Some(0.3_f32),
+            model_rotation: None,
         };
 
         let mut defaults_settings = HashMap::new();
@@ -1598,6 +1601,7 @@ mod tests {
             settings: defaults_settings,
             max_tokens: Some(16_000),
             temperature: Some(0.9_f32),
+            model_rotation: None,
         };
 
         CodeResourceManager::merge_cli_config(&mut existing, &defaults);
