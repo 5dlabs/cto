@@ -66,7 +66,11 @@ pub struct CLIConfig {
     pub temperature: Option<f32>,
 
     /// Model rotation array for retry attempts (JSON array as string or Vec<String>)
-    #[serde(default, rename = "modelRotation", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "modelRotation",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub model_rotation: Option<serde_json::Value>,
 }
 
