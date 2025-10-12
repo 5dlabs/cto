@@ -1053,11 +1053,10 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
-        let model = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .map(|cfg| cfg.model.as_str())
+        // Extract model from cli_config like other templates do
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
             .unwrap_or(&code_run.spec.model)
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
@@ -1922,11 +1921,10 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
-        let model = code_run
-            .spec
-            .cli_config
-            .as_ref()
-            .map(|cfg| cfg.model.as_str())
+        // Extract model from cli_config like other templates do
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
             .unwrap_or(&code_run.spec.model)
             .to_string();
         let cli_type = Self::determine_cli_type(code_run).to_string();
