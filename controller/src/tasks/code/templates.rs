@@ -879,6 +879,13 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
+        // Extract model from cli_config like other templates do
+        let cli_model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -887,7 +894,7 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
-            "model": code_run.spec.model,
+            "model": cli_model.clone(), // Use cli_model for consistency
             "context_version": code_run.spec.context_version,
             "workflow_env_vars": workflow_env_vars,
             "requirements_env_vars": requirements_env_vars,
@@ -896,7 +903,7 @@ impl CodeTemplateGenerator {
             "cli_type": cli_type,
             "cli": {
                 "type": cli_type,
-                "model": code_run.spec.model.clone(),
+                "model": cli_model, // Use cli_model instead of code_run.spec.model
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
