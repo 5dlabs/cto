@@ -2077,7 +2077,11 @@ $SUCCESS_DETAILS
 
 **APPROVED** - Ready for merge to main branch." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
 
-    # Label manipulation removed - using GitHub PR reviews only
+    # Add approved label to signal workflow completion
+    echo "🏷️  Adding 'approved' label to signal all checks passed"
+    if [ -n "$PR_NUM" ]; then
+      timeout 30 gh pr edit "$PR_NUM" --add-label "approved" || echo "⚠️ Failed to add approved label"
+    fi
     update_coderun_status "approved" "approved" "$PR_URL"
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
