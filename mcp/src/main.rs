@@ -1305,6 +1305,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     params.push(format!("auto-merge={auto_merge}"));
     eprintln!("🐛 DEBUG: Auto-merge enabled: {auto_merge}");
 
+    // Final task parameter - indicates this is the last task requiring deployment verification
+    let final_task = parse_bool_argument(&arguments, "final_task")
+        .unwrap_or(false);
+    params.push(format!("final-task={final_task}"));
+    eprintln!("🐛 DEBUG: Final task flag: {final_task}");
+
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {
         let requirements_content = std::fs::read_to_string(&path).context(format!(

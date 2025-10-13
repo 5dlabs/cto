@@ -2047,7 +2047,69 @@ $PENDING_DETAILS
     # Label manipulation removed - using GitHub PR reviews only
     # Note: No longer setting needs-tess status - GitHub PR review state is the source of truth
   elif [ "$SUCCESS_CHECKS" -eq "$TOTAL_CHECKS" ] && [ "$TOTAL_CHECKS" -gt 0 ]; then
-    echo "✅ All CI checks passing - posting APPROVE review"
+    echo "✅ All CI checks passing"
+    
+    # Check if this is the final task requiring deployment verification
+    DEPLOYMENT_STATUS=""
+    if [ "${FINAL_TASK:-false}" = "true" ]; then
+      echo "🎯 Final task detected - verifying Kubernetes deployment"
+      
+      # Extract service name from repository or use default
+      SERVICE_NAME="${SERVICE:-$(basename "$REPOSITORY" .git)}"
+      NAMESPACE="${NAMESPACE:-agent-platform}"
+      
+      # Check for deployment
+      if kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" &>/dev/null; then
+        READY_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        DESIRED_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+        
+        if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "0" ]; then
+          echo "✅ Deployment verified: $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
+          
+          # Get ingress URLs
+          INGRESS_URLS=$(kubectl get ingress -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.rules[*].host}{"\n"}{end}' 2>/dev/null | grep -v "^$" || echo "")
+          
+          if [ -n "$INGRESS_URLS" ]; then
+            DEPLOYMENT_STATUS="
+
+## 🚀 Deployment Verified
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE  
+- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Live URLs**:
+$(echo "$INGRESS_URLS" | sed 's/^/  - https:\/\//')"
+          else
+            DEPLOYMENT_STATUS="
+
+## 🚀 Deployment Verified
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Access**: Service deployed (no ingress configured)"
+          fi
+        else
+          echo "⚠️ Deployment not ready: $READY_REPLICAS/$DESIRED_REPLICAS replicas"
+          DEPLOYMENT_STATUS="
+
+## ⚠️ Deployment Not Ready
+- **Service**: $SERVICE_NAME  
+- **Namespace**: $NAMESPACE
+- **Status**: ⏳ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Action Required**: Waiting for deployment to stabilize"
+        fi
+      else
+        echo "⚠️ Deployment not found: $SERVICE_NAME in namespace $NAMESPACE"
+        DEPLOYMENT_STATUS="
+
+## ⚠️ Deployment Not Found
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ❌ Deployment not detected
+- **Action Required**: Ensure deployment manifests are applied"
+      fi
+    fi
+    
+    echo "✅ Posting APPROVE review"
     # Get details of successful checks
     if command -v jq >/dev/null 2>&1; then
       SUCCESS_DETAILS=$(echo "$CI_JSON" | jq -r '[.[] | select(.status == "completed" and .conclusion == "success")] | map("- " + .name + " ✅") | join("\n")')
@@ -2068,7 +2130,7 @@ $SUCCESS_DETAILS
 ## Task $TASK_ID Acceptance Criteria
 ✅ **All criteria met**: Implementation complete and verified
 ✅ **Code quality**: Passes all standards
-✅ **Testing**: Comprehensive test coverage achieved
+✅ **Testing**: Comprehensive test coverage achieved$DEPLOYMENT_STATUS
 
 ## Final Assessment
 - **Quality Score**: Excellent implementation
