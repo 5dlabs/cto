@@ -1657,6 +1657,16 @@ EOF
         refresh_token_if_needed || true
         timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
         rm -f "$REVIEW_BODY_FILE"
+        
+        # Auto-merge if enabled (Tess only)
+        if [ "${AUTO_MERGE:-false}" = "true" ]; then
+          echo "🔀 AUTO_MERGE enabled - merging PR automatically"
+          if timeout 30 gh pr merge "$PR_NUM" --auto --squash --delete-branch; then
+            echo "✅ PR scheduled for auto-merge"
+          else
+            echo "⚠️ Auto-merge failed - PR may need manual intervention"
+          fi
+        fi
       else
         # Cleo hands off to Tess via comment and label (NOT approve)
         echo "✅ $STAGE_NAME checks passed - handing off to Tess"

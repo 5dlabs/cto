@@ -196,6 +196,8 @@ struct PlayDefaults {
     quality_max_retries: Option<u32>,
     #[serde(rename = "testingMaxRetries")]
     testing_max_retries: Option<u32>,
+    #[serde(rename = "autoMerge")]
+    auto_merge: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -322,6 +324,18 @@ fn parse_max_retries_argument(arguments: &HashMap<String, Value>, key: &str) -> 
     arguments.get(key).and_then(|value| match value {
         Value::Number(num) => num.as_u64().map(|v| v as u32),
         Value::String(s) => s.parse::<u32>().ok(),
+        _ => None,
+    })
+}
+
+fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<bool> {
+    arguments.get(key).and_then(|value| match value {
+        Value::Bool(b) => Some(*b),
+        Value::String(s) => match s.to_lowercase().as_str() {
+            "true" | "yes" | "1" => Some(true),
+            "false" | "no" | "0" => Some(false),
+            _ => None,
+        },
         _ => None,
     })
 }
@@ -1283,6 +1297,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     params.push(format!("quality-max-retries={quality_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));
     params.push(format!("opencode-max-retries={opencode_max_retries}"));
+
+    // Auto-merge parameter
+    let auto_merge = parse_bool_argument(&arguments, "auto_merge")
+        .or(config.defaults.play.auto_merge)
+        .unwrap_or(false);
+    params.push(format!("auto-merge={auto_merge}"));
+    eprintln!("🐛 DEBUG: Auto-merge enabled: {auto_merge}");
 
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {
