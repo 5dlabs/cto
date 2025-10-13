@@ -2055,7 +2055,7 @@ $PENDING_DETAILS
       echo "🎯 Final task detected - verifying Kubernetes deployment"
       
       # Extract service name from repository or use default
-      SERVICE_NAME="${SERVICE:-$(basename "$REPOSITORY" .git)}"
+      SERVICE_NAME="${SERVICE_NAME:-$(basename "$REPOSITORY" .git)}"
       NAMESPACE="${NAMESPACE:-agent-platform}"
       
       # Check for deployment
