@@ -1720,18 +1720,88 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
 - Production readiness confirmed"
         NEXT_STAGE="human review and merge"
         
+        # Check if this is the final task requiring deployment verification
+        DEPLOYMENT_STATUS=""
+        if [ "${FINAL_TASK:-false}" = "true" ]; then
+          echo "🎯 Final task detected - verifying Kubernetes deployment"
+          
+          # Extract service name from repository or use default
+          SERVICE_NAME="${SERVICE_NAME:-$(basename "$REPOSITORY" .git)}"
+          NAMESPACE="${NAMESPACE:-agent-platform}"
+          
+          # Check for deployment
+          if kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" &>/dev/null; then
+            READY_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            DESIRED_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+            
+            if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "0" ]; then
+              echo "✅ Deployment verified: $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
+              
+              # Get ingress URLs
+              INGRESS_URLS=$(kubectl get ingress -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.rules[*].host}{"\n"}{end}' 2>/dev/null | grep -v "^$" || echo "")
+              
+              if [ -n "$INGRESS_URLS" ]; then
+                DEPLOYMENT_STATUS="
+
+## 🚀 Deployment Verified
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Live URLs**:
+$(echo "$INGRESS_URLS" | sed 's/^/  - https:\/\//')"
+              else
+                DEPLOYMENT_STATUS="
+
+## 🚀 Deployment Verified
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ✅ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Access**: Service deployed (no ingress configured)"
+              fi
+            else
+              echo "⚠️ Deployment not ready: $READY_REPLICAS/$DESIRED_REPLICAS replicas"
+              DEPLOYMENT_STATUS="
+
+## ⚠️ Deployment Not Ready
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ⏳ $READY_REPLICAS/$DESIRED_REPLICAS replicas ready
+- **Action Required**: Waiting for deployment to stabilize"
+            fi
+          else
+            echo "⚠️ Deployment not found: $SERVICE_NAME in namespace $NAMESPACE"
+            DEPLOYMENT_STATUS="
+
+## ⚠️ Deployment Not Found
+- **Service**: $SERVICE_NAME
+- **Namespace**: $NAMESPACE
+- **Status**: ❌ Deployment not detected
+- **Action Required**: Ensure deployment manifests are applied"
+          fi
+        fi
+        
         echo "✅ $STAGE_NAME complete - posting APPROVE review (Tess final approval)"
         REVIEW_BODY=$(cat <<EOF
 ### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All checks have passed:
 $CHECKS_PASSED
-Ready for $NEXT_STAGE.
+Ready for $NEXT_STAGE.$DEPLOYMENT_STATUS
 
 **Final Approval:** Tess has verified all acceptance criteria are met.
 EOF
 )
         refresh_token_if_needed || true
         timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
+        
+        # Auto-merge if enabled (Tess only)
+        if [ "${AUTO_MERGE:-false}" = "true" ]; then
+          echo "🔀 AUTO_MERGE enabled - merging PR automatically"
+          if timeout 30 gh pr merge "$PR_NUM" --auto --squash --delete-branch; then
+            echo "✅ PR scheduled for auto-merge"
+          else
+            echo "⚠️ Auto-merge failed - PR may need manual intervention"
+          fi
+        fi
       else
         # Cleo hands off to Tess via comment and label (NOT approve)
         echo "✅ $STAGE_NAME checks passed - handing off to Tess"

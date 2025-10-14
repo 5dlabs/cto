@@ -45,7 +45,9 @@ spec:
           "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}",
           "implementation-max-retries": "{{`{{workflow.parameters.implementation-max-retries}}`}}",
           "quality-max-retries": "{{`{{workflow.parameters.quality-max-retries}}`}}",
-          "testing-max-retries": "{{`{{workflow.parameters.testing-max-retries}}`}}"
+          "testing-max-retries": "{{`{{workflow.parameters.testing-max-retries}}`}}",
+          "auto-merge": "{{`{{workflow.parameters.auto-merge}}`}}",
+          "final-task": "{{`{{workflow.parameters.final-task}}`}}"
         }
 
   # Main entry point
@@ -162,6 +164,12 @@ spec:
       - name: testing-max-retries
         description: "Maximum retry attempts for testing agent executions (0 = unlimited)"
         value: "10"
+      - name: auto-merge
+        description: "Whether Tess should automatically merge PRs after approval (true/false)"
+        value: "false"
+      - name: final-task
+        description: "Whether this is the final task requiring deployment verification (true/false)"
+        value: "false"
 
   # Workflow instance naming pattern
   onExit: cleanup-handler
@@ -392,6 +400,10 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.testing-max-retries}}`}}"
+                - name: auto-merge
+                  value: "{{`{{workflow.parameters.auto-merge}}`}}"
+                - name: final-task
+                  value: "{{`{{workflow.parameters.final-task}}`}}"
         - - name: update-to-waiting-qa
             template: update-workflow-stage
             arguments:
@@ -737,6 +749,10 @@ spec:
             default: "false"
           - name: max-retries
             default: ""
+          - name: auto-merge
+            default: "false"
+          - name: final-task
+            default: "false"
       outputs:
         parameters:
           - name: coderun-name
@@ -872,6 +888,8 @@ spec:
               CLAUDE_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               OPENCODE_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               OPENCODE_VERBOSE: "{{`{{workflow.parameters.opencode-verbose}}`}}"
+              AUTO_MERGE: "{{`{{inputs.parameters.auto-merge}}`}}"
+              FINAL_TASK: "{{`{{inputs.parameters.final-task}}`}}"
 
     # Helper to reliably resolve the created CodeRun name before waiting for completion
     - name: resolve-coderun-name

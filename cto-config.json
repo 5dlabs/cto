@@ -49,7 +49,8 @@
       "maxRetries": 10,
       "implementationMaxRetries": 10,
       "qualityMaxRetries": 5,
-      "testingMaxRetries": 5
+      "testingMaxRetries": 5,
+      "autoMerge": true
     },
     "docs_ingest": {
       "model": "claude-sonnet-4-20250514",
