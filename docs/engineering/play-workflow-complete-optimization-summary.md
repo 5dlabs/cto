@@ -34,16 +34,18 @@ Changed PR creation polling from 60s to 20s:
 
 **Location**: Line ~535
 
-### 3. Per-Stage Timeout Guards (Priority 1)
-**File Modified**: `play-workflow-template.yaml`  
-**Expected Impact**: Prevent runaway executions
+### 3. ~~Per-Stage Timeout Guards~~ (Removed - Not Supported)
+**Status**: ❌ Removed due to Argo version incompatibility  
+**Reason**: Argo Workflows doesn't support step-level `timeout:` field
 
-Added stage-specific timeouts:
-- Implementation (Rex): 25 minutes
-- Quality (Cleo): 20 minutes  
-- Testing (Tess): 30 minutes
+Attempted to add stage-specific timeouts but received error:
+```
+json: unknown field "timeout"
+```
 
-**Locations**: Lines ~270, ~350, ~380
+**Current Protection**: Workflow-level timeout exists (`activeDeadlineSeconds: 1209600` = 14 days)
+
+**Future**: May be possible with Argo upgrade or different syntax
 
 ### 4. Incremental Context Persistence (Priority 2)
 **Files Modified**: All CLI container scripts  
