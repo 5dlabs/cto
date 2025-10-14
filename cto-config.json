@@ -36,8 +36,8 @@
       }
     },
     "play": {
-      "model": "claude-sonnet-4-20250514",
-      "cli": "claude",
+      "model": "claude-sonnet-4-5-20250929",
+      "cli": "factory",
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
       "testingAgent": "5DLabs-Tess",
@@ -80,14 +80,14 @@
     },
     "rex": {
       "githubApp": "5DLabs-Rex",
-      "cli": "codex",
-      "model": "gpt-5-codex",
+      "cli": "factory",
+      "model": "claude-sonnet-4-5-20250929",
       "modelRotation": {
         "enabled": true,
         "models": [
+          "claude-sonnet-4-5-20250929",
           "gpt-5-codex",
-          "gpt-5-codex-preview",
-          "claude-sonnet-4-20250514"
+          "claude-opus-4-1-20250805"
         ]
       },
       "tools": {
