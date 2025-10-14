@@ -269,7 +269,6 @@ spec:
       steps:
         - - name: implementation-work
             template: agent-coderun
-            timeout: 25m  # Prevent runaway implementation work
             arguments:
               parameters:
                 - name: github-app
@@ -352,7 +351,6 @@ spec:
             template: agent-coderun
             continueOn:
               failed: true  # Allow workflow to proceed to Tess even if Cleo finds issues
-            timeout: 20m  # Prevent runaway quality checks (increased from 15m to 20m for safety)
             arguments:
               parameters:
                 - name: github-app
@@ -380,7 +378,6 @@ spec:
         # continueOn.failed allows Tess to run even if Cleo raises concerns
         - - name: testing-work
             template: agent-coderun
-            timeout: 30m  # Prevent runaway testing (E2E tests can take longer)
             arguments:
               parameters:
                 - name: github-app
