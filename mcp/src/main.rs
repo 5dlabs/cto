@@ -1121,30 +1121,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     validate_model_name(&testing_model)
         .map_err(|e| anyhow!("Invalid testing agent model: {}", e))?;
 
-    eprintln!("🐛 DEBUG: Play workflow submitting with task_id: {task_id}");
-    eprintln!("🐛 DEBUG: Play workflow repository: {repository}");
-    eprintln!("🐛 DEBUG: Play workflow service: {service}");
-    eprintln!(
-        "🐛 DEBUG: Implementation agent: {implementation_agent} (CLI: {implementation_cli}, Model: {implementation_model})"
-    );
-    eprintln!("🐛 DEBUG: Implementation tools: {implementation_tools}");
-    eprintln!(
-        "🐛 DEBUG: Quality agent: {quality_agent} (CLI: {quality_cli}, Model: {quality_model})"
-    );
-    eprintln!("🐛 DEBUG: Quality tools: {quality_tools}");
-    eprintln!(
-        "🐛 DEBUG: Testing agent: {testing_agent} (CLI: {testing_cli}, Model: {testing_model})"
-    );
-    eprintln!("🐛 DEBUG: Testing tools: {testing_tools}");
-
-    eprintln!(
-        "🐛 DEBUG: Available agents in config: {:?}",
-        config.agents.keys().collect::<Vec<_>>()
-    );
-    eprintln!("🐛 DEBUG: Implementation agent input: '{implementation_agent_input}'");
-    eprintln!("🐛 DEBUG: Quality agent input: '{quality_agent_input}'");
-    eprintln!("🐛 DEBUG: Testing agent input: '{testing_agent_input}'");
-
     let implementation_max_retries =
         parse_max_retries_argument(&arguments, "implementation_max_retries")
             .or(parse_max_retries_argument(
@@ -1178,11 +1154,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let opencode_max_retries_override =
         parse_max_retries_argument(&arguments, "opencode_max_retries");
     let opencode_max_retries = opencode_max_retries_override.unwrap_or(implementation_max_retries);
-
-    eprintln!("🐛 DEBUG: Implementation max retries: {implementation_max_retries}");
-    eprintln!("🐛 DEBUG: Quality max retries: {quality_max_retries}");
-    eprintln!("🐛 DEBUG: Testing max retries: {testing_max_retries}");
-    eprintln!("🐛 DEBUG: OpenCode max retries: {opencode_max_retries}");
 
     // Check for requirements.yaml file
     // Try to determine workspace directory, but don't fail if we can't
@@ -1255,13 +1226,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or(config.defaults.play.auto_merge)
         .unwrap_or(false);
     params.push(format!("auto-merge={auto_merge}"));
-    eprintln!("🐛 DEBUG: Auto-merge enabled: {auto_merge}");
 
     // Final task parameter - indicates this is the last task requiring deployment verification
     let final_task = parse_bool_argument(&arguments, "final_task")
         .unwrap_or(false);
     params.push(format!("final-task={final_task}"));
-    eprintln!("🐛 DEBUG: Final task flag: {final_task}");
 
     // Load and encode requirements.yaml if it exists
     if let Some(path) = requirements_path {
