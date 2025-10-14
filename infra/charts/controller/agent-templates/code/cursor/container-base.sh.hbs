@@ -1164,9 +1164,103 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   # Refresh GitHub token at the start of each iteration to keep gh interactions authenticated
   refresh_github_token || true
 
+  # =========================================================================
+  # FAST-PATH: Skip work if PR already approved
+  # =========================================================================
+  # Only applies to quality and testing agents (Cleo/Tess), not implementation (Rex)
+  if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ] && [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
+    echo ""
+    echo "🔍 Checking if PR #${PR_NUMBER} already has approval..."
+    
+    # Check for existing approvals
+    APPROVAL_COUNT=$(gh pr view "$PR_NUMBER" --json reviews --jq '[.reviews[] | select(.state == "APPROVED")] | length' 2>/dev/null || echo "0")
+    
+    if [ "${APPROVAL_COUNT:-0}" -gt 0 ]; then
+      echo "✅ PR #${PR_NUMBER} already has ${APPROVAL_COUNT} approval(s)"
+      echo "🚀 FAST-PATH: Skipping ${WORKFLOW_STAGE} checks since PR is already approved"
+      
+      # Determine agent name for message
+      AGENT_NAME="Quality Agent"
+      TIME_SAVED="10-15 minutes"
+      if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
+        AGENT_NAME="Testing Agent"
+        TIME_SAVED="15-20 minutes"
+      fi
+      
+      # Post a quick comment explaining the skip
+      gh pr comment "$PR_NUMBER" --body "✅ **${AGENT_NAME} - Fast-Path**
+
+PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant ${WORKFLOW_STAGE} checks.
+
+**Fast-Path Benefits:**
+- Saves ~${TIME_SAVED} of execution time
+- Reduces unnecessary compute and model API calls
+- PR already validated by previous quality gate
+
+_${AGENT_NAME} will still run full checks if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
+
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=1
+      break
+    else
+      echo "ℹ️ No existing approvals found, proceeding with ${WORKFLOW_STAGE} checks"
+    fi
+  fi
+  echo ""
+
   CURRENT_ATTEMPT=$ATTEMPT
   LAST_MESSAGE_FILE="/tmp/cursor-last-message-${ATTEMPT}.txt"
   RUN_LOG="/tmp/cursor-run-${ATTEMPT}.jsonl"
+
+  # =========================================================================
+  # INCREMENTAL CONTEXT: Load previous iteration findings
+  # =========================================================================
+  AGENT_STATE_DIR="/workspace/.agent-state"
+  mkdir -p "$AGENT_STATE_DIR"
+  
+  PREVIOUS_CONTEXT=""
+  if [ $ATTEMPT -gt 1 ]; then
+    PREV_ATTEMPT=$((ATTEMPT - 1))
+    PREV_STATE_FILE="$AGENT_STATE_DIR/${WORKFLOW_STAGE:-agent}-iteration-${PREV_ATTEMPT}.json"
+    
+    if [ -f "$PREV_STATE_FILE" ]; then
+      echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
+      
+      # Extract key findings from previous run
+      if command -v jq >/dev/null 2>&1; then
+        PREV_FINDINGS=$(jq -r '.findings // "No findings recorded"' "$PREV_STATE_FILE" 2>/dev/null || echo "")
+        PREV_STATUS=$(jq -r '.status // "unknown"' "$PREV_STATE_FILE" 2>/dev/null || echo "unknown")
+        PREV_ISSUES=$(jq -r '.issues // []' "$PREV_STATE_FILE" 2>/dev/null || echo "[]")
+        
+        if [ -n "$PREV_FINDINGS" ] && [ "$PREV_FINDINGS" != "No findings recorded" ]; then
+          PREVIOUS_CONTEXT="
+
+## 🔄 Context from Previous Iteration (#$PREV_ATTEMPT)
+
+**Status**: $PREV_STATUS
+
+**Previous Findings**:
+$PREV_FINDINGS
+
+**Focus for This Iteration**:
+- Address the issues identified above
+- Don't repeat the same analysis
+- Build on previous progress incrementally
+
+"
+          echo "✅ Loaded context: $PREV_STATUS with findings"
+        fi
+      fi
+    else
+      echo "ℹ️ No previous iteration state found (first attempt or state cleared)"
+    fi
+  fi
+  
+  # Append previous context to prompt if available
+  if [ -n "$PREVIOUS_CONTEXT" ]; then
+    PROMPT_CONTENT="${PROMPT_CONTENT}${PREVIOUS_CONTEXT}"
+    echo "📝 Enhanced prompt with previous iteration context"
+  fi
 
   CURSOR_CMD=("cursor-agent" "--print" "--output-format" "$OUTPUT_FORMAT")
   if [ -n "$CURRENT_MODEL" ]; then
@@ -1338,10 +1432,48 @@ Address the items above before rerunning checks."
     fi
   fi
 
+  # =========================================================================
+  # SAVE ITERATION STATE: Persist findings for next iteration
+  # =========================================================================
+  STATE_FILE="$AGENT_STATE_DIR/${WORKFLOW_STAGE:-agent}-iteration-${ATTEMPT}.json"
+  
   if [ "$COMPLETION_RESPONSE" = "yes" ]; then
+    # Save successful completion state
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "completed",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": "Task completed successfully on iteration $ATTEMPT",
+  "completion_response": "yes",
+  "issues": []
+}
+EOF
+    echo "💾 Saved successful completion state to $STATE_FILE"
+    
     SUCCESS=1
     COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     break
+  else
+    # Save incomplete state with findings for next iteration
+    ISSUES_JSON="[]"
+    if [ -n "$CURRENT_REASON" ]; then
+      # Escape quotes and newlines for JSON
+      ESCAPED_REASON=$(printf '%s' "$CURRENT_REASON" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+      ISSUES_JSON="[\"$ESCAPED_REASON\"]"
+    fi
+    
+    cat > "$STATE_FILE" <<EOF
+{
+  "iteration": $ATTEMPT,
+  "status": "incomplete",
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "findings": $([ -n "$CURRENT_REASON" ] && echo "\"$ESCAPED_REASON\"" || echo "\"No specific issues identified\""),
+  "completion_response": "no",
+  "issues": $ISSUES_JSON
+}
+EOF
+    echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
   fi
 
   if [ -n "$CURRENT_REASON" ]; then
