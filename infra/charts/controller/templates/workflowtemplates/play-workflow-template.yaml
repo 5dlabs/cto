@@ -785,6 +785,10 @@ spec:
                   value: "{{`{{inputs.parameters.qa-ready}}`}}"
                 - name: max-retries
                   value: "{{`{{inputs.parameters.max-retries}}`}}"
+                - name: auto-merge
+                  value: "{{`{{inputs.parameters.auto-merge}}`}}"
+                - name: final-task
+                  value: "{{`{{inputs.parameters.final-task}}`}}"
         - - name: resolve-coderun-name
             template: resolve-coderun-name
             arguments:
@@ -825,6 +829,10 @@ spec:
             default: "false"
           - name: max-retries
             default: ""
+          - name: auto-merge
+            default: "false"
+          - name: final-task
+            default: "false"
       outputs:
         parameters:
           - name: name
