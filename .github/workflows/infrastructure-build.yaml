@@ -38,6 +38,7 @@ jobs:
   # Build infrastructure images
   build-infrastructure:
     runs-on: [k8s-runner]
+    timeout-minutes: 120
     permissions:
       contents: read
       packages: write
