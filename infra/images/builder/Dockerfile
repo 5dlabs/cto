@@ -1,6 +1,6 @@
 # Rust builder image for fast CI builds
 # Based on official GitHub Actions Runner Controller (ARC) image
-FROM ghcr.io/actions/actions-runner:2.327.1
+FROM ghcr.io/actions/actions-runner:2.328.0
 
 # Switch to root for installations
 USER root
@@ -19,11 +19,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && \
     # Add LLVM repository for modern clang/lld
     curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-15 main" | tee /etc/apt/sources.list.d/llvm.list > /dev/null \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-15 main" | tee /etc/apt/sources.list.d/llvm.list > /dev/null \
     && \
     # Add Docker's official GPG key and repository
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && ARCH=$(dpkg --print-architecture) \
+    && echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && \
     # Update package lists and install all packages
     apt-get update && apt-get install -y \
