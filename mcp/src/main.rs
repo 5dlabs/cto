@@ -350,8 +350,28 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
     }
 }
 
+fn find_command(name: &str) -> String {
+    // Check common installation locations in order
+    let common_paths = [
+        format!("/opt/homebrew/bin/{}", name),  // Homebrew Apple Silicon
+        format!("/usr/local/bin/{}", name),     // Homebrew Intel / standard Linux
+        format!("/usr/bin/{}", name),           // System binaries
+        name.to_string(),                        // Fallback to PATH
+    ];
+    
+    for path in &common_paths {
+        if std::path::Path::new(path).exists() {
+            return path.clone();
+        }
+    }
+    
+    // If nothing found, return the name and let PATH resolution happen
+    name.to_string()
+}
+
 fn run_argo_cli(args: &[&str]) -> Result<String> {
-    let output = Command::new("argo")
+    let argo_cmd = find_command("argo");
+    let output = Command::new(&argo_cmd)
         .args(args)
         .output()
         .context("Failed to execute argo command")?;
@@ -1439,7 +1459,8 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
     });
 
     // Create the ConfigMap using kubectl
-    let cm_output = std::process::Command::new("kubectl")
+    let kubectl_cmd = find_command("kubectl");
+    let cm_output = std::process::Command::new(&kubectl_cmd)
         .args([
             "create",
             "configmap",
@@ -1466,7 +1487,8 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
     // Submit Argo workflow with minimal parameters
     let workflow_name = format!("intake-{}", chrono::Utc::now().timestamp());
 
-    let output = std::process::Command::new("argo")
+    let argo_cmd = find_command("argo");
+    let output = std::process::Command::new(&argo_cmd)
         .args([
             "submit",
             "--from",
@@ -1661,7 +1683,8 @@ fn handle_method(method: &str, params: Option<&Value>) -> Option<Result<Value>> 
 }
 
 fn run_kubectl_json(args: &[&str]) -> Result<Value> {
-    let output = std::process::Command::new("kubectl").args(args).output()?;
+    let kubectl_cmd = find_command("kubectl");
+    let output = std::process::Command::new(&kubectl_cmd).args(args).output()?;
     if output.status.success() {
         let stdout = String::from_utf8(output.stdout)?;
         let v: Value = serde_json::from_str(&stdout)?;
