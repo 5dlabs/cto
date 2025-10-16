@@ -254,7 +254,6 @@ Control and monitor your AI development workflows:
 
 - **`jobs()`** - List all running workflows with status
 - **`stop_job()`** - Stop any running workflow gracefully
-- **`input()`** - Send live messages to running AI agents
 - **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
 
 All operations run as **Kubernetes jobs** with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup.
@@ -264,7 +263,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 ## **🚀 Getting Started**
 
 ### Prerequisites
-- Access to any MCP-compatible AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
+- Access to any AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
 - A project with Task Master initialized (`.taskmaster/` directory)
 - GitHub repository for your project
 
@@ -780,32 +779,7 @@ stop_job({
 
 **Workflow types:** `intake`, `play`, `workflow`
 
-### 6. **`input()` - Live Agent Communication**
-Send messages to running AI agents in real-time.
-
-```javascript
-// Send message to active job
-input({
-  text: "Please add error handling for edge cases"
-});
-
-// Route by specific job name
-input({
-  text: "Update the API endpoint to use /v2",
-  name: "code-5dlabs-cto-task-5",
-  job_type: "code"
-});
-
-// Route by user label
-input({
-  text: "Can you explain your approach?",
-  user: "jonathon"
-});
-```
-
-**Use cases:** Provide guidance, answer questions, steer implementation
-
-### 7. **`docs_ingest()` - Documentation Analysis**
+### 6. **`docs_ingest()` - Documentation Analysis**
 Intelligently analyze GitHub repos and ingest documentation.
 
 ```javascript
@@ -1022,7 +996,7 @@ Common variables available in templates:
    - Use `docs()` for documentation generation
    - Use `play()` for full-cycle development (implementation → QA → testing)
    - Use `intake_prd()` for new project setup from PRDs
-   - Use `jobs()` / `stop_job()` / `input()` for workflow management
+   - Use `jobs()` / `stop_job()` for workflow management
 4. **Mix and match CLIs** - assign the best CLI to each agent based on task requirements
 5. **Customize tool access** - use the `tools` configuration to control agent capabilities
 6. **Use minimal MCP calls** - let configuration defaults handle most parameters
