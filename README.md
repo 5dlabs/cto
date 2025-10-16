@@ -274,7 +274,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 This is an integrated platform with crystal-clear data flow:
 
 **Component Architecture:**
-- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any MCP-compatible CLI with configuration-driven defaults
+- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with configuration-driven defaults
 - **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
 - **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
@@ -282,7 +282,7 @@ This is an integrated platform with crystal-clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-1. Any MCP-compatible CLI calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
+1. Any CLI calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
@@ -349,18 +349,18 @@ helm upgrade --install twingate-weightless-hummingbird twingate/connector \
 
 ### Install MCP Server
 
-For MCP-compatible CLI integration (Cursor, Claude Code, etc.), install the MCP server:
+For CLI integration (Cursor, Claude Code, etc.), install the MCP server:
 
 ```bash
 # One-liner installer (Linux/macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/5dlabs/cto/releases/download/v0.2.0/tools-installer.sh | sh
 
 # Verify installation
-cto-mcp --help   # MCP server for any MCP-compatible CLI
+cto-mcp --help   # MCP server for any CLI
 ```
 
 **What you get:**
-- `cto-mcp` - MCP server that integrates with any MCP-compatible CLI
+- `cto-mcp` - MCP server that integrates with any CLI
 - Multi-platform support (Linux x64/ARM64, macOS Intel/Apple Silicon, Windows x64)
 - Automatic installation to system PATH
 
@@ -504,7 +504,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
 
 ### Configure MCP Integration
 
-After creating your configuration file, configure your MCP-compatible CLI to use the MCP server.
+After creating your configuration file, configure your CLI to use the MCP server.
 
 **For Cursor**, create a `.cursor/mcp.json` file in your project directory:
 
