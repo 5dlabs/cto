@@ -11,7 +11,7 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.19+-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 
 ### **💎 Production-Ready AI Development Platform - MCP Protocol Native 💎**
-*Deploy autonomous Claude agents that ship production code via GitHub PRs*
+*Deploy autonomous AI agents with your choice of CLI that ship production code via GitHub PRs*
 
 </div>
 
@@ -264,7 +264,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 ## **🚀 Getting Started**
 
 ### Prerequisites
-- Access to a Cursor/Claude environment with MCP support
+- Access to any MCP-compatible AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
 - A project with Task Master initialized (`.taskmaster/` directory)
 - GitHub repository for your project
 
@@ -275,7 +275,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 This is an integrated platform with crystal-clear data flow:
 
 **Component Architecture:**
-- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from Cursor/Claude with configuration-driven defaults
+- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any MCP-compatible CLI with configuration-driven defaults
 - **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
 - **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
@@ -283,12 +283,12 @@ This is an integrated platform with crystal-clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-1. Cursor/Claude calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
+1. Any MCP-compatible CLI calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
 5. Dedicated Kubernetes controllers reconcile CRDs with idempotent job management
-6. Controllers deploy CLI agents (Claude Code, Cursor, Codex, OpenCode, Factory) as Jobs with workspace isolation
+6. Controllers deploy configured CLI agents (Claude Code, Cursor, Factory, Codex, OpenCode, etc.) as Jobs with workspace isolation
 7. Agents authenticate via GitHub Apps and complete work
 8. Agents submit GitHub PRs with automatic cleanup
 
@@ -350,18 +350,18 @@ helm upgrade --install twingate-weightless-hummingbird twingate/connector \
 
 ### Install MCP Server
 
-For Cursor/Claude integration, install the MCP server:
+For MCP-compatible CLI integration (Cursor, Claude Code, etc.), install the MCP server:
 
 ```bash
 # One-liner installer (Linux/macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/5dlabs/cto/releases/download/v0.2.0/tools-installer.sh | sh
 
 # Verify installation
-cto-mcp --help   # MCP server for Cursor/Claude integration
+cto-mcp --help   # MCP server for any MCP-compatible CLI
 ```
 
 **What you get:**
-- `cto-mcp` - MCP server that integrates with Cursor/Claude
+- `cto-mcp` - MCP server that integrates with any MCP-compatible CLI
 - Multi-platform support (Linux x64/ARM64, macOS Intel/Apple Silicon, Windows x64)
 - Automatic installation to system PATH
 
@@ -503,9 +503,11 @@ Create a `cto-config.json` file in your project root to configure agents, models
 - **Tool Profiles**: Customize tool access per agent
 - **Security**: Restrict agent capabilities as needed
 
-### Configure Cursor MCP Integration
+### Configure MCP Integration
 
-After creating your configuration file, configure Cursor to use the MCP server by creating a `.cursor/mcp.json` file in your project directory:
+After creating your configuration file, configure your MCP-compatible CLI to use the MCP server.
+
+**For Cursor**, create a `.cursor/mcp.json` file in your project directory:
 
 ```json
 {
@@ -519,10 +521,23 @@ After creating your configuration file, configure Cursor to use the MCP server b
 }
 ```
 
+**For Claude Code**, add to your MCP configuration (typically in `~/.config/claude/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "cto-mcp": {
+      "command": "cto-mcp",
+      "args": []
+    }
+  }
+}
+```
+
 **Usage:**
 1. Create the `cto-config.json` file in your project root with your specific settings
-2. Create the `.cursor/mcp.json` file to enable MCP integration
-3. Restart Cursor to load the MCP server
+2. Configure your CLI's MCP integration as shown above
+3. Restart your CLI to load the MCP server
 4. All MCP tools will be available with your configured defaults
 
 **Benefits of Configuration-Driven Approach:**
@@ -856,11 +871,11 @@ The platform uses a template system to customize agent behavior, settings, and p
 
 All templates now live under `infra/charts/controller/agent-templates/` with CLI-specific subdirectories:
 
-**Docs Tasks (Claude today)**
+**Docs Tasks (Multi-CLI Support)**
 
-- **Prompts**: Rendered from `docs/claude/prompt.md.hbs` into the ConfigMap
-- **Settings**: `docs/claude/settings.json.hbs` controls model, permissions, tools
-- **Container Script**: `docs/claude/container.sh.hbs` handles Git workflow and CLI execution
+- **Prompts**: Rendered from `docs/{cli}/prompt.md.hbs` into the ConfigMap
+- **Settings**: `docs/{cli}/settings.json.hbs` controls model, permissions, tools
+- **Container Script**: `docs/{cli}/container.sh.hbs` handles Git workflow and CLI execution
 
 **Code Tasks (multi-CLI)**
 
@@ -887,34 +902,44 @@ All templates now live under `infra/charts/controller/agent-templates/` with CLI
 
 #### 1. Changing Agent Settings
 
-Edit the settings template files directly:
+Edit the settings template files for your chosen CLI:
 
 ```bash
-# For docs (Claude) agents
+# For docs agents (Claude Code example)
 vim infra/charts/controller/agent-templates/docs/claude/settings.json.hbs
 
-# For code (Claude) agents
+# For code agents (Claude Code example)
 vim infra/charts/controller/agent-templates/code/claude/settings.json.hbs
 
-# For code (Codex) agents
+# For code agents (Codex example)
 vim infra/charts/controller/agent-templates/code/codex/config.toml.hbs
+
+# For code agents (Factory example)
+vim infra/charts/controller/agent-templates/code/factory/factory-cli-config.json.hbs
 ```
 
 Settings control:
-- Model selection (`claude-opus-4`, `claude-sonnet-4`, etc.)
+- Model selection (CLI-specific model identifiers)
 - Tool permissions and access
 - MCP tool configuration
-- Enterprise managed settings
+- CLI-specific settings (permissions, hooks, etc.)
 
-See [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settings) for complete configuration options.
+Refer to your CLI's documentation for complete configuration options:
+- [Claude Code Settings](https://docs.anthropic.com/en/docs/claude-code/settings)
+- [Factory CLI Documentation](https://docs.factory.ai)
+- Other CLIs: Refer to their respective documentation
 
 #### 2. Updating Prompts
 
 **For docs tasks** (affects all documentation generation):
 
 ```bash
-# Edit the docs prompt template
+# Edit the docs prompt template for your CLI
+vim infra/charts/controller/agent-templates/docs/{cli}/prompt.md.hbs
+
+# Examples:
 vim infra/charts/controller/agent-templates/docs/claude/prompt.md.hbs
+vim infra/charts/controller/agent-templates/docs/cursor/prompt.md.hbs
 ```
 
 **For code tasks** (affects specific task implementation):
@@ -946,16 +971,21 @@ The play workflow template controls:
 Hooks are shell scripts that run during agent execution. Add new hook files beneath the CLI you are extending:
 
 ```bash
-# Create new hook script (docs/Claude example)
+# Create new hook script (docs/Claude Code example)
 vim infra/charts/controller/agent-templates/docs/claude/hooks/my-custom-hook.sh.hbs
 
 # Create new hook script (code/Codex example)
 vim infra/charts/controller/agent-templates/code/codex/hooks/my-custom-hook.sh.hbs
+
+# Create new hook script (code/Factory example)
+vim infra/charts/controller/agent-templates/code/factory/hooks/my-custom-hook.sh.hbs
 ```
 
 Hook files are automatically discovered and rendered. Ensure the hook name matches any references in your settings templates.
 
-See [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide) for detailed hook configuration and examples.
+Refer to your CLI's documentation for hook configuration:
+- [Claude Code Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide)
+- Other CLIs: Refer to their respective documentation for hook/script support
 
 #### 5. Deploying Template Changes
 
@@ -1071,6 +1101,6 @@ See our [ROADMAP.md](ROADMAP.md) for upcoming features and planned enhancements 
 
 ---
 
-*The platform runs on Kubernetes and automatically manages Claude agent deployments, workspace isolation, and GitHub integration. All you need to do is call the MCP tools and review the resulting PRs.*
+*The platform runs on Kubernetes and automatically manages multi-CLI agent deployments, workspace isolation, and GitHub integration. All you need to do is call the MCP tools and review the resulting PRs.*
 
 </div>
