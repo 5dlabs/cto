@@ -254,7 +254,6 @@ Control and monitor your AI development workflows:
 
 - **`jobs()`** - List all running workflows with status
 - **`stop_job()`** - Stop any running workflow gracefully
-- **`input()`** - Send live messages to running AI agents
 - **`docs_ingest()`** - Intelligently analyze and ingest documentation from GitHub repos
 
 All operations run as **Kubernetes jobs** with enhanced reliability through TTL-safe reconciliation, preventing infinite loops and ensuring proper resource cleanup.
@@ -264,7 +263,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 ## **🚀 Getting Started**
 
 ### Prerequisites
-- Access to any MCP-compatible AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
+- Access to any AI coding assistant (Claude Code, Cursor, Factory, Codex, OpenCode, etc.)
 - A project with Task Master initialized (`.taskmaster/` directory)
 - GitHub repository for your project
 
@@ -275,7 +274,7 @@ All operations run as **Kubernetes jobs** with enhanced reliability through TTL-
 This is an integrated platform with crystal-clear data flow:
 
 **Component Architecture:**
-- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any MCP-compatible CLI with configuration-driven defaults
+- **MCP Server (`cto-mcp`)**: Handles MCP protocol calls from any CLI with configuration-driven defaults
 - **Controller Service**: Kubernetes REST API that manages CodeRun/DocsRun CRDs via Argo Workflows
 - **Argo Workflows**: Orchestrates agent deployment through workflow templates
 - **Kubernetes Controllers**: Separate controllers for CodeRun and DocsRun resources with TTL-safe reconciliation
@@ -283,7 +282,7 @@ This is an integrated platform with crystal-clear data flow:
 - **GitHub Apps**: Secure authentication system replacing personal tokens
 
 **Data Flow:**
-1. Any MCP-compatible CLI calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
+1. Any CLI calls MCP tools (`docs()`, `play()`, `intake_prd()`, etc.) via MCP protocol
 2. MCP server loads configuration from `cto-config.json` and applies defaults
 3. MCP server submits workflow to Argo with all required parameters
 4. Argo Workflows creates CodeRun/DocsRun custom resources
@@ -350,18 +349,18 @@ helm upgrade --install twingate-weightless-hummingbird twingate/connector \
 
 ### Install MCP Server
 
-For MCP-compatible CLI integration (Cursor, Claude Code, etc.), install the MCP server:
+For CLI integration (Cursor, Claude Code, etc.), install the MCP server:
 
 ```bash
 # One-liner installer (Linux/macOS)
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/5dlabs/cto/releases/download/v0.2.0/tools-installer.sh | sh
 
 # Verify installation
-cto-mcp --help   # MCP server for any MCP-compatible CLI
+cto-mcp --help   # MCP server for any CLI
 ```
 
 **What you get:**
-- `cto-mcp` - MCP server that integrates with any MCP-compatible CLI
+- `cto-mcp` - MCP server that integrates with any CLI
 - Multi-platform support (Linux x64/ARM64, macOS Intel/Apple Silicon, Windows x64)
 - Automatic installation to system PATH
 
@@ -505,7 +504,7 @@ Create a `cto-config.json` file in your project root to configure agents, models
 
 ### Configure MCP Integration
 
-After creating your configuration file, configure your MCP-compatible CLI to use the MCP server.
+After creating your configuration file, configure your CLI to use the MCP server.
 
 **For Cursor**, create a `.cursor/mcp.json` file in your project directory:
 
@@ -780,32 +779,7 @@ stop_job({
 
 **Workflow types:** `intake`, `play`, `workflow`
 
-### 6. **`input()` - Live Agent Communication**
-Send messages to running AI agents in real-time.
-
-```javascript
-// Send message to active job
-input({
-  text: "Please add error handling for edge cases"
-});
-
-// Route by specific job name
-input({
-  text: "Update the API endpoint to use /v2",
-  name: "code-5dlabs-cto-task-5",
-  job_type: "code"
-});
-
-// Route by user label
-input({
-  text: "Can you explain your approach?",
-  user: "jonathon"
-});
-```
-
-**Use cases:** Provide guidance, answer questions, steer implementation
-
-### 7. **`docs_ingest()` - Documentation Analysis**
+### 6. **`docs_ingest()` - Documentation Analysis**
 Intelligently analyze GitHub repos and ingest documentation.
 
 ```javascript
@@ -1022,7 +996,7 @@ Common variables available in templates:
    - Use `docs()` for documentation generation
    - Use `play()` for full-cycle development (implementation → QA → testing)
    - Use `intake_prd()` for new project setup from PRDs
-   - Use `jobs()` / `stop_job()` / `input()` for workflow management
+   - Use `jobs()` / `stop_job()` for workflow management
 4. **Mix and match CLIs** - assign the best CLI to each agent based on task requirements
 5. **Customize tool access** - use the `tools` configuration to control agent capabilities
 6. **Use minimal MCP calls** - let configuration defaults handle most parameters
