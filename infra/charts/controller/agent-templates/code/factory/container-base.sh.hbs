@@ -486,8 +486,9 @@ ensure_pr_created() {
     return
   fi
 
-  RUN_LABEL="run-{{workflow_name}}"
-  if [ "${RUN_LABEL#run-}" = "" ]; then
+  # Use environment variable WORKFLOW_NAME if available, otherwise fall back to template
+  RUN_LABEL="run-${WORKFLOW_NAME:-{{workflow_name}}}"
+  if [ "${RUN_LABEL#run-}" = "" ] || [ "$RUN_LABEL" = "run-" ]; then
     RUN_LABEL="run-unknown"
   fi
 
