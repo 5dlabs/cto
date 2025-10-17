@@ -748,12 +748,17 @@ fi
 # === BRANCH DERIVATION FROM PR_NUMBER ===
 # If PR_NUMBER is provided, derive the branch from the PR to ensure consistency
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+DERIVED_FROM_PR=false
 if [ -n "${PR_NUMBER:-}" ] && command -v gh >/dev/null 2>&1; then
   echo "🔍 Deriving branch from PR #${PR_NUMBER}..."
   DERIVED_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
   if [ -n "$DERIVED_BRANCH" ]; then
     FEATURE_BRANCH="$DERIVED_BRANCH"
+    DERIVED_FROM_PR=true
     echo "✅ Using PR branch: $FEATURE_BRANCH (from PR #${PR_NUMBER})"
+    # Fetch the branch from remote to ensure it exists locally
+    echo "📥 Fetching branch $FEATURE_BRANCH from remote..."
+    git fetch origin "$FEATURE_BRANCH:$FEATURE_BRANCH" 2>/dev/null || git fetch origin "$FEATURE_BRANCH" 2>/dev/null || true
   else
     echo "⚠️ Could not derive branch from PR #${PR_NUMBER}; using default"
   fi
