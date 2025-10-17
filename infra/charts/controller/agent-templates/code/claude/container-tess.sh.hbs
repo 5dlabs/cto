@@ -1891,6 +1891,10 @@ if [ "$GH_AVAILABLE" = "true" ]; then
   fi
 
   case $CI_STATUS in
+  0)
+    # Success - CI status retrieved successfully, continue to parse results
+    echo "✅ CI status check completed successfully"
+    ;;
   1)
     echo "⚠️ GitHub CLI unavailable - cannot perform PR reviews"
     echo "📝 Tess QA completed but unable to post PR review due to GitHub CLI issues"
@@ -1959,6 +1963,21 @@ if [ "$GH_AVAILABLE" = "true" ]; then
 - [ ] Contact administrator for access issues
 
 **Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
+    ;;
+  *)
+    echo "⚠️ Unknown CI status code: $CI_STATUS - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+
+## CI Status
+❌ **Unknown Error**: Unexpected CI status check result
+❌ **Cannot verify**: CI status code $CI_STATUS not recognized
+
+## Required Actions
+- [ ] Review CI check configuration
+- [ ] Check for system errors
+- [ ] Contact administrator if issue persists
+
+**Note**: Cannot proceed with QA until CI status can be properly determined." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
     ;;
   esac
 
@@ -2314,63 +2333,11 @@ cleanup_child_processes() {
 
 cleanup_child_processes
 
-  # Check if testing was successful
-  # Tess is successful if Claude exited cleanly (tests should pass)
-  if [ ${CLAUDE_PID:-0} -ne 0 ]; then
-    wait $CLAUDE_PID 2>/dev/null || true
-    CLAUDE_EXIT_CODE=$?
-  fi
-  
-  # =========================================================================
-  # SAVE ITERATION STATE: Persist findings for next iteration
-  # =========================================================================
-  STATE_FILE="$AGENT_STATE_DIR/testing-iteration-${ATTEMPT}.json"
-  
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    # Save successful completion state
-    cat > "$STATE_FILE" <<EOF
-{
-  "iteration": $ATTEMPT,
-  "status": "completed",
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Testing completed successfully on iteration $ATTEMPT",
-  "exit_code": 0,
-  "issues": []
-}
-EOF
-    echo "💾 Saved successful completion state to $STATE_FILE"
-    
-    echo "✅ Attempt $ATTEMPT: Testing completed successfully"
-    SUCCESS=1
-    break
-  else
-    # Save incomplete state
-    cat > "$STATE_FILE" <<EOF
-{
-  "iteration": $ATTEMPT,
-  "status": "incomplete",
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Testing incomplete - exit code $CLAUDE_EXIT_CODE",
-  "exit_code": $CLAUDE_EXIT_CODE,
-  "issues": ["Claude exited with non-zero status"]
-}
-EOF
-    echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
-    
-    echo "⚠️ Attempt $ATTEMPT: Testing incomplete (exit code: $CLAUDE_EXIT_CODE)"
-    
-    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
-      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
-      ATTEMPT=$((ATTEMPT + 1))
-      echo ""
-      # Brief pause before retry
-      sleep 2
-    else
-      echo "❌ Maximum retry attempts reached"
-      break
-    fi
-  fi
-done
+# Check if testing was successful
+# Tess is successful if Claude exited cleanly (tests should pass)
+echo "🔍 Final status check..."
+echo "  - Final exit code: $CLAUDE_EXIT_CODE"
+echo "  - Success flag: $SUCCESS"
 
 # Report final status
 echo ""

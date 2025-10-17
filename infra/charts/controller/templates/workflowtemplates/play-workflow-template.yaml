@@ -470,15 +470,11 @@ spec:
           RUN_LABEL="run-{{`{{workflow.name}}`}}"
           SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
 
-          # For single-repo setups, we need to find PRs from previous workflow runs
-          # Check if we're in a subsequent stage (quality/testing) by checking input parameters
+          # For single-repo setups, we need to find PRs from the current workflow run
+          # Always use both task label AND run label to avoid finding old PRs from previous runs
           STAGE="{{`{{inputs.parameters.stage}}`}}"
 
-          if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
-            echo "🔎 Stage $STAGE: Looking for existing PR with label ${LABEL} in ${REPO}"
-          else
-            echo "🔎 Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
-          fi
+          echo "🔎 Stage $STAGE: Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
 
           # Ensure tools
           apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
@@ -538,11 +534,8 @@ spec:
           attempts=4
           while [ $attempts -gt 0 ]; do
             # Prefer Issues API for label queries; filter to PRs by presence of .pull_request
-            if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
-              q_labels=$(printf "%s" "$LABEL" | sed 's/,/%2C/g')
-            else
-              q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
-            fi
+            # Always use both task label AND run label to ensure we find the right PR
+            q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
 
             url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
             if [ -n "$AUTH_HEADER" ]; then
@@ -553,20 +546,6 @@ spec:
 
             pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
             pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
-
-            # Fallback: if implementation stage and not found with both labels, try just task label
-            if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
-              if [ "$STAGE" != "quality" ] && [ "$STAGE" != "testing" ]; then
-                url2="https://api.github.com/repos/${REPO}/issues?state=open&labels=$(printf "%s" "$LABEL" | sed 's/,/%2C/g')"
-                if [ -n "$AUTH_HEADER" ]; then
-                  resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url2") || resp="[]"
-                else
-                  resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url2") || resp="[]"
-                fi
-                pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
-                pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
-              fi
-            fi
 
             if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
               echo "$pr_url" > /tmp/pr-url.txt
@@ -591,13 +570,13 @@ spec:
           done
 
           if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
-            echo "❌ No PR found for ${LABEL}. This indicates the implementation stage hasn't created a PR yet."
+            echo "❌ No PR found with labels ${LABEL} and ${RUN_LABEL}. This indicates the implementation stage hasn't created a PR yet."
             # For quality/testing, this is an error condition
             > /tmp/pr-url.txt
             > /tmp/pr-number.txt
             exit 1
           else
-            echo "❌ No PR found for ${LABEL} after waiting."
+            echo "❌ No PR found with labels ${LABEL} and ${RUN_LABEL} after waiting."
             # Leave outputs empty; upstream can decide to re-run implementation
             > /tmp/pr-url.txt
             > /tmp/pr-number.txt
