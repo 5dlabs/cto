@@ -959,8 +959,7 @@ fi
 
 # Create initial CLAUDE.md if needed
 if [ ! -f "/workspace/CLAUDE.md" ] || [ "{{overwrite_memory}}" = "true" ]; then
-    # Use PR_NUMBER from environment if available, otherwise use template value
-    PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+    # Use PR_NUMBER from environment if available
     # Extract template variables for use in heredoc
     TASK_ID="{{task_id}}"
     cat > /workspace/CLAUDE.md << EOF
@@ -1159,11 +1158,11 @@ INITIAL_GUIDANCE=$(cat <<TESS_EOF
 
 **🚨 CRITICAL: PR WORKFLOW - READ THIS FIRST 🚨**
 
-You are working on **PR #$PR_NUM** that Rex created and Cleo quality-checked.
+You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex created and Cleo quality-checked.
 - **DO NOT create a new PR** - Rex already created one
 - **DO NOT create a new branch** - you're already on the PR branch
 - **DO push your test code** to the EXISTING PR branch
-- All your commits (test files, fixes) will automatically appear on PR #$PR_NUM
+- All your commits (test files, fixes) will automatically appear on PR #${PR_NUMBER:-UNKNOWN}
 - The repository is already checked out to the correct PR branch
 
 **Your job**: Write tests and validate functionality on Rex's PR, NOT create your own PR.
@@ -1199,7 +1198,7 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 **Your STRICT testing requirements:**
 
 1. **CRITICAL: Verify CI Status FIRST (ABSOLUTE BLOCKER)**:
-   - **If repository has workflows**: Run \`gh pr checks $PR_NUM\` to see CI status
+   - **If repository has workflows**: Run \`gh pr checks ${PR_NUMBER:-UNKNOWN}\` to see CI status
    - **If no workflows**: Skip CI validation and proceed to testing requirements
    - If ANY CI check is failing: DO NOT EXIT
    - Instead: Write tests to fix the failures
@@ -1270,14 +1269,14 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
    - Fix the issues yourself by writing tests
    - Format Rust code if needed: \`cargo fmt --all\` (for Rust projects)
    - Push your fixes and wait for CI
-   - **If workflows exist**: Check \`gh pr checks $PR_NUM\` again
+   - **If workflows exist**: Check \`gh pr checks ${PR_NUMBER:-UNKNOWN}\` again
    - If still failing, keep fixing and pushing
    - REPEAT until you can post APPROVE
    - You are NOT ALLOWED to finish without APPROVE status
 
 10. **MANDATORY PRE-APPROVAL CHECKLIST**:
     Before you can APPROVE, ALL of these MUST be true:
-    □ CI Status: **If workflows exist** - Run \`gh pr checks $PR_NUM --json name,status\` - ALL must show "completed" with "success"
+    □ CI Status: **If workflows exist** - Run \`gh pr checks ${PR_NUMBER:-UNKNOWN} --json name,status\` - ALL must show "completed" with "success"
     □ Test Coverage: Must be >= 95% (verify with coverage tools)
     □ All Tests Pass: 100% of tests must pass, no skipped tests
     □ Acceptance Criteria: 100% of Task $TASK_ID criteria met
@@ -1290,7 +1289,7 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
     # 1. Verify CI is completely green - NO FAILURES ALLOWED
     # Check CI status (only if workflows exist)
    if [ -d ".github/workflows" ] && [ -n "$(find .github/workflows -name "*.yml" -o -name "*.yaml" 2>/dev/null | head -1)" ]; then
-       gh pr checks $PR_NUM
+       gh pr checks ${PR_NUMBER:-UNKNOWN}
    else
        echo "ℹ️  No GitHub Actions workflows found - skipping CI validation"
    fi
@@ -1299,7 +1298,7 @@ You are Tess - the quality gatekeeper for **Task $TASK_ID ONLY**. Your job is to
 
     # 2. Verify all checks are passing using tab-separated status field
     # gh pr checks output format: NAME<TAB>STATUS<TAB>CONCLUSION<TAB>URL
-    CI_OUTPUT=\$(gh pr checks $PR_NUM)
+    CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-UNKNOWN})
     if [ -z "\$CI_OUTPUT" ]; then
         echo "⚠️ No CI checks found - continuing without CI verification"
         # Don't exit, just continue with testing
@@ -1434,7 +1433,7 @@ Use GitHub CLI to create a PROPER REVIEW with formal review status:
 # gh pr review {{pr_number}} --comment --body \"Some feedback\"
 
 # CORRECT - Submit a proper REQUEST CHANGES review:
-gh pr review $PR_NUM --request-changes --body \"### 🔴 Required Changes
+gh pr review ${PR_NUMBER:-UNKNOWN} --request-changes --body \"### 🔴 Required Changes
 
 ## CI Status
 ✅ **GitHub Actions CI**: All checks passing
@@ -1469,7 +1468,7 @@ Note: Only reviewing Task {{task_id}} implementation, not the entire project.\"
 
 # CORRECT - Submit an APPROVE review ONLY when ALL checks pass:
 # FIRST: Verify you can approve
-CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-$PR_NUM})
+CI_OUTPUT=\$(gh pr checks ${PR_NUMBER:-UNKNOWN})
 if [ -z "\$CI_OUTPUT" ]; then
   echo "⚠️ No CI checks found - will continue working on testing requirements"
   # Don't exit, continue with testing
@@ -1486,7 +1485,7 @@ if [ "\$CI_FAILED" -gt 0 ]; then
 fi
 
 # APPROVE REVIEW FORMAT:
-gh pr review $PR_NUM --approve --body \"### ✅ QA Review for Task $TASK_ID - APPROVED
+gh pr review ${PR_NUMBER:-UNKNOWN} --approve --body \"### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
 ✅ **ALL CI checks verified**: Ran 'gh pr checks' - all showing success
@@ -1536,7 +1535,7 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
 
 **CRITICAL ITERATION REQUIREMENT**:
 - DO NOT EXIT until ALL of the following are true:
-  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks ${PR_NUMBER:-$PR_NUM}
+  1. CI is GREEN (all checks passing) - VERIFY WITH: gh pr checks ${PR_NUMBER:-UNKNOWN}
   2. Test coverage is >= 95%
   3. All acceptance criteria for Task $TASK_ID are met
   4. Kubernetes deployment succeeds (if you have access)
@@ -1546,7 +1545,7 @@ Remember: Your job is to WRITE TESTS, VALIDATE functionality, and provide FEEDBA
   1. Write/fix tests as needed
   2. Format Rust code: \`cargo fmt --all\` (if Rust project)
   3. Push your changes
-  4. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-$PR_NUM})
+  4. Wait for CI to run (use: sleep 120 && gh pr checks ${PR_NUMBER:-UNKNOWN})
   5. Check status again
   6. KEEP ITERATING until everything passes
 
@@ -1779,16 +1778,14 @@ exec 9>&- 2>/dev/null || true
 # =============================================================================
 echo "🔍 Checking if PR review was already posted by Claude..."
 
-# Use PR_NUMBER from environment if available, otherwise use template value
-PR_NUM="${PR_NUMBER:-{{pr_number}}}"
+# Use PR_NUMBER directly
 TASK_ID="{{task_id}}"
 
-# Debug: Show what we got for PR_NUM
-echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}', pr_number template='{{pr_number}}'"
-echo "🔍 DEBUG: Resolved PR_NUM='$PR_NUM'"
+# Debug: Show what we got for PR number
+echo "🔍 DEBUG: PR_NUMBER='${PR_NUMBER:-<not_set>}'"
 
-# Handle case where PR_NUM is empty - skip PR review entirely
-if [ -z "$PR_NUM" ] || [ "$PR_NUM" = "{{pr_number}}" ]; then
+# Handle case where PR_NUMBER is empty - skip PR review entirely
+if [ -z "${PR_NUMBER:-}" ]; then
   echo "ℹ️ No PR number available - skipping PR review posting"
   echo "🔍 This is normal for non-PR workflows or when PR context is not provided"
   echo "✅ Tess QA workflow completed successfully"
@@ -1797,7 +1794,7 @@ fi
 
 # Check if Claude already posted a review (to avoid duplicate reviews)
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  EXISTING_REVIEW=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews[] | select(.author.login == "tess-5dlabs" or .author.login == "5dlabs-tess") | .state' 2>/dev/null | head -1)
+  EXISTING_REVIEW=$(gh pr view "$PR_NUMBER" --json reviews --jq '.reviews[] | select(.author.login == "tess-5dlabs" or .author.login == "5dlabs-tess") | .state' 2>/dev/null | head -1)
   if [ -n "$EXISTING_REVIEW" ]; then
     echo "✅ Claude already posted a $EXISTING_REVIEW review - skipping duplicate"
     echo "🔍 Tess QA workflow completed successfully"
@@ -1806,7 +1803,7 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
 fi
 
 # Check CI status to determine review type
-echo "📊 Checking CI status for PR #$PR_NUM..."
+echo "📊 Checking CI status for PR #${PR_NUMBER:-UNKNOWN}..."
 
 # Pre-flight check: Verify GitHub CLI is available and working
 echo "🔍 Pre-flight check: GitHub CLI availability..."
@@ -1889,7 +1886,7 @@ check_ci_status() {
 # Only perform PR review if GitHub CLI is available
 if [ "$GH_AVAILABLE" = "true" ]; then
   # Get CI status using robust JSON parsing
-  CI_JSON=$(check_ci_status "$PR_NUM")
+  CI_JSON=$(check_ci_status "$PR_NUMBER")
   CI_STATUS=$?
 
   # Validate CI_JSON is valid JSON before proceeding
@@ -1915,10 +1912,10 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   2)
     echo "⚠️ PR not found - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
-❌ **PR Not Found**: Pull request #$PR_NUM does not exist
+❌ **PR Not Found**: Pull request #${PR_NUMBER:-UNKNOWN} does not exist
 ❌ **Cannot verify**: Invalid PR reference
 
 ## Required Actions
@@ -1930,7 +1927,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   3)
     echo "⚠️ Network error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Network Error**: Unable to connect to GitHub API
@@ -1945,7 +1942,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   4)
     echo "⚠️ Authentication error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Authentication Error**: GitHub token permissions insufficient
@@ -1961,7 +1958,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   5)
     echo "⚠️ Repository access error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Repository Access Error**: Repository not found or not accessible
@@ -1977,7 +1974,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     ;;
   *)
     echo "⚠️ Unknown CI status code: $CI_STATUS - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Unknown Error**: Unexpected CI status check result
@@ -1996,7 +1993,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
   if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
     echo "⚠️ No CI checks found - posting REQUEST CHANGES review"
     # Post REQUEST CHANGES review for missing CI
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **Missing CI Setup**: No GitHub Actions workflows detected
@@ -2090,7 +2087,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
   echo "  - Pending: $PENDING_CHECKS"
 
   HAVE_PR_REF=false
-  if [ -n "$REPO_SLUG" ] && { [ -n "$PR_NUM" ] || [ -n "$PR_URL" ]; }; then
+  if [ -n "$REPO_SLUG" ] && { [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; }; then
     HAVE_PR_REF=true
     ensure_status_labels "$REPO_SLUG" \
       "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
@@ -2110,7 +2107,7 @@ if [ "$GH_AVAILABLE" = "true" ]; then
       FAILED_DETAILS=$(extract_check_details "$CI_JSON" "failed")
     fi
 
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ❌ **CI Failures Detected**: $FAILED_CHECKS out of $TOTAL_CHECKS check(s) failing
@@ -2138,7 +2135,7 @@ $FAILED_DETAILS
       PENDING_DETAILS=$(extract_check_details "$CI_JSON" "pending")
     fi
 
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ⏳ **CI Checks Pending**: $PENDING_CHECKS out of $TOTAL_CHECKS check(s) still running
@@ -2227,7 +2224,7 @@ $(echo "$INGRESS_URLS" | sed 's/^/  - https:\/\//')"
       SUCCESS_DETAILS=$(extract_check_details "$CI_JSON" "success")
     fi
 
-    timeout 30 gh pr review "$PR_NUM" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
+    timeout 30 gh pr review "$PR_NUMBER" --approve --body "### ✅ QA Review for Task $TASK_ID - APPROVED
 
 ## Pre-Approval Verification
 ✅ **ALL CI checks verified**: $SUCCESS_CHECKS out of $TOTAL_CHECKS checks passing
@@ -2251,15 +2248,15 @@ $SUCCESS_DETAILS
 
     # Add approved label to signal workflow completion
     echo "🏷️  Adding 'approved' label to signal all checks passed"
-    if [ -n "$PR_NUM" ]; then
-      timeout 30 gh pr edit "$PR_NUM" --add-label "approved" || echo "⚠️ Failed to add approved label"
+    if [ -n "$PR_NUMBER" ]; then
+      timeout 30 gh pr edit "$PR_NUMBER" --add-label "approved" || echo "⚠️ Failed to add approved label"
     fi
     update_coderun_status "approved" "approved" "$PR_URL"
     
     # Auto-merge if enabled
-    if [ "${AUTO_MERGE:-false}" = "true" ] && [ -n "$PR_NUM" ]; then
+    if [ "${AUTO_MERGE:-false}" = "true" ] && [ -n "$PR_NUMBER" ]; then
       echo "🔀 AUTO_MERGE enabled - merging PR automatically"
-      if timeout 30 gh pr merge "$PR_NUM" --auto --squash --delete-branch; then
+      if timeout 30 gh pr merge "$PR_NUMBER" --auto --squash --delete-branch; then
         echo "✅ PR scheduled for auto-merge"
       else
         echo "⚠️ Auto-merge failed - PR may need manual intervention"
@@ -2267,7 +2264,7 @@ $SUCCESS_DETAILS
     fi
   else
     echo "⚠️ Unexpected CI state - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUM" --request-changes --body "### 🔴 Required Changes
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
 
 ## CI Status
 ⚠️ **Unexpected CI State**: Unable to determine final CI status
@@ -2318,7 +2315,7 @@ echo "  - PID: $CLAUDE_PID"
 echo "  - Exit code: $CLAUDE_EXIT_CODE"
 echo "  - Working directory: $(pwd)"
 echo "  - Repository: $REPO_NAME"
-echo "  - PR Review: Posted to #$PR_NUM"
+echo "  - PR Review: Posted to #${PR_NUMBER:-UNKNOWN}"
 
 # Sidecar shutdown is handled by the EXIT trap defined earlier
 # The shutdown_sidecar function will be called automatically when the script exits
