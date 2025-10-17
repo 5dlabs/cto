@@ -554,6 +554,18 @@ EOF
   maybe_add_label "$SERVICE_LABEL"
   maybe_add_label "$RUN_LABEL"
 
+  # Guard: never auto-create a PR if one already exists or PR_NUMBER is provided
+  if [ -n "${PR_NUMBER:-}" ]; then
+    echo "ℹ️ PR_NUMBER=${PR_NUMBER} provided by orchestrator; skipping fallback PR creation"
+    return
+  fi
+
+  # Guard: only auto-create PRs during implementation stage
+  if [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
+    echo "ℹ️ Not in implementation stage (${WORKFLOW_STAGE:-unknown}); skipping fallback PR creation"
+    return
+  fi
+
   if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
   else
