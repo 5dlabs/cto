@@ -554,6 +554,18 @@ EOF
   maybe_add_label "$SERVICE_LABEL"
   maybe_add_label "$RUN_LABEL"
 
+  # Guard: never auto-create a PR if one already exists or PR_NUMBER is provided
+  if [ -n "${PR_NUMBER:-}" ]; then
+    echo "ℹ️ PR_NUMBER=${PR_NUMBER} provided by orchestrator; skipping fallback PR creation"
+    return
+  fi
+
+  # Guard: only auto-create PRs during implementation stage
+  if [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
+    echo "ℹ️ Not in implementation stage (${WORKFLOW_STAGE:-unknown}); skipping fallback PR creation"
+    return
+  fi
+
   if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
   else
@@ -732,7 +744,19 @@ if [ -n "$BASE_BRANCH" ]; then
   git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
 fi
 
+# === BRANCH DERIVATION FROM PR_NUMBER ===
+# If PR_NUMBER is provided, derive the branch from the PR to ensure consistency
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
+if [ -n "${PR_NUMBER:-}" ] && command -v gh >/dev/null 2>&1; then
+  echo "🔍 Deriving branch from PR #${PR_NUMBER}..."
+  DERIVED_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+  if [ -n "$DERIVED_BRANCH" ]; then
+    FEATURE_BRANCH="$DERIVED_BRANCH"
+    echo "✅ Using PR branch: $FEATURE_BRANCH (from PR #${PR_NUMBER})"
+  else
+    echo "⚠️ Could not derive branch from PR #${PR_NUMBER}; using default"
+  fi
+fi
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
   
@@ -766,10 +790,16 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
     if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
-      echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; creating fresh branch from $REMOTE_BASE"
-      NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
-      git checkout -B "$NEW_BRANCH" "$REMOTE_BASE"
-      FEATURE_BRANCH="$NEW_BRANCH"
+      # Skip timestamped fallback if PR_NUMBER is provided - stay on the PR branch
+      if [ -n "${PR_NUMBER:-}" ]; then
+        echo "⚠️ Unable to fast-forward $FEATURE_BRANCH but PR_NUMBER is set; staying on PR branch"
+        echo "ℹ️ Manual conflict resolution may be needed"
+      else
+        echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; creating fresh branch from $REMOTE_BASE"
+        NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
+        git checkout -B "$NEW_BRANCH" "$REMOTE_BASE"
+        FEATURE_BRANCH="$NEW_BRANCH"
+      fi
     fi
   fi
 else
