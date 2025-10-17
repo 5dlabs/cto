@@ -63,6 +63,9 @@ spec:
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
         value: ""  # Must be provided by MCP client
+      - name: security-agent
+        description: "Agent to use for security scanning (e.g., 5DLabs-Cipher)"
+        value: ""  # Must be provided by MCP client
       - name: testing-agent
         description: "Agent to use for testing and validation (e.g., 5DLabs-Tess)"
         value: ""  # Must be provided by MCP client

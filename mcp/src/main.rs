@@ -180,6 +180,8 @@ struct PlayDefaults {
     implementation_agent: String,
     #[serde(rename = "qualityAgent")]
     quality_agent: String,
+    #[serde(rename = "securityAgent")]
+    security_agent: String,
     #[serde(rename = "testingAgent")]
     testing_agent: String,
     repository: Option<String>,
@@ -194,6 +196,8 @@ struct PlayDefaults {
     implementation_max_retries: Option<u32>,
     #[serde(rename = "qualityMaxRetries")]
     quality_max_retries: Option<u32>,
+    #[serde(rename = "securityMaxRetries")]
+    security_max_retries: Option<u32>,
     #[serde(rename = "testingMaxRetries")]
     testing_max_retries: Option<u32>,
     #[serde(rename = "autoMerge")]
@@ -1047,6 +1051,89 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let quality_agent_max_retries = quality_agent_cfg.and_then(|cfg| cfg.max_retries);
 
+    // Handle security agent - use provided value or config default
+    let security_agent_input = arguments
+        .get("security_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .unwrap_or_else(|| config.defaults.play.security_agent.clone());
+
+    // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
+    let security_agent_cfg = config
+        .agents
+        .values()
+        .find(|a| a.github_app == security_agent_input);
+
+    let (security_agent, security_cli, security_model, security_tools, security_model_rotation) =
+        if let Some(agent_config) = security_agent_cfg {
+            // Use the structured agent configuration
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized security agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize security agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for security agent {security_agent_input}");
+                    "{}".to_string()
+                });
+            let agent_model_rotation = agent_config.model_rotation.as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for security agent: {json}");
+                                Some(json)
+                            },
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!("⚠️ Agent {security_agent_input} not found in config, using defaults");
+            (
+                security_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+
+    let security_agent_max_retries = security_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Handle testing agent - use provided value or config default
     let testing_agent_input = arguments
         .get("testing_agent")
@@ -1138,6 +1225,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map_err(|e| anyhow!("Invalid implementation agent model: {}", e))?;
     validate_model_name(&quality_model)
         .map_err(|e| anyhow!("Invalid quality agent model: {}", e))?;
+    validate_model_name(&security_model)
+        .map_err(|e| anyhow!("Invalid security agent model: {}", e))?;
     validate_model_name(&testing_model)
         .map_err(|e| anyhow!("Invalid testing agent model: {}", e))?;
 
@@ -1160,6 +1249,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let quality_max_retries = parse_max_retries_argument(&arguments, "quality_max_retries")
         .or(quality_agent_max_retries)
         .or(config.defaults.play.quality_max_retries)
+        .or(config.defaults.play.max_retries)
+        .or(config.defaults.code.max_retries)
+        .unwrap_or(10);
+
+    let security_max_retries = parse_max_retries_argument(&arguments, "security_max_retries")
+        .or(security_agent_max_retries)
+        .or(config.defaults.play.security_max_retries)
         .or(config.defaults.play.max_retries)
         .or(config.defaults.code.max_retries)
         .unwrap_or(10);
@@ -1227,6 +1323,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("quality-model={quality_model}"),
         format!("quality-tools={quality_tools}"),
         format!("quality-model-rotation={quality_model_rotation}"),
+        format!("security-agent={security_agent}"),
+        format!("security-cli={security_cli}"),
+        format!("security-model={security_model}"),
+        format!("security-tools={security_tools}"),
+        format!("security-model-rotation={security_model_rotation}"),
         format!("testing-agent={testing_agent}"),
         format!("testing-cli={testing_cli}"),
         format!("testing-model={testing_model}"),
@@ -1238,6 +1339,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "implementation-max-retries={implementation_max_retries}"
     ));
     params.push(format!("quality-max-retries={quality_max_retries}"));
+    params.push(format!("security-max-retries={security_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));
     params.push(format!("opencode-max-retries={opencode_max_retries}"));
 
@@ -1299,6 +1401,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             "quality_agent": quality_agent,
             "quality_cli": quality_cli,
             "quality_model": quality_model,
+            "security_agent": security_agent,
+            "security_cli": security_cli,
+            "security_model": security_model,
             "testing_agent": testing_agent,
             "testing_cli": testing_cli,
             "testing_model": testing_model,
