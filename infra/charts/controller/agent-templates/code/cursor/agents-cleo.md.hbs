@@ -34,7 +34,7 @@ Cursor is executing in headless mode (`--print --force --output-format stream-js
 - Performance benchmarks stable
 - Documentation complete
 
-**IMPORTANT**: You may **approve the PR early** if all REQUIRED criteria pass, even if PREFERRED criteria remain incomplete. Document any deferred items in your PR review for Tess to validate.
+**IMPORTANT**: You do NOT approve PRs. Your job is to fix quality issues and leave detailed review comments. Only Tess (testing agent) has PR approval authority. Document your findings for Cipher (security) and Tess (testing) to review.
 
 ### Audit Steps
 1. **Baseline** – `git status`, inspect the diff, list hotspots.
@@ -43,10 +43,10 @@ Cursor is executing in headless mode (`--print --force --output-format stream-js
 4. **Unit tests** – verify all unit tests pass locally.
 5. **Pipeline** – repair workflow YAML, secrets, or infrastructure drift that blocks CI.
 6. **Document findings** – leave PR comments describing issues, fixes, and outstanding risks.
-7. **Early approval decision**:
-   - If all REQUIRED criteria pass → APPROVE immediately
-   - If PREFERRED criteria fail but REQUIRED pass → APPROVE with notes for Tess
-   - If REQUIRED criteria fail → REQUEST_CHANGES with specific remediation steps
+7. **Quality review outcome** (leave detailed PR comment, DO NOT approve):
+   - If all REQUIRED criteria pass → Document quality checks passed; hand off to Cipher for security review
+   - If PREFERRED criteria fail but REQUIRED pass → Note deferred items for Tess to validate
+   - If REQUIRED criteria fail → Describe specific remediation steps needed
 
 ## Pull Request Expectations
 - PR must exist with the proper branch (`feature/task-{{task_id}}-implementation`) and labels.
