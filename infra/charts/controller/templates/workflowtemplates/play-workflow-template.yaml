@@ -36,6 +36,9 @@ spec:
           "quality-agent": "{{`{{workflow.parameters.quality-agent}}`}}",
           "quality-cli": "{{`{{workflow.parameters.quality-cli}}`}}",
           "quality-model": "{{`{{workflow.parameters.quality-model}}`}}",
+          "security-agent": "{{`{{workflow.parameters.security-agent}}`}}",
+          "security-cli": "{{`{{workflow.parameters.security-cli}}`}}",
+          "security-model": "{{`{{workflow.parameters.security-model}}`}}",
           "testing-agent": "{{`{{workflow.parameters.testing-agent}}`}}",
           "testing-cli": "{{`{{workflow.parameters.testing-cli}}`}}",
           "testing-model": "{{`{{workflow.parameters.testing-model}}`}}",
@@ -45,6 +48,7 @@ spec:
           "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}",
           "implementation-max-retries": "{{`{{workflow.parameters.implementation-max-retries}}`}}",
           "quality-max-retries": "{{`{{workflow.parameters.quality-max-retries}}`}}",
+          "security-max-retries": "{{`{{workflow.parameters.security-max-retries}}`}}",
           "testing-max-retries": "{{`{{workflow.parameters.testing-max-retries}}`}}",
           "auto-merge": "{{`{{workflow.parameters.auto-merge}}`}}",
           "final-task": "{{`{{workflow.parameters.final-task}}`}}"
@@ -100,6 +104,12 @@ spec:
       - name: quality-model
         description: "Model to use for quality agent"
         value: ""  # Must be provided by MCP client
+      - name: security-cli
+        description: "CLI to use for security agent (e.g., claude, codex)"
+        value: ""  # Must be provided by MCP client
+      - name: security-model
+        description: "Model to use for security agent"
+        value: ""  # Must be provided by MCP client
       - name: testing-cli
         description: "CLI to use for testing agent"
         value: ""  # Must be provided by MCP client
@@ -114,6 +124,9 @@ spec:
       - name: quality-tools
         description: "JSON string of tools config for quality agent"
         value: "{}"  # Defaults to empty, populated by MCP client
+      - name: security-tools
+        description: "JSON string of tools config for security agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
       - name: testing-tools
         description: "JSON string of tools config for testing agent"
         value: "{}"  # Defaults to empty, populated by MCP client
@@ -124,6 +137,9 @@ spec:
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
       - name: quality-model-rotation
         description: "JSON array of model names for quality agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: security-model-rotation
+        description: "JSON array of model names for security agent retry rotation"
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
       - name: testing-model-rotation
         description: "JSON array of model names for testing agent retry rotation"
@@ -163,6 +179,9 @@ spec:
         value: "10"
       - name: quality-max-retries
         description: "Maximum retry attempts for quality agent executions (0 = unlimited)"
+        value: "10"
+      - name: security-max-retries
+        description: "Maximum retry attempts for security agent executions (0 = unlimited)"
         value: "10"
       - name: testing-max-retries
         description: "Maximum retry attempts for testing agent executions (0 = unlimited)"
@@ -353,7 +372,7 @@ spec:
         - - name: quality-work
             template: agent-coderun
             continueOn:
-              failed: true  # Allow workflow to proceed to Tess even if Cleo finds issues
+              failed: true  # Allow workflow to proceed to Cipher even if Cleo finds issues
             arguments:
               parameters:
                 - name: github-app
@@ -376,9 +395,44 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
-        # No suspend needed after Cleo - proceed directly to Tess
-        # Cleo hands off via ready-for-qa label, Tess is final approver
-        # continueOn.failed allows Tess to run even if Cleo raises concerns
+        # Proceed to Cipher security scanning after Cleo quality checks
+        - - name: update-to-security-in-progress
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "security-in-progress"
+                - name: verify-update
+                  value: "true"
+        - - name: security-work
+            template: agent-coderun
+            continueOn:
+              failed: true  # Allow workflow to proceed to Tess even if Cipher finds security issues
+            arguments:
+              parameters:
+                - name: github-app
+                  value: "{{`{{workflow.parameters.security-agent}}`}}"
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+                - name: stage
+                  value: "security"
+                - name: cli-type
+                  value: "{{`{{workflow.parameters.security-cli}}`}}"
+                - name: model
+                  value: "{{`{{workflow.parameters.security-model}}`}}"
+                - name: model-rotation
+                  value: "{{`{{workflow.parameters.security-model-rotation}}`}}"
+                - name: tools-config
+                  value: "{{`{{workflow.parameters.security-tools}}`}}"
+                - name: pr-url
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+                - name: pr-number
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: max-retries
+                  value: "{{`{{workflow.parameters.security-max-retries}}`}}"
+        # No suspend needed after Cipher - proceed directly to Tess
+        # Cipher hands off to Tess, which is final approver
+        # continueOn.failed allows Tess to run even if Cipher raises security concerns
         - - name: testing-work
             template: agent-coderun
             arguments:
@@ -572,9 +626,9 @@ spec:
             sleep 5
           done
 
-          if [ "$STAGE" = "quality" ] || [ "$STAGE" = "testing" ]; then
+          if [ "$STAGE" = "quality" ] || [ "$STAGE" = "security" ] || [ "$STAGE" = "testing" ]; then
             echo "❌ No PR found with labels ${LABEL} and ${RUN_LABEL}. This indicates the implementation stage hasn't created a PR yet."
-            # For quality/testing, this is an error condition
+            # For quality/security/testing, this is an error condition
             > /tmp/pr-url.txt
             > /tmp/pr-number.txt
             exit 1
@@ -998,7 +1052,7 @@ spec:
               return 0
             fi
 
-            # Define valid transitions (Rex → Cleo → Tess flow)
+            # Define valid transitions (Rex → Cleo → Cipher → Tess flow)
             case $current_stage in
               "pending")
                 # Primary path: pending → quality-in-progress
@@ -1012,7 +1066,13 @@ spec:
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 ;;
               "quality-in-progress")
+                # New path: quality → security
+                [[ $new_stage == "security-in-progress" ]] && return 0
+                # Legacy paths for backward compatibility
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
+                ;;
+              "security-in-progress")
+                # Security → testing
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-quality-complete")
