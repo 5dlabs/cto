@@ -1070,7 +1070,6 @@ spec:
                 [[ $new_stage == "security-in-progress" ]] && return 0
                 # Legacy paths for backward compatibility
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
-                [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "security-in-progress")
                 # Security → testing
