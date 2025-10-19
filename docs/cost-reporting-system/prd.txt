@@ -1,0 +1,927 @@
+<context>
+# Overview
+The Cost Reporting System provides comprehensive tracking and analysis of AI model token usage and associated costs across the CTO platform. This system enables per-PR cost tracking, agent-specific cost analysis, and iteration-based cost visibility to optimize resource usage and provide transparency into operational expenses.
+
+# Core Features
+## Token Usage Tracking
+- **Per-CLI/Agent Tracking**: Monitor token consumption for each AI agent (Rex, Morgan, Cleo, etc.)
+- **Model-Specific Tracking**: Track input and output tokens separately per model
+- **Real-time Metrics**: Collect token usage data during workflow execution
+- **Historical Data**: Store token usage history for trend analysis
+
+## Cost Calculation
+- **Dynamic Pricing**: Support multiple AI provider pricing models
+- **Model Cost Mapping**: Maintain cost per 1M tokens for each model
+- **Input/Output Differentiation**: Calculate costs based on separate input/output pricing
+- **Provider Rate Updates**: Support dynamic updates to provider pricing
+
+## PR-Level Cost Analysis
+- **Per-PR Aggregation**: Calculate total cost for each pull request
+- **Iteration Tracking**: Track cost per agent iteration within a PR
+- **Stage-Based Costs**: Break down costs by workflow stage (intake, code, docs, QA, security)
+- **Cost Comments**: Automatically post cost summaries to PR comments
+
+## Reporting & Visualization
+- **CLI Reporting**: Query costs via cto-cli commands
+- **Web Dashboard**: View costs in documentation server (future)
+- **Cost Alerts**: Configure thresholds for cost notifications
+- **Export Capabilities**: Export cost data for external analysis
+
+# User Experience
+## User Personas
+- **Platform Engineers**: Monitor overall platform costs and optimize agent configurations
+- **Development Teams**: Understand cost impact of their PRs and workflow choices
+- **Finance Teams**: Track AI spending for budgeting and cost allocation
+- **Agent Developers**: Analyze agent efficiency and optimize token usage
+
+## Key User Flows
+1. **PR Cost Visibility**: Developer opens PR and sees estimated/actual costs in comments
+2. **Cost Query**: Engineer runs `cto-cli costs show --pr 123` to view detailed breakdown
+3. **Agent Analysis**: Platform engineer reviews per-agent costs to identify optimization opportunities
+4. **Budget Monitoring**: Finance team exports monthly cost reports for accounting
+5. **Threshold Alerts**: Admin receives notification when PR costs exceed configured threshold
+</context>
+
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### Core Infrastructure
+- **Cost Collector**: Captures token usage from agent executions
+- **Cost Calculator**: Applies pricing models to compute costs
+- **Cost Store**: Persists cost data for analysis and reporting
+- **Reporting Engine**: Generates cost reports and summaries
+
+### Data Collection Architecture
+```yaml
+Cost Collection Flow:
+  Agent Execution:
+    - Capture input token count
+    - Capture output token count
+    - Record model used
+    - Record timestamp
+    - Tag with PR number
+    - Tag with agent name
+    - Tag with iteration number
+    
+  Storage:
+    - Write to cost database
+    - Update PR aggregates
+    - Update agent statistics
+    
+  Reporting:
+    - Query cost data
+    - Apply filters
+    - Generate reports
+    - Post to PR (optional)
+```
+
+## Data Models
+
+### Token Usage Record
+```rust
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TokenUsage {
+    /// Unique identifier for this usage record
+    pub id: String,
+    
+    /// GitHub PR number
+    pub pr_number: u64,
+    
+    /// Agent name (rex, morgan, cleo, etc.)
+    pub agent: String,
+    
+    /// CLI used (claude-code, cursor, windsurf, etc.)
+    pub cli: Option<String>,
+    
+    /// Model identifier (e.g., "claude-3-7-sonnet-20250219")
+    pub model: String,
+    
+    /// Provider (anthropic, openai, perplexity, etc.)
+    pub provider: String,
+    
+    /// Input tokens consumed
+    pub input_tokens: u64,
+    
+    /// Output tokens generated
+    pub output_tokens: u64,
+    
+    /// Workflow stage (intake, code, docs, qa, security)
+    pub stage: String,
+    
+    /// Iteration number within this stage
+    pub iteration: u32,
+    
+    /// Task ID if applicable
+    pub task_id: Option<String>,
+    
+    /// Timestamp of execution
+    pub timestamp: DateTime<Utc>,
+    
+    /// Calculated cost in USD
+    pub cost_usd: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ModelPricing {
+    /// Model identifier
+    pub model: String,
+    
+    /// Provider name
+    pub provider: String,
+    
+    /// Cost per 1M input tokens in USD
+    pub input_cost_per_million: f64,
+    
+    /// Cost per 1M output tokens in USD
+    pub output_cost_per_million: f64,
+    
+    /// Last updated timestamp
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PRCostSummary {
+    /// PR number
+    pub pr_number: u64,
+    
+    /// Total cost for this PR in USD
+    pub total_cost: f64,
+    
+    /// Total input tokens
+    pub total_input_tokens: u64,
+    
+    /// Total output tokens
+    pub total_output_tokens: u64,
+    
+    /// Cost breakdown by agent
+    pub agent_costs: HashMap<String, AgentCost>,
+    
+    /// Cost breakdown by stage
+    pub stage_costs: HashMap<String, StageCost>,
+    
+    /// Number of iterations per agent
+    pub iterations: HashMap<String, u32>,
+    
+    /// First token usage timestamp
+    pub started_at: DateTime<Utc>,
+    
+    /// Last token usage timestamp
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentCost {
+    pub agent: String,
+    pub cost: f64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub iterations: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StageCost {
+    pub stage: String,
+    pub cost: f64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+}
+```
+
+### Cost Configuration
+```rust
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CostConfig {
+    /// Enable cost tracking
+    pub enabled: bool,
+    
+    /// Post cost summaries to PR comments
+    pub post_to_pr: bool,
+    
+    /// Cost threshold for warnings (USD)
+    pub warning_threshold: Option<f64>,
+    
+    /// Cost threshold for errors (USD)
+    pub error_threshold: Option<f64>,
+    
+    /// Model pricing configuration
+    pub pricing: Vec<ModelPricing>,
+    
+    /// Storage backend configuration
+    pub storage: StorageConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StorageConfig {
+    /// Storage type (sqlite, postgres, etc.)
+    pub backend: String,
+    
+    /// Connection string or path
+    pub connection: String,
+    
+    /// Data retention period in days
+    pub retention_days: u32,
+}
+```
+
+## APIs and Integrations
+
+### MCP Tool for Cost Reporting
+```rust
+Tool {
+    name: "mcp_cto_costs",
+    description: "Query and analyze AI cost usage for PRs, agents, and tasks",
+    parameters: json!({
+        "action": {
+            "type": "string",
+            "description": "Cost action to perform",
+            "enum": ["show", "summary", "agent", "compare", "export"],
+        },
+        "pr_number": {
+            "type": "integer",
+            "description": "PR number to query costs for",
+        },
+        "agent": {
+            "type": "string",
+            "description": "Agent name to filter by",
+        },
+        "start_date": {
+            "type": "string",
+            "description": "Start date for cost query (ISO 8601)",
+        },
+        "end_date": {
+            "type": "string",
+            "description": "End date for cost query (ISO 8601)",
+        },
+        "format": {
+            "type": "string",
+            "description": "Output format",
+            "enum": ["json", "table", "markdown"],
+            "default": "table",
+        }
+    })
+}
+```
+
+### CLI Commands
+```bash
+# Show costs for a specific PR
+cto-cli costs show --pr 123
+
+# Show detailed breakdown with iterations
+cto-cli costs show --pr 123 --detailed
+
+# Show costs for a specific agent
+cto-cli costs agent --name rex --since 2025-01-01
+
+# Compare costs across multiple PRs
+cto-cli costs compare --prs 120,121,122
+
+# Export cost data
+cto-cli costs export --output costs.json --since 2025-01-01
+
+# Show current month summary
+cto-cli costs summary --month current
+
+# Show cost trends
+cto-cli costs trends --agents rex,morgan --days 30
+```
+
+### Cost Collection Implementation
+```rust
+// controller/src/costs/collector.rs
+pub struct CostCollector {
+    config: CostConfig,
+    storage: Box<dyn CostStorage>,
+    pricing: HashMap<String, ModelPricing>,
+}
+
+impl CostCollector {
+    /// Record token usage from an agent execution
+    pub async fn record_usage(
+        &self,
+        pr_number: u64,
+        agent: &str,
+        model: &str,
+        input_tokens: u64,
+        output_tokens: u64,
+        stage: &str,
+        iteration: u32,
+    ) -> Result<TokenUsage> {
+        // Look up pricing for this model
+        let pricing = self.pricing.get(model)
+            .ok_or_else(|| anyhow!("No pricing found for model: {}", model))?;
+        
+        // Calculate cost
+        let input_cost = (input_tokens as f64 / 1_000_000.0) * pricing.input_cost_per_million;
+        let output_cost = (output_tokens as f64 / 1_000_000.0) * pricing.output_cost_per_million;
+        let total_cost = input_cost + output_cost;
+        
+        // Create usage record
+        let usage = TokenUsage {
+            id: Uuid::new_v4().to_string(),
+            pr_number,
+            agent: agent.to_string(),
+            cli: None, // Will be set from metadata if available
+            model: model.to_string(),
+            provider: pricing.provider.clone(),
+            input_tokens,
+            output_tokens,
+            stage: stage.to_string(),
+            iteration,
+            task_id: None,
+            timestamp: Utc::now(),
+            cost_usd: total_cost,
+        };
+        
+        // Store the record
+        self.storage.insert_usage(&usage).await?;
+        
+        // Check thresholds
+        self.check_thresholds(pr_number, total_cost).await?;
+        
+        Ok(usage)
+    }
+    
+    /// Get cost summary for a PR
+    pub async fn get_pr_summary(&self, pr_number: u64) -> Result<PRCostSummary> {
+        let usages = self.storage.get_pr_usages(pr_number).await?;
+        
+        let mut summary = PRCostSummary {
+            pr_number,
+            total_cost: 0.0,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            agent_costs: HashMap::new(),
+            stage_costs: HashMap::new(),
+            iterations: HashMap::new(),
+            started_at: Utc::now(),
+            completed_at: None,
+        };
+        
+        // Aggregate costs
+        for usage in &usages {
+            // Total
+            summary.total_cost += usage.cost_usd;
+            summary.total_input_tokens += usage.input_tokens;
+            summary.total_output_tokens += usage.output_tokens;
+            
+            // By agent
+            summary.agent_costs.entry(usage.agent.clone())
+                .or_insert_with(|| AgentCost {
+                    agent: usage.agent.clone(),
+                    cost: 0.0,
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    iterations: 0,
+                })
+                .update(usage);
+            
+            // By stage
+            summary.stage_costs.entry(usage.stage.clone())
+                .or_insert_with(|| StageCost {
+                    stage: usage.stage.clone(),
+                    cost: 0.0,
+                    input_tokens: 0,
+                    output_tokens: 0,
+                })
+                .update(usage);
+            
+            // Track iterations
+            *summary.iterations.entry(usage.agent.clone()).or_insert(0) = 
+                summary.iterations.get(&usage.agent).unwrap_or(&0).max(&usage.iteration);
+            
+            // Timestamps
+            if usage.timestamp < summary.started_at {
+                summary.started_at = usage.timestamp;
+            }
+            summary.completed_at = Some(usage.timestamp);
+        }
+        
+        Ok(summary)
+    }
+    
+    async fn check_thresholds(&self, pr_number: u64, new_cost: f64) -> Result<()> {
+        let summary = self.get_pr_summary(pr_number).await?;
+        
+        if let Some(threshold) = self.config.error_threshold {
+            if summary.total_cost >= threshold {
+                tracing::error!(
+                    "PR {} exceeded error cost threshold: ${:.2} >= ${:.2}",
+                    pr_number, summary.total_cost, threshold
+                );
+                // TODO: Post comment to PR or send notification
+            }
+        }
+        
+        if let Some(threshold) = self.config.warning_threshold {
+            if summary.total_cost >= threshold {
+                tracing::warn!(
+                    "PR {} exceeded warning cost threshold: ${:.2} >= ${:.2}",
+                    pr_number, summary.total_cost, threshold
+                );
+            }
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Storage Interface
+```rust
+// controller/src/costs/storage.rs
+#[async_trait]
+pub trait CostStorage: Send + Sync {
+    async fn insert_usage(&self, usage: &TokenUsage) -> Result<()>;
+    async fn get_pr_usages(&self, pr_number: u64) -> Result<Vec<TokenUsage>>;
+    async fn get_agent_usages(&self, agent: &str, since: DateTime<Utc>) -> Result<Vec<TokenUsage>>;
+    async fn get_usages_in_range(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Result<Vec<TokenUsage>>;
+    async fn cleanup_old_records(&self, before: DateTime<Utc>) -> Result<u64>;
+}
+
+pub struct SqliteCostStorage {
+    pool: SqlitePool,
+}
+
+impl SqliteCostStorage {
+    pub async fn new(path: &str) -> Result<Self> {
+        let pool = SqlitePool::connect(path).await?;
+        
+        // Create tables
+        sqlx::query(r#"
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id TEXT PRIMARY KEY,
+                pr_number INTEGER NOT NULL,
+                agent TEXT NOT NULL,
+                cli TEXT,
+                model TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                stage TEXT NOT NULL,
+                iteration INTEGER NOT NULL,
+                task_id TEXT,
+                timestamp TEXT NOT NULL,
+                cost_usd REAL NOT NULL
+            )
+        "#)
+        .execute(&pool)
+        .await?;
+        
+        // Create indexes
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_pr_number ON token_usage(pr_number)")
+            .execute(&pool)
+            .await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_agent ON token_usage(agent)")
+            .execute(&pool)
+            .await?;
+        
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_timestamp ON token_usage(timestamp)")
+            .execute(&pool)
+            .await?;
+        
+        Ok(Self { pool })
+    }
+}
+
+#[async_trait]
+impl CostStorage for SqliteCostStorage {
+    async fn insert_usage(&self, usage: &TokenUsage) -> Result<()> {
+        sqlx::query(r#"
+            INSERT INTO token_usage (
+                id, pr_number, agent, cli, model, provider,
+                input_tokens, output_tokens, stage, iteration,
+                task_id, timestamp, cost_usd
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "#)
+        .bind(&usage.id)
+        .bind(usage.pr_number as i64)
+        .bind(&usage.agent)
+        .bind(&usage.cli)
+        .bind(&usage.model)
+        .bind(&usage.provider)
+        .bind(usage.input_tokens as i64)
+        .bind(usage.output_tokens as i64)
+        .bind(&usage.stage)
+        .bind(usage.iteration as i64)
+        .bind(&usage.task_id)
+        .bind(usage.timestamp.to_rfc3339())
+        .bind(usage.cost_usd)
+        .execute(&self.pool)
+        .await?;
+        
+        Ok(())
+    }
+    
+    async fn get_pr_usages(&self, pr_number: u64) -> Result<Vec<TokenUsage>> {
+        let records = sqlx::query_as::<_, TokenUsageRow>(
+            "SELECT * FROM token_usage WHERE pr_number = ? ORDER BY timestamp"
+        )
+        .bind(pr_number as i64)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(records.into_iter().map(|r| r.into()).collect())
+    }
+    
+    // ... other trait methods
+}
+```
+
+## Infrastructure Requirements
+
+### ConfigMap for Pricing Data
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-pricing-config
+  namespace: cto
+data:
+  pricing.json: |
+    {
+      "models": [
+        {
+          "model": "claude-3-7-sonnet-20250219",
+          "provider": "anthropic",
+          "input_cost_per_million": 3.0,
+          "output_cost_per_million": 15.0
+        },
+        {
+          "model": "claude-opus-4-20250514",
+          "provider": "anthropic",
+          "input_cost_per_million": 15.0,
+          "output_cost_per_million": 75.0
+        },
+        {
+          "model": "gpt-4o",
+          "provider": "openai",
+          "input_cost_per_million": 2.5,
+          "output_cost_per_million": 10.0
+        },
+        {
+          "model": "sonar-pro",
+          "provider": "perplexity",
+          "input_cost_per_million": 3.0,
+          "output_cost_per_million": 15.0
+        }
+      ]
+    }
+```
+
+### Cost Database PVC
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cost-database-pvc
+  namespace: cto
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+```
+
+### Cost Collector Sidecar
+```yaml
+# Add to agent workflow templates
+- name: cost-collector
+  image: ghcr.io/5dlabs/cost-collector:latest
+  env:
+    - name: PR_NUMBER
+      value: "{{inputs.parameters.pr_number}}"
+    - name: AGENT_NAME
+      value: "{{inputs.parameters.agent}}"
+    - name: STAGE
+      value: "{{inputs.parameters.stage}}"
+    - name: ITERATION
+      value: "{{inputs.parameters.iteration}}"
+    - name: COST_DB_PATH
+      value: /cost-data/costs.db
+  volumeMounts:
+    - name: cost-data
+      mountPath: /cost-data
+```
+
+## Integration Points
+
+### Agent Workflow Modifications
+Each agent workflow needs to:
+1. Report token usage after each API call
+2. Include PR number, stage, and iteration in metrics
+3. Write usage data to shared volume for collector
+4. Include model identifier in metadata
+
+### GitHub PR Comments
+```markdown
+## 💰 Cost Report
+
+**Total Cost**: $2.45
+
+### Breakdown by Agent
+| Agent | Iterations | Input Tokens | Output Tokens | Cost |
+|-------|-----------|--------------|---------------|------|
+| Rex   | 3         | 15,234       | 8,456         | $1.34 |
+| Cleo  | 2         | 8,123        | 4,234         | $0.87 |
+| Tess  | 1         | 2,345        | 1,234         | $0.24 |
+
+### Breakdown by Stage
+| Stage  | Cost   | % of Total |
+|--------|--------|------------|
+| Code   | $1.34  | 54.7%      |
+| Lint   | $0.87  | 35.5%      |
+| QA     | $0.24  | 9.8%       |
+
+<details>
+<summary>Detailed Usage</summary>
+
+#### Rex - Iteration 1
+- Model: claude-3-7-sonnet-20250219
+- Input: 5,234 tokens
+- Output: 2,456 tokens
+- Cost: $0.45
+
+#### Rex - Iteration 2
+- Model: claude-3-7-sonnet-20250219
+- Input: 6,000 tokens
+- Output: 3,000 tokens
+- Cost: $0.48
+
+...
+
+</details>
+```
+
+# Development Roadmap
+
+## Phase 1: Core Infrastructure (Days 1-3)
+### Data Models & Storage
+- Define Rust structs for token usage and costs
+- Implement SQLite storage backend
+- Create database schema and indexes
+- Add model pricing configuration
+
+### Cost Collector
+- Implement token usage recording
+- Create cost calculation logic
+- Add pricing lookup and updates
+- Build storage interface
+
+### Deliverables
+- Working cost storage system
+- Token usage data models
+- Cost calculation engine
+- Unit tests for core logic
+
+## Phase 2: CLI Integration (Days 4-5)
+### CLI Commands
+- Implement `costs show` command
+- Add `costs summary` command
+- Create `costs agent` command
+- Build `costs export` command
+
+### Query Engine
+- PR-based cost queries
+- Agent-based cost queries
+- Date range filtering
+- Aggregation logic
+
+### Deliverables
+- Working CLI commands
+- Query engine
+- Output formatting (table, JSON, markdown)
+- CLI tests
+
+## Phase 3: Workflow Integration (Days 6-8)
+### Agent Instrumentation
+- Add token tracking to Rex
+- Add token tracking to Morgan
+- Add token tracking to Cleo
+- Add tracking to other agents
+
+### Workflow Updates
+- Modify workflow templates
+- Add cost collector sidecar
+- Configure shared volumes
+- Update ConfigMaps
+
+### Deliverables
+- Instrumented agents
+- Updated workflows
+- Cost collection in production
+- Integration tests
+
+## Phase 4: Reporting & Visualization (Days 9-10)
+### PR Comment Integration
+- Implement GitHub comment poster
+- Create cost report template
+- Add threshold notifications
+- Configure posting triggers
+
+### MCP Tool
+- Implement `mcp_cto_costs` tool
+- Add cost query capabilities
+- Enable filtering and aggregation
+- Support multiple output formats
+
+### Deliverables
+- Automated PR cost comments
+- Working MCP tool
+- Cost threshold alerts
+- Documentation
+
+## Phase 5: Advanced Features (Days 11-12)
+### Analytics & Trends
+- Agent efficiency analysis
+- Cost trend visualization
+- Budget tracking
+- Cost optimization recommendations
+
+### Export & Integration
+- CSV export
+- JSON export
+- External system integration
+- Cost reporting API
+
+### Deliverables
+- Advanced analytics
+- Export capabilities
+- API documentation
+- User guides
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+### Token Count Accuracy
+**Risk**: Token counts from APIs may be delayed or inaccurate
+**Mitigation**: Use provider-reported counts when available, estimate as fallback
+
+### Pricing Updates
+**Risk**: Provider pricing changes may not be reflected immediately
+**Mitigation**: ConfigMap-based pricing with update mechanism, alerts for outdated pricing
+
+### Storage Growth
+**Risk**: Cost database may grow large over time
+**Mitigation**: Implement data retention policy, archival strategy, cleanup jobs
+
+## Operational Challenges
+
+### Performance Impact
+**Risk**: Cost tracking may slow down workflows
+**Mitigation**: Asynchronous cost recording, batching, separate sidecar
+
+### Data Privacy
+**Risk**: Cost data may contain sensitive information
+**Mitigation**: No content storage, only metadata and counts, access controls
+
+## Minimum Viable Product Definition
+
+### MVP Scope
+- Token usage tracking for Rex, Morgan, Cleo
+- SQLite storage backend
+- Basic CLI commands (show, summary)
+- PR-level cost aggregation
+- Simple cost calculation
+
+### MVP Success Criteria
+- Accurate cost tracking for at least 3 agents
+- CLI can query and display PR costs
+- Cost data persists across workflow runs
+- Calculations match provider pricing
+- Zero performance degradation
+
+### Out of Scope for MVP
+- Web dashboard
+- Advanced analytics
+- Real-time cost tracking
+- Multi-tenancy support
+- Cost prediction/estimation
+
+# Appendix
+
+## Cost Calculation Examples
+
+### Example 1: Claude Sonnet
+```
+Input tokens: 10,000
+Output tokens: 5,000
+Model: claude-3-7-sonnet-20250219
+
+Input cost: (10,000 / 1,000,000) * $3.00 = $0.03
+Output cost: (5,000 / 1,000,000) * $15.00 = $0.075
+Total: $0.105
+```
+
+### Example 2: GPT-4o
+```
+Input tokens: 8,000
+Output tokens: 3,000
+Model: gpt-4o
+
+Input cost: (8,000 / 1,000,000) * $2.50 = $0.02
+Output cost: (3,000 / 1,000,000) * $10.00 = $0.03
+Total: $0.05
+```
+
+## Database Schema
+```sql
+-- Token usage table
+CREATE TABLE token_usage (
+    id TEXT PRIMARY KEY,
+    pr_number INTEGER NOT NULL,
+    agent TEXT NOT NULL,
+    cli TEXT,
+    model TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    stage TEXT NOT NULL,
+    iteration INTEGER NOT NULL,
+    task_id TEXT,
+    timestamp TEXT NOT NULL,
+    cost_usd REAL NOT NULL
+);
+
+-- Indexes for fast queries
+CREATE INDEX idx_pr_number ON token_usage(pr_number);
+CREATE INDEX idx_agent ON token_usage(agent);
+CREATE INDEX idx_timestamp ON token_usage(timestamp);
+CREATE INDEX idx_stage ON token_usage(stage);
+
+-- Model pricing table
+CREATE TABLE model_pricing (
+    model TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    input_cost_per_million REAL NOT NULL,
+    output_cost_per_million REAL NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+## CLI Output Examples
+
+### Show Command
+```
+$ cto-cli costs show --pr 123
+
+PR #123 Cost Summary
+====================
+Total Cost: $2.45
+Total Input Tokens: 25,702
+Total Output Tokens: 13,924
+Duration: 12m 34s
+Status: Completed
+
+By Agent:
+  Rex    (3 iterations): $1.34  (15,234 in / 8,456 out)
+  Cleo   (2 iterations): $0.87  (8,123 in / 4,234 out)
+  Tess   (1 iteration):  $0.24  (2,345 in / 1,234 out)
+
+By Stage:
+  Code:     $1.34  (54.7%)
+  Lint:     $0.87  (35.5%)
+  QA:       $0.24   (9.8%)
+```
+
+### Agent Command
+```
+$ cto-cli costs agent --name rex --days 7
+
+Rex Cost Analysis (Last 7 Days)
+================================
+Total Cost: $45.67
+Average per PR: $2.85
+Total PRs: 16
+Total Iterations: 48
+Average Iterations per PR: 3.0
+
+Cost Trend:
+  Today:      $6.34
+  Yesterday:  $5.89
+  2 days ago: $7.12
+  3 days ago: $4.23
+  ...
+
+Top 5 Most Expensive PRs:
+  PR #125: $4.56  (5 iterations)
+  PR #123: $4.23  (4 iterations)
+  PR #120: $3.89  (3 iterations)
+  PR #119: $3.45  (4 iterations)
+  PR #118: $3.12  (2 iterations)
+```
+
+## Success Metrics
+- Cost tracking accuracy: >99%
+- Query response time: <500ms for PR queries
+- Storage overhead: <100MB per 10,000 PRs
+- Performance impact: <1% workflow slowdown
+- Adoption rate: All active agents instrumented within 2 weeks
+</PRD>
+
