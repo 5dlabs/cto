@@ -149,4 +149,13 @@ Define projected volume for agent templates (merges all ConfigMaps)
     - configMap:
         name: {{ include "controller.fullname" . }}-agent-templates-opencode
         optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-code-shared
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-docs
+        optional: true
+    - configMap:
+        name: {{ include "controller.fullname" . }}-agent-templates-intake
+        optional: true
 {{- end }}

@@ -22,6 +22,9 @@ spec:
         agent-templates-cursor/checksum: {{ include (print $.Template.BasePath "/agent-templates-cursor.yaml") . | sha256sum }}
         agent-templates-factory/checksum: {{ include (print $.Template.BasePath "/agent-templates-factory.yaml") . | sha256sum }}
         agent-templates-opencode/checksum: {{ include (print $.Template.BasePath "/agent-templates-opencode.yaml") . | sha256sum }}
+        agent-templates-code-shared/checksum: {{ include (print $.Template.BasePath "/agent-templates-code-shared.yaml") . | sha256sum }}
+        agent-templates-docs/checksum: {{ include (print $.Template.BasePath "/agent-templates-docs.yaml") . | sha256sum }}
+        agent-templates-intake/checksum: {{ include (print $.Template.BasePath "/agent-templates-intake.yaml") . | sha256sum }}
         # Force pod restart when controller config changes
         controller-config/checksum: {{ include (print $.Template.BasePath "/task-controller-config.yaml") . | sha256sum }}
         # Force pod restart when main config changes
