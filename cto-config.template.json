@@ -44,6 +44,7 @@
       "cli": "claude",
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
       "repository": "your-org/your-test-repo",
       "service": "your-test-service",

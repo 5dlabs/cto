@@ -9,8 +9,11 @@ This architecture introduces a specialized **Frontend Agent** to the multi-agent
 1. **Design-First Automation**: Automated UI design generation from text prompts
 2. **Production-Ready Code**: React + TypeScript + Tailwind CSS + shadcn/ui output
 3. **Visual Documentation**: Automated screenshot capture for every PR
-4. **Multi-Agent Integration**: Seamless integration with existing Rex → Cleo → Tess pipeline
-5. **Cost-Effective**: Self-hosted infrastructure with minimal external dependencies
+4. **Live Preview URLs**: Every PR includes Ngrok-powered live preview URLs
+5. **Multi-Agent Integration**: Seamless integration with existing Rex → Cleo → Tess pipeline
+6. **Kubernetes-Native**: Full deployment in K8s cluster with Ngrok ingress
+7. **E2E Testing**: Playwright-based screenshot capture and interaction validation
+8. **Cost-Effective**: Self-hosted infrastructure with minimal external dependencies
 
 ## System Architecture
 
@@ -30,21 +33,29 @@ graph TD
     H --> I[shadcn CLI: Install Components]
     I --> J[Component Integration]
 
-    J --> K[Chrome DevTools MCP]
-    K --> L[Screenshot Capture]
-    L --> M[GitHub PR Creation]
+    J --> K[Deploy to K8s Staging]
+    K --> L[Ngrok Ingress Setup]
+    L --> M[Generate Live Preview URL]
+    
+    M --> N[Playwright E2E Tests]
+    N --> O[Screenshot Capture]
+    O --> P[Interaction Testing]
+    
+    P --> Q[GitHub PR Creation]
+    Q --> R[Upload Screenshots + Live URL]
 
-    M --> N[Cleo: Code Quality Review]
-    N --> O[ESLint + TypeScript + jsx-a11y]
-    O --> P[PR Review: APPROVE/CHANGES]
+    R --> S[Cleo: Code Quality Review]
+    S --> T[ESLint + TypeScript + jsx-a11y]
+    T --> U[PR Review: APPROVE/CHANGES]
 
-    P --> Q[Tess: E2E QA Testing]
-    Q --> R[Playwright E2E Tests]
-    R --> S[Visual Regression Testing]
-    S --> T[PR Review: APPROVE/CHANGES]
+    U --> V[Tess: E2E QA Testing]
+    V --> W[Playwright Extended Tests]
+    W --> X[Visual Regression Testing]
+    X --> Y[Accessibility Audit]
+    Y --> Z[PR Review: APPROVE/CHANGES]
 
-    T --> U[Human: Final Approval]
-    U --> V[Merge to Main]
+    Z --> AA[Human: Final Approval]
+    AA --> AB[Merge to Main]
 ```
 
 ### Agent Flow Integration
@@ -83,8 +94,11 @@ graph TD
 3. Initialize Next.js project structure
 4. Install shadcn/ui components
 5. Integrate generated components
-6. Capture multi-viewport screenshots
-7. Create GitHub PR with visual documentation
+6. Deploy to Kubernetes staging namespace
+7. Configure Ngrok ingress for live preview
+8. Run Playwright E2E tests with screenshot capture
+9. Capture multi-viewport screenshots
+10. Create GitHub PR with screenshots + live preview URL
 
 **Container Image**: `registry.local/frontend-agent:latest`
 
@@ -256,9 +270,386 @@ This means:
 - ✅ Screen reader compatible
 - ✅ Full customization via Tailwind classes
 
-### 4. Screenshot Automation System
+### 4. Kubernetes Deployment with Ngrok Ingress
 
-**Chrome DevTools MCP Integration**:
+**Deployment Architecture**:
+
+Every Blaze-generated frontend application is automatically deployed to the Kubernetes cluster with a live preview URL for immediate review.
+
+**Namespace Strategy**:
+```yaml
+# Each task gets isolated staging namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blaze-staging-task-123
+  labels:
+    agent: blaze
+    task-id: "123"
+    purpose: frontend-preview
+```
+
+**Next.js Deployment**:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-preview
+  namespace: blaze-staging-task-123
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-preview
+  template:
+    metadata:
+      labels:
+        app: frontend-preview
+    spec:
+      containers:
+        - name: nextjs
+          image: node:20-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              cd /app && \
+              pnpm install && \
+              pnpm run build && \
+              pnpm run start
+          ports:
+            - containerPort: 3000
+              name: http
+          volumeMounts:
+            - name: app-code
+              mountPath: /app
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: app-code
+          persistentVolumeClaim:
+            claimName: workspace-frontend-task-123
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-preview
+  namespace: blaze-staging-task-123
+spec:
+  selector:
+    app: frontend-preview
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http
+  type: ClusterIP
+```
+
+**Ngrok Ingress for Live Preview**:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-preview-ngrok
+  namespace: blaze-staging-task-123
+  annotations:
+    k8s.ngrok.com/modules: "compression,headers"
+    k8s.ngrok.com/domain: "blaze-task-123.ngrok.app"
+spec:
+  ingressClassName: ngrok
+  rules:
+    - host: blaze-task-123.ngrok.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-preview
+                port:
+                  number: 80
+---
+# Ngrok Domain CRD
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+kind: Domain
+metadata:
+  name: blaze-task-123
+  namespace: blaze-staging-task-123
+spec:
+  domain: blaze-task-123.ngrok.app
+```
+
+**URL Generation Script**:
+```bash
+#!/bin/bash
+# scripts/generate-preview-url.sh
+
+TASK_ID=$1
+NAMESPACE="blaze-staging-task-${TASK_ID}"
+
+# Create unique ngrok subdomain
+SUBDOMAIN="blaze-task-${TASK_ID}-$(date +%s | tail -c 6)"
+
+# Apply Ngrok domain
+kubectl apply -f - <<EOF
+apiVersion: ingress.k8s.ngrok.com/v1alpha1
+kind: Domain
+metadata:
+  name: ${SUBDOMAIN}
+  namespace: ${NAMESPACE}
+spec:
+  domain: ${SUBDOMAIN}.ngrok.app
+EOF
+
+# Wait for domain to be ready
+kubectl wait --for=condition=Ready \
+  domain/${SUBDOMAIN} \
+  -n ${NAMESPACE} \
+  --timeout=60s
+
+# Get the live URL
+PREVIEW_URL="https://${SUBDOMAIN}.ngrok.app"
+echo ${PREVIEW_URL} > /workspace/preview_url.txt
+
+echo "✅ Live preview available at: ${PREVIEW_URL}"
+```
+
+**Deployment Flow**:
+```
+1. Blaze completes code generation
+2. Create K8s namespace for task
+3. Deploy Next.js app to namespace
+4. Configure Ngrok ingress with unique subdomain
+5. Wait for deployment ready + Ngrok tunnel active
+6. Generate live preview URL (https://blaze-task-123-xyz.ngrok.app)
+7. Run Playwright tests against live URL
+8. Capture screenshots from live deployment
+9. Add URL to GitHub PR
+```
+
+### 5. Playwright E2E Testing & Screenshot Automation
+
+**Playwright Test Suite**:
+
+Blaze uses Playwright for both screenshot capture AND functional testing of the live deployment.
+
+**Test Configuration**:
+```typescript
+// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  
+  use: {
+    baseURL: process.env.PREVIEW_URL, // Live Ngrok URL
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+  },
+
+  projects: [
+    {
+      name: 'Desktop Chrome',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 13'] },
+    },
+    {
+      name: 'Tablet',
+      use: { ...devices['iPad Pro'] },
+    },
+  ],
+
+  webServer: undefined, // Using live K8s deployment, not local server
+});
+```
+
+**Screenshot Capture Tests**:
+```typescript
+// tests/e2e/screenshots.spec.ts
+import { test, expect } from '@playwright/test';
+
+const viewports = [
+  { name: 'mobile', width: 375, height: 667 },
+  { name: 'tablet', width: 768, height: 1024 },
+  { name: 'desktop', width: 1920, height: 1080 },
+];
+
+test.describe('Visual Documentation', () => {
+  for (const viewport of viewports) {
+    test(`capture ${viewport.name} viewport`, async ({ page }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height
+      });
+      
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+      
+      // Full page screenshot
+      await page.screenshot({
+        path: `screenshots/${viewport.name}-full.png`,
+        fullPage: true
+      });
+      
+      // Component screenshots
+      const components = await page.locator('[data-component]').all();
+      for (const component of components) {
+        const componentName = await component.getAttribute('data-component');
+        await component.screenshot({
+          path: `screenshots/${viewport.name}-${componentName}.png`
+        });
+      }
+    });
+  }
+});
+```
+
+**Interaction Tests**:
+```typescript
+// tests/e2e/interactions.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Component Interactions', () => {
+  test('navigation works correctly', async ({ page }) => {
+    await page.goto('/');
+    
+    // Test navigation links
+    await page.click('nav a[href="/dashboard"]');
+    await expect(page).toHaveURL(/.*dashboard/);
+  });
+
+  test('forms submit correctly', async ({ page }) => {
+    await page.goto('/');
+    
+    await page.fill('input[name="email"]', 'test@example.com');
+    await page.click('button[type="submit"]');
+    
+    await expect(page.locator('.success-message')).toBeVisible();
+  });
+
+  test('responsive menu toggles', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+    
+    const menu = page.locator('[data-testid="mobile-menu"]');
+    await expect(menu).not.toBeVisible();
+    
+    await page.click('[data-testid="menu-toggle"]');
+    await expect(menu).toBeVisible();
+  });
+});
+```
+
+**Accessibility Tests**:
+```typescript
+// tests/e2e/accessibility.spec.ts
+import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+
+test.describe('Accessibility Compliance', () => {
+  test('should not have any automatically detectable WCAG A and AA violations', async ({ page }) => {
+    await page.goto('/');
+    
+    const accessibilityScanResults = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze();
+    
+    expect(accessibilityScanResults.violations).toEqual([]);
+  });
+
+  test('keyboard navigation works correctly', async ({ page }) => {
+    await page.goto('/');
+    
+    // Tab through interactive elements
+    await page.keyboard.press('Tab');
+    let focused = await page.evaluate(() => document.activeElement?.tagName);
+    expect(['BUTTON', 'A', 'INPUT']).toContain(focused);
+  });
+});
+```
+
+**Performance Tests**:
+```typescript
+// tests/e2e/performance.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Performance Metrics', () => {
+  test('lighthouse scores meet targets', async ({ page }) => {
+    await page.goto('/');
+    
+    const metrics = await page.evaluate(() => {
+      return new Promise((resolve) => {
+        new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          resolve({
+            fcp: entries.find(e => e.name === 'first-contentful-paint')?.startTime,
+            lcp: entries.find(e => e.entryType === 'largest-contentful-paint')?.startTime,
+          });
+        }).observe({ entryTypes: ['paint', 'largest-contentful-paint'] });
+      });
+    });
+    
+    // FCP should be < 1.8s (Lighthouse "Good" threshold)
+    expect(metrics.fcp).toBeLessThan(1800);
+    
+    // LCP should be < 2.5s (Core Web Vitals "Good" threshold)
+    expect(metrics.lcp).toBeLessThan(2500);
+  });
+});
+```
+
+**Test Execution Script**:
+```bash
+#!/bin/bash
+# scripts/run-playwright-tests.sh
+
+PREVIEW_URL=$1
+TASK_ID=$2
+
+export PREVIEW_URL
+
+echo "🎭 Running Playwright tests against: ${PREVIEW_URL}"
+
+# Create screenshots directory
+mkdir -p screenshots
+
+# Run tests
+pnpm exec playwright test \
+  --reporter=html,json \
+  --output=test-results
+
+# Generate test report
+pnpm exec playwright show-report test-results
+
+# Upload results
+echo "📊 Test Results:"
+cat test-results/results.json | jq '.suites[].specs[] | {title: .title, outcome: .tests[0].results[0].status}'
+
+# Save summary
+echo "Tests completed for task ${TASK_ID}" > test-summary.txt
+echo "Preview URL: ${PREVIEW_URL}" >> test-summary.txt
+echo "Screenshots: $(ls screenshots/*.png | wc -l)" >> test-summary.txt
+```
+
+### 6. Chrome DevTools MCP Integration (Backup)
 
 **Deployment**:
 ```yaml
@@ -360,6 +751,17 @@ await uploadScreenshotsToGitHub('screenshots/', prNumber);
 
 **GitHub PR Comment Format**:
 ```markdown
+## 🎨 Blaze Frontend Implementation
+
+### 🌐 Live Preview
+**[👉 View Live Demo](https://blaze-task-123-xyz.ngrok.app)** ← Click to see the implementation
+
+> 🔗 **Preview URL**: `https://blaze-task-123-xyz.ngrok.app`
+> ⏰ **Available until**: PR is merged (auto-cleanup after merge)
+> 🔄 **Updates live**: Every push to this branch updates the preview
+
+---
+
 ## 📸 UI Screenshots
 
 ### Desktop View (1920×1080)
@@ -378,19 +780,63 @@ await uploadScreenshotsToGitHub('screenshots/', prNumber);
 
 ---
 
+## ✅ Quality Checks
+
 ### Accessibility
 - ✅ WCAG AA Compliant
 - ✅ Keyboard Navigation
 - ✅ Screen Reader Compatible
 - ✅ Color Contrast: 4.5:1
+- ✅ All images have alt text
+- ✅ Semantic HTML structure
 
 ### Performance (Lighthouse)
-- Performance: 95/100
-- Accessibility: 100/100
-- Best Practices: 95/100
-- SEO: 100/100
+- Performance: 95/100 ⚡
+- Accessibility: 100/100 ♿
+- Best Practices: 95/100 ✨
+- SEO: 100/100 🔍
 
-🤖 Generated by Frontend Agent with [Claude Code](https://claude.com/claude-code)
+### Core Web Vitals
+- First Contentful Paint: 1.2s
+- Largest Contentful Paint: 2.1s
+- Cumulative Layout Shift: 0.05
+- Time to Interactive: 2.4s
+
+### Test Results
+- ✅ 15/15 Playwright tests passed
+- ✅ Visual regression: No diffs detected
+- ✅ Interaction tests: All passing
+- ✅ Accessibility audit: 0 violations
+
+---
+
+## 🛠️ Technical Stack
+
+**Frontend**:
+- React 19 + TypeScript 5
+- Next.js 15 (App Router)
+- Tailwind CSS 4
+- shadcn/ui components
+
+**Infrastructure**:
+- Deployed to: Kubernetes staging namespace
+- Ingress: Ngrok
+- Testing: Playwright E2E
+
+**shadcn/ui Components Used**:
+- Button, Card, Dialog, Input, Form
+
+---
+
+## 📋 Next Steps
+
+- [ ] **Cleo Review**: Code quality, linting, tests
+- [ ] **Tess QA**: Extended E2E tests, visual regression
+- [ ] **Human Approval**: Final review and merge
+
+🤖 Generated by **Blaze** (Frontend Agent) with [Codex CLI](https://docs.anthropic.com/claude/docs/claude-code)
+
+Co-Authored-By: Blaze <noreply@5dlabs.io>
 ```
 
 ### 5. Argo Events Integration
@@ -774,18 +1220,33 @@ test.describe('Frontend Implementation Tests', () => {
    └─ Sensor: frontend-task-sensor
    └─ Triggers: frontend-agent-workflow
 
-3. Frontend Agent Execution
-   └─ v0 API: Generate React design
+3. Blaze Agent Execution
+   └─ v0 API: Generate React design (~20s)
    └─ Parse: Extract components and dependencies
-   └─ Setup: Initialize Next.js project
-   └─ Install: shadcn/ui components via CLI
+   └─ Setup: Initialize Next.js project (~30s)
+   └─ Install: shadcn/ui components via CLI (~30s)
    └─ Integrate: Copy v0 code into project
-   └─ Dev Server: Start Next.js dev server
-   └─ MCP Call: Chrome DevTools screenshot capture
-   └─ Upload: Screenshots to GitHub
-   └─ Git: Commit changes
-   └─ GitHub: Create PR with screenshots
-   └─ Output: pr_number.txt
+   └─ Git: Commit changes to branch
+   
+   └─ K8s Deploy: Create staging namespace
+   └─ K8s Deploy: Deploy Next.js to namespace (~60s)
+   └─ K8s Deploy: Wait for pod ready
+   
+   └─ Ngrok: Configure ingress with unique subdomain (~10s)
+   └─ Ngrok: Wait for tunnel active
+   └─ Ngrok: Generate live preview URL
+   
+   └─ Playwright: Run E2E tests against live URL (~90s)
+   └─ Playwright: Capture screenshots (mobile, tablet, desktop)
+   └─ Playwright: Run interaction tests
+   └─ Playwright: Run accessibility audit
+   └─ Playwright: Run performance tests
+   
+   └─ GitHub: Create PR with screenshots + live URL
+   └─ GitHub: Upload test artifacts
+   └─ Output: pr_number.txt, preview_url.txt
+   
+   └─ Total Time: ~4-5 minutes
 
 4. Workflow Suspend (await-cleo-review)
    └─ PR created, waiting for Cleo review
