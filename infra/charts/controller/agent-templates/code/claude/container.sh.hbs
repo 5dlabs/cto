@@ -959,7 +959,7 @@ fi
 echo "✓ Code implementation environment ready"
 
 # Build Claude command
-CLAUDE_CMD="claude -p --output-format text --input-format stream-json --verbose"
+CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 
 # Add MCP configuration if available
 if [ -f "/workspace/.mcp.json" ]; then
