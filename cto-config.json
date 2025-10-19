@@ -40,6 +40,7 @@
       "cli": "factory",
       "implementationAgent": "5DLabs-Rex",
       "qualityAgent": "5DLabs-Cleo",
+      "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
       "repository": "5dlabs/cto",
       "service": "cli-agnostic-platform",
@@ -49,6 +50,7 @@
       "maxRetries": 10,
       "implementationMaxRetries": 10,
       "qualityMaxRetries": 5,
+      "securityMaxRetries": 5,
       "testingMaxRetries": 5,
       "autoMerge": true
     },
