@@ -2040,9 +2040,6 @@ ps aux | head -5
 # Write completion marker for workflow tracking
 echo "cipher-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
 
-# Cleanup FIFO
-rm -f "$FIFO_PATH" 2>/dev/null || true
-
 # Explicitly stop Docker sidecar before exiting
 echo "🛑 Explicitly stopping Docker sidecar..."
 stop_docker_sidecar || true
