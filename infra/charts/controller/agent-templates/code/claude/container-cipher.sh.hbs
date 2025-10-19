@@ -1798,9 +1798,10 @@ echo "════════════════════════�
 USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
 
 # Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
-printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" | $CLAUDE_CMD &
+# Use a subshell to ensure stdin closes after the prompt is sent
+(printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED"; exec 0<&-) | $CLAUDE_CMD &
 CLAUDE_PID=$!
-echo "✓ Started Claude with Cipher prompt (PID: $CLAUDE_PID)"
+echo "✓ Started Claude with Cipher prompt (PID: $CLAUDE_PID), stdin will close after prompt"
 
 # Start background token refresh for long-running jobs
 (
