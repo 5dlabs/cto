@@ -2374,6 +2374,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
             "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
@@ -2388,6 +2389,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/factory/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/factory/agents-tess.md.hbs",
             _ => "code/factory/agents.md.hbs",
