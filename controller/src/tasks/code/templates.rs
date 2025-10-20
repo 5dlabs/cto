@@ -2588,6 +2588,13 @@ mod tests {
     }
 
     #[test]
+    fn test_cipher_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
+    }
+
+    #[test]
     fn test_default_template_selection() {
         let code_run = create_test_code_run(None);
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
