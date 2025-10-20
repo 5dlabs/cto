@@ -2475,9 +2475,11 @@ impl CodeTemplateGenerator {
             "agents/system-prompt",
         ];
 
+        let mut failed_partials = Vec::new();
+
         for partial_name in agent_partials {
             // Load the partial template from ConfigMap
-            // The partial path uses '/' but ConfigMap keys use '_'
+            // The ConfigMap key uses underscores instead of slashes (e.g., agents_cipher-system-prompt.md.hbs)
             let template_path = format!("{partial_name}.md.hbs");
             match Self::load_template(&template_path) {
                 Ok(content) => {
@@ -2488,13 +2490,28 @@ impl CodeTemplateGenerator {
                                 "Failed to register agent partial {partial_name}: {e}"
                             ))
                         })?;
-                    debug!("Registered agent partial: {}", partial_name);
+                    debug!("Successfully registered agent partial: {}", partial_name);
                 }
                 Err(e) => {
-                    // Log but don't fail if a partial is missing - it may not be needed
-                    debug!("Skipping agent partial {partial_name}: {e}");
+                    // Warn but don't fail - the partial may not be needed for this specific agent
+                    warn!(
+                        "Failed to load agent partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Templates referencing this partial will fail to render."
+                    );
+                    failed_partials.push(partial_name);
                 }
             }
+        }
+
+        // Log summary of partial registration
+        if !failed_partials.is_empty() {
+            warn!(
+                "Agent partial registration incomplete. {} partials failed to load: {:?}. \
+                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                failed_partials.len(),
+                failed_partials,
+                AGENT_TEMPLATES_PATH
+            );
         }
 
         Ok(())
