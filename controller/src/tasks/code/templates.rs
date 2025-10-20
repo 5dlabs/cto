@@ -348,6 +348,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_cursor_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -620,6 +623,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_factory_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -796,6 +802,9 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
 
         let template = Self::load_template(CODE_CLAUDE_MEMORY_TEMPLATE)?;
 
@@ -1033,6 +1042,9 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
 
         let template_path = Self::get_codex_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
@@ -1902,6 +1914,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_opencode_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -2250,6 +2265,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "claude/container-rex.sh.hbs",
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
             "5DLabs-Tess" => "claude/container-tess.sh.hbs",
             _ => {
@@ -2270,6 +2286,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
             _ => "code/codex/container.sh.hbs",
@@ -2283,6 +2300,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/codex/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/codex/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/codex/agents-tess.md.hbs",
             _ => "code/codex/agents.md.hbs",
@@ -2298,6 +2316,7 @@ impl CodeTemplateGenerator {
                 "code/opencode/container-rex.sh.hbs"
             }
             "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
@@ -2313,6 +2332,7 @@ impl CodeTemplateGenerator {
                 "code/opencode/agents-rex.md.hbs"
             }
             "5DLabs-Blaze" => "code/opencode/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/opencode/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/opencode/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/opencode/agents-tess.md.hbs",
             _ => "code/opencode/agents.md.hbs",
@@ -2326,6 +2346,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
@@ -2339,6 +2360,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/cursor/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/cursor/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/cursor/agents-tess.md.hbs",
             _ => "code/cursor/agents.md.hbs",
@@ -2352,6 +2374,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
             "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
@@ -2366,6 +2389,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/factory/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/factory/agents-tess.md.hbs",
             _ => "code/factory/agents.md.hbs",
@@ -2447,6 +2471,60 @@ impl CodeTemplateGenerator {
             ))
         })
     }
+
+    /// Register shared agent system prompt partials
+    /// These partials are used by agent-specific templates via {{> agents/partial-name}}
+    fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
+        // List of shared agent system prompt partials that need to be registered
+        let agent_partials = vec![
+            "agents/cipher-system-prompt",
+            "agents/cleo-system-prompt",
+            "agents/rex-system-prompt",
+            "agents/tess-system-prompt",
+            "agents/system-prompt",
+        ];
+
+        let mut failed_partials = Vec::new();
+
+        for partial_name in agent_partials {
+            // Load the partial template from ConfigMap
+            // The ConfigMap key uses underscores instead of slashes (e.g., agents_cipher-system-prompt.md.hbs)
+            let template_path = format!("{partial_name}.md.hbs");
+            match Self::load_template(&template_path) {
+                Ok(content) => {
+                    handlebars
+                        .register_partial(partial_name, content)
+                        .map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to register agent partial {partial_name}: {e}"
+                            ))
+                        })?;
+                    debug!("Successfully registered agent partial: {}", partial_name);
+                }
+                Err(e) => {
+                    // Warn but don't fail - the partial may not be needed for this specific agent
+                    warn!(
+                        "Failed to load agent partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Templates referencing this partial will fail to render."
+                    );
+                    failed_partials.push(partial_name);
+                }
+            }
+        }
+
+        // Log summary of partial registration
+        if !failed_partials.is_empty() {
+            warn!(
+                "Agent partial registration incomplete. {} partials failed to load: {:?}. \
+                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                failed_partials.len(),
+                failed_partials,
+                AGENT_TEMPLATES_PATH
+            );
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -2507,6 +2585,13 @@ mod tests {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(template_path, "code/claude/container-tess.sh.hbs");
+    }
+
+    #[test]
+    fn test_cipher_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
     }
 
     #[test]

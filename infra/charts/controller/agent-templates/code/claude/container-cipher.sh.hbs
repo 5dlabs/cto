@@ -1533,8 +1533,22 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
 
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
-3. **Verify Live Data Implementation**: Ensure NO mocks exist - all implementations must use real databases, APIs, and configurable parameters (no hard-coded trading pairs, endpoints, etc.)
-4. **Run quality checks (CRITICAL - NO BYPASSES)**:
+3. **Check GitHub Code Scanning (CRITICAL - MUST FIX ALL MEDIUM/HIGH ISSUES)**:
+   - Check for security vulnerabilities: gh api "/repos/{{repo_owner}}/{{repo_name}}/code-scanning/alerts?state=open&pr={{pr_number}}"
+   - **ZERO TOLERANCE** for HIGH and CRITICAL severity issues
+   - **MUST FIX** all MEDIUM severity issues
+   - Common issues to address:
+     * SQL injection vulnerabilities
+     * Command injection risks
+     * Path traversal vulnerabilities
+     * Insecure cryptographic practices
+     * Hardcoded credentials
+     * Unsafe deserialization
+   - If code scanning alerts exist, you MUST fix them before proceeding
+   - Use secure coding practices: parameterized queries, input validation, safe path handling
+   - Do NOT suppress security warnings - fix the underlying vulnerability
+4. **Verify Live Data Implementation**: Ensure NO mocks exist - all implementations must use real databases, APIs, and configurable parameters (no hard-coded trading pairs, endpoints, etc.)
+5. **Run quality checks (CRITICAL - NO BYPASSES)**:
    - For Rust: cargo clippy -- -D warnings -W clippy::pedantic
    - **ABSOLUTELY CRITICAL**: DO NOT add #[allow(clippy::...)] to bypass warnings!
    - Instead, FIX the underlying code issues that Clippy identifies
@@ -1543,7 +1557,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
    - For YAML: YAML linting and validation
    - IMPORTANT: Commit and push ALL fixes immediately (don't wait until the end)
    - NOTE: Do NOT write tests - Tess handles all testing
-5. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
+6. **Set up CI/CD Pipeline (CRITICAL - Use These EXACT Patterns)**:
    - Check if .github/workflows/ci.yml exists (or similar CI workflow)
    - If not, create using these PROVEN TEMPLATES from our production platform:
 
@@ -1699,7 +1713,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
      * Verify workflow syntax is correct
      * Fix any workflow configuration issues
    - KEEP ITERATING: Fix issues, push, check CI, repeat until ALL JOBS RUN AND PASS
-5. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
+7. **Verify CI Success (THE ONLY MEASURE OF SUCCESS)**:
    - **If repository has workflows**: Use 'gh pr checks {{pr_number}}' to confirm ALL checks are passing
    - **If no workflows**: Skip CI validation and proceed to code quality checks
    - **CRITICAL: Check for stuck/pending jobs** (only if workflows exist):
@@ -1731,11 +1745,14 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
    - **VERIFY DOCKER PUSH SUCCESS**: If workflow includes Docker build, ensure images push to registry successfully
    - SUCCESS = Code quality checks pass + CI passes (if workflows exist) OR code quality checks pass (if no workflows)
    - Do NOT proceed until quality standards are met AND Docker images can be pushed (if applicable)
-7. **Review against task requirements**: Verify implementation matches acceptance criteria
-8. **Report results**: Provide detailed summary of checks performed, CI setup, and any fixes applied
-9. **Success criteria**: Quality checks must pass for approval. CI/CD validation required only when workflows exist.
+8. **Review against task requirements**: Verify implementation matches acceptance criteria
+9. **Report results**: Provide detailed summary of checks performed, security scanning results, CI setup, and any fixes applied
+10. **Success criteria**: Security vulnerabilities fixed + Quality checks pass + CI/CD validation (when workflows exist)
 
 ## Quality Standards (MUST PASS IN GITHUB ACTIONS WHEN WORKFLOWS EXIST, OTHERWISE LOCALLY!)
+- **Zero tolerance for security vulnerabilities** - All MEDIUM, HIGH, and CRITICAL severity issues from GitHub code scanning MUST be fixed
+- **No security warning suppression** - Fix the vulnerability, don't silence the alert
+- **Secure coding practices required** - Use parameterized queries, input validation, safe APIs
 - **Zero tolerance** for clippy warnings at pedantic level (in CI if workflows exist, locally otherwise)
 - **NO CLIPPY BYPASSES** - Absolutely no #[allow(clippy::...)] attributes unless critically necessary with documented justification
 - **FIX THE CODE, NOT THE WARNING** - Address the underlying issues Clippy identifies
