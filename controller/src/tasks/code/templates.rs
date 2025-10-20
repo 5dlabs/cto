@@ -2265,6 +2265,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "claude/container-rex.sh.hbs",
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
             "5DLabs-Tess" => "claude/container-tess.sh.hbs",
             _ => {
@@ -2285,6 +2286,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
             _ => "code/codex/container.sh.hbs",
@@ -2298,6 +2300,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/codex/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/codex/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/codex/agents-tess.md.hbs",
             _ => "code/codex/agents.md.hbs",
@@ -2313,6 +2316,7 @@ impl CodeTemplateGenerator {
                 "code/opencode/container-rex.sh.hbs"
             }
             "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
@@ -2328,6 +2332,7 @@ impl CodeTemplateGenerator {
                 "code/opencode/agents-rex.md.hbs"
             }
             "5DLabs-Blaze" => "code/opencode/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/opencode/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/opencode/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/opencode/agents-tess.md.hbs",
             _ => "code/opencode/agents.md.hbs",
@@ -2341,6 +2346,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
@@ -2354,6 +2360,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/cursor/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/cursor/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/cursor/agents-tess.md.hbs",
             _ => "code/cursor/agents.md.hbs",
@@ -2367,6 +2374,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/container-rex.sh.hbs",
             "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
             "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
@@ -2381,6 +2389,7 @@ impl CodeTemplateGenerator {
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/agents-rex.md.hbs",
             "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
+            "5DLabs-Cipher" => "code/factory/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
             "5DLabs-Tess" => "code/factory/agents-tess.md.hbs",
             _ => "code/factory/agents.md.hbs",
@@ -2576,6 +2585,13 @@ mod tests {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(template_path, "code/claude/container-tess.sh.hbs");
+    }
+
+    #[test]
+    fn test_cipher_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
     }
 
     #[test]
