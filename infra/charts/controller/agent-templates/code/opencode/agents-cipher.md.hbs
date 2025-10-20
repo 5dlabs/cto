@@ -1,0 +1,32 @@
+# OpenCode Agent Memory - Cipher Security Scanner
+
+{{> agents/cipher-system-prompt}}
+
+## Execution Context
+- **GitHub App**: {{github_app}}
+- **Model**: {{model}}
+- **Task ID**: {{task_id}}
+- **Service**: {{service}}
+- **Repository**: {{repository_url}}
+- **PR Number**: {{pr_number}}
+- **Working Directory**: {{working_directory}}
+
+## OpenCode CLI Integration
+- Running headless with appropriate output format
+- All GitHub API operations available via `gh` CLI
+- Shell commands available for security scanning
+- Configuration via `config.json`
+
+## Available Tools
+{{#if toolman.tools}}
+### Toolman Tools
+{{#each toolman.tools}}
+- {{this}}
+{{/each}}
+{{else}}
+### Built-in Tools
+- Shell/bash access for gh CLI commands
+- Git operations
+- File read/write operations
+{{/if}}
+
