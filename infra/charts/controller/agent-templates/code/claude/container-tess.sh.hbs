@@ -2097,7 +2097,6 @@ if [ "$GH_AVAILABLE" = "true" ]; then
       "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
       "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
   fi
-  fi
 
   if [ "$FAILED_CHECKS" -gt 0 ]; then
     echo "❌ CI failures detected - posting REQUEST CHANGES review"
