@@ -1883,6 +1883,83 @@ check_ci_status() {
   return 0
 }
 
+
+# Function to parse JSON without jq dependency
+parse_ci_json() {
+  local json="$1"
+  local field="$2"
+  local value="$3"
+
+  # Count total checks
+  if [ "$field" = "total" ]; then
+    echo "$json" | grep -o '"name"' | wc -l
+    return
+  fi
+
+  # Count by status and conclusion
+  case "$field" in
+    "completed")
+      echo "$json" | grep -o '"status":"completed"' | wc -l
+      ;;
+    "success")
+      # Count objects that have both completed status and success conclusion
+      echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | wc -l
+      ;;
+    "failed")
+      # Count objects that have completed status and failure/cancelled/timed_out conclusion
+      echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | wc -l
+      ;;
+    "pending")
+      local total completed
+      total=$(echo "$json" | grep -o '"name"' | wc -l)
+      completed=$(echo "$json" | grep -o '"status":"completed"' | wc -l)
+      echo $((total - completed))
+      ;;
+  esac
+}
+
+# Function to extract check details
+extract_check_details() {
+  local json="$1"
+  local type="$2"
+
+  case "$type" in
+    "failed")
+      # Extract failed check names and conclusions
+      echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | sed -E 's/.*"name":"([^"]+)".*"conclusion":"([^"]+)".*/- \1 (\2)/'
+      ;;
+    "pending")
+      # Extract pending check names and statuses
+      echo "$json" | sed 's/},{/\n/g' | grep -v '"status":"completed"' | sed -E 's/.*"name":"([^"]+)".*"status":"([^"]+)".*/- \1 (\2)/'
+      ;;
+    "success")
+      # Extract successful check names
+      echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | sed -E 's/.*"name":"([^"]+)".*/- \1 ✅/'
+      ;;
+  esac
+}
+
+# Function to extract check details
+extract_check_details() {
+  local json="$1"
+  local type="$2"
+
+  case "$type" in
+    "failed")
+      # Extract failed check names and conclusions
+      echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | sed -E 's/.*"name":"([^"]+)".*"conclusion":"([^"]+)".*/- \1 (\2)/'
+      ;;
+    "pending")
+      # Extract pending check names and statuses
+      echo "$json" | sed 's/},{/\n/g' | grep -v '"status":"completed"' | sed -E 's/.*"name":"([^"]+)".*"status":"([^"]+)".*/- \1 (\2)/'
+      ;;
+    "success")
+      # Extract successful check names
+      echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | sed -E 's/.*"name":"([^"]+)".*/- \1 ✅/'
+      ;;
+  esac
+}
+
 # Only perform PR review if GitHub CLI is available
 if [ "$GH_AVAILABLE" = "true" ]; then
   # Get CI status using robust JSON parsing
@@ -1898,96 +1975,16 @@ if [ "$GH_AVAILABLE" = "true" ]; then
     fi
   fi
 
-  case $CI_STATUS in
-  0)
+  # Handle CI status results
+  if [ $CI_STATUS -eq 0 ]; then
     # Success - CI status retrieved successfully, continue to parse results
     echo "✅ CI status check completed successfully"
-    ;;
-  1)
+  elif [ $CI_STATUS -eq 1 ]; then
     echo "⚠️ GitHub CLI unavailable - cannot perform PR reviews"
     echo "📝 Tess QA completed but unable to post PR review due to GitHub CLI issues"
     echo "✅ QA workflow finished successfully despite GitHub CLI problems"
     echo "🔍 Recommendation: Install and authenticate GitHub CLI for full functionality"
-    # Don't exit here - continue to sidecar shutdown
-    ;;
-  2)
-    echo "⚠️ PR not found - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
-
-## CI Status
-❌ **PR Not Found**: Pull request #${PR_NUMBER:-UNKNOWN} does not exist
-❌ **Cannot verify**: Invalid PR reference
-
-## Required Actions
-- [ ] Verify correct PR number
-- [ ] Check if PR was closed or merged
-- [ ] Update PR reference if needed
-
-**Note**: Cannot proceed with QA until valid PR is specified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    ;;
-  3)
-    echo "⚠️ Network error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
-
-## CI Status
-❌ **Network Error**: Unable to connect to GitHub API
-❌ **Cannot verify**: CI status check failed due to connectivity issues
-
-## Required Actions
-- [ ] Check network connectivity
-- [ ] Verify GitHub API access
-- [ ] Retry after network issues are resolved
-
-**Note**: Cannot proceed with QA until CI status can be verified." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    ;;
-  4)
-    echo "⚠️ Authentication error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
-
-## CI Status
-❌ **Authentication Error**: GitHub token permissions insufficient
-❌ **Cannot verify**: CI status check failed due to auth issues
-
-## Required Actions
-- [ ] Verify GitHub token has correct permissions
-- [ ] Check repository access permissions
-- [ ] Ensure token hasn't expired
-- [ ] Contact administrator for token refresh
-
-**Note**: Cannot proceed with QA until authentication is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    ;;
-  5)
-    echo "⚠️ Repository access error - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
-
-## CI Status
-❌ **Repository Access Error**: Repository not found or not accessible
-❌ **Cannot verify**: CI status check failed due to repo access issues
-
-## Required Actions
-- [ ] Verify repository exists and is accessible
-- [ ] Check repository permissions for the token
-- [ ] Ensure repository URL is correct
-- [ ] Contact administrator for access issues
-
-**Note**: Cannot proceed with QA until repository access is resolved." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    ;;
-  *)
-    echo "⚠️ Unknown CI status code: $CI_STATUS - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
-
-## CI Status
-❌ **Unknown Error**: Unexpected CI status check result
-❌ **Cannot verify**: CI status code $CI_STATUS not recognized
-
-## Required Actions
-- [ ] Review CI check configuration
-- [ ] Check for system errors
-- [ ] Contact administrator if issue persists
-
-**Note**: Cannot proceed with QA until CI status can be properly determined." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
-    ;;
-  esac
+  fi
 
   # Parse CI status from JSON output
   if [ -z "$CI_JSON" ] || [ "$CI_JSON" = "[]" ]; then
@@ -2007,60 +2004,6 @@ if [ "$GH_AVAILABLE" = "true" ]; then
 
 **Note**: Cannot proceed with QA until CI is properly configured." || echo "⚠️ PR review command timed out or failed (exit code: $?)"
   else
-  # Function to parse JSON without jq dependency
-  parse_ci_json() {
-    local json="$1"
-    local field="$2"
-    local value="$3"
-
-    # Count total checks
-    if [ "$field" = "total" ]; then
-      echo "$json" | grep -o '"name"' | wc -l
-      return
-    fi
-
-    # Count by status and conclusion
-    case "$field" in
-      "completed")
-        echo "$json" | grep -o '"status":"completed"' | wc -l
-        ;;
-      "success")
-        # Count objects that have both completed status and success conclusion
-        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | wc -l
-        ;;
-      "failed")
-        # Count objects that have completed status and failure/cancelled/timed_out conclusion
-        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | wc -l
-        ;;
-      "pending")
-        local total completed
-        total=$(echo "$json" | grep -o '"name"' | wc -l)
-        completed=$(echo "$json" | grep -o '"status":"completed"' | wc -l)
-        echo $((total - completed))
-        ;;
-    esac
-  }
-
-  # Function to extract check details
-  extract_check_details() {
-    local json="$1"
-    local type="$2"
-
-    case "$type" in
-      "failed")
-        # Extract failed check names and conclusions
-        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep -E '"conclusion":"(failure|cancelled|timed_out)"' | sed -E 's/.*"name":"([^"]+)".*"conclusion":"([^"]+)".*/- \1 (\2)/'
-        ;;
-      "pending")
-        # Extract pending check names and statuses
-        echo "$json" | sed 's/},{/\n/g' | grep -v '"status":"completed"' | sed -E 's/.*"name":"([^"]+)".*"status":"([^"]+)".*/- \1 (\2)/'
-        ;;
-      "success")
-        # Extract successful check names
-        echo "$json" | sed 's/},{/\n/g' | grep '"status":"completed"' | grep '"conclusion":"success"' | sed -E 's/.*"name":"([^"]+)".*/- \1 ✅/'
-        ;;
-    esac
-  }
 
   # Use jq if available, otherwise use fallback parsing
   if command -v jq >/dev/null 2>&1; then
