@@ -2478,7 +2478,7 @@ impl CodeTemplateGenerator {
         for partial_name in agent_partials {
             // Load the partial template from ConfigMap
             // The partial path uses '/' but ConfigMap keys use '_'
-            let template_path = format!("{}.md.hbs", partial_name);
+            let template_path = format!("{partial_name}.md.hbs");
             match Self::load_template(&template_path) {
                 Ok(content) => {
                     handlebars
