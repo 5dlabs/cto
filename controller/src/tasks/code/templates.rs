@@ -348,6 +348,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_cursor_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -620,6 +623,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_factory_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -796,6 +802,9 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
 
         let template = Self::load_template(CODE_CLAUDE_MEMORY_TEMPLATE)?;
 
@@ -1033,6 +1042,9 @@ impl CodeTemplateGenerator {
     ) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
+
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
 
         let template_path = Self::get_codex_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
@@ -1902,6 +1914,9 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
         let template_path = Self::get_opencode_memory_template(code_run);
         let template = Self::load_template(&template_path)?;
 
@@ -2446,6 +2461,60 @@ impl CodeTemplateGenerator {
                 "Failed to load code template {relative_path} (key: {configmap_key}): {e}"
             ))
         })
+    }
+
+    /// Register shared agent system prompt partials
+    /// These partials are used by agent-specific templates via {{> agents/partial-name}}
+    fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
+        // List of shared agent system prompt partials that need to be registered
+        let agent_partials = vec![
+            "agents/cipher-system-prompt",
+            "agents/cleo-system-prompt",
+            "agents/rex-system-prompt",
+            "agents/tess-system-prompt",
+            "agents/system-prompt",
+        ];
+
+        let mut failed_partials = Vec::new();
+
+        for partial_name in agent_partials {
+            // Load the partial template from ConfigMap
+            // The ConfigMap key uses underscores instead of slashes (e.g., agents_cipher-system-prompt.md.hbs)
+            let template_path = format!("{partial_name}.md.hbs");
+            match Self::load_template(&template_path) {
+                Ok(content) => {
+                    handlebars
+                        .register_partial(partial_name, content)
+                        .map_err(|e| {
+                            crate::tasks::types::Error::ConfigError(format!(
+                                "Failed to register agent partial {partial_name}: {e}"
+                            ))
+                        })?;
+                    debug!("Successfully registered agent partial: {}", partial_name);
+                }
+                Err(e) => {
+                    // Warn but don't fail - the partial may not be needed for this specific agent
+                    warn!(
+                        "Failed to load agent partial {partial_name} from ConfigMap (path: {template_path}): {e}. \
+                        Templates referencing this partial will fail to render."
+                    );
+                    failed_partials.push(partial_name);
+                }
+            }
+        }
+
+        // Log summary of partial registration
+        if !failed_partials.is_empty() {
+            warn!(
+                "Agent partial registration incomplete. {} partials failed to load: {:?}. \
+                Ensure the agent-templates ConfigMaps are properly mounted at {}",
+                failed_partials.len(),
+                failed_partials,
+                AGENT_TEMPLATES_PATH
+            );
+        }
+
+        Ok(())
     }
 }
 
