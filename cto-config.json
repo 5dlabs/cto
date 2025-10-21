@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -88,7 +88,7 @@
         "enabled": true,
         "models": [
           "claude-sonnet-4-5-20250929",
-          "gpt-5-codex",
+          "gpt-4o",
           "claude-opus-4-1-20250805"
         ]
       },
@@ -166,7 +166,7 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
@@ -185,7 +185,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
