@@ -8,7 +8,7 @@
       "sourceBranch": "main"
     },
     "code": {
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "githubApp": "5DLabs-Rex",
       "continueSession": false,
       "workingDirectory": ".",
@@ -91,7 +91,7 @@
     "rex": {
       "githubApp": "5DLabs-Rex",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -187,7 +187,7 @@
     "blaze": {
       "githubApp": "5DLabs-Blaze",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
@@ -216,7 +216,7 @@
     "cipher": {
       "githubApp": "5DLabs-Cipher",
       "cli": "codex",
-      "model": "gpt-5-codex",
+      "model": "gpt-4o",
       "tools": {
         "remote": [
           "memory_create_entities",
