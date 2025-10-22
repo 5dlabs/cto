@@ -649,6 +649,9 @@ export SSH_ASKPASS=/bin/true
 WORK_DIR="{{working_directory}}"
 cd /workspace
 
+REPO_ROOT="/workspace/$REPO_NAME"
+git config --global --add safe.directory "$REPO_ROOT"
+
 if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
   cd "$REPO_NAME"
@@ -661,8 +664,6 @@ else
   cd "$REPO_NAME"
 fi
 
-REPO_ROOT="/workspace/$REPO_NAME"
-git config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 
 echo "=== BRANCH SETUP ==="
