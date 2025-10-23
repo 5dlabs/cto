@@ -367,6 +367,20 @@ ensure_pr_created() {
     return
   fi
 
+  # CRITICAL GUARD #1: Check if orchestrator already provided PR_NUMBER
+  # This must be checked BEFORE any other logic to prevent duplicate PRs
+  if [ -n "${PR_NUMBER:-}" ]; then
+    echo "ℹ️ PR_NUMBER=${PR_NUMBER} provided by orchestrator; skipping fallback PR creation"
+    return
+  fi
+
+  # CRITICAL GUARD #2: Only auto-create PRs during implementation stage
+  # Quality/security/testing agents should NEVER create PRs
+  if [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
+    echo "ℹ️ Not in implementation stage (${WORKFLOW_STAGE:-unknown}); skipping fallback PR creation"
+    return
+  fi
+
   if [ ! -d .git ]; then
     echo "⚠️ Repository not initialised; skipping auto PR creation"
     return
@@ -393,15 +407,31 @@ ensure_pr_created() {
     return
   fi
 
+  # Ensure we have repo context for PR checks
+  REPO_SLUG="${REPO_OWNER:-}/${REPO_NAME:-}"
+  if [ "$REPO_SLUG" = "/" ] || [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
+    echo "⚠️ REPO_OWNER/REPO_NAME not set; checking for PRs without explicit repo context"
+    REPO_SLUG=""
+  fi
+
+  # Check if PR already exists for this branch (with explicit repo context)
   refresh_token_if_needed || true
-  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  if [ -n "$REPO_SLUG" ]; then
+    PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  else
+    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  fi
   PR_EXIT_CODE=$?
 
   if [ $PR_EXIT_CODE -ne 0 ] && printf '%s' "$PR_OUTPUT" | grep -qi "HTTP 401"; then
     echo "⚠️ gh pr list returned HTTP 401; refreshing GitHub credentials"
     refresh_github_token || true
     ensure_gh_authenticated
-    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    if [ -n "$REPO_SLUG" ]; then
+      PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    else
+      PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    fi
     PR_EXIT_CODE=$?
   fi
 
