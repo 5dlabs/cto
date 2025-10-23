@@ -1803,7 +1803,7 @@ case "${WORKFLOW_STAGE:-}" in
     ;;
 esac
 
-if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
+if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
   PR_NUM="${PR_NUMBER:-}"
   if [ -z "$PR_NUM" ]; then
     # Try to get PR number from current branch
@@ -1823,7 +1823,37 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "testing" ]; then
 - Quality standards met'
       NEXT_STAGE="end-to-end testing by Tess"
       
-      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+      if [ "$WORKFLOW_STAGE" = "security" ]; then
+        # Cipher security review
+        STAGE_NAME="Security"
+        STAGE_EMOJI="🔒"
+        CHECKS_PASSED=$'- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified'
+        NEXT_STAGE="QA testing by Tess"
+        
+        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+All security checks have passed:
+$CHECKS_PASSED
+
+**Status:** Ready for $NEXT_STAGE
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher*
+EOF
+        refresh_token_if_needed || true
+        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        rm -f "$REVIEW_BODY_FILE"
+        
+        # Add security-approved label
+        echo "🏷️  Adding 'security-approved' label"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "security-approved" 2>&1 || echo "⚠️ Failed to add security-approved label"
+      elif [ "$WORKFLOW_STAGE" = "testing" ]; then
         # Tess has final approval authority
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
@@ -1946,7 +1976,14 @@ EOF
 - Fix linting errors
 - Ensure unit tests pass
 - Meet quality standards'
-      if [ "$WORKFLOW_STAGE" = "testing" ]; then
+      if [ "$WORKFLOW_STAGE" = "security" ]; then
+        STAGE_NAME="Security"
+        STAGE_EMOJI="🔒"
+        ISSUES_DESC=$'- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations'
+      elif [ "$WORKFLOW_STAGE" = "testing" ]; then
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
         ISSUES_DESC=$'- Fix failing end-to-end tests
