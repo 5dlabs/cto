@@ -1870,34 +1870,39 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
 
   # Create comment body based on Claude exit status
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    COMMENT_BODY="## 🔍 Code Quality Review by Cipher
+    COMMENT_BODY="## 🔒 Security Review by Cipher
 
-✅ **Quality checks completed successfully**
+✅ **Security checks completed successfully**
 
-### Review Summary
-- Code has been reviewed for quality standards
-- All required checks have passed
-- Ready for QA testing
+### Security Gates Passed
+- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified
+
+**Status:** Ready for QA testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Reviewed by Cipher - 5DLabs Code Quality Agent*"
+*Security review by Cipher*"
   else
-    COMMENT_BODY="## 🔍 Code Quality Review by Cipher
+    COMMENT_BODY="## 🔒 Security Review by Cipher
 
-⚠️ **Quality review encountered issues**
+⚠️ **Security review encountered issues**
 
 ### Current Status
-- Quality checks are being processed
+- Security checks are being processed
 - Some issues may need to be resolved
 - Review will continue until standards are met
 
 ### Next Steps
-- Monitor CI/CD pipeline status
-- Address any failing quality checks
-- Iterate until all standards are met
+- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations
 
 ---
-*Reviewed by Cipher - 5DLabs Code Quality Agent*"
+*Security review by Cipher*"
   fi
 
   # Post comment using PR number or URL
@@ -1927,42 +1932,42 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    echo "✅ Cipher quality checks passed - handing off to Tess for E2E testing"
+    echo "✅ Cipher security checks passed - handing off to Tess for E2E testing"
     
     # Post COMMENT (NOT APPROVE) - Tess has final approval authority
-    timeout 30 gh pr comment "$PR_NUMBER" --body "### ✅ Code Quality Review - PASSED
+    timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED
 
-All quality checks have passed:
-- Code formatting verified
-- Linting passed
-- Unit tests successful
-- Quality standards met
+All security checks have passed:
+- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified
 
-**Status:** Ready for end-to-end testing by Tess
+**Status:** Ready for QA testing by Tess
 **Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Quality review by Cipher - 5DLabs Code Quality Agent*" || echo "⚠️ PR comment command failed"
+*Security review by Cipher*" || echo "⚠️ PR comment command failed"
     
-    # Add ready-for-qa label to signal Tess
-    echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
-    timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-qa" || echo "⚠️ Failed to add ready-for-qa label"
+    # Add security-approved label
+    echo "🏷️  Adding 'security-approved' label"
+    timeout 30 gh pr edit "$PR_NUMBER" --add-label "security-approved" || echo "⚠️ Failed to add security-approved label"
     
     update_coderun_status "ready-for-qa" "quality-passed" "$PR_URL"
   else
-    echo "❌ Quality issues detected - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
+    echo "❌ Security issues detected - posting REQUEST CHANGES review"
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Security Changes
 
-Code quality issues detected. Please address the following:
-- Review code formatting
-- Fix linting errors
-- Ensure unit tests pass
-- Meet quality standards
+Security issues detected. Please address the following:
+- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations
 
 Rex will address these issues and resubmit for review.
 
 ---
-*Quality review by Cipher - 5DLabs Code Quality Agent*" || echo "⚠️ PR review command failed"
+*Security review by Cipher*" || echo "⚠️ PR review command failed"
     update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   fi
 else

@@ -1870,6 +1870,44 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       echo "   - run-${WORKFLOW_NAME}"
       echo "   - service-${SERVICE_NAME}"
     fi
+    
+    # Post QA Testing approval/comment after labeling
+    echo ""
+    echo "💬 Posting Tess QA testing review to PR #${PR_NUMBER}..."
+    if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+      echo "✅ All tests passed - posting APPROVE review"
+      timeout 30 gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body "### 🧪 QA Testing - APPROVED
+
+All end-to-end and integration tests have passed:
+- End-to-end tests passed
+- Integration tests successful
+- Acceptance criteria validated
+- No regressions detected
+
+**Status:** Ready for merge
+**Result:** All quality gates passed
+
+---
+*QA testing by Tess*" || echo "⚠️ PR approval command failed"
+      
+      # Add approved label
+      echo "🏷️ Adding 'approved' label"
+      timeout 30 gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "approved" || echo "⚠️ Failed to add approved label"
+    else
+      echo "❌ Tests failed - posting REQUEST CHANGES review"
+      timeout 30 gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --request-changes --body "### 🧪 QA Testing - CHANGES REQUESTED
+
+Testing has found issues that must be addressed:
+- Fix failing end-to-end tests
+- Address integration test failures
+- Validate acceptance criteria
+- Resolve test regressions
+
+Please address these issues and re-request review once resolved.
+
+---
+*QA testing by Tess*" || echo "⚠️ PR review command failed"
+    fi
   else
     echo "ℹ️ No PR found for this task (Claude may not have created one)"
   fi
