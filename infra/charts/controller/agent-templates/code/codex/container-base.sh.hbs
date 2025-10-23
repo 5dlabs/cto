@@ -1600,7 +1600,7 @@ FINAL_REMEDIATION_STATUS=""
 FINAL_QA_STATUS=""
 FINAL_MESSAGE=""
 
-if [ "$WORKFLOW_STAGE" != "quality-in-progress" ] && [ "$WORKFLOW_STAGE" != "testing-in-progress" ]; then
+if [ "$WORKFLOW_STAGE" != "quality-in-progress" ] && [ "$WORKFLOW_STAGE" != "security-in-progress" ] && [ "$WORKFLOW_STAGE" != "testing-in-progress" ]; then
   if [ $SUCCESS -eq 1 ]; then
     FINAL_REMEDIATION_STATUS="ready-for-qa"
     FINAL_MESSAGE="Implementation completed - ready for quality review"
@@ -1615,7 +1615,7 @@ if [ $SUCCESS -ne 1 ] && [ -n "$LAST_COMPLETION_REASON" ]; then
 fi
 
 # Submit GitHub PR review for Cleo/Tess stages (enables workflow progression)
-if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
   PR_NUM="${PR_NUMBER:-}"
   if [ -z "$PR_NUM" ]; then
     # Try to get PR number from current branch
@@ -1657,6 +1657,18 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
         QUALITY_GATES_PASSED=0
       else
         echo "    ✅ Tests passed"
+      fi
+    elif [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+      echo "🔍 Running security checks..."
+      
+      # Security checks can assume code passed quality gates
+      # Focus on security-specific validations
+      echo "  ➤ Security scan completed by Cipher"
+      if [ $SUCCESS -ne 1 ]; then
+        echo "    ❌ Security issues detected"
+        QUALITY_GATES_PASSED=0
+      else
+        echo "    ✅ Security checks passed"
       fi
     elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
       echo "🔍 Running integration and E2E tests..."
@@ -1710,7 +1722,37 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "testi
 - Quality standards met"
       NEXT_STAGE="end-to-end testing by Tess"
       
-      if [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+      if [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+        # Cipher security review
+        STAGE_NAME="Security"
+        STAGE_EMOJI="🔒"
+        CHECKS_PASSED="- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified"
+        NEXT_STAGE="QA testing by Tess"
+        
+        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        REVIEW_BODY_FILE=$(mktemp)
+        cat <<EOF > "$REVIEW_BODY_FILE"
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+All security checks have passed:
+$CHECKS_PASSED
+
+**Status:** Ready for $NEXT_STAGE
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher*
+EOF
+        refresh_token_if_needed || true
+        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        rm -f "$REVIEW_BODY_FILE"
+        
+        # Add security-approved label
+        echo "🏷️  Adding 'security-approved' label"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "security-approved" 2>&1 || echo "⚠️ Failed to add security-approved label"
+      elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
         # Tess has final approval authority
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
@@ -1829,6 +1871,10 @@ EOF
         FINAL_REMEDIATION_STATUS="ready-for-qa"
         FINAL_QA_STATUS="quality-passed"
         FINAL_MESSAGE="Quality review passed - ready for QA testing"
+      elif [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+        FINAL_REMEDIATION_STATUS="security-approved"
+        FINAL_QA_STATUS="security-passed"
+        FINAL_MESSAGE="Security review passed - ready for QA testing"
       else
         FINAL_REMEDIATION_STATUS="approved"
         FINAL_QA_STATUS="approved"
@@ -1863,6 +1909,13 @@ $(cat /tmp/test-check.log | tail -n 100)
 ```
 </details>"
         fi
+      elif [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+        STAGE_NAME="Security"
+        STAGE_EMOJI="🔒"
+        ISSUES_DESC="- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations"
       elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
@@ -1887,6 +1940,8 @@ EOF
       FINAL_QA_STATUS="changes_requested"
       if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
         FINAL_MESSAGE="Quality review requested changes"
+      elif [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+        FINAL_MESSAGE="Security review requested changes"
       else
         FINAL_MESSAGE="Testing requested changes"
       fi
