@@ -734,6 +734,10 @@ echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
 echo "=== BRANCH SETUP ==="
 cd "/workspace/$REPO_NAME"
 
+# Fix git dubious ownership before any git operations
+git config --global --add safe.directory "/workspace/$REPO_NAME"
+echo "✓ Added repository to git safe directories"
+
 # Sync with latest main to prevent conflicts
 echo "🔄 Syncing with latest main to prevent conflicts..."
 git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || echo "⚠️ Could not fetch main/master branch"
