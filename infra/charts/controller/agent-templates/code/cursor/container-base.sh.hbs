@@ -792,6 +792,32 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   fi
 else
   echo "Creating new feature branch '$FEATURE_BRANCH'"
+  
+  # Check for and abort any in-progress merge conflicts before checkout
+  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^DD\|^AU\|^UA\|^DU\|^UD"; then
+    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
+    git merge --abort 2>/dev/null || true
+    echo "✓ Merge conflicts aborted"
+  fi
+  
+  # Check for and reset any incomplete merge (rebase, cherry-pick, etc.)
+  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
+    echo "⚠️ Detecting incomplete git operation, resetting..."
+    git rebase --abort 2>/dev/null || true
+    git cherry-pick --abort 2>/dev/null || true  
+    git merge --abort 2>/dev/null || true
+    if ! git diff-index --quiet HEAD; then
+      git reset --hard HEAD 2>/dev/null || true
+    fi
+    echo "✓ Git operations reset"
+  fi
+  
+  # Stash any local changes from previous runs to avoid checkout conflicts
+  if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    echo "🔄 Stashing local changes and untracked files before creating new branch"
+    git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" || true
+  fi
+  
   if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
     git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
   else
