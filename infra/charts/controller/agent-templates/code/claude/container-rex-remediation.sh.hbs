@@ -756,14 +756,25 @@ if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
         echo "✓ Successfully merged latest main into feature branch"
     else
         echo "⚠️ MERGE CONFLICT: Cannot auto-merge main into $FEATURE_BRANCH"
-        echo "🔄 Auto-aborting merge and creating a fresh branch from origin/main"
-        # Abort merge if in progress
-        git merge --abort 2>/dev/null || true
-        # Create a unique fresh branch to avoid reuse conflicts
-        NEW_BRANCH="${FEATURE_BRANCH}-$(date -u +%Y%m%d%H%M%S)"
-        git checkout -B "$NEW_BRANCH" origin/main
-        FEATURE_BRANCH="$NEW_BRANCH"
-        echo "✓ Switched to fresh branch: $FEATURE_BRANCH"
+        # Check if PR exists before creating timestamped fallback
+        echo "🔍 Checking for existing PR for this branch..."
+        EXISTING_PR=$(gh pr list --state open --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+        
+        if [ -n "$EXISTING_PR" ]; then
+            echo "✅ Found existing PR #$EXISTING_PR for branch $FEATURE_BRANCH"
+            echo "ℹ️ Continuing with this branch despite merge conflict (will be resolved in PR)"
+            # Abort the merge but stay on the branch
+            git merge --abort 2>/dev/null || true
+        else
+            echo "ℹ️ No existing PR found; recreating branch from origin/main"
+            # Abort merge if in progress
+            git merge --abort 2>/dev/null || true
+            # Delete local branch and recreate fresh from base
+            git checkout origin/main 2>/dev/null || git checkout -b temp-branch origin/main
+            git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+            git checkout -b "$FEATURE_BRANCH" origin/main
+            echo "✅ Recreated $FEATURE_BRANCH from origin/main"
+        fi
     fi
 else
     # Create new feature branch from latest main

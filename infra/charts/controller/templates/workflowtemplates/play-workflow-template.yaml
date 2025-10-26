@@ -590,10 +590,8 @@ spec:
           # Previous: 12 attempts = 60s total (too long for typical PR creation)
           attempts=4
           while [ $attempts -gt 0 ]; do
-            # Prefer Issues API for label queries; filter to PRs by presence of .pull_request
-            # Always use both task label AND run label to ensure we find the right PR
+            # First, try to find PR by labels (fast path for already-labeled PRs)
             q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
-
             url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
             if [ -n "$AUTH_HEADER" ]; then
               resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
@@ -603,6 +601,25 @@ spec:
 
             pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
             pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
+
+            # If not found by labels, try searching by branch name
+            if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+              echo "🔍 No PR found by labels, searching by branch name..."
+              BRANCH_NAME="feature/task-${TASK_ID}-implementation"
+              url="https://api.github.com/repos/${REPO}/pulls?state=open&head=${OWNER}:${BRANCH_NAME}"
+              if [ -n "$AUTH_HEADER" ]; then
+                resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
+              else
+                resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
+              fi
+              
+              pr_url=$(echo "$resp" | jq -r '.[0].html_url // empty' | head -n1)
+              pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
+              
+              if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
+                echo "✅ Found PR #$pr_number by branch name: $BRANCH_NAME"
+              fi
+            fi
 
             if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
               echo "$pr_url" > /tmp/pr-url.txt
