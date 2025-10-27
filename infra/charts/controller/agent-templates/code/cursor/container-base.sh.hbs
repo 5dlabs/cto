@@ -864,6 +864,7 @@ source /agent-templates/shared_task-setup-functions.sh || {
     echo "⚠️ Warning: Resilient task functions not available, using basic operations"
     # Define minimal fallback functions
     safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
+    safe_copy_directory() { cp -r "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
     safe_ensure_directory() { mkdir -p "$1"; }
     verify_task_files() { [ -f "$1/prompt.md" ] && echo "✅ Task files verified" || echo "❌ Task files missing"; }
     create_error_report() { echo "❌ ERROR: $3"; }
