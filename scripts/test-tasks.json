@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "title": "Create Frontend Components",
+    "description": "Build React components for UI",
+    "dependencies": [],
+    "priority": "high"
+  },
+  {
+    "id": 2,
+    "title": "Build API Endpoints",
+    "description": "Create REST API endpoints",
+    "dependencies": [1],
+    "priority": "high"
+  },
+  {
+    "id": 3,
+    "title": "Write Documentation",
+    "description": "Create README and API docs",
+    "dependencies": [],
+    "priority": "medium"
+  },
+  {
+    "id": 4,
+    "title": "Deploy to Production",
+    "description": "Deploy application with CI/CD",
+    "dependencies": [1, 2],
+    "priority": "high"
+  },
+  {
+    "id": 5,
+    "title": "Add Monitoring",
+    "description": "Set up application monitoring",
+    "dependencies": [4],
+    "priority": "medium"
+  }
+]
+
