@@ -562,6 +562,7 @@ async fn update_code_status_with_completion(
     new_phase: &str,
     new_message: &str,
     work_completed: bool,
+    retry_count_override: Option<u32>,
 ) -> Result<()> {
     // Only update if status actually changed or work_completed changed
     let current_phase = code_run
@@ -590,12 +591,21 @@ async fn update_code_status_with_completion(
 
     let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
 
+    let retry_count = retry_count_override.unwrap_or_else(|| {
+        code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0)
+    });
+
     let status_patch = json!({
         "status": {
             "phase": new_phase,
             "message": new_message,
             "lastUpdate": chrono::Utc::now().to_rfc3339(),
             "workCompleted": work_completed,
+            "retryCount": retry_count,
         }
     });
 
