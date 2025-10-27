@@ -14,7 +14,7 @@ echo "Generating split ConfigMaps from agent templates..."
 
 # Define CLI types and shared resources
 CLI_TYPES=("claude" "codex" "cursor" "factory" "opencode")
-SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/")
+SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/" "shared/")
 
 generate_configmap() {
   local name=$1

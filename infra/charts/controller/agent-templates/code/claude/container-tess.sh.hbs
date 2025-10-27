@@ -539,9 +539,19 @@ else
     echo "✓ Target repository cloned successfully"
 fi
 
-# Step 3: Copy task files from docs repo to target repo
-echo "📋 TASK FILES: COPYING from docs to target repository"
-mkdir -p "/workspace/$TARGET_REPO_DIR/task"
+# Load resilient task setup functions (mounted from shared ConfigMap)
+source /agent-templates/shared_task-setup-functions.sh || {
+    echo "⚠️ Warning: Resilient task functions not available, using basic operations"
+    # Define minimal fallback functions
+    safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
+    safe_ensure_directory() { mkdir -p "$1"; }
+    verify_task_files() { [ -f "$1/prompt.md" ] && echo "✅ Task files verified" || echo "❌ Task files missing"; }
+    create_error_report() { echo "❌ ERROR: $3"; }
+    attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
+}
+
+# Step 3: Copy task files from docs repo to target repo with resilient operations
+echo "📋 TASK FILES: COPYING from docs to target repository (RESILIENT MODE)"
 
 # Determine docs project directory path
 {{#if docs_project_directory}}
@@ -554,77 +564,108 @@ fi
 DOCS_PATH="/tmp/docs-repo/.taskmaster"
 {{/if}}
 
-# Copy specific task files
+# Identify source and destination
 TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
-echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
-echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
-echo "🔍 DEBUG: Contents of docs temp directory:"
-ls -la /tmp/docs-repo/.taskmaster/ || echo "No .taskmaster found"
-echo "🔍 DEBUG: Contents of docs directory:"
-ls -la /tmp/docs-repo/.taskmaster/docs/ || echo "No docs directory found"
+DEST_TASK_DIR="/workspace/$TARGET_REPO_DIR/task"
+
+echo "🔍 DEBUG: Source task directory: $TASK_DIR"
+echo "🔍 DEBUG: Destination task directory: $DEST_TASK_DIR"
+echo "🔍 DEBUG: Docs path: $DOCS_PATH"
+
+# Enhanced debugging for task directory discovery
+echo "🔍 DEBUG: Docs repository structure:"
+find /tmp/docs-repo -name "*.md" -path "*/task-*/*" 2>/dev/null | head -10 || echo "No task files found"
+
+# Ensure destination directory exists
+if ! safe_ensure_directory "$DEST_TASK_DIR" "task destination directory"; then
+    echo "❌ CRITICAL: Cannot create task destination directory"
+    exit 1
+fi
 
 if [ -d "$TASK_DIR" ]; then
     echo "🔍 DEBUG: Task directory found, contents:"
     ls -la "$TASK_DIR"
-
-    echo "✅ Copying task.md..."
-    cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
-
-    echo "✅ Copying acceptance-criteria.md..."
-    cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
-
-    echo "✅ Copying prompt.md..."
-    cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
-
-    echo "✅ Copying client-config.json..."
+    
+    # Copy critical files with resilient operations
+    COPY_SUCCESS=true
+    
+    # Copy task.md
+    if ! safe_copy_file "$TASK_DIR/task.md" "$DEST_TASK_DIR/task.md" "task.md"; then
+        COPY_SUCCESS=false
+    fi
+    
+    # Copy acceptance-criteria.md
+    if ! safe_copy_file "$TASK_DIR/acceptance-criteria.md" "$DEST_TASK_DIR/acceptance-criteria.md" "acceptance-criteria.md"; then
+        COPY_SUCCESS=false
+    fi
+    
+    # Copy prompt.md (CRITICAL)
+    if ! safe_copy_file "$TASK_DIR/prompt.md" "$DEST_TASK_DIR/prompt.md" "prompt.md"; then
+        echo "❌ CRITICAL: Failed to copy prompt.md - this will cause agent failure"
+        COPY_SUCCESS=false
+    fi
+    
+    # Copy client-config.json to multiple locations
     if [ -f "/task-files/client-config.json" ]; then
-        cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
-        cp "/task-files/client-config.json" "/workspace/client-config.json" && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
+        safe_copy_file "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" "client-config.json (working dir)"
+        safe_copy_file "/task-files/client-config.json" "/workspace/client-config.json" "client-config.json (workspace)"
     else
         echo "⚠️ client-config.json not found - MCP client may not be configured"
     fi
-
-    echo "✅ Copying toolman-guide.md..."
+    
+    # Copy optional files
     if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-        cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
+        safe_copy_file "$TASK_DIR/toolman-guide.md" "$DEST_TASK_DIR/toolman-guide.md" "toolman-guide.md"
     else
-        echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
+        echo "ℹ️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
-
-    echo "✓ Task {{task_id}} files copied from $TASK_DIR"
+    
+    # Copy architecture.md from docs root
+    ARCH_FILE="$DOCS_PATH/docs/architecture.md"
+    if [ -f "$ARCH_FILE" ]; then
+        safe_copy_file "$ARCH_FILE" "$DEST_TASK_DIR/architecture.md" "architecture.md"
+    else
+        echo "ℹ️ architecture.md not found at: $ARCH_FILE"
+    fi
+    
+    # Copy tasks.json if it exists
+    if [ -f "$DOCS_PATH/tasks.json" ]; then
+        safe_copy_file "$DOCS_PATH/tasks.json" "$DEST_TASK_DIR/tasks.json" "tasks.json"
+    fi
+    
+    # Verify all critical files were copied successfully
+    if verify_task_files "$DEST_TASK_DIR" "{{task_id}}"; then
+        echo "✅ Task {{task_id}} files copied and verified successfully"
+    else
+        echo "❌ CRITICAL: Task {{task_id}} file verification failed"
+        create_error_report "$DEST_TASK_DIR" "{{task_id}}" "File copying verification failed"
+        
+        # Attempt recovery
+        if attempt_task_recovery "$TASK_DIR" "$DEST_TASK_DIR" "{{task_id}}"; then
+            echo "✅ Recovery successful - continuing with task setup"
+        else
+            echo "❌ Recovery failed - task setup cannot continue"
+            exit 1
+        fi
+    fi
 else
     echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
     echo "🔍 DEBUG: Available directories in docs:"
     find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+    
+    create_error_report "$DEST_TASK_DIR" "{{task_id}}" "Source task directory not found"
+    exit 1
 fi
 
-# Copy architecture.md from docs root
-ARCH_FILE="$DOCS_PATH/docs/architecture.md"
-if [ -f "$ARCH_FILE" ]; then
-    cp "$ARCH_FILE" "/workspace/$TARGET_REPO_DIR/task/"
-    echo "✓ Architecture documentation copied"
-else
-    echo "⚠️ architecture.md not found at: $ARCH_FILE"
-fi
-
-# Copy tasks.json if it exists
-if [ -f "$DOCS_PATH/tasks.json" ]; then
-    cp "$DOCS_PATH/tasks.json" "/workspace/$TARGET_REPO_DIR/task/"
-    echo "✓ tasks.json copied"
-fi
-
-echo "✓ Task files copied to target repository"
-
-# DEBUG: Verify files were copied successfully
-echo "🔍 DEBUG: Contents of target task directory after copy:"
-ls -la "/workspace/$TARGET_REPO_DIR/task/" || echo "Task directory not found"
-echo "🔍 DEBUG: Checking if prompt.md exists:"
-[ -f "/workspace/$TARGET_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
-
-# Step 4: Clean up docs repository
+# Step 4: Clean up docs repository (after files are safely copied)
 echo "🧹 CLEANUP: Removing temporary docs repository"
-rm -rf /tmp/docs-repo
-echo "✓ Docs repository cleaned up"
+# Only cleanup after we've verified files are in place
+if verify_task_files "$DEST_TASK_DIR" "{{task_id}}"; then
+    rm -rf /tmp/docs-repo
+    echo "✓ Docs repository cleaned up safely"
+else
+    echo "⚠️ Keeping docs repository for potential recovery"
+fi
 
 # Set working directory to the target repository root
 # DO NOT overwrite REPO_NAME - it's already correctly parsed for GitHub API calls
@@ -828,29 +869,75 @@ else
 fi
 
 
-# Copy Current Task Documentation to Working Directory
-echo "=== TASK DOCUMENTATION SETUP ==="
+# Resilient Task Documentation Setup - PRESERVE EXISTING FILES
+echo "=== TASK DOCUMENTATION SETUP (RESILIENT MODE) ==="
 echo "🔍 DEBUG: REPO_NAME is: $REPO_NAME"
 echo "🔍 DEBUG: CLAUDE_WORK_DIR is: $CLAUDE_WORK_DIR"
 echo "🔍 DEBUG: Task ID is: {{task_id}}"
 
-# Task directory should already exist from multi-repo workflow or be created as needed
-mkdir -p "$CLAUDE_WORK_DIR/task"
-echo "✓ Created task directory at: $CLAUDE_WORK_DIR/task"
+# CRITICAL: Use safe_ensure_directory to avoid overwriting existing files
+TASK_FINAL_DIR="$CLAUDE_WORK_DIR/task"
+echo "📁 Ensuring task directory exists WITHOUT overwriting files..."
 
-# Task documentation was copied from docs repository during repository setup
-echo "✓ Task documentation available in task/ directory"
-
-# Move client-config.json if it's in the task directory
-if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
-    mv "$CLAUDE_WORK_DIR/task/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Claude working directory" || echo "❌ client-config.json move failed"
+if ! safe_ensure_directory "$TASK_FINAL_DIR" "final task directory"; then
+    echo "❌ CRITICAL: Cannot ensure task directory exists"
+    create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Cannot create final task directory"
+    exit 1
 fi
 
-# DEBUG: Verify files were copied successfully
-echo "🔍 DEBUG: Contents of target task directory:"
-ls -la "$CLAUDE_WORK_DIR/task/" || echo "Task directory not found"
-echo "🔍 DEBUG: Checking if prompt.md exists:"
-[ -f "$CLAUDE_WORK_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
+# Verify that critical files are present after directory setup
+echo "🔍 VERIFICATION: Checking if task files survived directory setup..."
+if verify_task_files "$TASK_FINAL_DIR" "{{task_id}}"; then
+    echo "✅ Task files verification: PASSED - all critical files present"
+else
+    echo "❌ CRITICAL: Task files missing after directory setup!"
+    
+    # This is the bug we're fixing - files were overwritten by mkdir -p
+    echo "🔄 ATTEMPTING RECOVERY: Task files may have been overwritten..."
+    
+    # Try to recover from the original repository location
+    ORIGINAL_TASK_DIR="/workspace/$TARGET_REPO_DIR/task"
+    if [ "$ORIGINAL_TASK_DIR" != "$TASK_FINAL_DIR" ] && [ -d "$ORIGINAL_TASK_DIR" ]; then
+        echo "📁 Found original task directory: $ORIGINAL_TASK_DIR"
+        if verify_task_files "$ORIGINAL_TASK_DIR" "{{task_id}}"; then
+            echo "✅ Original location has valid files - copying to final location"
+            if safe_copy_directory "$ORIGINAL_TASK_DIR" "$TASK_FINAL_DIR" "task files recovery"; then
+                echo "✅ Recovery successful!"
+            else
+                echo "❌ Recovery failed"
+                create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "File recovery failed after directory overwrite"
+                exit 1
+            fi
+        fi
+    else
+        echo "❌ No recovery source available"
+        create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Task files missing and no recovery source"
+        exit 1
+    fi
+fi
+
+# Handle client-config.json carefully
+if [ -f "$TASK_FINAL_DIR/client-config.json" ]; then
+    echo "📁 Moving client-config.json to working directory..."
+    if safe_copy_file "$TASK_FINAL_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" "client-config.json"; then
+        rm -f "$TASK_FINAL_DIR/client-config.json"
+        echo "✓ client-config.json moved to Claude working directory"
+    else
+        echo "❌ client-config.json move failed"
+    fi
+fi
+
+# Final comprehensive verification
+echo "🔍 FINAL VERIFICATION: Task setup completion check..."
+if verify_task_files "$TASK_FINAL_DIR" "{{task_id}}"; then
+    echo "✅ TASK SETUP SUCCESS: All critical files verified in final location"
+    echo "📊 Final task directory contents:"
+    ls -la "$TASK_FINAL_DIR/" | sed 's/^/    /'
+else
+    echo "❌ TASK SETUP FAILED: Critical files missing in final verification"
+    create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Final verification failed - critical files missing"
+    exit 1
+fi
 
 # Verify client-config.json is available in Claude's working directory
 echo "=== TOOLMAN CONFIG SETUP ==="
