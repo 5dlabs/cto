@@ -1,6 +1,5 @@
 use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
-use super::status::CodeStatusManager;
 use crate::crds::CodeRun;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
 use k8s_openapi::api::{
