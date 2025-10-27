@@ -1874,6 +1874,9 @@ fi
 if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
+elif [[ "{{github_app}}" =~ [Rr]ex ]] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+  echo "🔍 Rex implementation agent - creating PR even though completion unconfirmed"
+  ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
 else
   echo "⚠️ Skipping auto PR enforcement due to OpenCode completion status"
 fi

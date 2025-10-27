@@ -1774,6 +1774,9 @@ else
   if [ "$MAX_RETRIES" = "1" ]; then
     echo "🔍 Single-iteration mode - attempting PR creation for result inspection"
     ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
+  elif [[ "{{github_app}}" =~ [Rr]ex ]] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+    echo "🔍 Rex implementation agent - creating PR even though completion unconfirmed"
+    ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
   else
     echo "⚠️ Skipping auto PR enforcement due to Factory completion status"
   fi
