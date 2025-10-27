@@ -1997,8 +1997,10 @@ EOF
         FINAL_MESSAGE="Security review requested changes"
       else
         FINAL_MESSAGE="Testing requested changes"
-      fi
     fi
+  fi
+  fi
+fi
 
 if [ -z "$FINAL_MESSAGE" ]; then
   if [ $SUCCESS -eq 1 ]; then
