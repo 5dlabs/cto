@@ -1002,7 +1002,7 @@ async fn schedule_retry(
         "Running",
         &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
         false,
-        Some(next_attempt),  // Pass the incremented retry count
+        Some(next_attempt), // Pass the incremented retry count
     )
     .await?;
 
