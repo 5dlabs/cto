@@ -987,16 +987,16 @@ async fn schedule_retry(
         max_retries.to_string()
     };
 
-    let ctx_arc = Arc::new(ctx.clone());
-    let code_run_arc = Arc::new(code_run.clone());
-    CodeStatusManager::increment_retry_count(&code_run_arc, &ctx_arc).await?;
-
+    // Update status with incremented retry count in a single atomic operation
+    // This fixes a race condition where increment_retry_count and update_code_status_with_completion
+    // would overwrite each other's changes
     update_code_status_with_completion(
         code_run,
         ctx,
         "Running",
         &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
         false,
+        Some(next_attempt),  // Pass the incremented retry count
     )
     .await?;
 
