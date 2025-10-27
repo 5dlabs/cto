@@ -102,4 +102,5 @@ charts-repo/
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
+**/target/*

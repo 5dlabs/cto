@@ -1,6 +1,5 @@
 use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
-use super::status::CodeStatusManager;
 use crate::crds::CodeRun;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
 use k8s_openapi::api::{
@@ -107,6 +106,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Succeeded",
                     "Code implementation completed successfully",
                     true,
+                    None,
                 )
                 .await?;
 
@@ -163,6 +163,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Running",
                 "Code implementation started",
                 false,
+                None,
             )
             .await?;
 
@@ -180,6 +181,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Running",
                 "Code task in progress",
                 false,
+                None,
             )
             .await?;
 
@@ -238,6 +240,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Failed",
                     &failure_message,
                     false,
+                    None,
                 )
                 .await?;
 
@@ -330,6 +333,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Failed",
                     &format!("Retry limit reached without completion: {reason}"),
                     false,
+                    None,
                 )
                 .await?;
 
@@ -363,6 +367,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Succeeded",
                 "Code implementation completed successfully",
                 true,
+                None,
             )
             .await?;
 
@@ -447,6 +452,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Failed",
                 "Code implementation failed",
                 false,
+                None,
             )
             .await?;
 
@@ -562,6 +568,7 @@ async fn update_code_status_with_completion(
     new_phase: &str,
     new_message: &str,
     work_completed: bool,
+    retry_count_override: Option<u32>,
 ) -> Result<()> {
     // Only update if status actually changed or work_completed changed
     let current_phase = code_run
@@ -590,12 +597,21 @@ async fn update_code_status_with_completion(
 
     let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
 
+    let retry_count = retry_count_override.unwrap_or_else(|| {
+        code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0)
+    });
+
     let status_patch = json!({
         "status": {
             "phase": new_phase,
             "message": new_message,
             "lastUpdate": chrono::Utc::now().to_rfc3339(),
             "workCompleted": work_completed,
+            "retryCount": retry_count,
         }
     });
 
@@ -977,16 +993,16 @@ async fn schedule_retry(
         max_retries.to_string()
     };
 
-    let ctx_arc = Arc::new(ctx.clone());
-    let code_run_arc = Arc::new(code_run.clone());
-    CodeStatusManager::increment_retry_count(&code_run_arc, &ctx_arc).await?;
-
+    // Update status with incremented retry count in a single atomic operation
+    // This fixes a race condition where increment_retry_count and update_code_status_with_completion
+    // would overwrite each other's changes
     update_code_status_with_completion(
         code_run,
         ctx,
         "Running",
         &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
         false,
+        Some(next_attempt),  // Pass the incremented retry count
     )
     .await?;
 
