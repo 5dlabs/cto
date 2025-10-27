@@ -901,15 +901,42 @@ echo "📦 git status"
 refresh_token_if_needed
 git status --short || true
 
+# Load resilient task setup functions (mounted from shared ConfigMap)
+source /agent-templates/shared_task-setup-functions.sh || {
+    echo "⚠️ Warning: Resilient task functions not available, using basic operations"
+    # Define minimal fallback functions
+    safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
+    safe_ensure_directory() { mkdir -p "$1"; }
+    verify_task_files() { [ -f "$1/prompt.md" ] && echo "✅ Task files verified" || echo "❌ Task files missing"; }
+    create_error_report() { echo "❌ ERROR: $3"; }
+    attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
+}
+
 # =========================================================================
-# Materialise task context
+# Materialise task context (RESILIENT MODE)
 # =========================================================================
 
-echo "🧱 Syncing task assets"
-mkdir -p "$FACTORY_WORK_DIR/task"
-mkdir -p "$FACTORY_WORK_DIR/.factory"
-mkdir -p "$HOME/.factory"
-cp -R /task-files/task/* "$FACTORY_WORK_DIR/task/" 2>/dev/null || true
+echo "🧱 Syncing task assets (RESILIENT MODE)"
+# Use safe directory creation to avoid overwriting files
+if ! safe_ensure_directory "$FACTORY_WORK_DIR/task" "Factory task directory"; then
+    echo "❌ CRITICAL: Cannot create Factory task directory"
+    exit 1
+fi
+if ! safe_ensure_directory "$FACTORY_WORK_DIR/.factory" "Factory config directory"; then
+    echo "❌ CRITICAL: Cannot create Factory config directory"
+    exit 1
+fi
+safe_ensure_directory "$HOME/.factory" "Home Factory config directory"
+
+# Safely copy task files from ConfigMap
+if [ -d "/task-files/task" ]; then
+    echo "📂 Copying task files from ConfigMap..."
+    if ! safe_copy_directory "/task-files/task" "$FACTORY_WORK_DIR/task" "ConfigMap task files"; then
+        echo "⚠️ Warning: Could not copy all task files from ConfigMap"
+    fi
+else
+    echo "ℹ️ No task files in ConfigMap - will rely on docs repository"
+fi
 
 DOCS_REPO_URL="{{docs_repository_url}}"
 DOCS_BRANCH="{{docs_branch}}"
@@ -950,16 +977,22 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
     TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
 
     if [ -d "$TASK_DIR" ]; then
-      echo "✓ Copying task definition from $TASK_DIR"
+      echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
       refresh_token_if_needed
-      cp -R "$TASK_DIR"/. "$FACTORY_WORK_DIR/task/" 2>/dev/null || true
+      if safe_copy_directory "$TASK_DIR" "$FACTORY_WORK_DIR/task" "docs task files"; then
+          echo "✅ Task files copied successfully from docs repository"
+      else
+          echo "❌ CRITICAL: Failed to copy task files from docs repository"
+          create_error_report "$FACTORY_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
+      fi
     else
       echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
+      create_error_report "$FACTORY_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
     fi
 
     if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
       refresh_token_if_needed
-      cp "$DOCS_BASE_PATH/tasks.json" "$FACTORY_WORK_DIR/task/" 2>/dev/null || true
+      safe_copy_file "$DOCS_BASE_PATH/tasks.json" "$FACTORY_WORK_DIR/task/tasks.json" "tasks.json"
     fi
   fi
 else
@@ -1089,17 +1122,25 @@ if [ -f "$FACTORY_WORK_DIR/AGENTS.md" ]; then
   fi
 fi
 
-echo "🔍 DEBUG: About to check for prompt.md at: $FACTORY_WORK_DIR/task/prompt.md"
-echo "🔍 DEBUG: Contents of task directory:"
-ls -la "$FACTORY_WORK_DIR/task/" || echo "Task directory not found or empty"
-echo "🔍 DEBUG: Current working directory contents:"
-ls -la "$FACTORY_WORK_DIR/" || echo "Working directory not accessible"
+# Resilient verification of task files
+echo "🔍 RESILIENT VERIFICATION: Checking task files at: $FACTORY_WORK_DIR/task/"
+if verify_task_files "$FACTORY_WORK_DIR/task" "{{task_id}}"; then
+    echo "✅ Task files verification: PASSED"
+else
+    echo "❌ CRITICAL: Task files verification: FAILED"
+    create_error_report "$FACTORY_WORK_DIR/task" "{{task_id}}" "Task files missing before agent execution"
+    
+    # Attempt recovery
+    if attempt_task_recovery "/tmp/docs-repo" "$FACTORY_WORK_DIR/task" "{{task_id}}"; then
+        echo "✅ Recovery successful - continuing with execution"
+    else
+        echo "❌ Recovery failed - cannot proceed without prompt.md"
+        exit 1
+    fi
+fi
 
 PROMPT_FILE="$FACTORY_WORK_DIR/task/prompt.md"
-if [ ! -f "$PROMPT_FILE" ]; then
-  echo "❌ prompt.md not found at $PROMPT_FILE"
-  exit 1
-fi
+echo "📄 Using prompt file: $PROMPT_FILE"
 
 echo "startingTask:{{task_id}}"
 echo ""
