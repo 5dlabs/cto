@@ -189,8 +189,8 @@ impl CodeStatusManager {
 
         let current_retry_count = retry_count_override.unwrap_or_else(|| {
             code_run
-                .status
-                .as_ref()
+            .status
+            .as_ref()
                 .map_or(0, |s| s.retry_count.unwrap_or(0))
         });
         let session_id = code_run
