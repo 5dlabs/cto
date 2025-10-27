@@ -1468,28 +1468,28 @@ Your response:"
     COMPLETION_OUTPUT=""
     COMPLETION_RESPONSE=""
   else
-    COMPLETION_CMD=(
-      "codex"
-      "--ask-for-approval" "never"
-      "exec"
-      "--dangerously-bypass-approvals-and-sandbox"
-      "--skip-git-repo-check"
-      "--output-last-message" "$COMPLETION_LAST_MESSAGE"
-      "--cd" "$CODEX_WORK_DIR"
-      "resume"
+  COMPLETION_CMD=(
+    "codex"
+    "--ask-for-approval" "never"
+    "exec"
+    "--dangerously-bypass-approvals-and-sandbox"
+    "--skip-git-repo-check"
+    "--output-last-message" "$COMPLETION_LAST_MESSAGE"
+    "--cd" "$CODEX_WORK_DIR"
+    "resume"
       "$CURRENT_SESSION_ID"
       "$COMPLETION_PROMPT"
     )
-    COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
-    COMPLETION_EXIT=${PIPESTATUS[0]}
-    
-    if [ $COMPLETION_EXIT -ne 0 ]; then
-      echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
-    fi
+  COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
+  COMPLETION_EXIT=${PIPESTATUS[0]}
 
-    echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+  if [ $COMPLETION_EXIT -ne 0 ]; then
+    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+  fi
 
-    COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
   fi
   
   set +o pipefail
@@ -1999,8 +1999,8 @@ EOF
         FINAL_MESSAGE="Testing requested changes"
     fi
   fi
-  fi
-fi
+      fi
+    fi
 
 if [ -z "$FINAL_MESSAGE" ]; then
   if [ $SUCCESS -eq 1 ]; then

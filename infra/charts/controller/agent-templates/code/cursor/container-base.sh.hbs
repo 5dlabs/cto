@@ -438,7 +438,7 @@ ensure_pr_created() {
   if [ -n "$REPO_SLUG" ]; then
     PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
   else
-    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
   fi
   PR_EXIT_CODE=$?
 
@@ -448,7 +448,7 @@ ensure_pr_created() {
     if [ -n "$REPO_SLUG" ]; then
       PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
     else
-      PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
     fi
     PR_EXIT_CODE=$?
   fi
@@ -606,7 +606,7 @@ EOF
 
   # Note: Critical guards (PR_NUMBER and WORKFLOW_STAGE checks) are now at the top of this function
   # to prevent duplicate PRs before any PR creation setup occurs
-  
+
   if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
   else

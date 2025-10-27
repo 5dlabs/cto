@@ -678,8 +678,8 @@ if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
             git merge --abort 2>/dev/null || true
         else
             echo "ℹ️ No existing PR found; recreating branch from origin/main"
-            # Abort merge if in progress
-            git merge --abort 2>/dev/null || true
+        # Abort merge if in progress
+        git merge --abort 2>/dev/null || true
             # Delete local branch and recreate fresh from base
             git checkout origin/main 2>/dev/null || git checkout -b temp-branch origin/main
             git branch -D "$FEATURE_BRANCH" 2>/dev/null || true

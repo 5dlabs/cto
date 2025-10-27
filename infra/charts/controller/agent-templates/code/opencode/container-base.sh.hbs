@@ -419,7 +419,7 @@ ensure_pr_created() {
   if [ -n "$REPO_SLUG" ]; then
     PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
   else
-    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
   fi
   PR_EXIT_CODE=$?
 
@@ -430,7 +430,7 @@ ensure_pr_created() {
     if [ -n "$REPO_SLUG" ]; then
       PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
     else
-      PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
     fi
     PR_EXIT_CODE=$?
   fi
