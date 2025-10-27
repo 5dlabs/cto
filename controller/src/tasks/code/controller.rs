@@ -107,6 +107,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Succeeded",
                     "Code implementation completed successfully",
                     true,
+                    None,
                 )
                 .await?;
 
@@ -163,6 +164,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Running",
                 "Code implementation started",
                 false,
+                None,
             )
             .await?;
 
@@ -180,6 +182,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Running",
                 "Code task in progress",
                 false,
+                None,
             )
             .await?;
 
@@ -238,6 +241,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Failed",
                     &failure_message,
                     false,
+                    None,
                 )
                 .await?;
 
@@ -330,6 +334,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Failed",
                     &format!("Retry limit reached without completion: {reason}"),
                     false,
+                    None,
                 )
                 .await?;
 
@@ -363,6 +368,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Succeeded",
                 "Code implementation completed successfully",
                 true,
+                None,
             )
             .await?;
 
@@ -447,6 +453,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Failed",
                 "Code implementation failed",
                 false,
+                None,
             )
             .await?;
 
