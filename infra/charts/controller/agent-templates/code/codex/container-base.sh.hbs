@@ -1446,36 +1446,54 @@ Your response:"
   COMPLETION_LAST_MESSAGE="/tmp/codex-completion-${ATTEMPT}.txt"
   COMPLETION_LOG="/tmp/codex-completion-${ATTEMPT}.jsonl"
 
+  # Check if we have a session to resume before attempting completion probe
+  if [ -z "$CURRENT_SESSION_ID" ]; then
+    # Try to find the most recent session
+    if [ -d "$SESSION_DIR" ]; then
+      LATEST_SESSION=$(find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -printf '%T@ %f\n' 2>/dev/null | sort -rn | head -n1 | awk '{print $2}' | sed 's/\.json$//' || true)
+      if [ -n "$LATEST_SESSION" ]; then
+        CURRENT_SESSION_ID="$LATEST_SESSION"
+        echo "ℹ️  Found latest session: $CURRENT_SESSION_ID"
+      fi
+    fi
+  fi
+
   set +e
   set -o pipefail
-  COMPLETION_CMD=(
-    "codex"
-    "--ask-for-approval" "never"
-    "exec"
-    "--dangerously-bypass-approvals-and-sandbox"
-    "--skip-git-repo-check"
-    "--output-last-message" "$COMPLETION_LAST_MESSAGE"
-    "--cd" "$CODEX_WORK_DIR"
-    "resume"
-  )
-  if [ -n "$CURRENT_SESSION_ID" ]; then
-    COMPLETION_CMD+=("$CURRENT_SESSION_ID")
+  
+  # Skip completion probe if no session exists
+  if [ -z "$CURRENT_SESSION_ID" ]; then
+    echo "⚠️ No Codex session found - skipping completion probe for attempt $ATTEMPT"
+    COMPLETION_EXIT=0
+    COMPLETION_OUTPUT=""
+    COMPLETION_RESPONSE=""
   else
-    COMPLETION_CMD+=("--last")
+    COMPLETION_CMD=(
+      "codex"
+      "--ask-for-approval" "never"
+      "exec"
+      "--dangerously-bypass-approvals-and-sandbox"
+      "--skip-git-repo-check"
+      "--output-last-message" "$COMPLETION_LAST_MESSAGE"
+      "--cd" "$CODEX_WORK_DIR"
+      "resume"
+      "$CURRENT_SESSION_ID"
+      "$COMPLETION_PROMPT"
+    )
+    COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
+    COMPLETION_EXIT=${PIPESTATUS[0]}
+    
+    if [ $COMPLETION_EXIT -ne 0 ]; then
+      echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
+    fi
+
+    echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+
+    COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
   fi
-  COMPLETION_CMD+=("$COMPLETION_PROMPT")
-  COMPLETION_OUTPUT=$("${COMPLETION_CMD[@]}" 2>&1 | tee "$COMPLETION_LOG")
-  COMPLETION_EXIT=${PIPESTATUS[0]}
+  
   set +o pipefail
   set -e
-
-  if [ $COMPLETION_EXIT -ne 0 ]; then
-    echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
-  fi
-
-  echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
-
-  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
     CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
@@ -1979,8 +1997,10 @@ EOF
         FINAL_MESSAGE="Security review requested changes"
       else
         FINAL_MESSAGE="Testing requested changes"
-      fi
     fi
+  fi
+  fi
+fi
 
 if [ -z "$FINAL_MESSAGE" ]; then
   if [ $SUCCESS -eq 1 ]; then
