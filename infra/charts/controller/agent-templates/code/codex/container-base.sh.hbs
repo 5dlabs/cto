@@ -1748,13 +1748,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       fi
     fi
 
-    if [ $QUALITY_GATES_PASSED -eq 1 ]; then
-      STAGE_NAME="Quality"
-      STAGE_EMOJI="🛡️"
-      CHECKS_PASSED="- Code formatting verified
-- Linting passed
-- Unit tests successful
-    if [ $SUCCESS -eq 1 ]; then
+    if [ $QUALITY_GATES_PASSED -eq 1 ] && [ $SUCCESS -eq 1 ]; then
       STAGE_NAME="Quality"
       STAGE_EMOJI="🛡️"
       CHECKS_PASSED="- Code formatting verified
