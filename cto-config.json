@@ -39,6 +39,7 @@
       "model": "claude-sonnet-4-5-20250929",
       "cli": "factory",
       "implementationAgent": "5DLabs-Rex",
+      "frontendAgent": "5DLabs-Blaze",
       "qualityAgent": "5DLabs-Cleo",
       "securityAgent": "5DLabs-Cipher",
       "testingAgent": "5DLabs-Tess",
