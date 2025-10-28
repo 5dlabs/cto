@@ -202,6 +202,8 @@ struct PlayDefaults {
     testing_max_retries: Option<u32>,
     #[serde(rename = "autoMerge")]
     auto_merge: Option<bool>,
+    #[serde(rename = "parallelExecution")]
+    parallel_execution: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -1351,6 +1353,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Parallel execution parameter - determines which workflow template to use
     let parallel_execution = parse_bool_argument(&arguments, "parallel_execution")
+        .or(config.defaults.play.parallel_execution)
         .unwrap_or(false);
     
     // Select workflow template based on parallel_execution flag

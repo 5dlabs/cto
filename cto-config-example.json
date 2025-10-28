@@ -46,7 +46,8 @@
       "docsRepository": "5dlabs/cto-play-test",
       "docsProjectDirectory": "docs",
       "workingDirectory": "/Users/jonathonfritz/cto-play-test",
-      "autoMerge": false
+      "autoMerge": false,
+      "parallelExecution": false
     },
     "docs_ingest": {
       "model": "claude-sonnet-4-20250514",
