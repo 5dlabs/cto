@@ -836,18 +836,19 @@ echo "✓ All required files present. Workspace is valid."
 
 # Create PR branch BEFORE Claude runs (like code jobs)
 # This ensures all commits go to the PR branch, not the base branch
-SOURCE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# Note: SOURCE_BRANCH is already set from template at line 551
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RANDOM_ID=$(date +%s | tail -c 6)
 PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
 
-echo "Creating PR branch from $SOURCE_BRANCH..."
-echo "Branch: $PR_BRANCH"
-if ! git checkout -b "$PR_BRANCH" 2>/dev/null; then
-    echo "❌ Failed to create PR branch"
+echo "Creating PR branch: $PR_BRANCH"
+echo "Target base branch: $SOURCE_BRANCH"
+# Create branch from the correct source branch (not current HEAD)
+if ! git checkout -b "$PR_BRANCH" "origin/$SOURCE_BRANCH" 2>/dev/null; then
+    echo "❌ Failed to create PR branch from origin/$SOURCE_BRANCH"
     exit 1
 fi
-echo "✓ Created PR branch: $PR_BRANCH (from $SOURCE_BRANCH)"
+echo "✓ Created PR branch: $PR_BRANCH (from origin/$SOURCE_BRANCH)"
 
 # Export for use by auto-save hook and later PR creation
 export DOCS_AUTO_SAVE_BRANCH="$PR_BRANCH"
