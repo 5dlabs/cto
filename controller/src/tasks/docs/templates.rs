@@ -1,4 +1,3 @@
-use crate::cli::types::CLIType;
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
