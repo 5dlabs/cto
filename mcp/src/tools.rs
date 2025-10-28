@@ -116,6 +116,11 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                         format!("Agent for testing and validation. Available agents: {agent_list}")
                     }
                 },
+                "parallel_execution": {
+                    "type": "boolean",
+                    "description": "Enable parallel execution of independent tasks. When true, analyzes TaskMaster dependencies and runs tasks in parallel execution levels. When false (default), runs tasks sequentially one at a time. Requires TaskMaster tasks.json with proper dependencies.",
+                    "default": false
+                },
                 "model": {
                     "type": "string",
                     "description": "Claude model to use for all agents (optional, defaults to configuration)"
