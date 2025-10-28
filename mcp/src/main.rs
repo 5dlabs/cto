@@ -972,6 +972,89 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let implementation_agent_max_retries = implementation_agent_cfg.and_then(|cfg| cfg.max_retries);
 
+    // Handle frontend agent - use provided value or config default
+    let frontend_agent_input = arguments
+        .get("frontend_agent")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| config.defaults.play.frontend_agent.clone())
+        .unwrap_or_else(|| config.defaults.play.implementation_agent.clone()); // Fallback to implementation agent
+
+    let frontend_agent_cfg = config
+        .agents
+        .values()
+        .find(|a| a.github_app == frontend_agent_input);
+
+    // Resolve frontend agent name and extract CLI/model/tools/modelRotation
+    let (frontend_agent, frontend_cli, frontend_model, frontend_tools, frontend_model_rotation) =
+        if let Some(agent_config) = frontend_agent_cfg {
+            let agent_cli = if agent_config.cli.is_empty() {
+                cli.clone()
+            } else {
+                agent_config.cli.clone()
+            };
+            let agent_model = if agent_config.model.is_empty() {
+                model.clone()
+            } else {
+                agent_config.model.clone()
+            };
+            let agent_tools = agent_config.tools.as_ref()
+                .map(|t| {
+                    match serde_json::to_string(t) {
+                        Ok(json) => {
+                            eprintln!("✅ Serialized frontend agent tools: {json}");
+                            json
+                        },
+                        Err(e) => {
+                            eprintln!("❌ Failed to serialize frontend agent tools: {e}");
+                            eprintln!("   Tools data: {t:?}");
+                            "{}".to_string()
+                        }
+                    }
+                })
+                .unwrap_or_else(|| {
+                    eprintln!("ℹ️ No tools configured for frontend agent {frontend_agent_input}");
+                    "{}".to_string()
+                });
+            let agent_model_rotation = agent_config.model_rotation.as_ref()
+                .and_then(|mr| {
+                    if mr.enabled && !mr.models.is_empty() {
+                        match serde_json::to_string(&mr.models) {
+                            Ok(json) => {
+                                eprintln!("✅ Model rotation enabled for frontend agent: {json}");
+                                Some(json)
+                            },
+                            Err(e) => {
+                                eprintln!("❌ Failed to serialize model rotation: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| "[]".to_string());
+            (
+                agent_config.github_app.clone(),
+                agent_cli,
+                agent_model,
+                agent_tools,
+                agent_model_rotation,
+            )
+        } else {
+            // Not a configured agent, use provided name with defaults
+            eprintln!("⚠️ Frontend agent {frontend_agent_input} not found in config, using defaults");
+            (
+                frontend_agent_input.clone(),
+                cli.clone(),
+                model.clone(),
+                "{}".to_string(),
+                "[]".to_string(),
+            )
+        };
+
+    let frontend_agent_max_retries = frontend_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
         .get("quality_agent")
@@ -1322,6 +1405,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         format!("implementation-model={implementation_model}"),
         format!("implementation-tools={implementation_tools}"),
         format!("implementation-model-rotation={implementation_model_rotation}"),
+        format!("frontend-agent={frontend_agent}"),
+        format!("frontend-cli={frontend_cli}"),
+        format!("frontend-model={frontend_model}"),
+        format!("frontend-tools={frontend_tools}"),
+        format!("frontend-model-rotation={frontend_model_rotation}"),
         format!("quality-agent={quality_agent}"),
         format!("quality-cli={quality_cli}"),
         format!("quality-model={quality_model}"),
