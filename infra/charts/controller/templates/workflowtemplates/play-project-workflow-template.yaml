@@ -530,9 +530,9 @@ spec:
                 - name: implementation-model
                   value: "{{`{{workflow.parameters.implementation-model}}`}}"
                 - name: implementation-tools
-                  value: "{{`{{workflow.parameters.implementation-tools}}`}}"
+                  value: '{{`{{workflow.parameters.implementation-tools}}`}}'
                 - name: implementation-model-rotation
-                  value: "{{`{{workflow.parameters.implementation-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.implementation-model-rotation}}`}}'
                 - name: quality-agent
                   value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: quality-cli
@@ -540,9 +540,9 @@ spec:
                 - name: quality-model
                   value: "{{`{{workflow.parameters.quality-model}}`}}"
                 - name: quality-tools
-                  value: "{{`{{workflow.parameters.quality-tools}}`}}"
+                  value: '{{`{{workflow.parameters.quality-tools}}`}}'
                 - name: quality-model-rotation
-                  value: "{{`{{workflow.parameters.quality-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.quality-model-rotation}}`}}'
                 - name: security-agent
                   value: "{{`{{workflow.parameters.security-agent}}`}}"
                 - name: security-cli
@@ -550,9 +550,9 @@ spec:
                 - name: security-model
                   value: "{{`{{workflow.parameters.security-model}}`}}"
                 - name: security-tools
-                  value: "{{`{{workflow.parameters.security-tools}}`}}"
+                  value: '{{`{{workflow.parameters.security-tools}}`}}'
                 - name: security-model-rotation
-                  value: "{{`{{workflow.parameters.security-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.security-model-rotation}}`}}'
                 - name: testing-agent
                   value: "{{`{{workflow.parameters.testing-agent}}`}}"
                 - name: testing-cli
@@ -560,9 +560,9 @@ spec:
                 - name: testing-model
                   value: "{{`{{workflow.parameters.testing-model}}`}}"
                 - name: testing-tools
-                  value: "{{`{{workflow.parameters.testing-tools}}`}}"
+                  value: '{{`{{workflow.parameters.testing-tools}}`}}'
                 - name: testing-model-rotation
-                  value: "{{`{{workflow.parameters.testing-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.testing-model-rotation}}`}}'
                 - name: implementation-max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
                 - name: quality-max-retries
@@ -988,9 +988,9 @@ spec:
                 - name: implementation-model
                   value: "{{`{{workflow.parameters.implementation-model}}`}}"
                 - name: implementation-tools
-                  value: "{{`{{workflow.parameters.implementation-tools}}`}}"
+                  value: '{{`{{workflow.parameters.implementation-tools}}`}}'
                 - name: implementation-model-rotation
-                  value: "{{`{{workflow.parameters.implementation-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.implementation-model-rotation}}`}}'
                 - name: quality-agent
                   value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: quality-cli
@@ -998,9 +998,9 @@ spec:
                 - name: quality-model
                   value: "{{`{{workflow.parameters.quality-model}}`}}"
                 - name: quality-tools
-                  value: "{{`{{workflow.parameters.quality-tools}}`}}"
+                  value: '{{`{{workflow.parameters.quality-tools}}`}}'
                 - name: quality-model-rotation
-                  value: "{{`{{workflow.parameters.quality-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.quality-model-rotation}}`}}'
                 - name: security-agent
                   value: "{{`{{workflow.parameters.security-agent}}`}}"
                 - name: security-cli
@@ -1008,9 +1008,9 @@ spec:
                 - name: security-model
                   value: "{{`{{workflow.parameters.security-model}}`}}"
                 - name: security-tools
-                  value: "{{`{{workflow.parameters.security-tools}}`}}"
+                  value: '{{`{{workflow.parameters.security-tools}}`}}'
                 - name: security-model-rotation
-                  value: "{{`{{workflow.parameters.security-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.security-model-rotation}}`}}'
                 - name: testing-agent
                   value: "{{`{{workflow.parameters.testing-agent}}`}}"
                 - name: testing-cli
@@ -1018,9 +1018,9 @@ spec:
                 - name: testing-model
                   value: "{{`{{workflow.parameters.testing-model}}`}}"
                 - name: testing-tools
-                  value: "{{`{{workflow.parameters.testing-tools}}`}}"
+                  value: '{{`{{workflow.parameters.testing-tools}}`}}'
                 - name: testing-model-rotation
-                  value: "{{`{{workflow.parameters.testing-model-rotation}}`}}"
+                  value: '{{`{{workflow.parameters.testing-model-rotation}}`}}'
                 - name: implementation-max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
                 - name: quality-max-retries
