@@ -8,7 +8,28 @@ The parallel task execution system analyzes TaskMaster dependencies and automati
 
 ## Quick Start
 
-### 1. Enable Parallel Execution
+### Option 1: Using MCP Tool (Cursor/IDE Integration)
+
+The easiest way to trigger parallel execution is through the MCP `play()` tool:
+
+```javascript
+play({
+  task_id: 1,
+  repository: "5dlabs/my-repo",
+  service: "my-service",
+  docs_repository: "5dlabs/my-repo",
+  docs_project_directory: "docs",
+  parallel_execution: true  // Enable parallel execution
+})
+```
+
+**Benefits:**
+- ✅ No need to write YAML manifests
+- ✅ Direct integration with Cursor/IDE
+- ✅ Uses your configured agents and defaults
+- ✅ Simple boolean flag to enable parallel mode
+
+### Option 2: Manual Workflow Submission
 
 Set the `parallel-execution` parameter to `"true"` when launching a play project workflow:
 
@@ -27,6 +48,11 @@ spec:
       - name: repository
         value: "your-org/your-repo"
       # ... other parameters
+```
+
+Submit with:
+```bash
+argo submit -n agent-platform parallel-play.yaml
 ```
 
 ### 2. TaskMaster Requirements
