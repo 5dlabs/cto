@@ -493,17 +493,41 @@ impl<'a> DocsResourceManager<'a> {
         let job_name = self.generate_job_name(docs_run);
 
         // Ensure PVC exists before creating job
-        info!("🔧 DocsRun {}: Ensuring PVC exists for job {}", docs_run.name_any(), job_name);
+        info!(
+            "🔧 DocsRun {}: Ensuring PVC exists for job {}",
+            docs_run.name_any(),
+            job_name
+        );
         self.ensure_workspace_pvc(docs_run).await?;
-        info!("✅ DocsRun {}: PVC ready for job {}", docs_run.name_any(), job_name);
+        info!(
+            "✅ DocsRun {}: PVC ready for job {}",
+            docs_run.name_any(),
+            job_name
+        );
 
-        info!("🔧 DocsRun {}: Building job spec for {}", docs_run.name_any(), job_name);
+        info!(
+            "🔧 DocsRun {}: Building job spec for {}",
+            docs_run.name_any(),
+            job_name
+        );
         let job = self.build_job_spec(docs_run, &job_name, cm_name).await?;
-        info!("✅ DocsRun {}: Job spec built for {}", docs_run.name_any(), job_name);
+        info!(
+            "✅ DocsRun {}: Job spec built for {}",
+            docs_run.name_any(),
+            job_name
+        );
 
-        info!("🔧 DocsRun {}: Creating job {}", docs_run.name_any(), job_name);
+        info!(
+            "🔧 DocsRun {}: Creating job {}",
+            docs_run.name_any(),
+            job_name
+        );
         let created_job = self.jobs.create(&PostParams::default(), &job).await?;
-        info!("✅ DocsRun {}: Job created successfully: {}", docs_run.name_any(), job_name);
+        info!(
+            "✅ DocsRun {}: Job created successfully: {}",
+            docs_run.name_any(),
+            job_name
+        );
 
         info!("✅ RESOURCE_MANAGER: Created docs job: {}", job_name);
 
@@ -1003,18 +1027,35 @@ impl<'a> DocsResourceManager<'a> {
         let pvcs: Api<k8s_openapi::api::core::v1::PersistentVolumeClaim> =
             Api::namespaced(self.ctx.client.clone(), &self.ctx.namespace);
 
-        info!("🔍 DocsRun {}: Checking if PVC {} exists", docs_run.name_any(), pvc_name);
+        info!(
+            "🔍 DocsRun {}: Checking if PVC {} exists",
+            docs_run.name_any(),
+            pvc_name
+        );
         match pvcs.get(&pvc_name).await {
             Ok(_) => {
-                info!("✅ DocsRun {}: PVC {} already exists", docs_run.name_any(), pvc_name);
+                info!(
+                    "✅ DocsRun {}: PVC {} already exists",
+                    docs_run.name_any(),
+                    pvc_name
+                );
                 return Ok(());
             }
             Err(kube::Error::Api(ae)) if ae.code == 404 => {
                 // PVC doesn't exist, create it
-                info!("📦 DocsRun {}: Creating PVC: {}", docs_run.name_any(), pvc_name);
+                info!(
+                    "📦 DocsRun {}: Creating PVC: {}",
+                    docs_run.name_any(),
+                    pvc_name
+                );
             }
             Err(e) => {
-                error!("❌ DocsRun {}: Failed to check PVC {}: {}", docs_run.name_any(), pvc_name, e);
+                error!(
+                    "❌ DocsRun {}: Failed to check PVC {}: {}",
+                    docs_run.name_any(),
+                    pvc_name,
+                    e
+                );
                 return Err(e.into());
             }
         }
@@ -1057,18 +1098,35 @@ impl<'a> DocsResourceManager<'a> {
             ..Default::default()
         };
 
-        info!("🔧 DocsRun {}: Attempting to create PVC {}", docs_run.name_any(), pvc_name);
+        info!(
+            "🔧 DocsRun {}: Attempting to create PVC {}",
+            docs_run.name_any(),
+            pvc_name
+        );
         match pvcs.create(&kube::api::PostParams::default(), &pvc).await {
             Ok(_) => {
-                info!("✅ DocsRun {}: Created PVC: {}", docs_run.name_any(), pvc_name);
+                info!(
+                    "✅ DocsRun {}: Created PVC: {}",
+                    docs_run.name_any(),
+                    pvc_name
+                );
                 Ok(())
             }
             Err(kube::Error::Api(ae)) if ae.code == 409 => {
-                info!("✅ DocsRun {}: PVC {} already exists (created concurrently)", docs_run.name_any(), pvc_name);
+                info!(
+                    "✅ DocsRun {}: PVC {} already exists (created concurrently)",
+                    docs_run.name_any(),
+                    pvc_name
+                );
                 Ok(())
             }
             Err(e) => {
-                error!("❌ DocsRun {}: Failed to create PVC {}: {:?}", docs_run.name_any(), pvc_name, e);
+                error!(
+                    "❌ DocsRun {}: Failed to create PVC {}: {:?}",
+                    docs_run.name_any(),
+                    pvc_name,
+                    e
+                );
                 Err(e.into())
             }
         }
