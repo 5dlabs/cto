@@ -205,14 +205,14 @@ export GITHUB_TOKEN
 export GH_TOKEN="$GITHUB_TOKEN"
 export GH_HOST="github.com"
 
-export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
-CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
-mkdir -p /workspace
-
 # Task-specific workspace for parallel execution isolation
 TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
+CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 
 git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
