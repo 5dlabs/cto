@@ -1061,3 +1061,59 @@ struct SshVolumes {
     volumes: Vec<serde_json::Value>,
     volume_mounts: Vec<serde_json::Value>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_directory_name() {
+        // Test empty string
+        assert_eq!(DocsResourceManager::sanitize_directory_name(""), "default");
+        
+        // Test normal directory name
+        assert_eq!(DocsResourceManager::sanitize_directory_name("docs"), "docs");
+        
+        // Test directory with special characters
+        assert_eq!(DocsResourceManager::sanitize_directory_name("my/project"), "my-project");
+        
+        // Test directory that becomes empty after sanitization
+        assert_eq!(DocsResourceManager::sanitize_directory_name("///"), "default");
+        
+        // Test directory with mixed characters
+        assert_eq!(DocsResourceManager::sanitize_directory_name("docs@2024!"), "docs-2024");
+    }
+
+    #[test]
+    fn test_backward_compatibility_scenarios() {
+        // Test that new function returns "default" for empty string
+        assert_eq!(DocsResourceManager::sanitize_directory_name(""), "default");
+        
+        // Simulate what the old function would have returned for empty string
+        let legacy_result = "".chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_lowercase();
+        assert_eq!(legacy_result, "");
+        
+        // Test that both give same result for non-empty strings
+        assert_eq!(DocsResourceManager::sanitize_directory_name("docs"), "docs");
+        
+        let legacy_result_docs = "docs".chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_lowercase();
+        assert_eq!(legacy_result_docs, "docs");
+        
+        // Test that this demonstrates the backward compatibility issue
+        // Old: empty working_directory would result in PVC name ending with "-" (empty suffix)
+        // New: empty working_directory results in PVC name ending with "-default"
+        let old_pvc_name = format!("docs-workspace-repo-{}", legacy_result);
+        let new_pvc_name = format!("docs-workspace-repo-{}", DocsResourceManager::sanitize_directory_name(""));
+        assert_eq!(old_pvc_name, "docs-workspace-repo-");
+        assert_eq!(new_pvc_name, "docs-workspace-repo-default");
+        assert_ne!(old_pvc_name, new_pvc_name);
+    }
+}
