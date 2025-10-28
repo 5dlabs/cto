@@ -106,7 +106,7 @@ spec:
               parameters:
               - name: docs-directory
                 value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
-            when: "{{`{{workflow.parameters.parallel-execution}}`}} == \"true\""
+            when: "{{`{{workflow.parameters.parallel-execution}}`}}"
 
         # Step 3: Process tasks (parallel or sequential based on parameter)
         - - name: process-tasks-parallel
@@ -117,7 +117,7 @@ spec:
                 value: "{{`{{steps.build-dependency-graph.outputs.parameters.execution-levels}}`}}"
               - name: task-count
                 value: "{{`{{steps.discover-tasks.outputs.parameters.task-count}}`}}"
-            when: "{{`{{workflow.parameters.parallel-execution}}`}} == \"true\""
+            when: "{{`{{workflow.parameters.parallel-execution}}`}}"
           - name: process-tasks-sequential
             template: sequential-task-processor
             arguments:
@@ -126,7 +126,7 @@ spec:
                 value: "{{`{{steps.discover-tasks.outputs.parameters.task-list}}`}}"
               - name: task-count
                 value: "{{`{{steps.discover-tasks.outputs.parameters.task-count}}`}}"
-            when: "{{`{{workflow.parameters.parallel-execution}}`}} == \"false\""
+            when: "!{{`{{workflow.parameters.parallel-execution}}`}}"
 
     # Task discovery template
     - name: task-discovery
