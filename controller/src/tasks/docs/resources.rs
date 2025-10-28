@@ -627,6 +627,19 @@ impl<'a> DocsResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
+        // Agent templates volume for integration task templates
+        let agent_templates_cm_name = "controller-agent-templates-docs".to_string();
+        volumes.push(json!({
+            "name": "agent-templates",
+            "configMap": {
+                "name": agent_templates_cm_name
+            }
+        }));
+        volume_mounts.push(json!({
+            "name": "agent-templates",
+            "mountPath": "/agent-templates"
+        }));
+
         // Mount settings.json as managed-settings.json for enterprise compatibility
         volume_mounts.push(json!({
             "name": "task-files",
