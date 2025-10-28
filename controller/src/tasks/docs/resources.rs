@@ -493,7 +493,7 @@ impl<'a> DocsResourceManager<'a> {
         // Ensure PVC exists before creating job
         self.ensure_workspace_pvc(docs_run).await?;
 
-        let job = self.build_job_spec(docs_run, &job_name, cm_name)?;
+        let job = self.build_job_spec(docs_run, &job_name, cm_name).await?;
 
         let created_job = self.jobs.create(&PostParams::default(), &job).await?;
 
@@ -548,7 +548,7 @@ impl<'a> DocsResourceManager<'a> {
             .to_lowercase()
     }
 
-    fn build_job_spec(&self, docs_run: &DocsRun, job_name: &str, cm_name: &str) -> Result<Job> {
+    async fn build_job_spec(&self, docs_run: &DocsRun, job_name: &str, cm_name: &str) -> Result<Job> {
         let labels = self.create_task_labels(docs_run);
 
         // Create owner reference to DocsRun for proper event handling
