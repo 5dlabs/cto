@@ -28,8 +28,6 @@ impl DocsTemplateGenerator {
         docs_run: &DocsRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
-        let cli_type = Self::determine_cli_type(docs_run);
-        
         // All CLIs currently use Claude templates
         Self::generate_claude_templates(docs_run, config)
     }
