@@ -130,8 +130,14 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
     debug!("Generated job name: {}", job_name);
 
     let job_state = check_job_state(&jobs, &job_name).await?;
-    info!("🔍 DocsRun {}: Generated job name: {}", docs_run_name, job_name);
-    info!("🔍 DocsRun {}: Current job state: {:?}", docs_run_name, job_state);
+    info!(
+        "🔍 DocsRun {}: Generated job name: {}",
+        docs_run_name, job_name
+    );
+    info!(
+        "🔍 DocsRun {}: Current job state: {:?}",
+        docs_run_name, job_state
+    );
 
     match job_state {
         JobState::NotFound => {
