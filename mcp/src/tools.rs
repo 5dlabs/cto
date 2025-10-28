@@ -92,10 +92,19 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                 "implementation_agent": {
                     "type": "string",
                     "description": if agents.is_empty() {
-                        "Agent for implementation work (e.g., 5DLabs-Rex, 5DLabs-Blaze)".to_string()
+                        "Agent for backend/general implementation work (e.g., 5DLabs-Rex)".to_string()
                     } else {
                         let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                        format!("Agent for implementation work. Available agents: {agent_list}")
+                        format!("Agent for backend/general implementation work. Available agents: {agent_list}")
+                    }
+                },
+                "frontend_agent": {
+                    "type": "string",
+                    "description": if agents.is_empty() {
+                        "Agent for frontend tasks (React, UI components) (e.g., 5DLabs-Blaze). Optional if defaults.play.frontendAgent is set in config.".to_string()
+                    } else {
+                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        format!("Agent for frontend tasks (React, UI components). Available agents: {agent_list}")
                     }
                 },
                 "quality_agent": {

@@ -178,6 +178,8 @@ struct PlayDefaults {
     cli: String,
     #[serde(rename = "implementationAgent")]
     implementation_agent: String,
+    #[serde(rename = "frontendAgent")]
+    frontend_agent: Option<String>,
     #[serde(rename = "qualityAgent")]
     quality_agent: String,
     #[serde(rename = "securityAgent")]
