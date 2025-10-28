@@ -1,3 +1,4 @@
+use crate::cli::types::CLIType;
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::template_paths::{
@@ -21,6 +22,29 @@ pub struct DocsTemplateGenerator;
 impl DocsTemplateGenerator {
     /// Generate all template files for a docs task
     pub fn generate_all_templates(
+        docs_run: &DocsRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let cli_type = Self::determine_cli_type(docs_run);
+        
+        // Route to CLI-specific template generation
+        match cli_type {
+            CLIType::Claude => Self::generate_claude_templates(docs_run, config),
+            // TODO: Add support for other CLIs (Cursor, Codex, OpenCode) as needed
+            _ => Self::generate_claude_templates(docs_run, config),
+        }
+    }
+
+    fn determine_cli_type(docs_run: &DocsRun) -> CLIType {
+        docs_run
+            .spec
+            .cli
+            .as_ref()
+            .and_then(|cli_str| CLIType::from_str_ci(cli_str))
+            .unwrap_or(CLIType::Claude)
+    }
+
+    fn generate_claude_templates(
         docs_run: &DocsRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {

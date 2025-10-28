@@ -23,6 +23,9 @@ pub struct DocsRunSpec {
     pub github_user: Option<String>,
     #[serde(rename = "githubApp", default)]
     pub github_app: Option<String>,
+    /// Optional: CLI type to use (e.g., "Claude", "Cursor", "Codex", "OpenCode")
+    #[serde(default)]
+    pub cli: Option<String>,
     #[serde(rename = "includeCodebase", default)]
     pub include_codebase: Option<bool>,
     /// Optional: additional remote MCP tools to merge into the baseline
