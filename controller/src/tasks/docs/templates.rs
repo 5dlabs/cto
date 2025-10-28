@@ -30,12 +30,8 @@ impl DocsTemplateGenerator {
     ) -> Result<BTreeMap<String, String>> {
         let cli_type = Self::determine_cli_type(docs_run);
         
-        // All CLIs currently use Claude templates; match kept for future expansion
-        match cli_type {
-            CLIType::Claude | CLIType::Cursor | CLIType::Codex | CLIType::OpenCode => {
-                Self::generate_claude_templates(docs_run, config)
-            }
-        }
+        // All CLIs currently use Claude templates
+        Self::generate_claude_templates(docs_run, config)
     }
 
     fn determine_cli_type(docs_run: &DocsRun) -> CLIType {
