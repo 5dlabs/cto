@@ -37,6 +37,31 @@ impl<'a> DocsResourceManager<'a> {
         }
     }
 
+    /// Sanitize a directory name for use in Kubernetes resource names.
+    /// Returns "default" if the input is empty or becomes empty after sanitization.
+    fn sanitize_directory_name(directory: &str) -> String {
+        if directory.is_empty() {
+            return "default".to_string();
+        }
+
+        let sanitized = directory
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .to_lowercase();
+
+        if sanitized.is_empty() {
+            "default".to_string()
+        } else {
+            sanitized
+        }
+    }
+
     pub async fn reconcile_create_or_update(&self, docs_run: &Arc<DocsRun>) -> Result<Action> {
         let name = docs_run.name_any();
         info!(
@@ -593,22 +618,7 @@ impl<'a> DocsResourceManager<'a> {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_lowercase(),
-            if docs_run.spec.working_directory.is_empty() {
-                "default".to_string()
-            } else {
-                docs_run
-                    .spec
-                    .working_directory
-                    .chars()
-                    .map(|c| if c.is_alphanumeric() || c == '-' {
-                        c
-                    } else {
-                        '-'
-                    })
-                    .collect::<String>()
-                    .trim_matches('-')
-                    .to_lowercase()
-            }
+            Self::sanitize_directory_name(&docs_run.spec.working_directory)
         );
 
         volumes.push(json!({
@@ -973,22 +983,7 @@ impl<'a> DocsResourceManager<'a> {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_lowercase(),
-            if docs_run.spec.working_directory.is_empty() {
-                "default".to_string()
-            } else {
-                docs_run
-                    .spec
-                    .working_directory
-                    .chars()
-                    .map(|c| if c.is_alphanumeric() || c == '-' {
-                        c
-                    } else {
-                        '-'
-                    })
-                    .collect::<String>()
-                    .trim_matches('-')
-                    .to_lowercase()
-            }
+            Self::sanitize_directory_name(&docs_run.spec.working_directory)
         );
 
         // Check if PVC already exists
