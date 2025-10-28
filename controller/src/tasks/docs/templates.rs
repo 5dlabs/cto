@@ -32,15 +32,6 @@ impl DocsTemplateGenerator {
         Self::generate_claude_templates(docs_run, config)
     }
 
-    fn determine_cli_type(docs_run: &DocsRun) -> CLIType {
-        docs_run
-            .spec
-            .cli
-            .as_ref()
-            .and_then(|cli_str| CLIType::from_str_ci(cli_str))
-            .unwrap_or(CLIType::Claude)
-    }
-
     fn generate_claude_templates(
         docs_run: &DocsRun,
         config: &ControllerConfig,
