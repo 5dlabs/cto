@@ -40,7 +40,7 @@ impl DocsTemplateGenerator {
             .spec
             .cli
             .as_ref()
-            .and_then(|cli_str| cli_str.parse::<CLIType>().ok())
+            .and_then(|cli_str| CLIType::from_str_ci(cli_str))
             .unwrap_or(CLIType::Claude)
     }
 
