@@ -227,6 +227,9 @@ impl DocsTemplateGenerator {
     /// 1) agents.<agent>.clientConfig (verbatim pass-through)
     /// 2) agents.<agent>.tools (convert to client-config.json structure generically)
     /// 3) fallback to empty object {}
+    ///
+    /// # Errors
+    /// Returns error if config generation fails
     fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
         debug!(
