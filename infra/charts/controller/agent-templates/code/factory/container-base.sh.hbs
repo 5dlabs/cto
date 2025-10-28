@@ -983,7 +983,7 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
     fi
 
     echo "🔍 Docs base path: $DOCS_BASE_PATH"
-    TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+    TASK_DIR="$DOCS_BASE_PATH/tasks/task-{{task_id}}"
 
     if [ -d "$TASK_DIR" ]; then
       echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
