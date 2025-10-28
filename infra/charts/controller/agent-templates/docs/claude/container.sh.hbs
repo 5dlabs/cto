@@ -328,10 +328,14 @@ for file in $REQUIRED_FILES; do
   fi
 done
 
-# Check for .taskmaster directory
+# Check for .taskmaster directory - create if missing for resilient setup
 if [ ! -d "$CLAUDE_WORK_DIR/.taskmaster" ]; then
-  echo "❌ .taskmaster directory not found"
-  exit 1
+  echo "⚠️  .taskmaster directory not found, initializing structure..."
+  mkdir -p "$CLAUDE_WORK_DIR/.taskmaster/tasks"
+  mkdir -p "$CLAUDE_WORK_DIR/.taskmaster/docs"
+  echo "✓ Created .taskmaster structure"
+else
+  echo "✓ .taskmaster directory exists"
 fi
 
 # Ensure docs directory exists and clean old data to prevent contamination

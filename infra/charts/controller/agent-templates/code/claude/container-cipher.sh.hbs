@@ -720,13 +720,19 @@ if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
         echo "   Taskmaster directory: $DOCS_PATH"
         echo "   Task directory: $TASK_DIR"
         
-        # Validate .taskmaster directory
+        # Validate .taskmaster directory - create if missing for resilient setup
         if [ ! -d "$DOCS_PATH" ]; then
             echo "⚠️  .taskmaster directory not found at: $DOCS_PATH"
-            echo "   This likely indicates incorrect docs_project_directory configuration"
-            echo "   Available directories in base path:"
-            ls -d "$DOCS_BASE_PATH"/*/ 2>/dev/null | head -5 || echo "   None visible"
-            DOCS_PATH_VALID=false
+            echo "   Initializing .taskmaster structure..."
+            mkdir -p "$DOCS_PATH/tasks"
+            mkdir -p "$DOCS_PATH/docs"
+            if [ -d "$DOCS_PATH" ]; then
+                echo "✅ Created .taskmaster structure"
+                DOCS_PATH_VALID=true
+            else
+                echo "❌ Failed to create .taskmaster structure"
+                DOCS_PATH_VALID=false
+            fi
         else
             echo "✅ .taskmaster directory found"
             DOCS_PATH_VALID=true
