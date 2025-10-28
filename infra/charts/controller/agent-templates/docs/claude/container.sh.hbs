@@ -834,6 +834,25 @@ fi
 
 echo "✓ All required files present. Workspace is valid."
 
+# Create PR branch BEFORE Claude runs (like code jobs)
+# This ensures all commits go to the PR branch, not the base branch
+SOURCE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+RANDOM_ID=$(date +%s | tail -c 6)
+PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
+
+echo "Creating PR branch from $SOURCE_BRANCH..."
+echo "Branch: $PR_BRANCH"
+if ! git checkout -b "$PR_BRANCH" 2>/dev/null; then
+    echo "❌ Failed to create PR branch"
+    exit 1
+fi
+echo "✓ Created PR branch: $PR_BRANCH (from $SOURCE_BRANCH)"
+
+# Export for use by auto-save hook and later PR creation
+export DOCS_AUTO_SAVE_BRANCH="$PR_BRANCH"
+export SOURCE_BRANCH
+
 # Claude execution
 echo "Starting Claude execution (stream-json)..."
 
@@ -1021,25 +1040,17 @@ fi
 
 echo "✓ Documentation changes detected, proceeding with PR creation..."
 
-# Check if we're already on an auto-save branch from the hook
+# Verify we're on the PR branch created at the start
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [[ "$CURRENT_BRANCH" == docs/auto-save-* ]]; then
-    echo "✓ Already on auto-save branch from hook: $CURRENT_BRANCH"
-    PR_BRANCH="$CURRENT_BRANCH"
-    SOURCE_BRANCH="main"  # Assume we branched from main originally
-else
-    # Create new PR branch if not already on one
-    SOURCE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    RANDOM_ID=$(date +%s | tail -c 6)
-    PR_BRANCH="docs/{{#if task_id}}task-{{task_id}}{{else}}auto-gen{{/if}}-${TIMESTAMP}-${RANDOM_ID}"
-
-    echo "Creating branch: $PR_BRANCH"
-    if ! git checkout -b "$PR_BRANCH"; then
-        echo "❌ Failed to create branch"
+if [ "$CURRENT_BRANCH" != "$PR_BRANCH" ]; then
+    echo "⚠️ Warning: Current branch ($CURRENT_BRANCH) differs from expected PR branch ($PR_BRANCH)"
+    echo "Switching back to PR branch..."
+    if ! git checkout "$PR_BRANCH"; then
+        echo "❌ Failed to checkout PR branch"
         exit 1
     fi
 fi
+echo "✓ On PR branch: $PR_BRANCH (target: $SOURCE_BRANCH)"
 
 echo "Staging all .taskmaster changes..."
 git add .taskmaster/
