@@ -165,7 +165,7 @@ else
 fi
 
 # Git configuration with proper GitHub App attribution
-git config --global --add safe.directory /workspace
+git config --global --add safe.directory "$TASK_WORKSPACE"
 
 # Set GitHub App attribution - use generic format for all agents
 derive_bot_identity() {
@@ -599,7 +599,7 @@ if [ -d "/tmp/docs-repo" ]; then
     git fetch origin
     git checkout "$DOCS_BRANCH"
     git reset --hard "origin/$DOCS_BRANCH"
-    cd /workspace
+    cd "$TASK_WORKSPACE"
     echo "✓ Docs repository updated"
 else
     echo "📥 DOCS REPOSITORY: CLONING - extracting task files"
@@ -607,7 +607,7 @@ else
         echo "❌ Failed to clone docs repository: {{docs_repository_url}} ($DOCS_HTTP_URL)"
         exit 1
     fi
-    cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd /workspace
+    cd /tmp/docs-repo && git checkout "$DOCS_BRANCH" && cd "$TASK_WORKSPACE"
     echo "✓ Docs repository cloned to temporary location"
 fi
 
@@ -618,7 +618,7 @@ if [ -d "$TARGET_REPO_DIR" ]; then
     cd "$TARGET_REPO_DIR"
     git fetch origin main
     git reset --hard origin/main
-    cd /workspace
+    cd "$TASK_WORKSPACE"
     echo "✓ Target repository updated successfully"
 else
     echo "📥 TARGET REPOSITORY: CLONING - first time setup"
@@ -669,7 +669,7 @@ if [ -d "$TASK_DIR" ]; then
     echo "✅ Copying client-config.json..."
     if [ -f "/task-files/client-config.json" ]; then
         cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
-        cp "/task-files/client-config.json" "/workspace/client-config.json" && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
+        cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
     else
         echo "⚠️ client-config.json not found - MCP client may not be configured"
     fi
@@ -814,7 +814,7 @@ if [ -d "/workspace/$REPO_NAME/.git" ]; then
     echo "✓ Enabled automatic upstream setup for new branches"
 fi
 
-cd /workspace
+cd "$TASK_WORKSPACE"
 
 # Copy ConfigMap files to working directory (AFTER repository clone)
 echo "=== CONFIGMAP FILE SETUP ==="
@@ -1623,7 +1623,7 @@ else
 fi
 
 # Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
-touch /workspace/.agent_done 2>/dev/null || true
+touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
 
 # Final termination sequence
 echo '════════════════════════════════════════════════════════════════'

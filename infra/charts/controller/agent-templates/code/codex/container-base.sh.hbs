@@ -120,9 +120,14 @@ export GITHUB_TOKEN
 export GH_TOKEN="$GITHUB_TOKEN"
 export GH_HOST="github.com"
 
-export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
-CREDENTIALS_FILE=/workspace/.git-credentials
+export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
+CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 mkdir -p /workspace
+
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
 git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 
@@ -563,7 +568,7 @@ fi
   fi
 }
 
-git config --global --add safe.directory /workspace
+git config --global --add safe.directory "$TASK_WORKSPACE"
 
 derive_bot_identity() {
   local app_name="$1"
@@ -617,9 +622,9 @@ export SSH_ASKPASS=/bin/true
 # =========================================================================
 
 WORK_DIR="{{working_directory}}"
-cd /workspace
+cd "$TASK_WORKSPACE"
 
-REPO_ROOT="/workspace/$REPO_NAME"
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
 git config --global --add safe.directory "$REPO_ROOT"
 
 if [ -d "$REPO_NAME/.git" ]; then
@@ -952,7 +957,7 @@ guard_rm() {
         esac
         local resolved
         resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
-        if [ "$resolved" = "$CODEX_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||
+        if [ "$resolved" = "$CODEX_WORK_DIR" ] || [ "$resolved" = "$TASK_WORKSPACE" ] ||
            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
           echo "❌ Guard: destructive rm blocked (target=$target)" >&2
           return 1
@@ -982,7 +987,7 @@ fi
 echo "=== MCP CLIENT CONFIG ==="
 WORKSPACE_CFG="$CODEX_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
-TARGET_CFG="${MCP_CLIENT_CONFIG:-/workspace/client-config.json}"
+TARGET_CFG="${MCP_CLIENT_CONFIG:-$TASK_WORKSPACE/client-config.json}"
 
 is_valid_cfg() {
   local path="$1"

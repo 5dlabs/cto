@@ -115,9 +115,14 @@ export GITHUB_TOKEN
 export GH_TOKEN="$GITHUB_TOKEN"
 export GH_HOST="github.com"
 
-export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
-CREDENTIALS_FILE=/workspace/.git-credentials
+export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
+CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 mkdir -p /workspace
+
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
 git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
@@ -595,7 +600,7 @@ EOF
   fi
 }
 
-git config --global --add safe.directory /workspace
+git config --global --add safe.directory "$TASK_WORKSPACE"
 
 derive_bot_identity() {
   local app_name="$1"
@@ -683,9 +688,9 @@ export SSH_ASKPASS=/bin/true
 # =========================================================================
 
 WORK_DIR="{{working_directory}}"
-cd /workspace
+cd "$TASK_WORKSPACE"
 
-REPO_ROOT="/workspace/$REPO_NAME"
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
 git config --global --add safe.directory "$REPO_ROOT"
 
 if [ -d "$REPO_NAME/.git" ]; then
@@ -1063,7 +1068,7 @@ if [ ! -f "$FACTORY_WORK_DIR/client-config.json" ]; then
   exit 1
 fi
 
-cp "$FACTORY_WORK_DIR/client-config.json" "/workspace/client-config.json" 2>/dev/null || true
+cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true 2>/dev/null || true
 
 echo "=== MCP PRECHECKS ==="
 if ! command -v toolman >/dev/null 2>&1; then
@@ -1341,7 +1346,7 @@ _${AGENT_NAME} will still run full checks if approval is revoked._" 2>/dev/null 
   # =========================================================================
   # INCREMENTAL CONTEXT: Load previous iteration findings
   # =========================================================================
-  AGENT_STATE_DIR="/workspace/.agent-state"
+  AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
   mkdir -p "$AGENT_STATE_DIR"
   
   PREVIOUS_CONTEXT=""
@@ -2090,7 +2095,7 @@ EOF
   fi
 fi
 
-touch /workspace/.agent_done 2>/dev/null || true
+touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
 
 # Explicitly stop Docker sidecar before exiting
 echo "🛑 Explicitly stopping Docker sidecar..."

@@ -180,7 +180,7 @@ fi
 
 
 # Git configuration with proper GitHub App attribution
-git config --global --add safe.directory /workspace
+git config --global --add safe.directory "$TASK_WORKSPACE"
 
 # Set GitHub App attribution - use generic format for all agents
 derive_bot_identity() {
@@ -239,7 +239,7 @@ echo "Branch: $REPO_BRANCH"
 
 if [ -d "/workspace/.git" ]; then
   echo "Repository exists, updating..."
-  cd /workspace
+  cd "$TASK_WORKSPACE"
   git remote set-url origin "$REPO_URL"
   git fetch origin
   git checkout "$REPO_BRANCH"
@@ -259,7 +259,7 @@ else
   mv "$TEMP_CLONE_DIR"/* /workspace/ 2>/dev/null || true
   mv "$TEMP_CLONE_DIR"/.[^.]* /workspace/ 2>/dev/null || true
   rm -rf "$TEMP_CLONE_DIR"
-  cd /workspace
+  cd "$TASK_WORKSPACE"
 fi
 
 echo "✓ Repository ready"
@@ -563,7 +563,7 @@ if [ -f "/task-files/client-config.json" ]; then
   cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" \
     && echo "✓ client-config.json copied to Claude working directory" \
     || echo "❌ client-config.json copy failed"
-  cp "/task-files/client-config.json" "/workspace/client-config.json" \
+  cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true \
     && echo "✓ client-config.json copied to workspace root" \
     || echo "❌ client-config.json copy to workspace failed"
 
@@ -614,7 +614,7 @@ for CFG_PATH in "${CTO_CANDIDATES[@]}"; do
        append_only_merge($base; $extra)
       )' "$CLAUDE_WORK_DIR/client-config.json" "$CFG_PATH" > "$TMP_MERGE"; then
       mv "$TMP_MERGE" "$CLAUDE_WORK_DIR/client-config.json"
-      cp "$CLAUDE_WORK_DIR/client-config.json" "/workspace/client-config.json" 2>/dev/null || true
+      cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true 2>/dev/null || true
       echo "✓ Appended repo clientConfig for agent: $AGENT_KEY"
       echo "🔍 DEBUG: Dest $CLAUDE_WORK_DIR/client-config.json summary (post-merge):"
       (jq -c '{remoteTools: (.remoteTools // []), localServers: (.localServers // {})}' \
@@ -858,7 +858,7 @@ export SOURCE_BRANCH
 echo "Starting Claude execution (stream-json)..."
 
 # Ensure Claude runs from workspace root for proper MCP scope resolution
-cd /workspace
+cd "$TASK_WORKSPACE"
 echo "🔍 DEBUG: Launching Claude from directory: $(pwd)"
 
 # Check if system prompt file exists and add to command if available
@@ -974,7 +974,7 @@ DEFAULT_PROMPT_EOF
 fi
 
 # Return to workspace root for proper MCP resolution
-cd /workspace
+cd "$TASK_WORKSPACE"
 
 # Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
 # Use a subshell to ensure stdin closes after the prompt is sent
