@@ -1349,6 +1349,22 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or(false);
     params.push(format!("auto-merge={auto_merge}"));
 
+    // Parallel execution parameter - determines which workflow template to use
+    let parallel_execution = parse_bool_argument(&arguments, "parallel_execution")
+        .unwrap_or(false);
+    
+    // Select workflow template based on parallel_execution flag
+    let workflow_template = if parallel_execution {
+        eprintln!("🚀 Using parallel execution mode (play-project-workflow-template)");
+        "workflowtemplate/play-project-workflow-template"
+    } else {
+        eprintln!("🔄 Using sequential execution mode (play-workflow-template)");
+        "workflowtemplate/play-workflow-template"
+    };
+    
+    // Add parallel-execution parameter for the workflow
+    params.push(format!("parallel-execution={parallel_execution}"));
+
     // Final task parameter - indicates this is the last task requiring deployment verification
     let final_task = parse_bool_argument(&arguments, "final_task")
         .unwrap_or(false);
@@ -1371,13 +1387,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         params.push("task-requirements=".to_string());
     }
 
-    let mut args = vec![
-        "submit",
-        "--from",
-        "workflowtemplate/play-workflow-template",
-        "-n",
-        "agent-platform",
-    ];
+    let mut args: Vec<&str> = vec!["submit", "--from", workflow_template, "-n", "agent-platform"];
 
     // Add all parameters to the command
     for param in &params {
