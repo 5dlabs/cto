@@ -567,6 +567,19 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/config/agents"
         }));
 
+        // Shared agent templates ConfigMap volume for shared scripts
+        let shared_templates_cm_name = "controller-agent-templates-shared".to_string();
+        volumes.push(json!({
+            "name": "agent-templates-shared",
+            "configMap": {
+                "name": shared_templates_cm_name
+            }
+        }));
+        volume_mounts.push(json!({
+            "name": "agent-templates-shared",
+            "mountPath": "/agent-templates"
+        }));
+
         let cli_type = Self::code_run_cli_type(code_run);
 
         if cli_type == CLIType::Claude {
