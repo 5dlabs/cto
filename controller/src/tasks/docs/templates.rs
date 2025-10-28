@@ -434,6 +434,8 @@ impl DocsTemplateGenerator {
         }
     }
 
+    /// # Errors
+    /// Returns error if hook script generation fails
     fn generate_hook_scripts(docs_run: &DocsRun) -> Result<BTreeMap<String, String>> {
         let mut hook_scripts = BTreeMap::new();
         let hooks_prefixes = vec![
@@ -455,7 +457,7 @@ impl DocsTemplateGenerator {
                     if path.is_file() {
                         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
                             // Check if this is a hook template for docs
-                            if filename.ends_with(".hbs") {
+                            if path.extension().and_then(|e| e.to_str()) == Some("hbs") {
                                 if let Some(prefix) = hooks_prefixes
                                     .iter()
                                     .find(|prefix| filename.starts_with(prefix.as_str()))
