@@ -93,9 +93,49 @@ Immediately after finishing the required outputs (including diagrams if created)
 2. Note at least one improvement or insight to apply on the next task (e.g., missing code reference, unclear criteria).
 3. State how you will adjust before beginning the next task and follow through.
 
-## Step 4: Completion and Handoff
+## Step 4: Create Final Integration Task
+After generating documentation for all PRD tasks, create one final integration task:
+
+### 4.1 Copy Integration Templates
+Copy the integration task templates from `/agent-templates/docs/templates/integration-task/` to `.taskmaster/docs/task-[FINAL_ID]/`:
+```bash
+# FINAL_ID = highest task ID + 1
+cp -r /agent-templates/docs/templates/integration-task/* .taskmaster/docs/task-[FINAL_ID]/
+```
+
+### 4.2 Update Integration Task Files
+Update the copied templates:
+- In `task.txt`: Replace `ALL_OTHER_TASKS` with comma-separated list of all task IDs
+- In `task.xml`: Replace `INTEGRATION_TASK_ID` with the final task ID
+- In `task.xml`: Replace `ALL_DEPENDENCY_TASK_IDS` with comma-separated list of all task IDs
+- All other template content should remain as-is (comprehensive instructions are already included)
+
+### 4.3 Add to tasks.json
+Append the integration task to `.taskmaster/tasks/tasks.json`:
+```json
+{
+  "id": [FINAL_ID],
+  "title": "Integration & Deployment Verification",
+  "description": "Coordinate PR merges in dependency order, execute comprehensive integration tests, and verify deployment readiness across all services",
+  "status": "pending",
+  "dependencies": [LIST_ALL_PREVIOUS_TASK_IDS],
+  "priority": "critical",
+  "agentHint": "integration",
+  "details": "Comprehensive integration task - see .taskmaster/docs/task-[FINAL_ID]/ for full instructions",
+  "testStrategy": "Execute full integration test suite, verify all service health endpoints, run smoke tests on critical paths, and confirm deployment readiness"
+}
+```
+
+### 4.4 Verify Integration Task
+Confirm the integration task was created correctly:
+- [ ] Task files exist at `.taskmaster/docs/task-[FINAL_ID]/`
+- [ ] All five files present: `task.txt`, `task.md`, `prompt.md`, `acceptance-criteria.md`, `task.xml`
+- [ ] Task added to `tasks.json` with correct ID and dependencies
+- [ ] `agentHint` set to "integration" to route to Tess agent
+
+## Step 5: Completion and Handoff
 - Do **not** run git commands; the orchestrator handles branch, commit, push, and PR creation (`docs-gen-{{source_branch}}`).
-- When all incomplete tasks are processed, confirm: "✅ DOCUMENTATION FILES GENERATED - Hook will handle git workflow and PR creation".
+- When all tasks (including integration task) are complete, confirm: "✅ DOCUMENTATION FILES GENERATED - Hook will handle git workflow and PR creation".
 
 ## Quality and Error Handling
 - Ensure documents are technically accurate, well-formatted, and consistent.
@@ -108,7 +148,9 @@ End with exactly:
 🎉 DOCUMENTATION GENERATION COMPLETE 🎉
 ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
 ✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, task.xml)
-📋 Total files created: [COUNT]
+✅ Created final Integration & Deployment Verification task
+📋 Total tasks documented: [COUNT] (including integration task)
+📋 Total files created: [FILE_COUNT]
 🔧 Generated comprehensive markdown documentation
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook
 ```

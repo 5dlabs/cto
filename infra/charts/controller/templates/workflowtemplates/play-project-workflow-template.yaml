@@ -558,6 +558,14 @@ spec:
                     SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.frontend-model-rotation}}`}}'
                     echo "  ↳ Routing to frontend agent: $SELECTED_AGENT"
                     ;;
+                  integration)
+                    SELECTED_AGENT="{{`{{workflow.parameters.testing-agent}}`}}"
+                    SELECTED_CLI="{{`{{workflow.parameters.testing-cli}}`}}"
+                    SELECTED_MODEL="{{`{{workflow.parameters.testing-model}}`}}"
+                    SELECTED_TOOLS='{{`{{workflow.parameters.testing-tools}}`}}'
+                    SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.testing-model-rotation}}`}}'
+                    echo "  ↳ Routing to integration agent (Tess): $SELECTED_AGENT"
+                    ;;
                   backend|*)
                     echo "  ↳ Routing to backend agent: $SELECTED_AGENT"
                     ;;
@@ -1113,6 +1121,14 @@ spec:
                   SELECTED_TOOLS='{{`{{workflow.parameters.frontend-tools}}`}}'
                   SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.frontend-model-rotation}}`}}'
                   echo "  ↳ Routing to frontend agent: $SELECTED_AGENT"
+                  ;;
+                integration)
+                  SELECTED_AGENT="{{`{{workflow.parameters.testing-agent}}`}}"
+                  SELECTED_CLI="{{`{{workflow.parameters.testing-cli}}`}}"
+                  SELECTED_MODEL="{{`{{workflow.parameters.testing-model}}`}}"
+                  SELECTED_TOOLS='{{`{{workflow.parameters.testing-tools}}`}}'
+                  SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.testing-model-rotation}}`}}'
+                  echo "  ↳ Routing to integration agent (Tess): $SELECTED_AGENT"
                   ;;
                 backend|*)
                   echo "  ↳ Routing to backend agent: $SELECTED_AGENT"

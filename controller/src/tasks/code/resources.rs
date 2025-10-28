@@ -916,6 +916,17 @@ impl<'a> CodeResourceManager<'a> {
                         "mountPath": "/data"
                     }
                 ],
+                "lifecycle": {
+                    "preStop": {
+                        "exec": {
+                            "command": [
+                                "/bin/sh",
+                                "-c",
+                                "pkill dockerd || killall dockerd || kill $(pidof dockerd) || true"
+                            ]
+                        }
+                    }
+                },
                 "resources": {
                     "requests": {
                         "cpu": "100m",
