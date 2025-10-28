@@ -861,21 +861,32 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
     fi
 
     echo "🔍 Docs base path: $DOCS_BASE_PATH"
-    TASK_DIR="$DOCS_BASE_PATH/tasks/task-{{task_id}}"
-
-  if [ -d "$TASK_DIR" ]; then
-    echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
-    refresh_token_if_needed
-    if safe_copy_directory "$TASK_DIR" "$CODEX_WORK_DIR/task" "docs task files"; then
-        echo "✅ Task files copied successfully from docs repository"
-    else
-        echo "❌ CRITICAL: Failed to copy task files from docs repository"
-        create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
+    
+    # Resilient task directory discovery - check both possible locations
+    TASK_DIR=""
+    if [ -d "$DOCS_BASE_PATH/docs/task-{{task_id}}" ]; then
+      TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
+      echo "✓ Found task files in docs/ directory"
+    elif [ -d "$DOCS_BASE_PATH/tasks/task-{{task_id}}" ]; then
+      TASK_DIR="$DOCS_BASE_PATH/tasks/task-{{task_id}}"
+      echo "✓ Found task files in tasks/ directory"
     fi
-  else
-    echo "❌ CRITICAL: Task directory not found at $TASK_DIR"
-    create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
-  fi
+
+    if [ -n "$TASK_DIR" ] && [ -d "$TASK_DIR" ]; then
+      echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
+      refresh_token_if_needed
+      if safe_copy_directory "$TASK_DIR" "$CODEX_WORK_DIR/task" "docs task files"; then
+          echo "✅ Task files copied successfully from docs repository"
+      else
+          echo "❌ CRITICAL: Failed to copy task files from docs repository"
+          create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
+      fi
+    else
+      echo "❌ CRITICAL: Task directory not found. Checked:"
+      echo "   - $DOCS_BASE_PATH/docs/task-{{task_id}}"
+      echo "   - $DOCS_BASE_PATH/tasks/task-{{task_id}}"
+      create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
+    fi
 
     if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
       refresh_token_if_needed
