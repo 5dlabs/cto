@@ -593,18 +593,22 @@ impl<'a> DocsResourceManager<'a> {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_lowercase(),
-            docs_run
-                .spec
-                .working_directory
-                .chars()
-                .map(|c| if c.is_alphanumeric() || c == '-' {
-                    c
-                } else {
-                    '-'
-                })
-                .collect::<String>()
-                .trim_matches('-')
-                .to_lowercase()
+            if docs_run.spec.working_directory.is_empty() {
+                "default".to_string()
+            } else {
+                docs_run
+                    .spec
+                    .working_directory
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() || c == '-' {
+                        c
+                    } else {
+                        '-'
+                    })
+                    .collect::<String>()
+                    .trim_matches('-')
+                    .to_lowercase()
+            }
         );
 
         volumes.push(json!({
@@ -969,18 +973,22 @@ impl<'a> DocsResourceManager<'a> {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_lowercase(),
-            docs_run
-                .spec
-                .working_directory
-                .chars()
-                .map(|c| if c.is_alphanumeric() || c == '-' {
-                    c
-                } else {
-                    '-'
-                })
-                .collect::<String>()
-                .trim_matches('-')
-                .to_lowercase()
+            if docs_run.spec.working_directory.is_empty() {
+                "default".to_string()
+            } else {
+                docs_run
+                    .spec
+                    .working_directory
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() || c == '-' {
+                        c
+                    } else {
+                        '-'
+                    })
+                    .collect::<String>()
+                    .trim_matches('-')
+                    .to_lowercase()
+            }
         );
 
         // Check if PVC already exists
