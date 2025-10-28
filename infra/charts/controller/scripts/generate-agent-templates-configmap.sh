@@ -46,7 +46,7 @@ HEADER_EOF
   fi
   
   # Find matching files
-  local files_list=$(find "agent-templates" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) | LC_ALL=C sort | grep -E "$pattern" || true)
+  local files_list=$(find "agent-templates" -type f \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" -o -name "*.txt" -o -name "*.xml" \) | LC_ALL=C sort | grep -E "$pattern" || true)
   
   if [ -z "$files_list" ]; then
     echo "  ⚠️ No files found for pattern: $pattern"
