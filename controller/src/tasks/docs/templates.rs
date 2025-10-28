@@ -534,7 +534,10 @@ impl DocsTemplateGenerator {
         Ok(hook_scripts)
     }
 
-    /// Load a template file from the mounted ConfigMap
+    /// Load a template file from the mounted `ConfigMap`
+    ///
+    /// # Errors
+    /// Returns error if template loading fails
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
         let configmap_key = relative_path.replace('/', "_");
