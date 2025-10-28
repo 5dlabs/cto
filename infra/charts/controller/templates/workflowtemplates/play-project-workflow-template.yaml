@@ -32,6 +32,10 @@ spec:
       # Agent selection (using same pattern as play-workflow-template)
       - name: implementation-agent
         value: "5DLabs-Rex"
+        description: "Default agent for backend/general implementation tasks"
+      - name: frontend-agent
+        value: "5DLabs-Blaze"
+        description: "Specialized agent for frontend tasks (React, UI components)"
       - name: quality-agent
         value: "5DLabs-Cleo"
       - name: testing-agent
@@ -492,6 +496,90 @@ spec:
             for task_id in $task_array; do
               echo "  → Task $task_id"
               
+              # ========================================
+              # AGENT ROUTING LOGIC
+              # ========================================
+              # Clone docs repo to read tasks.json (if not already cloned)
+              if [ ! -d "/tmp/docs-repo-agent-routing" ]; then
+                echo "📥 Cloning docs repository for agent routing..."
+                git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" "$AUTH_URL" /tmp/docs-repo-agent-routing 2>/dev/null || true
+              fi
+              
+              # Extract agent hint and task metadata from tasks.json
+              AGENT_HINT=""
+              TASK_TITLE=""
+              TASK_DESC=""
+              TASK_DETAILS=""
+              
+              if [ -f "/tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json" ]; then
+                # Try to read from tasks.json (handle both tagged and non-tagged formats)
+                AGENT_HINT=$(jq -r "
+                  (.master.tasks[]? // .tasks[]?) | 
+                  select(.id == $task_id) | 
+                  .agentHint // \"\"
+                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                
+                TASK_TITLE=$(jq -r "
+                  (.master.tasks[]? // .tasks[]?) | 
+                  select(.id == $task_id) | 
+                  .title // \"\"
+                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                
+                TASK_DESC=$(jq -r "
+                  (.master.tasks[]? // .tasks[]?) | 
+                  select(.id == $task_id) | 
+                  .description // \"\"
+                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                
+                TASK_DETAILS=$(jq -r "
+                  (.master.tasks[]? // .tasks[]?) | 
+                  select(.id == $task_id) | 
+                  .details // \"\"
+                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              fi
+              
+              # Default to implementation agent
+              SELECTED_AGENT="{{`{{workflow.parameters.implementation-agent}}`}}"
+              SELECTED_CLI="{{`{{workflow.parameters.implementation-cli}}`}}"
+              SELECTED_MODEL="{{`{{workflow.parameters.implementation-model}}`}}"
+              SELECTED_TOOLS='{{`{{workflow.parameters.implementation-tools}}`}}'
+              SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.implementation-model-rotation}}`}}'
+              
+              # Apply agent routing logic
+              if [ -n "$AGENT_HINT" ]; then
+                # Explicit hint takes precedence
+                echo "🎯 Agent hint found: $AGENT_HINT"
+                case "$AGENT_HINT" in
+                  frontend)
+                    SELECTED_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
+                    SELECTED_CLI="{{`{{workflow.parameters.frontend-cli}}`}}"
+                    SELECTED_MODEL="{{`{{workflow.parameters.frontend-model}}`}}"
+                    SELECTED_TOOLS='{{`{{workflow.parameters.frontend-tools}}`}}'
+                    SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.frontend-model-rotation}}`}}'
+                    echo "  ↳ Routing to frontend agent: $SELECTED_AGENT"
+                    ;;
+                  backend|*)
+                    echo "  ↳ Routing to backend agent: $SELECTED_AGENT"
+                    ;;
+                esac
+              else
+                # Auto-detect from content
+                TASK_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
+                if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte)"; then
+                  SELECTED_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
+                  SELECTED_CLI="{{`{{workflow.parameters.frontend-cli}}`}}"
+                  SELECTED_MODEL="{{`{{workflow.parameters.frontend-model}}`}}"
+                  SELECTED_TOOLS='{{`{{workflow.parameters.frontend-tools}}`}}'
+                  SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.frontend-model-rotation}}`}}'
+                  echo "🔍 Auto-detected frontend task (keywords matched)"
+                  echo "  ↳ Routing to frontend agent: $SELECTED_AGENT"
+                else
+                  echo "🔍 Standard task (no frontend keywords)"
+                  echo "  ↳ Routing to backend agent: $SELECTED_AGENT"
+                fi
+              fi
+              # ========================================
+              
               cat > /tmp/workflow-task-${task_id}.yaml <<EOF
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
@@ -524,15 +612,15 @@ spec:
                 - name: docs-branch
                   value: "{{`{{workflow.parameters.docs-branch}}`}}"
                 - name: implementation-agent
-                  value: "{{`{{workflow.parameters.implementation-agent}}`}}"
+                  value: "$SELECTED_AGENT"
                 - name: implementation-cli
-                  value: "{{`{{workflow.parameters.implementation-cli}}`}}"
+                  value: "$SELECTED_CLI"
                 - name: implementation-model
-                  value: "{{`{{workflow.parameters.implementation-model}}`}}"
+                  value: "$SELECTED_MODEL"
                 - name: implementation-tools
-                  value: '{{`{{workflow.parameters.implementation-tools}}`}}'
+                  value: '$SELECTED_TOOLS'
                 - name: implementation-model-rotation
-                  value: '{{`{{workflow.parameters.implementation-model-rotation}}`}}'
+                  value: '$SELECTED_MODEL_ROTATION'
                 - name: quality-agent
                   value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: quality-cli
@@ -952,6 +1040,102 @@ spec:
             # Submit workflow for this task
             echo "🚀 Submitting workflow for task-$task_id..."
 
+            # ========================================
+            # AGENT ROUTING LOGIC (same as parallel)
+            # ========================================
+            # Clone docs repo to read tasks.json (if not already cloned)
+            if [ ! -d "/tmp/docs-repo-agent-routing" ]; then
+              echo "📥 Cloning docs repository for agent routing..."
+              apk add --no-cache git curl openssl jq 2>/dev/null || true
+              
+              # Build auth URL (reuse logic from above)
+              DOCS_REPO_INPUT="{{`{{workflow.parameters.docs-repository}}`}}"
+              case "$DOCS_REPO_INPUT" in
+                http://*|https://*)
+                  DOCS_REPO_URL="$DOCS_REPO_INPUT"
+                  ;;
+                *)
+                  DOCS_REPO_URL="https://github.com/$DOCS_REPO_INPUT"
+                  ;;
+              esac
+              AUTH_URL="$DOCS_REPO_URL"
+              
+              git clone --depth 1 --branch "{{`{{workflow.parameters.docs-branch}}`}}" "$AUTH_URL" /tmp/docs-repo-agent-routing 2>/dev/null || true
+            fi
+            
+            # Extract agent hint and task metadata
+            AGENT_HINT=""
+            TASK_TITLE=""
+            TASK_DESC=""
+            TASK_DETAILS=""
+            
+            if [ -f "/tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json" ]; then
+              AGENT_HINT=$(jq -r "
+                (.master.tasks[]? // .tasks[]?) | 
+                select(.id == $task_id) | 
+                .agentHint // \"\"
+              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              
+              TASK_TITLE=$(jq -r "
+                (.master.tasks[]? // .tasks[]?) | 
+                select(.id == $task_id) | 
+                .title // \"\"
+              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              
+              TASK_DESC=$(jq -r "
+                (.master.tasks[]? // .tasks[]?) | 
+                select(.id == $task_id) | 
+                .description // \"\"
+              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              
+              TASK_DETAILS=$(jq -r "
+                (.master.tasks[]? // .tasks[]?) | 
+                select(.id == $task_id) | 
+                .details // \"\"
+              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+            fi
+            
+            # Default to implementation agent
+            SELECTED_AGENT="{{`{{workflow.parameters.implementation-agent}}`}}"
+            SELECTED_CLI="{{`{{workflow.parameters.implementation-cli}}`}}"
+            SELECTED_MODEL="{{`{{workflow.parameters.implementation-model}}`}}"
+            SELECTED_TOOLS='{{`{{workflow.parameters.implementation-tools}}`}}'
+            SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.implementation-model-rotation}}`}}'
+            
+            # Apply agent routing logic
+            if [ -n "$AGENT_HINT" ]; then
+              echo "🎯 Agent hint found: $AGENT_HINT"
+              case "$AGENT_HINT" in
+                frontend)
+                  SELECTED_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
+                  SELECTED_CLI="{{`{{workflow.parameters.frontend-cli}}`}}"
+                  SELECTED_MODEL="{{`{{workflow.parameters.frontend-model}}`}}"
+                  SELECTED_TOOLS='{{`{{workflow.parameters.frontend-tools}}`}}'
+                  SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.frontend-model-rotation}}`}}'
+                  echo "  ↳ Routing to frontend agent: $SELECTED_AGENT"
+                  ;;
+                backend|*)
+                  echo "  ↳ Routing to backend agent: $SELECTED_AGENT"
+                  ;;
+              esac
+            else
+              # Auto-detect from content
+              TASK_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
+              if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte)"; then
+                SELECTED_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
+                SELECTED_CLI="{{`{{workflow.parameters.frontend-cli}}`}}"
+                SELECTED_MODEL="{{`{{workflow.parameters.frontend-model}}`}}"
+                SELECTED_TOOLS='{{`{{workflow.parameters.frontend-tools}}`}}'
+                SELECTED_MODEL_ROTATION='{{`{{workflow.parameters.frontend-model-rotation}}`}}'
+                echo "🔍 Auto-detected frontend task (keywords matched)"
+                echo "  ↳ Routing to frontend agent: $SELECTED_AGENT"
+              else
+                echo "🔍 Standard task (no frontend keywords)"
+                echo "  ↳ Routing to backend agent: $SELECTED_AGENT"
+              fi
+            fi
+            # ========================================
+
             cat > /tmp/workflow.yaml <<EOF
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
@@ -982,15 +1166,15 @@ spec:
                 - name: docs-branch
                   value: "{{`{{workflow.parameters.docs-branch}}`}}"
                 - name: implementation-agent
-                  value: "{{`{{workflow.parameters.implementation-agent}}`}}"
+                  value: "$SELECTED_AGENT"
                 - name: implementation-cli
-                  value: "{{`{{workflow.parameters.implementation-cli}}`}}"
+                  value: "$SELECTED_CLI"
                 - name: implementation-model
-                  value: "{{`{{workflow.parameters.implementation-model}}`}}"
+                  value: "$SELECTED_MODEL"
                 - name: implementation-tools
-                  value: '{{`{{workflow.parameters.implementation-tools}}`}}'
+                  value: '$SELECTED_TOOLS'
                 - name: implementation-model-rotation
-                  value: '{{`{{workflow.parameters.implementation-model-rotation}}`}}'
+                  value: '$SELECTED_MODEL_ROTATION'
                 - name: quality-agent
                   value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: quality-cli
