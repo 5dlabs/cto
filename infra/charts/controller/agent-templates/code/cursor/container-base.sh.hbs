@@ -866,7 +866,15 @@ source /agent-templates/shared_task-setup-functions.sh || {
     safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
     safe_copy_directory() { cp -r "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
     safe_ensure_directory() { mkdir -p "$1"; }
-    verify_task_files() { [ -f "$1/prompt.md" ] && echo "✅ Task files verified" || echo "❌ Task files missing"; }
+    verify_task_files() { 
+        if [ -f "$1/prompt.md" ]; then
+            echo "✅ Task files verified"
+            return 0
+        else
+            echo "❌ Task files missing"
+            return 1
+        fi
+    }
     create_error_report() { echo "❌ ERROR: $3"; }
     attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
 }
