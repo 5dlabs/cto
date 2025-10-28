@@ -21,17 +21,20 @@ pub struct DocsTemplateGenerator;
 
 impl DocsTemplateGenerator {
     /// Generate all template files for a docs task
+    ///
+    /// # Errors
+    /// Returns error if template generation fails
     pub fn generate_all_templates(
         docs_run: &DocsRun,
         config: &ControllerConfig,
     ) -> Result<BTreeMap<String, String>> {
         let cli_type = Self::determine_cli_type(docs_run);
         
-        // Route to CLI-specific template generation
+        // All CLIs currently use Claude templates; match kept for future expansion
         match cli_type {
-            CLIType::Claude => Self::generate_claude_templates(docs_run, config),
-            // TODO: Add support for other CLIs (Cursor, Codex, OpenCode) as needed
-            _ => Self::generate_claude_templates(docs_run, config),
+            CLIType::Claude | CLIType::Cursor | CLIType::Codex | CLIType::OpenCode => {
+                Self::generate_claude_templates(docs_run, config)
+            }
         }
     }
 
@@ -219,7 +222,7 @@ impl DocsTemplateGenerator {
         Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
     }
 
-    /// Generate agent-centric client-config.json for DocsRun.
+    /// Generate agent-centric client-config.json for `DocsRun`.
     /// Precedence:
     /// 1) agents.<agent>.clientConfig (verbatim pass-through)
     /// 2) agents.<agent>.tools (convert to client-config.json structure generically)
