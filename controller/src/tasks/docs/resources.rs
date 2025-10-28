@@ -503,7 +503,7 @@ impl<'a> DocsResourceManager<'a> {
         let created_job = self.jobs.create(&PostParams::default(), &job).await?;
         info!("✅ DocsRun {}: Job created successfully: {}", docs_run.name_any(), job_name);
 
-        error!("✅ RESOURCE_MANAGER: Created docs job: {}", job_name);
+        info!("✅ RESOURCE_MANAGER: Created docs job: {}", job_name);
 
         // Update status using legacy status manager if needed
         if let Err(e) = super::status::DocsStatusManager::update_job_started(
