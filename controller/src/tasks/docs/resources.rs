@@ -46,10 +46,12 @@ impl<'a> DocsResourceManager<'a> {
 
         let sanitized = directory
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' {
-                c
-            } else {
-                '-'
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
             })
             .collect::<String>()
             .trim_matches('-')
@@ -548,7 +550,12 @@ impl<'a> DocsResourceManager<'a> {
             .to_lowercase()
     }
 
-    async fn build_job_spec(&self, docs_run: &DocsRun, job_name: &str, cm_name: &str) -> Result<Job> {
+    async fn build_job_spec(
+        &self,
+        docs_run: &DocsRun,
+        job_name: &str,
+        cm_name: &str,
+    ) -> Result<Job> {
         let labels = self.create_task_labels(docs_run);
 
         // Create owner reference to DocsRun for proper event handling
@@ -1070,48 +1077,74 @@ mod tests {
     fn test_sanitize_directory_name() {
         // Test empty string
         assert_eq!(DocsResourceManager::sanitize_directory_name(""), "default");
-        
+
         // Test normal directory name
         assert_eq!(DocsResourceManager::sanitize_directory_name("docs"), "docs");
-        
+
         // Test directory with special characters
-        assert_eq!(DocsResourceManager::sanitize_directory_name("my/project"), "my-project");
-        
+        assert_eq!(
+            DocsResourceManager::sanitize_directory_name("my/project"),
+            "my-project"
+        );
+
         // Test directory that becomes empty after sanitization
-        assert_eq!(DocsResourceManager::sanitize_directory_name("///"), "default");
-        
+        assert_eq!(
+            DocsResourceManager::sanitize_directory_name("///"),
+            "default"
+        );
+
         // Test directory with mixed characters
-        assert_eq!(DocsResourceManager::sanitize_directory_name("docs@2024!"), "docs-2024");
+        assert_eq!(
+            DocsResourceManager::sanitize_directory_name("docs@2024!"),
+            "docs-2024"
+        );
     }
 
     #[test]
     fn test_backward_compatibility_scenarios() {
         // Test that new function returns "default" for empty string
         assert_eq!(DocsResourceManager::sanitize_directory_name(""), "default");
-        
+
         // Simulate what the old function would have returned for empty string
-        let legacy_result = "".chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        let legacy_result = ""
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
             .collect::<String>()
             .trim_matches('-')
             .to_lowercase();
         assert_eq!(legacy_result, "");
-        
+
         // Test that both give same result for non-empty strings
         assert_eq!(DocsResourceManager::sanitize_directory_name("docs"), "docs");
-        
-        let legacy_result_docs = "docs".chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+
+        let legacy_result_docs = "docs"
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
             .collect::<String>()
             .trim_matches('-')
             .to_lowercase();
         assert_eq!(legacy_result_docs, "docs");
-        
+
         // Test that this demonstrates the backward compatibility issue
         // Old: empty working_directory would result in PVC name ending with "-" (empty suffix)
         // New: empty working_directory results in PVC name ending with "-default"
         let old_pvc_name = format!("docs-workspace-repo-{}", legacy_result);
-        let new_pvc_name = format!("docs-workspace-repo-{}", DocsResourceManager::sanitize_directory_name(""));
+        let new_pvc_name = format!(
+            "docs-workspace-repo-{}",
+            DocsResourceManager::sanitize_directory_name("")
+        );
         assert_eq!(old_pvc_name, "docs-workspace-repo-");
         assert_eq!(new_pvc_name, "docs-workspace-repo-default");
         assert_ne!(old_pvc_name, new_pvc_name);
