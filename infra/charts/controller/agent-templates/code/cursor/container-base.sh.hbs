@@ -205,9 +205,14 @@ export GITHUB_TOKEN
 export GH_TOKEN="$GITHUB_TOKEN"
 export GH_HOST="github.com"
 
-export GIT_CONFIG_GLOBAL=/workspace/.gitconfig
-CREDENTIALS_FILE=/workspace/.git-credentials
+export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
+CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 mkdir -p /workspace
+
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
 git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > "$CREDENTIALS_FILE"
@@ -614,7 +619,7 @@ EOF
   fi
 }
 
-git config --global --add safe.directory /workspace
+git config --global --add safe.directory "$TASK_WORKSPACE"
 
 derive_bot_identity() {
   local app_name="$1"
@@ -668,9 +673,9 @@ export SSH_ASKPASS=/bin/true
 # =========================================================================
 
 WORK_DIR="{{working_directory}}"
-cd /workspace
+cd "$TASK_WORKSPACE"
 
-REPO_ROOT="/workspace/$REPO_NAME"
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
 git config --global --add safe.directory "$REPO_ROOT"
 
 if [ -d "$REPO_NAME/.git" ]; then
@@ -1029,7 +1034,7 @@ fi
 
 WORKSPACE_CFG="$MCP_CLIENT_CONFIG"
 SOURCE_CFG="/task-files/client-config.json"
-TARGET_CFG="${MCP_CLIENT_CONFIG:-/workspace/client-config.json}"
+TARGET_CFG="${MCP_CLIENT_CONFIG:-$TASK_WORKSPACE/client-config.json}"
 
 is_valid_cfg() {
   local path="$1"
@@ -1126,7 +1131,7 @@ guard_rm() {
           esac
           local resolved
           resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
-          if [ "$resolved" = "$CURSOR_WORK_DIR" ] || [ "$resolved" = "/workspace" ] ||            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
+          if [ "$resolved" = "$CURSOR_WORK_DIR" ] || [ "$resolved" = "$TASK_WORKSPACE" ] ||            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
             echo "❌ Guard: destructive rm blocked (target=$target)" >&2
             return 1
           fi
@@ -1372,7 +1377,7 @@ _${AGENT_NAME} will still run full checks if approval is revoked._" 2>/dev/null 
   # =========================================================================
   # INCREMENTAL CONTEXT: Load previous iteration findings
   # =========================================================================
-  AGENT_STATE_DIR="/workspace/.agent-state"
+  AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
   mkdir -p "$AGENT_STATE_DIR"
   
   PREVIOUS_CONTEXT=""
@@ -1991,7 +1996,7 @@ EOF
   fi
 fi
 
-touch /workspace/.agent_done 2>/dev/null || true
+touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
 
 if [ $SUCCESS -ne 1 ]; then
   {{#if agent_completion_message}}

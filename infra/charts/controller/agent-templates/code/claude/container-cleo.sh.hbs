@@ -321,7 +321,7 @@ fi
 
 # Extract repository name from URL (e.g., "5dlabs/rust-basic-api-2" -> "rust-basic-api-2")
 REPO_NAME=$(echo "{{repository_url}}" | sed -E 's|.*/([^/]+)$|\1|' | sed 's|\.git$||')
-REPO_ROOT="/workspace/$REPO_NAME"
+REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
 
 # Determine working directory - use repo root if working_directory is "." or empty
 WORK_DIR="{{working_directory}}"
@@ -469,7 +469,7 @@ else
 fi
 
 # Clone or update repository
-cd /workspace
+cd "$TASK_WORKSPACE"
 if [ -d "$REPO_NAME/.git" ]; then
     echo "📁 Found existing repository at '$REPO_ROOT', updating..."
     cd "$REPO_NAME"
@@ -1113,7 +1113,7 @@ update_coderun_status() {
 # Copy client-config.json from task files first
 if [ -f "/task-files/client-config.json" ]; then
   cp /task-files/client-config.json "$CLAUDE_WORK_DIR/client-config.json"
-  cp /task-files/client-config.json "/workspace/client-config.json"
+  cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
   echo "✓ client-config.json copied from ConfigMap to both working directory and workspace root"
 else
   echo "⚠️ client-config.json not found in task-files"
@@ -1401,7 +1401,7 @@ _Cleo will still run full checks if approval is revoked._" 2>/dev/null || echo "
   # =========================================================================
   # INCREMENTAL CONTEXT: Load previous iteration findings
   # =========================================================================
-  AGENT_STATE_DIR="/workspace/.agent-state"
+  AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
   mkdir -p "$AGENT_STATE_DIR"
   
   PREVIOUS_CONTEXT=""
