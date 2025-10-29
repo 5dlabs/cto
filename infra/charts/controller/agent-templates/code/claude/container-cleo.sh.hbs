@@ -43,6 +43,12 @@ echo "🔍 Focus: Code quality, CI/CD setup, and Docker image building"
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: Perfect code quality AND working CI/CD pipeline with Docker builds"
 
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
 # Docker sidecar cleanup function
 stop_docker_sidecar() {
   echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."

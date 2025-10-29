@@ -43,6 +43,12 @@ echo "🎯 Agent: {{github_app}}"
 echo "📚 Focus: Documentation-first implementation approach"
 echo "📋 Task ID: {{task_id}}"
 
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
 # Docker sidecar cleanup function
 stop_docker_sidecar() {
   echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."

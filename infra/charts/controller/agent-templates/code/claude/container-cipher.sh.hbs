@@ -43,6 +43,12 @@ echo "🔍 Focus: Security vulnerability scanning, dependency analysis, complian
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: Zero tolerance for CRITICAL/HIGH security vulnerabilities"
 
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
 # Docker sidecar cleanup function
 stop_docker_sidecar() {
   echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."
