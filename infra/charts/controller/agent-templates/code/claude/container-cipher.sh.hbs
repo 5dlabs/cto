@@ -1466,7 +1466,7 @@ _Cipher will still run full scan if approval is revoked._" 2>/dev/null || echo "
   PREVIOUS_CONTEXT=""
   if [ $ATTEMPT -gt 1 ]; then
     PREV_ATTEMPT=$((ATTEMPT - 1))
-    PREV_STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${PREV_ATTEMPT}.json"
+    PREV_STATE_FILE="$AGENT_STATE_DIR/security-iteration-${PREV_ATTEMPT}.json"
     
     if [ -f "$PREV_STATE_FILE" ]; then
       echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
