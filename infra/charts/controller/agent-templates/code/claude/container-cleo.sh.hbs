@@ -398,6 +398,9 @@ git config --global user.name "$GIT_AUTHOR_NAME"
 git config --global user.email "$GIT_AUTHOR_EMAIL"
 git config --global init.defaultBranch main
 
+# Fix git dubious ownership issues
+git config --global --add safe.directory "$TASK_WORKSPACE"
+
 # Set environment variables for Claude Code to use
 export GIT_AUTHOR_NAME="$GIT_AUTHOR_NAME"
 export GIT_AUTHOR_EMAIL="$GIT_AUTHOR_EMAIL"
@@ -448,7 +451,7 @@ echo "  Constructed REPO_HTTP_URL: '$REPO_HTTP_URL'"
 echo "  Constructed DOCS_HTTP_URL: '$DOCS_HTTP_URL'"
 echo "  Current working directory: $(pwd)"
 echo "  Available environment variables:"
-env | grep -E "(GITHUB|ANTHROPIC)" | sort
+env | grep -E "(GITHUB|ANTHROPIC)" | sed -E 's/(=).*/=\[REDACTED\]/' | sort
 
 # Test HTTPS access to repository
 echo "🔍 DEBUG: Testing HTTPS repository access..."
@@ -535,6 +538,10 @@ fi
 if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
     cd "$CLAUDE_WORK_DIR"
+
+    # Fix git dubious ownership before any git operations
+    git config --global --add safe.directory "$CLAUDE_WORK_DIR"
+    echo "✓ Added repository to git safe directories"
 
     # Fetch all latest changes including PR branches
     git fetch origin --prune
