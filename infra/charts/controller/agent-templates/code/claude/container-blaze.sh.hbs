@@ -23,6 +23,17 @@ echo "🌐 Repository: {{repository_url}}"
 echo "⚙️  Service: {{service}}"
 echo "════════════════════════════════════════════════════════════════"
 
+# Task-specific workspace for parallel execution isolation
+# CRITICAL: This must be set BEFORE including the base template so that
+# the repository clones into the task-specific directory, not the shared workspace
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+# Ensure we're in the task workspace before base template clones the repo
+cd "$TASK_WORKSPACE"
+
 # Source the base container setup
 {{> claude_container_base
     agent_banner=""
@@ -37,15 +48,6 @@ echo "════════════════════════�
 echo "║           BLAZE FRONTEND WORKFLOW STARTING                  ║"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-
-# Task-specific workspace for parallel execution isolation
-TASK_WORKSPACE="/workspace/task-{{task_id}}"
-mkdir -p /workspace
-mkdir -p "$TASK_WORKSPACE"
-echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
-
-# Ensure we're in the task workspace
-cd "$TASK_WORKSPACE"
 
 # Check if frontend scripts are available
 SCRIPTS_DIR="/workspace/scripts/blaze"
