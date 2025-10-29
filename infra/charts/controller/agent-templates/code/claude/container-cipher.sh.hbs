@@ -577,7 +577,7 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "✅ Repository positioned at PR #$PR_NUMBER with latest changes"
 else
     echo "⚠️  No PR context found (PR_NUMBER=$PR_NUMBER, PR_URL=$PR_URL)"
-    echo "📋 Will perform quality review on current repository state"
+    echo "📋 Will perform security scan on current repository state"
 fi
 
 echo "════════════════════════════════════════════════════════════════"
@@ -600,7 +600,7 @@ echo ""
 echo "════════════════════════════════════════════════════════════════"
 
 # Copy task files from docs repository if configured
-echo "📋 Preparing task documentation for quality review..."
+echo "📋 Preparing task documentation for security scan..."
 echo "════════════════════════════════════════════════════════════════"
 
 {{#if docsRepositoryUrl}}
@@ -1990,13 +1990,13 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   # Post comment using PR number or URL
   if [ -n "$PR_NUMBER" ]; then
     if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
+      echo "✅ Successfully posted security scan comment"
     else
       echo "⚠️ Failed to post comment using PR number"
     fi
   elif [ -n "$PR_URL" ]; then
     if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
+      echo "✅ Successfully posted security scan comment"
     else
       echo "⚠️ Failed to post comment"
     fi
@@ -2062,9 +2062,9 @@ fi
   # =========================================================================
   # SAVE ITERATION STATE: Persist findings for next iteration
   # =========================================================================
-  STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${ATTEMPT}.json"
+  STATE_FILE="$AGENT_STATE_DIR/security-iteration-${ATTEMPT}.json"
   
-  # Check if quality review was successful
+  # Check if security scan was successful
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
     # Save successful completion state
     cat > "$STATE_FILE" <<EOF
