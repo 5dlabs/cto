@@ -1894,7 +1894,7 @@ fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Compose initial user turn with the static prompt
-USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
+USER_COMBINED=$(printf "%s" "$CIPHER_PROMPT" | jq -Rs .)
 
 # Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
 # Use a subshell to ensure stdin closes after the prompt is sent
