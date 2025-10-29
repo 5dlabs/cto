@@ -45,7 +45,11 @@ echo "✅ Mission: Zero tolerance for CRITICAL/HIGH security vulnerabilities"
 
 # Docker sidecar cleanup function
 stop_docker_sidecar() {
+  echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."
+  
+  # Check if Docker socket exists and is accessible
   if [ ! -S /var/run/docker.sock ]; then
+    echo "⚠️ Docker socket not found at /var/run/docker.sock - sidecar may not be running or already stopped"
     return
   fi
 
