@@ -535,6 +535,13 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
 
     # Get PR branch information and checkout
     PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null || echo "")
+    
+    # If we couldn't get the branch name from pr view, try getting it from the PR list
+    if [ -z "$PR_BRANCH" ]; then
+        echo "⚠️  Initial branch name lookup failed, trying alternate method..."
+        PR_BRANCH=$(gh pr list --json number,headRefName --jq ".[] | select(.number == $PR_NUMBER) | .headRefName" 2>/dev/null || echo "")
+    fi
+    
     if [ -n "$PR_BRANCH" ]; then
         echo "📦 Checking out PR branch: $PR_BRANCH"
         if git checkout "$PR_BRANCH" 2>/dev/null; then
@@ -543,12 +550,17 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
         elif git checkout -b "$PR_BRANCH" "origin/$PR_BRANCH" 2>/dev/null; then
             echo "✅ Created and checked out tracking branch for $PR_BRANCH"
         else
-            echo "⚠️  Branch checkout failed, trying GitHub CLI method..."
-            gh pr checkout "$PR_NUMBER" || echo "❌ Failed to checkout PR via gh CLI"
+            echo "⚠️  Branch checkout failed, trying to fetch and checkout..."
+            git fetch origin "$PR_BRANCH:$PR_BRANCH" 2>/dev/null && git checkout "$PR_BRANCH" || {
+                echo "❌ All checkout methods failed"
+                exit 1
+            }
         fi
     else
-        echo "⚠️  Could not determine PR branch name, using GitHub CLI to checkout PR directly"
-        gh pr checkout "$PR_NUMBER" || echo "❌ Failed to checkout PR"
+        echo "❌ CRITICAL: Could not determine PR branch name from PR #$PR_NUMBER"
+        echo "   This would create a wrong branch name (pr-$PR_NUMBER)"
+        echo "   Refusing to continue to avoid creating duplicate branches"
+        exit 1
     fi
 
     # Verify we're on the right commit
