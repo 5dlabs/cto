@@ -1,0 +1,17 @@
+# ConfigMap containing Blaze frontend agent scripts
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controller.fullname" . }}-agent-scripts-blaze
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent-scripts
+    agent-scripts/type: blaze
+binaryData:
+  init-nextjs-project.sh: {{ .Files.Get "../../scripts/blaze/init-nextjs-project.sh" | b64enc }}
+  deploy-to-k8s.sh: {{ .Files.Get "../../scripts/blaze/deploy-to-k8s.sh" | b64enc }}
+  setup-ngrok-ingress.sh: {{ .Files.Get "../../scripts/blaze/setup-ngrok-ingress.sh" | b64enc }}
+  run-playwright-tests.sh: {{ .Files.Get "../../scripts/blaze/run-playwright-tests.sh" | b64enc }}
+
