@@ -1371,13 +1371,13 @@ export REPO_NAME
 export REPO_ROOT
 
 echo "════════════════════════════════════════════════════════════════"
-echo "✅ CLEO CODE QUALITY AGENT READY"
+echo "✅ CIPHER SECURITY AGENT READY"
 echo "════════════════════════════════════════════════════════════════"
 echo "📁 Working Directory: $CLAUDE_WORK_DIR"
 echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
 echo "📋 Task: {{task_id}}"
-echo "🎯 Focus: Rigorous code quality enforcement"
-echo "⚠️  CRITICAL: Must pass all quality checks before adding 'ready-for-qa' label"
+echo "🎯 Focus: Security vulnerability scanning and remediation"
+echo "⚠️  CRITICAL: Must fix all CRITICAL/HIGH/MEDIUM security vulnerabilities"
 echo "════════════════════════════════════════════════════════════════"
 
 # Export necessary variables for Claude execution
@@ -1391,7 +1391,7 @@ ATTEMPT=1
 SUCCESS=0
 CLAUDE_EXIT_CODE=1
 
-echo "🔄 Cipher will retry up to $MAX_RETRIES times until quality standards are met"
+echo "🔄 Cipher will retry up to $MAX_RETRIES times until security standards are met"
 echo ""
 
 # =========================================================================
