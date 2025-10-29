@@ -302,6 +302,10 @@ spec:
           - name: model-rotation
             default: "[]"
           - name: max-retries
+          - name: task-language
+            default: "rust"
+          - name: task-framework
+            default: ""
       outputs:
         parameters:
           - name: pr-url
@@ -331,6 +335,10 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-tools}}`}}"
                 - name: max-retries
                   value: "{{`{{inputs.parameters.max-retries}}`}}"
+                - name: task-language
+                  value: "{{`{{inputs.parameters.task-language}}`}}"
+                - name: task-framework
+                  value: "{{`{{inputs.parameters.task-framework}}`}}"
         - - name: wait-for-pr
             template: check-or-wait-for-pr
             arguments:
@@ -390,6 +398,10 @@ spec:
                   value: "{{`{{steps.determine-agent.outputs.parameters.model-rotation}}`}}"
                 - name: max-retries
                   value: "{{`{{steps.determine-agent.outputs.parameters.max-retries}}`}}"
+                - name: task-language
+                  value: "{{`{{steps.determine-agent.outputs.parameters.task-language}}`}}"
+                - name: task-framework
+                  value: "{{`{{steps.determine-agent.outputs.parameters.task-framework}}`}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
@@ -840,6 +852,10 @@ spec:
             default: "false"
           - name: final-task
             default: "false"
+          - name: task-language
+            default: "rust"
+          - name: task-framework
+            default: ""
       outputs:
         parameters:
           - name: coderun-name
@@ -876,6 +892,10 @@ spec:
                   value: "{{`{{inputs.parameters.auto-merge}}`}}"
                 - name: final-task
                   value: "{{`{{inputs.parameters.final-task}}`}}"
+                - name: task-language
+                  value: "{{`{{inputs.parameters.task-language}}`}}"
+                - name: task-framework
+                  value: "{{`{{inputs.parameters.task-framework}}`}}"
         - - name: resolve-coderun-name
             template: resolve-coderun-name
             arguments:
@@ -920,6 +940,10 @@ spec:
             default: "false"
           - name: final-task
             default: "false"
+          - name: task-language
+            default: "rust"
+          - name: task-framework
+            default: ""
       outputs:
         parameters:
           - name: name
@@ -976,6 +1000,8 @@ spec:
               SERVICE_NAME: "{{`{{workflow.parameters.service}}`}}"
               RUN_NAME: "{{`{{workflow.name}}`}}"
               TASK_ID: "{{`{{inputs.parameters.task-id}}`}}"
+              TASK_LANGUAGE: "{{`{{inputs.parameters.task-language}}`}}"
+              TASK_FRAMEWORK: "{{`{{inputs.parameters.task-framework}}`}}"
               EXECUTION_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               FACTORY_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
               CODEX_MAX_RETRIES: "{{`{{inputs.parameters.max-retries}}`}}"
@@ -1402,6 +1428,12 @@ spec:
           - name: max-retries
             valueFrom:
               path: /tmp/max-retries.txt
+          - name: task-language
+            valueFrom:
+              path: /tmp/task-language.txt
+          - name: task-framework
+            valueFrom:
+              path: /tmp/task-framework.txt
       script:
         image: alpine:3.20
         env:
@@ -1482,6 +1514,8 @@ spec:
             echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
             echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
             echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+            echo "rust" > /tmp/task-language.txt
+            echo "" > /tmp/task-framework.txt
             exit 0
           }
           
@@ -1496,6 +1530,8 @@ spec:
             echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
             echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
             echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+            echo "rust" > /tmp/task-language.txt
+            echo "" > /tmp/task-framework.txt
             exit 0
           fi
           
@@ -1512,7 +1548,40 @@ spec:
           # Convert to lowercase for comparison
           AGENT_TYPE=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
           
+          # Extract language from task file (look for "**Language**: typescript" pattern)
+          LANGUAGE=$(grep -i "^\*\*Language\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          
+          if [ -z "$LANGUAGE" ]; then
+            # Try alternative format: "Language: typescript"
+            LANGUAGE=$(grep -i "^Language:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          fi
+          
+          # Convert to lowercase for comparison
+          LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
+          
+          # Extract framework from task file (look for "**Framework**: react, nextjs" pattern)
+          FRAMEWORK=$(grep -i "^\*\*Framework\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          
+          if [ -z "$FRAMEWORK" ]; then
+            # Try alternative format: "Framework: react"
+            FRAMEWORK=$(grep -i "^Framework:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          fi
+          
+          # Convert to lowercase for comparison
+          FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
+          
+          # Default language/framework if not specified
+          if [ -z "$LANGUAGE" ]; then
+            if [ "$AGENT_TYPE" = "frontend" ] || [ "$AGENT_TYPE" = "ui" ]; then
+              LANGUAGE="typescript"
+            else
+              LANGUAGE="rust"
+            fi
+          fi
+          
           echo "   Detected agent type: '${AGENT_TYPE}'"
+          echo "   Detected language: '${LANGUAGE}'"
+          echo "   Detected framework: '${FRAMEWORK}'"
           
           # Determine which agent to use based on agent type
           case "$AGENT_TYPE" in
@@ -1534,9 +1603,15 @@ spec:
               ;;
           esac
           
+          # Write language and framework to output files
+          echo "$LANGUAGE" > /tmp/task-language.txt
+          echo "$FRAMEWORK" > /tmp/task-framework.txt
+          
           echo "   GitHub App: $(cat /tmp/github-app.txt)"
           echo "   CLI Type: $(cat /tmp/cli-type.txt)"
           echo "   Model: $(cat /tmp/model.txt)"
+          echo "   Language: ${LANGUAGE}"
+          echo "   Framework: ${FRAMEWORK}"
           echo ""
           echo "🎯 Agent determination complete"
 

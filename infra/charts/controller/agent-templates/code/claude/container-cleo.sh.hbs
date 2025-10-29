@@ -1514,12 +1514,74 @@ fi
 echo "✓ Creating Cleo's code quality enforcement prompt"
 
 # Build static prompt with task context
+# Determine language-specific quality checks
+TASK_LANG="${TASK_LANGUAGE:-rust}"
+TASK_FW="${TASK_FRAMEWORK:-}"
+
+# Build language-specific guidance
+LANGUAGE_SPECIFIC=""
+case "$TASK_LANG" in
+  typescript|javascript|ts|js)
+    LANGUAGE_SPECIFIC="
+## TypeScript/JavaScript Quality Standards
+- **Type Safety**: Strict TypeScript compilation with no 'any' types
+- **Linting**: ESLint with recommended rules, no warnings allowed
+- **Formatting**: Prettier for consistent code style
+- **Testing**: Jest/Vitest with appropriate test coverage
+- **Build**: Clean TypeScript compilation with no errors
+- **Dependencies**: Properly declared in package.json with correct versions"
+    if echo "$TASK_FW" | grep -q "react\|next"; then
+      LANGUAGE_SPECIFIC="$LANGUAGE_SPECIFIC
+- **React Standards**: Hooks rules, no prop-types errors, proper component structure
+- **Next.js Standards**: App router conventions if applicable, proper data fetching"
+    fi
+    ;;
+  rust)
+    LANGUAGE_SPECIFIC="
+## Rust Quality Standards
+- **Compilation**: Zero warnings with \`cargo clippy --all-targets -- -D warnings\`
+- **Formatting**: \`cargo fmt --all --check\` must pass
+- **Testing**: All tests pass with \`cargo test\`
+- **Pedantic Linting**: \`cargo clippy -- -D clippy::all -D clippy::pedantic\`
+- **Documentation**: Public APIs must be documented
+- **Dependencies**: Minimal, well-justified additions to Cargo.toml"
+    ;;
+  python)
+    LANGUAGE_SPECIFIC="
+## Python Quality Standards
+- **Type Checking**: mypy strict mode with no errors
+- **Linting**: ruff or pylint with no violations
+- **Formatting**: black for consistent formatting
+- **Testing**: pytest with appropriate coverage
+- **Dependencies**: Properly declared in requirements.txt or pyproject.toml"
+    ;;
+  go)
+    LANGUAGE_SPECIFIC="
+## Go Quality Standards
+- **Formatting**: \`gofmt\` and \`go vet\` must pass
+- **Linting**: golangci-lint with no issues
+- **Testing**: All tests pass with \`go test ./...\`
+- **Build**: Clean compilation with \`go build\`
+- **Dependencies**: go.mod properly maintained"
+    ;;
+  *)
+    LANGUAGE_SPECIFIC="
+## General Quality Standards
+- **Build**: Project must compile/build without errors
+- **Linting**: Language-appropriate linting must pass
+- **Testing**: All existing tests must pass
+- **Formatting**: Consistent code style throughout"
+    ;;
+esac
+
 CLEO_PROMPT="# Code Quality Review Assignment
 
 You are Cleo, a rigorous code quality enforcement agent. Your mission is to ensure zero-tolerance quality standards for this pull request.
 
 ## Your Role
 - **Primary Focus**: Code quality enforcement AND CI/CD pipeline setup
+- **Language Context**: This is a **${TASK_LANG}** project${TASK_FW:+ using $TASK_FW}
+$LANGUAGE_SPECIFIC"
 - **Quality Tools**: Clippy (pedantic), cargo fmt, cargo test, YAML linting
 - **DevOps Setup**: GitHub Actions workflows, Docker image building, permissions configuration, CI verification
 - **Permissions**: MUST fix workflow permissions (packages:write, contents:write, etc.) - don't skip!
