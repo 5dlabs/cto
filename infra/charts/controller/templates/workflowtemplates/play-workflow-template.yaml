@@ -1540,7 +1540,9 @@ spec:
           TASK_DESC=""
           TASK_DETAILS=""
           
+          FOUND_TASK_METADATA=false
           if [ -n "$TASK_ENTRY" ]; then
+            FOUND_TASK_METADATA=true
             AGENT_TYPE=$(echo "$TASK_ENTRY" | jq -r '.agentHint // .agentType // empty')
             TASK_TITLE=$(echo "$TASK_ENTRY" | jq -r '.title // empty')
             TASK_DESC=$(echo "$TASK_ENTRY" | jq -r '.description // empty')
@@ -1607,7 +1609,7 @@ spec:
               fi
             fi
           else
-            echo "ℹ️ Task file not found in expected locations; using repository metadata and heuristics"
+            echo "ℹ️ Task file not found in expected locations"
           fi
           
           # Convert extracted values to lowercase for comparison
@@ -1615,24 +1617,30 @@ spec:
           LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
           FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
           
-          TASK_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
-          if [ -n "$TASK_FILE" ]; then
-            TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
-          fi
-          
-          if [ -z "$AGENT_TYPE" ] && echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte)"; then
-            AGENT_TYPE="frontend"
-          fi
-          
-          if [ -z "$FRAMEWORK" ]; then
-            if echo "$TASK_CONTENT" | grep -qi "next"; then
-              FRAMEWORK="nextjs"
-            elif echo "$TASK_CONTENT" | grep -qi "react"; then
-              FRAMEWORK="react"
+          # Content-based auto-detection ONLY if we have no structured task metadata
+          if [ "$FOUND_TASK_METADATA" = "false" ] && [ -z "$AGENT_TYPE" ]; then
+            echo "ℹ️ No task metadata found, attempting content-based detection"
+            TASK_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
+            if [ -n "$TASK_FILE" ]; then
+              TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
+            fi
+            
+            if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte)"; then
+              echo "🔍 Auto-detected frontend task (keywords matched)"
+              AGENT_TYPE="frontend"
+            fi
+            
+            # Also try to detect framework when no metadata
+            if [ -z "$FRAMEWORK" ]; then
+              if echo "$TASK_CONTENT" | grep -qi "next"; then
+                FRAMEWORK="nextjs"
+              elif echo "$TASK_CONTENT" | grep -qi "react"; then
+                FRAMEWORK="react"
+              fi
             fi
           fi
           
-          # Default language/framework if not specified
+          # Default language if not specified
           if [ -z "$LANGUAGE" ]; then
             if [ "$AGENT_TYPE" = "frontend" ] || [ "$AGENT_TYPE" = "ui" ]; then
               LANGUAGE="typescript"
@@ -1640,11 +1648,6 @@ spec:
               LANGUAGE="rust"
             fi
           fi
-
-          # Normalize final values
-          AGENT_TYPE=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
-          LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
-          FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
           
           echo "   Detected agent type: '${AGENT_TYPE}'"
           echo "   Detected language: '${LANGUAGE}'"
