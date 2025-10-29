@@ -202,6 +202,8 @@ struct PlayDefaults {
     security_max_retries: Option<u32>,
     #[serde(rename = "testingMaxRetries")]
     testing_max_retries: Option<u32>,
+    #[serde(rename = "frontendMaxRetries")]
+    frontend_max_retries: Option<u32>,
     #[serde(rename = "autoMerge")]
     auto_merge: Option<bool>,
     #[serde(rename = "parallelExecution")]
@@ -361,9 +363,9 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
 fn find_command(name: &str) -> String {
     // Check common installation locations in order
     let common_paths = [
-        format!("/opt/homebrew/bin/{}", name),  // Homebrew Apple Silicon
-        format!("/usr/local/bin/{}", name),     // Homebrew Intel / standard Linux
-        format!("/usr/bin/{}", name),           // System binaries
+        format!("/opt/homebrew/bin/{name}"),  // Homebrew Apple Silicon
+        format!("/usr/local/bin/{name}"),     // Homebrew Intel / standard Linux
+        format!("/usr/bin/{name}"),           // System binaries
         name.to_string(),                        // Fallback to PATH
     ];
     
@@ -1053,8 +1055,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             )
         };
 
-    let frontend_agent_max_retries = frontend_agent_cfg.and_then(|cfg| cfg.max_retries);
-
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
         .get("quality_agent")
@@ -1304,12 +1304,16 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
 
+    let frontend_agent_max_retries = frontend_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
 
     // Validate agent-specific models
     validate_model_name(&implementation_model)
         .map_err(|e| anyhow!("Invalid implementation agent model: {}", e))?;
+    validate_model_name(&frontend_model)
+        .map_err(|e| anyhow!("Invalid frontend agent model: {}", e))?;
     validate_model_name(&quality_model)
         .map_err(|e| anyhow!("Invalid quality agent model: {}", e))?;
     validate_model_name(&security_model)
@@ -1318,13 +1322,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map_err(|e| anyhow!("Invalid testing agent model: {}", e))?;
 
     let implementation_max_retries =
-        parse_max_retries_argument(&arguments, "implementation_max_retries")
+        parse_max_retries_argument(arguments, "implementation_max_retries")
             .or(parse_max_retries_argument(
-                &arguments,
+                arguments,
                 "factory_max_retries",
             ))
             .or(parse_max_retries_argument(
-                &arguments,
+                arguments,
                 "opencode_max_retries",
             ))
             .or(implementation_agent_max_retries)
@@ -1333,21 +1337,28 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             .or(config.defaults.code.max_retries)
             .unwrap_or(10);
 
-    let quality_max_retries = parse_max_retries_argument(&arguments, "quality_max_retries")
+    let frontend_max_retries = parse_max_retries_argument(arguments, "frontend_max_retries")
+        .or(frontend_agent_max_retries)
+        .or(config.defaults.play.frontend_max_retries)
+        .or(config.defaults.play.max_retries)
+        .or(config.defaults.code.max_retries)
+        .unwrap_or(10);
+
+    let quality_max_retries = parse_max_retries_argument(arguments, "quality_max_retries")
         .or(quality_agent_max_retries)
         .or(config.defaults.play.quality_max_retries)
         .or(config.defaults.play.max_retries)
         .or(config.defaults.code.max_retries)
         .unwrap_or(10);
 
-    let security_max_retries = parse_max_retries_argument(&arguments, "security_max_retries")
+    let security_max_retries = parse_max_retries_argument(arguments, "security_max_retries")
         .or(security_agent_max_retries)
         .or(config.defaults.play.security_max_retries)
         .or(config.defaults.play.max_retries)
         .or(config.defaults.code.max_retries)
         .unwrap_or(10);
 
-    let testing_max_retries = parse_max_retries_argument(&arguments, "testing_max_retries")
+    let testing_max_retries = parse_max_retries_argument(arguments, "testing_max_retries")
         .or(testing_agent_max_retries)
         .or(config.defaults.play.testing_max_retries)
         .or(config.defaults.play.max_retries)
@@ -1355,7 +1366,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .unwrap_or(10);
 
     let opencode_max_retries_override =
-        parse_max_retries_argument(&arguments, "opencode_max_retries");
+        parse_max_retries_argument(arguments, "opencode_max_retries");
     let opencode_max_retries = opencode_max_retries_override.unwrap_or(implementation_max_retries);
 
     // Check for requirements.yaml file
@@ -1430,19 +1441,20 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     params.push(format!(
         "implementation-max-retries={implementation_max_retries}"
     ));
+    params.push(format!("frontend-max-retries={frontend_max_retries}"));
     params.push(format!("quality-max-retries={quality_max_retries}"));
     params.push(format!("security-max-retries={security_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));
     params.push(format!("opencode-max-retries={opencode_max_retries}"));
 
     // Auto-merge parameter
-    let auto_merge = parse_bool_argument(&arguments, "auto_merge")
+    let auto_merge = parse_bool_argument(arguments, "auto_merge")
         .or(config.defaults.play.auto_merge)
         .unwrap_or(false);
     params.push(format!("auto-merge={auto_merge}"));
 
     // Parallel execution parameter - determines which workflow template to use
-    let parallel_execution = parse_bool_argument(&arguments, "parallel_execution")
+    let parallel_execution = parse_bool_argument(arguments, "parallel_execution")
         .or(config.defaults.play.parallel_execution)
         .unwrap_or(false);
     
@@ -1459,7 +1471,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     params.push(format!("parallel-execution={parallel_execution}"));
 
     // Final task parameter - indicates this is the last task requiring deployment verification
-    let final_task = parse_bool_argument(&arguments, "final_task")
+    let final_task = parse_bool_argument(arguments, "final_task")
         .unwrap_or(false);
     params.push(format!("final-task={final_task}"));
 
