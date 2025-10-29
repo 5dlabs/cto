@@ -47,9 +47,15 @@ echo "✅ Mission: Zero tolerance for CRITICAL/HIGH security vulnerabilities"
 stop_docker_sidecar() {
   echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."
   
+  # CRITICAL: Write sentinel file to signal sidecar to stop (file watch mechanism)
+  # This must happen BEFORE any returns so sidecar stops even on early exit
+  touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
+  echo "✅ Sentinel file created to signal sidecar shutdown"
+  
   # Check if Docker socket exists and is accessible
   if [ ! -S /var/run/docker.sock ]; then
     echo "⚠️ Docker socket not found at /var/run/docker.sock - sidecar may not be running or already stopped"
+    echo "ℹ️  Sidecar will stop via sentinel file watch"
     return
   fi
 
