@@ -272,13 +272,15 @@ jobs:
           wait: 120s
           verbosity: 1
 
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
       - name: Test Helm Chart Structure
         run: |
           echo "🎯 Testing controller Helm chart..."
-
-          # Install Helm
-          curl -fsSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz
-          sudo mv linux-amd64/helm /usr/local/bin/
+          
           helm version
 
           # Lint the Helm chart
