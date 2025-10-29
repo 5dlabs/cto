@@ -1435,18 +1435,18 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     
     if [ "${APPROVAL_COUNT:-0}" -gt 0 ]; then
       echo "✅ PR #${PR_NUMBER} already has ${APPROVAL_COUNT} approval(s)"
-      echo "🚀 FAST-PATH: Skipping quality checks since PR is already approved"
+      echo "🚀 FAST-PATH: Skipping security scan since PR is already approved"
       
-      gh pr comment "$PR_NUMBER" --body "✅ **Cipher Quality Check - Fast-Path**
+      gh pr comment "$PR_NUMBER" --body "✅ **Cipher Security Scan - Fast-Path**
 
-PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant quality checks.
+PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant security scan.
 
 **Fast-Path Benefits:**
 - Saves ~10-15 minutes of execution time
 - Reduces unnecessary compute and model API calls
-- PR already validated by previous quality gate
+- PR already validated by previous security gate
 
-_Cipher will still run full checks if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
+_Cipher will still run full scan if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
 
       SUCCESS=1
       COMPLETED_ATTEMPTS=1
