@@ -1808,12 +1808,29 @@ echo "$CLEO_PROMPT"
 echo "════════════════════════════════════════════════════════════════"
 
 echo "════════════════════════════════════════════════════════════════"
-echo "🔍 DEBUG: CLAUDE.md MEMORY CONTENT"
+echo "🔍 DEBUG: CLI MEMORY FILE CONTENT"
 echo "════════════════════════════════════════════════════════════════"
-if [ -f "$CLAUDE_WORK_DIR/CLAUDE.md" ]; then
-    cat "$CLAUDE_WORK_DIR/CLAUDE.md"
+# Check for the appropriate memory file based on CLI type
+CLI_TYPE="{{cli_type}}"
+case "$CLI_TYPE" in
+    "claude")
+        MEMORY_FILE="CLAUDE.md"
+        ;;
+    "factory")
+        MEMORY_FILE="AGENTS.md"
+        ;;
+    "codex")
+        MEMORY_FILE="AGENTS.md"
+        ;;
+    *)
+        MEMORY_FILE="CLAUDE.md"  # Default fallback
+        ;;
+esac
+
+if [ -f "$CLAUDE_WORK_DIR/$MEMORY_FILE" ]; then
+    cat "$CLAUDE_WORK_DIR/$MEMORY_FILE"
 else
-    echo "❌ No CLAUDE.md found at $CLAUDE_WORK_DIR/CLAUDE.md"
+    echo "ℹ️ No $MEMORY_FILE found at $CLAUDE_WORK_DIR/$MEMORY_FILE (using $CLI_TYPE CLI)"
 fi
 echo "════════════════════════════════════════════════════════════════"
 
