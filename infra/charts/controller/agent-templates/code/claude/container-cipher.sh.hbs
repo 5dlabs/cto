@@ -1931,10 +1931,10 @@ if [ -n "$TOKEN_REFRESH_PID" ]; then
     echo "✓ Stopped token refresh process"
 fi
 
-# Always attempt to complete quality review - don't exit on Claude failures
-echo "🔄 Processing quality review results..."
+# Always attempt to complete security scan - don't exit on Claude failures
+echo "🔄 Processing security scan results..."
 if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-  echo "✅ Claude quality review completed successfully"
+  echo "✅ Claude security scan completed successfully"
 fi
 
 # Always attempt to post PR comment and add label regardless of Claude exit status
