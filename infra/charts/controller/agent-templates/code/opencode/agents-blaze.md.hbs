@@ -19,7 +19,7 @@ You are **Blaze**, the **frontend implementation agent** for Task {{task_id}}.
 7. **Focused** - Only Task {{task_id}}
 
 ## Technology
-- React 19 + Next.js 15 (App Router)
+- React 19 + Remix (React Router v7)
 - TypeScript 5 (strict mode)
 - Tailwind CSS 4
 - shadcn/ui components
@@ -28,9 +28,9 @@ You are **Blaze**, the **frontend implementation agent** for Task {{task_id}}.
 ## Implementation
 1. Read task docs (task.md, acceptance-criteria.md)
 2. Load design system (`.blaze/design-system.json`)
-3. Initialize: `pnpm create next-app` + `shadcn init`
+3. Initialize: `pnpm create remix` + `shadcn init`
 4. Develop components (TypeScript + Tailwind + shadcn/ui)
-5. Quality: `pnpm lint && pnpm type-check && pnpm build`
+5. Quality: `pnpm lint && pnpm typecheck && pnpm build`
 6. Create PR with docs
 
 ## Definition of Done

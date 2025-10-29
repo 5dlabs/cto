@@ -1590,22 +1590,22 @@ spec:
           
           if [ -n "$TASK_FILE" ]; then
             echo "📄 Reading task file: ${TASK_FILE}"
-            if [ -z "$AGENT_TYPE" ]; then
+          if [ -z "$AGENT_TYPE" ]; then
               AGENT_TYPE=$(grep -i "^\*\*Agent Type\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
               if [ -z "$AGENT_TYPE" ]; then
-                AGENT_TYPE=$(grep -i "^Agent Type:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
-              fi
+            AGENT_TYPE=$(grep -i "^Agent Type:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          fi
             fi
             if [ -z "$LANGUAGE" ]; then
-              LANGUAGE=$(grep -i "^\*\*Language\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
-              if [ -z "$LANGUAGE" ]; then
-                LANGUAGE=$(grep -i "^Language:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
-              fi
+          LANGUAGE=$(grep -i "^\*\*Language\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          if [ -z "$LANGUAGE" ]; then
+            LANGUAGE=$(grep -i "^Language:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          fi
             fi
             if [ -z "$FRAMEWORK" ]; then
-              FRAMEWORK=$(grep -i "^\*\*Framework\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
-              if [ -z "$FRAMEWORK" ]; then
-                FRAMEWORK=$(grep -i "^Framework:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          FRAMEWORK=$(grep -i "^\*\*Framework\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          if [ -z "$FRAMEWORK" ]; then
+            FRAMEWORK=$(grep -i "^Framework:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
               fi
             fi
           else
