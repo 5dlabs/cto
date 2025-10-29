@@ -142,7 +142,7 @@ export SSH_ASKPASS=/bin/true
 REPO_URL="{{repository_url}}"
 
 # GitHub App authentication is configured via environment variables
-echo "Using GitHub App authentication for code quality checks"
+echo "Using GitHub App authentication for security scanning"
 
 # Authenticate with GitHub App
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
