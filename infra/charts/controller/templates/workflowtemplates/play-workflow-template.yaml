@@ -1519,56 +1519,118 @@ spec:
             exit 0
           }
           
-          # Find and read task file
-          TASK_FILE="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks/task-${TASK_ID}.md"
-          
-          if [ ! -f "$TASK_FILE" ]; then
-            echo "⚠️ Task file not found: ${TASK_FILE}"
-            echo "   Using default implementation agent"
-            echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
-            echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
-            echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
-            echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
-            echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
-            echo "rust" > /tmp/task-language.txt
-            echo "" > /tmp/task-framework.txt
-            exit 0
+          # Load task metadata from tasks.json when available
+          TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks/tasks.json"
+          TASK_ENTRY=""
+          if [ -f "$TASKS_JSON" ]; then
+            TASK_ENTRY=$(jq -c --arg tid "$TASK_ID" '
+              (
+                .master.tasks[]? | select((.id|tostring) == $tid)
+              ),
+              (
+                .tasks[]? | select((.id|tostring) == $tid)
+              )
+            ' "$TASKS_JSON" 2>/dev/null | head -n 1)
           fi
           
-          echo "📄 Reading task file: ${TASK_FILE}"
+          AGENT_TYPE=""
+          LANGUAGE=""
+          FRAMEWORK=""
+          TASK_TITLE=""
+          TASK_DESC=""
+          TASK_DETAILS=""
           
-          # Extract agentType from task file (look for "**Agent Type**: frontend" pattern)
-          AGENT_TYPE=$(grep -i "^\*\*Agent Type\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
-          
-          if [ -z "$AGENT_TYPE" ]; then
-            # Try alternative format: "Agent Type: frontend"
-            AGENT_TYPE=$(grep -i "^Agent Type:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          if [ -n "$TASK_ENTRY" ]; then
+            AGENT_TYPE=$(echo "$TASK_ENTRY" | jq -r '.agentHint // .agentType // empty')
+            TASK_TITLE=$(echo "$TASK_ENTRY" | jq -r '.title // empty')
+            TASK_DESC=$(echo "$TASK_ENTRY" | jq -r '.description // empty')
+            TASK_DETAILS=$(echo "$TASK_ENTRY" | jq -r '.details // empty')
+            LANGUAGE=$(echo "$TASK_ENTRY" | jq -r '.language // .taskLanguage // empty')
+            FRAMEWORK=$(echo "$TASK_ENTRY" | jq -r '.framework // .taskFramework // empty')
           fi
           
-          # Convert to lowercase for comparison
+          # Attempt to locate task file for supplemental metadata
+          TASK_FILE=""
+          TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks"
+          if [ -d "$TASK_BASE_DIR" ]; then
+            PADDED_ID=""
+            case "$TASK_ID" in
+              *[!0-9]*|"")
+                PADDED_ID=""
+                ;;
+              *)
+                PADDED_ID=$(printf "%03d" "$TASK_ID")
+                ;;
+            esac
+            
+            for candidate in \
+              "$TASK_BASE_DIR/task-${TASK_ID}.md" \
+              "$TASK_BASE_DIR/task-${TASK_ID}.txt" \
+              "$TASK_BASE_DIR/task_${TASK_ID}.md" \
+              "$TASK_BASE_DIR/task_${TASK_ID}.txt"; do
+              if [ -z "$TASK_FILE" ] && [ -f "$candidate" ]; then
+                TASK_FILE="$candidate"
+              fi
+            done
+            
+            if [ -z "$TASK_FILE" ] && [ -n "$PADDED_ID" ]; then
+              for candidate in \
+                "$TASK_BASE_DIR/task-${PADDED_ID}.md" \
+                "$TASK_BASE_DIR/task-${PADDED_ID}.txt" \
+                "$TASK_BASE_DIR/task_${PADDED_ID}.md" \
+                "$TASK_BASE_DIR/task_${PADDED_ID}.txt"; do
+                if [ -z "$TASK_FILE" ] && [ -f "$candidate" ]; then
+                  TASK_FILE="$candidate"
+                fi
+              done
+            fi
+          fi
+          
+          if [ -n "$TASK_FILE" ]; then
+            echo "📄 Reading task file: ${TASK_FILE}"
+            if [ -z "$AGENT_TYPE" ]; then
+              AGENT_TYPE=$(grep -i "^\*\*Agent Type\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+              if [ -z "$AGENT_TYPE" ]; then
+                AGENT_TYPE=$(grep -i "^Agent Type:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+              fi
+            fi
+            if [ -z "$LANGUAGE" ]; then
+              LANGUAGE=$(grep -i "^\*\*Language\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+              if [ -z "$LANGUAGE" ]; then
+                LANGUAGE=$(grep -i "^Language:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+              fi
+            fi
+            if [ -z "$FRAMEWORK" ]; then
+              FRAMEWORK=$(grep -i "^\*\*Framework\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+              if [ -z "$FRAMEWORK" ]; then
+                FRAMEWORK=$(grep -i "^Framework:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+              fi
+            fi
+          else
+            echo "ℹ️ Task file not found in expected locations; using repository metadata and heuristics"
+          fi
+          
+          # Convert extracted values to lowercase for comparison
           AGENT_TYPE=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
+          LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
+          FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
           
-          # Extract language from task file (look for "**Language**: typescript" pattern)
-          LANGUAGE=$(grep -i "^\*\*Language\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
-          
-          if [ -z "$LANGUAGE" ]; then
-            # Try alternative format: "Language: typescript"
-            LANGUAGE=$(grep -i "^Language:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          TASK_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
+          if [ -n "$TASK_FILE" ]; then
+            TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
           fi
           
-          # Convert to lowercase for comparison
-          LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
-          
-          # Extract framework from task file (look for "**Framework**: react, nextjs" pattern)
-          FRAMEWORK=$(grep -i "^\*\*Framework\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          if [ -z "$AGENT_TYPE" ] && echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte)"; then
+            AGENT_TYPE="frontend"
+          fi
           
           if [ -z "$FRAMEWORK" ]; then
-            # Try alternative format: "Framework: react"
-            FRAMEWORK=$(grep -i "^Framework:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+            if echo "$TASK_CONTENT" | grep -qi "next"; then
+              FRAMEWORK="nextjs"
+            elif echo "$TASK_CONTENT" | grep -qi "react"; then
+              FRAMEWORK="react"
+            fi
           fi
-          
-          # Convert to lowercase for comparison
-          FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
           
           # Default language/framework if not specified
           if [ -z "$LANGUAGE" ]; then
@@ -1578,6 +1640,11 @@ spec:
               LANGUAGE="rust"
             fi
           fi
+
+          # Normalize final values
+          AGENT_TYPE=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
+          LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
+          FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
           
           echo "   Detected agent type: '${AGENT_TYPE}'"
           echo "   Detected language: '${LANGUAGE}'"
