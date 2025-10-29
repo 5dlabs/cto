@@ -1460,6 +1460,65 @@ else
         echo ""
 
         # Prepare prompt prefix with CRITICAL task isolation instruction
+        # Determine language-specific testing guidance
+        TASK_LANG="${TASK_LANGUAGE:-rust}"
+        TASK_FW="${TASK_FRAMEWORK:-}"
+
+        # Build language-specific testing guidance
+        LANGUAGE_TEST_GUIDANCE=""
+        case "$TASK_LANG" in
+          typescript|javascript|ts|js)
+            LANGUAGE_TEST_GUIDANCE="
+## TypeScript/JavaScript Testing Standards
+- **Test Framework**: Use Jest or Vitest for unit and integration tests
+- **Test Coverage**: Aim for meaningful coverage of business logic
+- **Mocking**: Use appropriate mocking libraries (jest.mock, vi.mock)
+- **Async Testing**: Properly handle promises and async/await in tests
+- **Type Safety**: Write tests in TypeScript with proper types"
+            if echo "$TASK_FW" | grep -q "react\|next"; then
+              LANGUAGE_TEST_GUIDANCE="$LANGUAGE_TEST_GUIDANCE
+- **Component Testing**: Use React Testing Library for component tests
+- **User Interactions**: Test user flows, not implementation details
+- **Hooks Testing**: Properly test custom hooks if applicable"
+            fi
+            ;;
+          rust)
+            LANGUAGE_TEST_GUIDANCE="
+## Rust Testing Standards
+- **Unit Tests**: Write tests in \`mod tests\` blocks within source files
+- **Integration Tests**: Place in \`tests/\` directory when appropriate
+- **Test Command**: Run \`cargo test\` to execute all tests
+- **Assertions**: Use standard Rust assertions and #[should_panic] when appropriate
+- **Test Coverage**: Cover edge cases, errors, and success paths"
+            ;;
+          python)
+            LANGUAGE_TEST_GUIDANCE="
+## Python Testing Standards
+- **Test Framework**: Use pytest for all tests
+- **Test Structure**: Follow pytest conventions for test discovery
+- **Fixtures**: Use pytest fixtures for test setup/teardown
+- **Mocking**: Use unittest.mock or pytest-mock
+- **Type Checking**: Ensure tests pass mypy if project uses type hints"
+            ;;
+          go)
+            LANGUAGE_TEST_GUIDANCE="
+## Go Testing Standards
+- **Test Files**: Create \`*_test.go\` files alongside source
+- **Test Command**: Run \`go test ./...\` for all tests
+- **Table-Driven**: Use table-driven tests for multiple cases
+- **Mocking**: Use interfaces and dependency injection for testability
+- **Benchmarks**: Include benchmarks for performance-critical code if appropriate"
+            ;;
+          *)
+            LANGUAGE_TEST_GUIDANCE="
+## General Testing Standards
+- **Test Coverage**: Write tests for new functionality
+- **Edge Cases**: Test error conditions and boundary cases
+- **Integration**: Verify integration points work correctly
+- **Regression**: Ensure existing tests still pass"
+            ;;
+        esac
+
         PROMPT_PREFIX="⛔ **CRITICAL TASK ISOLATION REQUIREMENT** ⛔
 
 You are assigned to work on **TASK {{task_id}} ONLY**.
@@ -1474,6 +1533,13 @@ You are assigned to work on **TASK {{task_id}} ONLY**.
 7. NEVER use mocks or hard-coded values - implement with real APIs, databases, and configurable parameters
         
         **TASK VERIFICATION:** Before starting, confirm you are working on Task {{task_id}} by stating: \"Starting implementation of Task {{task_id}} only.\"
+        
+        ---
+        
+        ## Language Context
+        This is a **${TASK_LANG}** project${TASK_FW:+ using $TASK_FW}
+        
+        $LANGUAGE_TEST_GUIDANCE
         
         ---
         
