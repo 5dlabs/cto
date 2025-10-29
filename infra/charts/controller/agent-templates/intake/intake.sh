@@ -900,6 +900,57 @@ if [ ! -f "$TASKS_FILE" ]; then
 fi
 
 # ========================================
+# Auto-Add Agent Hints
+# ========================================
+echo "🎯 Auto-detecting and adding agent routing hints..."
+
+# Post-process tasks.json to add agentHint based on task content
+jq '
+  # Function to check if task should use frontend agent
+  def is_frontend_task:
+    (.title + " " + (.description // "") + " " + (.details // "")) 
+    | test("frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|next\\.js|nuxt|page|layout|button|form|modal|navbar|header|footer"; "i");
+  
+  # Function to check if task should use integration/testing agent
+  def is_integration_task:
+    (.title + " " + (.description // "") + " " + (.details // "")) 
+    | test("test|testing|integration|e2e|end.to.end|qa|quality|verify|validation|cypress|playwright|jest|vitest|spec"; "i");
+  
+  # Apply to all tasks (handle both tagged and non-tagged formats)
+  if .master.tasks then
+    .master.tasks |= map(
+      if .agentHint then
+        # Keep existing agentHint if present
+        .
+      elif is_frontend_task then
+        . + {"agentHint": "frontend"}
+      elif is_integration_task then
+        . + {"agentHint": "integration"}
+      else
+        # Backend/general tasks - no hint needed (defaults to Rex)
+        .
+      end
+    )
+  elif .tasks then
+    .tasks |= map(
+      if .agentHint then
+        .
+      elif is_frontend_task then
+        . + {"agentHint": "frontend"}
+      elif is_integration_task then
+        . + {"agentHint": "integration"}
+      else
+        .
+      end
+    )
+  else
+    .
+  end
+' "$TASKS_FILE" > "$TASKS_FILE.tmp" && mv "$TASKS_FILE.tmp" "$TASKS_FILE"
+
+echo "✅ Agent hints added based on task content"
+
+# ========================================
 # Append Integration Task
 # ========================================
 echo "📝 Appending integration & deployment verification task..."
