@@ -531,9 +531,9 @@ if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
   fi
 fi
 
-# Checkout PR branch for quality review
+# Checkout PR branch for security scan
 if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
-    echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
+    echo "🔄 Checking out PR #$PR_NUMBER for security scan..."
     cd "$CLAUDE_WORK_DIR"
 
     # Fetch all latest changes including PR branches
