@@ -1514,6 +1514,8 @@ spec:
             echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
             echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
             echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+            echo "rust" > /tmp/task-language.txt
+            echo "" > /tmp/task-framework.txt
             exit 0
           }
           
@@ -1528,6 +1530,8 @@ spec:
             echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
             echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
             echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+            echo "rust" > /tmp/task-language.txt
+            echo "" > /tmp/task-framework.txt
             exit 0
           fi
           
