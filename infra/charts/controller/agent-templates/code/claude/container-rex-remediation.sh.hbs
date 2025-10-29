@@ -44,6 +44,12 @@ echo "🔧 Mode: Remediation - Fix Only"
 echo "📋 Task ID: {{task_id}}"
 echo "🚨 CRITICAL: ONLY fix the issues identified in feedback"
 
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
