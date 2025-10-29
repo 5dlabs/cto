@@ -159,3 +159,23 @@ Define projected volume for agent templates (merges all ConfigMaps)
         name: {{ include "controller.fullname" . }}-agent-templates-intake
         optional: true
 {{- end }}
+
+{{/*
+Define volume mounts for Blaze agent scripts
+*/}}
+{{- define "platform.blazeScriptsVolumeMounts" -}}
+- name: blaze-scripts
+  mountPath: /workspace/scripts/blaze
+  readOnly: true
+{{- end }}
+
+{{/*
+Define volume for Blaze agent scripts ConfigMap
+*/}}
+{{- define "platform.blazeScriptsVolume" -}}
+- name: blaze-scripts
+  configMap:
+    name: {{ include "controller.fullname" . }}-agent-scripts-blaze
+    defaultMode: 0755
+    optional: true
+{{- end }}

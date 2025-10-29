@@ -580,6 +580,20 @@ impl<'a> CodeResourceManager<'a> {
             "mountPath": "/agent-templates"
         }));
 
+        // Blaze agent scripts ConfigMap volume for frontend workflows
+        let blaze_scripts_cm_name = "controller-agent-scripts-blaze".to_string();
+        volumes.push(json!({
+            "name": "blaze-scripts",
+            "configMap": {
+                "name": blaze_scripts_cm_name,
+                "defaultMode": 0o755
+            }
+        }));
+        volume_mounts.push(json!({
+            "name": "blaze-scripts",
+            "mountPath": "/workspace/scripts/blaze"
+        }));
+
         let cli_type = Self::code_run_cli_type(code_run);
 
         if cli_type == CLIType::Claude {

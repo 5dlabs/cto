@@ -389,6 +389,16 @@ USER node
 RUN sudo npm install -g @mermaid-js/mermaid-cli && \
     sudo chown -R node:node /usr/local/share/npm-global
 
+# Install Playwright for frontend E2E testing (Blaze agent)
+USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::ForceIPv4=true update && \
+    npm install -g @playwright/test && \
+    npx playwright install --with-deps chromium && \
+    chown -R node:node /usr/local/share/npm-global
+USER node
+
 # Go environment for non-root user
 ENV GOPATH=/home/node/go
 ENV PATH=$PATH:$GOPATH/bin:$GOROOT/bin
