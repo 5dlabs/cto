@@ -2072,14 +2072,14 @@ fi
   "iteration": $ATTEMPT,
   "status": "completed",
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Quality checks passed on iteration $ATTEMPT",
+  "findings": "Security checks passed on iteration $ATTEMPT",
   "exit_code": 0,
   "issues": []
 }
 EOF
     echo "💾 Saved successful completion state to $STATE_FILE"
     
-    echo "✅ Attempt $ATTEMPT: Quality checks passed"
+    echo "✅ Attempt $ATTEMPT: Security checks passed"
     SUCCESS=1
     break
   else
@@ -2089,14 +2089,14 @@ EOF
   "iteration": $ATTEMPT,
   "status": "incomplete",
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Quality checks incomplete - exit code $CLAUDE_EXIT_CODE",
+  "findings": "Security checks incomplete - exit code $CLAUDE_EXIT_CODE",
   "exit_code": $CLAUDE_EXIT_CODE,
   "issues": ["Claude exited with non-zero status"]
 }
 EOF
     echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
     
-    echo "⚠️ Attempt $ATTEMPT: Quality checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    echo "⚠️ Attempt $ATTEMPT: Security checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
     
     if [ $ATTEMPT -lt $MAX_RETRIES ]; then
       echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
