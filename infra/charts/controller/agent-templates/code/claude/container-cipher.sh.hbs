@@ -1946,9 +1946,9 @@ else
   REPO_SLUG="$REPO_INPUT"
 fi
 
-# Post quality review comment to PR
+# Post security scan comment to PR
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
-  echo "💬 Posting quality review comment to PR..."
+  echo "💬 Posting security scan comment to PR..."
 
   # Create comment body based on Claude exit status
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
