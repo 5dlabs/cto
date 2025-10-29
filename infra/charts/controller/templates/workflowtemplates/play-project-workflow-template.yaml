@@ -511,31 +511,31 @@ spec:
               TASK_DESC=""
               TASK_DETAILS=""
               
-              if [ -f "/tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json" ]; then
+              if [ -f "/tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json" ]; then
                 # Try to read from tasks.json (handle both tagged and non-tagged formats)
                 AGENT_HINT=$(jq -r "
                   (.master.tasks[]? // .tasks[]?) | 
                   select(.id == $task_id) | 
                   .agentHint // \"\"
-                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
                 
                 TASK_TITLE=$(jq -r "
                   (.master.tasks[]? // .tasks[]?) | 
                   select(.id == $task_id) | 
                   .title // \"\"
-                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
                 
                 TASK_DESC=$(jq -r "
                   (.master.tasks[]? // .tasks[]?) | 
                   select(.id == $task_id) | 
                   .description // \"\"
-                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
                 
                 TASK_DETAILS=$(jq -r "
                   (.master.tasks[]? // .tasks[]?) | 
                   select(.id == $task_id) | 
                   .details // \"\"
-                " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+                " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
               fi
               
               # Default to implementation agent
@@ -1077,30 +1077,30 @@ spec:
             TASK_DESC=""
             TASK_DETAILS=""
             
-            if [ -f "/tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json" ]; then
+            if [ -f "/tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json" ]; then
               AGENT_HINT=$(jq -r "
                 (.master.tasks[]? // .tasks[]?) | 
                 select(.id == $task_id) | 
                 .agentHint // \"\"
-              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
               
               TASK_TITLE=$(jq -r "
                 (.master.tasks[]? // .tasks[]?) | 
                 select(.id == $task_id) | 
                 .title // \"\"
-              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
               
               TASK_DESC=$(jq -r "
                 (.master.tasks[]? // .tasks[]?) | 
                 select(.id == $task_id) | 
                 .description // \"\"
-              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
               
               TASK_DETAILS=$(jq -r "
                 (.master.tasks[]? // .tasks[]?) | 
                 select(.id == $task_id) | 
                 .details // \"\"
-              " /tmp/docs-repo-agent-routing/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
+              " /tmp/docs-repo-agent-routing/{{`{{workflow.parameters.docs-project-directory}}`}}/.taskmaster/tasks/tasks.json 2>/dev/null || echo "")
             fi
             
             # Default to implementation agent
