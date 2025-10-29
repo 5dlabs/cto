@@ -2008,7 +2008,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   ensure_status_labels "$REPO_SLUG" \
     "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
     "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
-    "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cipher quality review" \
+    "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cipher security scan" \
     "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
@@ -2115,26 +2115,26 @@ done
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 if [ $SUCCESS -eq 1 ]; then
-  echo "✅ CLEO QUALITY REVIEW SUCCESSFUL"
+  echo "✅ CIPHER SECURITY SCAN SUCCESSFUL"
   echo "   Completed after $ATTEMPT attempt(s)"
 else
-  echo "⚠️ CLEO QUALITY REVIEW INCOMPLETE"
+  echo "⚠️ CIPHER SECURITY SCAN INCOMPLETE"
   echo "   Attempted $ATTEMPT time(s)"
-  echo "   Quality standards not yet met"
+  echo "   Security standards not yet met"
 fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Cleanup and exit
 echo "════════════════════════════════════════════════════════════════"
-echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
+echo "║                 CIPHER SECURITY SCAN COMPLETE                ║"
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 Task: {{task_id}}"
-echo "✅ Code quality checks completed"
+echo "✅ Security checks completed"
 echo "════════════════════════════════════════════════════════════════"
 
 # Final termination sequence
 echo "════════════════════════════════════════════════════════════════"
-echo "🔚 TERMINATING CLEO CONTAINER"
+echo "🔚 TERMINATING CIPHER CONTAINER"
 echo "════════════════════════════════════════════════════════════════"
 echo "Claude Exit Code: $CLAUDE_EXIT_CODE"
 echo "Container PID: $$"
@@ -2142,7 +2142,7 @@ echo "Final Process Check:"
 ps aux | head -5
 
 # Write completion marker for workflow tracking
-echo "cipher-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
 
 # Explicitly stop Docker sidecar before exiting
 echo "🛑 Explicitly stopping Docker sidecar..."
@@ -2154,6 +2154,6 @@ if [ $SUCCESS -eq 1 ]; then
   exit 0
 else
   echo "🔚 Terminating container with failure status..."
-  echo "📝 Quality checks incomplete after $ATTEMPT attempt(s)"
+  echo "📝 Security checks incomplete after $ATTEMPT attempt(s)"
   exit 1
 fi
