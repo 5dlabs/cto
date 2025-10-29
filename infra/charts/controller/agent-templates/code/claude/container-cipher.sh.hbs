@@ -1560,7 +1560,7 @@ You are Cipher, a rigorous security scanning agent. Your mission is to identify 
 
 # Add task context if available
 if [ -f "$CLAUDE_WORK_DIR/task/task.md" ]; then
-    CLEO_PROMPT="$CLEO_PROMPT
+    CIPHER_PROMPT="$CIPHER_PROMPT
 
 ### Task Information (for context)
 $(cat "$CLAUDE_WORK_DIR/task/task.md")
@@ -1574,14 +1574,14 @@ $(cat "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" 2>/dev/null || echo "No acc
 ### Architecture Reference (if available)
 $(cat "$CLAUDE_WORK_DIR/task/architecture.md" 2>/dev/null || echo "No architecture.md found")"
 else
-    CLEO_PROMPT="$CLEO_PROMPT
+    CIPHER_PROMPT="$CIPHER_PROMPT
 
 ### Task Information
-No task files found in /task directory - proceeding with general code quality review."
+No task files found in /task directory - proceeding with general security scan."
 fi
 
 # Complete the prompt
-CLEO_PROMPT="$CLEO_PROMPT
+CIPHER_PROMPT="$CIPHER_PROMPT
 
 ## Your Instructions
 
@@ -1594,7 +1594,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
 - All your commits will automatically appear on PR #${PR_NUMBER:-UNKNOWN}
 - The repository is already checked out to the correct PR branch
 
-**Your job**: Fix code quality issues on Rex's PR, NOT create your own PR.
+**Your job**: Fix security vulnerabilities on Rex's PR, NOT create your own PR.
 
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
