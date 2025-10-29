@@ -1053,8 +1053,6 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             )
         };
 
-    let frontend_agent_max_retries = frontend_agent_cfg.and_then(|cfg| cfg.max_retries);
-
     // Handle quality agent - use provided value or config default
     let quality_agent_input = arguments
         .get("quality_agent")
@@ -1304,12 +1302,16 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let testing_agent_max_retries = testing_agent_cfg.and_then(|cfg| cfg.max_retries);
 
+    let frontend_agent_max_retries = frontend_agent_cfg.and_then(|cfg| cfg.max_retries);
+
     // Validate model name (support both Claude API and CLAUDE code formats)
     validate_model_name(&model)?;
 
     // Validate agent-specific models
     validate_model_name(&implementation_model)
         .map_err(|e| anyhow!("Invalid implementation agent model: {}", e))?;
+    validate_model_name(&frontend_model)
+        .map_err(|e| anyhow!("Invalid frontend agent model: {}", e))?;
     validate_model_name(&quality_model)
         .map_err(|e| anyhow!("Invalid quality agent model: {}", e))?;
     validate_model_name(&security_model)
@@ -1332,6 +1334,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             .or(config.defaults.play.max_retries)
             .or(config.defaults.code.max_retries)
             .unwrap_or(10);
+
+    let frontend_max_retries = parse_max_retries_argument(&arguments, "frontend_max_retries")
+        .or(frontend_agent_max_retries)
+        .or(config.defaults.play.frontend_max_retries)
+        .or(config.defaults.play.max_retries)
+        .or(config.defaults.code.max_retries)
+        .unwrap_or(10);
 
     let quality_max_retries = parse_max_retries_argument(&arguments, "quality_max_retries")
         .or(quality_agent_max_retries)
@@ -1430,6 +1439,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     params.push(format!(
         "implementation-max-retries={implementation_max_retries}"
     ));
+    params.push(format!("frontend-max-retries={frontend_max_retries}"));
     params.push(format!("quality-max-retries={quality_max_retries}"));
     params.push(format!("security-max-retries={security_max_retries}"));
     params.push(format!("testing-max-retries={testing_max_retries}"));

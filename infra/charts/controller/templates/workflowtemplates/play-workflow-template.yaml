@@ -33,6 +33,9 @@ spec:
           "implementation-agent": "{{`{{workflow.parameters.implementation-agent}}`}}",
           "implementation-cli": "{{`{{workflow.parameters.implementation-cli}}`}}",
           "implementation-model": "{{`{{workflow.parameters.implementation-model}}`}}",
+          "frontend-agent": "{{`{{workflow.parameters.frontend-agent}}`}}",
+          "frontend-cli": "{{`{{workflow.parameters.frontend-cli}}`}}",
+          "frontend-model": "{{`{{workflow.parameters.frontend-model}}`}}",
           "quality-agent": "{{`{{workflow.parameters.quality-agent}}`}}",
           "quality-cli": "{{`{{workflow.parameters.quality-cli}}`}}",
           "quality-model": "{{`{{workflow.parameters.quality-model}}`}}",
@@ -47,6 +50,7 @@ spec:
           "docs-repository": "{{`{{workflow.parameters.docs-repository}}`}}",
           "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}",
           "implementation-max-retries": "{{`{{workflow.parameters.implementation-max-retries}}`}}",
+          "frontend-max-retries": "{{`{{workflow.parameters.frontend-max-retries}}`}}",
           "quality-max-retries": "{{`{{workflow.parameters.quality-max-retries}}`}}",
           "security-max-retries": "{{`{{workflow.parameters.security-max-retries}}`}}",
           "testing-max-retries": "{{`{{workflow.parameters.testing-max-retries}}`}}",
@@ -63,6 +67,9 @@ spec:
       # Agent selection parameters (no hardcoded names)
       - name: implementation-agent
         description: "Agent to use for implementation work (e.g., 5DLabs-Rex)"
+        value: ""  # Must be provided by MCP client
+      - name: frontend-agent
+        description: "Agent to use for frontend work (e.g., 5DLabs-Blaze)"
         value: ""  # Must be provided by MCP client
       - name: quality-agent
         description: "Agent to use for quality assurance (e.g., 5DLabs-Cleo)"
@@ -116,6 +123,12 @@ spec:
       - name: testing-model
         description: "Model to use for testing agent"
         value: ""  # Must be provided by MCP client
+      - name: frontend-cli
+        description: "CLI to use for frontend agent (e.g., codex, claude)"
+        value: ""  # Must be provided by MCP client
+      - name: frontend-model
+        description: "Model to use for frontend agent"
+        value: ""  # Must be provided by MCP client
 
       # Agent tool configurations (JSON strings from client-side config)
       - name: implementation-tools
@@ -130,6 +143,9 @@ spec:
       - name: testing-tools
         description: "JSON string of tools config for testing agent"
         value: "{}"  # Defaults to empty, populated by MCP client
+      - name: frontend-tools
+        description: "JSON string of tools config for frontend agent"
+        value: "{}"  # Defaults to empty, populated by MCP client
 
       # Model rotation configurations (JSON arrays of model names)
       - name: implementation-model-rotation
@@ -143,6 +159,9 @@ spec:
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
       - name: testing-model-rotation
         description: "JSON array of model names for testing agent retry rotation"
+        value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
+      - name: frontend-model-rotation
+        description: "JSON array of model names for frontend agent retry rotation"
         value: "[]"  # Defaults to empty array, populated by MCP client from cto-config.json
 
       # PR context (populated by suspend/resume)
@@ -185,6 +204,9 @@ spec:
         value: "10"
       - name: testing-max-retries
         description: "Maximum retry attempts for testing agent executions (0 = unlimited)"
+        value: "10"
+      - name: frontend-max-retries
+        description: "Maximum retry attempts for frontend agent executions (0 = unlimited)"
         value: "10"
       - name: auto-merge
         description: "Whether Tess should automatically merge PRs after approval (true/false)"
@@ -340,24 +362,34 @@ spec:
           duration: "60s"
           factor: 2
       steps:
+        - - name: determine-agent
+            template: determine-task-agent
+            arguments:
+              parameters:
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+                - name: docs-repository
+                  value: "{{`{{workflow.parameters.docs-repository}}`}}"
+                - name: docs-project-directory
+                  value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
         - - name: implementation
             template: implementation-cycle
             arguments:
               parameters:
                 - name: github-app
-                  value: "{{`{{workflow.parameters.implementation-agent}}`}}"
+                  value: "{{`{{steps.determine-agent.outputs.parameters.github-app}}`}}"
                 - name: task-id
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: stage
                   value: "implementation"
                 - name: cli-type
-                  value: "{{`{{workflow.parameters.implementation-cli}}`}}"
+                  value: "{{`{{steps.determine-agent.outputs.parameters.cli-type}}`}}"
                 - name: model
-                  value: "{{`{{workflow.parameters.implementation-model}}`}}"
+                  value: "{{`{{steps.determine-agent.outputs.parameters.model}}`}}"
                 - name: model-rotation
-                  value: "{{`{{workflow.parameters.implementation-model-rotation}}`}}"
+                  value: "{{`{{steps.determine-agent.outputs.parameters.model-rotation}}`}}"
                 - name: max-retries
-                  value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
+                  value: "{{`{{steps.determine-agent.outputs.parameters.max-retries}}`}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
@@ -1345,6 +1377,168 @@ spec:
           echo "Task {{`{{inputs.parameters.task-id}}`}} workflow completed!"
           echo ""
           echo "Note: Next task will be started automatically by webhook system"
+
+    # Template to determine which agent should handle a task based on its type
+    - name: determine-task-agent
+      inputs:
+        parameters:
+          - name: task-id
+          - name: docs-repository
+          - name: docs-project-directory
+      outputs:
+        parameters:
+          - name: github-app
+            valueFrom:
+              path: /tmp/github-app.txt
+          - name: cli-type
+            valueFrom:
+              path: /tmp/cli-type.txt
+          - name: model
+            valueFrom:
+              path: /tmp/model.txt
+          - name: model-rotation
+            valueFrom:
+              path: /tmp/model-rotation.txt
+          - name: max-retries
+            valueFrom:
+              path: /tmp/max-retries.txt
+      script:
+        image: alpine:3.20
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
+          DOCS_REPO="{{`{{inputs.parameters.docs-repository}}`}}"
+          DOCS_PROJECT_DIR="{{`{{inputs.parameters.docs-project-directory}}`}}"
+          
+          echo "🔍 Determining agent for task ${TASK_ID}"
+          echo "   Docs repository: ${DOCS_REPO}"
+          echo "   Project directory: ${DOCS_PROJECT_DIR}"
+          
+          # Install tools
+          apk add --no-cache curl jq openssl git >/dev/null 2>&1 || true
+          
+          # Authenticate with GitHub App
+          TEMP_KEY="/tmp/github-app-key.pem"
+          printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+          chmod 600 "$TEMP_KEY"
+          
+          NOW=$(date +%s)
+          EXP=$((NOW + 600))
+          HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
+          HDR=$(echo -n "$HDR" | tr '+/' '-_' | tr -d '=')
+          PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64)
+          PAY=$(echo -n "$PAY" | tr '+/' '-_' | tr -d '=')
+          SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
+          SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
+          JWT="$HDR.$PAY.$SIG"
+          
+          OWNER=$(echo "$DOCS_REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$DOCS_REPO" | cut -d'/' -f2)
+          
+          # Get installation token
+          INSTALLATION_ID=$(curl -s -L \
+            -H "Authorization: Bearer $JWT" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
+          
+          if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
+            INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $JWT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
+          fi
+          
+          TOKEN=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+          
+          rm -f "$TEMP_KEY"
+          
+          # Clone docs repository to read task file
+          CLONE_DIR="/tmp/docs-repo"
+          rm -rf "$CLONE_DIR"
+          
+          echo "📥 Cloning docs repository..."
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1 || {
+            echo "❌ Failed to clone repository"
+            # Fallback to implementation agent
+            echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
+            echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
+            echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
+            echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
+            echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+            exit 0
+          }
+          
+          # Find and read task file
+          TASK_FILE="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks/task-${TASK_ID}.md"
+          
+          if [ ! -f "$TASK_FILE" ]; then
+            echo "⚠️ Task file not found: ${TASK_FILE}"
+            echo "   Using default implementation agent"
+            echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
+            echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
+            echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
+            echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
+            echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+            exit 0
+          fi
+          
+          echo "📄 Reading task file: ${TASK_FILE}"
+          
+          # Extract agentType from task file (look for "**Agent Type**: frontend" pattern)
+          AGENT_TYPE=$(grep -i "^\*\*Agent Type\*\*:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          
+          if [ -z "$AGENT_TYPE" ]; then
+            # Try alternative format: "Agent Type: frontend"
+            AGENT_TYPE=$(grep -i "^Agent Type:" "$TASK_FILE" | sed 's/.*: *//; s/ *$//' || echo "")
+          fi
+          
+          # Convert to lowercase for comparison
+          AGENT_TYPE=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
+          
+          echo "   Detected agent type: '${AGENT_TYPE}'"
+          
+          # Determine which agent to use based on agent type
+          case "$AGENT_TYPE" in
+            "frontend"|"ui"|"react"|"nextjs")
+              echo "✅ Routing to FRONTEND agent (Blaze)"
+              echo "{{`{{workflow.parameters.frontend-agent}}`}}" > /tmp/github-app.txt
+              echo "{{`{{workflow.parameters.frontend-cli}}`}}" > /tmp/cli-type.txt
+              echo "{{`{{workflow.parameters.frontend-model}}`}}" > /tmp/model.txt
+              echo "{{`{{workflow.parameters.frontend-model-rotation}}`}}" > /tmp/model-rotation.txt
+              echo "{{`{{workflow.parameters.frontend-max-retries}}`}}" > /tmp/max-retries.txt
+              ;;
+            *)
+              echo "✅ Routing to IMPLEMENTATION agent (Rex)"
+              echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
+              echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
+              echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
+              echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
+              echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+              ;;
+          esac
+          
+          echo "   GitHub App: $(cat /tmp/github-app.txt)"
+          echo "   CLI Type: $(cat /tmp/cli-type.txt)"
+          echo "   Model: $(cat /tmp/model.txt)"
+          echo ""
+          echo "🎯 Agent determination complete"
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
