@@ -1646,15 +1646,6 @@ spec:
           LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
           FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
           
-          # Default language/framework if not specified
-          if [ -z "$LANGUAGE" ]; then
-            if [ "$AGENT_TYPE" = "frontend" ] || [ "$AGENT_TYPE" = "ui" ]; then
-              LANGUAGE="typescript"
-            else
-              LANGUAGE="rust"
-            fi
-          fi
-          
           echo "   Detected agent type: '${AGENT_TYPE}'"
           echo "   Detected language: '${LANGUAGE}'"
           echo "   Detected framework: '${FRAMEWORK}'"
