@@ -272,13 +272,6 @@ jobs:
           wait: 120s
           verbosity: 1
 
-      - name: Setup Helm
-        run: |
-          wget -q https://github.com/helm/helm/releases/download/v3.14.0/helm-v3.14.0-linux-amd64.tar.gz
-          tar -xzf helm-v3.14.0-linux-amd64.tar.gz
-          sudo mv linux-amd64/helm /usr/local/bin/helm
-          helm version
-
       - name: Test Helm Chart Structure
         run: |
           echo "🎯 Testing controller Helm chart..."
