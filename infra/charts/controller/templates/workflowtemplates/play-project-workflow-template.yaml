@@ -33,13 +33,67 @@ spec:
       - name: implementation-agent
         value: "5DLabs-Rex"
         description: "Default agent for backend/general implementation tasks"
+      - name: implementation-cli
+        value: "factory"
+      - name: implementation-model
+        value: "claude-sonnet-4-5-20250929"
+      - name: implementation-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: implementation-model-rotation
+        value: '[]'
+      - name: implementation-max-retries
+        value: "10"
       - name: frontend-agent
         value: "5DLabs-Blaze"
         description: "Specialized agent for frontend tasks (React, UI components)"
+      - name: frontend-cli
+        value: "codex"
+      - name: frontend-model
+        value: "gpt-5-codex"
+      - name: frontend-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: frontend-model-rotation
+        value: '[]'
+      - name: frontend-max-retries
+        value: "10"
       - name: quality-agent
         value: "5DLabs-Cleo"
+      - name: quality-cli
+        value: "claude"
+      - name: quality-model
+        value: "claude-sonnet-4-5-20250929"
+      - name: quality-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: quality-model-rotation
+        value: '[]'
+      - name: quality-max-retries
+        value: "5"
+      - name: security-agent
+        value: "5DLabs-Cipher"
+      - name: security-cli
+        value: "codex"
+      - name: security-model
+        value: "gpt-5"
+      - name: security-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: security-model-rotation
+        value: '[]'
+      - name: security-max-retries
+        value: "5"
       - name: testing-agent
         value: "5DLabs-Tess"
+      - name: testing-cli
+        value: "claude"
+      - name: testing-model
+        value: "claude-sonnet-4-5-20250929"
+      - name: testing-tools
+        value: '{"remote":[],"localServers":{}}'
+      - name: testing-model-rotation
+        value: '[]'
+      - name: testing-max-retries
+        value: "5"
+      - name: opencode-max-retries
+        value: "3"
 
       # Repository configuration
       - name: repository
