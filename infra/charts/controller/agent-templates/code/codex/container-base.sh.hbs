@@ -554,11 +554,6 @@ EOF
 
   maybe_add_label "$TASK_LABEL"
   maybe_add_label "$SERVICE_LABEL"
-if [ -d "$REPO_ROOT/.factory" ]; then
-  echo "🧹 Removing stale .factory directory before Codex run"
-  rm -rf "$REPO_ROOT/.factory"
-fi
-
   maybe_add_label "$RUN_LABEL"
 
   if gh pr create "${LABEL_ARGS[@]}"; then
@@ -2060,10 +2055,10 @@ EOF
         FINAL_MESSAGE="Security review requested changes"
       else
         FINAL_MESSAGE="Testing requested changes"
-    fi
-  fi
       fi
     fi
+  fi
+fi
 
 if [ -z "$FINAL_MESSAGE" ]; then
   if [ $SUCCESS -eq 1 ]; then

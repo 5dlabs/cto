@@ -356,14 +356,14 @@ echo "🔍 DEBUG: WORKFLOW_TYPE set to: $WORKFLOW_TYPE"
 if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
     echo "=== SINGLE-REPO WORKFLOW ==="
     # Check if repository already exists (retry scenario)
-    echo "🔍 DEBUG: Checking for existing repository directory: $TARGET_REPO_DIR"
+    echo "🔍 DEBUG: Checking for existing repository directory: /workspace/$TARGET_REPO_DIR"
     echo "  Workspace contents: $(ls -la /workspace/ | grep -v '^total')"
 
-    if [ -d "$TARGET_REPO_DIR" ]; then
+    if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
         echo "🔄 REPOSITORY: UPDATE - directory already exists"
-        echo "📁 Found existing repository '$TARGET_REPO_DIR', updating..."
-        echo "  Directory contents: $(ls -la $TARGET_REPO_DIR | head -5)"
-        cd "$TARGET_REPO_DIR"
+        echo "📁 Found existing repository '/workspace/$TARGET_REPO_DIR', updating..."
+        echo "  Directory contents: $(ls -la /workspace/$TARGET_REPO_DIR | head -5)"
+        cd "/workspace/$TARGET_REPO_DIR"
         echo "  Current branch: $(git branch --show-current 2>/dev/null || echo 'unknown')"
         echo "  Git status before update: $(git status --porcelain | wc -l) files changed"
         git fetch origin
@@ -373,16 +373,16 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
         echo "✓ Repository updated successfully to $DOCS_BRANCH"
     else
         echo "📥 REPOSITORY: CLONING - first time setup"
-        echo "  Clone command: git clone \"$REPO_HTTP_URL\" \"$TARGET_REPO_DIR\""
-        if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
+        echo "  Clone command: git clone \"$REPO_HTTP_URL\" \"/workspace/$TARGET_REPO_DIR\""
+        if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
             echo "❌ Failed to clone repository: {{repository_url}} ($REPO_HTTP_URL)"
             echo "  Last git error: $(git config --get-regexp 'credential|remote')"
             exit 1
         fi
         echo "  Clone successful, changing to directory and checking out $DOCS_BRANCH"
-        cd "$TARGET_REPO_DIR" && git checkout "$DOCS_BRANCH" && cd "$TASK_WORKSPACE"
-        echo "✓ Repository cloned successfully"
-        echo "  Final directory structure: $(ls -la $TARGET_REPO_DIR | head -5)"
+        cd "/workspace/$TARGET_REPO_DIR" && git checkout "$DOCS_BRANCH" && cd "$TASK_WORKSPACE"
+        echo "✓ Repository cloned successfully to /workspace/$TARGET_REPO_DIR"
+        echo "  Final directory structure: $(ls -la /workspace/$TARGET_REPO_DIR | head -5)"
     fi
 
     # Preserve Task Master files before branch switching (single-repo workflow)
@@ -480,21 +480,21 @@ else
     fi
 
     # Step 2: Clone or update target repository
-    if [ -d "$TARGET_REPO_DIR" ]; then
+    if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
         echo "🔄 TARGET REPOSITORY: UPDATE - directory already exists"
-        echo "📁 Found existing target repository '$TARGET_REPO_DIR', updating..."
-        cd "$TARGET_REPO_DIR"
+        echo "📁 Found existing target repository '/workspace/$TARGET_REPO_DIR', updating..."
+        cd "/workspace/$TARGET_REPO_DIR"
         git fetch origin main
         git reset --hard origin/main
         cd "$TASK_WORKSPACE"
         echo "✓ Target repository updated successfully"
     else
         echo "📥 TARGET REPOSITORY: CLONING - first time setup"
-        if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
+        if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
             echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
             exit 1
         fi
-        echo "✓ Target repository cloned successfully"
+        echo "✓ Target repository cloned successfully to /workspace/$TARGET_REPO_DIR"
     fi
 
     # Step 3: Copy task files from docs repo to target repo
@@ -637,11 +637,12 @@ BRANCH_EXISTS="false"
     fi
 
 # 5. Set Working Directory (Critical for Claude Execution)
+WORKSPACE_DIR="$TARGET_REPO_DIR"
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
 else
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
 fi
 mkdir -p "$CLAUDE_WORK_DIR" && cd "$CLAUDE_WORK_DIR"
 echo "✓ Set working directory: $CLAUDE_WORK_DIR"
@@ -903,7 +904,7 @@ for file in $REQUIRED_FILES; do
 done
 
 # Check git repository (REQUIRED for implementation tasks)
-if [ ! -d "/workspace/$REPO_NAME/.git" ]; then
+if [ ! -d "/workspace/$TARGET_REPO_DIR/.git" ]; then
   echo "✗ CRITICAL ERROR: No target git repository found!"
   MISSING_FILES="$MISSING_FILES git-repository"
 else

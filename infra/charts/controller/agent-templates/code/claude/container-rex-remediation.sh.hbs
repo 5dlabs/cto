@@ -618,21 +618,21 @@ else
 fi
 
 # Step 2: Clone or update target repository
-if [ -d "$TARGET_REPO_DIR" ]; then
+if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
     echo "🔄 TARGET REPOSITORY: UPDATE - directory already exists"
-    echo "📁 Found existing target repository '$TARGET_REPO_DIR', updating..."
-    cd "$TARGET_REPO_DIR"
+    echo "📁 Found existing target repository '/workspace/$TARGET_REPO_DIR', updating..."
+    cd "/workspace/$TARGET_REPO_DIR"
     git fetch origin main
     git reset --hard origin/main
     cd "$TASK_WORKSPACE"
     echo "✓ Target repository updated successfully"
 else
     echo "📥 TARGET REPOSITORY: CLONING - first time setup"
-    if ! git clone "$REPO_HTTP_URL" "$TARGET_REPO_DIR"; then
+    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
         echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
         exit 1
     fi
-    echo "✓ Target repository cloned successfully"
+    echo "✓ Target repository cloned successfully to /workspace/$TARGET_REPO_DIR"
 fi
 
 # Step 3: Copy task files from docs repo to target repo
@@ -727,11 +727,12 @@ REPO_NAME="$TARGET_REPO_DIR"
 echo "✓ Working directory: /workspace/$REPO_NAME"
 
 # Set Claude working directory early (needed for client-config.json copy)
+WORKSPACE_DIR="$TARGET_REPO_DIR"
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME"
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
 else
-  CLAUDE_WORK_DIR="/workspace/$REPO_NAME/$WORK_DIR"
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
 fi
 mkdir -p "$CLAUDE_WORK_DIR"
 echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
@@ -1048,7 +1049,7 @@ for file in $REQUIRED_FILES; do
 done
 
 # Check git repository (REQUIRED for implementation tasks)
-if [ ! -d "/workspace/$REPO_NAME/.git" ]; then
+if [ ! -d "/workspace/$TARGET_REPO_DIR/.git" ]; then
   echo "✗ CRITICAL ERROR: No target git repository found!"
   MISSING_FILES="$MISSING_FILES git-repository"
 else
