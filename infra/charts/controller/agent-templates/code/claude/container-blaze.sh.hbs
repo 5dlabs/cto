@@ -127,11 +127,12 @@ else
 fi
 
 # Set up Claude work directory
-{{#if work_dir}}
-CLAUDE_WORK_DIR="$TASK_WORKSPACE/$WORKSPACE_DIR/{{work_dir}}"
-{{else}}
-CLAUDE_WORK_DIR="$TASK_WORKSPACE/$WORKSPACE_DIR"
-{{/if}}
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+    CLAUDE_WORK_DIR="$TASK_WORKSPACE/$WORKSPACE_DIR"
+else
+    CLAUDE_WORK_DIR="$TASK_WORKSPACE/$WORKSPACE_DIR/$WORK_DIR"
+fi
 mkdir -p "$CLAUDE_WORK_DIR"
 echo "✓ Claude working directory: $CLAUDE_WORK_DIR"
 
