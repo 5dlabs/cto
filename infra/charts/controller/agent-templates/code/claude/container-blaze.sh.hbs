@@ -34,6 +34,12 @@ echo "║           BLAZE FRONTEND WORKFLOW STARTING                  ║"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
 
+# Task-specific workspace for parallel execution isolation
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
 # Ensure we're in the task workspace
 cd "$TASK_WORKSPACE"
 
