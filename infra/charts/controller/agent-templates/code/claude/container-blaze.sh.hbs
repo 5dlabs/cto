@@ -31,13 +31,25 @@ mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
-# Ensure we're in the task workspace before base template clones the repo
+# Ensure we're in the task workspace
 cd "$TASK_WORKSPACE"
 
-# Source the base container setup
-{{> claude_container_base
-    agent_banner=""
-    agent_completion_message=""}}
+# =========================================================================
+# TODO: MISSING BASE SETUP (Repository Cloning & Authentication)
+# =========================================================================
+# This template is incomplete and references a non-existent 'claude_container_base' partial.
+# Required setup missing:
+#   1. Git authentication (GitHub App token setup)
+#   2. Repository cloning logic
+#   3. CLAUDE_WORK_DIR variable setup
+#   4. Git configuration (user.name, user.email)
+#
+# For a complete implementation, see container.sh.hbs or container-rex.sh.hbs
+# which include full authentication and cloning logic (~300+ lines).
+#
+# Current workaround: This template will fail at runtime when CLAUDE_WORK_DIR
+# is referenced (line 67) because it's never set.
+# =========================================================================
 
 # =========================================================================
 # BLAZE-SPECIFIC FRONTEND WORKFLOW
