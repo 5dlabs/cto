@@ -629,6 +629,18 @@ spec:
                   value: '$SELECTED_TOOLS'
                 - name: implementation-model-rotation
                   value: '$SELECTED_MODEL_ROTATION'
+                - name: frontend-agent
+                  value: "{{`{{workflow.parameters.frontend-agent}}`}}"
+                - name: frontend-cli
+                  value: "{{`{{workflow.parameters.frontend-cli}}`}}"
+                - name: frontend-model
+                  value: "{{`{{workflow.parameters.frontend-model}}`}}"
+                - name: frontend-tools
+                  value: '{{`{{workflow.parameters.frontend-tools}}`}}'
+                - name: frontend-model-rotation
+                  value: '{{`{{workflow.parameters.frontend-model-rotation}}`}}'
+                - name: frontend-max-retries
+                  value: "{{`{{workflow.parameters.frontend-max-retries}}`}}"
                 - name: quality-agent
                   value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: quality-cli
@@ -1191,6 +1203,18 @@ spec:
                   value: '$SELECTED_TOOLS'
                 - name: implementation-model-rotation
                   value: '$SELECTED_MODEL_ROTATION'
+                - name: frontend-agent
+                  value: "{{`{{workflow.parameters.frontend-agent}}`}}"
+                - name: frontend-cli
+                  value: "{{`{{workflow.parameters.frontend-cli}}`}}"
+                - name: frontend-model
+                  value: "{{`{{workflow.parameters.frontend-model}}`}}"
+                - name: frontend-tools
+                  value: '{{`{{workflow.parameters.frontend-tools}}`}}'
+                - name: frontend-model-rotation
+                  value: '{{`{{workflow.parameters.frontend-model-rotation}}`}}'
+                - name: frontend-max-retries
+                  value: "{{`{{workflow.parameters.frontend-max-retries}}`}}"
                 - name: quality-agent
                   value: "{{`{{workflow.parameters.quality-agent}}`}}"
                 - name: quality-cli
