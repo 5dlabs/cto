@@ -584,18 +584,18 @@ echo "════════════════════════�
 echo "🔍 CODE QUALITY ANALYSIS PREPARATION"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo "MISSION: Enforce rigorous code quality standards:"
-echo "1. Run Clippy pedantic checks on all Rust code changes"
-echo "2. Verify code formatting with cargo fmt --check"
-echo "3. Execute all tests with cargo test"
-echo "4. Lint YAML files when YAML changes are detected"
-echo "5. Add 'ready-for-qa' label only when all quality checks pass"
+echo "MISSION: Enforce rigorous security standards:"
+echo "1. Check GitHub code scanning for open security vulnerabilities"
+echo "2. Fix all CRITICAL/HIGH/MEDIUM severity security issues"
+echo "3. Verify security best practices are followed"
+echo "4. Run quality checks (Clippy, fmt, tests) after security fixes"
+echo "5. Add 'ready-for-qa' label only when all security checks pass"
 echo ""
-echo "Quality Standards:"
-echo "- Zero clippy warnings (pedantic level)"
-echo "- Perfect code formatting"
-echo "- 100% test passing rate"
-echo "- Clean YAML syntax and structure"
+echo "Security Standards:"
+echo "- Zero CRITICAL/HIGH/MEDIUM security vulnerabilities"
+echo "- No hardcoded secrets or credentials"
+echo "- Proper input validation and sanitization"
+echo "- Secure cryptography practices"
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
@@ -1418,10 +1418,10 @@ if [ -n "$DEFAULT_MODEL" ]; then
   echo "🎯 Default model: $DEFAULT_MODEL"
 fi
 
-# Retry loop - Cipher will continue until quality checks pass or max retries reached
+# Retry loop - Cipher will continue until security checks pass or max retries reached
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "════════════════════════════════════════════════════════════════"
-  echo "🚀 Cipher Quality Review Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "🚀 Cipher Security Scan Attempt $ATTEMPT/$MAX_RETRIES"
   echo "════════════════════════════════════════════════════════════════"
 
   # =========================================================================
