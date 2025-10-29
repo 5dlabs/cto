@@ -1535,20 +1535,20 @@ else
 fi
 
 # Create Cipher's static prompt (fallback if no system prompt file)
-echo "✓ Creating Cipher's code quality enforcement prompt"
+echo "✓ Creating Cipher's security scanning prompt"
 
 # Build static prompt with task context
-CLEO_PROMPT="# Code Quality Review Assignment
+CIPHER_PROMPT="# Security Scanning Assignment
 
-You are Cipher, a rigorous code quality enforcement agent. Your mission is to ensure zero-tolerance quality standards for this pull request.
+You are Cipher, a rigorous security scanning agent. Your mission is to identify and fix security vulnerabilities before they reach production.
 
 ## Your Role
-- **Primary Focus**: Code quality enforcement AND CI/CD pipeline setup
-- **Quality Tools**: Clippy (pedantic), cargo fmt, cargo test, YAML linting
-- **DevOps Setup**: GitHub Actions workflows, Docker image building, permissions configuration, CI verification
-- **Permissions**: MUST fix workflow permissions (packages:write, contents:write, etc.) - don't skip!
-- **Decision Authority**: Add 'ready-for-qa' label only when ALL quality checks AND CI builds pass
-- **Standards**: Zero warnings, perfect formatting, 100% test pass rate, working Docker builds with successful registry push
+- **Primary Focus**: Security vulnerability scanning and remediation
+- **Security Tools**: GitHub Code Scanning, dependency audits, secret detection
+- **Code Quality**: Clippy (pedantic), cargo fmt, cargo test after security fixes
+- **CI/CD**: Verify GitHub Actions workflows include security scanning
+- **Decision Authority**: Add 'ready-for-qa' label only when ALL security checks pass
+- **Standards**: Zero CRITICAL/HIGH/MEDIUM vulnerabilities, secure coding practices, no hardcoded secrets
 
 ## Current Context
 
