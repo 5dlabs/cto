@@ -35,11 +35,11 @@ else
 fi
 
 echo '════════════════════════════════════════════════════════════════'
-echo '║               🔧 REX REMEDIATION WORKFLOW STARTING             ║'
-echo '║                  Remediation Agent Active                      ║'
-echo '║            ⚠️  FIXING FEEDBACK - NO NEW IMPLEMENTATION ⚠️         ║'
+printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
+echo '║  🔧 REX REMEDIATION WORKFLOW STARTING                        ║'
+echo '║  Remediation Agent Active                                    ║'
+echo '║  ⚠️  FIXING FEEDBACK - NO NEW IMPLEMENTATION ⚠️                    ║'
 echo '════════════════════════════════════════════════════════════════'
-echo "🎯 Agent: {{github_app}}"
 echo "🔧 Mode: Remediation - Fix Only"
 echo "📋 Task ID: {{task_id}}"
 echo "🚨 CRITICAL: ONLY fix the issues identified in feedback"

@@ -12,17 +12,139 @@ set -euo pipefail
 # - Automated PR creation with visual documentation
 # =========================================================================
 
-echo "🎨 Blaze Claude frontend workflow starting"
-echo "════════════════════════════════════════════════════════════════"
-echo "Task ID: {{task_id}}"
-echo "Repository: {{repository_url}}"
-echo "Service: {{service}}"
+echo '════════════════════════════════════════════════════════════════'
+printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
+echo '║  BLAZE FRONTEND WORKFLOW STARTING                            ║'
+echo '║  Frontend Development & UI/UX Agent                          ║'
+echo '════════════════════════════════════════════════════════════════'
+echo "🎨 Focus: Frontend development, React/Next.js, UI components"
+echo "📋 Task ID: {{task_id}}"
+echo "🌐 Repository: {{repository_url}}"
+echo "⚙️  Service: {{service}}"
 echo "════════════════════════════════════════════════════════════════"
 
-# Source the base container setup
-{{> claude_container_base
-    agent_banner=""
-    agent_completion_message=""}}
+# Task-specific workspace for parallel execution isolation
+# CRITICAL: This must be set BEFORE including the base template so that
+# the repository clones into the task-specific directory, not the shared workspace
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+# Ensure we're in the task workspace
+cd "$TASK_WORKSPACE"
+
+# =========================================================================
+# GITHUB AUTHENTICATION & REPOSITORY SETUP
+# =========================================================================
+
+# Disable interactive Git prompts globally
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
+export SSH_ASKPASS=/bin/true
+
+# Repository URL
+REPO_URL="{{repository_url}}"
+
+echo "Authenticating with GitHub App..."
+
+# Authenticate with GitHub App
+if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
+    # Create temporary private key file (support escaped newlines)
+    TEMP_KEY_FILE="/tmp/github-app-key.pem"
+    printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+
+    # Generate JWT token for GitHub App
+    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
+    JWT_HEADER=$(echo "$JWT_HEADER" | tr '+/' '-_' | tr -d '=')
+
+    NOW=$(date +%s)
+    EXP=$((NOW + 600))
+    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
+    JWT_PAYLOAD=$(echo "$JWT_PAYLOAD" | tr '+/' '-_' | tr -d '=')
+
+    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 2>/dev/null || base64 | tr -d '\n' | tr '+/' '-_' | tr -d '=')
+    JWT_SIGNATURE=$(echo "$JWT_SIGNATURE" | tr '+/' '-_' | tr -d '=')
+    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
+
+    # Parse repository owner and name
+    INPUT_REPO="{{repository_url}}"
+    if echo "$INPUT_REPO" | grep -qE '^https://github.com/'; then
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
+    elif echo "$INPUT_REPO" | grep -qE '^git@github.com:'; then
+        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:([^/]+)/.*|\1|')
+        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|git@github.com:[^/]+/([^/]+)(\.git)?|\1|')
+    else
+        SLUG=$(echo "$INPUT_REPO" | sed -E 's|\.git$||')
+        REPO_OWNER=$(echo "$SLUG" | cut -d'/' -f1)
+        REPO_NAME=$(echo "$SLUG" | cut -d'/' -f2)
+    fi
+
+    # Get installation access token
+    INSTALL_ID=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+
+    if [ -n "$INSTALL_ID" ]; then
+        TOKEN_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/app/installations/$INSTALL_ID/access_tokens")
+        ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+        if [ -n "$ACCESS_TOKEN" ]; then
+            echo "✓ GitHub App authentication successful"
+            export GITHUB_TOKEN="$ACCESS_TOKEN"
+        else
+            echo "❌ Failed to obtain GitHub App access token"
+            exit 1
+        fi
+    else
+        echo "❌ Failed to get installation ID for $REPO_OWNER/$REPO_NAME"
+        exit 1
+    fi
+
+    rm -f "$TEMP_KEY_FILE"
+else
+    echo "❌ Missing GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID"
+    exit 1
+fi
+
+# Clone repository
+echo "Cloning repository: $REPO_URL"
+WORKSPACE_DIR="$REPO_NAME"
+
+# Use access token for cloning
+AUTH_REPO_URL=$(echo "$REPO_URL" | sed "s|https://|https://x-access-token:${ACCESS_TOKEN}@|")
+
+if git clone "$AUTH_REPO_URL" "$TASK_WORKSPACE/$WORKSPACE_DIR"; then
+    echo "✓ Repository cloned successfully"
+else
+    echo "❌ Failed to clone repository"
+    exit 1
+fi
+
+# Set up Claude work directory
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
+    CLAUDE_WORK_DIR="$TASK_WORKSPACE/$WORKSPACE_DIR"
+else
+    CLAUDE_WORK_DIR="$TASK_WORKSPACE/$WORKSPACE_DIR/$WORK_DIR"
+fi
+mkdir -p "$CLAUDE_WORK_DIR"
+echo "✓ Claude working directory: $CLAUDE_WORK_DIR"
+
+# Configure Git
+cd "$CLAUDE_WORK_DIR"
+git config user.name "{{github_app}}"
+git config user.email "{{github_app}}@users.noreply.github.com"
+echo "✓ Git configured"
+
+# =========================================================================
+# END AUTHENTICATION & REPOSITORY SETUP
+# =========================================================================
 
 # =========================================================================
 # BLAZE-SPECIFIC FRONTEND WORKFLOW
@@ -33,15 +155,6 @@ echo "════════════════════════�
 echo "║           BLAZE FRONTEND WORKFLOW STARTING                  ║"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-
-# Task-specific workspace for parallel execution isolation
-TASK_WORKSPACE="/workspace/task-{{task_id}}"
-mkdir -p /workspace
-mkdir -p "$TASK_WORKSPACE"
-echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
-
-# Ensure we're in the task workspace
-cd "$TASK_WORKSPACE"
 
 # Check if frontend scripts are available
 SCRIPTS_DIR="/workspace/scripts/blaze"

@@ -35,11 +35,11 @@ else
 fi
 
 echo '════════════════════════════════════════════════════════════════'
-echo '║              CIPHER SECURITY SCANNING WORKFLOW STARTING             ║'
-echo '║     Vulnerability Analysis & Security Validation Agent          ║'
+printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
+echo '║  CIPHER SECURITY SCANNING WORKFLOW STARTING                  ║'
+echo '║  Vulnerability Analysis & Security Validation Agent          ║'
 echo '════════════════════════════════════════════════════════════════'
-echo "🎯 Agent: {{github_app}}"
-echo "🔍 Focus: Security vulnerability scanning, dependency analysis, compliance"
+echo "🔒 Focus: Security vulnerability scanning, dependency analysis, compliance"
 echo "📋 Task ID: {{task_id}}"
 echo "✅ Mission: Zero tolerance for CRITICAL/HIGH security vulnerabilities"
 
@@ -142,7 +142,7 @@ export SSH_ASKPASS=/bin/true
 REPO_URL="{{repository_url}}"
 
 # GitHub App authentication is configured via environment variables
-echo "Using GitHub App authentication for code quality checks"
+echo "Using GitHub App authentication for security scanning"
 
 # Authenticate with GitHub App
 if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
@@ -350,9 +350,9 @@ fi
 echo "🔧 Repository: $REPO_NAME"
 echo "🔧 Working directory will be set to: $CLAUDE_WORK_DIR"
 
-# Prepare environment for QA checks
+# Prepare environment for security checks
 echo "════════════════════════════════════════════════════════════════"
-echo "📊 PREPARING CODE QUALITY ENVIRONMENT"
+echo "📊 PREPARING SECURITY SCANNING ENVIRONMENT"
 echo "════════════════════════════════════════════════════════════════"
 
 # Set GitHub App attribution - use generic format for all agents
@@ -531,9 +531,9 @@ if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
   fi
 fi
 
-# Checkout PR branch for quality review
+# Checkout PR branch for security scan
 if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
-    echo "🔄 Checking out PR #$PR_NUMBER for quality review..."
+    echo "🔄 Checking out PR #$PR_NUMBER for security scan..."
     cd "$CLAUDE_WORK_DIR"
 
     # Fetch all latest changes including PR branches
@@ -577,30 +577,30 @@ if [ -n "$PR_NUMBER" ] && [ -n "$PR_URL" ]; then
     echo "✅ Repository positioned at PR #$PR_NUMBER with latest changes"
 else
     echo "⚠️  No PR context found (PR_NUMBER=$PR_NUMBER, PR_URL=$PR_URL)"
-    echo "📋 Will perform quality review on current repository state"
+    echo "📋 Will perform security scan on current repository state"
 fi
 
 echo "════════════════════════════════════════════════════════════════"
-echo "🔍 CODE QUALITY ANALYSIS PREPARATION"
+echo "🔍 SECURITY ANALYSIS PREPARATION"
 echo "════════════════════════════════════════════════════════════════"
 echo ""
-echo "MISSION: Enforce rigorous code quality standards:"
-echo "1. Run Clippy pedantic checks on all Rust code changes"
-echo "2. Verify code formatting with cargo fmt --check"
-echo "3. Execute all tests with cargo test"
-echo "4. Lint YAML files when YAML changes are detected"
-echo "5. Add 'ready-for-qa' label only when all quality checks pass"
+echo "MISSION: Enforce rigorous security standards:"
+echo "1. Check GitHub code scanning for open security vulnerabilities"
+echo "2. Fix all CRITICAL/HIGH/MEDIUM severity security issues"
+echo "3. Verify security best practices are followed"
+echo "4. Run quality checks (Clippy, fmt, tests) after security fixes"
+echo "5. Add 'ready-for-qa' label only when all security checks pass"
 echo ""
-echo "Quality Standards:"
-echo "- Zero clippy warnings (pedantic level)"
-echo "- Perfect code formatting"
-echo "- 100% test passing rate"
-echo "- Clean YAML syntax and structure"
+echo "Security Standards:"
+echo "- Zero CRITICAL/HIGH/MEDIUM security vulnerabilities"
+echo "- No hardcoded secrets or credentials"
+echo "- Proper input validation and sanitization"
+echo "- Secure cryptography practices"
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 
 # Copy task files from docs repository if configured
-echo "📋 Preparing task documentation for quality review..."
+echo "📋 Preparing task documentation for security scan..."
 echo "════════════════════════════════════════════════════════════════"
 
 {{#if docsRepositoryUrl}}
@@ -1182,18 +1182,48 @@ elif [ -f "/workspace/CLAUDE.md" ]; then
 else
     echo "📝 Creating Cipher-specific CLAUDE.md memory file"
     cat > "$CLAUDE_WORK_DIR/CLAUDE.md" << 'EOF'
-# CLEO - Code Quality Enforcement Agent
+# CIPHER - Security Scanning Agent
 
 ## Agent Role
-- **Primary**: Rigorous code quality enforcement and CI/CD maintenance
-- **Focus**: Fix CI failures, resolve merge conflicts, enforce quality standards
-- **Secondary**: YAML linting for infrastructure changes
-- **Critical**: Add "ready-for-qa" label only when ALL quality checks pass
+- **Primary**: Security vulnerability scanning and remediation
+- **Focus**: Identify and fix security vulnerabilities before production
+- **Zero tolerance for MEDIUM/HIGH/CRITICAL severity vulnerabilities**
+- **Critical**: Ensure all security best practices are followed
 
 ## PRIORITY TASKS
 
-### 1. Merge Conflict Resolution (DO FIRST!)
-Check for merge conflicts and resolve them immediately:
+### 1. GitHub Code Scanning (DO FIRST!)
+Check for security vulnerabilities on the current PR:
+\\\`\\\`\\\`bash
+# Get all open security alerts for this PR
+gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM"
+
+# Check if there are any CRITICAL/HIGH/MEDIUM severity alerts
+CRITICAL_COUNT=\\\$(gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM" | jq '[.[] | select(.rule.severity == "critical")] | length')
+HIGH_COUNT=\\\$(gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM" | jq '[.[] | select(.rule.severity == "high")] | length')
+MEDIUM_COUNT=\\\$(gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUM" | jq '[.[] | select(.rule.severity == "medium")] | length')
+
+echo "🔒 Security Scan Results:"
+echo "   CRITICAL: \\\$CRITICAL_COUNT"
+echo "   HIGH: \\\$HIGH_COUNT"
+echo "   MEDIUM: \\\$MEDIUM_COUNT"
+\\\`\\\`\\\`
+
+### 2. Security Vulnerability Remediation (HIGH PRIORITY)
+Address all vulnerabilities found:
+
+**Common Vulnerabilities to Fix:**
+- **SQL Injection**: Always use parameterized queries/prepared statements
+- **Command Injection**: Validate and sanitize all command inputs
+- **Path Traversal**: Use path normalization and validation
+- **Insecure Crypto**: Use modern, approved cryptographic libraries
+- **Hardcoded Secrets**: Move to environment variables or secret management
+- **Unsafe Deserialization**: Validate data before deserialization
+- **XSS**: Properly escape all user input in HTML contexts
+- **Auth/Authorization Bypass**: Verify permissions at every access point
+
+### 3. Merge Conflict Resolution
+Check for merge conflicts and resolve them:
 \\\`\\\`\\\`bash
 # Check if PR has conflicts
 gh pr view $PR_NUM --json mergeable,mergeStateStatus
@@ -1207,91 +1237,92 @@ git commit -m "fix: resolve merge conflicts with main"
 git push
 \\\`\\\`\\\`
 
-### 2. CI/CD Failure Fixes (HIGH PRIORITY)
-Monitor CI status and fix any failures OR stuck jobs:
-\\\`\\\`\\\`bash
-# Check if repository has workflows before checking CI status
-if [ -d ".github/workflows" ] && [ "\\\$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | wc -l)" -gt 0 ]; then
-  # Check CI status - look for BOTH failures AND stuck jobs
-  gh pr checks $PR_NUM
-  # Get PR branch dynamically
-  PR_BRANCH=\\\$(gh pr view $PR_NUM --json headRefName -q .headRefName)
-  gh run list --branch="\\\$PR_BRANCH" --limit 5
-else
-  echo "ℹ️  No GitHub Actions workflows found in repository"
-  echo "   CI/CD checks will be skipped for this repository"
-fi
+## Security Best Practices
 
-# If jobs are stuck/not starting:
-# 1. Check workflow syntax:
-cat .github/workflows/*.yml | head -50
-# 2. Verify runner labels exist
-# 3. Check for workflow errors in GitHub UI
+### Input Validation
+- Validate all user input against expected formats
+- Use allowlists, not denylists
+- Sanitize input before use in sensitive contexts
 
-# Common fixes for stuck jobs:
-# - Fix 'runs-on:' to use valid runner (ubuntu-latest, ubuntu-22.04, etc.)
-# - Fix action versions (e.g., actions/checkout@v4)
-# - Ensure workflow triggers match (push, pull_request)
-# - Remove or fix invalid workflow syntax
+### Secure Database Access
+\\\`\\\`\\\`rust
+// ❌ NEVER do this (SQL injection risk):
+let query = format!("SELECT * FROM users WHERE id = {}", user_id);
 
-# Common fixes for failed jobs:
-# - Fix linting errors (cargo fmt, black, eslint --fix)
-# - Fix type errors
-# - Update dependencies if needed
-# - Fix test failures
-# - Adjust CI configuration if needed
+// ✅ Always use parameterized queries:
+let user = sqlx::query!("SELECT * FROM users WHERE id = $1", user_id)
+    .fetch_one(&pool)
+    .await?;
 \\\`\\\`\\\`
 
-## Code Quality Requirements
+### Safe Path Handling
+\\\`\\\`\\\`rust
+// ❌ NEVER do this (path traversal risk):
+let path = format!("/data/{}", user_input);
 
-### CRITICAL: Clippy Pedantic Enforcement
-**ABSOLUTE PRIORITY: Avoid #[allow(clippy::...)] bypasses at all costs!**
-- **DO NOT** add \`#[allow(clippy::pedantic)]\` or similar suppressions
-- **DO NOT** use \`#![allow(...)]\` at module or crate level
-- **ALWAYS** fix the underlying code issue instead of suppressing warnings
-- **ONLY** bypass if absolutely necessary AND document WHY in detail
-- Each bypass is a code smell that should be addressed, not hidden
+// ✅ Always normalize and validate paths:
+use std::path::Path;
+let base = Path::new("/data");
+let requested = base.join(user_input);
+if !requested.starts_with(base) {
+    return Err("Invalid path");
+}
+\\\`\\\`\\\`
 
-### Change Detection Logic
-Analyze git diff to determine appropriate quality checks:
+### Secure Cryptography
+- Use modern algorithms (AES-256-GCM, ChaCha20-Poly1305)
+- Never implement your own crypto
+- Use secure random number generators
+- Properly handle keys and initialization vectors
+
+### Secret Management
+\\\`\\\`\\\`rust
+// ❌ NEVER do this:
+const API_KEY: &str = "sk_live_abc123...";
+
+// ✅ Always use environment variables:
+let api_key = std::env::var("API_KEY")
+    .expect("API_KEY must be set");
+\\\`\\\`\\\`
+
+## Code Quality Integration
+
+### Security-Aware Quality Checks
 \\\`\\\`\\\`bash
+# Run standard quality checks
 RUST_CHANGES=\\\$(git diff --name-only origin/main...HEAD | grep -E '\\\.(rs|toml)\\\$' || true)
-YAML_CHANGES=\\\$(git diff --name-only origin/main...HEAD | grep -E '\\\.(yaml|yml)\\\$' || true)
+if [ -n "\\\$RUST_CHANGES" ]; then
+  cargo clippy -- -D warnings -D clippy::pedantic
+  cargo fmt --check
+  cargo test
+fi
 \\\`\\\`\\\`
 
-### Quality Check Execution
-**For Rust Changes:**
-1. \\\`cargo clippy -- -D warnings -D clippy::pedantic\\\` (ZERO tolerance, NO bypasses)
-2. Review existing code for any \`#[allow(clippy::...)]\` and remove them by fixing the code
-3. \\\`cargo fmt\\\` (auto-fix formatting)
-4. \\\`cargo test\\\` (all tests must pass)
+### Important Rules
+- **NEVER suppress security warnings** - fix the underlying vulnerability
+- Document all security-sensitive code decisions
+- Review dependencies for known vulnerabilities
+- Ensure CI/CD includes security scanning
 
-**For YAML Changes:**
-1. YAML syntax validation with yamllint
-2. Auto-fix trailing spaces and formatting issues
-
-### Error Handling
-- **NEVER** suppress Clippy warnings with #[allow(...)]
-- **ALWAYS** fix the root cause of Clippy warnings
-- Automatically fix formatting and linting issues properly
-- Fix compilation errors if straightforward
-- Update outdated dependencies if causing CI failures
-- Never approve when quality checks fail after fixes
-
-### GitHub Integration
-- Monitor PR for CI failures and merge conflicts
-- Fix issues proactively without waiting
-- Post PR comments about fixes made
-- Add "ready-for-qa" label only when CI is green
-- Use GitHub CLI for all PR operations
+## GitHub Integration
+- Check code scanning alerts before any other work
+- Fix all CRITICAL/HIGH/MEDIUM vulnerabilities
+- Post PR comments documenting security fixes
+- Push fixes and verify alerts are resolved
+- Only approve when all security checks pass
 
 ## Success Criteria
-- PR has no merge conflicts
-- All CI checks passing (green)
-- Zero clippy warnings at pedantic level
-- Perfect code formatting consistency
-- 100% test pass rate
-- Clean YAML syntax and structure
+- ✅ Zero CRITICAL/HIGH/MEDIUM security vulnerabilities
+- ✅ All security best practices followed
+- ✅ No hardcoded secrets or credentials
+- ✅ Input validation implemented properly
+- ✅ Secure cryptography used correctly
+- ✅ All quality checks passing
+- ✅ Changes documented and pushed
+
+## Remember
+Security is not optional. Every vulnerability you fix protects users, data, and the company. 
+Never suppress security warnings - fix the root cause. When in doubt, fail securely.
 EOF
 
     # Append base CLAUDE.md from ConfigMap if it exists
@@ -1340,13 +1371,13 @@ export REPO_NAME
 export REPO_ROOT
 
 echo "════════════════════════════════════════════════════════════════"
-echo "✅ CLEO CODE QUALITY AGENT READY"
+echo "✅ CIPHER SECURITY AGENT READY"
 echo "════════════════════════════════════════════════════════════════"
 echo "📁 Working Directory: $CLAUDE_WORK_DIR"
 echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
 echo "📋 Task: {{task_id}}"
-echo "🎯 Focus: Rigorous code quality enforcement"
-echo "⚠️  CRITICAL: Must pass all quality checks before adding 'ready-for-qa' label"
+echo "🎯 Focus: Security vulnerability scanning and remediation"
+echo "⚠️  CRITICAL: Must fix all CRITICAL/HIGH/MEDIUM security vulnerabilities"
 echo "════════════════════════════════════════════════════════════════"
 
 # Export necessary variables for Claude execution
@@ -1360,7 +1391,7 @@ ATTEMPT=1
 SUCCESS=0
 CLAUDE_EXIT_CODE=1
 
-echo "🔄 Cipher will retry up to $MAX_RETRIES times until quality standards are met"
+echo "🔄 Cipher will retry up to $MAX_RETRIES times until security standards are met"
 echo ""
 
 # =========================================================================
@@ -1387,10 +1418,10 @@ if [ -n "$DEFAULT_MODEL" ]; then
   echo "🎯 Default model: $DEFAULT_MODEL"
 fi
 
-# Retry loop - Cipher will continue until quality checks pass or max retries reached
+# Retry loop - Cipher will continue until security checks pass or max retries reached
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "════════════════════════════════════════════════════════════════"
-  echo "🚀 Cipher Quality Review Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "🚀 Cipher Security Scan Attempt $ATTEMPT/$MAX_RETRIES"
   echo "════════════════════════════════════════════════════════════════"
 
   # =========================================================================
@@ -1404,18 +1435,18 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
     
     if [ "${APPROVAL_COUNT:-0}" -gt 0 ]; then
       echo "✅ PR #${PR_NUMBER} already has ${APPROVAL_COUNT} approval(s)"
-      echo "🚀 FAST-PATH: Skipping quality checks since PR is already approved"
+      echo "🚀 FAST-PATH: Skipping security scan since PR is already approved"
       
-      gh pr comment "$PR_NUMBER" --body "✅ **Cipher Quality Check - Fast-Path**
+      gh pr comment "$PR_NUMBER" --body "✅ **Cipher Security Scan - Fast-Path**
 
-PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant quality checks.
+PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant security scan.
 
 **Fast-Path Benefits:**
 - Saves ~10-15 minutes of execution time
 - Reduces unnecessary compute and model API calls
-- PR already validated by previous quality gate
+- PR already validated by previous security gate
 
-_Cipher will still run full checks if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
+_Cipher will still run full scan if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
 
       SUCCESS=1
       COMPLETED_ATTEMPTS=1
@@ -1435,7 +1466,7 @@ _Cipher will still run full checks if approval is revoked._" 2>/dev/null || echo
   PREVIOUS_CONTEXT=""
   if [ $ATTEMPT -gt 1 ]; then
     PREV_ATTEMPT=$((ATTEMPT - 1))
-    PREV_STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${PREV_ATTEMPT}.json"
+    PREV_STATE_FILE="$AGENT_STATE_DIR/security-iteration-${PREV_ATTEMPT}.json"
     
     if [ -f "$PREV_STATE_FILE" ]; then
       echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
@@ -1504,20 +1535,20 @@ else
 fi
 
 # Create Cipher's static prompt (fallback if no system prompt file)
-echo "✓ Creating Cipher's code quality enforcement prompt"
+echo "✓ Creating Cipher's security scanning prompt"
 
 # Build static prompt with task context
-CLEO_PROMPT="# Code Quality Review Assignment
+CIPHER_PROMPT="# Security Scanning Assignment
 
-You are Cipher, a rigorous code quality enforcement agent. Your mission is to ensure zero-tolerance quality standards for this pull request.
+You are Cipher, a rigorous security scanning agent. Your mission is to identify and fix security vulnerabilities before they reach production.
 
 ## Your Role
-- **Primary Focus**: Code quality enforcement AND CI/CD pipeline setup
-- **Quality Tools**: Clippy (pedantic), cargo fmt, cargo test, YAML linting
-- **DevOps Setup**: GitHub Actions workflows, Docker image building, permissions configuration, CI verification
-- **Permissions**: MUST fix workflow permissions (packages:write, contents:write, etc.) - don't skip!
-- **Decision Authority**: Add 'ready-for-qa' label only when ALL quality checks AND CI builds pass
-- **Standards**: Zero warnings, perfect formatting, 100% test pass rate, working Docker builds with successful registry push
+- **Primary Focus**: Security vulnerability scanning and remediation
+- **Security Tools**: GitHub Code Scanning, dependency audits, secret detection
+- **Code Quality**: Clippy (pedantic), cargo fmt, cargo test after security fixes
+- **CI/CD**: Verify GitHub Actions workflows include security scanning
+- **Decision Authority**: Add 'ready-for-qa' label only when ALL security checks pass
+- **Standards**: Zero CRITICAL/HIGH/MEDIUM vulnerabilities, secure coding practices, no hardcoded secrets
 
 ## Current Context
 
@@ -1529,7 +1560,7 @@ You are Cipher, a rigorous code quality enforcement agent. Your mission is to en
 
 # Add task context if available
 if [ -f "$CLAUDE_WORK_DIR/task/task.md" ]; then
-    CLEO_PROMPT="$CLEO_PROMPT
+    CIPHER_PROMPT="$CIPHER_PROMPT
 
 ### Task Information (for context)
 $(cat "$CLAUDE_WORK_DIR/task/task.md")
@@ -1543,14 +1574,14 @@ $(cat "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" 2>/dev/null || echo "No acc
 ### Architecture Reference (if available)
 $(cat "$CLAUDE_WORK_DIR/task/architecture.md" 2>/dev/null || echo "No architecture.md found")"
 else
-    CLEO_PROMPT="$CLEO_PROMPT
+    CIPHER_PROMPT="$CIPHER_PROMPT
 
 ### Task Information
-No task files found in /task directory - proceeding with general code quality review."
+No task files found in /task directory - proceeding with general security scan."
 fi
 
 # Complete the prompt
-CLEO_PROMPT="$CLEO_PROMPT
+CIPHER_PROMPT="$CIPHER_PROMPT
 
 ## Your Instructions
 
@@ -1563,7 +1594,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
 - All your commits will automatically appear on PR #${PR_NUMBER:-UNKNOWN}
 - The repository is already checked out to the correct PR branch
 
-**Your job**: Fix code quality issues on Rex's PR, NOT create your own PR.
+**Your job**: Fix security vulnerabilities on Rex's PR, NOT create your own PR.
 
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
@@ -1826,13 +1857,13 @@ If CI jobs won't start (showing \"Waiting\" or \"Pending\" indefinitely):
    - Workflow disabled in repo settings
 - The PR checks page on GitHub is your source of truth
 
-Begin your code quality review now."
+Begin your security scan now."
 
 # Debug: Print the actual prompt and CLAUDE.md content
 echo "════════════════════════════════════════════════════════════════"
-echo "🔍 DEBUG: CLEO PROMPT CONTENT"
+echo "🔍 DEBUG: CIPHER PROMPT CONTENT"
 echo "════════════════════════════════════════════════════════════════"
-echo "$CLEO_PROMPT"
+echo "$CIPHER_PROMPT"
 echo "════════════════════════════════════════════════════════════════"
 
 echo "════════════════════════════════════════════════════════════════"
@@ -1863,7 +1894,7 @@ fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Compose initial user turn with the static prompt
-USER_COMBINED=$(printf "%s" "$CLEO_PROMPT" | jq -Rs .)
+USER_COMBINED=$(printf "%s" "$CIPHER_PROMPT" | jq -Rs .)
 
 # Start Claude with prompt piped directly to stdin (no sidecar, no FIFO)
 # Use a subshell to ensure stdin closes after the prompt is sent
@@ -1900,10 +1931,10 @@ if [ -n "$TOKEN_REFRESH_PID" ]; then
     echo "✓ Stopped token refresh process"
 fi
 
-# Always attempt to complete quality review - don't exit on Claude failures
-echo "🔄 Processing quality review results..."
+# Always attempt to complete security scan - don't exit on Claude failures
+echo "🔄 Processing security scan results..."
 if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-  echo "✅ Claude quality review completed successfully"
+  echo "✅ Claude security scan completed successfully"
 fi
 
 # Always attempt to post PR comment and add label regardless of Claude exit status
@@ -1915,9 +1946,9 @@ else
   REPO_SLUG="$REPO_INPUT"
 fi
 
-# Post quality review comment to PR
+# Post security scan comment to PR
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
-  echo "💬 Posting quality review comment to PR..."
+  echo "💬 Posting security scan comment to PR..."
 
   # Create comment body based on Claude exit status
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
@@ -1959,13 +1990,13 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   # Post comment using PR number or URL
   if [ -n "$PR_NUMBER" ]; then
     if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
+      echo "✅ Successfully posted security scan comment"
     else
       echo "⚠️ Failed to post comment using PR number"
     fi
   elif [ -n "$PR_URL" ]; then
     if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
+      echo "✅ Successfully posted security scan comment"
     else
       echo "⚠️ Failed to post comment"
     fi
@@ -1977,7 +2008,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   ensure_status_labels "$REPO_SLUG" \
     "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
     "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \
-    "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cipher quality review" \
+    "${STATUS_LABEL_NEEDS_CLEO}:0e8a16:Awaiting Cipher security scan" \
     "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
@@ -2031,9 +2062,9 @@ fi
   # =========================================================================
   # SAVE ITERATION STATE: Persist findings for next iteration
   # =========================================================================
-  STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${ATTEMPT}.json"
+  STATE_FILE="$AGENT_STATE_DIR/security-iteration-${ATTEMPT}.json"
   
-  # Check if quality review was successful
+  # Check if security scan was successful
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
     # Save successful completion state
     cat > "$STATE_FILE" <<EOF
@@ -2041,14 +2072,14 @@ fi
   "iteration": $ATTEMPT,
   "status": "completed",
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Quality checks passed on iteration $ATTEMPT",
+  "findings": "Security checks passed on iteration $ATTEMPT",
   "exit_code": 0,
   "issues": []
 }
 EOF
     echo "💾 Saved successful completion state to $STATE_FILE"
     
-    echo "✅ Attempt $ATTEMPT: Quality checks passed"
+    echo "✅ Attempt $ATTEMPT: Security checks passed"
     SUCCESS=1
     break
   else
@@ -2058,14 +2089,14 @@ EOF
   "iteration": $ATTEMPT,
   "status": "incomplete",
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Quality checks incomplete - exit code $CLAUDE_EXIT_CODE",
+  "findings": "Security checks incomplete - exit code $CLAUDE_EXIT_CODE",
   "exit_code": $CLAUDE_EXIT_CODE,
   "issues": ["Claude exited with non-zero status"]
 }
 EOF
     echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
     
-    echo "⚠️ Attempt $ATTEMPT: Quality checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    echo "⚠️ Attempt $ATTEMPT: Security checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
     
     if [ $ATTEMPT -lt $MAX_RETRIES ]; then
       echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
@@ -2084,26 +2115,26 @@ done
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 if [ $SUCCESS -eq 1 ]; then
-  echo "✅ CLEO QUALITY REVIEW SUCCESSFUL"
+  echo "✅ CIPHER SECURITY SCAN SUCCESSFUL"
   echo "   Completed after $ATTEMPT attempt(s)"
 else
-  echo "⚠️ CLEO QUALITY REVIEW INCOMPLETE"
+  echo "⚠️ CIPHER SECURITY SCAN INCOMPLETE"
   echo "   Attempted $ATTEMPT time(s)"
-  echo "   Quality standards not yet met"
+  echo "   Security standards not yet met"
 fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Cleanup and exit
 echo "════════════════════════════════════════════════════════════════"
-echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
+echo "║                 CIPHER SECURITY SCAN COMPLETE                ║"
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 Task: {{task_id}}"
-echo "✅ Code quality checks completed"
+echo "✅ Security checks completed"
 echo "════════════════════════════════════════════════════════════════"
 
 # Final termination sequence
 echo "════════════════════════════════════════════════════════════════"
-echo "🔚 TERMINATING CLEO CONTAINER"
+echo "🔚 TERMINATING CIPHER CONTAINER"
 echo "════════════════════════════════════════════════════════════════"
 echo "Claude Exit Code: $CLAUDE_EXIT_CODE"
 echo "Container PID: $$"
@@ -2111,7 +2142,7 @@ echo "Final Process Check:"
 ps aux | head -5
 
 # Write completion marker for workflow tracking
-echo "cipher-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
 
 # Explicitly stop Docker sidecar before exiting
 echo "🛑 Explicitly stopping Docker sidecar..."
@@ -2123,6 +2154,6 @@ if [ $SUCCESS -eq 1 ]; then
   exit 0
 else
   echo "🔚 Terminating container with failure status..."
-  echo "📝 Quality checks incomplete after $ATTEMPT attempt(s)"
+  echo "📝 Security checks incomplete after $ATTEMPT attempt(s)"
   exit 1
 fi
