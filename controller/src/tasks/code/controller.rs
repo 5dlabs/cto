@@ -144,18 +144,42 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
     match job_state {
         CodeJobState::NotFound => {
-            // Check if work was already completed (job might have been deleted after success)
+            // Check if work was already completed or CodeRun already succeeded
+            // (job might have been deleted after success by old controller)
             let work_completed = code_run
                 .status
                 .as_ref()
                 .and_then(|s| s.work_completed)
                 .unwrap_or(false);
+            
+            let current_phase = code_run
+                .status
+                .as_ref()
+                .map(|s| s.phase.as_str())
+                .unwrap_or("");
 
-            if work_completed {
+            if work_completed || current_phase == "Succeeded" {
                 info!(
-                    "Job not found but work already completed for CodeRun {} - skipping new job creation",
-                    code_run.name_any()
+                    "Job not found but CodeRun {} already completed (phase={}, work_completed={}) - skipping new job creation",
+                    code_run.name_any(),
+                    current_phase,
+                    work_completed
                 );
+                
+                // Ensure work_completed flag is set if phase is Succeeded
+                if current_phase == "Succeeded" && !work_completed {
+                    info!("Backfilling work_completed=true for succeeded CodeRun");
+                    update_code_status_with_completion(
+                        &code_run,
+                        ctx,
+                        "Succeeded",
+                        "Code implementation completed successfully",
+                        true,
+                        None,
+                    )
+                    .await?;
+                }
+                
                 return Ok(Action::await_change());
             }
 
