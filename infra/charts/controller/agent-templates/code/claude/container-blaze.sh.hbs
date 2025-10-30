@@ -552,8 +552,6 @@ fi
 TASK_REPO_DIR="$TASK_WORKSPACE/$TARGET_REPO_DIR"
 
 # Set working directory early (needed for correct file placement)
-# Derive from TASK_WORKSPACE to ensure paths stay synchronized
-WORKSPACE_DIR="${TASK_WORKSPACE#/workspace/}/$TARGET_REPO_DIR"
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
   CLAUDE_WORK_DIR="$TASK_REPO_DIR"
@@ -1152,9 +1150,9 @@ echo "Project directory contents:"
 ls -la "$CLAUDE_WORK_DIR"
 echo ""
 
-# Show git status
+# Show git status from repository root
 echo "Git status:"
-git status 2>/dev/null || echo "Git status unavailable"
+(cd "$TASK_REPO_DIR" && git status 2>/dev/null) || echo "Git status unavailable"
 echo ""
 
 echo '=== CLAUDE EXECUTION ==='
