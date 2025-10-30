@@ -128,8 +128,13 @@ safe_copy_directory() {
     local source_count=$(find "$source_dir" -maxdepth 1 -type f 2>/dev/null | wc -l)
     local dest_count=$(find "$dest_dir" -maxdepth 1 -type f 2>/dev/null | wc -l)
     
-    if [ "$source_count" -eq "$dest_count" ] && [ "$dest_count" -gt 0 ]; then
-        echo "✅ $description copied successfully ($dest_count files)"
+    # Success if destination has at least as many files as source (extra files from previous agents are OK)
+    if [ "$dest_count" -ge "$source_count" ] && [ "$source_count" -gt 0 ]; then
+        if [ "$dest_count" -gt "$source_count" ]; then
+            echo "✅ $description copied successfully ($source_count files copied, $((dest_count - source_count)) pre-existing)"
+        else
+            echo "✅ $description copied successfully ($dest_count files)"
+        fi
         return 0
     else
         echo "❌ $description copy incomplete: $dest_count/$source_count files copied"
