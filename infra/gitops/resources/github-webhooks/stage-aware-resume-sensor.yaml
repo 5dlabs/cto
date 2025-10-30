@@ -403,7 +403,7 @@ spec:
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
                           exit 0
                         fi
 
@@ -504,7 +504,7 @@ spec:
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
                           exit 0
                         fi
 
