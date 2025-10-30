@@ -94,7 +94,7 @@ function parseTaskDesignPreferences(description) {
   const overrides = {};
   
   // Parse color preferences
-  const colorMatch = description.match(/(?:color|colors?):\s*([^\\n]+)/i);
+  const colorMatch = description.match(/(?:color|colors?):\s*([^\n]+)/i);
   if (colorMatch) {
     const colorText = colorMatch[1];
     // Extract hex colors
@@ -108,7 +108,7 @@ function parseTaskDesignPreferences(description) {
   }
   
   // Parse font preferences
-  const fontMatch = description.match(/(?:font|typography):\s*([^\\n]+)/i);
+  const fontMatch = description.match(/(?:font|typography):\s*([^\n]+)/i);
   if (fontMatch) {
     overrides.typography = {
       fontFamily: { sans: fontMatch[1].trim() }
