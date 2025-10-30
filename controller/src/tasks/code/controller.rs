@@ -144,6 +144,21 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
     match job_state {
         CodeJobState::NotFound => {
+            // Check if work was already completed (job might have been deleted after success)
+            let work_completed = code_run
+                .status
+                .as_ref()
+                .and_then(|s| s.work_completed)
+                .unwrap_or(false);
+
+            if work_completed {
+                info!(
+                    "Job not found but work already completed for CodeRun {} - skipping new job creation",
+                    code_run.name_any()
+                );
+                return Ok(Action::await_change());
+            }
+
             info!("No existing job found, using optimistic job creation");
 
             // STEP 3: Optimistic job creation with conflict handling (copied from working docs controller)
@@ -246,7 +261,20 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
                 handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
 
-                if ctx.config.cleanup.enabled {
+                // Skip cleanup for workflow-managed jobs (let workflow handle it)
+                let has_workflow_owner = latest_code_run
+                    .metadata
+                    .owner_references
+                    .as_ref()
+                    .and_then(|refs| refs.iter().find(|r| r.kind == "Workflow"))
+                    .is_some();
+
+                if has_workflow_owner {
+                    info!(
+                        "Skipping cleanup for workflow-managed job {} requiring manual intervention (workflow will manage lifecycle)",
+                        job_name
+                    );
+                } else if ctx.config.cleanup.enabled {
                     let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                     if cleanup_delay_minutes == 0 {
                         if let Err(err) = jobs.delete(&job_name, &DeleteParams::default()).await {
@@ -339,7 +367,20 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
                 handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
 
-                if ctx.config.cleanup.enabled {
+                // Skip cleanup for workflow-managed jobs (let workflow handle it)
+                let has_workflow_owner = latest_code_run
+                    .metadata
+                    .owner_references
+                    .as_ref()
+                    .and_then(|refs| refs.iter().find(|r| r.kind == "Workflow"))
+                    .is_some();
+
+                if has_workflow_owner {
+                    info!(
+                        "Skipping cleanup for workflow-managed failed job {} (workflow will manage lifecycle)",
+                        job_name
+                    );
+                } else if ctx.config.cleanup.enabled {
                     let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                     if cleanup_delay_minutes == 0 {
                         let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
@@ -373,7 +414,20 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
             handle_workflow_resumption_on_completion(&latest_code_run, ctx).await?;
 
-            if ctx.config.cleanup.enabled {
+            // Skip cleanup for workflow-managed jobs (let workflow handle it)
+            let has_workflow_owner = latest_code_run
+                .metadata
+                .owner_references
+                .as_ref()
+                .and_then(|refs| refs.iter().find(|r| r.kind == "Workflow"))
+                .is_some();
+
+            if has_workflow_owner {
+                info!(
+                    "Skipping cleanup for workflow-managed job {} (workflow will manage lifecycle)",
+                    job_name
+                );
+            } else if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
                     let _ = jobs.delete(&job_name, &DeleteParams::default()).await;

@@ -1222,7 +1222,7 @@ mod tests {
         // Test that this demonstrates the backward compatibility issue
         // Old: empty working_directory would result in PVC name ending with "-" (empty suffix)
         // New: empty working_directory results in PVC name ending with "-default"
-        let old_pvc_name = format!("docs-workspace-repo-{}", legacy_result);
+        let old_pvc_name = format!("docs-workspace-repo-{legacy_result}");
         let new_pvc_name = format!(
             "docs-workspace-repo-{}",
             DocsResourceManager::sanitize_directory_name("")
