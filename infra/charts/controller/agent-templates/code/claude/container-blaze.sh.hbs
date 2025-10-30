@@ -552,7 +552,8 @@ fi
 TASK_REPO_DIR="$TASK_WORKSPACE/$TARGET_REPO_DIR"
 
 # Set working directory early (needed for correct file placement)
-WORKSPACE_DIR="task-{{task_id}}/$TARGET_REPO_DIR"
+# Derive from TASK_WORKSPACE to ensure paths stay synchronized
+WORKSPACE_DIR="${TASK_WORKSPACE#/workspace/}/$TARGET_REPO_DIR"
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
   CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
