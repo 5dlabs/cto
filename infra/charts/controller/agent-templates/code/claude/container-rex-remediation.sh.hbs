@@ -704,7 +704,7 @@ if [ -d "$TASK_DIR" ]; then
     echo "✅ Copying client-config.json..."
     if [ -f "/task-files/client-config.json" ]; then
         cp "/task-files/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
-        cp \$FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
+        cp "$FACTORY_WORK_DIR/client-config.json" "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true && echo "✓ client-config.json copied to workspace root" || echo "❌ client-config.json copy to workspace failed"
     else
         echo "⚠️ client-config.json not found - MCP client may not be configured"
     fi
