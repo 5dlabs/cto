@@ -605,7 +605,7 @@ DOCS_PATH="/tmp/docs-repo/.taskmaster"
 
 # Identify source and destination
 TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
-DEST_TASK_DIR="/workspace/$TARGET_REPO_DIR/task"
+DEST_TASK_DIR="$TASK_REPO_DIR/task"
 
 echo "🔍 DEBUG: Source task directory: $TASK_DIR"
 echo "🔍 DEBUG: Destination task directory: $DEST_TASK_DIR"
