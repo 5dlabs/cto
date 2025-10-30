@@ -1395,10 +1395,10 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   if [ -n "$CURRENT_MODEL" ]; then
     echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
     
-    # Update settings.json with current model
+    # Update settings.json with current model (use writable location, not ConfigMap mount)
     if [ -f "/etc/claude-code/managed-settings.json" ]; then
-      jq --arg model "$CURRENT_MODEL" '.model = $model' /etc/claude-code/managed-settings.json > /tmp/settings-rotated.json && \
-      mv /tmp/settings-rotated.json /etc/claude-code/managed-settings.json
+      jq --arg model "$CURRENT_MODEL" '.model = $model' /etc/claude-code/managed-settings.json > "$CLAUDE_WORK_DIR/.claude/settings.json"
+      echo "✓ Updated model rotation settings"
     fi
   fi
 
