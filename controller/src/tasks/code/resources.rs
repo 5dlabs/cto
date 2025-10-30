@@ -1030,7 +1030,7 @@ impl<'a> CodeResourceManager<'a> {
                 }
             }
         });
-        
+
         // Only set TTL for non-workflow-managed jobs
         // Workflow-owned jobs should be cleaned up by the workflow itself
         let has_workflow_owner = code_run
@@ -1039,7 +1039,7 @@ impl<'a> CodeResourceManager<'a> {
             .as_ref()
             .and_then(|refs| refs.iter().find(|r| r.kind == "Workflow"))
             .is_some();
-        
+
         if !has_workflow_owner {
             // Standalone CodeRun - set TTL for automatic cleanup
             job_spec["spec"]["ttlSecondsAfterFinished"] = json!(3600);
