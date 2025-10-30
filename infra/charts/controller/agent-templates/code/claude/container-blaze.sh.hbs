@@ -551,6 +551,16 @@ fi
 # This prevents task-1's branch from contaminating task-4's workspace
 TASK_REPO_DIR="$TASK_WORKSPACE/$TARGET_REPO_DIR"
 
+# Set working directory early (needed for correct file placement)
+WORKSPACE_DIR="task-{{task_id}}/$TARGET_REPO_DIR"
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
+else
+  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
+fi
+echo "✓ Claude working directory: $CLAUDE_WORK_DIR"
+
 if [ -d "$TASK_REPO_DIR/.git" ]; then
     echo "🔄 TARGET REPOSITORY: UPDATE - valid git repository exists in task workspace"
     echo "📁 Found existing target repository in task-{{task_id}} workspace, updating..."
@@ -618,18 +628,18 @@ if [ -d "$TASK_DIR" ]; then
     echo "🔍 DEBUG: Task directory found, contents:"
     ls -la "$TASK_DIR"
 
-    # Ensure target task directory exists before copying (task-specific location)
-    mkdir -p "$TASK_REPO_DIR/task"
-    echo "✓ Created target task directory at $TASK_REPO_DIR/task"
+    # Ensure target task directory exists before copying (using Claude's working directory)
+    mkdir -p "$CLAUDE_WORK_DIR/task"
+    echo "✓ Created target task directory at $CLAUDE_WORK_DIR/task"
 
     echo "✅ Copying task.md..."
-    cp "$TASK_DIR/task.md" "$TASK_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
+    cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
 
     echo "✅ Copying acceptance-criteria.md..."
-    cp "$TASK_DIR/acceptance-criteria.md" "$TASK_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
+    cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
 
     echo "✅ Copying prompt.md..."
-    cp "$TASK_DIR/prompt.md" "$TASK_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
+    cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
 
     echo "✅ Copying client-config.json..."
     if [ -f "/task-files/client-config.json" ]; then
@@ -641,7 +651,7 @@ if [ -d "$TASK_DIR" ]; then
 
     echo "✅ Copying toolman-guide.md..."
     if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-        cp "$TASK_DIR/toolman-guide.md" "$TASK_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
+        cp "$TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
     else
         echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
@@ -656,7 +666,7 @@ fi
 # Copy architecture.md from docs root
 ARCH_FILE="$DOCS_PATH/docs/architecture.md"
 if [ -f "$ARCH_FILE" ]; then
-    cp "$ARCH_FILE" "$TASK_REPO_DIR/task/"
+    cp "$ARCH_FILE" "$CLAUDE_WORK_DIR/task/"
     echo "✓ Architecture documentation copied"
 else
     echo "⚠️ architecture.md not found at: $ARCH_FILE"
@@ -664,7 +674,7 @@ fi
 
 # Copy tasks.json if it exists
 if [ -f "$DOCS_PATH/tasks.json" ]; then
-    cp "$DOCS_PATH/tasks.json" "$TASK_REPO_DIR/task/"
+    cp "$DOCS_PATH/tasks.json" "$CLAUDE_WORK_DIR/task/"
     echo "✓ tasks.json copied"
 fi
 
@@ -672,31 +682,18 @@ echo "✓ Task files copied to target repository"
 
 # DEBUG: Verify files were copied successfully
 echo "🔍 DEBUG: Contents of target task directory after copy:"
-ls -la "$TASK_REPO_DIR/task/" || echo "Task directory not found"
+ls -la "$CLAUDE_WORK_DIR/task/" || echo "Task directory not found"
 echo "🔍 DEBUG: Checking if prompt.md exists:"
-[ -f "$TASK_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
+[ -f "$CLAUDE_WORK_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
 
 # Step 4: Clean up docs repository
 echo "🧹 CLEANUP: Removing temporary docs repository"
 rm -rf /tmp/docs-repo
 echo "✓ Docs repository cleaned up"
 
-# Set working directory to the task-specific target repository
-# This prevents branch contamination between parallel tasks
-# DO NOT overwrite REPO_NAME - it's already correctly parsed for GitHub API calls
-# WORKSPACE_DIR is relative path under /workspace/
-WORKSPACE_DIR="task-{{task_id}}/$TARGET_REPO_DIR"
-echo "✓ Working directory: /workspace/$WORKSPACE_DIR"
-
-# Set Claude working directory early (needed for client-config.json copy)
-WORK_DIR="{{working_directory}}"
-if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
-else
-  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
-fi
+# Ensure Claude working directory exists (already defined earlier for file placement)
 mkdir -p "$CLAUDE_WORK_DIR"
-echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
+echo "✓ Ensured Claude working directory exists: $CLAUDE_WORK_DIR"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
@@ -922,28 +919,14 @@ if verify_task_files "$TASK_FINAL_DIR" "{{task_id}}"; then
 else
     echo "❌ CRITICAL: Task files missing after directory setup!"
     
-    # This is the bug we're fixing - files were overwritten by mkdir -p
-    echo "🔄 ATTEMPTING RECOVERY: Task files may have been overwritten..."
-    
-    # Try to recover from the original repository location
-    ORIGINAL_TASK_DIR="/workspace/$TARGET_REPO_DIR/task"
-    if [ "$ORIGINAL_TASK_DIR" != "$TASK_FINAL_DIR" ] && [ -d "$ORIGINAL_TASK_DIR" ]; then
-        echo "📁 Found original task directory: $ORIGINAL_TASK_DIR"
-        if verify_task_files "$ORIGINAL_TASK_DIR" "{{task_id}}"; then
-            echo "✅ Original location has valid files - copying to final location"
-            if safe_copy_directory "$ORIGINAL_TASK_DIR" "$TASK_FINAL_DIR" "task files recovery"; then
-                echo "✅ Recovery successful!"
-            else
-                echo "❌ Recovery failed"
-                create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "File recovery failed after directory overwrite"
-                exit 1
-            fi
-        fi
-    else
-        echo "❌ No recovery source available"
-        create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Task files missing and no recovery source"
-        exit 1
-    fi
+    # Task files are missing - this indicates a problem with the copy operation
+    echo "❌ No recovery available - task files were never copied or copy operation failed"
+    echo "🔍 DEBUG: Expected location: $TASK_FINAL_DIR"
+    echo "🔍 DEBUG: Source location: $TASK_DIR"
+    echo "🔍 DEBUG: Checking source directory:"
+    ls -la "$TASK_DIR" 2>/dev/null || echo "Source directory not accessible"
+    create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Task files missing - copy operation may have failed"
+    exit 1
 fi
 
 # Final comprehensive verification
