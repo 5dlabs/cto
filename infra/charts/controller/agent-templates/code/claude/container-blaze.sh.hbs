@@ -1,37 +1,47 @@
 #!/bin/sh
 
-# Ensure Rust environment is always properly set up
-echo "🔧 Setting up Rust environment..."
+# Ensure Node.js and frontend environment is properly set up
+echo "🔧 Setting up Node.js frontend environment..."
 
-# Source Rust environment if available (fixes cargo not found issues)
-if [ -f "$HOME/.cargo/env" ]; then
-    . "$HOME/.cargo/env"
-    echo "✓ Sourced Rust environment from $HOME/.cargo/env"
-fi
-
-# Also try root cargo env as fallback
-if [ -f "/root/.cargo/env" ]; then
-    . "/root/.cargo/env"
-    echo "✓ Sourced Rust environment from /root/.cargo/env"
-fi
-
-# Ensure rustup has a default toolchain set
-if command -v rustup >/dev/null 2>&1; then
-    rustup default stable 2>/dev/null || true
-    echo "✓ Ensured stable Rust toolchain is default"
+# Verify Node.js is available
+if command -v node >/dev/null 2>&1; then
+    NODE_VERSION=$(node --version)
+    echo "✓ Node.js is available: $NODE_VERSION"
+    
+    # Verify Node.js version is 20+ (required for Next.js 15)
+    NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1 | tr -d 'v')
+    if [ "$NODE_MAJOR" -ge 20 ]; then
+        echo "✓ Node.js version is sufficient for Next.js 15 (v20+)"
+    else
+        echo "⚠️  Node.js version $NODE_VERSION may not support Next.js 15 (requires v20+)"
+    fi
 else
-    echo "⚠️ rustup not found in PATH"
-fi
-
-# Verify Rust is available
-if command -v cargo >/dev/null 2>&1; then
-    echo "✓ Cargo is available: $(cargo --version)"
-else
-    echo "❌ Cargo not found in PATH"
+    echo "❌ Node.js not found in PATH"
     echo "Current PATH: $PATH"
-    echo "Attempting to find cargo..."
-    find /usr -name cargo 2>/dev/null | head -5 || echo "No cargo found in /usr"
-    find /home -name cargo 2>/dev/null | head -5 || echo "No cargo found in /home"
+    echo "Attempting to find node..."
+    find /usr -name node 2>/dev/null | head -5 || echo "No node found in /usr"
+fi
+
+# Verify pnpm is available (preferred package manager)
+if command -v pnpm >/dev/null 2>&1; then
+    PNPM_VERSION=$(pnpm --version)
+    echo "✓ pnpm is available: $PNPM_VERSION"
+else
+    echo "⚠️  pnpm not found in PATH"
+    echo "Checking for npm as fallback..."
+    if command -v npm >/dev/null 2>&1; then
+        NPM_VERSION=$(npm --version)
+        echo "✓ npm is available: $NPM_VERSION (will install pnpm if needed)"
+    else
+        echo "❌ Neither pnpm nor npm found in PATH"
+    fi
+fi
+
+# Verify kubectl is available (for K8s deployments and Ngrok setup)
+if command -v kubectl >/dev/null 2>&1; then
+    echo "✓ kubectl is available: $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+else
+    echo "⚠️  kubectl not found (optional - needed for live preview deployments)"
 fi
 
 echo '════════════════════════════════════════════════════════════════'
@@ -538,14 +548,25 @@ else
 fi
 
 # Step 2: Clone or update target repository
-if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
-    echo "🔄 TARGET REPOSITORY: UPDATE - directory already exists"
+if [ -d "/workspace/$TARGET_REPO_DIR/.git" ]; then
+    echo "🔄 TARGET REPOSITORY: UPDATE - valid git repository exists"
     echo "📁 Found existing target repository '/workspace/$TARGET_REPO_DIR', updating..."
+    # Fix dubious ownership before git operations
+    git config --global --add safe.directory "/workspace/$TARGET_REPO_DIR"
     cd "/workspace/$TARGET_REPO_DIR"
     git fetch origin main
     git reset --hard origin/main
     cd "$TASK_WORKSPACE"
     echo "✓ Target repository updated successfully"
+elif [ -d "/workspace/$TARGET_REPO_DIR" ]; then
+    echo "⚠️ TARGET REPOSITORY: INVALID - directory exists but not a git repository"
+    echo "🧹 Removing invalid directory and re-cloning..."
+    rm -rf "/workspace/$TARGET_REPO_DIR"
+    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+        echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
+        exit 1
+    fi
+    echo "✓ Target repository cloned successfully to /workspace/$TARGET_REPO_DIR"
 else
     echo "📥 TARGET REPOSITORY: CLONING - first time setup"
     if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
