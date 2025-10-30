@@ -1032,10 +1032,21 @@ rm -f /workspace/CLAUDE.md
 # Generate configuration files from templates
 echo "🔧 Generating Cleo-specific configuration files..."
 
-# Enterprise managed settings are mounted directly from ConfigMap
+# Enterprise managed settings - copy to writable location for model rotation
 echo "=== ENTERPRISE MANAGED SETTINGS ==="
-echo "✓ Settings mounted directly from ConfigMap at: /etc/claude-code/managed-settings.json"
-echo "✓ No copying needed - mount automatically reflects latest ConfigMap changes"
+echo "✓ Settings source: /etc/claude-code/managed-settings.json (ConfigMap mount)"
+
+# Copy enterprise settings to writable location
+# ConfigMap mounts use symlinks that can't be modified, so we copy to a writable path
+# Claude will use this writable copy, allowing model rotation to work
+mkdir -p "/etc/claude-code-writable"
+if [ -f "/etc/claude-code/managed-settings.json" ]; then
+  cp "/etc/claude-code/managed-settings.json" "/etc/claude-code-writable/managed-settings.json"
+  echo "✓ Copied enterprise settings to /etc/claude-code-writable/managed-settings.json (writable)"
+  echo "✓ Model rotation will modify this writable copy"
+else
+  echo "⚠️ Enterprise settings not found, Claude will use defaults"
+fi
 
 # Verify client-config.json is available and valid
 echo "=== TOOLMAN CONFIG SETUP ==="
@@ -1489,9 +1500,10 @@ $PREV_FINDINGS
   if [ -n "$CURRENT_MODEL" ]; then
     echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
     
-    # Update settings.json with current model (use writable location, not ConfigMap mount)
-    if [ -f "/etc/claude-code/managed-settings.json" ]; then
-      jq --arg model "$CURRENT_MODEL" '.model = $model' /etc/claude-code/managed-settings.json > "$CLAUDE_WORK_DIR/.claude/settings.json"
+    # Update writable copy of enterprise settings with current model
+    if [ -f "/etc/claude-code-writable/managed-settings.json" ]; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "/etc/claude-code-writable/managed-settings.json" > /tmp/settings-rotated.json && \
+      mv /tmp/settings-rotated.json "/etc/claude-code-writable/managed-settings.json"
       echo "✓ Updated model rotation settings"
     fi
   fi
@@ -1501,6 +1513,12 @@ cd "$CLAUDE_WORK_DIR"
 
 # Build Claude command
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
+
+# Add writable enterprise settings for model rotation
+if [ -f "/etc/claude-code-writable/managed-settings.json" ]; then
+    echo "✓ Using writable enterprise settings for model rotation"
+    CLAUDE_CMD="$CLAUDE_CMD --settings /etc/claude-code-writable/managed-settings.json"
+fi
 
 # Look for Cleo-specific system prompt file
 if [ -f "/task-files/cleo-system-prompt.md" ]; then
