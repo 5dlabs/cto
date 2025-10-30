@@ -195,13 +195,18 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        # Find workflow by labels (since actual names have random suffixes)
+                        # Extract repository for precise correlation (critical for parallel batch execution)
+                        REPO_FULL='{{ .Input.body.repository.full_name }}'
+                        REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
+                        echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
+
+                        # Find workflow by labels (include repository for precise matching in parallel scenarios)
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
                           exit 0
                         fi
 
@@ -286,13 +291,18 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        # Find workflow by labels (since actual names have random suffixes)
+                        # Extract repository for precise correlation (critical for parallel batch execution)
+                        REPO_FULL='{{ .Input.body.repository.full_name }}'
+                        REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
+                        echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
+
+                        # Find workflow by labels (include repository for precise matching in parallel scenarios)
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
                           exit 0
                         fi
 
@@ -382,13 +392,18 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        # Find workflow by labels
+                        # Extract repository for precise correlation (critical for parallel batch execution)
+                        REPO_FULL='{{ .Input.body.repository.full_name }}'
+                        REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
+                        echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
+
+                        # Find workflow by labels (include repository for precise matching in parallel scenarios)
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
                           exit 0
                         fi
 
@@ -478,13 +493,18 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
-                        # Find workflow by labels
+                        # Extract repository for precise correlation (critical for parallel batch execution)
+                        REPO_FULL='{{ .Input.body.repository.full_name }}'
+                        REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
+                        echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
+
+                        # Find workflow by labels (include repository for precise matching in parallel scenarios)
                         WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
-                          -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                          -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
                         if [ -z "$WORKFLOW_NAME" ]; then
-                          echo "ℹ️ No workflow found for task-id=$TASK_ID (may be for different repo/workflow)"
+                          echo "ℹ️ No workflow found for task-id=$TASK_ID and repository=$REPO_LABEL"
                           exit 0
                         fi
 
