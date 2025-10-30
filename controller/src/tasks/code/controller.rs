@@ -151,7 +151,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .as_ref()
                 .and_then(|s| s.work_completed)
                 .unwrap_or(false);
-            
+
             let current_phase = code_run
                 .status
                 .as_ref()
@@ -165,7 +165,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     current_phase,
                     work_completed
                 );
-                
+
                 // Ensure work_completed flag is set if phase is Succeeded
                 if current_phase == "Succeeded" && !work_completed {
                     info!("Backfilling work_completed=true for succeeded CodeRun");
@@ -179,7 +179,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     )
                     .await?;
                 }
-                
+
                 return Ok(Action::await_change());
             }
 
