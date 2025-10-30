@@ -553,6 +553,10 @@ else
         echo "🔍 DEBUG: Task directory found, contents:"
         ls -la "$TASK_DIR"
 
+        # Ensure target task directory exists before copying
+        mkdir -p "/workspace/$TARGET_REPO_DIR/task"
+        echo "✓ Created target task directory"
+
         echo "✅ Copying task.md..."
         cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
 
