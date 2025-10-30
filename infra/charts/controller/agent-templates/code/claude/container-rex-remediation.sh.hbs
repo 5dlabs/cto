@@ -618,14 +618,23 @@ else
 fi
 
 # Step 2: Clone or update target repository
-if [ -d "/workspace/$TARGET_REPO_DIR" ]; then
-    echo "🔄 TARGET REPOSITORY: UPDATE - directory already exists"
+if [ -d "/workspace/$TARGET_REPO_DIR/.git" ]; then
+    echo "🔄 TARGET REPOSITORY: UPDATE - valid git repository exists"
     echo "📁 Found existing target repository '/workspace/$TARGET_REPO_DIR', updating..."
     cd "/workspace/$TARGET_REPO_DIR"
     git fetch origin main
     git reset --hard origin/main
     cd "$TASK_WORKSPACE"
     echo "✓ Target repository updated successfully"
+elif [ -d "/workspace/$TARGET_REPO_DIR" ]; then
+    echo "⚠️ TARGET REPOSITORY: INVALID - directory exists but not a git repository"
+    echo "🧹 Removing invalid directory and re-cloning..."
+    rm -rf "/workspace/$TARGET_REPO_DIR"
+    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+        echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
+        exit 1
+    fi
+    echo "✓ Target repository cloned successfully to /workspace/$TARGET_REPO_DIR"
 else
     echo "📥 TARGET REPOSITORY: CLONING - first time setup"
     if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
