@@ -547,33 +547,36 @@ else
     echo "✓ Docs repository cloned to temporary location"
 fi
 
-# Step 2: Clone or update target repository
-if [ -d "/workspace/$TARGET_REPO_DIR/.git" ]; then
-    echo "🔄 TARGET REPOSITORY: UPDATE - valid git repository exists"
-    echo "📁 Found existing target repository '/workspace/$TARGET_REPO_DIR', updating..."
+# Step 2: Clone or update target repository TO TASK-SPECIFIC WORKSPACE
+# This prevents task-1's branch from contaminating task-4's workspace
+TASK_REPO_DIR="$TASK_WORKSPACE/$TARGET_REPO_DIR"
+
+if [ -d "$TASK_REPO_DIR/.git" ]; then
+    echo "🔄 TARGET REPOSITORY: UPDATE - valid git repository exists in task workspace"
+    echo "📁 Found existing target repository in task-{{task_id}} workspace, updating..."
     # Fix dubious ownership before git operations
-    git config --global --add safe.directory "/workspace/$TARGET_REPO_DIR"
-    cd "/workspace/$TARGET_REPO_DIR"
+    git config --global --add safe.directory "$TASK_REPO_DIR"
+    cd "$TASK_REPO_DIR"
     git fetch origin main
     git reset --hard origin/main
     cd "$TASK_WORKSPACE"
     echo "✓ Target repository updated successfully"
-elif [ -d "/workspace/$TARGET_REPO_DIR" ]; then
+elif [ -d "$TASK_REPO_DIR" ]; then
     echo "⚠️ TARGET REPOSITORY: INVALID - directory exists but not a git repository"
     echo "🧹 Removing invalid directory and re-cloning..."
-    rm -rf "/workspace/$TARGET_REPO_DIR"
-    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+    rm -rf "$TASK_REPO_DIR"
+    if ! git clone "$REPO_HTTP_URL" "$TASK_REPO_DIR"; then
         echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
         exit 1
     fi
-    echo "✓ Target repository cloned successfully to /workspace/$TARGET_REPO_DIR"
+    echo "✓ Target repository cloned successfully to $TASK_REPO_DIR"
 else
-    echo "📥 TARGET REPOSITORY: CLONING - first time setup"
-    if ! git clone "$REPO_HTTP_URL" "/workspace/$TARGET_REPO_DIR"; then
+    echo "📥 TARGET REPOSITORY: CLONING - first time setup to task-specific workspace"
+    if ! git clone "$REPO_HTTP_URL" "$TASK_REPO_DIR"; then
         echo "❌ Failed to clone target repository: {{repository_url}} ($REPO_HTTP_URL)"
         exit 1
     fi
-    echo "✓ Target repository cloned successfully to /workspace/$TARGET_REPO_DIR"
+    echo "✓ Target repository cloned successfully to $TASK_REPO_DIR"
 fi
 
 # Load resilient task setup functions (mounted from shared ConfigMap)
@@ -615,18 +618,18 @@ if [ -d "$TASK_DIR" ]; then
     echo "🔍 DEBUG: Task directory found, contents:"
     ls -la "$TASK_DIR"
 
-    # Ensure target task directory exists before copying
-    mkdir -p "/workspace/$TARGET_REPO_DIR/task"
-    echo "✓ Created target task directory"
+    # Ensure target task directory exists before copying (task-specific location)
+    mkdir -p "$TASK_REPO_DIR/task"
+    echo "✓ Created target task directory at $TASK_REPO_DIR/task"
 
     echo "✅ Copying task.md..."
-    cp "$TASK_DIR/task.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
+    cp "$TASK_DIR/task.md" "$TASK_REPO_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
 
     echo "✅ Copying acceptance-criteria.md..."
-    cp "$TASK_DIR/acceptance-criteria.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
+    cp "$TASK_DIR/acceptance-criteria.md" "$TASK_REPO_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
 
     echo "✅ Copying prompt.md..."
-    cp "$TASK_DIR/prompt.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
+    cp "$TASK_DIR/prompt.md" "$TASK_REPO_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
 
     echo "✅ Copying client-config.json..."
     if [ -f "/task-files/client-config.json" ]; then
@@ -638,7 +641,7 @@ if [ -d "$TASK_DIR" ]; then
 
     echo "✅ Copying toolman-guide.md..."
     if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-        cp "$TASK_DIR/toolman-guide.md" "/workspace/$TARGET_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
+        cp "$TASK_DIR/toolman-guide.md" "$TASK_REPO_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
     else
         echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
@@ -653,7 +656,7 @@ fi
 # Copy architecture.md from docs root
 ARCH_FILE="$DOCS_PATH/docs/architecture.md"
 if [ -f "$ARCH_FILE" ]; then
-    cp "$ARCH_FILE" "/workspace/$TARGET_REPO_DIR/task/"
+    cp "$ARCH_FILE" "$TASK_REPO_DIR/task/"
     echo "✓ Architecture documentation copied"
 else
     echo "⚠️ architecture.md not found at: $ARCH_FILE"
@@ -661,7 +664,7 @@ fi
 
 # Copy tasks.json if it exists
 if [ -f "$DOCS_PATH/tasks.json" ]; then
-    cp "$DOCS_PATH/tasks.json" "/workspace/$TARGET_REPO_DIR/task/"
+    cp "$DOCS_PATH/tasks.json" "$TASK_REPO_DIR/task/"
     echo "✓ tasks.json copied"
 fi
 
@@ -669,18 +672,20 @@ echo "✓ Task files copied to target repository"
 
 # DEBUG: Verify files were copied successfully
 echo "🔍 DEBUG: Contents of target task directory after copy:"
-ls -la "/workspace/$TARGET_REPO_DIR/task/" || echo "Task directory not found"
+ls -la "$TASK_REPO_DIR/task/" || echo "Task directory not found"
 echo "🔍 DEBUG: Checking if prompt.md exists:"
-[ -f "/workspace/$TARGET_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
+[ -f "$TASK_REPO_DIR/task/prompt.md" ] && echo "✅ prompt.md exists" || echo "❌ prompt.md missing"
 
 # Step 4: Clean up docs repository
 echo "🧹 CLEANUP: Removing temporary docs repository"
 rm -rf /tmp/docs-repo
 echo "✓ Docs repository cleaned up"
 
-# Set working directory to the target repository root
+# Set working directory to the task-specific target repository
+# This prevents branch contamination between parallel tasks
 # DO NOT overwrite REPO_NAME - it's already correctly parsed for GitHub API calls
-WORKSPACE_DIR="$TARGET_REPO_DIR"
+# WORKSPACE_DIR is relative path under /workspace/
+WORKSPACE_DIR="task-{{task_id}}/$TARGET_REPO_DIR"
 echo "✓ Working directory: /workspace/$WORKSPACE_DIR"
 
 # Set Claude working directory early (needed for client-config.json copy)
