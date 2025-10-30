@@ -2130,8 +2130,8 @@ EOF
 
   echo "✅ Handoff document created at task/rex-handoff.md"
   
-  # Commit and push the handoff document
-  cd "$CLAUDE_WORK_DIR"
+  # Commit and push the handoff document (from repository root for consistency)
+  cd "$TASK_REPO_DIR"
   git add task/rex-handoff.md 2>/dev/null || true
   git commit -m "docs(task-{{task_id}}): add Rex handoff document
 
