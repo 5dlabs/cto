@@ -246,9 +246,9 @@ agents:
   cipher:
     name: "Cipher"
     githubApp: "5DLabs-Cipher"
-    cli: "Codex"
-    model: "gpt-4o"
-    maxTokens: 64000
+    cli: "Claude"
+    model: "claude-sonnet-4-5-20250929"
+    maxTokens: 200000
     temperature: 0.6
     reasoningEffort: "high"
     appId: "1724450"
