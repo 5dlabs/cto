@@ -709,26 +709,26 @@ fi
 # Set working directory to the task-specific target repository
 # This prevents branch contamination between parallel tasks
 # DO NOT overwrite REPO_NAME - it's already correctly parsed for GitHub API calls
-# WORKSPACE_DIR is relative path under /workspace/
-WORKSPACE_DIR="task-{{task_id}}/$TARGET_REPO_DIR"
-echo "✓ Working directory: /workspace/$WORKSPACE_DIR"
+# WORKSPACE_DIR is relative path under /workspace/ - derive from TASK_WORKSPACE to ensure paths stay synchronized
+WORKSPACE_DIR="${TASK_WORKSPACE#/workspace/}/$TARGET_REPO_DIR"
+echo "✓ Working directory: $TASK_REPO_DIR"
 
 # Set Claude working directory early (needed for client-config.json copy)
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
+  CLAUDE_WORK_DIR="$TASK_REPO_DIR"
 else
-  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
+  CLAUDE_WORK_DIR="$TASK_REPO_DIR/$WORK_DIR"
 fi
 mkdir -p "$CLAUDE_WORK_DIR"
 echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
-cd "/workspace/$WORKSPACE_DIR"
+cd "$TASK_REPO_DIR"
 
 # Fix git dubious ownership before any git operations
-git config --global --add safe.directory "/workspace/$WORKSPACE_DIR"
+git config --global --add safe.directory "$TASK_REPO_DIR"
 echo "✓ Added repository to git safe directories"
 
 # Sync with latest main to prevent conflicts
@@ -793,12 +793,12 @@ echo "🔑 CRITICAL: Claude will be launched from this directory"
 # Configure git user after successful clone
 echo "=== POST-CLONE GIT CONFIGURATION ==="
 # Fix dubious ownership issues
-git config --global --add safe.directory "/workspace/$WORKSPACE_DIR"
+git config --global --add safe.directory "$TASK_REPO_DIR"
 echo "✓ Added repository to safe directories"
 
 # Set git config locally in the working repository (persistent on PVC)
-if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
-    cd "/workspace/$WORKSPACE_DIR"
+if [ -d "$TASK_REPO_DIR/.git" ]; then
+    cd "$TASK_REPO_DIR"
     git config --local user.name "$GIT_AUTHOR_NAME"
     git config --local user.email "$GIT_AUTHOR_EMAIL"
     # Set up automatic upstream for new branches
@@ -944,28 +944,14 @@ if verify_task_files "$TASK_FINAL_DIR" "{{task_id}}"; then
 else
     echo "❌ CRITICAL: Task files missing after directory setup!"
     
-    # This is the bug we're fixing - files were overwritten by mkdir -p
-    echo "🔄 ATTEMPTING RECOVERY: Task files may have been overwritten..."
-    
-    # Try to recover from the original repository location
-    ORIGINAL_TASK_DIR="/workspace/$TARGET_REPO_DIR/task"
-    if [ "$ORIGINAL_TASK_DIR" != "$TASK_FINAL_DIR" ] && [ -d "$ORIGINAL_TASK_DIR" ]; then
-        echo "📁 Found original task directory: $ORIGINAL_TASK_DIR"
-        if verify_task_files "$ORIGINAL_TASK_DIR" "{{task_id}}"; then
-            echo "✅ Original location has valid files - copying to final location"
-            if safe_copy_directory "$ORIGINAL_TASK_DIR" "$TASK_FINAL_DIR" "task files recovery"; then
-                echo "✅ Recovery successful!"
-            else
-                echo "❌ Recovery failed"
-                create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "File recovery failed after directory overwrite"
-                exit 1
-            fi
-        fi
-    else
-        echo "❌ No recovery source available"
-        create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Task files missing and no recovery source"
-        exit 1
-    fi
+    # Task files are missing - this indicates a problem with the copy operation
+    echo "❌ No recovery available - task files were never copied or copy operation failed"
+    echo "🔍 DEBUG: Expected location: $TASK_FINAL_DIR"
+    echo "🔍 DEBUG: Source location: $TASK_DIR"
+    echo "🔍 DEBUG: Checking source directory:"
+    ls -la "$TASK_DIR" 2>/dev/null || echo "Source directory not accessible"
+    create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Task files missing - copy operation may have failed"
+    exit 1
 fi
 
 # Handle client-config.json carefully
@@ -1147,7 +1133,7 @@ for file in $REQUIRED_FILES; do
 done
 
 # Check git repository (REQUIRED for implementation tasks)
-if [ ! -d "/workspace/$WORKSPACE_DIR/.git" ]; then
+if [ ! -d "$TASK_REPO_DIR/.git" ]; then
   echo "✗ CRITICAL ERROR: No target git repository found!"
   MISSING_FILES="$MISSING_FILES git-repository"
 else
@@ -1224,8 +1210,8 @@ if [ ! -d ".git" ]; then
   echo "📂 Checking parent directory structure:"
   echo "  Current: $(pwd)"
   echo "  Contents: $(ls -la . | head -5)"
-  if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
-    echo "  Found .git at: /workspace/$REPO_NAME/"
+  if [ -d "$TASK_REPO_DIR/.git" ]; then
+    echo "  Found .git at: $TASK_REPO_DIR/"
     echo "🔧 This indicates a working directory path mismatch"
     echo "🔧 CLAUDE_WORK_DIR: $CLAUDE_WORK_DIR"
     echo "🔧 Expected git repo: /workspace/$REPO_NAME"
