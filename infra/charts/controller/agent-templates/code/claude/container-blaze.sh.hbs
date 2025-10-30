@@ -2011,6 +2011,38 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       echo "   - run-${WORKFLOW_NAME}"
       echo "   - service-${SERVICE_NAME}"
     fi
+
+    # CRITICAL: Update CodeRun status with PR URL and work_completed=true
+    # This prevents duplicate job creation when controller reconciles
+    echo "🔄 Updating CodeRun status with PR URL and completion flag..."
+    if [ -n "$CODERUN_NAME" ] && [ -n "$NAMESPACE" ] && [ -n "$PR_URL" ]; then
+      if command -v kubectl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        PATCH=$(jq -n \
+          --arg ts "$TIMESTAMP" \
+          --arg pr "$PR_URL" \
+          '{status: {
+            lastUpdate: $ts,
+            pullRequestUrl: $pr,
+            workCompleted: true,
+            phase: "Succeeded",
+            message: "Code implementation completed successfully and PR created"
+          }}')
+        
+        if kubectl patch coderun "$CODERUN_NAME" -n "$NAMESPACE" --type=merge --subresource=status -p "$PATCH" 2>/dev/null; then
+          echo "✅ Updated CodeRun status with PR URL and work_completed=true"
+        else
+          echo "⚠️ Failed to update CodeRun status (this may cause duplicate job creation)"
+        fi
+      else
+        echo "⚠️ kubectl or jq not available, cannot update CodeRun status"
+      fi
+    else
+      echo "⚠️ Missing required variables for CodeRun status update:"
+      echo "   CODERUN_NAME: ${CODERUN_NAME:-<not set>}"
+      echo "   NAMESPACE: ${NAMESPACE:-<not set>}"
+      echo "   PR_URL: ${PR_URL:-<not set>}"
+    fi
   else
     echo "ℹ️ No PR found for this task (Claude may not have created one)"
   fi
