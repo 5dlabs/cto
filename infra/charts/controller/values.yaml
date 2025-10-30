@@ -242,13 +242,6 @@ agents:
       URLs, comprehensive screenshots, and E2E tests.
     tools:
       remote: ["memory_create_entities", "memory_add_observations", "brave_search_brave_web_search"]
-      localServers:
-        filesystem:
-          enabled: true
-          tools: ["read_file", "write_file", "list_directory"]
-        git:
-          enabled: true
-          tools: ["git_status", "git_log"]
 
   cipher:
     name: "Cipher"
@@ -492,13 +485,6 @@ agents:
       - DO NOT modify business logic (only security-related changes)
     tools:
       remote: ["memory_create_entities", "memory_add_observations", "brave_search_brave_web_search"]
-      localServers:
-        filesystem:
-          enabled: false
-          tools: []
-        git:
-          enabled: false
-          tools: []
 
   stitch:
     name: "Stitch"
