@@ -541,6 +541,8 @@ fi
 if [ -d "/workspace/$TARGET_REPO_DIR/.git" ]; then
     echo "🔄 TARGET REPOSITORY: UPDATE - valid git repository exists"
     echo "📁 Found existing target repository '/workspace/$TARGET_REPO_DIR', updating..."
+    # Fix dubious ownership before git operations
+    git config --global --add safe.directory "/workspace/$TARGET_REPO_DIR"
     cd "/workspace/$TARGET_REPO_DIR"
     git fetch origin main
     git reset --hard origin/main
