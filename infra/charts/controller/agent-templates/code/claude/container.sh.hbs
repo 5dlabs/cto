@@ -795,6 +795,9 @@ if [ -d "/task-files" ]; then
   if [ -f "/task-files/mcp.json" ]; then
     cp /task-files/mcp.json "$CLAUDE_WORK_DIR/.mcp.json"
     echo "✓ Copied mcp.json to .mcp.json (project scope)"
+    # Also copy to /workspace for Claude's MCP loader
+    cp /task-files/mcp.json "/workspace/.mcp.json"
+    echo "✓ Copied mcp.json to /workspace/.mcp.json for MCP loader"
   else
     echo "⚠️  mcp.json template not found"
   fi
