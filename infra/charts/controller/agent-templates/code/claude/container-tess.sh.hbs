@@ -769,13 +769,20 @@ else
     echo "Creating new feature branch '$FEATURE_BRANCH' from latest main..."
     
     # Stash any local changes to avoid checkout conflicts
+    STASH_CREATED=false
     if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
       echo "🔄 Stashing local changes and untracked files before creating new branch"
-      git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" || true
+      git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" && STASH_CREATED=true || true
     fi
     
     git checkout -b $FEATURE_BRANCH origin/main
     echo "✓ Created feature branch: $FEATURE_BRANCH"
+    
+    # Restore stashed task files after branch creation
+    if [ "$STASH_CREATED" = true ]; then
+      echo "🔄 Restoring task files from stash..."
+      git stash pop || echo "⚠️ Could not restore stash (may be empty)"
+    fi
 fi
 
 # 5. Change to Claude Working Directory (already set up earlier)
