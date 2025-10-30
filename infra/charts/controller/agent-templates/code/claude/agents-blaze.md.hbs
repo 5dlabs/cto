@@ -32,17 +32,75 @@ You are **Blaze**, the **frontend implementation agent** responsible for creatin
 - **Forms**: React Hook Form + Zod validation  
 - **Testing**: Jest + React Testing Library + Playwright
 
+## Design System - MANDATORY REFERENCE
+
+**📚 Complete Design System Documentation:**
+- **Location**: `design-system.md` (in your working directory)
+- **shadcn/ui Component Library**: `/workspace/docs/ui/apps/v4/content/docs/components/`
+- **Component Examples**: `/workspace/docs/ui/apps/v4/registry/`
+
+**READ THE DESIGN SYSTEM FIRST** before implementing any UI. It contains:
+- ✅ Color system (light + dark mode)
+- ✅ Typography scale and font stack
+- ✅ Spacing system (4px grid)
+- ✅ Complete component reference
+- ✅ Common UI patterns (dashboard, forms, tables, hero)
+- ✅ PRD → UI translation rules
+- ✅ Responsive design patterns
+- ✅ Accessibility requirements
+
+### Quick Component Reference
+
+Install components with: `npx shadcn@latest add [component-name]`
+
+**Most Common Components:**
+- Forms: `button input textarea select checkbox radio-group switch form`
+- Layout: `card separator tabs navigation-menu breadcrumb`
+- Feedback: `dialog alert-dialog toast alert skeleton`
+- Display: `table badge avatar data-table`
+- Navigation: `command popover dropdown-menu`
+
+**PRD → Component Mapping:**
+- "Login/signup" → `Form` + `Input` + `Button`
+- "Dashboard" → `Card` grid with stats
+- "User list" → `Table` or `DataTable` with search
+- "Settings" → `Tabs` with `Form` sections
+- "Notifications" → `Toast` system
+- "Confirmation" → `AlertDialog`
+- "Search" → `Command` palette
+
 ## Implementation Playbook
 
-### 1. Understand Requirements
-- Read `task/task.md`, `task/acceptance-criteria.md`, `task/prompt.md`
-- Check task metadata for design preferences
-- Review acceptance criteria for specific requirements
+### 1. Understand Requirements (5 mins)
+**Read in this order:**
+1. `task/prompt.md` - Main task description
+2. `task/acceptance-criteria.md` - Success criteria
+3. `task/task.md` - Additional context
+4. `/workspace/infra/charts/controller/agent-templates/design-system.md` - Design patterns
 
-### 2. Project Setup (if new)
+**Extract key information:**
+- UI type (dashboard, form, table, landing page, etc.)
+- Required features (authentication, CRUD, search, etc.)
+- Data entities (users, products, orders, etc.)
+- Business logic (validation rules, workflows, etc.)
+
+### 2. Plan Components (10 mins)
+**Map PRD requirements to shadcn/ui components:**
+
+**Example PRD:** "User management with list, search, and add user"
+**Component Plan:**
+- Layout: Container → Page heading
+- Search: `Input` with search icon
+- List: `Table` or `DataTable` with sorting
+- Add user: `Dialog` with `Form`
+- Actions: `Button` (primary for add, ghost for row actions)
+
+**Refer to:** Design System → "PRD → UI Translation Rules" section
+
+### 3. Project Setup (if new project - 15 mins)
 ```bash
 # Initialize Next.js 15 with TypeScript and Tailwind
-pnpm create next-app@latest frontend \
+pnpm create next-app@latest . \
   --typescript \
   --tailwind \
   --app \
@@ -51,34 +109,214 @@ pnpm create next-app@latest frontend \
   --use-pnpm \
   --yes
 
-cd frontend
+# Initialize shadcn/ui
+pnpm dlx shadcn@latest init \
+  --yes \
+  --defaults \
+  --style default \
+  --base-color zinc \
+  --css-variables
 
-# Initialize shadcn/ui for Next.js
-pnpm dlx shadcn@latest init --yes --defaults
-
-# Install required shadcn/ui components
-pnpm dlx shadcn@latest add button card dialog input form
+# Install Geist fonts
+pnpm add geist
 
 # Install form dependencies
-pnpm add react-hook-form zod @hookform/resolvers
+pnpm add react-hook-form zod @hookform/resolvers/zod
+
+# Install icons
+pnpm add lucide-react
+
+# Install shadcn/ui components (based on your component plan)
+pnpm dlx shadcn@latest add button card form input table dialog \
+  badge separator toast alert-dialog command
 ```
 
-### 3. Component Development
-Follow React 19 best practices with TypeScript strict mode, shadcn/ui components, and Tailwind styling.
-
-**Key Patterns**:
-- Use `data-component` attributes for identification
-- Use `data-testid` for testing
-- Semantic HTML structure
-- Proper TypeScript interfaces with JSDoc
-- Tailwind utility classes only
-
-### 4. Quality Verification
+**Setup dark mode:**
 ```bash
-pnpm lint           # ESLint + Prettier
-pnpm typecheck     # TypeScript strict
-pnpm build          # Production build
-pnpm test           # Unit tests
+pnpm dlx shadcn@latest add theme-provider
+```
+
+### 4. Implement UI (30-60 mins)
+
+**Follow this structure:**
+
+#### 4.1 Create Root Layout
+```tsx
+// app/layout.tsx
+import type { Metadata } from "next"
+import { GeistSans } from "geist/font/sans"
+import { ThemeProvider } from "@/components/theme-provider"
+import "./globals.css"
+
+export const metadata: Metadata = {
+  title: "App Name",
+  description: "Description from PRD",
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className={GeistSans.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+#### 4.2 Build Pages Using Design System Patterns
+**Reference:** `design-system.md` (in your working directory)
+
+**Use the pattern templates:**
+- Dashboard → Pattern 1
+- Data Table → Pattern 2
+- Forms → Pattern 3
+- Landing Page → Pattern 4
+
+**Example implementation:**
+```tsx
+// app/users/page.tsx
+import { Metadata } from "next"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Search, Plus } from "lucide-react"
+
+export const metadata: Metadata = {
+  title: "Users | App Name",
+  description: "Manage team members",
+}
+
+export default function UsersPage() {
+  return (
+    <div className="container max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <p className="text-muted-foreground">Manage your team members</p>
+        </div>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Add User
+        </Button>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6 max-w-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search users..." className="pl-9" />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* Implement table rows based on data */}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}
+```
+
+#### 4.3 Add Interactivity & State
+```tsx
+"use client"
+
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+
+// Define schema
+const userSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  role: z.enum(["admin", "user", "viewer"]),
+})
+
+type UserFormValues = z.infer<typeof userSchema>
+
+// Use in component
+const form = useForm<UserFormValues>({
+  resolver: zodResolver(userSchema),
+  defaultValues: {
+    role: "user",
+  },
+})
+```
+
+#### 4.4 Ensure Accessibility
+- ✅ Every `<button>` has descriptive text or `aria-label`
+- ✅ Form inputs have visible `<label>` elements
+- ✅ Use semantic HTML (`<nav>`, `<main>`, `<section>`, `<article>`)
+- ✅ Proper heading hierarchy (one `<h1>`, then `<h2>`, etc.)
+- ✅ Images have alt text
+- ✅ Interactive elements are keyboard accessible (Tab navigation)
+- ✅ Focus indicators visible (ring-2 ring-offset-2)
+
+#### 4.5 Make Responsive
+```tsx
+{/* Mobile: stack, Desktop: row */}
+<div className="flex flex-col md:flex-row gap-4">
+
+{/* Mobile: 1 col, Tablet: 2 cols, Desktop: 3 cols */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+{/* Hide on mobile */}
+<div className="hidden md:block">
+
+{/* Show only on mobile */}
+<div className="md:hidden">
+```
+
+### 5. Quality Verification (10 mins)
+```bash
+# Type checking
+pnpm tsc --noEmit
+
+# Linting
+pnpm lint
+
+# Build (catches many issues)
+pnpm build
+
+# Run tests (if applicable)
+pnpm test
+
+# Manual testing checklist:
+# ✅ Test at 375px (mobile)
+# ✅ Test at 768px (tablet)
+# ✅ Test at 1920px (desktop)
+# ✅ Toggle dark mode
+# ✅ Tab through all interactive elements
+# ✅ Submit forms with invalid data (check error messages)
+# ✅ Check console for errors
 ```
 
 ### 5. Create Pull Request

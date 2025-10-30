@@ -93,45 +93,103 @@ Immediately after finishing the required outputs (including diagrams if created)
 2. Note at least one improvement or insight to apply on the next task (e.g., missing code reference, unclear criteria).
 3. State how you will adjust before beginning the next task and follow through.
 
-## Step 4: Create Final Integration Task
-After generating documentation for all PRD tasks, create one final integration task:
+## Step 4: Create Integration Tasks for Parallel Execution Levels
 
-### 4.1 Copy Integration Templates
-Copy the integration task templates from `/agent-templates/docs/templates/integration-task/` to `.taskmaster/docs/task-[FINAL_ID]/`:
-```bash
-# FINAL_ID = highest task ID + 1
-cp -r /agent-templates/docs/templates/integration-task/* .taskmaster/docs/task-[FINAL_ID]/
+**Purpose:** When tasks can run in parallel, we need integration validation between levels to ensure they work together.
+
+### 4.1 Analyze Dependency Graph
+1. Read `.taskmaster/tasks/tasks.json`
+2. Build dependency graph to identify execution levels:
+   - **Level 0:** Tasks with no dependencies
+   - **Level 1:** Tasks depending only on Level 0 tasks
+   - **Level 2:** Tasks depending on Level 0 or 1 tasks
+   - Etc.
+
+3. Identify levels needing integration tasks:
+   - **Rule:** If a level has 2+ tasks, create an integration task after it
+   - **Single task levels:** Skip integration (nothing to integrate)
+
+**Example Analysis:**
+```
+Given tasks.json:
+- Task 1 (deps: []) → Level 0
+- Task 2 (deps: []) → Level 0
+- Task 3 (deps: []) → Level 0
+- Task 4 (deps: [1,2,3]) → Level 1
+
+Result:
+- Level 0: [1,2,3] ← 3 parallel tasks, CREATE integration task
+- Level 1: [4] ← 1 task, SKIP integration
 ```
 
-### 4.2 Update Integration Task Files
-Update the copied templates:
-- In `task.txt`: Replace `ALL_OTHER_TASKS` with comma-separated list of all task IDs
-- In `task.xml`: Replace `INTEGRATION_TASK_ID` with the final task ID
-- In `task.xml`: Replace `ALL_DEPENDENCY_TASK_IDS` with comma-separated list of all task IDs
-- All other template content should remain as-is (comprehensive instructions are already included)
+### 4.2 Create Integration Tasks
 
-### 4.3 Add to tasks.json
-Append the integration task to `.taskmaster/tasks/tasks.json`:
+For EACH level with 2+ tasks:
+
+**Step A: Determine Integration Task ID**
+- Use next available ID after the level's tasks
+- Example: If level has tasks 1,2,3, integration task is 4
+
+**Step B: Copy and customize templates**
+```bash
+INTEGRATION_ID=[next_available_id]
+LEVEL_INDEX=[level_number]
+LEVEL_TASKS=[comma_separated_task_ids]
+
+# Copy templates
+cp -r /agent-templates/docs/templates/integration-task .taskmaster/docs/task-$INTEGRATION_ID/
+
+# Update placeholders in all files
+sed -i "s/LEVEL_INDEX/$LEVEL_INDEX/g" .taskmaster/docs/task-$INTEGRATION_ID/*.md
+sed -i "s/TASK_LIST_PLACEHOLDER/$LEVEL_TASKS/g" .taskmaster/docs/task-$INTEGRATION_ID/*.md
+```
+
+**Step C: Add to tasks.json**
+Insert integration task into tasks.json at appropriate position:
 ```json
 {
-  "id": [FINAL_ID],
-  "title": "Integration & Deployment Verification",
-  "description": "Coordinate PR merges in dependency order, execute comprehensive integration tests, and verify deployment readiness across all services",
+  "id": INTEGRATION_ID,
+  "title": "Integration - Level LEVEL_INDEX",
+  "description": "Validate that tasks LEVEL_TASKS integrate correctly before proceeding to next level",
   "status": "pending",
-  "dependencies": [LIST_ALL_PREVIOUS_TASK_IDS],
-  "priority": "critical",
+  "dependencies": [LEVEL_TASKS],
+  "priority": "high",
   "agentHint": "integration",
-  "details": "Comprehensive integration task - see .taskmaster/docs/task-[FINAL_ID]/ for full instructions",
-  "testStrategy": "Execute full integration test suite, verify all service health endpoints, run smoke tests on critical paths, and confirm deployment readiness"
+  "details": "Integration validation for execution level LEVEL_INDEX",
+  "testStrategy": "Run full test suite with integrated code, verify no conflicts, validate build succeeds"
 }
 ```
 
-### 4.4 Verify Integration Task
-Confirm the integration task was created correctly:
-- [ ] Task files exist at `.taskmaster/docs/task-[FINAL_ID]/`
-- [ ] All five files present: `task.txt`, `task.md`, `prompt.md`, `acceptance-criteria.md`, `task.xml`
-- [ ] Task added to `tasks.json` with correct ID and dependencies
-- [ ] `agentHint` set to "integration" to route to Tess agent
+**Step D: Update dependent tasks**
+- Tasks in the NEXT level should now depend on the integration task
+- Example: If Task 4 depended on [1,2,3], update to depend on [integration_task_id]
+
+### 4.3 Create Final Integration Task (Always)
+After all levels and their integration tasks, create ONE final integration task:
+- ID: highest task ID + 1
+- Depends on: ALL previous tasks (including level integration tasks)
+- Purpose: End-to-end system validation
+
+```json
+{
+  "id": FINAL_ID,
+  "title": "Final Integration & Deployment Verification",
+  "description": "End-to-end system validation and deployment readiness verification",
+  "status": "pending",
+  "dependencies": [ALL_TASK_IDS],
+  "priority": "critical",
+  "agentHint": "integration",
+  "details": "Final integration validation - see .taskmaster/docs/task-[FINAL_ID]/",
+  "testStrategy": "Complete system integration tests, deployment validation, smoke tests"
+}
+```
+
+### 4.4 Verify All Integration Tasks
+- [ ] Integration task created for each level with 2+ tasks
+- [ ] Final integration task created depending on ALL tasks
+- [ ] Dependencies updated correctly
+- [ ] All template files exist and are customized
+- [ ] `agentHint` set to "integration" for all integration tasks
 
 ## Step 5: Completion and Handoff
 - Do **not** run git commands; the orchestrator handles branch, commit, push, and PR creation (`docs-gen-{{source_branch}}`).
@@ -148,8 +206,10 @@ End with exactly:
 🎉 DOCUMENTATION GENERATION COMPLETE 🎉
 ✅ Generated documentation for {{#if task_id}}task {{task_id}}{{else}}ALL tasks{{/if}}
 ✅ Created all required documentation files (task.md, prompt.md, acceptance-criteria.md, task.xml)
-✅ Created final Integration & Deployment Verification task
-📋 Total tasks documented: [COUNT] (including integration task)
+✅ Created [X] integration tasks for parallel execution levels
+✅ Created final integration & deployment verification task
+📋 Total tasks documented: [COUNT] (including integration tasks)
+📋 Integration tasks created for levels with 2+ parallel tasks
 📋 Total files created: [FILE_COUNT]
 🔧 Generated comprehensive markdown documentation
 🔗 Git workflow and pull request will be handled automatically by orchestrator hook
