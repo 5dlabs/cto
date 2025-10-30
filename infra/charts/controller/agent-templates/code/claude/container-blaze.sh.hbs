@@ -556,9 +556,9 @@ TASK_REPO_DIR="$TASK_WORKSPACE/$TARGET_REPO_DIR"
 WORKSPACE_DIR="${TASK_WORKSPACE#/workspace/}/$TARGET_REPO_DIR"
 WORK_DIR="{{working_directory}}"
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR"
+  CLAUDE_WORK_DIR="$TASK_REPO_DIR"
 else
-  CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
+  CLAUDE_WORK_DIR="$TASK_REPO_DIR/$WORK_DIR"
 fi
 echo "✓ Claude working directory: $CLAUDE_WORK_DIR"
 
@@ -698,10 +698,10 @@ echo "✓ Ensured Claude working directory exists: $CLAUDE_WORK_DIR"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
-cd "/workspace/$WORKSPACE_DIR"
+cd "$TASK_REPO_DIR"
 
 # Fix git dubious ownership before any git operations
-git config --global --add safe.directory "/workspace/$WORKSPACE_DIR"
+git config --global --add safe.directory "$TASK_REPO_DIR"
 echo "✓ Added repository to git safe directories"
 
 # Sync with latest main to prevent conflicts
@@ -766,12 +766,12 @@ echo "🔑 CRITICAL: Claude will be launched from this directory"
 # Configure git user after successful clone
 echo "=== POST-CLONE GIT CONFIGURATION ==="
 # Fix dubious ownership issues
-git config --global --add safe.directory "/workspace/$WORKSPACE_DIR"
+git config --global --add safe.directory "$TASK_REPO_DIR"
 echo "✓ Added repository to safe directories"
 
 # Set git config locally in the working repository (persistent on PVC)
-if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
-    cd "/workspace/$WORKSPACE_DIR"
+if [ -d "$TASK_REPO_DIR/.git" ]; then
+    cd "$TASK_REPO_DIR"
     git config --local user.name "$GIT_AUTHOR_NAME"
     git config --local user.email "$GIT_AUTHOR_EMAIL"
     # Set up automatic upstream for new branches
@@ -1109,7 +1109,7 @@ for file in $REQUIRED_FILES; do
 done
 
 # Check git repository (REQUIRED for implementation tasks)
-if [ ! -d "/workspace/$WORKSPACE_DIR/.git" ]; then
+if [ ! -d "$TASK_REPO_DIR/.git" ]; then
   echo "✗ CRITICAL ERROR: No target git repository found!"
   MISSING_FILES="$MISSING_FILES git-repository"
 else
@@ -1186,8 +1186,8 @@ if [ ! -d ".git" ]; then
   echo "📂 Checking parent directory structure:"
   echo "  Current: $(pwd)"
   echo "  Contents: $(ls -la . | head -5)"
-  if [ -d "/workspace/$WORKSPACE_DIR/.git" ]; then
-    echo "  Found .git at: /workspace/$REPO_NAME/"
+  if [ -d "$TASK_REPO_DIR/.git" ]; then
+    echo "  Found .git at: $TASK_REPO_DIR/"
     echo "🔧 This indicates a working directory path mismatch"
     echo "🔧 CLAUDE_WORK_DIR: $CLAUDE_WORK_DIR"
     echo "🔧 Expected git repo: /workspace/$REPO_NAME"
