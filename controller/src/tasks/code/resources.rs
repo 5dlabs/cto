@@ -1007,7 +1007,7 @@ impl<'a> CodeResourceManager<'a> {
             pod_spec["serviceAccountName"] = json!(default_sa.clone());
         }
 
-        let job_spec = json!({
+        let mut job_spec = json!({
             "apiVersion": "batch/v1",
             "kind": "Job",
             "metadata": {
@@ -1024,13 +1024,27 @@ impl<'a> CodeResourceManager<'a> {
             },
             "spec": {
                 "backoffLimit": 0,
-                "ttlSecondsAfterFinished": 3600, // Clean up completed jobs after 1 hour
                 "template": {
                     "metadata": { "labels": labels },
                     "spec": pod_spec
                 }
             }
         });
+        
+        // Only set TTL for non-workflow-managed jobs
+        // Workflow-owned jobs should be cleaned up by the workflow itself
+        let has_workflow_owner = code_run
+            .metadata
+            .owner_references
+            .as_ref()
+            .and_then(|refs| refs.iter().find(|r| r.kind == "Workflow"))
+            .is_some();
+        
+        if !has_workflow_owner {
+            // Standalone CodeRun - set TTL for automatic cleanup
+            job_spec["spec"]["ttlSecondsAfterFinished"] = json!(3600);
+        }
+        // Workflow-owned CodeRuns: no TTL set - workflow manages lifecycle
 
         Ok(serde_json::from_value(job_spec)?)
     }
