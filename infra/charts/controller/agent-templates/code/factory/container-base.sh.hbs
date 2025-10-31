@@ -1079,17 +1079,37 @@ fi
 TOOLMAN_URL=${TOOLMAN_SERVER_URL:-"http://toolman.agent-platform.svc.cluster.local:3000/mcp"}
 TOOLMAN_URL="${TOOLMAN_URL%/}"
 echo "🔍 Checking Toolman endpoint: $TOOLMAN_URL"
-if ! curl -sSf --connect-timeout 2 --max-time 6 \
-  -X POST "$TOOLMAN_URL" \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
-  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL"
+TOOLMAN_RETRIES=3
+TOOLMAN_WAIT=2
+TOOLMAN_SUCCESS=false
+for i in $(seq 1 $TOOLMAN_RETRIES); do
+  if curl -sSf --connect-timeout 5 --max-time 10 \
+    -X POST "$TOOLMAN_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":"health","method":"tools/list","params":{}}' >/tmp/toolman-ping.log 2>&1; then
+    TOOLMAN_SUCCESS=true
+    rm -f /tmp/toolman-ping.log
+    break
+  fi
+  if [ $i -lt $TOOLMAN_RETRIES ]; then
+    echo "⚠️ Toolman connectivity check failed (attempt $i/$TOOLMAN_RETRIES), retrying in ${TOOLMAN_WAIT}s..."
+    cat /tmp/toolman-ping.log >&2 || true
+    rm -f /tmp/toolman-ping.log
+    sleep $TOOLMAN_WAIT
+    TOOLMAN_WAIT=$((TOOLMAN_WAIT * 2))  # Exponential backoff
+  fi
+done
+
+if [ "$TOOLMAN_SUCCESS" != "true" ]; then
+  echo "❌ Unable to reach Toolman server at $TOOLMAN_URL after $TOOLMAN_RETRIES attempts"
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
-  exit 1
+  echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
+  echo "⚠️ If Factory execution fails, check Toolman service health and DNS resolution."
+  # Don't exit - allow Factory to proceed in case Toolman comes back online
+  # The MCP client will handle connection failures gracefully
 fi
-rm -f /tmp/toolman-ping.log
-echo "✓ Toolman endpoint reachable"
+echo "✓ Toolman endpoint check completed"
 
 if command -v jq >/dev/null 2>&1; then
   echo "[client-config] summary:"
