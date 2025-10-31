@@ -1334,19 +1334,15 @@ impl<'a> CodeResourceManager<'a> {
                 }
 
                 // Check if ConfigMap has an owner reference to a Job
-                let job_owner_name = cm
-                    .metadata
-                    .owner_references
-                    .as_ref()
-                    .and_then(|owners| {
-                        owners.iter().find_map(|owner| {
-                            if owner.kind == "Job" && owner.api_version.starts_with("batch/") {
-                                Some(owner.name.clone())
-                            } else {
-                                None
-                            }
-                        })
-                    });
+                let job_owner_name = cm.metadata.owner_references.as_ref().and_then(|owners| {
+                    owners.iter().find_map(|owner| {
+                        if owner.kind == "Job" && owner.api_version.starts_with("batch/") {
+                            Some(owner.name.clone())
+                        } else {
+                            None
+                        }
+                    })
+                });
 
                 if let Some(job_name) = job_owner_name {
                     // Check if any pods from this job are still running
