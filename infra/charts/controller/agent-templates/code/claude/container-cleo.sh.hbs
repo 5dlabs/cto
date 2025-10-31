@@ -81,20 +81,38 @@ stop_docker_sidecar() {
     echo "🛑 Stopping Docker sidecar"
   fi
 
-  # Attempt to stop processes regardless of socket status
+  # Give sidecar a moment to see sentinel file and shut down gracefully
+  echo "   Waiting briefly for graceful sidecar shutdown..."
+  sleep 2
+  
+  # Check if processes are still running after grace period
+  DOCKER_PID=$(pidof dockerd 2>/dev/null || true)
+  INIT_PID=$(pidof docker-init 2>/dev/null || true)
+  
+  # Only kill processes if they're still running after grace period
+  if [ -z "$DOCKER_PID" ] && [ -z "$INIT_PID" ]; then
+    echo "✅ Docker sidecar stopped gracefully via sentinel file"
+    return
+  fi
+  
+  # Attempt to stop processes if still running after grace period
   if command -v pkill >/dev/null 2>&1; then
     if [ -n "$DOCKER_PID" ]; then
+      echo "   Sending SIGTERM to dockerd (PID: $DOCKER_PID)..."
       pkill dockerd >/dev/null 2>&1 || true
     fi
     if [ -n "$INIT_PID" ]; then
+      echo "   Sending SIGTERM to docker-init (PID: $INIT_PID)..."
       pkill docker-init >/dev/null 2>&1 || true
     fi
     sleep 1
     # Force kill if still running
     if pidof dockerd >/dev/null 2>&1; then
+      echo "   Force killing dockerd..."
       pkill -9 dockerd >/dev/null 2>&1 || true
     fi
     if pidof docker-init >/dev/null 2>&1; then
+      echo "   Force killing docker-init..."
       pkill -9 docker-init >/dev/null 2>&1 || true
     fi
   elif command -v killall >/dev/null 2>&1; then
@@ -2216,9 +2234,8 @@ echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
 
-# Explicitly stop Docker sidecar before exiting
-echo "🛑 Explicitly stopping Docker sidecar..."
-stop_docker_sidecar || true
+# Note: Docker sidecar cleanup is handled by EXIT trap
+# No explicit call needed - trap will fire on exit
 
 # Exit with appropriate code based on success
 if [ $SUCCESS -eq 1 ]; then
