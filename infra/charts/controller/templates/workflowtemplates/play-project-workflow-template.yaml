@@ -306,15 +306,28 @@ spec:
 
           cd /workspace/"{{`{{inputs.parameters.docs-directory}}`}}"
 
-          # Check for .taskmaster/docs directory
-          TASK_DIR=".taskmaster/docs"
-          if [ ! -d "$TASK_DIR" ]; then
-            echo "❌ TaskMaster directory not found: $TASK_DIR"
+          # Resilient task directory discovery - check both possible locations
+          TASK_DIR=""
+          if [ -d ".taskmaster/docs" ] && [ -n "$(ls -A .taskmaster/docs/task-* 2>/dev/null)" ]; then
+            TASK_DIR=".taskmaster/docs"
+            echo "✓ Found task files in docs/ directory"
+          elif [ -d ".taskmaster/tasks" ] && [ -n "$(ls -A .taskmaster/tasks/task-* 2>/dev/null)" ]; then
+            TASK_DIR=".taskmaster/tasks"
+            echo "✓ Found task files in tasks/ directory"
+          fi
+
+          if [ -z "$TASK_DIR" ]; then
+            echo "❌ No TaskMaster task directories found. Checked:"
+            echo "   - .taskmaster/docs/task-*"
+            echo "   - .taskmaster/tasks/task-*"
+            # Create empty output files so Argo can read them
+            echo "" > /tmp/task-list.txt
+            echo "0" > /tmp/task-count.txt
             exit 1
           fi
 
           # Discover task directories
-          echo "📋 Scanning for task-* directories..."
+          echo "📋 Scanning for task-* directories in $TASK_DIR..."
           tasks=""
           count=0
 
