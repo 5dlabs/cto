@@ -340,6 +340,9 @@ spec:
 
           if [ -z "$tasks" ]; then
             echo "❌ No tasks found starting from task-{{`{{inputs.parameters.start-from}}`}}"
+            # Create empty output files so Argo can read them
+            echo "" > /tmp/task-list.txt
+            echo "0" > /tmp/task-count.txt
             exit 1
           fi
 
