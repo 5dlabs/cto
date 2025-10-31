@@ -75,6 +75,88 @@ spec:
                           fi
                         fi
 
+                        ensure_argo_cli() {
+                          if command -v argo >/dev/null 2>&1; then
+                            ARGO_BIN=$(command -v argo)
+                            return 0
+                          fi
+
+                          ARGO_VERSION="${ARGO_VERSION:-v3.7.1}"
+                          ARGO_BIN="/tmp/argo"
+
+                          if [ ! -x "$ARGO_BIN" ]; then
+                            echo "Downloading argo CLI ($ARGO_VERSION)..."
+                            if command -v wget >/dev/null 2>&1; then
+                              wget -qO "$ARGO_BIN" "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-linux-amd64"
+                            elif command -v curl >/dev/null 2>&1; then
+                              curl -sSL -o "$ARGO_BIN" "https://github.com/argoproj/argo-workflows/releases/download/$ARGO_VERSION/argo-linux-amd64"
+                            else
+                              echo "Neither wget nor curl is available"
+                              return 1
+                            fi
+                            chmod +x "$ARGO_BIN"
+                          fi
+                        }
+
+                        build_kubeconfig() {
+                          local kubeconfig_path="/tmp/argo-kubeconfig"
+                          if [ -f "$kubeconfig_path" ]; then
+                            echo "$kubeconfig_path"
+                            return 0
+                          fi
+
+                          local ca_cert="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                          local token_file="/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+                          if [ ! -f "$token_file" ]; then
+                            echo "Service account token not found"
+                            return 1
+                          fi
+
+                          local server="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+                          local token
+                          token=$(cat "$token_file")
+
+                          {
+                            echo "apiVersion: v1"
+                            echo "kind: Config"
+                            echo "clusters:"
+                            echo "  - cluster:"
+                            printf '      certificate-authority: %s\n' "$ca_cert"
+                            printf '      server: %s\n' "$server"
+                            echo "    name: in-cluster"
+                            echo "contexts:"
+                            echo "  - context:"
+                            echo "      cluster: in-cluster"
+                            echo "      namespace: agent-platform"
+                            echo "      user: sensor-sa"
+                            echo "    name: in-cluster"
+                            echo "current-context: in-cluster"
+                            echo "users:"
+                            echo "  - name: sensor-sa"
+                            echo "    user:"
+                            printf '      token: %s\n' "$token"
+                          } > "$kubeconfig_path"
+
+                          echo "$kubeconfig_path"
+                        }
+
+                        resume_workflow() {
+                          ensure_argo_cli || return 1
+                          local kubeconfig_path
+                          kubeconfig_path=$(build_kubeconfig) || return 1
+
+                          if "$ARGO_BIN" --auth-mode kubeconfig --kubeconfig "$kubeconfig_path" \
+                            -n agent-platform resume "$WORKFLOW_NAME" >/tmp/argo-resume.log 2>&1; then
+                            echo "✅ Workflow resumed successfully"
+                            return 0
+                          fi
+
+                          echo "⚠️ Failed to resume via argo CLI; output:"
+                          cat /tmp/argo-resume.log
+                          return 1
+                        }
+
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-quality-complete"
                         echo "Reviewer: {{ .Input.body.review.user.login }}"
@@ -110,24 +192,25 @@ spec:
 
                         echo "Found workflow: $WORKFLOW_NAME"
 
-                        # Check if workflow is at correct stage
-                        CURRENT_STAGE=$(kubectl get workflow $WORKFLOW_NAME \
-                          -n agent-platform \
-                          -o jsonpath='{.metadata.labels.current-stage}' \
-                          2>/dev/null || echo "")
+                        # Check if workflow is at correct stage and suspended
+                        WORKFLOW_JSON=$(kubectl get workflow $WORKFLOW_NAME -n agent-platform -o json 2>/dev/null)
+                        CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"] // ""')
+                        SUSPEND_NODE=$(echo "$WORKFLOW_JSON" | \
+                          jq -r '(.status.nodes // {})
+                            | to_entries[]?
+                            | select(.value.displayName == "wait-for-cleo-approval")
+                            | .value.phase' 2>/dev/null || echo "")
 
-                        if [ "$CURRENT_STAGE" = "waiting-quality-complete" ]; then
-                          echo "Found workflow at correct stage, resuming..."
+                        if [ "$CURRENT_STAGE" = "waiting-quality-complete" ] && [ "$SUSPEND_NODE" = "Running" ]; then
+                          echo "Found workflow at correct stage and suspended, resuming..."
 
-                          # Resume the workflow
-                          kubectl patch workflow $WORKFLOW_NAME \
-                            -n agent-platform \
-                            --type='merge' \
-                            -p '{"spec":{"suspend":false}}'
-
-                          echo "✅ Workflow resumed successfully"
+                          # Resume the workflow using argo CLI
+                          if ! resume_workflow; then
+                            echo "⚠️ Resume attempt failed"
+                            exit 0
+                          fi
                         else
-                          echo "Workflow not at expected stage (current: $CURRENT_STAGE)"
+                          echo "Workflow not ready for resume (stage: $CURRENT_STAGE, suspend: $SUSPEND_NODE)"
                           echo "Skipping resume to prevent incorrect stage progression"
                         fi
       retryStrategy:

@@ -1034,16 +1034,21 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
+                        # Extract repository for precise correlation
+                        REPO_FULL="${OWNER}/${REPO_NAME}"
+                        REPO_LABEL=$(echo "$REPO_FULL" | tr '/' '-')
+                        echo "Repository: $REPO_FULL (label: $REPO_LABEL)"
+
                         echo "Polling for workflow reaching security-in-progress stage..."
                         MAX_WORKFLOW_ATTEMPTS=90
                         WORKFLOW_WAIT_SECONDS=10
                         WORKFLOW_ATTEMPT=1
                         WORKFLOW_NAME=""
-                        STAGE_READY=false
+                        SUSPEND_READY=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
                           WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
-                            -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                            -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                             -o json 2>/dev/null || echo "")
 
                           WORKFLOW_NAME=""
@@ -1055,25 +1060,31 @@ spec:
                           if [ -n "$WORKFLOW_NAME" ]; then
                             CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | \
                               jq -r '.items[0].metadata.labels["current-stage"] // ""' 2>/dev/null || echo "")
+                            SUSPEND_NODE=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '(.items[0].status.nodes // {})
+                                | to_entries[]?
+                                | select(.value.displayName == "wait-for-cipher-approval")
+                                | .value.phase' 2>/dev/null || echo "")
 
-                            # Check if workflow is at security-in-progress stage and waiting
-                            if [ "$CURRENT_STAGE" = "security-in-progress" ]; then
-                              STAGE_READY=true
-                              echo "✅ Workflow $WORKFLOW_NAME is at security-in-progress stage"
+                            if [ "$CURRENT_STAGE" = "security-in-progress" ] && [ "$SUSPEND_NODE" = "Running" ]; then
+                              SUSPEND_READY=true
+                              echo "✅ Workflow $WORKFLOW_NAME is suspended at security-in-progress stage"
                               break
                             fi
 
-                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE; waiting ${WORKFLOW_WAIT_SECONDS}s"
+                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE suspend-node=${SUSPEND_NODE:-none};"
+                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           else
-                            echo "⏳ No workflow discovered for task-id=$TASK_ID yet; waiting ${WORKFLOW_WAIT_SECONDS}s"
+                            echo "⏳ No workflow discovered for task-id=$TASK_ID and repository=$REPO_LABEL yet;"
+                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           fi
 
                           sleep $WORKFLOW_WAIT_SECONDS
                           WORKFLOW_ATTEMPT=$((WORKFLOW_ATTEMPT + 1))
                         done
 
-                        if [ "$STAGE_READY" != true ]; then
-                          echo "⚠️ Workflow did not reach security-in-progress stage in time; skipping resume"
+                        if [ "$SUSPEND_READY" != true ]; then
+                          echo "⚠️ Workflow did not reach security-in-progress suspend point in time; skipping resume"
                           exit 0
                         fi
 
@@ -1352,16 +1363,20 @@ spec:
 
                         echo "Task ID: $TASK_ID"
 
+                        # Extract repository for precise correlation
+                        REPO_LABEL=$(echo "$REPO" | tr '/' '-')
+                        echo "Repository: $REPO (label: $REPO_LABEL)"
+
                         echo "Polling for workflow reaching waiting-ready-for-qa stage..."
                         MAX_WORKFLOW_ATTEMPTS=90
                         WORKFLOW_WAIT_SECONDS=10
                         WORKFLOW_ATTEMPT=1
                         WORKFLOW_NAME=""
-                        STAGE_READY=false
+                        SUSPEND_READY=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
                           WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
-                            -l task-id=$TASK_ID,workflow-type=play-orchestration \
+                            -l task-id=$TASK_ID,workflow-type=play-orchestration,repository=$REPO_LABEL \
                             -o json 2>/dev/null || echo "")
 
                           WORKFLOW_NAME=""
@@ -1373,25 +1388,31 @@ spec:
                           if [ -n "$WORKFLOW_NAME" ]; then
                             CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | \
                               jq -r '.items[0].metadata.labels["current-stage"] // ""' 2>/dev/null || echo "")
+                            SUSPEND_NODE=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '(.items[0].status.nodes // {})
+                                | to_entries[]?
+                                | select(.value.displayName == "wait-for-tess-approval")
+                                | .value.phase' 2>/dev/null || echo "")
 
-                            # Check if workflow is at waiting-ready-for-qa stage and waiting
-                            if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ]; then
-                              STAGE_READY=true
-                              echo "✅ Workflow $WORKFLOW_NAME is at waiting-ready-for-qa stage"
+                            if [ "$CURRENT_STAGE" = "waiting-ready-for-qa" ] && [ "$SUSPEND_NODE" = "Running" ]; then
+                              SUSPEND_READY=true
+                              echo "✅ Workflow $WORKFLOW_NAME is suspended at waiting-ready-for-qa stage"
                               break
                             fi
 
-                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE; waiting ${WORKFLOW_WAIT_SECONDS}s"
+                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE suspend-node=${SUSPEND_NODE:-none};"
+                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           else
-                            echo "⏳ No workflow discovered for task-id=$TASK_ID yet; waiting ${WORKFLOW_WAIT_SECONDS}s"
+                            echo "⏳ No workflow discovered for task-id=$TASK_ID and repository=$REPO_LABEL yet;"
+                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           fi
 
                           sleep $WORKFLOW_WAIT_SECONDS
                           WORKFLOW_ATTEMPT=$((WORKFLOW_ATTEMPT + 1))
                         done
 
-                        if [ "$STAGE_READY" != true ]; then
-                          echo "⚠️ Workflow did not reach waiting-ready-for-qa stage in time; skipping resume"
+                        if [ "$SUSPEND_READY" != true ]; then
+                          echo "⚠️ Workflow did not reach waiting-ready-for-qa suspend point in time; skipping resume"
                           exit 0
                         fi
 
