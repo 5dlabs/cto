@@ -180,7 +180,49 @@
           "agent_docs_qwen_query",
           "agent_docs_openhands_query"
         ],
-        "localServers": {}
+        "localServers": {
+          "shadcn": {
+            "enabled": true,
+            "command": "npx",
+            "args": [
+              "shadcn@latest",
+              "mcp"
+            ],
+            "tools": [
+              "list_components",
+              "search_components",
+              "add_component",
+              "init_project"
+            ]
+          },
+          "filesystem": {
+            "enabled": true,
+            "command": "npx",
+            "args": [
+              "-y",
+              "@modelcontextprotocol/server-filesystem",
+              "/workspace"
+            ],
+            "tools": [
+              "read_file",
+              "write_file",
+              "list_directory",
+              "search_files",
+              "directory_tree"
+            ]
+          },
+          "git": {
+            "enabled": true,
+            "command": "mcp-server-git",
+            "args": [],
+            "tools": [
+              "git_status",
+              "git_diff",
+              "git_log",
+              "git_show"
+            ]
+          }
+        }
       }
     },
     "cipher": {
