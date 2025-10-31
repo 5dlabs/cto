@@ -180,6 +180,59 @@ curl -X POST https://<ngrok-url>/api/auth/login \
   -d '{"username":"test","password":"test123"}'
 ```
 
+### 7a. Frontend Testing with Playwright (If Frontend Project)
+
+**For React/Next.js/Frontend projects, use Playwright to capture screenshots:**
+
+```bash
+# Install Playwright
+npm init playwright@latest --yes
+
+# Create smoke test
+cat > tests/e2e/smoke.spec.ts <<'EOF'
+import { test, expect } from '@playwright/test';
+
+test('deployed app loads successfully', async ({ page }) => {
+  const ngrokUrl = process.env.NGROK_URL || 'https://<your-ngrok-url>';
+  
+  await page.goto(ngrokUrl);
+  await page.screenshot({ path: 'screenshots/deployed-homepage.png', fullPage: true });
+  
+  await expect(page).toHaveTitle(/.+/);
+  console.log('✅ App loaded successfully');
+});
+EOF
+
+# Run against deployed URL
+NGROK_URL=$(kubectl get ingress <service>-ngrok -n agent-platform -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+npx playwright test --config playwright.config.ts
+
+# Post screenshots to PR
+if [ -d "screenshots" ]; then
+  git add screenshots/
+  git commit -m "docs: add deployment screenshots"
+  git push origin HEAD
+  
+  # Create PR comment with screenshots
+  gh pr comment ${PR_NUMBER} --body "## 🚀 Deployment Screenshots
+
+**Live URL:** https://$NGROK_URL
+
+### Application Screenshots
+$(for img in screenshots/*.png; do echo "![$img]($img)"; echo ""; done)
+
+**Status:** Application deployed and accessible ✅"
+fi
+```
+
+**Screenshot Requirements for Frontend:**
+- Homepage/landing page
+- Key user flows (login, navigation, forms)
+- Different states (loading, success, error)
+- Mobile responsiveness (if applicable)
+
+**Post screenshots to PR to demonstrate UI is working!**
+
 ### 8. Create Deployment Report
 
 Document the deployment:
