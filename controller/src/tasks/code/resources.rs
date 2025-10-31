@@ -4,10 +4,9 @@ use crate::cli::types::CLIType;
 use crate::crds::{CLIConfig, CodeRun};
 use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
-use k8s_openapi::api::core::v1::Pod;
 use k8s_openapi::api::{
     batch::v1::Job,
-    core::v1::{ConfigMap, PersistentVolumeClaim, Service},
+    core::v1::{ConfigMap, PersistentVolumeClaim, Pod, Service},
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
@@ -1335,21 +1334,24 @@ impl<'a> CodeResourceManager<'a> {
                 }
 
                 // Check if ConfigMap has an owner reference to a Job
-                let job_owner_name = cm.metadata.owner_references.as_ref().and_then(|owners| {
-                    owners.iter().find_map(|owner| {
-                        if owner.kind == "Job" && owner.api_version.starts_with("batch/") {
-                            Some(owner.name.clone())
-                        } else {
-                            None
-                        }
-                    })
-                });
+                let job_owner_name = cm
+                    .metadata
+                    .owner_references
+                    .as_ref()
+                    .and_then(|owners| {
+                        owners.iter().find_map(|owner| {
+                            if owner.kind == "Job" && owner.api_version.starts_with("batch/") {
+                                Some(owner.name.clone())
+                            } else {
+                                None
+                            }
+                        })
+                    });
 
                 if let Some(job_name) = job_owner_name {
                     // Check if any pods from this job are still running
                     let pod_list_params = ListParams::default()
                         .labels(&format!("batch.kubernetes.io/job-name={}", job_name));
-
                     match pods.list(&pod_list_params).await {
                         Ok(pod_list) => {
                             let has_running_pods = pod_list.items.iter().any(|pod| {

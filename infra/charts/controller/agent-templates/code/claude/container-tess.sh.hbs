@@ -1601,6 +1601,36 @@ You are assigned to work on **TASK {{task_id}} ONLY**.
         
         ---
         
+        🚨 MERGE CONFLICT RESOLUTION 🚨
+        
+        If you encounter merge conflicts when pulling or merging branches:
+        
+        **Step 1: Identify Conflicts**
+        - Run \`git status\` to see conflicted files
+        - Files with conflicts will show as \"both modified\" or similar
+        
+        **Step 2: Resolve Conflicts**
+        - Open each conflicted file
+        - Look for conflict markers: \`<<<<<<< HEAD\`, \`=======\`, \`>>>>>>> branch-name\`
+        - Manually edit to keep the correct code (often keeping both changes, sometimes choosing one)
+        - Remove all conflict markers
+        - Ensure the merged code makes logical sense
+        
+        **Step 3: Complete Resolution**
+        - Stage resolved files: \`git add <file>\`
+        - If in a merge: \`git commit\` (uses default merge message)
+        - If in a rebase: \`git rebase --continue\`
+        - Push: \`git push origin <branch>\`
+        
+        **Common Scenarios:**
+        - **Both added same feature**: Keep both if compatible, merge functionality if overlapping
+        - **Formatting conflicts**: Keep proper formatting, apply project style
+        - **Import/dependency conflicts**: Keep all unique imports, remove duplicates
+        
+        **NEVER use \`git merge --abort\` or \`git rebase --abort\` unless instructed - resolve conflicts properly!**
+        
+        ---
+        
         🚨 NON-NEGOTIABLE PR REQUIREMENT 🚨
         
         After you finish implementation and validations:
