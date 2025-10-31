@@ -663,7 +663,7 @@ echo "════════════════════════�
 echo "📋 Preparing task documentation for quality review..."
 echo "════════════════════════════════════════════════════════════════"
 
-{{#if docsRepositoryUrl}}
+{{#if docs_repository_url}}
 # Initialize comprehensive tracking with explicit stage flags
 COPIED_FILES=""
 FAILED_FILES=""
@@ -696,7 +696,7 @@ fi
 # Only proceed if we have authentication
 if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
     # Build authenticated docs URL
-    DOCS_REPO_URL="{{docsRepositoryUrl}}"
+    DOCS_REPO_URL="{{docs_repository_url}}"
     DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
     
     echo "📥 Docs Repository: $DOCS_REPO_URL"
@@ -1023,7 +1023,7 @@ else
     echo "Troubleshooting Steps:"
     if [ "$DOCS_AUTH_VERIFIED" != "true" ]; then
         echo "   1. Verify GITHUB_TOKEN is valid and has repository access"
-        echo "   2. Check repository URL: {{docsRepositoryUrl}}"
+        echo "   2. Check repository URL: {{docs_repository_url}}"
     fi
     if [ "$DOCS_CLONE_SUCCESS" != "true" ] && [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
         echo "   1. Review clone error log: /tmp/docs_clone_error.log"
@@ -1058,7 +1058,7 @@ if [ -d "$CLAUDE_WORK_DIR/task" ]; then
     fi
 else
     echo "⚠️  No task documentation available"
-    echo "   - No docs repository configured (docsRepositoryUrl not set)"
+    echo "   - No docs repository configured (docs_repository_url not set)"
     echo "   - No local task/ directory found in repository"
     echo "   Agent will proceed with minimal context"
 fi
