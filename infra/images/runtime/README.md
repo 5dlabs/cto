@@ -5,7 +5,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 ## Included Tools
 
 ### Core Development Stack
-- **Node.js 20 LTS** with npm, yarn, and pnpm
+- **Node.js 20 LTS** with npm, yarn, and pnpm (latest)
 - **Python 3** with pip, venv, and setuptools
 - **Go** with latest stable version and GOPATH setup
 - **Rust** with stable toolchain, clippy, rustfmt, and rust-analyzer
@@ -131,6 +131,7 @@ This is the base runtime image (`ghcr.io/5dlabs/runtime:latest`) that serves as 
 - **SQLFluff** - SQL linter and formatter
 - **Pip-tools** - Python dependency management
 - **TypeScript** - TypeScript compiler
+- **shadcn CLI** - shadcn/ui component CLI for modern UI development
 - **Node.js development tools** - nodemon, concurrently, cross-env, dotenv-cli, zx
 
 ### Development Environment
