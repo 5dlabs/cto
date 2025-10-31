@@ -8,7 +8,9 @@ resources:
   - externalsecret.yaml
   - sa-rbac.yaml
   - play-workflow-sensors.yaml
-  - stage-aware-resume-sensor.yaml
+  - stage-aware-cleo-approval-sensor.yaml
+  - stage-aware-tess-approval-sensor.yaml
+  - stage-aware-pr-merged-sensor.yaml
   - merge-to-main-sensor.yaml
   - remediation-feedback-sensor.yaml
 
