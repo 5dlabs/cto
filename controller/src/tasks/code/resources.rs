@@ -10,12 +10,13 @@ use k8s_openapi::api::{
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
+use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::controller::Action;
 use kube::ResourceExt;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct CodeResourceManager<'a> {
     pub jobs: &'a Api<Job>,
@@ -1317,6 +1318,14 @@ impl<'a> CodeResourceManager<'a> {
 
         let configmaps = self.configmaps.list(&list_params).await?;
 
+        // Get pods API for checking if pods are still running
+        let namespace = code_run
+            .metadata
+            .namespace
+            .as_deref()
+            .unwrap_or(&self.ctx.namespace);
+        let pods: Api<Pod> = Api::namespaced(self.ctx.client.clone(), namespace);
+
         for cm in configmaps {
             if let Some(cm_name) = cm.metadata.name {
                 // Skip deleting the current ConfigMap - this prevents deletion of active job's ConfigMap
@@ -1325,25 +1334,52 @@ impl<'a> CodeResourceManager<'a> {
                     continue;
                 }
 
-                // Check if ConfigMap has an owner reference to a Job that's still running
-                let has_active_job = cm
+                // Check if ConfigMap has an owner reference to a Job
+                let job_owner_name = cm
                     .metadata
                     .owner_references
                     .as_ref()
-                    .map(|owners| {
-                        owners.iter().any(|owner| {
-                            owner.kind == "Job" && owner.api_version.starts_with("batch/")
+                    .and_then(|owners| {
+                        owners.iter().find_map(|owner| {
+                            if owner.kind == "Job" && owner.api_version.starts_with("batch/") {
+                                Some(owner.name.clone())
+                            } else {
+                                None
+                            }
                         })
-                    })
-                    .unwrap_or(false);
+                    });
 
-                if has_active_job {
-                    // If ConfigMap is owned by a Job, let Kubernetes handle cleanup when Job completes
-                    info!(
-                        "Skipping cleanup of ConfigMap with active Job owner: {}",
-                        cm_name
-                    );
-                    continue;
+                if let Some(job_name) = job_owner_name {
+                    // Check if any pods from this job are still running
+                    let pod_list_params = ListParams::default()
+                        .labels(&format!("batch.kubernetes.io/job-name={}", job_name));
+                    
+                    match pods.list(&pod_list_params).await {
+                        Ok(pod_list) => {
+                            let has_running_pods = pod_list.items.iter().any(|pod| {
+                                pod.status
+                                    .as_ref()
+                                    .and_then(|s| s.phase.as_deref())
+                                    .map(|phase| phase == "Running" || phase == "Pending")
+                                    .unwrap_or(false)
+                            });
+
+                            if has_running_pods {
+                                info!(
+                                    "Skipping cleanup of ConfigMap {} - job {} still has running pods",
+                                    cm_name, job_name
+                                );
+                                continue;
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to list pods for job {}: {} - skipping ConfigMap deletion for safety",
+                                job_name, e
+                            );
+                            continue;
+                        }
+                    }
                 }
 
                 info!("Deleting old code ConfigMap: {}", cm_name);
