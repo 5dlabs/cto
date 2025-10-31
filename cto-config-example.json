@@ -192,17 +192,38 @@
       "model": "gpt-4o",
       "tools": {
         "remote": [
-          "memory_create_entities",
-          "memory_add_observations",
-          "brave-search_brave_web_search"
+          "brave_search_brave_web_search",
+          "context7_get_library_docs"
         ],
         "localServers": {
+          "shadcn": {
+            "enabled": true,
+            "command": "npx",
+            "args": [
+              "shadcn@latest",
+              "mcp"
+            ],
+            "tools": [
+              "list_components",
+              "search_components",
+              "add_component",
+              "init_project"
+            ]
+          },
           "filesystem": {
             "enabled": true,
+            "command": "npx",
+            "args": [
+              "-y",
+              "@modelcontextprotocol/server-filesystem",
+              "/workspace"
+            ],
             "tools": [
               "read_file",
               "write_file",
-              "list_directory"
+              "list_directory",
+              "search_files",
+              "directory_tree"
             ]
           },
           "git": {
