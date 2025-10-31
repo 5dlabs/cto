@@ -75,8 +75,11 @@ RUN --mount=type=cache,target=/root/.cache \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
 
-# Enable corepack (pnpm only, skip yarn since we use system yarn)
-RUN if command -v corepack >/dev/null 2>&1; then corepack enable pnpm; fi
+# Enable corepack for pnpm only (skip yarn since we use system yarn)
+RUN if command -v corepack >/dev/null 2>&1; then \
+    corepack enable pnpm && \
+    corepack prepare pnpm@latest --activate; \
+  fi
 
 # Install latest stable Go (robust arch/version selection)
 RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
@@ -273,7 +276,8 @@ RUN --mount=type=cache,target=/root/.cache \
         concurrently \
         cross-env \
         dotenv-cli \
-        zx || true
+        zx \
+        shadcn@latest || true
 
 # Install Rust toolchain for root
 RUN --mount=type=cache,target=/root/.cache \
