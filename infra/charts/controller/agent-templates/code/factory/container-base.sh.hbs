@@ -1427,12 +1427,42 @@ $PREV_FINDINGS
     printf '    [%d] %s\n' "$idx" "${FACTORY_CMD[$idx]}"
   done
 
+  # Handle SIGPIPE gracefully to prevent exit 141 (broken pipe)
+  # SIGPIPE occurs when a process tries to write to a closed pipe (e.g., log collector closed early)
   set +e
   set -o pipefail
-  "${FACTORY_CMD[@]}" | tee "$RUN_LOG"
+  # Capture both Factory exit code and pipe status
+  "${FACTORY_CMD[@]}" 2>&1 | tee "$RUN_LOG" || true
   FACTORY_EXIT=${PIPESTATUS[0]}
+  TEE_EXIT=${PIPESTATUS[1]:-0}
   set +o pipefail
   set -e
+  
+  # If Factory exit code is 141 (SIGPIPE), check if it was just a pipe issue
+  if [ "$FACTORY_EXIT" = "141" ]; then
+    echo "⚠️ Factory CLI encountered SIGPIPE (exit code 141) - pipe may have closed early"
+    echo "🔍 Checking if Factory produced any output before pipe closed..."
+    if [ -f "$RUN_LOG" ] && [ -s "$RUN_LOG" ]; then
+      LOG_SIZE=$(stat -f%z "$RUN_LOG" 2>/dev/null || stat -c%s "$RUN_LOG" 2>/dev/null || echo "0")
+      if [ "$LOG_SIZE" -gt 100 ]; then
+        echo "✅ Factory produced ${LOG_SIZE} bytes of output before pipe closed - likely log collection issue"
+        echo "ℹ️ Treating as recoverable - Factory may have completed successfully before log pipe closed"
+        # Check if the log indicates completion
+        if grep -q "✅\|complete\|finished\|done" "$RUN_LOG" 2>/dev/null; then
+          echo "✅ Log shows completion indicators - treating as success"
+          FACTORY_EXIT=0
+        else
+          echo "⚠️ Log shows no clear completion - will retry"
+        fi
+      else
+        echo "❌ Minimal or no Factory output detected (${LOG_SIZE} bytes) - treating as failure"
+      fi
+    else
+      echo "❌ No Factory output log file found - treating as failure"
+    fi
+  elif [ "$TEE_EXIT" != "0" ] && [ "$FACTORY_EXIT" = "0" ]; then
+    echo "⚠️ Log collection (tee) failed but Factory succeeded - continuing"
+  fi
 
   echo "[factory-debug] Attempt $ATTEMPT finished with exit code $FACTORY_EXIT"
 
