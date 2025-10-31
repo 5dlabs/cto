@@ -900,8 +900,130 @@ spec:
             done
 
             if [ $elapsed -ge $max_wait ]; then
-              echo "⏱️ Timeout waiting for level $level_index tasks"
-              exit 1
+              echo ""
+              echo "═══════════════════════════════════════════════════════════════"
+              echo "⏱️ TIMEOUT: Level $level_index exceeded maximum wait time ($max_wait seconds)"
+              echo "═══════════════════════════════════════════════════════════════"
+              echo ""
+              
+              # Detailed diagnostics for each workflow
+              echo "📊 DIAGNOSTICS: Checking status of all workflows in level $level_index..."
+              echo ""
+              
+              stuck_count=0
+              failed_count=0
+              succeeded_count=0
+              unknown_count=0
+              
+              for workflow_name in $workflow_names; do
+                status=$(kubectl get workflow "$workflow_name" \
+                  -n {{ .Release.Namespace }} \
+                  -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+                
+                message=$(kubectl get workflow "$workflow_name" \
+                  -n {{ .Release.Namespace }} \
+                  -o jsonpath='{.status.message}' 2>/dev/null || echo "")
+                
+                case "$status" in
+                  "Succeeded")
+                    echo "  ✅ $workflow_name: Succeeded"
+                    succeeded_count=$((succeeded_count + 1))
+                    ;;
+                  "Failed"|"Error")
+                    echo "  ❌ $workflow_name: $status"
+                    if [ -n "$message" ]; then
+                      echo "     Message: $message"
+                    fi
+                    failed_count=$((failed_count + 1))
+                    # Get node status for more details
+                    failed_nodes=$(kubectl get workflow "$workflow_name" \
+                      -n {{ .Release.Namespace }} \
+                      -o jsonpath='{.status.nodes[*].phase}' 2>/dev/null | tr ' ' '\n' | grep -E "Failed|Error" | wc -l || echo "0")
+                    if [ "$failed_nodes" -gt 0 ]; then
+                      echo "     Failed nodes: $failed_nodes"
+                    fi
+                    ;;
+                  "Running"|"Pending")
+                    echo "  ⏳ $workflow_name: $status (stuck or still processing)"
+                    stuck_count=$((stuck_count + 1))
+                    
+                    # Get active pods for this workflow
+                    active_pods=$(kubectl get pods \
+                      -n {{ .Release.Namespace }} \
+                      -l workflows.argoproj.io/workflow="$workflow_name" \
+                      --field-selector=status.phase=Running \
+                      -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+                    
+                    if [ -n "$active_pods" ]; then
+                      echo "     Active pods: $(echo "$active_pods" | wc -w | tr -d ' ')"
+                      for pod in $active_pods; do
+                        pod_age=$(kubectl get pod "$pod" \
+                          -n {{ .Release.Namespace }} \
+                          -o jsonpath='{.status.startTime}' 2>/dev/null || echo "")
+                        if [ -n "$pod_age" ]; then
+                          echo "       - $pod (running since: $pod_age)"
+                        else
+                          echo "       - $pod"
+                        fi
+                      done
+                    else
+                      echo "     No active pods found"
+                    fi
+                    ;;
+                  "NotFound")
+                    echo "  ⚠️  $workflow_name: Not found (may have been deleted)"
+                    unknown_count=$((unknown_count + 1))
+                    ;;
+                  *)
+                    echo "  ❓ $workflow_name: Unknown status '$status'"
+                    unknown_count=$((unknown_count + 1))
+                    ;;
+                esac
+                echo ""
+              done
+              
+              echo "═══════════════════════════════════════════════════════════════"
+              echo "📈 SUMMARY:"
+              echo "  ✅ Succeeded: $succeeded_count"
+              echo "  ❌ Failed: $failed_count"
+              echo "  ⏳ Still running/stuck: $stuck_count"
+              echo "  ❓ Unknown: $unknown_count"
+              echo "═══════════════════════════════════════════════════════════════"
+              echo ""
+              
+              # Provide actionable remediation steps
+              if [ "$failed_count" -gt 0 ]; then
+                echo "🔧 REMEDIATION:"
+                echo "  1. Check failed workflow logs: kubectl logs -n {{ .Release.Namespace }} -l workflows.argoproj.io/workflow=<workflow-name>"
+                echo "  2. Review workflow status: kubectl get workflow <workflow-name> -n {{ .Release.Namespace }} -o yaml"
+                echo "  3. Check CodeRun status if applicable: kubectl get coderun -n {{ .Release.Namespace }}"
+                echo ""
+              fi
+              
+              if [ "$stuck_count" -gt 0 ]; then
+                echo "🔧 REMEDIATION FOR STUCK WORKFLOWS:"
+                echo "  1. Check pod logs: kubectl logs -n {{ .Release.Namespace }} <pod-name>"
+                echo "  2. Check workflow suspend status: kubectl get workflow <workflow-name> -n {{ .Release.Namespace }} -o jsonpath='{.status.nodes[*].phase}'"
+                echo "  3. Workflows may be waiting on external events (PR creation, webhooks, etc.)"
+                echo "  4. Consider increasing max_wait timeout if tasks legitimately take longer than 2 hours"
+                echo ""
+              fi
+              
+              # Exit with error, but provide context
+              if [ "$failed_count" -gt 0 ] && [ "$stuck_count" -eq 0 ]; then
+                echo "❌ Level $level_index failed: $failed_count task(s) failed"
+                exit 1
+              elif [ "$stuck_count" -gt 0 ]; then
+                echo "⏱️ Level $level_index timeout: $stuck_count task(s) did not complete within $max_wait seconds"
+                echo "   This may indicate:"
+                echo "   - Workflows waiting on external events (GitHub PRs, webhooks)"
+                echo "   - Long-running implementation tasks that exceed timeout"
+                echo "   - Workflow suspension/resume issues"
+                exit 1
+              else
+                echo "❌ Level $level_index timeout: Unknown issue preventing completion"
+                exit 1
+              fi
             fi
 
             # Progress report
@@ -1170,7 +1292,47 @@ spec:
             done
 
             if [ $elapsed -ge $max_wait ]; then
-              echo "⏱️ Timeout waiting for task $task_id"
+              echo ""
+              echo "═══════════════════════════════════════════════════════════════"
+              echo "⏱️ TIMEOUT: Task $task_id exceeded maximum wait time ($max_wait seconds)"
+              echo "═══════════════════════════════════════════════════════════════"
+              echo ""
+              
+              # Get detailed workflow status
+              status=$(kubectl get workflow "$workflow_name" \
+                -n {{ .Release.Namespace }} \
+                -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+              
+              message=$(kubectl get workflow "$workflow_name" \
+                -n {{ .Release.Namespace }} \
+                -o jsonpath='{.status.message}' 2>/dev/null || echo "")
+              
+              echo "📊 Workflow Status: $status"
+              if [ -n "$message" ]; then
+                echo "📝 Message: $message"
+              fi
+              
+              # Get active pods
+              active_pods=$(kubectl get pods \
+                -n {{ .Release.Namespace }} \
+                -l workflows.argoproj.io/workflow="$workflow_name" \
+                --field-selector=status.phase=Running \
+                -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+              
+              if [ -n "$active_pods" ]; then
+                echo "🔍 Active pods:"
+                for pod in $active_pods; do
+                  echo "   - $pod"
+                done
+              fi
+              
+              echo ""
+              echo "🔧 REMEDIATION:"
+              echo "  1. Check workflow logs: kubectl logs -n {{ .Release.Namespace }} -l workflows.argoproj.io/workflow=$workflow_name"
+              echo "  2. Review workflow: kubectl get workflow $workflow_name -n {{ .Release.Namespace }} -o yaml"
+              echo "  3. Check if workflow is suspended waiting for external events"
+              echo ""
+              
               exit 1
             fi
 
