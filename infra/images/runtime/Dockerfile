@@ -75,9 +75,9 @@ RUN --mount=type=cache,target=/root/.cache \
   && npm install -g npm@latest \
   && rm -rf /var/lib/apt/lists/*
 
-# Enable corepack and install latest pnpm
+# Enable corepack for pnpm only (skip yarn since we use system yarn)
 RUN if command -v corepack >/dev/null 2>&1; then \
-    corepack enable && \
+    corepack enable pnpm && \
     corepack prepare pnpm@latest --activate; \
   fi
 
