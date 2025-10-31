@@ -808,8 +808,11 @@ echo "✅ shadcn/ui component index created at $CLAUDE_WORK_DIR/shadcn-component
 if [ -f "/agent-templates/shared_design-system.md" ]; then
     cp "/agent-templates/shared_design-system.md" "$CLAUDE_WORK_DIR/design-system.md"
     echo "✅ Design system copied to Claude working directory"
+elif [ -f "/agent-templates/shared/design-system.md" ]; then
+    cp "/agent-templates/shared/design-system.md" "$CLAUDE_WORK_DIR/design-system.md"
+    echo "✅ Design system copied to Claude working directory (alternative path)"
 else
-    echo "⚠️ Design system not found at /agent-templates/shared_design-system.md"
+    echo "⚠️ Design system not found at /agent-templates/shared_design-system.md or /agent-templates/shared/design-system.md"
 fi
 
 # List available shadcn/ui components from the cloned docs
