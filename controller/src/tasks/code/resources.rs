@@ -6,11 +6,10 @@ use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
-    core::v1::{ConfigMap, PersistentVolumeClaim, Service},
+    core::v1::{ConfigMap, PersistentVolumeClaim, Pod, Service},
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
-use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::controller::Action;
 use kube::ResourceExt;
 use serde_json::json;
@@ -1353,7 +1352,6 @@ impl<'a> CodeResourceManager<'a> {
                     // Check if any pods from this job are still running
                     let pod_list_params = ListParams::default()
                         .labels(&format!("batch.kubernetes.io/job-name={}", job_name));
-                    
                     match pods.list(&pod_list_params).await {
                         Ok(pod_list) => {
                             let has_running_pods = pod_list.items.iter().any(|pod| {
