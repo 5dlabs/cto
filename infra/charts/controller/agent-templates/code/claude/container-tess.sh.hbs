@@ -1537,7 +1537,118 @@ else
               LANGUAGE_TEST_GUIDANCE="$LANGUAGE_TEST_GUIDANCE
 - **Component Testing**: Use React Testing Library for component tests
 - **User Interactions**: Test user flows, not implementation details
-- **Hooks Testing**: Properly test custom hooks if applicable"
+- **Hooks Testing**: Properly test custom hooks if applicable
+
+## 📸 Frontend E2E Testing with Playwright (REQUIRED)
+
+For frontend tasks, you MUST use Playwright for visual validation and user flow testing:
+
+### Setup Playwright
+\\\`\\\`\\\`bash
+npm init playwright@latest --yes
+# Creates playwright.config.ts and tests/ directory
+\\\`\\\`\\\`
+
+### Create E2E Tests
+\\\`\\\`\\\`typescript
+// tests/e2e/app.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('homepage loads and displays correctly', async ({ page }) => {
+  await page.goto('http://localhost:3000');
+  
+  // Take screenshot
+  await page.screenshot({ path: 'screenshots/homepage.png', fullPage: true });
+  
+  // Verify key elements
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('button')).toBeVisible();
+});
+
+test('user can navigate and interact', async ({ page }) => {
+  await page.goto('http://localhost:3000');
+  
+  // Test interactions
+  await page.getByRole('button', { name: /submit/i }).click();
+  await page.screenshot({ path: 'screenshots/after-submit.png' });
+  
+  // Verify results
+  await expect(page.getByText(/success/i)).toBeVisible();
+});
+\\\`\\\`\\\`
+
+### Run Tests and Capture Screenshots
+\\\`\\\`\\\`bash
+# Start dev server in background
+npm run dev &
+DEV_PID=\$!
+sleep 5  # Wait for server to start
+
+# Run Playwright tests (generates screenshots automatically)
+npx playwright test
+
+# Kill dev server
+kill \$DEV_PID
+\\\`\\\`\\\`
+
+### Post Screenshots to GitHub PR
+
+**CRITICAL: You MUST post screenshots to the PR to document UI progress!**
+
+\\\`\\\`\\\`bash
+# Create PR comment with screenshots
+SCREENSHOT_DIR=\"screenshots\"
+if [ -d \"\$SCREENSHOT_DIR\" ] && [ -n \"\$(ls -A \$SCREENSHOT_DIR 2>/dev/null)\" ]; then
+  echo \"📸 Uploading screenshots to GitHub...\"
+  
+  # Create comment body
+  cat > /tmp/screenshot-comment.md <<'EOF'
+## 🎨 Frontend Testing Results
+
+**E2E Tests:** PASSED ✅
+
+### Screenshots
+
+EOF
+  
+  # Upload each screenshot as an issue comment attachment
+  for screenshot in \$SCREENSHOT_DIR/*.png; do
+    if [ -f \"\$screenshot\" ]; then
+      FILENAME=\$(basename \"\$screenshot\")
+      echo \"📤 Uploading \$FILENAME...\"
+      
+      # Upload screenshot as GitHub issue asset
+      # Note: Use gh pr comment with image markdown after manual upload
+      # For now, include paths in comment
+      echo \"![\$FILENAME](./$screenshot)\" >> /tmp/screenshot-comment.md
+      echo \"\" >> /tmp/screenshot-comment.md
+    fi
+  done
+  
+  echo \"\" >> /tmp/screenshot-comment.md
+  echo \"**Test Command:** \\\`npx playwright test\\\`\" >> /tmp/screenshot-comment.md
+  echo \"**Screenshots Directory:** \\\`$SCREENSHOT_DIR/\\\`\" >> /tmp/screenshot-comment.md
+  
+  # Post comment
+  gh pr comment \${PR_NUMBER} --body-file /tmp/screenshot-comment.md
+  
+  # Commit screenshots to PR branch
+  git add screenshots/
+  git commit -m \"test: add Playwright E2E test screenshots\"
+  git push origin HEAD
+  
+  echo \"✅ Screenshots posted to PR\"
+fi
+\\\`\\\`\\\`
+
+### Screenshot Requirements
+- **Homepage**: Full page screenshot showing initial state
+- **Key Interactions**: Screenshots after user actions (clicks, form submissions)
+- **Different States**: Loading, success, error states
+- **Responsive Views**: Desktop and mobile if applicable
+- **Component Showcase**: Major UI components in action
+
+**Post ALL screenshots to the PR with descriptions!**"
             fi
             ;;
           rust)
