@@ -1853,7 +1853,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
 - Quality standards met"
       NEXT_STAGE="end-to-end testing by Tess"
       
-      if [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+      if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
         # Cipher security review
         STAGE_NAME="Security"
         STAGE_EMOJI="🔒"

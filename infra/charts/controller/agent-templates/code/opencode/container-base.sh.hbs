@@ -2023,7 +2023,7 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
 - Quality standards met'
       NEXT_STAGE="end-to-end testing by Tess"
       
-      if [ "$WORKFLOW_STAGE" = "security" ]; then
+      if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
         # Cipher security review
         STAGE_NAME="Security"
         STAGE_EMOJI="🔒"
