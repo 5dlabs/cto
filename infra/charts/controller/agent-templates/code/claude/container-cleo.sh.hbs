@@ -1814,19 +1814,19 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
              CARGO_INCREMENTAL: "0"
              CARGO_NET_GIT_FETCH_WITH_CLI: "true"
              CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
-           run: |
-             # Pre-warm sccache (already installed on k8s-runner)
-             sccache --start-server || true
-             echo "📊 Initial sccache stats:"
-             sccache --show-stats
-             
-             # Build with persistent cache directory
-             mkdir -p \$HOME/cache/target
-             cargo build --release --bin <binary-name>
-             
-             # Show cache hit rates
-             echo "📊 Final sccache stats:"
-             sccache --show-stats
+          run: |
+            # Pre-warm sccache (already installed on k8s-runner)
+            sccache --start-server || true
+            echo \"📊 Initial sccache stats:\"
+            sccache --show-stats
+            
+            # Build with persistent cache directory
+            mkdir -p \$HOME/cache/target
+            cargo build --release --bin <binary-name>
+            
+            # Show cache hit rates
+            echo \"📊 Final sccache stats:\"
+            sccache --show-stats
              
              # Copy from cache dir to workspace
              cp \$HOME/cache/target/release/<binary-name> ./<binary-name>
