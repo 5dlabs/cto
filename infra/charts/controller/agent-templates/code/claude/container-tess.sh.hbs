@@ -624,6 +624,16 @@ source /agent-templates/shared_task-setup-functions.sh || {
     attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
 }
 
+# Set Claude working directory EARLY (needed for client-config.json copy in docs section)
+WORK_DIR="{{working_directory}}"
+if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
+  CLAUDE_WORK_DIR="$TASK_REPO_DIR"
+else
+  CLAUDE_WORK_DIR="$TASK_REPO_DIR/$WORK_DIR"
+fi
+mkdir -p "$CLAUDE_WORK_DIR"
+echo "✓ Set Claude working directory early: $CLAUDE_WORK_DIR"
+
 # Step 3: Copy task files from docs repo to target repo with resilient operations
 echo "📋 TASK FILES: COPYING from docs to target repository (RESILIENT MODE)"
 
@@ -748,15 +758,8 @@ fi
 WORKSPACE_DIR="${TASK_WORKSPACE#/workspace/}/$TARGET_REPO_DIR"
 echo "✓ Working directory: $TASK_REPO_DIR"
 
-# Set Claude working directory early (needed for client-config.json copy)
-WORK_DIR="{{working_directory}}"
-if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ]; then
-  CLAUDE_WORK_DIR="$TASK_REPO_DIR"
-else
-  CLAUDE_WORK_DIR="$TASK_REPO_DIR/$WORK_DIR"
-fi
-mkdir -p "$CLAUDE_WORK_DIR"
-echo "✓ Set Claude working directory: $CLAUDE_WORK_DIR"
+# Note: CLAUDE_WORK_DIR already set earlier (before docs copy section)
+echo "✓ Using Claude working directory: $CLAUDE_WORK_DIR"
 
 # Setup feature branch for implementation
 echo "=== BRANCH SETUP ==="
