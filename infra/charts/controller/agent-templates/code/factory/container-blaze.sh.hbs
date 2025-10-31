@@ -1,3 +1,144 @@
 {{> factory_container_base
     agent_banner="🎨 Blaze Factory frontend workflow starting"
     agent_completion_message="✅ Blaze Factory frontend implementation complete"}}
+
+# =========================================================================
+# Blaze-specific shadcn/ui Setup (after base container setup)
+# =========================================================================
+
+echo ""
+echo "=== SHADCN/UI SETUP FOR BLAZE ==="
+cd "$TASK_WORKSPACE"
+
+# Create shadcn/ui component index for Blaze
+echo "📚 Indexing shadcn/ui component library..."
+cat > "$FACTORY_WORK_DIR/shadcn-components-index.md" <<'EOF'
+# shadcn/ui Component Library
+
+**Installation:** `npx shadcn@latest add [component-name]`
+
+## Available Components
+
+Reference: `/workspace/docs/ui/apps/www/content/docs/components/`
+
+### Forms & Input
+- `button` - Buttons with variants (default, destructive, outline, secondary, ghost, link)
+- `input` - Text input field
+- `textarea` - Multi-line text input
+- `select` - Dropdown selection
+- `checkbox` - Boolean checkbox input
+- `radio-group` - Single choice from options
+- `switch` - Toggle switch
+- `slider` - Range selection
+- `form` - Form wrapper with validation (react-hook-form + zod)
+- `label` - Form labels
+
+### Layout
+- `card` - Content container with header/body/footer
+- `separator` - Visual divider
+- `tabs` - Content organization tabs
+- `navigation-menu` - Primary navigation
+- `breadcrumb` - Hierarchical navigation
+- `scroll-area` - Scrollable container
+
+### Feedback
+- `dialog` - Modal dialogs
+- `alert-dialog` - Confirmation dialogs
+- `toast` - Notification toasts
+- `alert` - Inline alerts
+- `skeleton` - Loading placeholders
+- `progress` - Progress bars
+
+### Display
+- `table` - Basic data tables
+- `badge` - Status indicators
+- `avatar` - User images
+- `tooltip` - Hover hints
+- `popover` - Contextual popups
+- `dropdown-menu` - Action menus
+- `accordion` - Collapsible content
+- `aspect-ratio` - Maintain aspect ratios
+
+### Advanced
+- `data-table` - Sortable/filterable tables
+- `command` - Command palette (⌘K)
+- `calendar` - Date selection
+- `date-picker` - Date input with calendar
+- `charts` - Data visualization
+
+## Quick Install Common Sets
+
+```bash
+# Forms
+npx shadcn@latest add button input textarea select checkbox form label
+
+# Dashboard
+npx shadcn@latest add card badge separator skeleton
+
+# Data Tables
+npx shadcn@latest add table data-table
+
+# Modals & Dialogs
+npx shadcn@latest add dialog alert-dialog
+
+# Navigation
+npx shadcn@latest add navigation-menu breadcrumb tabs
+
+# All Common Components
+npx shadcn@latest add button input form card table dialog \
+  alert toast badge separator tabs command
+```
+
+## Usage Pattern
+
+```tsx
+// 1. Install component
+npx shadcn@latest add button
+
+// 2. Import component
+import { Button } from "@/components/ui/button"
+
+// 3. Use in JSX
+<Button variant="default">Click me</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="outline" size="sm">Small</Button>
+```
+
+## Design System Reference
+
+See `$FACTORY_WORK_DIR/design-system.md` for complete documentation:
+- Component library and installation commands
+- PRD → Component mapping
+- Composition patterns (dashboard, forms, tables)
+- Responsive design patterns
+- Quality checklist
+EOF
+
+echo "✅ shadcn/ui component index created at $FACTORY_WORK_DIR/shadcn-components-index.md"
+
+# Copy design system from agent-templates mount to Factory working directory
+if [ -f "/agent-templates/shared_design-system.md" ]; then
+    cp "/agent-templates/shared_design-system.md" "$FACTORY_WORK_DIR/design-system.md"
+    echo "✅ Design system copied to Factory working directory"
+elif [ -f "/agent-templates/shared/design-system.md" ]; then
+    cp "/agent-templates/shared/design-system.md" "$FACTORY_WORK_DIR/design-system.md"
+    echo "✅ Design system copied to Factory working directory (alternative path)"
+else
+    echo "⚠️ Design system not found at /agent-templates/shared_design-system.md or /agent-templates/shared/design-system.md"
+    echo "   Blaze should still work but may need manual setup"
+fi
+
+# List available shadcn/ui components from the cloned docs (if available)
+if [ -d "/workspace/docs/ui/apps/www/content/docs/components" ]; then
+    echo "📦 Available shadcn/ui components:"
+    find /workspace/docs/ui/apps/www/content/docs/components -name "*.mdx" -exec basename {} .mdx \; 2>/dev/null | sort | head -20 || echo "  (component discovery unavailable)"
+    COMPONENT_COUNT=$(find /workspace/docs/ui/apps/www/content/docs/components -name "*.mdx" 2>/dev/null | wc -l || echo "0")
+    if [ "$COMPONENT_COUNT" -gt 0 ]; then
+        echo "✅ Total components available: $COMPONENT_COUNT"
+    fi
+else
+    echo "ℹ️ shadcn/ui component docs not found at /workspace/docs/ui/ (this is optional)"
+fi
+
+echo "✅ Blaze frontend setup complete"
+echo ""

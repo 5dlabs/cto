@@ -68,48 +68,83 @@ stop_docker_sidecar() {
   touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
   echo "✅ Sentinel file created to signal sidecar shutdown"
   
-  # Check if Docker socket exists and is accessible
-  if [ ! -S /var/run/docker.sock ]; then
-    echo "⚠️ Docker socket not found at /var/run/docker.sock - sidecar may not be running or already stopped"
-    echo "ℹ️  Sidecar will stop via sentinel file watch"
+  # Check if Docker processes are running (more reliable than socket check)
+  DOCKER_PID=$(pidof dockerd 2>/dev/null || true)
+  INIT_PID=$(pidof docker-init 2>/dev/null || true)
+  
+  # If no processes are running, we're done
+  if [ -z "$DOCKER_PID" ] && [ -z "$INIT_PID" ]; then
+    # Also check socket for informational purposes
+    if [ ! -S /var/run/docker.sock ]; then
+      echo "✅ Docker sidecar not running (no processes found, socket also missing)"
+    else
+      echo "⚠️ Docker processes not found but socket exists - sidecar may be in transition"
+    fi
     return
   fi
 
-  echo "🛑 Stopping Docker sidecar"
+  # Socket check for informational purposes only (don't block on it)
+  if [ ! -S /var/run/docker.sock ]; then
+    echo "⚠️ Docker socket not found at /var/run/docker.sock but processes are running"
+    echo "   Attempting to stop processes directly..."
+  else
+    echo "🛑 Stopping Docker sidecar"
+  fi
 
+  # Attempt to stop processes regardless of socket status
   if command -v pkill >/dev/null 2>&1; then
-    pkill dockerd >/dev/null 2>&1 || true
+    if [ -n "$DOCKER_PID" ]; then
+      pkill dockerd >/dev/null 2>&1 || true
+    fi
+    if [ -n "$INIT_PID" ]; then
+      pkill docker-init >/dev/null 2>&1 || true
+    fi
     sleep 1
+    # Force kill if still running
     if pidof dockerd >/dev/null 2>&1; then
       pkill -9 dockerd >/dev/null 2>&1 || true
     fi
     if pidof docker-init >/dev/null 2>&1; then
-      pkill docker-init >/dev/null 2>&1 || true
+      pkill -9 docker-init >/dev/null 2>&1 || true
     fi
   elif command -v killall >/dev/null 2>&1; then
     killall dockerd >/dev/null 2>&1 || true
+    killall docker-init >/dev/null 2>&1 || true
   else
-    PID=$(pidof dockerd 2>/dev/null || true)
-    if [ -n "$PID" ]; then
-      kill "$PID" >/dev/null 2>&1 || true
+    if [ -n "$DOCKER_PID" ]; then
+      kill "$DOCKER_PID" >/dev/null 2>&1 || true
+      sleep 1
+      if pidof dockerd >/dev/null 2>&1; then
+        kill -9 "$DOCKER_PID" >/dev/null 2>&1 || true
+      fi
     fi
-    PID_INIT=$(pidof docker-init 2>/dev/null || true)
-    if [ -n "$PID_INIT" ]; then
-      kill "$PID_INIT" >/dev/null 2>&1 || true
+    if [ -n "$INIT_PID" ]; then
+      kill "$INIT_PID" >/dev/null 2>&1 || true
+      sleep 1
+      if pidof docker-init >/dev/null 2>&1; then
+        kill -9 "$INIT_PID" >/dev/null 2>&1 || true
+      fi
     fi
   fi
 
+  # Wait for processes to actually stop
   for _ in 1 2 3 4 5; do
     if ! pidof dockerd >/dev/null 2>&1 && ! pidof docker-init >/dev/null 2>&1; then
-      echo "✅ Docker sidecar stopped"
+      echo "✅ Docker sidecar stopped successfully"
       return
     fi
     sleep 1
   done
 
+  # Final check - report if still running
   REMAINING_DOCKER=$(pidof dockerd 2>/dev/null || true)
   REMAINING_INIT=$(pidof docker-init 2>/dev/null || true)
-  echo "⚠️ Docker sidecar still running (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+  if [ -n "$REMAINING_DOCKER" ] || [ -n "$REMAINING_INIT" ]; then
+    echo "⚠️ Docker sidecar still running after cleanup attempts (dockerd: ${REMAINING_DOCKER:-none}, docker-init: ${REMAINING_INIT:-none})"
+    echo "   Sidecar will stop via sentinel file watch mechanism"
+  else
+    echo "✅ Docker sidecar stopped"
+  fi
 }
 
 # Set up EXIT trap to ensure Docker sidecar cleanup
@@ -808,8 +843,11 @@ echo "✅ shadcn/ui component index created at $CLAUDE_WORK_DIR/shadcn-component
 if [ -f "/agent-templates/shared_design-system.md" ]; then
     cp "/agent-templates/shared_design-system.md" "$CLAUDE_WORK_DIR/design-system.md"
     echo "✅ Design system copied to Claude working directory"
+elif [ -f "/agent-templates/shared/design-system.md" ]; then
+    cp "/agent-templates/shared/design-system.md" "$CLAUDE_WORK_DIR/design-system.md"
+    echo "✅ Design system copied to Claude working directory (alternative path)"
 else
-    echo "⚠️ Design system not found at /agent-templates/shared_design-system.md"
+    echo "⚠️ Design system not found at /agent-templates/shared_design-system.md or /agent-templates/shared/design-system.md"
 fi
 
 # List available shadcn/ui components from the cloned docs
