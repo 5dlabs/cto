@@ -649,10 +649,13 @@ DOCS_PATH="/tmp/docs-repo/.taskmaster"
 {{/if}}
 
 # Identify source and destination
+# Check both regular location and .completed location (tasks moved after completion)
 TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
+COMPLETED_TASK_DIR="$DOCS_PATH/docs/.completed/task-{{task_id}}"
 DEST_TASK_DIR="$TASK_REPO_DIR/task"
 
-echo "🔍 DEBUG: Source task directory: $TASK_DIR"
+echo "🔍 DEBUG: Source task directory (regular): $TASK_DIR"
+echo "🔍 DEBUG: Source task directory (completed): $COMPLETED_TASK_DIR"
 echo "🔍 DEBUG: Destination task directory: $DEST_TASK_DIR"
 echo "🔍 DEBUG: Docs path: $DOCS_PATH"
 
@@ -664,6 +667,15 @@ find /tmp/docs-repo -name "*.md" -path "*/task-*/*" 2>/dev/null | head -10 || ec
 if ! safe_ensure_directory "$DEST_TASK_DIR" "task destination directory"; then
     echo "❌ CRITICAL: Cannot create task destination directory"
     exit 1
+fi
+
+# Determine which task directory to use (prefer regular, fallback to completed)
+if [ -d "$TASK_DIR" ]; then
+    echo "✅ Found task directory at regular location: $TASK_DIR"
+elif [ -d "$COMPLETED_TASK_DIR" ]; then
+    echo "✅ Found task directory at completed location: $COMPLETED_TASK_DIR"
+    echo "ℹ️ Task appears to be completed - using files from .completed folder"
+    TASK_DIR="$COMPLETED_TASK_DIR"
 fi
 
 if [ -d "$TASK_DIR" ]; then
