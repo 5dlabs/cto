@@ -2044,17 +2044,19 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
 
   # Create comment body based on Claude exit status
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    COMMENT_BODY="## 🔍 Code Quality Review by Cleo
+    COMMENT_BODY="## ✅ Code Quality Review - PASSED
 
-✅ **Quality checks completed successfully**
+All quality checks have passed:
+- Code formatting verified
+- Linting passed
+- Unit tests successful
+- Quality standards met
 
-### Review Summary
-- Code has been reviewed for quality standards
-- All required checks have passed
-- Ready for QA testing
+**Status:** Ready for end-to-end testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Reviewed by Cleo - 5DLabs Code Quality Agent*"
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
   else
     COMMENT_BODY="## 🔍 Code Quality Review by Cleo
 
@@ -2103,22 +2105,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
     echo "✅ Cleo quality checks passed - handing off to Tess for E2E testing"
     
-    # Post COMMENT (NOT APPROVE) - Tess has final approval authority
-    timeout 30 gh pr comment "$PR_NUMBER" --body "### ✅ Code Quality Review - PASSED
-
-All quality checks have passed:
-- Code formatting verified
-- Linting passed
-- Unit tests successful
-- Quality standards met
-
-**Status:** Ready for end-to-end testing by Tess
-**Next Step:** Tess will now perform comprehensive QA validation
-
----
-*Quality review by Cleo - 5DLabs Code Quality Agent*" || echo "⚠️ PR comment command failed"
-    
-    # Add ready-for-qa label to signal Tess
+    # Add ready-for-qa label to signal Tess (comment already posted above)
     echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
     timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-qa" || echo "⚠️ Failed to add ready-for-qa label"
     
