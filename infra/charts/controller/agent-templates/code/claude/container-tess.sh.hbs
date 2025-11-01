@@ -965,14 +965,29 @@ echo "🔍 DEBUG: REPO_NAME is: $REPO_NAME"
 echo "🔍 DEBUG: CLAUDE_WORK_DIR is: $CLAUDE_WORK_DIR"
 echo "🔍 DEBUG: Task ID is: {{task_id}}"
 
-# CRITICAL: Use safe_ensure_directory to avoid overwriting existing files
+# CRITICAL: Use DEST_TASK_DIR directly (files already copied there earlier)
+# TASK_FINAL_DIR should be the same as DEST_TASK_DIR to avoid overwriting
 TASK_FINAL_DIR="$CLAUDE_WORK_DIR/task"
-echo "📁 Ensuring task directory exists WITHOUT overwriting files..."
 
-if ! safe_ensure_directory "$TASK_FINAL_DIR" "final task directory"; then
-    echo "❌ CRITICAL: Cannot ensure task directory exists"
-    create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Cannot create final task directory"
-    exit 1
+# Only ensure directory if it's different from DEST_TASK_DIR (which already has files)
+if [ "$TASK_FINAL_DIR" != "$DEST_TASK_DIR" ]; then
+    echo "📁 Ensuring task directory exists WITHOUT overwriting files..."
+    if ! safe_ensure_directory "$TASK_FINAL_DIR" "final task directory"; then
+        echo "❌ CRITICAL: Cannot ensure task directory exists"
+        create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Cannot create final task directory"
+        exit 1
+    fi
+    
+    # If directories are different, copy files from DEST_TASK_DIR to TASK_FINAL_DIR
+    if [ -d "$DEST_TASK_DIR" ] && [ "$(find "$DEST_TASK_DIR" -type f 2>/dev/null | wc -l)" -gt 0 ]; then
+        echo "📋 Copying task files from $DEST_TASK_DIR to $TASK_FINAL_DIR..."
+        if ! safe_copy_directory "$DEST_TASK_DIR" "$TASK_FINAL_DIR" "task files (final location)"; then
+            echo "⚠️ Warning: Some task files may not have been copied to final location"
+        fi
+    fi
+else
+    echo "✓ Task directory already set up at: $DEST_TASK_DIR"
+    echo "✓ No need to recreate - files already present"
 fi
 
 # Verify that critical files are present after directory setup
@@ -985,9 +1000,12 @@ else
     # Task files are missing - this indicates a problem with the copy operation
     echo "❌ No recovery available - task files were never copied or copy operation failed"
     echo "🔍 DEBUG: Expected location: $TASK_FINAL_DIR"
+    echo "🔍 DEBUG: DEST_TASK_DIR location: $DEST_TASK_DIR"
     echo "🔍 DEBUG: Source location: $TASK_DIR"
-    echo "🔍 DEBUG: Checking source directory:"
-    ls -la "$TASK_DIR" 2>/dev/null || echo "Source directory not accessible"
+    echo "🔍 DEBUG: Checking DEST_TASK_DIR contents:"
+    ls -la "$DEST_TASK_DIR" 2>/dev/null || echo "DEST_TASK_DIR not accessible"
+    echo "🔍 DEBUG: Checking TASK_FINAL_DIR contents:"
+    ls -la "$TASK_FINAL_DIR" 2>/dev/null || echo "TASK_FINAL_DIR not accessible"
     create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Task files missing - copy operation may have failed"
     exit 1
 fi
