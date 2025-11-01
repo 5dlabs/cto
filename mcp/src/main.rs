@@ -363,18 +363,18 @@ fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Opt
 fn find_command(name: &str) -> String {
     // Check common installation locations in order
     let common_paths = [
-        format!("/opt/homebrew/bin/{name}"),  // Homebrew Apple Silicon
-        format!("/usr/local/bin/{name}"),     // Homebrew Intel / standard Linux
-        format!("/usr/bin/{name}"),           // System binaries
-        name.to_string(),                        // Fallback to PATH
+        format!("/opt/homebrew/bin/{name}"), // Homebrew Apple Silicon
+        format!("/usr/local/bin/{name}"),    // Homebrew Intel / standard Linux
+        format!("/usr/bin/{name}"),          // System binaries
+        name.to_string(),                    // Fallback to PATH
     ];
-    
+
     for path in &common_paths {
         if std::path::Path::new(path).exists() {
             return path.clone();
         }
     }
-    
+
     // If nothing found, return the name and let PATH resolution happen
     name.to_string()
 }
@@ -904,73 +904,82 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .find(|a| a.github_app == implementation_agent_input);
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
-    let (implementation_agent, implementation_cli, implementation_model, implementation_tools, implementation_model_rotation) =
-        if let Some(agent_config) = implementation_agent_cfg {
-            // Use the structured agent configuration
-            let agent_cli = if agent_config.cli.is_empty() {
-                cli.clone()
-            } else {
-                agent_config.cli.clone()
-            };
-            let agent_model = if agent_config.model.is_empty() {
-                model.clone()
-            } else {
-                agent_config.model.clone()
-            };
-            let agent_tools = agent_config.tools.as_ref()
-                .map(|t| {
-                    match serde_json::to_string(t) {
-                        Ok(json) => {
-                            eprintln!("✅ Serialized implementation agent tools: {json}");
-                            json
-                        },
-                        Err(e) => {
-                            eprintln!("❌ Failed to serialize implementation agent tools: {e}");
-                            eprintln!("   Tools data: {t:?}");
-                            "{}".to_string()
-                        }
-                    }
-                })
-                .unwrap_or_else(|| {
-                    eprintln!("ℹ️ No tools configured for implementation agent {implementation_agent_input}");
-                    "{}".to_string()
-                });
-            let agent_model_rotation = agent_config.model_rotation.as_ref()
-                .and_then(|mr| {
-                    if mr.enabled && !mr.models.is_empty() {
-                        match serde_json::to_string(&mr.models) {
-                            Ok(json) => {
-                                eprintln!("✅ Model rotation enabled for implementation agent: {json}");
-                                Some(json)
-                            },
-                            Err(e) => {
-                                eprintln!("❌ Failed to serialize model rotation: {e}");
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or_else(|| "[]".to_string());
-            (
-                agent_config.github_app.clone(),
-                agent_cli,
-                agent_model,
-                agent_tools,
-                agent_model_rotation,
-            )
+    let (
+        implementation_agent,
+        implementation_cli,
+        implementation_model,
+        implementation_tools,
+        implementation_model_rotation,
+    ) = if let Some(agent_config) = implementation_agent_cfg {
+        // Use the structured agent configuration
+        let agent_cli = if agent_config.cli.is_empty() {
+            cli.clone()
         } else {
-            // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Agent {implementation_agent_input} not found in config, using defaults");
-            (
-                implementation_agent_input.clone(),
-                cli.clone(),
-                model.clone(),
-                "{}".to_string(),
-                "[]".to_string(),
-            )
+            agent_config.cli.clone()
         };
+        let agent_model = if agent_config.model.is_empty() {
+            model.clone()
+        } else {
+            agent_config.model.clone()
+        };
+        let agent_tools = agent_config
+            .tools
+            .as_ref()
+            .map(|t| match serde_json::to_string(t) {
+                Ok(json) => {
+                    eprintln!("✅ Serialized implementation agent tools: {json}");
+                    json
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to serialize implementation agent tools: {e}");
+                    eprintln!("   Tools data: {t:?}");
+                    "{}".to_string()
+                }
+            })
+            .unwrap_or_else(|| {
+                eprintln!(
+                    "ℹ️ No tools configured for implementation agent {implementation_agent_input}"
+                );
+                "{}".to_string()
+            });
+        let agent_model_rotation = agent_config
+            .model_rotation
+            .as_ref()
+            .and_then(|mr| {
+                if mr.enabled && !mr.models.is_empty() {
+                    match serde_json::to_string(&mr.models) {
+                        Ok(json) => {
+                            eprintln!("✅ Model rotation enabled for implementation agent: {json}");
+                            Some(json)
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to serialize model rotation: {e}");
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "[]".to_string());
+        (
+            agent_config.github_app.clone(),
+            agent_cli,
+            agent_model,
+            agent_tools,
+            agent_model_rotation,
+        )
+    } else {
+        // Not a configured agent, use provided name with defaults
+        eprintln!("⚠️ Agent {implementation_agent_input} not found in config, using defaults");
+        (
+            implementation_agent_input.clone(),
+            cli.clone(),
+            model.clone(),
+            "{}".to_string(),
+            "[]".to_string(),
+        )
+    };
 
     let implementation_agent_max_retries = implementation_agent_cfg.and_then(|cfg| cfg.max_retries);
 
@@ -980,7 +989,22 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .map(String::from)
         .or_else(|| config.defaults.play.frontend_agent.clone())
-        .unwrap_or_else(|| config.defaults.play.implementation_agent.clone()); // Fallback to implementation agent
+        .unwrap_or_else(|| {
+            let fallback = config.defaults.play.implementation_agent.clone();
+            eprintln!(
+                "⚠️ WARNING: No frontend-agent specified and no defaults.play.frontendAgent in config!"
+            );
+            eprintln!(
+                "   Falling back to implementation-agent: {fallback}"
+            );
+            eprintln!(
+                "   ⚠️ This may cause frontend tasks to be routed incorrectly!"
+            );
+            eprintln!(
+                "   💡 Set defaults.play.frontendAgent in cto-config.json to avoid this"
+            );
+            fallback
+        });
 
     let frontend_agent_cfg = config
         .agents
@@ -1000,32 +1024,34 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             } else {
                 agent_config.model.clone()
             };
-            let agent_tools = agent_config.tools.as_ref()
-                .map(|t| {
-                    match serde_json::to_string(t) {
-                        Ok(json) => {
-                            eprintln!("✅ Serialized frontend agent tools: {json}");
-                            json
-                        },
-                        Err(e) => {
-                            eprintln!("❌ Failed to serialize frontend agent tools: {e}");
-                            eprintln!("   Tools data: {t:?}");
-                            "{}".to_string()
-                        }
+            let agent_tools = agent_config
+                .tools
+                .as_ref()
+                .map(|t| match serde_json::to_string(t) {
+                    Ok(json) => {
+                        eprintln!("✅ Serialized frontend agent tools: {json}");
+                        json
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to serialize frontend agent tools: {e}");
+                        eprintln!("   Tools data: {t:?}");
+                        "{}".to_string()
                     }
                 })
                 .unwrap_or_else(|| {
                     eprintln!("ℹ️ No tools configured for frontend agent {frontend_agent_input}");
                     "{}".to_string()
                 });
-            let agent_model_rotation = agent_config.model_rotation.as_ref()
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
                 .and_then(|mr| {
                     if mr.enabled && !mr.models.is_empty() {
                         match serde_json::to_string(&mr.models) {
                             Ok(json) => {
                                 eprintln!("✅ Model rotation enabled for frontend agent: {json}");
                                 Some(json)
-                            },
+                            }
                             Err(e) => {
                                 eprintln!("❌ Failed to serialize model rotation: {e}");
                                 None
@@ -1045,7 +1071,9 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             )
         } else {
             // Not a configured agent, use provided name with defaults
-            eprintln!("⚠️ Frontend agent {frontend_agent_input} not found in config, using defaults");
+            eprintln!(
+                "⚠️ Frontend agent {frontend_agent_input} not found in config, using defaults"
+            );
             (
                 frontend_agent_input.clone(),
                 cli.clone(),
@@ -1099,14 +1127,16 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for quality agent {quality_agent_input}");
                     "{}".to_string()
                 });
-            let agent_model_rotation = agent_config.model_rotation.as_ref()
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
                 .and_then(|mr| {
                     if mr.enabled && !mr.models.is_empty() {
                         match serde_json::to_string(&mr.models) {
                             Ok(json) => {
                                 eprintln!("✅ Model rotation enabled for quality agent: {json}");
                                 Some(json)
-                            },
+                            }
                             Err(e) => {
                                 eprintln!("❌ Failed to serialize model rotation: {e}");
                                 None
@@ -1182,14 +1212,16 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for security agent {security_agent_input}");
                     "{}".to_string()
                 });
-            let agent_model_rotation = agent_config.model_rotation.as_ref()
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
                 .and_then(|mr| {
                     if mr.enabled && !mr.models.is_empty() {
                         match serde_json::to_string(&mr.models) {
                             Ok(json) => {
                                 eprintln!("✅ Model rotation enabled for security agent: {json}");
                                 Some(json)
-                            },
+                            }
                             Err(e) => {
                                 eprintln!("❌ Failed to serialize model rotation: {e}");
                                 None
@@ -1265,14 +1297,16 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     eprintln!("ℹ️ No tools configured for testing agent {testing_agent_input}");
                     "{}".to_string()
                 });
-            let agent_model_rotation = agent_config.model_rotation.as_ref()
+            let agent_model_rotation = agent_config
+                .model_rotation
+                .as_ref()
                 .and_then(|mr| {
                     if mr.enabled && !mr.models.is_empty() {
                         match serde_json::to_string(&mr.models) {
                             Ok(json) => {
                                 eprintln!("✅ Model rotation enabled for testing agent: {json}");
                                 Some(json)
-                            },
+                            }
                             Err(e) => {
                                 eprintln!("❌ Failed to serialize model rotation: {e}");
                                 None
@@ -1323,10 +1357,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     let implementation_max_retries =
         parse_max_retries_argument(arguments, "implementation_max_retries")
-            .or(parse_max_retries_argument(
-                arguments,
-                "factory_max_retries",
-            ))
+            .or(parse_max_retries_argument(arguments, "factory_max_retries"))
             .or(parse_max_retries_argument(
                 arguments,
                 "opencode_max_retries",
@@ -1457,7 +1488,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let parallel_execution = parse_bool_argument(arguments, "parallel_execution")
         .or(config.defaults.play.parallel_execution)
         .unwrap_or(false);
-    
+
     // Select workflow template based on parallel_execution flag
     let workflow_template = if parallel_execution {
         eprintln!("🚀 Using parallel execution mode (play-project-workflow-template)");
@@ -1466,13 +1497,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         eprintln!("🔄 Using sequential execution mode (play-workflow-template)");
         "workflowtemplate/play-workflow-template"
     };
-    
+
     // Add parallel-execution parameter for the workflow
     params.push(format!("parallel-execution={parallel_execution}"));
 
     // Final task parameter - indicates this is the last task requiring deployment verification
-    let final_task = parse_bool_argument(arguments, "final_task")
-        .unwrap_or(false);
+    let final_task = parse_bool_argument(arguments, "final_task").unwrap_or(false);
     params.push(format!("final-task={final_task}"));
 
     // Load and encode requirements.yaml if it exists
@@ -1492,7 +1522,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         params.push("task-requirements=".to_string());
     }
 
-    let mut args: Vec<&str> = vec!["submit", "--from", workflow_template, "-n", "agent-platform"];
+    let mut args: Vec<&str> = vec![
+        "submit",
+        "--from",
+        workflow_template,
+        "-n",
+        "agent-platform",
+    ];
 
     // Add all parameters to the command
     for param in &params {
@@ -1904,7 +1940,9 @@ fn handle_method(method: &str, params: Option<&Value>) -> Option<Result<Value>> 
 
 fn run_kubectl_json(args: &[&str]) -> Result<Value> {
     let kubectl_cmd = find_command("kubectl");
-    let output = std::process::Command::new(&kubectl_cmd).args(args).output()?;
+    let output = std::process::Command::new(&kubectl_cmd)
+        .args(args)
+        .output()?;
     if output.status.success() {
         let stdout = String::from_utf8(output.stdout)?;
         let v: Value = serde_json::from_str(&stdout)?;
@@ -2570,7 +2608,10 @@ async fn rpc_loop() -> Result<()> {
 
 #[allow(clippy::disallowed_macros)]
 fn main() -> Result<()> {
-    eprintln!("🚀 Starting 5D Labs MCP Server... (built: {})", env!("BUILD_TIMESTAMP"));
+    eprintln!(
+        "🚀 Starting 5D Labs MCP Server... (built: {})",
+        env!("BUILD_TIMESTAMP")
+    );
 
     // Initialize configuration from JSON file
     let config = load_cto_config().context("Failed to load cto-config.json")?;
