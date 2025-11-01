@@ -440,6 +440,7 @@ spec:
                 - name: max-retries
                   value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
         # Proceed to Cipher security scanning after Cleo quality checks
+        # Skip security stage if agent/cli/model are not configured
         - - name: update-to-security-in-progress
             template: update-workflow-stage
             arguments:
@@ -448,6 +449,7 @@ spec:
                   value: "security-in-progress"
                 - name: verify-update
                   value: "true"
+            when: "{{`{{workflow.parameters.security-agent}}`}} != '' && {{`{{workflow.parameters.security-cli}}`}} != '' && {{`{{workflow.parameters.security-model}}`}} != ''"
         - - name: security-work
             template: agent-coderun
             continueOn:
@@ -474,6 +476,16 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.security-max-retries}}`}}"
+            when: "{{`{{workflow.parameters.security-agent}}`}} != '' && {{`{{workflow.parameters.security-cli}}`}} != '' && {{`{{workflow.parameters.security-model}}`}} != ''"
+        - - name: skip-security-stage
+            template: skip-stage-notice
+            arguments:
+              parameters:
+                - name: stage-name
+                  value: "security"
+                - name: reason
+                  value: "security-agent, security-cli, or security-model not configured"
+            when: "{{`{{workflow.parameters.security-agent}}`}} == '' || {{`{{workflow.parameters.security-cli}}`}} == '' || {{`{{workflow.parameters.security-model}}`}} == ''"
         # No suspend needed after Cipher - proceed directly to Tess
         # Cipher hands off to Tess, which is final approver
         # continueOn.failed allows Tess to run even if Cipher raises security concerns
@@ -1341,6 +1353,21 @@ spec:
           task-id: "{{`{{workflow.parameters.task-id}}`}}"
           workflow-type: "play-orchestration"
       suspend: {}  # Indefinite suspend until external resume via webhooks
+
+    # Template for skipping optional stages when configuration is missing
+    - name: skip-stage-notice
+      inputs:
+        parameters:
+          - name: stage-name
+          - name: reason
+      script:
+        image: alpine:3.20
+        command: [sh]
+        source: |
+          echo "⏭️  Skipping {{`{{inputs.parameters.stage-name}}`}} stage"
+          echo "Reason: {{`{{inputs.parameters.reason}}`}}"
+          echo "⚠️  This is optional - workflow will proceed to next stage"
+          echo "✅ Stage skipped successfully"
 
     # Template for task completion and cleanup
     - name: task-completion
