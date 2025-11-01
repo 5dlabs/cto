@@ -7,6 +7,25 @@
 
 ---
 
+## 🚫 CRITICAL RULE: NO Material-UI
+
+**Material-UI (MUI) is PROHIBITED. Always use shadcn/ui for React components.**
+
+### ✅ DO:
+- Use `npx shadcn@latest add button card form` to install components
+- Use shadcn/ui components exclusively for all UI elements
+- Copy shadcn components into your repo (they're source code, not npm packages)
+
+### ❌ NEVER:
+- Install `@mui/material`, `@mui/core`, or any Material-UI packages
+- Use Material-UI components like `<Button>`, `<Card>`, `<TextField>` from MUI
+- Import from `@mui/*` or `material-ui` packages
+- Use Material-UI styling solutions
+
+**Enforcement:** Cleo (quality agent) will REJECT any PR containing Material-UI dependencies or imports.
+
+---
+
 ## Core Concept
 
 **shadcn/ui is NOT a component library you install from npm.**
