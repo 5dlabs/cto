@@ -449,7 +449,7 @@ spec:
                   value: "security-in-progress"
                 - name: verify-update
                   value: "true"
-            when: "{{`{{workflow.parameters.security-agent}}`}} != '' && {{`{{workflow.parameters.security-cli}}`}} != '' && {{`{{workflow.parameters.security-model}}`}} != ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
         - - name: security-work
             template: agent-coderun
             continueOn:
@@ -476,7 +476,7 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.security-max-retries}}`}}"
-            when: "{{`{{workflow.parameters.security-agent}}`}} != '' && {{`{{workflow.parameters.security-cli}}`}} != '' && {{`{{workflow.parameters.security-model}}`}} != ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
         - - name: skip-security-stage
             template: skip-stage-notice
             arguments:
@@ -485,7 +485,7 @@ spec:
                   value: "security"
                 - name: reason
                   value: "security-agent, security-cli, or security-model not configured"
-            when: "{{`{{workflow.parameters.security-agent}}`}} == '' || {{`{{workflow.parameters.security-cli}}`}} == '' || {{`{{workflow.parameters.security-model}}`}} == ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' == '' || '{{`{{workflow.parameters.security-cli}}`}}' == '' || '{{`{{workflow.parameters.security-model}}`}}' == ''"
         # No suspend needed after Cipher - proceed directly to Tess
         # Cipher hands off to Tess, which is final approver
         # continueOn.failed allows Tess to run even if Cipher raises security concerns
