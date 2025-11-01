@@ -650,30 +650,51 @@ DOCS_PATH="/tmp/docs-repo/.taskmaster"
 {{/if}}
 
 # Copy specific task files
+# Check both regular location and .completed location (tasks moved after completion)
 TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
-echo "🔍 DEBUG: Looking for task files at: $TASK_DIR"
-echo "🔍 DEBUG: Docs path is: $DOCS_PATH"
-echo "🔍 DEBUG: Contents of docs temp directory:"
-ls -la /tmp/docs-repo/.taskmaster/ || echo "No .taskmaster found"
-echo "🔍 DEBUG: Contents of docs directory:"
-ls -la /tmp/docs-repo/.taskmaster/docs/ || echo "No docs directory found"
+COMPLETED_TASK_DIR="$DOCS_PATH/docs/.completed/task-{{task_id}}"
 
+echo "🔍 DEBUG: Source task directory (regular): $TASK_DIR"
+echo "🔍 DEBUG: Source task directory (completed): $COMPLETED_TASK_DIR"
+echo "🔍 DEBUG: Docs path: $DOCS_PATH"
+
+# Enhanced debugging for task directory discovery
+echo "🔍 DEBUG: Docs repository structure:"
+find /tmp/docs-repo -name "*.md" -path "*/task-*/*" 2>/dev/null | head -10 || echo "No task files found"
+
+# Determine which task directory to use (prefer regular, fallback to completed)
 if [ -d "$TASK_DIR" ]; then
+    echo "✅ Found task directory at regular location: $TASK_DIR"
+    USE_TASK_DIR="$TASK_DIR"
+elif [ -d "$COMPLETED_TASK_DIR" ]; then
+    echo "✅ Found task directory at completed location: $COMPLETED_TASK_DIR"
+    echo "ℹ️ Task appears to be completed - using files from .completed folder"
+    USE_TASK_DIR="$COMPLETED_TASK_DIR"
+else
+    echo "❌ CRITICAL: Task {{task_id}} directory not found. Checked:"
+    echo "   - Regular location: $TASK_DIR"
+    echo "   - Completed location: $COMPLETED_TASK_DIR"
+    echo "🔍 DEBUG: Available directories in docs:"
+    find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+    USE_TASK_DIR=""
+fi
+
+if [ -n "$USE_TASK_DIR" ] && [ -d "$USE_TASK_DIR" ]; then
     echo "🔍 DEBUG: Task directory found, contents:"
-    ls -la "$TASK_DIR"
+    ls -la "$USE_TASK_DIR"
 
     # Ensure target task directory exists before copying (using Claude's working directory)
     mkdir -p "$CLAUDE_WORK_DIR/task"
     echo "✓ Created target task directory at $CLAUDE_WORK_DIR/task"
 
     echo "✅ Copying task.md..."
-    cp "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
+    cp "$USE_TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ task.md copied" || echo "❌ task.md copy failed"
 
     echo "✅ Copying acceptance-criteria.md..."
-    cp "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
+    cp "$USE_TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ acceptance-criteria.md copied" || echo "❌ acceptance-criteria.md copy failed"
 
     echo "✅ Copying prompt.md..."
-    cp "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
+    cp "$USE_TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ prompt.md copied" || echo "❌ prompt.md copy failed"
 
     echo "✅ Copying client-config.json..."
     if [ -f "/task-files/client-config.json" ]; then
@@ -684,17 +705,13 @@ if [ -d "$TASK_DIR" ]; then
     fi
 
     echo "✅ Copying toolman-guide.md..."
-    if [ -f "$TASK_DIR/toolman-guide.md" ]; then
-        cp "$TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
+    if [ -f "$USE_TASK_DIR/toolman-guide.md" ]; then
+        cp "$USE_TASK_DIR/toolman-guide.md" "$CLAUDE_WORK_DIR/task/" && echo "✓ toolman-guide.md copied" || echo "❌ toolman-guide.md copy failed"
     else
         echo "⚠️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
 
-    echo "✓ Task {{task_id}} files copied from $TASK_DIR"
-else
-    echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
-    echo "🔍 DEBUG: Available directories in docs:"
-    find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+    echo "✓ Task {{task_id}} files copied from $USE_TASK_DIR"
 fi
 
 # Copy architecture.md from docs root
