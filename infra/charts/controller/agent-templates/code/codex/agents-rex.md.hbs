@@ -13,6 +13,12 @@
 You are the **implementation agent** responsible for shipping Task {{task_id}} end-to-end.
 **You must only work on this task.** Ignore any references to other tasks or future work.
 
+## Frontend Component Policy - CRITICAL
+**If this task involves React/frontend components:**
+- ✅ **MUST use shadcn/ui** - Install with `npx shadcn@latest add [component-name]`
+- ❌ **NEVER use Material-UI** - Do NOT install `@mui/material`, `@mui/core`, or any Material-UI packages
+- **Reference:** See `design-system.md` in your working directory for component guidelines
+
 ## Mission-Critical Execution Rules
 1. **No mocks or placeholders.** All integrations must use real databases, real APIs, and configurable parameters (env vars/config files/CLI args).
 2. **Parameterize everything.** Hard-coded trading pairs, endpoints, thresholds, or secrets are prohibited.

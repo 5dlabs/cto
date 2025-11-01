@@ -909,7 +909,7 @@ jq '
   # Function to check if task should use frontend agent
   def is_frontend_task:
     (.title + " " + (.description // "") + " " + (.details // "")) 
-    | test("frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|next\\.js|nuxt|page|layout|button|form|modal|navbar|header|footer"; "i");
+    | test("frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|next\\.js|nuxt|page|layout|button|form|modal|navbar|header|footer|material-ui|mui|@mui|shadcn|component.*registry"; "i");
   
   # Function to check if task should use integration/testing agent
   def is_integration_task:

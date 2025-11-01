@@ -1625,8 +1625,10 @@ spec:
               TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
             fi
             
-            if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte)"; then
+            # Enhanced frontend detection - check for Material-UI to catch misrouted tasks
+            if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|material-ui|mui|@mui)"; then
               echo "🔍 Auto-detected frontend task (keywords matched)"
+              echo "⚠️ WARNING: If Material-UI/MUI keywords detected, this MUST route to Blaze (frontend agent)"
               AGENT_TYPE="frontend"
             fi
             
@@ -1637,6 +1639,21 @@ spec:
               elif echo "$TASK_CONTENT" | grep -qi "react"; then
                 FRAMEWORK="react"
               fi
+            fi
+          fi
+          
+          # CRITICAL: Additional validation - check task content for Material-UI to catch misrouted frontend tasks
+          if [ -z "$AGENT_TYPE" ] || [ "$AGENT_TYPE" != "frontend" ]; then
+            VALIDATION_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
+            if [ -n "$TASK_FILE" ]; then
+              VALIDATION_CONTENT="$VALIDATION_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
+            fi
+            
+            # If we find React/frontend keywords but agent type isn't frontend, force frontend routing
+            if echo "$VALIDATION_CONTENT" | grep -qiE "(react.*component|react.*frontend|material-ui|mui|@mui/material|next\.js.*component)"; then
+              echo "🚨 CRITICAL: Detected frontend/React task but agent type is '${AGENT_TYPE}'"
+              echo "🔄 FORCING frontend agent routing (Blaze required for React/frontend tasks)"
+              AGENT_TYPE="frontend"
             fi
           fi
           
@@ -1657,21 +1674,62 @@ spec:
           case "$AGENT_TYPE" in
             "frontend"|"ui"|"react"|"nextjs")
               echo "✅ Routing to FRONTEND agent (Blaze)"
-              echo "{{`{{workflow.parameters.frontend-agent}}`}}" > /tmp/github-app.txt
-              echo "{{`{{workflow.parameters.frontend-cli}}`}}" > /tmp/cli-type.txt
-              echo "{{`{{workflow.parameters.frontend-model}}`}}" > /tmp/model.txt
-              echo "{{`{{workflow.parameters.frontend-model-rotation}}`}}" > /tmp/model-rotation.txt
-              echo "{{`{{workflow.parameters.frontend-max-retries}}`}}" > /tmp/max-retries.txt
+              FRONTEND_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
+              
+              # Validate frontend-agent is not empty
+              if [ -z "$FRONTEND_AGENT" ] || [ "$FRONTEND_AGENT" = "" ]; then
+                echo "❌ ERROR: frontend-agent parameter is empty but task requires frontend agent!"
+                echo "⚠️ Falling back to implementation-agent, but this task should use Blaze"
+                echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
+                echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
+                echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
+                echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
+                echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
+              else
+                echo "$FRONTEND_AGENT" > /tmp/github-app.txt
+                echo "{{`{{workflow.parameters.frontend-cli}}`}}" > /tmp/cli-type.txt
+                echo "{{`{{workflow.parameters.frontend-model}}`}}" > /tmp/model.txt
+                echo "{{`{{workflow.parameters.frontend-model-rotation}}`}}" > /tmp/model-rotation.txt
+                echo "{{`{{workflow.parameters.frontend-max-retries}}`}}" > /tmp/max-retries.txt
+              fi
               ;;
             *)
               echo "✅ Routing to IMPLEMENTATION agent (Rex)"
-              echo "{{`{{workflow.parameters.implementation-agent}}`}}" > /tmp/github-app.txt
+              IMPL_AGENT="{{`{{workflow.parameters.implementation-agent}}`}}"
+              
+              # Validate implementation-agent is not empty
+              if [ -z "$IMPL_AGENT" ] || [ "$IMPL_AGENT" = "" ]; then
+                echo "❌ ERROR: implementation-agent parameter is empty!"
+                echo "⚠️ Cannot proceed without agent configuration"
+                exit 1
+              fi
+              
+              echo "$IMPL_AGENT" > /tmp/github-app.txt
               echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
               echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
               echo "{{`{{workflow.parameters.implementation-model-rotation}}`}}" > /tmp/model-rotation.txt
               echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
               ;;
           esac
+          
+          # Final validation - ensure we have a valid agent
+          FINAL_AGENT=$(cat /tmp/github-app.txt 2>/dev/null || echo "")
+          if [ -z "$FINAL_AGENT" ] || [ "$FINAL_AGENT" = "" ]; then
+            echo "❌ FATAL ERROR: No agent determined for task ${TASK_ID}"
+            echo "   Agent type detected: ${AGENT_TYPE}"
+            echo "   Language: ${LANGUAGE}"
+            echo "   Framework: ${FRAMEWORK}"
+            exit 1
+          fi
+          
+          # Validate agent is not testing-agent (Tess should never do implementation)
+          if echo "$FINAL_AGENT" | grep -qiE "(tess|testing)"; then
+            echo "🚨 CRITICAL ERROR: Testing agent (Tess) cannot perform implementation work!"
+            echo "   Task ${TASK_ID} appears to be frontend/implementation but routed to testing agent"
+            echo "   This will cause incorrect component library usage (Material-UI instead of shadcn/ui)"
+            echo "   Aborting to prevent incorrect implementation"
+            exit 1
+          fi
           
           # Write language and framework to output files
           echo "$LANGUAGE" > /tmp/task-language.txt
