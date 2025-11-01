@@ -131,16 +131,6 @@ spec:
       - name: model
         value: "claude-3-5-sonnet-20241022"
 
-  # Volume for shared workspace
-  volumeClaimTemplates:
-    - metadata:
-        name: project-workspace
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 20Gi
-
   templates:
     # Main orchestration template
     - name: orchestrate-project
