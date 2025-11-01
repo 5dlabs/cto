@@ -982,9 +982,12 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
   fi
 
   if [ -n "$DOCS_CLONE_DIR" ]; then
-    DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
-    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ]; then
+    # Handle docs_project_directory: empty/null/"." means look for .taskmaster at repo root
+    # Otherwise, prepend the project directory path
+    if [ -n "$DOCS_PROJECT_DIRECTORY" ] && [ "$DOCS_PROJECT_DIRECTORY" != "null" ] && [ "$DOCS_PROJECT_DIRECTORY" != "." ]; then
       DOCS_BASE_PATH="$DOCS_CLONE_DIR/$DOCS_PROJECT_DIRECTORY/.taskmaster"
+    else
+      DOCS_BASE_PATH="$DOCS_CLONE_DIR/.taskmaster"
     fi
 
     echo "🔍 Docs base path: $DOCS_BASE_PATH"
