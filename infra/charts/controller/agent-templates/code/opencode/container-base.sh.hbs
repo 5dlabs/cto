@@ -896,11 +896,16 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
 
     echo "🔍 Docs base path: $DOCS_BASE_PATH"
     
-    # Resilient task directory discovery - check both possible locations
+    # Resilient task directory discovery - check regular, tasks/, and .completed locations
+    # Check both regular location and .completed location (tasks moved after completion)
     TASK_DIR=""
     if [ -d "$DOCS_BASE_PATH/docs/task-{{task_id}}" ]; then
       TASK_DIR="$DOCS_BASE_PATH/docs/task-{{task_id}}"
       echo "✓ Found task files in docs/ directory"
+    elif [ -d "$DOCS_BASE_PATH/docs/.completed/task-{{task_id}}" ]; then
+      TASK_DIR="$DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
+      echo "✓ Found task files in docs/.completed/ directory"
+      echo "ℹ️ Task appears to be completed - using files from .completed folder"
     elif [ -d "$DOCS_BASE_PATH/tasks/task-{{task_id}}" ]; then
       TASK_DIR="$DOCS_BASE_PATH/tasks/task-{{task_id}}"
       echo "✓ Found task files in tasks/ directory"
@@ -918,6 +923,7 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
     else
       echo "❌ CRITICAL: Task directory not found. Checked:"
       echo "   - $DOCS_BASE_PATH/docs/task-{{task_id}}"
+      echo "   - $DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
       echo "   - $DOCS_BASE_PATH/tasks/task-{{task_id}}"
       create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
     fi
