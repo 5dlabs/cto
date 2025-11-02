@@ -73,10 +73,6 @@ pub struct AgentConfig {
     #[serde(default, rename = "imagePullSecrets")]
     pub image_pull_secrets: Vec<String>,
 
-    /// Optional sidecar configuration
-    #[serde(default, rename = "inputBridge")]
-    pub input_bridge: InputBridgeConfig,
-
     /// Optional default ServiceAccount name to use for CodeRun jobs
     #[serde(default, rename = "serviceAccountName")]
     pub service_account_name: Option<String>,
@@ -124,28 +120,6 @@ fn default_agent_image() -> ImageConfig {
         repository: "MISSING_IMAGE_CONFIG".to_string(),
         tag: "MISSING_IMAGE_CONFIG".to_string(),
     }
-}
-
-/// Sidecar (auxiliary tools) configuration
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct InputBridgeConfig {
-    /// Whether the sidecar is enabled
-    #[serde(default = "default_input_bridge_enabled")]
-    pub enabled: bool,
-
-    /// Sidecar image configuration
-    pub image: ImageConfig,
-
-    /// HTTP port for the sidecar
-    #[serde(default = "default_input_bridge_port")]
-    pub port: u16,
-}
-
-fn default_input_bridge_enabled() -> bool {
-    false
-}
-fn default_input_bridge_port() -> u16 {
-    8080
 }
 
 /// Secrets configuration - only what we actually use
@@ -528,22 +502,16 @@ impl ControllerConfig {
             )));
         }
 
-        // If input bridge is enabled, ensure its image is configured
-        if self.agent.input_bridge.enabled && !self.agent.input_bridge.image.is_configured() {
-            return Err(anyhow::anyhow!(
-                "Input bridge is enabled but image is not configured. Please set 'agent.inputBridge.image.repository' and 'agent.inputBridge.image.tag' in Helm values."
-            ));
-        }
         Ok(())
     }
 
     /// Load configuration from mounted ConfigMap file
     pub fn from_mounted_file(config_path: &str) -> Result<Self, anyhow::Error> {
         let config_str = std::fs::read_to_string(config_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read config file {}: {}", config_path, e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to read config file {config_path}: {e}"))?;
 
         let mut config: ControllerConfig = serde_yaml::from_str(&config_str)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {e}"))?;
 
         config.merge_agent_cli_defaults();
         Ok(config)
@@ -583,14 +551,6 @@ impl Default for ControllerConfig {
                 cli_providers: HashMap::new(),
                 agent_cli_configs: HashMap::new(),
                 image_pull_secrets: vec!["ghcr-secret".to_string()],
-                input_bridge: InputBridgeConfig {
-                    enabled: true,
-                    image: ImageConfig {
-                        repository: "ghcr.io/5dlabs/input-bridge".to_string(),
-                        tag: "latest".to_string(),
-                    },
-                    port: 8080,
-                },
                 service_account_name: None,
             },
             agents: HashMap::new(),

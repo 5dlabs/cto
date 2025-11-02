@@ -824,9 +824,10 @@ else
     echo "Creating new feature branch '$FEATURE_BRANCH' from latest main..."
     
     # Stash any local changes to avoid checkout conflicts
+    # Exclude task/ directory to preserve task files that were just copied
     if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-      echo "🔄 Stashing local changes and untracked files before creating new branch"
-      git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" || true
+      echo "🔄 Stashing local changes and untracked files (excluding task/) before creating new branch"
+      git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
     fi
     
     git checkout -b $FEATURE_BRANCH origin/main
@@ -1805,6 +1806,60 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         else
             echo "✓ Including task isolation instructions (no toolman guide found)"
         fi
+
+        # CRITICAL: Inject frontend validation and Playwright requirements for Tess
+        # Ensures Tess sees these requirements IMMEDIATELY, not just if they read files later
+        PROMPT_PREFIX="${PROMPT_PREFIX}🚨 **CRITICAL: FRONTEND VALIDATION RULES** 🚨
+
+**If this is a frontend/React task, you MUST enforce these rules:**
+
+✅ **ACCEPT only if using shadcn/ui:**
+- Components in \`components/ui/\` directory
+- Installed via \`npx shadcn@latest add [component]\`
+- Imports from \`@/components/ui/*\`
+- React 19.0.0+ and Next.js 15.0.0+
+- Tailwind CSS for styling
+
+❌ **REJECT immediately if you find:**
+- \`@mui/material\`, \`@mui/core\`, or ANY \`@mui/*\` packages
+- Material-UI imports in code
+- React versions < 19.0.0
+- Next.js versions < 15.0.0
+
+**If Material-UI is detected, REQUEST_CHANGES immediately with:**
+\"❌ **Material-UI Detected - Design System Violation**
+This PR uses Material-UI which violates our standards.
+**Required:** Use shadcn/ui: \\\`npx shadcn@latest add button card form\\\`
+**Status:** REQUEST_CHANGES until fixed.\"
+
+---
+
+📸 **MANDATORY: Playwright Screenshots for Frontend Tasks**
+
+You MUST post Playwright screenshots to the PR:
+1. Run \`npm init playwright@latest --yes\`
+2. Create E2E tests with \`await page.screenshot({path: 'screenshots/test.png'})\`
+3. Commit screenshots: \`git add screenshots/ && git commit -m 'test: add screenshots'\`
+4. Post to PR: \`gh pr comment \${PR_NUMBER} --body \"🎨 Frontend Testing Results...\"\`
+
+**PR cannot be approved without screenshots for frontend tasks!**
+
+---
+
+🔧 **MANDATORY: Resolve Merge Conflicts**
+
+If you encounter merge conflicts:
+1. \`git status\` to see conflicted files
+2. Edit files to resolve conflicts (remove \`<<<<<<<\`, \`=======\`, \`>>>>>>>\` markers)
+3. \`git add <files> && git commit -m 'fix: resolve merge conflicts'\`
+4. \`git push origin HEAD\`
+
+**Never abort merges - resolve conflicts properly!**
+
+---
+
+"
+        echo "✓ Including critical Tess validation requirements in initial context"
 
         # Compose initial user turn
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)

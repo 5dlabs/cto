@@ -25,6 +25,10 @@ Generate complete documentation for {{#if task_id}}task {{task_id}}{{else}}every
 {{#if include_codebase}}
 4. Read `.taskmaster/docs/codebase.md` to understand the current implementation, reuse patterns, and note deltas required by upcoming tasks.
 {{/if}}
+5. **Technology Stack Requirements:**
+   - For **frontend/UI tasks**: Always specify Next.js 15+ (App Router), React 19, TypeScript 5+, Tailwind CSS 4+, and shadcn/ui
+   - For **backend/API tasks**: Reference Rust, PostgreSQL, or other backend technologies from architecture
+   - Ensure documentation reflects correct technology choices for each task type
 
 ## Step 2: Determine Workload
 Before starting any task, check whether all four required artifacts already exist with substantial content:
@@ -41,6 +45,7 @@ Create or update all four deliverables inside `.taskmaster/docs/task-{id}/`:
 ### 3.1 `task.md`
 - Summarize objectives, context, dependencies, and implementation plan.
 - Reference specific source files or modules (≤30 line excerpts) discovered via MCP tools.
+- **Specify the correct technology stack** (Next.js 15+ for frontend, Rust for backend, etc.)
 - Highlight architectural considerations and risks.
 
 ### 3.2 `prompt.md`
@@ -53,9 +58,11 @@ Create or update all four deliverables inside `.taskmaster/docs/task-{id}/`:
 
 ### 3.4 `task.xml`
 - Generate the XML prompt using the structure below. Populate every element with task-specific information.
+- **For frontend tasks**: Specify Next.js 15+ (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui in the role and technical specifications
+- **For backend tasks**: Specify Rust, appropriate frameworks, and system tools
 ```xml
 <prompt>
-    <role>You are a senior coding agent specializing in [technology stack from task].</role>
+    <role>You are a senior coding agent specializing in [technology stack - Next.js 15+ for frontend, Rust for backend].</role>
     <task>
         <id>[Task ID]</id>
         <title>[Task Title]</title>
@@ -65,7 +72,7 @@ Create or update all four deliverables inside `.taskmaster/docs/task-{id}/`:
         <dependencies>[comma-separated dependency IDs]</dependencies>
     </task>
     <technical_specifications>
-        <spec>[Technical requirement]</spec>
+        <spec>[Technical requirement with specific technology stack]</spec>
     </technical_specifications>
     <implementation_details>
         [Detailed implementation guidance from task.txt and analysis]

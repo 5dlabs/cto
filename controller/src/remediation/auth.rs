@@ -64,8 +64,7 @@ impl AuthorValidator {
                 } else {
                     warn!("Author '{}' not authorized (cached)", author);
                     Err(anyhow::anyhow!(
-                        "Author '{}' is not authorized to provide feedback",
-                        author
+                        "Author '{author}' is not authorized to provide feedback"
                     ))
                 };
             }
@@ -87,7 +86,7 @@ impl AuthorValidator {
                 "Author '{}' not authorized - not in allowlist and doesn't match team patterns",
                 author
             );
-            Err(anyhow::anyhow!("Author '{}' is not authorized to provide feedback. Contact an administrator to be added to the approved reviewers list.", author))
+            Err(anyhow::anyhow!("Author '{author}' is not authorized to provide feedback. Contact an administrator to be added to the approved reviewers list."))
         }
     }
 
@@ -116,8 +115,7 @@ impl AuthorValidator {
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "Author '{}' is already in the approved list",
-                author
+                "Author '{author}' is already in the approved list"
             ))
         }
     }
@@ -131,8 +129,7 @@ impl AuthorValidator {
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "Author '{}' is not in the approved list",
-                author
+                "Author '{author}' is not in the approved list"
             ))
         }
     }
@@ -145,8 +142,7 @@ impl AuthorValidator {
 
         if self.allowed_team_prefixes.contains(&prefix) {
             return Err(anyhow::anyhow!(
-                "Team prefix '{}' is already configured",
-                prefix
+                "Team prefix '{prefix}' is already configured"
             ));
         }
 
@@ -167,8 +163,7 @@ impl AuthorValidator {
             Ok(())
         } else {
             Err(anyhow::anyhow!(
-                "Team prefix '{}' is not configured",
-                prefix
+                "Team prefix '{prefix}' is not configured"
             ))
         }
     }
@@ -257,7 +252,7 @@ impl SharedAuthorValidator {
         let validator = self
             .inner
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         validator.validate_author(author)
     }
 
@@ -266,7 +261,7 @@ impl SharedAuthorValidator {
         let mut validator = self
             .inner
             .write()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire write lock: {e}"))?;
         validator.add_approved_author(author)
     }
 
@@ -275,7 +270,7 @@ impl SharedAuthorValidator {
         let validator = self
             .inner
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         Ok(validator.get_approved_authors())
     }
 
@@ -284,7 +279,7 @@ impl SharedAuthorValidator {
         let validator = self
             .inner
             .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {e}"))?;
         validator.clear_cache();
         Ok(())
     }

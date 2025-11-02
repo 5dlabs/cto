@@ -20,13 +20,9 @@ service:
   name: ssh
 
 api:
-  enabled: true
+  enabled: false
   port: 8080
   name: http
-  image:
-    repository: ghcr.io/5dlabs/sidecar
-    tag: latest
-    pullPolicy: IfNotPresent
 
 env:
   - name: ANTHROPIC_API_KEY

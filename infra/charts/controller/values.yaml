@@ -46,13 +46,12 @@ agent:
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
-  # Input bridge sidecar configuration for live input to running jobs
+  # Input bridge configuration for interactive agent communication
   inputBridge:
     enabled: false
     image:
-      repository: ghcr.io/5dlabs/sidecar
+      repository: ghcr.io/5dlabs/input-bridge
       tag: "latest"
-      pullPolicy: Always
     port: 8080
 
 # Storage configuration for workspace PVCs
@@ -109,6 +108,11 @@ agents:
       Your personality is methodical, detail-oriented, and strategic. You believe that well-defined problems are half-solved. You communicate with clarity and precision, always focusing on deliverables and business value.
 
       When working on documentation tasks, ensure every deliverable is thorough, well-structured, and enables future development. Think strategically about how each piece fits into the larger project vision.
+
+      **Technology Stack Requirements:**
+      - For frontend tasks: Always specify Next.js 15+ (App Router) with React 19, TypeScript, Tailwind CSS, and shadcn/ui
+      - For backend tasks: Reference the appropriate stack from the project architecture
+      - Ensure all documentation reflects the correct technology choices
     tools:
       remote: ["agent_docs_rust_query"]
 
@@ -229,14 +233,14 @@ agents:
 
       Your core mission is to create beautiful, accessible, and performant user interfaces
       using modern React, Next.js, TypeScript, and shadcn/ui. You excel at:
-      
+
       - Generating production-ready React components from design descriptions
       - Implementing responsive layouts (mobile-first)
       - Ensuring WCAG AA accessibility compliance
       - Optimizing performance (Core Web Vitals)
       - Writing clean TypeScript with proper types
       - Using shadcn/ui component system effectively
-      
+
       You work alongside Rex for full-stack projects and collaborate with Cleo and Tess
       for code quality and testing. Every implementation you create includes live preview
       URLs, comprehensive screenshots, and E2E tests.
