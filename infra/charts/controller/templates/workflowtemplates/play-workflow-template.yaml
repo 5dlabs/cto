@@ -413,10 +413,21 @@ spec:
                   value: "quality-in-progress"
                 - name: verify-update
                   value: "true"
+        - - name: check-quality-completion
+            template: check-pr-merge-status
+            arguments:
+              parameters:
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: pr-number
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: stage-name
+                  value: "quality"
         - - name: quality-work
             template: agent-coderun
             continueOn:
               failed: true  # Allow workflow to proceed to Cipher even if Cleo finds issues
+            when: "{{`{{steps.check-quality-completion.outputs.parameters.skip-stage}}`}} != true"
             arguments:
               parameters:
                 - name: github-app
@@ -450,6 +461,17 @@ spec:
                 - name: verify-update
                   value: "true"
             when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
+        - - name: check-security-completion
+            template: check-pr-merge-status
+            arguments:
+              parameters:
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: pr-number
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: stage-name
+                  value: "security"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
         - - name: security-work
             template: agent-coderun
             continueOn:
@@ -476,7 +498,7 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.security-max-retries}}`}}"
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && {{`{{steps.check-security-completion.outputs.parameters.skip-stage}}`}} != true"
         - - name: skip-security-stage
             template: skip-stage-notice
             arguments:
@@ -489,8 +511,19 @@ spec:
         # No suspend needed after Cipher - proceed directly to Tess
         # Cipher hands off to Tess, which is final approver
         # continueOn.failed allows Tess to run even if Cipher raises security concerns
+        - - name: check-testing-completion
+            template: check-pr-merge-status
+            arguments:
+              parameters:
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: pr-number
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                - name: stage-name
+                  value: "testing"
         - - name: testing-work
             template: agent-coderun
+            when: "{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}} != true"
             arguments:
               parameters:
                 - name: github-app
@@ -1769,6 +1802,142 @@ spec:
           echo "   Framework: ${FRAMEWORK}"
           echo ""
           echo "🎯 Agent determination complete"
+
+    # Check if PR is already merged (for completion state checking)
+    - name: check-pr-merge-status
+      inputs:
+        parameters:
+          - name: repository
+          - name: pr-number
+          - name: stage-name
+            default: ""
+      outputs:
+        parameters:
+          - name: is-merged
+            valueFrom:
+              path: /tmp/is-merged.txt
+            default: "false"
+          - name: skip-stage
+            valueFrom:
+              path: /tmp/skip-stage.txt
+            default: "false"
+      script:
+        image: alpine:3.20
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+
+          REPO="{{`{{inputs.parameters.repository}}`}}"
+          PR_NUMBER="{{`{{inputs.parameters.pr-number}}`}}"
+          STAGE_NAME="{{`{{inputs.parameters.stage-name}}`}}"
+
+          echo "========================================="
+          echo "Checking PR Merge Status"
+          echo "========================================="
+          echo "Repository: $REPO"
+          echo "PR Number: $PR_NUMBER"
+          echo "Stage: $STAGE_NAME"
+          echo ""
+
+          # Default to not merged and don't skip
+          echo "false" > /tmp/is-merged.txt
+          echo "false" > /tmp/skip-stage.txt
+
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "" ]; then
+            echo "ℹ️ No PR number provided, cannot check merge status"
+            exit 0
+          fi
+
+          apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
+
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+
+          # GitHub App authentication (same pattern as other templates)
+          AUTH_HEADER=""
+          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+            TEMP_KEY="/tmp/github-app-key.pem"
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+            chmod 600 "$TEMP_KEY"
+
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
+            HDR=$(echo -n "$HDR" | tr '+/' '-_' | tr -d '=')
+            PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64)
+            PAY=$(echo -n "$PAY" | tr '+/' '-_' | tr -d '=')
+            SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
+            SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
+            JWT="$HDR.$PAY.$SIG"
+
+            INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $JWT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
+
+            if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
+              INSTALLATION_ID=$(curl -s -L \
+                -H "Authorization: Bearer $JWT" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
+            fi
+
+            if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+              TOKEN=$(curl -s -X POST \
+                -H "Authorization: Bearer $JWT" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+              if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
+                AUTH_HEADER="Authorization: Bearer $TOKEN"
+              fi
+            fi
+
+            rm -f "$TEMP_KEY"
+          fi
+
+          if [ -z "$AUTH_HEADER" ]; then
+            echo "⚠️ No GitHub authentication available, cannot check PR status"
+            exit 0
+          fi
+
+          # Check PR status
+          echo "🔍 Checking PR #$PR_NUMBER status..."
+          PR_DATA=$(curl -s -L \
+            -H "Accept: application/vnd.github+json" \
+            -H "$AUTH_HEADER" \
+            "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER")
+
+          STATE=$(echo "$PR_DATA" | jq -r '.state // "unknown"')
+          MERGED=$(echo "$PR_DATA" | jq -r '.merged // false')
+          MERGED_AT=$(echo "$PR_DATA" | jq -r '.merged_at // "null"')
+
+          echo "   State: $STATE"
+          echo "   Merged: $MERGED"
+          echo "   Merged At: $MERGED_AT"
+
+          if [ "$MERGED" = "true" ] || [ "$STATE" = "closed" ]; then
+            echo "✅ PR is already merged/closed - task is complete!"
+            echo "true" > /tmp/is-merged.txt
+            echo "true" > /tmp/skip-stage.txt
+            
+            echo ""
+            echo "🎯 Skipping $STAGE_NAME stage - work already complete"
+            exit 0
+          fi
+
+          echo "✓ PR is open and not merged - stage should proceed"
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
