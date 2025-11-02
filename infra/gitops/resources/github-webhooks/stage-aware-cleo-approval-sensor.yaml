@@ -176,12 +176,14 @@ spec:
 
                         # Fallback: extract from PR title or branch
                         if [ -z "$TASK_ID" ]; then
-                          PR_TITLE="{{ .Input.body.pull_request.title }}"
+                          # Use jq to safely extract PR title (handles special chars)
+                          PR_TITLE=$(echo '{{ .Input.body | toJson }}' | jq -r '.pull_request.title // ""')
                           TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
                         fi
 
                         if [ -z "$TASK_ID" ]; then
-                          PR_BRANCH="{{ .Input.body.pull_request.head.ref }}"
+                          # Use jq to safely extract branch name (handles special chars)
+                          PR_BRANCH=$(echo '{{ .Input.body | toJson }}' | jq -r '.pull_request.head.ref // ""')
                           TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
                         fi
 
