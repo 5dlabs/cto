@@ -800,7 +800,7 @@ impl<'a> CodeResourceManager<'a> {
                             "command": [
                                 "/bin/sh",
                                 "-c",
-                                "pkill dockerd || killall dockerd || kill $(pidof dockerd) || true"
+                                "pkill -TERM dockerd; sleep 5; pkill -KILL dockerd || killall -9 dockerd || kill -9 $(pidof dockerd) || true"
                             ]
                         }
                     }
@@ -823,6 +823,7 @@ impl<'a> CodeResourceManager<'a> {
         let mut pod_spec = json!({
             "shareProcessNamespace": true,
             "restartPolicy": "Never",
+            "terminationGracePeriodSeconds": 60,
             "securityContext": {
                 "runAsUser": 1000,
                 "runAsGroup": 1000,
