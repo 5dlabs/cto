@@ -159,21 +159,43 @@ spec:
 
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-quality-complete"
-                        echo "Reviewer: {{ .Input.body.review.user.login }}"
-                        echo "Review State: {{ .Input.body.review.state }}"
 
-                        # Extract task ID from PR labels using jq
-                        TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
-                        TASK_ID=$(echo "$TASK_LABELS_JSON" \
-                          | jq -r '.[] | (.name // "") | ascii_downcase | capture("task-(?<id>[0-9]+)") | .id' \
-                          | head -1)
+                        # Extract task ID from PR labels
+                        TASK_ID=""
+                        TASK_LABELS='{{ .Input.body.pull_request.labels }}'
+
+                        # Parse labels array to find task-* label
+                        if [ "$TASK_LABELS" != "null" ] && [ -n "$TASK_LABELS" ]; then
+                          # Extract task ID from labels using jq if available, otherwise use grep
+                          if command -v jq >/dev/null 2>&1; then
+                            TASK_ID=$(echo '{{ .Input.body.pull_request.labels | toJson }}' \
+                              | jq -r '.[]? | select(.name) | .name | select(test("task-[0-9]+")) | capture("task-(?<id>[0-9]+)") | .id' \
+                              | head -1 || echo "")
+                          fi
+                        fi
+
+                        # Fallback: extract from PR title or branch
+                        if [ -z "$TASK_ID" ]; then
+                          # Use jq to safely extract PR title (handles special chars)
+                          PR_TITLE=$(echo '{{ .Input.body | toJson }}' | jq -r '.pull_request.title // ""')
+                          TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
+                        fi
 
                         if [ -z "$TASK_ID" ]; then
-                          echo "ℹ️ No task-* label found on PR (not a play workflow PR)"
+                          # Use jq to safely extract branch name (handles special chars)
+                          PR_BRANCH=$(echo '{{ .Input.body | toJson }}' | jq -r '.pull_request.head.ref // ""')
+                          TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
+                        fi
+
+                        if [ -z "$TASK_ID" ]; then
+                          echo "ℹ️ No task ID found in PR (not a play workflow PR)"
+                          echo "   Checked labels, title: $PR_TITLE, branch: $PR_BRANCH"
                           exit 0
                         fi
 
                         echo "Task ID: $TASK_ID"
+                        echo "Reviewer: {{ .Input.body.review.user.login }}"
+                        echo "Review State: {{ .Input.body.review.state }}"
 
                         # Extract repository for precise correlation (critical for parallel batch execution)
                         REPO_FULL='{{ .Input.body.repository.full_name }}'
