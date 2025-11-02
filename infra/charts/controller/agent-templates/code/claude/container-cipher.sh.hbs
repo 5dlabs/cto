@@ -1598,12 +1598,59 @@ fi
 echo "✓ Creating Cipher's security scanning prompt"
 
 # Build static prompt with task context
+# Determine language-specific security checks
+TASK_LANG="${TASK_LANGUAGE:-rust}"
+TASK_FW="${TASK_FRAMEWORK:-}"
+
+# Build language-specific security guidance
+LANGUAGE_SECURITY=""
+case "$TASK_LANG" in
+  typescript|javascript|ts|js)
+    LANGUAGE_SECURITY="
+## TypeScript/JavaScript Security Standards
+- **Dependency Audit**: Run \`npm audit\` and fix all HIGH/CRITICAL vulnerabilities
+- **Package Security**: Check for known vulnerable packages in package.json
+- **Secret Detection**: Scan for exposed API keys, tokens, credentials
+- **XSS Protection**: Verify input sanitization and output encoding"
+    if echo "$TASK_FW" | grep -q "react\|next"; then
+      LANGUAGE_SECURITY="$LANGUAGE_SECURITY
+- **React Security**: Check for dangerouslySetInnerHTML usage, validate prop types
+- **Next.js Security**: Verify API routes have proper authentication, check env var exposure"
+    fi
+    ;;
+  rust)
+    LANGUAGE_SECURITY="
+## Rust Security Standards
+- **Dependency Audit**: Run \`cargo audit\` and fix all vulnerabilities
+- **Unsafe Code**: Review all \`unsafe\` blocks for memory safety
+- **Input Validation**: Verify bounds checking and input sanitization
+- **Cryptography**: Ensure proper use of cryptographic libraries"
+    ;;
+  python)
+    LANGUAGE_SECURITY="
+## Python Security Standards
+- **Dependency Audit**: Run \`pip-audit\` or \`safety check\`
+- **Input Validation**: Check for SQL injection, command injection risks
+- **Secret Management**: Verify credentials not hardcoded
+- **Dependency Pinning**: Ensure requirements.txt has pinned versions"
+    ;;
+  *)
+    LANGUAGE_SECURITY="
+## General Security Standards
+- **Dependency Audit**: Check for known vulnerabilities in dependencies
+- **Secret Detection**: Scan for exposed credentials
+- **Input Validation**: Verify all user input is properly validated"
+    ;;
+esac
+
 CIPHER_PROMPT="# Security Scanning Assignment
 
 You are Cipher, a rigorous security scanning agent. Your mission is to identify and fix security vulnerabilities before they reach production.
 
 ## Your Role
 - **Primary Focus**: Security vulnerability scanning and remediation
+- **Language Context**: This is a **${TASK_LANG}** project${TASK_FW:+ using $TASK_FW}
+$LANGUAGE_SECURITY
 - **Security Tools**: GitHub Code Scanning, dependency audits, secret detection
 - **Code Quality**: Clippy (pedantic), cargo fmt, cargo test after security fixes
 - **CI/CD**: Verify GitHub Actions workflows include security scanning
