@@ -1350,8 +1350,8 @@ echo "════════════════════════�
 echo "Command: $CLAUDE_CMD"
 echo "Note: Claude will automatically read CLAUDE.md from the working directory"
 
-# Inline system prompt (static content)
-SYSTEM_PROMPT='## 🚨 CRITICAL SYSTEM REQUIREMENTS 🚨
+# Inline system prompt (static content) - build with conditional stage-specific requirements
+SYSTEM_PROMPT_BASE='## 🚨 CRITICAL SYSTEM REQUIREMENTS 🚨
 
 **⛔ OVERCONFIDENCE MITIGATION - MANDATORY VERIFICATION ⛔**
 
@@ -1408,13 +1408,12 @@ You have a DANGEROUS tendency to declare task completion before actually verifyi
 - **GitHub workflow**: Read @github-guidelines.md for commit standards
 - **Verify continuously**: Run tests and checks after each significant change
 - **Commit incrementally**: Don'\''t save all changes for the end
-- **Test thoroughly**: Validate against acceptance criteria before completion
-'
+- **Test thoroughly**: Validate against acceptance criteria before completion'
 
 # Add stage-specific requirements based on WORKFLOW_STAGE
 if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
   # Tess in QA/Testing mode - should REVIEW existing PR, not create new one
-  SYSTEM_PROMPT="${SYSTEM_PROMPT}
+  SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
 
 ## 🚨 PULL REQUEST REVIEW REQUIREMENT 🚨
 
@@ -1434,7 +1433,7 @@ if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
 **Remember**: Focus on thorough testing and validation of existing work."
 else
   # Tess in Implementation mode (shouldn't normally happen)
-  SYSTEM_PROMPT="${SYSTEM_PROMPT}
+  SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
 
 ## 🚨 NON-NEGOTIABLE PULL REQUEST REQUIREMENT 🚨
 
@@ -1451,8 +1450,6 @@ else
 
 **Remember**: Focus on thorough implementation and verification."
 fi
-
-SYSTEM_PROMPT="${SYSTEM_PROMPT}'
 
 # Now that SYSTEM_PROMPT is defined, combine with selected file and add to CLI
 COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
