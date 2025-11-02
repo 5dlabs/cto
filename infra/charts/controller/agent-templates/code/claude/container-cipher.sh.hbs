@@ -1116,7 +1116,7 @@ ensure_status_labels() {
     local desc="${rest#*:}"
 
     if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
-      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+      gh label create "$label" --force -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
     fi
   done
 }

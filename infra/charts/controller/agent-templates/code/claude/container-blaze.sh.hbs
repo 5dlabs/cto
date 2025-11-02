@@ -1172,7 +1172,7 @@ ensure_status_labels() {
     local desc="${rest#*:}"
 
     if ! gh label list -R "$repo" --search "$label" 2>/dev/null | grep -q "^$label"; then
-      gh label create "$label" -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+      gh label create "$label" --force -R "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
     fi
   done
 }
@@ -2129,7 +2129,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
           service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
           *) COLOR="ededed"; DESC="Correlation label" ;;
         esac
-        gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+        gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
       else
         echo "   ✓ Label '$label' already exists"
       fi
@@ -2162,7 +2162,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
             *) COLOR="ededed"; DESC="Unknown label type" ;;
           esac
 
-          CREATE_ERROR=$(gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>&1)
+          CREATE_ERROR=$(gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>&1)
           CREATE_EXIT=$?
           if [ $CREATE_EXIT -eq 0 ]; then
             echo "   ✅ Created label '$label'"

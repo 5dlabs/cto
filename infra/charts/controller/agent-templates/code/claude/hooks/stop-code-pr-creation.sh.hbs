@@ -317,7 +317,7 @@ The Claude agent has completed the implementation and addressed all acceptance c
               service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
               *) COLOR="ededed"; DESC="Correlation label" ;;
             esac
-            gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
+            gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" 2>/dev/null || true
           fi
           gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "$label" 2>/dev/null || true
         done
