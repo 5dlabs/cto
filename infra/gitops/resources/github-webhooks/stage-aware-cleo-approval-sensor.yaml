@@ -176,12 +176,12 @@ spec:
 
                         # Fallback: extract from PR title or branch
                         if [ -z "$TASK_ID" ]; then
-                          PR_TITLE='{{ .Input.body.pull_request.title }}'
+                          PR_TITLE="{{ .Input.body.pull_request.title }}"
                           TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
                         fi
 
                         if [ -z "$TASK_ID" ]; then
-                          PR_BRANCH='{{ .Input.body.pull_request.head.ref }}'
+                          PR_BRANCH="{{ .Input.body.pull_request.head.ref }}"
                           TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
                         fi
 
