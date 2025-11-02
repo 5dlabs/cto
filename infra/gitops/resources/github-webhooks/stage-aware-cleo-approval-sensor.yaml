@@ -162,29 +162,31 @@ spec:
 
                         # Extract task ID from PR labels
                         TASK_ID=""
-                        TASK_LABELS='{{ .Input.body.pull_request.labels }}'
+                        TASK_LABELS_JSON='{{ .Input.body.pull_request.labels | toJson }}'
 
                         # Parse labels array to find task-* label
-                        if [ "$TASK_LABELS" != "null" ] && [ -n "$TASK_LABELS" ]; then
+                        if [ "$TASK_LABELS_JSON" != "null" ] && [ -n "$TASK_LABELS_JSON" ]; then
                           # Extract task ID from labels using jq if available, otherwise use grep
                           if command -v jq >/dev/null 2>&1; then
-                            TASK_ID=$(echo '{{ .Input.body.pull_request.labels | toJson }}' \
+                            TASK_ID=$(echo "$TASK_LABELS_JSON" \
                               | jq -r '.[]? | select(.name) | .name | ascii_downcase | select(test("task-[0-9]+")) | capture("task-(?<id>[0-9]+)") | .id' \
-                              | head -1 || echo "")
+                              | head -1 2>/dev/null || echo "")
                           fi
                         fi
 
                         # Fallback: extract from PR title or branch
                         if [ -z "$TASK_ID" ]; then
                           # Use jq to safely extract PR title (handles special chars)
-                          PR_TITLE=$(echo '{{ .Input.body | toJson }}' | jq -r '.pull_request.title // ""')
-                          TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
+                          PR_BODY_JSON='{{ .Input.body | toJson }}'
+                          PR_TITLE=$(echo "$PR_BODY_JSON" | jq -r '.pull_request.title // ""' 2>/dev/null || echo "")
+                          TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' 2>/dev/null || echo "")
                         fi
 
                         if [ -z "$TASK_ID" ]; then
                           # Use jq to safely extract branch name (handles special chars)
-                          PR_BRANCH=$(echo '{{ .Input.body | toJson }}' | jq -r '.pull_request.head.ref // ""')
-                          TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
+                          PR_BODY_JSON='{{ .Input.body | toJson }}'
+                          PR_BRANCH=$(echo "$PR_BODY_JSON" | jq -r '.pull_request.head.ref // ""' 2>/dev/null || echo "")
+                          TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' 2>/dev/null || echo "")
                         fi
 
                         if [ -z "$TASK_ID" ]; then
