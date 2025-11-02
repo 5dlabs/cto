@@ -1415,22 +1415,23 @@ if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
   # Tess in QA/Testing mode - should REVIEW existing PR, not create new one
   SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
 
-## 🚨 PULL REQUEST REVIEW REQUIREMENT 🚨
+## 🚨 QA REVIEW MODE - PR #${PR_NUMBER:-UNKNOWN} 🚨
 
-**⛔ CRITICAL: YOU ARE IN QA/TESTING MODE - REVIEW THE EXISTING PR ⛔**
+**PRE-APPROVAL STEPS:**
+1. Check mergeable: \`gh pr view ${PR_NUMBER} --json mergeable\`
+2. If conflicts: checkout PR, merge main, resolve, test, push
+3. Run quality checks on merged code
+4. Validate acceptance criteria
+5. Approve: \`gh pr review ${PR_NUMBER} --approve\`
 
-**MANDATORY RESPONSIBILITIES:**
-- **MUST** review the existing PR #${PR_NUMBER:-UNKNOWN}
-- **MUST** test the implementation against acceptance criteria
-- **MUST** validate end-to-end functionality
-- **MUST** use \`gh pr review\` to approve or request changes
-- **DO NOT** create a new pull request - one already exists
-- **THE TASK IS INCOMPLETE IF YOU DON'T REVIEW THE PR**
+**REQUIREMENTS:**
+- MUST resolve merge conflicts before approval
+- MUST test merged code (not just original branch)
+- Use \`gh pr review\` to approve/request changes
+- DO NOT create new PRs
+- DO NOT approve PRs with conflicts
 
-**YOU ARE A QA AGENT, NOT AN IMPLEMENTATION AGENT.**
-**YOUR JOB IS TO VERIFY AND APPROVE THE EXISTING PR, NOT CREATE A NEW ONE.**
-
-**Remember**: Focus on thorough testing and validation of existing work."
+**You are QA, not implementation. Your job: verify, resolve conflicts, approve existing PR.**"
 else
   # Tess in Implementation mode (shouldn't normally happen)
   SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
