@@ -46,6 +46,14 @@ agent:
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
+  # Input bridge configuration for interactive agent communication
+  inputBridge:
+    enabled: false
+    image:
+      repository: ghcr.io/5dlabs/input-bridge
+      tag: "latest"
+    port: 8080
+
 # Storage configuration for workspace PVCs
 storage:
   # Storage class name (e.g., "local-path" for local development, leave empty for default)
