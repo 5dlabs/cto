@@ -128,7 +128,10 @@ nodes:
     }
 
     fn create_namespace(&self) -> Result<()> {
-        ui::print_progress(&format!("Creating namespace '{}'...", self.config.namespace));
+        ui::print_progress(&format!(
+            "Creating namespace '{}'...",
+            self.config.namespace
+        ));
 
         let output = Command::new("kubectl")
             .args([

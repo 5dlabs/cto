@@ -162,9 +162,7 @@ impl AuthorValidator {
             self.clear_cache();
             Ok(())
         } else {
-            Err(anyhow::anyhow!(
-                "Team prefix '{prefix}' is not configured"
-            ))
+            Err(anyhow::anyhow!("Team prefix '{prefix}' is not configured"))
         }
     }
 

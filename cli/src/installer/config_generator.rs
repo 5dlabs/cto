@@ -11,12 +11,11 @@ impl ConfigGenerator {
     }
 
     pub fn write_config(cto_config: &CtoConfig, path: &Path) -> Result<()> {
-        let json = serde_json::to_string_pretty(cto_config)
-            .context("Failed to serialize config")?;
+        let json =
+            serde_json::to_string_pretty(cto_config).context("Failed to serialize config")?;
 
         std::fs::write(path, json).context("Failed to write config file")?;
 
         Ok(())
     }
 }
-

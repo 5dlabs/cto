@@ -1,10 +1,7 @@
 use crate::crds::DocsRun;
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
-use k8s_openapi::api::{
-    batch::v1::Job,
-    core::v1::ConfigMap,
-};
+use k8s_openapi::api::{batch::v1::Job, core::v1::ConfigMap};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
 use kube::runtime::controller::Action;

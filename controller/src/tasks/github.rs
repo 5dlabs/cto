@@ -149,9 +149,7 @@ fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
     if parts.len() >= 2 {
         Ok((parts[0].to_string(), parts[1].to_string()))
     } else {
-        Err(anyhow::anyhow!(
-            "Invalid repository URL format: {repo_url}"
-        ))
+        Err(anyhow::anyhow!("Invalid repository URL format: {repo_url}"))
     }
 }
 

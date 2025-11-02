@@ -46,8 +46,8 @@ impl PrerequisitesValidator {
                     .map(|output| output.status.success())
                     .context("kubectl not found")
             }),
-            install_instructions:
-                "Install kubectl from https://kubernetes.io/docs/tasks/tools/".to_string(),
+            install_instructions: "Install kubectl from https://kubernetes.io/docs/tasks/tools/"
+                .to_string(),
             critical: true,
         });
 
@@ -78,7 +78,9 @@ impl PrerequisitesValidator {
                     .then_some(true)
                     .ok_or_else(|| anyhow::anyhow!("kind not found"))
             }),
-            install_instructions: "Install kind from https://kind.sigs.k8s.io/docs/user/quick-start/#installation".to_string(),
+            install_instructions:
+                "Install kind from https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+                    .to_string(),
             critical: false,
         });
 
@@ -158,4 +160,3 @@ impl Default for PrerequisitesValidator {
         Self::new()
     }
 }
-

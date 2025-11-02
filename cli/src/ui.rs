@@ -65,19 +65,11 @@ pub fn print_config_summary(config: &InstallConfig) {
     );
 
     if let Some(org) = &config.github_org {
-        println!(
-            "  {} {}",
-            "GitHub Org:".bright_black(),
-            org.green()
-        );
+        println!("  {} {}", "GitHub Org:".bright_black(), org.green());
     }
 
     if let Some(repo) = &config.github_repo {
-        println!(
-            "  {} {}",
-            "GitHub Repo:".bright_black(),
-            repo.green()
-        );
+        println!("  {} {}", "GitHub Repo:".bright_black(), repo.green());
     }
 
     println!(
@@ -87,11 +79,7 @@ pub fn print_config_summary(config: &InstallConfig) {
     );
 
     if let Some(domain) = &config.domain {
-        println!(
-            "  {} {}",
-            "Domain:".bright_black(),
-            domain.green()
-        );
+        println!("  {} {}", "Domain:".bright_black(), domain.green());
     }
 
     println!();
@@ -147,11 +135,7 @@ pub fn print_component(name: &str) {
 
 /// Print prerequisite check result
 pub fn print_check_result(name: &str, passed: bool, message: Option<&str>) {
-    let status = if passed {
-        "✓".green()
-    } else {
-        "✗".red()
-    };
+    let status = if passed { "✓".green() } else { "✗".red() };
 
     let text = if let Some(msg) = message {
         format!("{name} - {msg}")
@@ -161,4 +145,3 @@ pub fn print_check_result(name: &str, passed: bool, message: Option<&str>) {
 
     println!("  {status} {text}");
 }
-

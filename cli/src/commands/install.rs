@@ -78,9 +78,7 @@ impl InstallCommand {
 
     fn load_config_from_file(_path: &str) -> Result<InstallConfig> {
         // TODO: Implement config file loading
-        Err(anyhow::anyhow!(
-            "Config file loading not yet implemented"
-        ))
+        Err(anyhow::anyhow!("Config file loading not yet implemented"))
     }
 
     fn create_default_config(&self) -> InstallConfig {
@@ -191,10 +189,7 @@ impl InstallCommand {
         println!();
 
         // Step 5: Container registry
-        println!(
-            "{}",
-            "Container Registry Configuration".bright_black()
-        );
+        println!("{}", "Container Registry Configuration".bright_black());
 
         let registry: String = Input::with_theme(&theme)
             .with_prompt("Container registry URL")
@@ -266,4 +261,3 @@ impl InstallCommand {
         })
     }
 }
-

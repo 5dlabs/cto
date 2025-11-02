@@ -94,12 +94,7 @@ impl Installer {
         let installer = ComponentInstaller::new(&self.config);
 
         // Core components in order
-        let core_components = vec![
-            "argocd",
-            "argo-workflows",
-            "argo-events",
-            "controller",
-        ];
+        let core_components = vec!["argocd", "argo-workflows", "argo-events", "controller"];
 
         for component in core_components {
             ui::print_component(component);
@@ -176,8 +171,14 @@ impl Installer {
         println!("{}", "─".repeat(70).bright_black());
         println!();
 
-        println!("  1️⃣  {} Check cluster status:", "Verify Installation:".bold());
-        println!("     {}", "kubectl get pods -n agent-platform".bright_black());
+        println!(
+            "  1️⃣  {} Check cluster status:",
+            "Verify Installation:".bold()
+        );
+        println!(
+            "     {}",
+            "kubectl get pods -n agent-platform".bright_black()
+        );
         println!();
 
         println!("  2️⃣  {} Access ArgoCD:", "ArgoCD:".bold());
@@ -213,9 +214,14 @@ impl Installer {
         println!("{}", "Documentation".cyan().bold());
         println!("{}", "─".repeat(70).bright_black());
         println!();
-        println!("  📖 Full documentation: {}", "https://github.com/5dlabs/cto".cyan());
-        println!("  💬 Support: {}", "https://github.com/5dlabs/cto/discussions".cyan());
+        println!(
+            "  📖 Full documentation: {}",
+            "https://github.com/5dlabs/cto".cyan()
+        );
+        println!(
+            "  💬 Support: {}",
+            "https://github.com/5dlabs/cto/discussions".cyan()
+        );
         println!();
     }
 }
-

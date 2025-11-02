@@ -90,4 +90,3 @@ fn print_banner() {
 
     println!("{}", banner.cyan().bold());
 }
-

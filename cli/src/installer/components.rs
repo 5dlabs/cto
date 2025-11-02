@@ -107,9 +107,7 @@ impl<'a> ComponentInstaller<'a> {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!(
-                "Argo Events installation failed: {stderr}"
-            ));
+            return Err(anyhow::anyhow!("Argo Events installation failed: {stderr}"));
         }
 
         Ok(())
@@ -119,8 +117,7 @@ impl<'a> ComponentInstaller<'a> {
         ui::print_progress("Installing CTO Controller...");
 
         // Get the repository root (current directory when installer is run)
-        let repo_root = std::env::current_dir()
-            .context("Failed to get current directory")?;
+        let repo_root = std::env::current_dir().context("Failed to get current directory")?;
 
         // Build controller image locally for kind
         ui::print_progress("Building controller image...");
@@ -157,9 +154,7 @@ impl<'a> ComponentInstaller<'a> {
 
         if !load_output.status.success() {
             let stderr = String::from_utf8_lossy(&load_output.stderr);
-            return Err(anyhow::anyhow!(
-                "Failed to load controller image: {stderr}"
-            ));
+            return Err(anyhow::anyhow!("Failed to load controller image: {stderr}"));
         }
 
         // Install controller Helm chart
