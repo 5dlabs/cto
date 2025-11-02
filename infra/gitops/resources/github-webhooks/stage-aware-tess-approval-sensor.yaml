@@ -159,11 +159,11 @@ spec:
 
                         echo "=== Stage-Aware Workflow Resume ==="
                         echo "Target Stage: waiting-ready-for-qa"
-                        
+
                         # Extract task ID from PR labels
                         TASK_ID=""
                         TASK_LABELS='{{ .Input.body.pull_request.labels }}'
-                        
+
                         # Parse labels array to find task-* label
                         if [ "$TASK_LABELS" != "null" ] && [ -n "$TASK_LABELS" ]; then
                           # Extract task ID from labels using jq if available, otherwise use grep
@@ -173,13 +173,13 @@ spec:
                               | head -1 || echo "")
                           fi
                         fi
-                        
+
                         # Fallback: extract from PR title or branch
                         if [ -z "$TASK_ID" ]; then
                           PR_TITLE='{{ .Input.body.pull_request.title }}'
                           TASK_ID=$(echo "$PR_TITLE" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
                         fi
-                        
+
                         if [ -z "$TASK_ID" ]; then
                           PR_BRANCH='{{ .Input.body.pull_request.head.ref }}'
                           TASK_ID=$(echo "$PR_BRANCH" | grep -oE 'task[-_/ ]*([0-9]+)' | head -n1 | grep -oE '[0-9]+' || echo "")
