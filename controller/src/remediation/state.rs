@@ -320,7 +320,7 @@ impl RemediationStateManager {
         feedback: crate::remediation::StructuredFeedback,
     ) -> Result<RemediationState> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         // Increment iteration for new feedback
@@ -362,7 +362,7 @@ impl RemediationStateManager {
         actions_taken: Option<Vec<String>>,
     ) -> Result<()> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         if let Some(entry) = state
@@ -393,7 +393,7 @@ impl RemediationStateManager {
         run_namespace: String,
     ) -> Result<()> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         state.active_run = Some(ActiveRun {
@@ -418,7 +418,7 @@ impl RemediationStateManager {
     /// Clear active run (when agent completes)
     pub async fn clear_active_run(&self, pr_number: u32, task_id: &str) -> Result<()> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         state.active_run = None;
@@ -434,7 +434,7 @@ impl RemediationStateManager {
     /// Complete remediation workflow
     pub async fn complete_remediation(&self, pr_number: u32, task_id: &str) -> Result<()> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         state.status = RemediationStatus::Completed;
@@ -457,7 +457,7 @@ impl RemediationStateManager {
         reason: &str,
     ) -> Result<()> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         state.status = RemediationStatus::Terminated;
@@ -488,7 +488,7 @@ impl RemediationStateManager {
         error_message: &str,
     ) -> Result<()> {
         let mut state = self.load_state(pr_number, task_id).await?.ok_or_else(|| {
-            anyhow::anyhow!("No state found for PR #{} task {}", pr_number, task_id)
+            anyhow::anyhow!("No state found for PR #{pr_number} task {task_id}")
         })?;
 
         state.status = RemediationStatus::Failed;

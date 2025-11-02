@@ -818,7 +818,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   # Exclude task/ directory to preserve task files that were just copied
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     echo "🔄 Stashing local changes and untracked files (excluding task/) before checkout"
-    git stash push --include-untracked -- . ':!task' -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" || true
+    git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
   fi
   git checkout "$FEATURE_BRANCH"
   if [ -n "$REMOTE_BASE" ]; then
@@ -877,7 +877,7 @@ else
   # Exclude task/ directory to preserve task files that were just copied
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     echo "🔄 Stashing local changes and untracked files (excluding task/) before creating new branch"
-    git stash push --include-untracked -- . ':!task' -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" || true
+    git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
   fi
   
   if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then

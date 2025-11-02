@@ -118,6 +118,10 @@ impl<'a> ComponentInstaller<'a> {
     fn install_controller(&self) -> Result<()> {
         ui::print_progress("Installing CTO Controller...");
 
+        // Get the repository root (current directory when installer is run)
+        let repo_root = std::env::current_dir()
+            .context("Failed to get current directory")?;
+
         // Build controller image locally for kind
         ui::print_progress("Building controller image...");
         let build_output = Command::new("docker")
@@ -129,7 +133,7 @@ impl<'a> ComponentInstaller<'a> {
                 "infra/images/controller/Dockerfile",
                 ".",
             ])
-            .current_dir("/Users/jonathonfritz/code/work-projects/5dlabs/cto")
+            .current_dir(&repo_root)
             .output()
             .context("Failed to build controller image")?;
 
@@ -170,7 +174,7 @@ impl<'a> ComponentInstaller<'a> {
                 "--create-namespace",
                 "--wait",
             ])
-            .current_dir("/Users/jonathonfritz/code/work-projects/5dlabs/cto")
+            .current_dir(&repo_root)
             .output()
             .context("Failed to install controller")?;
 

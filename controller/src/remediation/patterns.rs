@@ -200,7 +200,7 @@ impl PatternExtractor {
             "Missing Feature" => Ok(IssueType::MissingFeature),
             "Regression" => Ok(IssueType::Regression),
             "Performance" => Ok(IssueType::Performance),
-            _ => Err(anyhow::anyhow!("Unknown issue type: {}", s)),
+            _ => Err(anyhow::anyhow!("Unknown issue type: {s}")),
         }
     }
 
@@ -211,7 +211,7 @@ impl PatternExtractor {
             "High" => Ok(Severity::High),
             "Medium" => Ok(Severity::Medium),
             "Low" => Ok(Severity::Low),
-            _ => Err(anyhow::anyhow!("Unknown severity: {}", s)),
+            _ => Err(anyhow::anyhow!("Unknown severity: {s}")),
         }
     }
 

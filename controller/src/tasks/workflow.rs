@@ -30,7 +30,7 @@ pub fn extract_pr_number(pr_url: &str) -> Result<u32> {
             .parse::<u32>()
             .with_context(|| format!("Failed to parse PR number from URL: {pr_url}"))
     } else {
-        Err(anyhow::anyhow!("Invalid PR URL format: {}", pr_url))
+        Err(anyhow::anyhow!("Invalid PR URL format: {pr_url}"))
     }
 }
 
@@ -163,10 +163,7 @@ async fn resume_workflow_via_http(
             .await
             .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(anyhow::anyhow!(
-            "Failed to get workflow {}: HTTP {} - {}",
-            workflow_name,
-            status,
-            error_text
+            "Failed to get workflow {workflow_name}: HTTP {status} - {error_text}"
         ));
     }
 
@@ -272,10 +269,7 @@ async fn resume_workflow_via_http(
             .await
             .unwrap_or_else(|_| "Unknown error".to_string());
         return Err(anyhow::anyhow!(
-            "Failed to patch workflow {}: HTTP {} - {}",
-            workflow_name,
-            status,
-            error_text
+            "Failed to patch workflow {workflow_name}: HTTP {status} - {error_text}"
         ));
     }
 

@@ -508,10 +508,10 @@ impl ControllerConfig {
     /// Load configuration from mounted ConfigMap file
     pub fn from_mounted_file(config_path: &str) -> Result<Self, anyhow::Error> {
         let config_str = std::fs::read_to_string(config_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read config file {}: {}", config_path, e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to read config file {config_path}: {e}"))?;
 
         let mut config: ControllerConfig = serde_yaml::from_str(&config_str)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse config YAML: {e}"))?;
 
         config.merge_agent_cli_defaults();
         Ok(config)

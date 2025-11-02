@@ -1211,7 +1211,7 @@ impl<'a> CodeResourceManager<'a> {
                 if let Some(job_name) = job_owner_name {
                     // Check if any pods from this job are still running
                     let pod_list_params = ListParams::default()
-                        .labels(&format!("batch.kubernetes.io/job-name={}", job_name));
+                        .labels(&format!("batch.kubernetes.io/job-name={job_name}"));
                     match pods.list(&pod_list_params).await {
                         Ok(pod_list) => {
                             let has_running_pods = pod_list.items.iter().any(|pod| {
