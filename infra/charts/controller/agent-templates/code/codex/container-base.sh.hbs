@@ -722,7 +722,10 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
       else
         echo "ℹ️ No existing PR found; recreating branch from $REMOTE_BASE"
         # Delete local branch and recreate fresh from base
-        git checkout "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-branch "$REMOTE_BASE"
+        # Force discard all local changes since we're recreating from scratch
+        git reset --hard HEAD 2>/dev/null || true
+        git clean -fd 2>/dev/null || true
+        git checkout -f "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-branch "$REMOTE_BASE"
         git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
         git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
         echo "✅ Recreated $FEATURE_BRANCH from $REMOTE_BASE"
