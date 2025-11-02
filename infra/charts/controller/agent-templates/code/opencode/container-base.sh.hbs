@@ -549,7 +549,7 @@ ensure_pr_created() {
       *) COLOR="ededed"; DESC="Automation label" ;;
     esac
 
-    if gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
+    if gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/tmp/gh-label-create.log 2>&1; then
       echo "   ✅ Created label '$label'"
     else
       echo "   ❌ Failed to create label '$label'"
@@ -593,7 +593,7 @@ EOF
           run-*) COLOR="0366d6"; DESC="Workflow correlation" ;;
           *) COLOR="ededed"; DESC="Automation label" ;;
         esac
-        gh label create "$label" -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/dev/null 2>&1 || true
+        gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/dev/null 2>&1 || true
       fi
       
       # Add label to PR (continue even if it fails)
