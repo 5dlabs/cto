@@ -427,7 +427,7 @@ spec:
             template: agent-coderun
             continueOn:
               failed: true  # Allow workflow to proceed to Cipher even if Cleo finds issues
-            when: "{{`{{steps.check-quality-completion.outputs.parameters.skip-stage}}`}} != true"
+            when: "'{{`{{steps.check-quality-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
             arguments:
               parameters:
                 - name: github-app
@@ -498,7 +498,7 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.security-max-retries}}`}}"
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && {{`{{steps.check-security-completion.outputs.parameters.skip-stage}}`}} != true"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.check-security-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
         - - name: skip-security-stage
             template: skip-stage-notice
             arguments:
@@ -523,7 +523,7 @@ spec:
                   value: "testing"
         - - name: testing-work
             template: agent-coderun
-            when: "{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}} != true"
+            when: "'{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
             arguments:
               parameters:
                 - name: github-app
