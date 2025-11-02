@@ -1691,6 +1691,39 @@ Before starting implementation, you MUST read and follow the task-specific tool 
             echo "✓ Including task isolation instructions (no toolman guide found)"
         fi
 
+        # CRITICAL: Inject design system documentation for Blaze (frontend agent)
+        # This ensures shadcn/ui requirements are in the initial context, not just referenced
+        if [ -f "$CLAUDE_WORK_DIR/design-system.md" ]; then
+            PROMPT_PREFIX="${PROMPT_PREFIX}📐 **MANDATORY DESIGN SYSTEM - READ THIS FIRST**
+
+🚫 **CRITICAL RULE: NO Material-UI**
+**Material-UI (MUI) is PROHIBITED. Always use shadcn/ui for React components.**
+
+**Technology Stack Requirements:**
+- Framework: Next.js 15 + React 19 (NOT React 18, NOT Remix, NOT CRA)
+- Components: shadcn/ui (copied into your repo via \`npx shadcn@latest add [components]\`)
+- Styling: Tailwind CSS 4 ONLY (NO Material-UI, NO @mui/*, NO CSS-in-JS)
+
+**DO:**
+- Use \`npx shadcn@latest add button card form\` to install components
+- Use React 19.0.0+ and Next.js 15.0.0+
+- Import from \`@/components/ui/\` (shadcn pattern)
+
+**NEVER:**
+- Install @mui/material, @mui/core, or any Material-UI packages
+- Use React 18.x or older versions
+- Import from @mui/* packages
+
+**Complete design system documentation is available in \`design-system.md\` in your working directory.**
+
+---
+
+"
+            echo "✓ Including critical design system requirements in initial context"
+        else
+            echo "⚠️ Warning: design-system.md not found - Blaze may use incorrect component library"
+        fi
+
         # Compose initial user turn
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
         
