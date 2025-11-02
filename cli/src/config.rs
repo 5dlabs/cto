@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum InstallProfile {
     /// Minimal profile - Local development
     /// - 8GB RAM requirement
-    /// - Core components only (ArgoCD, Argo Workflows, Controller)
+    /// - Core components only (`ArgoCD`, Argo Workflows, Controller)
     /// - No monitoring or databases
     Minimal,
 
@@ -209,7 +209,7 @@ impl CtoConfig {
                 install_config
                     .github_repo
                     .as_ref()
-                    .map(|repo| format!("{}/{}", org, repo))
+                    .map(|repo| format!("{org}/{repo}"))
             })
             .unwrap_or_else(|| "your-org/your-repo".to_string());
 

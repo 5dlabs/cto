@@ -15,7 +15,7 @@ pub fn print_section(title: &str) {
 pub fn print_step(current: usize, total: usize, message: &str) {
     println!(
         "{} {} {}",
-        format!("[{}/{}]", current, total).bright_black(),
+        format!("[{current}/{total}]").bright_black(),
         "▶".cyan(),
         message.bold()
     );
@@ -25,13 +25,6 @@ pub fn print_step(current: usize, total: usize, message: &str) {
 pub fn print_success(message: &str) {
     println!();
     println!("{} {}", "✓".green().bold(), message.green());
-    println!();
-}
-
-/// Print an error message
-pub fn print_error(message: &str) {
-    println!();
-    println!("{} {}", "✗".red().bold(), message.red());
     println!();
 }
 
@@ -121,7 +114,7 @@ pub fn print_config_summary(config: &InstallConfig) {
         } else {
             "○".bright_black()
         };
-        println!("  {} {}", status, component);
+        println!("  {status} {component}");
     }
 
     println!();
@@ -161,11 +154,11 @@ pub fn print_check_result(name: &str, passed: bool, message: Option<&str>) {
     };
 
     let text = if let Some(msg) = message {
-        format!("{} - {}", name, msg)
+        format!("{name} - {msg}")
     } else {
         name.to_string()
     };
 
-    println!("  {} {}", status, text);
+    println!("  {status} {text}");
 }
 

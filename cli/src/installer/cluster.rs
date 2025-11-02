@@ -10,20 +10,20 @@ pub struct ClusterProvisioner<'a> {
 }
 
 impl<'a> ClusterProvisioner<'a> {
-    pub fn new_kind(config: &'a InstallConfig) -> Self {
+    pub const fn new_kind(config: &'a InstallConfig) -> Self {
         Self { config }
     }
 
-    pub async fn provision(&self) -> Result<()> {
+    pub fn provision(&self) -> Result<()> {
         // Check if cluster already exists
-        if self.cluster_exists()? {
+        if Self::cluster_exists()? {
             ui::print_info("kind cluster 'cto-platform' already exists");
             return Ok(());
         }
 
         ui::print_progress("Creating kind cluster...");
 
-        let kind_config = self.generate_kind_config();
+        let kind_config = Self::generate_kind_config();
 
         // Write config to temp file
         let temp_file = tempfile::NamedTempFile::new()?;
@@ -44,14 +44,14 @@ impl<'a> ClusterProvisioner<'a> {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("kind cluster creation failed: {}", stderr));
+            return Err(anyhow::anyhow!("kind cluster creation failed: {stderr}"));
         }
 
         ui::print_success("kind cluster created");
 
         // Wait for cluster to be ready
         ui::print_progress("Waiting for cluster to be ready...");
-        self.wait_for_cluster_ready()?;
+        Self::wait_for_cluster_ready()?;
 
         // Create namespace
         self.create_namespace()?;
@@ -59,7 +59,7 @@ impl<'a> ClusterProvisioner<'a> {
         Ok(())
     }
 
-    fn cluster_exists(&self) -> Result<bool> {
+    fn cluster_exists() -> Result<bool> {
         let output = Command::new("kind")
             .args(["get", "clusters"])
             .output()
@@ -73,9 +73,8 @@ impl<'a> ClusterProvisioner<'a> {
         Ok(clusters.contains("cto-platform"))
     }
 
-    fn generate_kind_config(&self) -> String {
-        format!(
-            r#"kind: Cluster
+    fn generate_kind_config() -> String {
+        "kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: cto-platform
 nodes:
@@ -85,7 +84,7 @@ nodes:
     kind: InitConfiguration
     nodeRegistration:
       kubeletExtraArgs:
-        node-labels: "cto-platform=true"
+        node-labels: \"cto-platform=true\"
   extraPortMappings:
   # ArgoCD
   - containerPort: 8080
@@ -103,19 +102,25 @@ nodes:
   - containerPort: 443
     hostPort: 443
     protocol: TCP
-"#
-        )
+"
+        .to_string()
     }
 
-    fn wait_for_cluster_ready(&self) -> Result<()> {
+    fn wait_for_cluster_ready() -> Result<()> {
         let output = Command::new("kubectl")
-            .args(["wait", "--for=condition=Ready", "nodes", "--all", "--timeout=300s"])
+            .args([
+                "wait",
+                "--for=condition=Ready",
+                "nodes",
+                "--all",
+                "--timeout=300s",
+            ])
             .output()
             .context("Failed to wait for nodes")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("Cluster not ready: {}", stderr));
+            return Err(anyhow::anyhow!("Cluster not ready: {stderr}"));
         }
 
         ui::print_success("Cluster is ready");
@@ -140,8 +145,7 @@ nodes:
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "Failed to create namespace manifest: {}",
-                stderr
+                "Failed to create namespace manifest: {stderr}"
             ));
         }
 
@@ -169,4 +173,3 @@ nodes:
         Ok(())
     }
 }
-

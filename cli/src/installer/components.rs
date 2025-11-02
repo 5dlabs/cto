@@ -11,29 +11,29 @@ pub struct ComponentInstaller<'a> {
 }
 
 impl<'a> ComponentInstaller<'a> {
-    pub fn new(config: &'a InstallConfig) -> Self {
+    pub const fn new(config: &'a InstallConfig) -> Self {
         Self { config }
     }
 
     pub async fn install_component(&self, component: &str) -> Result<()> {
         match component {
             "argocd" => self.install_argocd().await,
-            "argo-workflows" => self.install_argo_workflows().await,
-            "argo-events" => self.install_argo_events().await,
-            "controller" => self.install_controller().await,
-            "victoria-metrics" => self.install_victoria_metrics().await,
-            "victoria-logs" => self.install_victoria_logs().await,
-            "grafana" => self.install_grafana().await,
-            "postgres-operator" => self.install_postgres_operator().await,
-            "redis-operator" => self.install_redis_operator().await,
-            "questdb-operator" => self.install_questdb_operator().await,
-            _ => Err(anyhow::anyhow!("Unknown component: {}", component)),
+            "argo-workflows" => self.install_argo_workflows(),
+            "argo-events" => self.install_argo_events(),
+            "controller" => self.install_controller(),
+            "victoria-metrics" => self.install_victoria_metrics(),
+            "victoria-logs" => self.install_victoria_logs(),
+            "grafana" => self.install_grafana(),
+            "postgres-operator" => self.install_postgres_operator(),
+            "redis-operator" => self.install_redis_operator(),
+            "questdb-operator" => self.install_questdb_operator(),
+            _ => Err(anyhow::anyhow!("Unknown component: {component}")),
         }
     }
 
     async fn install_argocd(&self) -> Result<()> {
         ui::print_progress("Creating argocd namespace...");
-        self.create_namespace_if_not_exists("argocd")?;
+        Self::create_namespace_if_not_exists("argocd")?;
 
         ui::print_progress("Installing ArgoCD...");
         let output = Command::new("kubectl")
@@ -49,7 +49,7 @@ impl<'a> ComponentInstaller<'a> {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("ArgoCD installation failed: {}", stderr));
+            return Err(anyhow::anyhow!("ArgoCD installation failed: {stderr}"));
         }
 
         ui::print_progress("Waiting for ArgoCD to be ready...");
@@ -58,12 +58,13 @@ impl<'a> ComponentInstaller<'a> {
         Ok(())
     }
 
-    async fn install_argo_workflows(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_argo_workflows(&self) -> Result<()> {
         ui::print_progress("Creating argo namespace...");
-        self.create_namespace_if_not_exists("argo")?;
+        Self::create_namespace_if_not_exists("argo")?;
 
         ui::print_progress("Adding Argo Helm repository...");
-        self.add_helm_repo("argo", "https://argoproj.github.io/argo-helm")?;
+        Self::add_helm_repo("argo", "https://argoproj.github.io/argo-helm")?;
 
         ui::print_progress("Installing Argo Workflows...");
         let output = Command::new("helm")
@@ -82,15 +83,15 @@ impl<'a> ComponentInstaller<'a> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "Argo Workflows installation failed: {}",
-                stderr
+                "Argo Workflows installation failed: {stderr}"
             ));
         }
 
         Ok(())
     }
 
-    async fn install_argo_events(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_argo_events(&self) -> Result<()> {
         ui::print_progress("Installing Argo Events...");
         let output = Command::new("helm")
             .args([
@@ -107,15 +108,14 @@ impl<'a> ComponentInstaller<'a> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "Argo Events installation failed: {}",
-                stderr
+                "Argo Events installation failed: {stderr}"
             ));
         }
 
         Ok(())
     }
 
-    async fn install_controller(&self) -> Result<()> {
+    fn install_controller(&self) -> Result<()> {
         ui::print_progress("Installing CTO Controller...");
 
         // Build controller image locally for kind
@@ -135,7 +135,7 @@ impl<'a> ComponentInstaller<'a> {
 
         if !build_output.status.success() {
             let stderr = String::from_utf8_lossy(&build_output.stderr);
-            return Err(anyhow::anyhow!("Controller image build failed: {}", stderr));
+            return Err(anyhow::anyhow!("Controller image build failed: {stderr}"));
         }
 
         // Load image into kind cluster
@@ -154,8 +154,7 @@ impl<'a> ComponentInstaller<'a> {
         if !load_output.status.success() {
             let stderr = String::from_utf8_lossy(&load_output.stderr);
             return Err(anyhow::anyhow!(
-                "Failed to load controller image: {}",
-                stderr
+                "Failed to load controller image: {stderr}"
             ));
         }
 
@@ -177,15 +176,16 @@ impl<'a> ComponentInstaller<'a> {
 
         if !helm_output.status.success() {
             let stderr = String::from_utf8_lossy(&helm_output.stderr);
-            return Err(anyhow::anyhow!("Controller installation failed: {}", stderr));
+            return Err(anyhow::anyhow!("Controller installation failed: {stderr}"));
         }
 
         Ok(())
     }
 
-    async fn install_victoria_metrics(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_victoria_metrics(&self) -> Result<()> {
         ui::print_progress("Adding VictoriaMetrics Helm repository...");
-        self.add_helm_repo(
+        Self::add_helm_repo(
             "victoriametrics",
             "https://victoriametrics.github.io/helm-charts/",
         )?;
@@ -207,15 +207,15 @@ impl<'a> ComponentInstaller<'a> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "VictoriaMetrics installation failed: {}",
-                stderr
+                "VictoriaMetrics installation failed: {stderr}"
             ));
         }
 
         Ok(())
     }
 
-    async fn install_victoria_logs(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_victoria_logs(&self) -> Result<()> {
         ui::print_progress("Installing VictoriaLogs...");
         let output = Command::new("helm")
             .args([
@@ -232,17 +232,17 @@ impl<'a> ComponentInstaller<'a> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "VictoriaLogs installation failed: {}",
-                stderr
+                "VictoriaLogs installation failed: {stderr}"
             ));
         }
 
         Ok(())
     }
 
-    async fn install_grafana(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_grafana(&self) -> Result<()> {
         ui::print_progress("Adding Grafana Helm repository...");
-        self.add_helm_repo("grafana", "https://grafana.github.io/helm-charts")?;
+        Self::add_helm_repo("grafana", "https://grafana.github.io/helm-charts")?;
 
         ui::print_progress("Installing Grafana...");
         let output = Command::new("helm")
@@ -259,15 +259,16 @@ impl<'a> ComponentInstaller<'a> {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("Grafana installation failed: {}", stderr));
+            return Err(anyhow::anyhow!("Grafana installation failed: {stderr}"));
         }
 
         Ok(())
     }
 
-    async fn install_postgres_operator(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_postgres_operator(&self) -> Result<()> {
         ui::print_progress("Installing PostgreSQL Operator...");
-        self.create_namespace_if_not_exists("postgres-operator")?;
+        Self::create_namespace_if_not_exists("postgres-operator")?;
 
         let output = Command::new("helm")
             .args([
@@ -284,17 +285,17 @@ impl<'a> ComponentInstaller<'a> {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(anyhow::anyhow!(
-                "PostgreSQL Operator installation failed: {}",
-                stderr
+                "PostgreSQL Operator installation failed: {stderr}"
             ));
         }
 
         Ok(())
     }
 
-    async fn install_redis_operator(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_redis_operator(&self) -> Result<()> {
         ui::print_progress("Installing Redis Operator...");
-        self.create_namespace_if_not_exists("redis-operator")?;
+        Self::create_namespace_if_not_exists("redis-operator")?;
 
         // For now, just acknowledge it would be installed
         ui::print_info("Redis Operator installation would go here");
@@ -302,9 +303,10 @@ impl<'a> ComponentInstaller<'a> {
         Ok(())
     }
 
-    async fn install_questdb_operator(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_questdb_operator(&self) -> Result<()> {
         ui::print_progress("Installing QuestDB Operator...");
-        self.create_namespace_if_not_exists("questdb-operator")?;
+        Self::create_namespace_if_not_exists("questdb-operator")?;
 
         // For now, just acknowledge it would be installed
         ui::print_info("QuestDB Operator installation would go here");
@@ -312,7 +314,7 @@ impl<'a> ComponentInstaller<'a> {
         Ok(())
     }
 
-    fn create_namespace_if_not_exists(&self, namespace: &str) -> Result<()> {
+    fn create_namespace_if_not_exists(namespace: &str) -> Result<()> {
         let output = Command::new("kubectl")
             .args(["get", "namespace", namespace])
             .output()
@@ -327,14 +329,14 @@ impl<'a> ComponentInstaller<'a> {
 
             if !create_output.status.success() {
                 let stderr = String::from_utf8_lossy(&create_output.stderr);
-                return Err(anyhow::anyhow!("Failed to create namespace: {}", stderr));
+                return Err(anyhow::anyhow!("Failed to create namespace: {stderr}"));
             }
         }
 
         Ok(())
     }
 
-    fn add_helm_repo(&self, name: &str, url: &str) -> Result<()> {
+    fn add_helm_repo(name: &str, url: &str) -> Result<()> {
         let output = Command::new("helm")
             .args(["repo", "add", name, url])
             .output()
@@ -349,7 +351,7 @@ impl<'a> ComponentInstaller<'a> {
 
             if !update_output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow::anyhow!("Failed to add Helm repository: {}", stderr));
+                return Err(anyhow::anyhow!("Failed to add Helm repository: {stderr}"));
             }
         }
 
@@ -386,9 +388,7 @@ impl<'a> ComponentInstaller<'a> {
             attempts += 1;
             if attempts >= max_attempts {
                 return Err(anyhow::anyhow!(
-                    "Deployment {} in namespace {} did not become ready within timeout",
-                    deployment,
-                    namespace
+                    "Deployment {deployment} in namespace {namespace} did not become ready within timeout"
                 ));
             }
 
@@ -396,4 +396,3 @@ impl<'a> ComponentInstaller<'a> {
         }
     }
 }
-

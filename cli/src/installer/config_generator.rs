@@ -3,16 +3,14 @@ use std::path::Path;
 
 use crate::config::{CtoConfig, InstallConfig};
 
-pub struct ConfigGenerator<'a> {
-    _config: &'a InstallConfig,
-}
+pub struct ConfigGenerator;
 
-impl<'a> ConfigGenerator<'a> {
-    pub fn new(config: &'a InstallConfig) -> Self {
-        Self { _config: config }
+impl ConfigGenerator {
+    pub const fn new(_config: &InstallConfig) -> Self {
+        Self
     }
 
-    pub fn write_config(&self, cto_config: &CtoConfig, path: &Path) -> Result<()> {
+    pub fn write_config(cto_config: &CtoConfig, path: &Path) -> Result<()> {
         let json = serde_json::to_string_pretty(cto_config)
             .context("Failed to serialize config")?;
 

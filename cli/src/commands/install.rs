@@ -44,9 +44,9 @@ impl InstallCommand {
         // Step 2: Gather configuration
         ui::print_step(2, 7, "Configuring installation");
         let config = if let Some(config_file) = &self.config {
-            self.load_config_from_file(config_file)?
+            Self::load_config_from_file(config_file)?
         } else if self.non_interactive {
-            self.create_default_config()?
+            self.create_default_config()
         } else {
             self.create_interactive_config()?
         };
@@ -76,14 +76,14 @@ impl InstallCommand {
         Ok(())
     }
 
-    fn load_config_from_file(&self, _path: &str) -> Result<InstallConfig> {
+    fn load_config_from_file(_path: &str) -> Result<InstallConfig> {
         // TODO: Implement config file loading
         Err(anyhow::anyhow!(
             "Config file loading not yet implemented"
         ))
     }
 
-    fn create_default_config(&self) -> Result<InstallConfig> {
+    fn create_default_config(&self) -> InstallConfig {
         let cluster_type = if self.local {
             ClusterType::Kind
         } else if self.remote {
@@ -92,7 +92,7 @@ impl InstallCommand {
             ClusterType::Kind // Default to local
         };
 
-        Ok(InstallConfig {
+        InstallConfig {
             profile: InstallProfile::Minimal,
             cluster_type,
             namespace: "agent-platform".to_string(),
@@ -104,9 +104,10 @@ impl InstallCommand {
             install_monitoring: false,
             install_databases: false,
             auto_generate_config: true,
-        })
+        }
     }
 
+    #[allow(clippy::too_many_lines, clippy::unused_self)]
     fn create_interactive_config(&self) -> Result<InstallConfig> {
         let theme = ColorfulTheme::default();
 
@@ -128,7 +129,6 @@ impl InstallCommand {
             .interact()?;
 
         let profile = match profile_idx {
-            0 => InstallProfile::Minimal,
             1 => InstallProfile::Standard,
             2 => InstallProfile::Production,
             _ => InstallProfile::Minimal,
@@ -149,7 +149,6 @@ impl InstallCommand {
             .interact()?;
 
         let cluster_type = match cluster_idx {
-            0 => ClusterType::Kind,
             1 => ClusterType::Remote,
             _ => ClusterType::Kind,
         };

@@ -108,20 +108,19 @@ impl PrerequisitesValidator {
         let mut failures = Vec::new();
 
         for requirement in &self.requirements {
-            match (requirement.check)() {
-                Ok(true) => {
-                    ui::print_check_result(&requirement.name, true, None);
-                }
-                Ok(false) | Err(_) => {
-                    ui::print_check_result(&requirement.name, false, None);
-                    failures.push(requirement);
-                }
+            if let Ok(true) = (requirement.check)() {
+                ui::print_check_result(&requirement.name, true, None);
+            } else {
+                ui::print_check_result(&requirement.name, false, None);
+                failures.push(requirement);
             }
         }
 
         println!();
 
-        if !failures.is_empty() {
+        if failures.is_empty() {
+            ui::print_success("All prerequisites met!");
+        } else {
             ui::print_warning("Some prerequisites are not met:");
             println!();
             for failure in &failures {
@@ -148,24 +147,6 @@ impl PrerequisitesValidator {
                     "Critical prerequisites not met. Please install the required tools and try again."
                 ));
             }
-        } else {
-            ui::print_success("All prerequisites met!");
-        }
-
-        Ok(())
-    }
-
-    /// Check if kubectl can connect to a cluster
-    pub fn validate_cluster_access(&self) -> Result<()> {
-        let output = Command::new("kubectl")
-            .arg("cluster-info")
-            .output()
-            .context("Failed to check cluster access")?;
-
-        if !output.status.success() {
-            return Err(anyhow::anyhow!(
-                "Cannot connect to Kubernetes cluster. Make sure your kubeconfig is set up correctly."
-            ));
         }
 
         Ok(())

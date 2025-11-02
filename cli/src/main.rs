@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
 }
 
 fn print_banner() {
-    let banner = r#"
+    let banner = r"
     ╔═══════════════════════════════════════════════════════════╗
     ║                                                           ║
     ║   ██████╗████████╗ ██████╗     ██████╗ ██╗      █████╗  ║
@@ -86,7 +86,7 @@ fn print_banner() {
     ║         Multi-Agent Development Orchestration            ║
     ║                                                           ║
     ╚═══════════════════════════════════════════════════════════╝
-"#;
+";
 
     println!("{}", banner.cyan().bold());
 }

@@ -28,7 +28,7 @@ impl Installer {
 
         // Step 3: Setup/validate cluster
         ui::print_step(3, 7, "Setting up Kubernetes cluster");
-        self.setup_cluster().await?;
+        self.setup_cluster()?;
 
         // Step 4: Install core components
         ui::print_step(4, 7, "Installing core components");
@@ -44,7 +44,7 @@ impl Installer {
 
         // Step 6: Install CTO binary
         ui::print_step(6, 7, "Installing CTO binary");
-        self.install_cto_binary().await?;
+        self.install_cto_binary()?;
 
         // Step 7: Generate configuration
         if self.config.auto_generate_config {
@@ -55,17 +55,17 @@ impl Installer {
         }
 
         ui::print_section("✨ Installation Summary");
-        self.print_access_info()?;
+        self.print_access_info();
 
         Ok(())
     }
 
-    async fn setup_cluster(&self) -> Result<()> {
+    fn setup_cluster(&self) -> Result<()> {
         match self.config.cluster_type {
             ClusterType::Kind => {
                 ui::print_component("Local kind cluster");
                 let provisioner = ClusterProvisioner::new_kind(&self.config);
-                provisioner.provision().await?;
+                provisioner.provision()?;
             }
             ClusterType::Remote => {
                 ui::print_component("Remote Kubernetes cluster");
@@ -104,7 +104,7 @@ impl Installer {
         for component in core_components {
             ui::print_component(component);
             installer.install_component(component).await?;
-            ui::print_success(&format!("{} installed", component));
+            ui::print_success(&format!("{component} installed"));
         }
 
         Ok(())
@@ -132,7 +132,8 @@ impl Installer {
         Ok(())
     }
 
-    async fn install_cto_binary(&self) -> Result<()> {
+    #[allow(clippy::unused_self)]
+    fn install_cto_binary(&self) -> Result<()> {
         ui::print_component("CTO Binary");
 
         // For now, we'll build from source
@@ -147,7 +148,7 @@ impl Installer {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(anyhow::anyhow!("Build failed: {}", stderr));
+            return Err(anyhow::anyhow!("Build failed: {stderr}"));
         }
 
         ui::print_success("CTO binary built successfully");
@@ -156,11 +157,11 @@ impl Installer {
     }
 
     fn generate_config(&self) -> Result<()> {
-        let generator = ConfigGenerator::new(&self.config);
+        let _generator = ConfigGenerator::new(&self.config);
         let config = CtoConfig::default_config(&self.config);
 
         let config_path = PathBuf::from("cto-config.json");
-        generator.write_config(&config, &config_path)?;
+        ConfigGenerator::write_config(&config, &config_path)?;
 
         ui::print_success(&format!(
             "Generated configuration at {}",
@@ -170,7 +171,7 @@ impl Installer {
         Ok(())
     }
 
-    fn print_access_info(&self) -> Result<()> {
+    fn print_access_info(&self) {
         println!("{}", "Next Steps".cyan().bold());
         println!("{}", "─".repeat(70).bright_black());
         println!();
@@ -215,8 +216,6 @@ impl Installer {
         println!("  📖 Full documentation: {}", "https://github.com/5dlabs/cto".cyan());
         println!("  💬 Support: {}", "https://github.com/5dlabs/cto/discussions".cyan());
         println!();
-
-        Ok(())
     }
 }
 

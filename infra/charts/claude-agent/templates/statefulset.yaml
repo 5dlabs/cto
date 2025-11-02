@@ -43,23 +43,6 @@ spec:
             - name: workspace
               mountPath: {{ .Values.persistence.mountPath }}
             {{- end }}
-        # Replaced inline BusyBox HTTP shim with Rust sidecar to avoid YAML parsing issues
-        - name: sidecar
-          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
-          env:
-            - name: FIFO_PATH
-              value: "{{ .Values.persistence.mountPath }}/agent-input.jsonl"
-            - name: PORT
-              value: {{ .Values.api.port | quote }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.api.port }}
-          volumeMounts:
-            {{- if .Values.persistence.enabled }}
-            - name: workspace
-              mountPath: {{ .Values.persistence.mountPath }}
-            {{- end }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       affinity:

@@ -4,7 +4,6 @@ members = [
     "cli",
     "controller",
     "mcp",
-    "sidecar",
 ]
 
 [workspace.package]
