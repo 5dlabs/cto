@@ -6,7 +6,7 @@ use crate::tasks::config::{ControllerConfig, ResolvedSecretBinding};
 use crate::tasks::types::{github_app_secret_name, Context, Error, Result};
 use k8s_openapi::api::{
     batch::v1::Job,
-    core::v1::{ConfigMap, PersistentVolumeClaim, Pod, Service},
+    core::v1::{ConfigMap, PersistentVolumeClaim, Pod},
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use kube::api::{Api, DeleteParams, ListParams, PostParams};
