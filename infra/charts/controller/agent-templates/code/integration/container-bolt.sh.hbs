@@ -1,8 +1,8 @@
 #!/bin/sh
-# Bolt - DevOps & Deployment Specialist
-# Monitors deployments, validates ArgoCD health, and ensures successful rollouts
+# Bolt - DevOps & Public Deployment Specialist
+# Creates ArgoCD apps, sets up ngrok ingress, ensures public availability
 
-echo "Bolt: Deployment monitoring and validation for {{service}}"
+echo "Bolt: Publishing {{service}} to public internet via ngrok"
 
 # Source common setup
 source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
@@ -14,86 +14,189 @@ setup_github_auth
 NAMESPACE="${NAMESPACE:-agent-platform}"
 SERVICE="{{service}}"
 TASK_ID="{{task_id}}"
+REPOSITORY="{{repository_url}}"
+BRANCH="${BRANCH:-main}"
 
-echo "Monitoring deployment for service: $SERVICE"
+echo "Service: $SERVICE"
 echo "Namespace: $NAMESPACE"
-echo "Task ID: $TASK_ID"
+echo "Repository: $REPOSITORY"
 
-# Check ArgoCD application health
-check_argocd_health() {
-    local app_name="$1"
-    echo "Checking ArgoCD application: $app_name"
+# Step 1: Create ArgoCD Application if it doesn't exist
+create_argocd_app() {
+    local app_name="$SERVICE"
+    local repo_url="$REPOSITORY"
+    local path="${ARGOCD_PATH:-helm}"
     
-    kubectl get application "$app_name" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown"
+    echo "===== Creating ArgoCD Application: $app_name ====="
+    
+    # Check if application already exists
+    if kubectl get application "$app_name" -n argocd >/dev/null 2>&1; then
+        echo "✅ ArgoCD application '$app_name' already exists"
+        return 0
+    fi
+    
+    # Create ArgoCD Application manifest
+    cat <<EOF | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: $app_name
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: $repo_url
+    targetRevision: $BRANCH
+    path: $path
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: $NAMESPACE
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+    
+    echo "✅ Created ArgoCD application: $app_name"
 }
 
-# Check deployment status
-check_deployment() {
-    local deployment="$1"
-    echo "Checking deployment: $deployment"
+# Step 2: Wait for ArgoCD sync and health
+wait_for_argocd_sync() {
+    local app_name="$SERVICE"
+    local max_wait=300  # 5 minutes
+    local elapsed=0
     
-    kubectl rollout status deployment/"$deployment" -n "$NAMESPACE" --timeout=5m
+    echo "===== Waiting for ArgoCD Sync: $app_name ====="
+    
+    while [ $elapsed -lt $max_wait ]; do
+        local sync_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+        local health_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+        
+        echo "Sync: $sync_status, Health: $health_status"
+        
+        if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
+            echo "✅ ArgoCD application is Synced and Healthy"
+            return 0
+        fi
+        
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+    
+    echo "⚠️  Timeout waiting for ArgoCD sync"
+    kubectl get application "$app_name" -n argocd -o yaml
+    return 1
 }
 
-# Validate pod health
-check_pods() {
-    local label_selector="$1"
-    echo "Checking pods with selector: $label_selector"
+# Step 3: Create ngrok ingress
+create_ngrok_ingress() {
+    local service_name="$SERVICE"
+    local service_port="${SERVICE_PORT:-80}"
     
-    kubectl get pods -n "$NAMESPACE" -l "$label_selector" -o wide
-    kubectl get pods -n "$NAMESPACE" -l "$label_selector" \
-        -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}'
-}
-
-# Main validation flow
-echo "===== Starting Deployment Validation ====="
-
-# 1. Check ArgoCD sync status
-if [ -n "$SERVICE" ]; then
-    ARGOCD_APP="${SERVICE}-app"
-    HEALTH=$(check_argocd_health "$ARGOCD_APP")
+    echo "===== Creating ngrok Ingress for $service_name ====="
     
-    if [ "$HEALTH" != "Healthy" ]; then
-        echo "⚠️  ArgoCD application $ARGOCD_APP is not healthy: $HEALTH"
-        echo "Investigating ArgoCD sync status..."
-        kubectl describe application "$ARGOCD_APP" -n argocd
+    # Check if ngrok tunnel already exists
+    if kubectl get tunnel "$service_name-ngrok" -n "$NAMESPACE" >/dev/null 2>&1; then
+        echo "✅ ngrok tunnel already exists"
     else
-        echo "✅ ArgoCD application $ARGOCD_APP is healthy"
+        # Create ngrok Tunnel CRD
+        cat <<EOF | kubectl apply -f -
+apiVersion: ngrok.k8s.ngrok.com/v1alpha1
+kind: Tunnel
+metadata:
+  name: $service_name-ngrok
+  namespace: $NAMESPACE
+spec:
+  forwardsTo: $service_name:$service_port
+EOF
+        echo "✅ Created ngrok tunnel"
     fi
-fi
-
-# 2. Check deployment rollout
-if [ -n "$SERVICE" ]; then
-    check_deployment "$SERVICE"
-fi
-
-# 3. Validate pod health
-if [ -n "$SERVICE" ]; then
-    check_pods "app=$SERVICE"
-fi
-
-# 4. Check for any recent errors in logs
-echo "===== Checking Recent Logs ====="
-if [ -n "$SERVICE" ]; then
-    POD=$(kubectl get pods -n "$NAMESPACE" -l "app=$SERVICE" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-    if [ -n "$POD" ]; then
-        echo "Recent logs from $POD:"
-        kubectl logs -n "$NAMESPACE" "$POD" --tail=50 --since=5m 2>/dev/null || echo "No recent logs"
-    fi
-fi
-
-# 5. Report findings to PR
-if [ -n "$PR_NUMBER" ]; then
-    echo "Posting deployment validation results to PR #$PR_NUMBER"
     
-    gh pr comment "$PR_NUMBER" --body "## 🚀 Bolt Deployment Validation
+    # Wait for tunnel to be ready
+    echo "Waiting for ngrok tunnel to provision..."
+    sleep 10
+}
+
+# Step 4: Get public URL
+get_public_url() {
+    local service_name="$SERVICE"
+    
+    echo "===== Getting Public URL ====="
+    
+    # Get ngrok tunnel URL
+    local public_url=$(kubectl get tunnel "$service_name-ngrok" -n "$NAMESPACE" -o jsonpath='{.status.url}' 2>/dev/null)
+    
+    if [ -z "$public_url" ]; then
+        echo "⚠️  Could not get ngrok URL, checking ingress..."
+        public_url=$(kubectl get ingress -n "$NAMESPACE" -l "app=$service_name" -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+    fi
+    
+    if [ -n "$public_url" ]; then
+        echo "✅ Public URL: $public_url"
+        echo "$public_url"
+    else
+        echo "❌ Could not determine public URL"
+        return 1
+    fi
+}
+
+# Step 5: Verify public accessibility
+verify_public_access() {
+    local url="$1"
+    
+    echo "===== Verifying Public Access: $url ====="
+    
+    # Try to curl the URL
+    if curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" | grep -E "^(200|301|302)$" >/dev/null; then
+        echo "✅ Application is publicly accessible"
+        return 0
+    else
+        echo "⚠️  Application may not be publicly accessible yet"
+        return 1
+    fi
+}
+
+# Main workflow
+echo "===== Bolt: Publishing Application ====="
+
+# 1. Create ArgoCD application
+create_argocd_app
+
+# 2. Wait for sync and health
+wait_for_argocd_sync
+
+# 3. Create ngrok ingress
+create_ngrok_ingress
+
+# 4. Get public URL
+PUBLIC_URL=$(get_public_url)
+
+# 5. Verify accessibility
+if [ -n "$PUBLIC_URL" ]; then
+    verify_public_access "$PUBLIC_URL"
+fi
+
+# 6. Post results to PR
+if [ -n "$PR_NUMBER" ] && [ -n "$PUBLIC_URL" ]; then
+    echo "===== Posting Public URL to PR #$PR_NUMBER ====="
+    
+    gh pr comment "$PR_NUMBER" --body "## 🚀 Bolt: Application Published
 
 **Service:** \`$SERVICE\`  
-**Namespace:** \`$NAMESPACE\`  
-**ArgoCD Health:** $HEALTH  
+**Public URL:** $PUBLIC_URL  
+**Status:** ✅ Application is live and publicly accessible
 
-Deployment validation completed successfully."
+🔗 **Access your application:** $PUBLIC_URL
+
+---
+*Deployed via ArgoCD | Exposed via ngrok*"
+else
+    echo "⚠️  Could not post to PR (PR_NUMBER or PUBLIC_URL missing)"
 fi
 
-echo "===== Bolt Deployment Validation Complete ====="
+echo "===== Bolt Complete ====="
 
