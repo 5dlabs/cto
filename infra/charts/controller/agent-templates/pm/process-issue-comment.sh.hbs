@@ -1,0 +1,188 @@
+#!/bin/bash
+set -euo pipefail
+
+# Morgan Issue Comment Processor
+# Processes human feedback from GitHub issue comments
+# Updates TaskMaster documentation based on comment intent
+
+echo "💬 Morgan - Processing Issue Comment"
+echo "Issue #$ISSUE_NUMBER | Author: $COMMENT_AUTHOR | Intent: $INTENT_TYPE"
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+REPO_URL="{{repository_url}}"
+TASK_DIR="/tmp/task-docs"
+
+# Parse owner/repo from URL
+if [[ "$REPOSITORY" =~ ([^/]+)/([^/]+) ]]; then
+  REPO_OWNER="${BASH_REMATCH[1]}"
+  REPO_NAME="${BASH_REMATCH[2]}"
+else
+  echo "❌ Failed to parse repository: $REPOSITORY"
+  exit 1
+fi
+
+# ============================================================================
+# MAIN PROCESSING
+# ============================================================================
+
+process_comment() {
+  echo "📥 Cloning repository..."
+  git clone --depth 1 "$REPOSITORY_URL" "$TASK_DIR"
+  cd "$TASK_DIR"
+  
+  # Find TaskMaster docs directory
+  DOCS_DIR=""
+  if [[ -d ".taskmaster/docs/task-$TASK_ID" ]]; then
+    DOCS_DIR=".taskmaster/docs/task-$TASK_ID"
+  elif [[ -d ".taskmaster/tasks/task-$TASK_ID" ]]; then
+    DOCS_DIR=".taskmaster/tasks/task-$TASK_ID"
+  else
+    echo "⚠️  Task directory not found for task $TASK_ID"
+    post_comment_reply "I couldn't find the task directory for task $TASK_ID. Please check the task ID."
+    exit 0
+  fi
+  
+  echo "✅ Found task directory: $DOCS_DIR"
+  
+  # Process based on intent type
+  case "$INTENT_TYPE" in
+    "scope-change")
+      handle_scope_change
+      ;;
+    "clarification")
+      handle_clarification
+      ;;
+    "priority-change")
+      handle_priority_change
+      ;;
+    *)
+      echo "ℹ️  No action required for intent type: $INTENT_TYPE"
+      ;;
+  esac
+}
+
+handle_scope_change() {
+  echo "🔄 Processing scope change request..."
+  
+  # Add comment to implementation notes
+  TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  echo "---" >> "$DOCS_DIR/implementation-notes.md"
+  echo "## Scope Change Request - $TIMESTAMP" >> "$DOCS_DIR/implementation-notes.md"
+  echo "**Requested by**: @$COMMENT_AUTHOR" >> "$DOCS_DIR/implementation-notes.md"
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  echo "$COMMENT_BODY" >> "$DOCS_DIR/implementation-notes.md"
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  
+  # Commit changes
+  git config user.name "Morgan PM Bot"
+  git config user.email "morgan@5dlabs.com"
+  git add "$DOCS_DIR/implementation-notes.md"
+  git commit -m "docs: update task $TASK_ID scope per issue #$ISSUE_NUMBER
+
+Requested by: @$COMMENT_AUTHOR
+Type: Scope change"
+  
+  git push origin HEAD
+  
+  # Reply to comment
+  post_comment_reply "✅ I've updated the implementation notes for task $TASK_ID to reflect your scope change request. The changes have been committed and will be visible to the implementation team."
+}
+
+handle_clarification() {
+  echo "❓ Processing clarification request..."
+  
+  # Add comment to implementation notes
+  TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  echo "---" >> "$DOCS_DIR/implementation-notes.md"
+  echo "## Clarification Request - $TIMESTAMP" >> "$DOCS_DIR/implementation-notes.md"
+  echo "**Asked by**: @$COMMENT_AUTHOR" >> "$DOCS_DIR/implementation-notes.md"
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  echo "$COMMENT_BODY" >> "$DOCS_DIR/implementation-notes.md"
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  echo "_Awaiting response from technical lead or stakeholder._" >> "$DOCS_DIR/implementation-notes.md"
+  echo "" >> "$DOCS_DIR/implementation-notes.md"
+  
+  # Commit changes
+  git config user.name "Morgan PM Bot"
+  git config user.email "morgan@5dlabs.com"
+  git add "$DOCS_DIR/implementation-notes.md"
+  git commit -m "docs: add clarification request for task $TASK_ID
+
+From issue #$ISSUE_NUMBER by @$COMMENT_AUTHOR"
+  
+  git push origin HEAD
+  
+  # Reply to comment
+  post_comment_reply "📝 I've documented your clarification request in the task notes. A technical lead or stakeholder will respond with the needed information."
+}
+
+handle_priority_change() {
+  echo "⚡ Processing priority change request..."
+  
+  # Extract new priority from comment
+  NEW_PRIORITY="high"
+  if echo "$COMMENT_BODY" | grep -iE 'medium|normal' >/dev/null; then
+    NEW_PRIORITY="medium"
+  elif echo "$COMMENT_BODY" | grep -iE 'low' >/dev/null; then
+    NEW_PRIORITY="low"
+  fi
+  
+  # Update tasks.json
+  TASKS_JSON=".taskmaster/tasks/tasks.json"
+  if [[ -f "$TASKS_JSON" ]]; then
+    TEMP_JSON=$(mktemp)
+    jq --arg task_id "$TASK_ID" \
+       --arg priority "$NEW_PRIORITY" \
+       '(.tasks // .master.tasks // []) |= map(if .id == ($task_id | tonumber) then .priority = $priority else . end)' \
+       "$TASKS_JSON" > "$TEMP_JSON"
+    mv "$TEMP_JSON" "$TASKS_JSON"
+    
+    # Commit changes
+    git config user.name "Morgan PM Bot"
+    git config user.email "morgan@5dlabs.com"
+    git add "$TASKS_JSON"
+    git commit -m "chore: update task $TASK_ID priority to $NEW_PRIORITY
+
+Requested in issue #$ISSUE_NUMBER by @$COMMENT_AUTHOR"
+    
+    git push origin HEAD
+    
+    # Update issue label
+    gh issue edit "$ISSUE_NUMBER" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --remove-label "priority-high,priority-medium,priority-low" \
+      --add-label "priority-$NEW_PRIORITY"
+    
+    # Reply to comment
+    post_comment_reply "✅ Priority updated to **$NEW_PRIORITY** for task $TASK_ID."
+  else
+    post_comment_reply "⚠️  I couldn't update the priority because the tasks.json file wasn't found."
+  fi
+}
+
+post_comment_reply() {
+  local message="$1"
+  
+  gh issue comment "$ISSUE_NUMBER" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --body "## Morgan PM Response
+
+$message
+
+---
+*This is an automated response from Morgan, your AI Project Manager.*"
+}
+
+# ============================================================================
+# EXECUTION
+# ============================================================================
+
+process_comment
+echo "✅ Comment processing complete"
+
+

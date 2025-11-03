@@ -1,0 +1,447 @@
+#!/bin/bash
+set -euo pipefail
+
+# Morgan Project Manager - GitHub Projects Integration
+# Runs as a daemon throughout the Play workflow lifecycle
+# Manages GitHub Project, Issues, and synchronizes with TaskMaster
+
+echo "🎯 MORGAN - Project Manager Mode"
+echo "Repository: {{repository_url}}"
+echo "Workflow: $WORKFLOW_NAME"
+echo "Namespace: $NAMESPACE"
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+REPO_URL="{{repository_url}}"
+DOCS_REPO="${DOCS_REPOSITORY}"
+DOCS_BRANCH="${DOCS_BRANCH}"
+DOCS_DIR="${DOCS_PROJECT_DIRECTORY}"
+SERVICE_NAME="${SERVICE_NAME}"
+
+# Shared state directory
+SHARED_DIR="/shared/morgan-pm"
+mkdir -p "$SHARED_DIR"
+
+TASK_ISSUE_MAP="$SHARED_DIR/task-issue-map.json"
+PROJECT_CONFIG="$SHARED_DIR/project-config.json"
+SYNC_LOG="$SHARED_DIR/sync.log"
+
+# Source helper functions
+source /workspace/github-projects-helpers.sh
+
+# Parse owner/repo from URL
+if [[ "$REPO_URL" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+  REPO_OWNER="${BASH_REMATCH[1]}"
+  REPO_NAME="${BASH_REMATCH[2]}"
+else
+  echo "❌ Failed to parse repository URL: $REPO_URL"
+  exit 1
+fi
+
+echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+log() {
+  echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $*" | tee -a "$SYNC_LOG"
+}
+
+# ============================================================================
+# PHASE 1: INITIALIZATION
+# ============================================================================
+
+initialize_project() {
+  log "📊 Phase 1: Project Initialization"
+  
+  # Clone docs repository to get TaskMaster data
+  log "📥 Cloning documentation repository..."
+  TEMP_CLONE="/tmp/docs-repo"
+  rm -rf "$TEMP_CLONE"
+  
+  git clone --depth 1 --branch "$DOCS_BRANCH" "$DOCS_REPO" "$TEMP_CLONE" || {
+    log "❌ Failed to clone docs repository"
+    exit 1
+  }
+  
+  cd "$TEMP_CLONE/$DOCS_DIR"
+  
+  # Find tasks.json
+  TASKS_JSON_PATH=""
+  if [[ -f ".taskmaster/tasks/tasks.json" ]]; then
+    TASKS_JSON_PATH=".taskmaster/tasks/tasks.json"
+  elif [[ -f ".taskmaster/docs/tasks.json" ]]; then
+    TASKS_JSON_PATH=".taskmaster/docs/tasks.json"
+  else
+    log "❌ TaskMaster tasks.json not found"
+    exit 1
+  fi
+  
+  log "✅ Found tasks.json at: $TASKS_JSON_PATH"
+  
+  # Read tasks data
+  TASKS_DATA=$(cat "$TASKS_JSON_PATH")
+  
+  # Get or create GitHub Project
+  log "🏗️  Setting up GitHub Project..."
+  
+  PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
+  PROJECT_ID=$(get_or_create_project "$REPO_OWNER" "$PROJECT_TITLE")
+  
+  if [[ -z "$PROJECT_ID" ]]; then
+    log "❌ Failed to create or find project"
+    exit 1
+  fi
+  
+  log "✅ Project ID: $PROJECT_ID"
+  
+  # Setup custom fields
+  log "🔧 Setting up custom fields..."
+  setup_custom_fields "$PROJECT_ID"
+  
+  # Store project configuration
+  cat > "$PROJECT_CONFIG" <<EOF
+{
+  "project_id": "$PROJECT_ID",
+  "project_title": "$PROJECT_TITLE",
+  "workflow_name": "$WORKFLOW_NAME",
+  "repository": "$REPO_OWNER/$REPO_NAME",
+  "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+  
+  log "✅ Project initialization complete"
+}
+
+# ============================================================================
+# PHASE 2: ISSUE CREATION
+# ============================================================================
+
+create_task_issues() {
+  log "📝 Phase 2: Creating Issues for Tasks"
+  
+  cd "$TEMP_CLONE/$DOCS_DIR"
+  
+  # Initialize task-issue mapping
+  echo "{}" > "$TASK_ISSUE_MAP"
+  
+  # Get master/default tag tasks (or all tasks if no tags)
+  TASKS=$(echo "$TASKS_DATA" | jq -c '.tasks // .master.tasks // []')
+  
+  if [[ "$TASKS" == "[]" ]] || [[ "$TASKS" == "null" ]]; then
+    log "⚠️  No tasks found in tasks.json"
+    return 0
+  fi
+  
+  TASK_COUNT=$(echo "$TASKS" | jq '. | length')
+  log "📊 Found $TASK_COUNT tasks to create issues for"
+  
+  echo "$TASKS" | jq -c '.[]' | while read -r task; do
+    TASK_ID=$(echo "$task" | jq -r '.id')
+    TASK_TITLE=$(echo "$task" | jq -r '.title')
+    TASK_STATUS=$(echo "$task" | jq -r '.status // "pending"')
+    TASK_PRIORITY=$(echo "$task" | jq -r '.priority // "medium"')
+    
+    log "📌 Creating issue for Task $TASK_ID: $TASK_TITLE"
+    
+    # Generate issue body from task details
+    ISSUE_BODY=$(generate_issue_body "$task" "$TASKS_JSON_PATH")
+    
+    # Create GitHub issue
+    ISSUE_NUMBER=$(gh issue create \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --title "Task $TASK_ID: $TASK_TITLE" \
+      --body "$ISSUE_BODY" \
+      --label "taskmaster-task,task-$TASK_ID,priority-$TASK_PRIORITY,status-$TASK_STATUS" \
+      2>/dev/null | grep -oP '\d+$' || echo "")
+    
+    if [[ -z "$ISSUE_NUMBER" ]]; then
+      log "⚠️  Failed to create issue for task $TASK_ID, skipping..."
+      continue
+    fi
+    
+    log "✅ Created issue #$ISSUE_NUMBER for task $TASK_ID"
+    
+    # Get issue node ID for GraphQL
+    ISSUE_NODE_ID=$(gh issue view "$ISSUE_NUMBER" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --json id --jq '.id')
+    
+    # Add issue to project
+    PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
+    ITEM_ID=$(add_issue_to_project "$PROJECT_ID" "$ISSUE_NODE_ID")
+    
+    if [[ -n "$ITEM_ID" ]]; then
+      log "✅ Added issue #$ISSUE_NUMBER to project (Item ID: $ITEM_ID)"
+      
+      # Set initial field values
+      set_project_item_status "$PROJECT_ID" "$ITEM_ID" "$TASK_STATUS"
+      set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
+      set_project_item_agent "$PROJECT_ID" "$ITEM_ID" "Pending"
+      
+      # Store mapping
+      TEMP_MAP=$(mktemp)
+      jq --arg task_id "$TASK_ID" \
+         --arg issue_num "$ISSUE_NUMBER" \
+         --arg item_id "$ITEM_ID" \
+         --arg node_id "$ISSUE_NODE_ID" \
+         '.[$task_id] = {
+           "issue_number": ($issue_num | tonumber),
+           "item_id": $item_id,
+           "node_id": $node_id
+         }' "$TASK_ISSUE_MAP" > "$TEMP_MAP"
+      mv "$TEMP_MAP" "$TASK_ISSUE_MAP"
+    fi
+  done
+  
+  CREATED_COUNT=$(jq 'length' "$TASK_ISSUE_MAP")
+  log "✅ Created $CREATED_COUNT issues and added to project"
+}
+
+# ============================================================================
+# PHASE 3: CONTINUOUS MONITORING
+# ============================================================================
+
+monitor_and_sync() {
+  log "👀 Phase 3: Continuous Monitoring & Synchronization"
+  log "🔄 Starting monitoring loop (updates every 30 seconds)..."
+  
+  PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
+  ITERATION=0
+  
+  while true; do
+    ITERATION=$((ITERATION + 1))
+    
+    # Check parent workflow status
+    WORKFLOW_STATUS=$(kubectl get workflow "$WORKFLOW_NAME" \
+      -n "$NAMESPACE" \
+      -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+    
+    log "📊 Iteration $ITERATION: Workflow status = $WORKFLOW_STATUS"
+    
+    if [[ "$WORKFLOW_STATUS" == "Succeeded" ]] || [[ "$WORKFLOW_STATUS" == "Failed" ]] || [[ "$WORKFLOW_STATUS" == "Error" ]]; then
+      log "✅ Parent workflow completed with status: $WORKFLOW_STATUS"
+      
+      # Final sync
+      sync_all_tasks "$PROJECT_ID"
+      
+      break
+    fi
+    
+    if [[ "$WORKFLOW_STATUS" == "NotFound" ]]; then
+      log "⚠️  Workflow not found, waiting..."
+      sleep 30
+      continue
+    fi
+    
+    # Sync task statuses
+    sync_all_tasks "$PROJECT_ID"
+    
+    sleep 30
+  done
+  
+  log "🎉 Monitoring complete"
+}
+
+sync_all_tasks() {
+  local project_id="$1"
+  
+  # Iterate through all task mappings
+  jq -c 'to_entries[]' "$TASK_ISSUE_MAP" | while read -r entry; do
+    TASK_ID=$(echo "$entry" | jq -r '.key')
+    ISSUE_NUMBER=$(echo "$entry" | jq -r '.value.issue_number')
+    ITEM_ID=$(echo "$entry" | jq -r '.value.item_id')
+    
+    # Find workflow for this task
+    TASK_WORKFLOW=$(kubectl get workflows -n "$NAMESPACE" \
+      -l "task-id=$TASK_ID,parent-workflow=$WORKFLOW_NAME" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -z "$TASK_WORKFLOW" ]]; then
+      continue
+    fi
+    
+    # Get current stage from workflow labels
+    CURRENT_STAGE=$(kubectl get workflow "$TASK_WORKFLOW" \
+      -n "$NAMESPACE" \
+      -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "pending")
+    
+    # Get workflow phase
+    WORKFLOW_PHASE=$(kubectl get workflow "$TASK_WORKFLOW" \
+      -n "$NAMESPACE" \
+      -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
+    
+    # Map stage to agent and status
+    CURRENT_AGENT=$(map_stage_to_agent "$CURRENT_STAGE" "$WORKFLOW_PHASE")
+    TASK_STATUS=$(map_workflow_to_status "$CURRENT_STAGE" "$WORKFLOW_PHASE")
+    
+    # Update project item
+    set_project_item_status "$project_id" "$ITEM_ID" "$TASK_STATUS"
+    set_project_item_agent "$project_id" "$ITEM_ID" "$CURRENT_AGENT"
+    
+    # Update issue labels to reflect current state
+    update_issue_labels "$ISSUE_NUMBER" "$TASK_STATUS" "$CURRENT_AGENT"
+  done
+}
+
+map_stage_to_agent() {
+  local stage="$1"
+  local phase="$2"
+  
+  case "$stage" in
+    "pending"|"waiting-pr-created")
+      echo "Rex (Implementation)"
+      ;;
+    "implementation"|"implementation-in-progress")
+      echo "Rex (Implementation)"
+      ;;
+    "quality-in-progress"|"waiting-ready-for-qa")
+      echo "Cleo (Quality)"
+      ;;
+    "security-in-progress")
+      echo "Cipher (Security)"
+      ;;
+    "testing-in-progress"|"qa-in-progress")
+      echo "Tess (QA)"
+      ;;
+    "completed"|"done")
+      echo "Complete ✅"
+      ;;
+    *)
+      if [[ "$phase" == "Succeeded" ]]; then
+        echo "Complete ✅"
+      else
+        echo "In Progress"
+      fi
+      ;;
+  esac
+}
+
+map_workflow_to_status() {
+  local stage="$1"
+  local phase="$2"
+  
+  case "$phase" in
+    "Succeeded")
+      echo "Done"
+      ;;
+    "Failed"|"Error")
+      echo "Blocked"
+      ;;
+    "Running")
+      case "$stage" in
+        "implementation"*|"pending")
+          echo "In Progress"
+          ;;
+        "quality"*|"security"*|"testing"*)
+          echo "In Review"
+          ;;
+        *)
+          echo "In Progress"
+          ;;
+      esac
+      ;;
+    *)
+      echo "Todo"
+      ;;
+  esac
+}
+
+update_issue_labels() {
+  local issue_number="$1"
+  local status="$2"
+  local agent="$3"
+  
+  # Remove old status labels
+  gh issue edit "$issue_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --remove-label "status-pending,status-in-progress,status-in-review,status-done,status-blocked" \
+    2>/dev/null || true
+  
+  # Add new labels
+  local status_label="status-$(echo "$status" | tr '[:upper:] ' '[:lower:]-')"
+  gh issue edit "$issue_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --add-label "$status_label" \
+    2>/dev/null || true
+}
+
+generate_issue_body() {
+  local task="$1"
+  local tasks_json_path="$2"
+  
+  local task_id=$(echo "$task" | jq -r '.id')
+  local title=$(echo "$task" | jq -r '.title')
+  local description=$(echo "$task" | jq -r '.description // "No description provided"')
+  local details=$(echo "$task" | jq -r '.details // "No details provided"')
+  local test_strategy=$(echo "$task" | jq -r '.testStrategy // "No test strategy defined"')
+  local priority=$(echo "$task" | jq -r '.priority // "medium"')
+  local dependencies=$(echo "$task" | jq -r '.dependencies // [] | join(", ")')
+  
+  cat <<EOF
+# Task $task_id: $title
+
+## 📋 Description
+$description
+
+## 🎯 Implementation Details
+$details
+
+## 🧪 Test Strategy
+$test_strategy
+
+## 📊 Metadata
+- **Priority**: $priority
+- **Dependencies**: ${dependencies:-None}
+- **Status**: Pending
+
+---
+
+## 🔗 Task Master Integration
+
+This issue is automatically synchronized with TaskMaster.
+
+**Task File**: \`$tasks_json_path\`  
+**Workflow**: \`$WORKFLOW_NAME\`
+
+### Agent Pipeline
+1. **Rex** - Implementation
+2. **Cleo** - Code Quality Review
+3. **Cipher** - Security Analysis
+4. **Tess** - QA Testing
+
+---
+
+*This issue is managed by Morgan (Project Manager). Updates will be posted automatically as the workflow progresses.*
+EOF
+}
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+main() {
+  log "🚀 Morgan PM starting..."
+  
+  # Phase 1: Initialize project
+  initialize_project
+  
+  # Phase 2: Create issues
+  create_task_issues
+  
+  # Phase 3: Monitor and sync
+  monitor_and_sync
+  
+  log "✅ Morgan PM completed successfully"
+}
+
+# Trap errors and cleanup
+trap 'log "❌ Morgan PM encountered an error on line $LINENO"' ERR
+
+# Run main
+main
+
+
