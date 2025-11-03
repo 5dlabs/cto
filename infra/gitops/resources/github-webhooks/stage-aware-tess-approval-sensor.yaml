@@ -31,7 +31,7 @@ spec:
             value: ["approved"]
           - path: body.review.user.login
             type: string
-            value: ["tess-5dlabs"]
+            value: ["5DLabs-Tess[bot]", "5DLabs-Tess", "tess-5dlabs"]
 
   triggers:
     # Resume workflows after Tess approval (waiting-ready-for-qa stage)
