@@ -11,6 +11,17 @@ echo "Issue #$ISSUE_NUMBER | Author: $COMMENT_AUTHOR | Intent: $INTENT_TYPE"
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
+#
+# Expected environment variables (provided by morgan-issue-comment-sensor):
+#   REPOSITORY          - Repository in "owner/repo" format
+#   REPOSITORY_URL      - Full clone URL for the repository
+#   ISSUE_NUMBER        - GitHub issue number
+#   COMMENT_BODY        - Full text of the comment
+#   COMMENT_AUTHOR      - GitHub username of comment author
+#   TASK_ID             - TaskMaster task ID extracted from issue labels
+#   INTENT_TYPE         - Classified intent (scope-change, clarification, priority-change)
+#   GITHUB_APP_ID       - GitHub App ID for authentication
+#   GITHUB_APP_PRIVATE_KEY - GitHub App private key
 
 TASK_DIR="/tmp/task-docs"
 
