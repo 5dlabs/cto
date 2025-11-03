@@ -2268,6 +2268,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
             "5DLabs-Tess" => "claude/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "claude/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "claude/container-bolt.sh.hbs",
             _ => {
                 // Default to the generic container template for unknown agents
                 debug!(
@@ -2289,6 +2291,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/codex/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/codex/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
         };
 
@@ -2319,6 +2323,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/opencode/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/opencode/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
         };
 
@@ -2349,6 +2355,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/cursor/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/cursor/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
         };
 
@@ -2377,6 +2385,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/factory/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/factory/container-bolt.sh.hbs",
             "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };

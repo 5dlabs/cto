@@ -66,6 +66,7 @@ pub struct ConfigRegistry {
 
 impl ConfigRegistry {
     /// Create a new configuration registry
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -76,6 +77,7 @@ impl ConfigRegistry {
     }
 
     /// Get default configuration for a CLI type
+    #[must_use]
     pub fn get_default(&self, cli_type: CLIType) -> Option<&AdapterConfig> {
         self.defaults.get(&cli_type)
     }
@@ -86,6 +88,7 @@ impl ConfigRegistry {
     }
 
     /// Get override configuration
+    #[must_use]
     pub fn get_override(&self, key: &str) -> Option<&AdapterConfig> {
         self.overrides.get(key)
     }
@@ -133,11 +136,17 @@ pub struct HealthCheckRecord {
 
 impl AdapterFactory {
     /// Create a new adapter factory
+    ///
+    /// # Errors
+    /// Returns error if adapter creation fails
     pub async fn new() -> AdapterResult<Self> {
         Self::with_config(FactoryConfig::default()).await
     }
 
     /// Create a new adapter factory with custom configuration
+    ///
+    /// # Errors
+    /// Returns error if adapter creation fails
     pub async fn with_config(config: FactoryConfig) -> AdapterResult<Self> {
         let health_monitor = Arc::new(HealthMonitor::new(HealthMonitorConfig::default()));
 
