@@ -1,0 +1,7 @@
+/Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/deps/agent_controller-d66d74bacf09e540.d: controller/src/bin/agent_controller.rs
+
+/Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/deps/agent_controller-d66d74bacf09e540: controller/src/bin/agent_controller.rs
+
+controller/src/bin/agent_controller.rs:
+
+# env-dep:CARGO_PKG_VERSION=0.2.0
