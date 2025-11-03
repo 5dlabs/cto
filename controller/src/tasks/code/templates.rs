@@ -2604,7 +2604,7 @@ mod tests {
     fn test_tess_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container-tess.sh.hbs");
+        assert_eq!(template_path, "code/integration/container-tess.sh.hbs");
     }
 
     #[test]
@@ -2612,6 +2612,20 @@ mod tests {
         let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
+    }
+
+    #[test]
+    fn test_atlas_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/integration/container-atlas.sh.hbs");
+    }
+
+    #[test]
+    fn test_bolt_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Bolt".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/integration/container-bolt.sh.hbs");
     }
 
     #[test]
