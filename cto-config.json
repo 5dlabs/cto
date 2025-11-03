@@ -244,6 +244,46 @@
         ],
         "localServers": {}
       }
+    },
+    "atlas": {
+      "githubApp": "5DLabs-Atlas",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "context7_get_library_docs",
+          "agent_docs_rust_query",
+          "agent_docs_codex_query",
+          "agent_docs_cursor_query",
+          "agent_docs_opencode_query",
+          "agent_docs_gemini_query",
+          "agent_docs_grok_query",
+          "agent_docs_qwen_query",
+          "agent_docs_openhands_query"
+        ],
+        "localServers": {}
+      }
+    },
+    "bolt": {
+      "githubApp": "5DLabs-Bolt",
+      "cli": "claude",
+      "model": "claude-sonnet-4-20250514",
+      "tools": {
+        "remote": [
+          "brave_search_brave_web_search",
+          "context7_get_library_docs",
+          "agent_docs_rust_query",
+          "agent_docs_codex_query",
+          "agent_docs_cursor_query",
+          "agent_docs_opencode_query",
+          "agent_docs_gemini_query",
+          "agent_docs_grok_query",
+          "agent_docs_qwen_query",
+          "agent_docs_openhands_query"
+        ],
+        "localServers": {}
+      }
     }
   }
 }

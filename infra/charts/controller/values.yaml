@@ -527,8 +527,8 @@ agents:
     model: "claude-sonnet-4-20250514"
     maxTokens: 4096
     temperature: 0.4
-    appId: ""  # TODO: Fill after creating GitHub App
-    clientId: ""  # TODO: Fill after creating GitHub App
+    appId: "2225842"
+    clientId: "Iv23liTupEPix4hvGi0w"
     role: "Integration & Merge Specialist"
     expertise: ["merge-conflicts", "git", "integration", "branch-management", "rebase", "conflict-resolution"]
     description: "AI Integration Specialist at 5D Labs - Resolves merge conflicts and ensures smooth PR integration"
@@ -573,8 +573,8 @@ agents:
     model: "claude-sonnet-4-20250514"
     maxTokens: 4096
     temperature: 0.3
-    appId: ""  # TODO: Fill after creating GitHub App
-    clientId: ""  # TODO: Fill after creating GitHub App
+    appId: "2225782"
+    clientId: "Iv23liYmdPdctJx4YCx2"
     role: "DevOps & Deployment Specialist"
     expertise: ["kubernetes", "argocd", "ci-cd", "deployments", "infrastructure", "monitoring", "sre"]
     description: "AI DevOps Engineer at 5D Labs - Infrastructure operations and deployment automation"
