@@ -684,7 +684,7 @@ ingress:
 resources:
   limits:
     cpu: 1000m
-    memory: 2Gi
+    # No memory limit - controller is critical infrastructure
   requests:
     cpu: 500m
     memory: 1Gi
