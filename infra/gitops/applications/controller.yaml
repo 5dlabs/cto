@@ -44,12 +44,11 @@ spec:
         # Resource configuration
         - name: resources.limits.cpu
           value: 1000m
-        - name: resources.limits.memory
-          value: 1Gi
+        # No memory limit - controller is critical infrastructure
         - name: resources.requests.cpu
           value: 500m
         - name: resources.requests.memory
-          value: 512Mi
+          value: 1Gi
 
         # Monitoring
         - name: metrics.enabled
