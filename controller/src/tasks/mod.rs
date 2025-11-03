@@ -1,14 +1,11 @@
 use crate::crds::{CodeRun, DocsRun};
-use chrono::Utc;
 use futures::StreamExt;
 use k8s_openapi::api::batch::v1::Job;
-use kube::api::{ListParams, Patch, PatchParams};
+use kube::api::ListParams;
 use kube::runtime::controller::{Action, Controller};
 use kube::runtime::watcher::Config;
 use kube::{Api, Client, ResourceExt};
-use serde_json::json;
 use std::sync::Arc;
-use std::time::Duration;
 use tracing::{debug, error, info, instrument, Instrument};
 
 pub mod cancel;
@@ -115,50 +112,15 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
         }
     }
 
-    // Periodic resync: proactively nudge missed CodeRuns to ensure reconcile is triggered
-    let _resync_handle = tokio::spawn({
-        let client = client.clone();
-        let namespace = namespace.clone();
-        async move {
-            let code_api: Api<CodeRun> = Api::namespaced(client.clone(), &namespace);
-            let mut ticker = tokio::time::interval(Duration::from_secs(120));
-            loop {
-                ticker.tick().await;
-                match code_api.list(&ListParams::default()).await {
-                    Ok(list) => {
-                        debug!(
-                            "Resync scan: {} CodeRun(s) in namespace {}",
-                            list.items.len(),
-                            namespace
-                        );
-                        for cr in list.items {
-                            let name = cr.name_any();
-                            let phase_empty = cr
-                                .status
-                                .as_ref()
-                                .map(|s| s.phase.trim().is_empty())
-                                .unwrap_or(true);
-                            if phase_empty {
-                                // Trigger a benign metadata change to emit a MODIFIED event
-                                let ts = Utc::now().to_rfc3339();
-                                let patch = json!({
-                                    "metadata": {"annotations": {"orchestrator.io/resync-ts": ts}}
-                                });
-                                let pp = PatchParams::default();
-                                match code_api.patch(&name, &pp, &Patch::Merge(&patch)).await {
-                                    Ok(_) => info!("Resync nudged CodeRun: {}", name),
-                                    Err(e) => debug!("Resync patch skipped for {}: {}", name, e),
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        debug!("Resync scan failed: {}", e);
-                    }
-                }
-            }
-        }
-    });
+    // NOTE: Periodic resync loop disabled due to performance regression
+    // The thundering herd of reconciliations every 120s was causing excessive
+    // CPU and memory usage. The kube-rs controller runtime already handles
+    // requeues and watches properly, so this forced resync is unnecessary.
+    //
+    // If you need to re-enable for debugging stuck resources, consider:
+    // 1. Much longer interval (e.g., 30+ minutes)
+    // 2. Rate limiting the patches
+    // 3. Only patching resources stuck for >N minutes
 
     // Run both controllers concurrently
     info!("Starting DocsRun and CodeRun controllers...");

@@ -54,10 +54,12 @@ use tracing::{error, info, warn, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Clone)]
+#[allow(dead_code)] // Fields are read via axum State extractor
 struct AppState {
     client: kube::Client,
     namespace: String,
     config: Arc<ControllerConfig>,
+    remediation_state_manager: Arc<RemediationStateManager>,
 }
 
 #[tokio::main]
@@ -83,10 +85,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = "agent-platform".to_string();
     let controller_config = Arc::new(load_controller_config());
 
+    // Create shared remediation state manager for webhook reuse
+    let task_context = TaskContext {
+        client: client.clone(),
+        namespace: namespace.clone(),
+        config: controller_config.clone(),
+    };
+    let remediation_state_manager = Arc::new(RemediationStateManager::new(&task_context));
+
     let state = AppState {
         client: client.clone(),
         namespace: namespace.clone(),
         config: controller_config.clone(),
+        remediation_state_manager,
     };
 
     // Start the controller in the background
@@ -288,21 +299,22 @@ async fn webhook_handler(
     let label_client =
         GitHubLabelClient::with_token(token, repo_owner.to_string(), repo_name.to_string());
 
-    let context = TaskContext {
-        client: state.client.clone(),
-        namespace: state.namespace.clone(),
-        config: state.config.clone(),
-    };
-
-    let state_manager = Arc::new(RemediationStateManager::new(&context));
-
+    // Reuse the shared state manager from AppState instead of creating new one per webhook
     let override_detector = OverrideDetector::new(label_client.clone());
-    let mut orchestrator =
-        LabelOrchestrator::new(label_client, state_manager.clone(), override_detector);
+    let mut orchestrator = LabelOrchestrator::new(
+        label_client,
+        state.remediation_state_manager.clone(),
+        override_detector,
+    );
 
-    match state_manager.load_state(pr_number as u32, &task_id).await {
+    match state
+        .remediation_state_manager
+        .load_state(pr_number as u32, &task_id)
+        .await
+    {
         Ok(None) => {
-            if let Err(err) = state_manager
+            if let Err(err) = state
+                .remediation_state_manager
                 .initialize_state(pr_number as u32, task_id.clone(), None)
                 .await
             {
