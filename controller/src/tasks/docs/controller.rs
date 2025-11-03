@@ -164,7 +164,8 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
             .await?;
 
             // Requeue to check job progress
-            Ok(Action::requeue(std::time::Duration::from_secs(30)))
+            // Using 90s instead of 30s to reduce reconciliation load
+            Ok(Action::requeue(std::time::Duration::from_secs(90)))
         }
 
         JobState::Running => {
@@ -181,7 +182,8 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
             .await?;
 
             // Continue monitoring
-            Ok(Action::requeue(std::time::Duration::from_secs(30)))
+            // Using 90s instead of 30s to reduce reconciliation load
+            Ok(Action::requeue(std::time::Duration::from_secs(90)))
         }
 
         JobState::Completed => {
