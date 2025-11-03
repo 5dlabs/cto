@@ -1,0 +1,12 @@
+/Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/deps/serde-bb6b2c1586b34d54.d: /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/build/serde-42e23fed40add71b/out/private.rs
+
+/Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/deps/libserde-bb6b2c1586b34d54.rmeta: /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/build/serde-42e23fed40add71b/out/private.rs
+
+/Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/jonathonfritz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/build/serde-42e23fed40add71b/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/jonathonfritz/code/work-projects/5dlabs/cto/target/debug/build/serde-42e23fed40add71b/out

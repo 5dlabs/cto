@@ -1,0 +1,174 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: atlas-batch-integration
+  namespace: agent-platform
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    # Batch completion in parallel execution
+    - name: batch-complete
+      eventSourceName: github-webhook
+      eventName: issue_comment
+      filters:
+        data:
+          # Trigger on PR comments from workflow
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - issue_comment
+          - path: body.action
+            type: string
+            value:
+              - created
+          # Filter for batch completion comments
+          - path: body.comment.body
+            type: string
+            value:
+              - ".*Batch [0-9]+ Complete.*"
+              - ".*Play Workflow Complete.*"
+
+  triggers:
+    - template:
+        name: atlas-integration-check
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-atlas-integration-
+                namespace: agent-platform
+                labels:
+                  agent: atlas
+                  trigger: batch-integration
+              spec:
+                githubApp: "5DLabs-Atlas"
+                cli: "Claude"
+                model: "claude-sonnet-4-20250514"
+                maxTokens: 4096
+                temperature: 0.4
+                repositoryUrl: ""
+                env:
+                  - name: PR_NUMBER
+                    value: ""
+                  - name: WORKFLOW_NAME
+                    value: ""
+                  - name: BATCH_NUMBER
+                    value: ""
+                  - name: INTEGRATION_TYPE
+                    value: "batch"  # or "end-of-play"
+
+        parameters:
+          - src:
+              dependencyName: batch-complete
+              dataKey: body.issue.number
+            dest: spec.env.0.value
+
+          - src:
+              dependencyName: batch-complete
+              dataKey: body.repository.clone_url
+            dest: spec.repositoryUrl
+
+          - src:
+              dependencyName: batch-complete
+              dataKey: body.comment.body
+            dest: spec.env.2.value
+            operation: append
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-batch-integration-strategy
+  namespace: agent-platform
+data:
+  strategy.md: |
+    # Atlas Batch Integration Strategy
+
+    ## Parallel Execution Batching
+
+    When parallel execution is enabled, tasks are grouped into batches/levels based on dependencies.
+    Atlas runs **after each batch** and **at the end of the play**.
+
+    ### Batch Processing Flow
+
+    ```
+    Batch 1: Task 1, Task 2, Task 3 (no dependencies)
+      ↓
+      All tasks complete → Multiple PRs created
+      ↓
+    🔗 ATLAS: Batch 1 Integration
+      ↓
+      - Detect all PRs from this batch
+      - Resolve any conflicts between PRs
+      - Merge all PRs cleanly
+      ↓
+    Batch 2: Task 4, Task 5 (depend on Batch 1)
+      ↓
+      All tasks complete → More PRs created
+      ↓
+    🔗 ATLAS: Batch 2 Integration
+      ↓
+      - Integrate Batch 2 PRs
+      - Ensure clean merge with Batch 1 results
+      ↓
+    Play Complete
+      ↓
+    🔗 ATLAS: Final Integration Check
+      ↓
+      - Verify all PRs merged cleanly
+      - No pending conflicts
+      - All tasks integrated successfully
+    ```
+
+    ## Why Batch Integration?
+
+    **Problem:** Multiple tasks in parallel can create conflicting PRs
+    **Solution:** Atlas integrates after each batch before next batch starts
+
+    ### Example Scenario
+
+    **Batch 1:**
+    - Task 1 → PR #100 (modifies `api/users.rs`)
+    - Task 2 → PR #101 (modifies `api/users.rs`)
+    - Task 3 → PR #102 (modifies `api/orders.rs`)
+
+    **Without Atlas Batch Integration:**
+    - PR #100 merges
+    - PR #101 has conflicts ❌
+    - PR #102 merges
+    - Batch 2 starts with unresolved conflicts
+    - Chaos ensues
+
+    **With Atlas Batch Integration:**
+    - PR #100 merges
+    - Atlas detects PR #101 conflict
+    - Atlas resolves conflict automatically
+    - PR #101 merges cleanly ✅
+    - PR #102 merges
+    - Batch 2 starts with clean state
+    - Success! 🎉
+
+    ## Integration Points
+
+    - **Batch Start** → Tasks execute in parallel
+    - **Batch Complete** → Atlas integrates all PRs
+    - **Next Batch Start** → Clean state, no conflicts
+    - **Play Complete** → Atlas final check
+
+    ## Trigger Conditions
+
+    1. **Batch Completion Comment:** "Batch N Complete - X PRs created"
+    2. **Play Completion Comment:** "Play Workflow Complete - All batches done"
+    3. **PR Labels:** `batch-1`, `batch-2`, etc. for correlation
+
+    ## Success Criteria
+
+    - All PRs from batch merged cleanly
+    - No remaining conflicts
+    - Ready for next batch (or final)
+

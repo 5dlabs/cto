@@ -13,7 +13,7 @@ cd "$CHART_DIR"
 echo "Generating split ConfigMaps from agent templates..."
 
 # Define CLI types and shared resources
-CLI_TYPES=("claude" "codex" "cursor" "factory" "opencode")
+CLI_TYPES=("claude" "codex" "cursor" "factory" "opencode" "integration")
 SHARED_PATTERNS=("coding-guidelines" "github-guidelines" "client-config" "mcp.json" "agents/" "shared/")
 
 generate_configmap() {

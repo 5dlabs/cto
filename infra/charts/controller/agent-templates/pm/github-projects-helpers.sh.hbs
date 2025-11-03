@@ -1,0 +1,426 @@
+#!/bin/bash
+# GitHub Projects V2 API Helper Functions
+# GraphQL-based operations for managing GitHub Projects
+# These functions are sourced by Morgan PM scripts
+# Patterns adapted from 5dlabs/tasks reference implementation
+
+# ============================================================================
+# GraphQL QUERY HELPERS WITH RETRY LOGIC
+# ============================================================================
+
+graphql_query() {
+  local query="$1"
+  local variables="${2:-{}}"
+  local max_retries=3
+  local retry_count=0
+  
+  while [ $retry_count -lt $max_retries ]; do
+    local result=$(gh api graphql -f query="$query" -F variables="$variables" 2>&1)
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+      echo "$result"
+      return 0
+    fi
+    
+    # Check if rate limited
+    if echo "$result" | grep -q "rate limit"; then
+      retry_count=$((retry_count + 1))
+      local backoff=$((2 ** retry_count))
+      echo "⚠️  Rate limited, retrying in ${backoff}s..." >&2
+      sleep "$backoff"
+    else
+      echo "{}" 
+      return 1
+    fi
+  done
+  
+  echo "{}"
+  return 1
+}
+
+# ============================================================================
+# PROJECT MANAGEMENT
+# ============================================================================
+
+get_or_create_project() {
+  local owner="$1"
+  local title="$2"
+  
+  # Try to find existing project
+  local query='
+    query($owner: String!) {
+      repositoryOwner(login: $owner) {
+        ... on Organization {
+          projectsV2(first: 20) {
+            nodes {
+              id
+              title
+            }
+          }
+        }
+        ... on User {
+          projectsV2(first: 20) {
+            nodes {
+              id
+              title
+            }
+          }
+        }
+      }
+    }
+  '
+  
+  local result=$(gh api graphql -f query="$query" -f owner="$owner")
+  
+  # Check if project exists
+  local project_id=$(echo "$result" | jq -r \
+    --arg title "$title" \
+    '.data.repositoryOwner.projectsV2.nodes[] | select(.title == $title) | .id')
+  
+  if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+    echo "$project_id"
+    return 0
+  fi
+  
+  # Create new project
+  local owner_id=$(gh api graphql -f query='
+    query($owner: String!) {
+      repositoryOwner(login: $owner) {
+        id
+      }
+    }
+  ' -f owner="$owner" | jq -r '.data.repositoryOwner.id')
+  
+  local create_mutation='
+    mutation($ownerId: ID!, $title: String!) {
+      createProjectV2(input: {
+        ownerId: $ownerId
+        title: $title
+      }) {
+        projectV2 {
+          id
+        }
+      }
+    }
+  '
+  
+  local create_result=$(gh api graphql \
+    -f query="$create_mutation" \
+    -f ownerId="$owner_id" \
+    -f title="$title")
+  
+  echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id'
+}
+
+# ============================================================================
+# CUSTOM FIELDS SETUP
+# ============================================================================
+
+setup_custom_fields() {
+  local project_id="$1"
+  
+  # Create "Current Agent" field
+  create_single_select_field "$project_id" "Current Agent" \
+    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Complete ✅"
+  
+  # Create "Stage" field
+  create_single_select_field "$project_id" "Stage" \
+    "Pending" "Implementation" "Code Review" "Security Check" "QA Testing" "Done"
+  
+  # Create "Task ID" field (text)
+  create_text_field "$project_id" "Task ID"
+}
+
+create_single_select_field() {
+  local project_id="$1"
+  local field_name="$2"
+  shift 2
+  local options=("$@")
+  
+  # Check if field already exists
+  local existing_field=$(get_project_field "$project_id" "$field_name")
+  if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
+    return 0
+  fi
+  
+  # Build options JSON
+  local options_json="["
+  local colors=("RED" "BLUE" "GREEN" "YELLOW" "ORANGE" "PURPLE" "PINK" "GRAY")
+  for i in "${!options[@]}"; do
+    local color="${colors[$((i % ${#colors[@]}))]}"
+    options_json+="{\"name\": \"${options[$i]}\", \"color\": \"$color\"}"
+    if [[ $i -lt $((${#options[@]} - 1)) ]]; then
+      options_json+=","
+    fi
+  done
+  options_json+="]"
+  
+  local mutation='
+    mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
+      createProjectV2Field(input: {
+        projectId: $projectId
+        dataType: SINGLE_SELECT
+        name: $name
+        singleSelectOptions: $options
+      }) {
+        projectV2Field {
+          ... on ProjectV2SingleSelectField {
+            id
+          }
+        }
+      }
+    }
+  '
+  
+  gh api graphql \
+    -f query="$mutation" \
+    -f projectId="$project_id" \
+    -f name="$field_name" \
+    -f options="$options_json" >/dev/null 2>&1 || true
+}
+
+create_text_field() {
+  local project_id="$1"
+  local field_name="$2"
+  
+  # Check if field already exists
+  local existing_field=$(get_project_field "$project_id" "$field_name")
+  if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
+    return 0
+  fi
+  
+  local mutation='
+    mutation($projectId: ID!, $name: String!) {
+      createProjectV2Field(input: {
+        projectId: $projectId
+        dataType: TEXT
+        name: $name
+      }) {
+        projectV2Field {
+          ... on ProjectV2Field {
+            id
+          }
+        }
+      }
+    }
+  '
+  
+  gh api graphql \
+    -f query="$mutation" \
+    -f projectId="$project_id" \
+    -f name="$field_name" >/dev/null 2>&1 || true
+}
+
+get_project_field() {
+  local project_id="$1"
+  local field_name="$2"
+  
+  local query='
+    query($projectId: ID!) {
+      node(id: $projectId) {
+        ... on ProjectV2 {
+          fields(first: 20) {
+            nodes {
+              ... on ProjectV2Field {
+                id
+                name
+              }
+              ... on ProjectV2SingleSelectField {
+                id
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  '
+  
+  gh api graphql \
+    -f query="$query" \
+    -f projectId="$project_id" \
+    | jq -r --arg name "$field_name" \
+      '.data.node.fields.nodes[] | select(.name == $name) | .id'
+}
+
+# ============================================================================
+# ISSUE MANAGEMENT
+# ============================================================================
+
+add_issue_to_project() {
+  local project_id="$1"
+  local issue_node_id="$2"
+  
+  local mutation='
+    mutation($projectId: ID!, $contentId: ID!) {
+      addProjectV2ItemById(input: {
+        projectId: $projectId
+        contentId: $contentId
+      }) {
+        item {
+          id
+        }
+      }
+    }
+  '
+  
+  local result=$(gh api graphql \
+    -f query="$mutation" \
+    -f projectId="$project_id" \
+    -f contentId="$issue_node_id")
+  
+  echo "$result" | jq -r '.data.addProjectV2ItemById.item.id'
+}
+
+# ============================================================================
+# FIELD VALUE UPDATES
+# ============================================================================
+
+set_project_item_status() {
+  local project_id="$1"
+  local item_id="$2"
+  local status="$3"
+  
+  local field_id=$(get_project_field "$project_id" "Stage")
+  
+  if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    return 0
+  fi
+  
+  local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
+  
+  if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    return 0
+  fi
+  
+  update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
+}
+
+set_project_item_agent() {
+  local project_id="$1"
+  local item_id="$2"
+  local agent="$3"
+  
+  local field_id=$(get_project_field "$project_id" "Current Agent")
+  
+  if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    return 0
+  fi
+  
+  local option_id=$(get_field_option_id "$project_id" "$field_id" "$agent")
+  
+  if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    return 0
+  fi
+  
+  update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
+}
+
+set_project_item_priority() {
+  local project_id="$1"
+  local item_id="$2"
+  local priority="$3"
+  
+  local field_id=$(get_project_field "$project_id" "Priority")
+  
+  if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    return 0
+  fi
+  
+  local priority_value="$priority"
+  case "$priority" in
+    "high") priority_value="High" ;;
+    "medium") priority_value="Medium" ;;
+    "low") priority_value="Low" ;;
+  esac
+  
+  local option_id=$(get_field_option_id "$project_id" "$field_id" "$priority_value")
+  
+  if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    return 0
+  fi
+  
+  update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
+}
+
+get_field_option_id() {
+  local project_id="$1"
+  local field_id="$2"
+  local option_name="$3"
+  
+  local query='
+    query($projectId: ID!) {
+      node(id: $projectId) {
+        ... on ProjectV2 {
+          fields(first: 20) {
+            nodes {
+              ... on ProjectV2SingleSelectField {
+                id
+                options {
+                  id
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  '
+  
+  local result=$(gh api graphql \
+    -f query="$query" \
+    -f projectId="$project_id")
+  
+  echo "$result" | jq -r \
+    --arg field_id "$field_id" \
+    --arg option_name "$option_name" \
+    '.data.node.fields.nodes[] | select(.id == $field_id) | .options[] | select(.name == $option_name) | .id'
+}
+
+update_project_item_field() {
+  local project_id="$1"
+  local item_id="$2"
+  local field_id="$3"
+  local value="$4"
+  
+  local mutation='
+    mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+      updateProjectV2ItemFieldValue(input: {
+        projectId: $projectId
+        itemId: $itemId
+        fieldId: $fieldId
+        value: {
+          singleSelectOptionId: $value
+        }
+      }) {
+        projectV2Item {
+          id
+        }
+      }
+    }
+  '
+  
+  gh api graphql \
+    -f query="$mutation" \
+    -f projectId="$project_id" \
+    -f itemId="$item_id" \
+    -f fieldId="$field_id" \
+    -f value="$value" >/dev/null 2>&1 || true
+}
+
+# Export functions for use in other scripts
+export -f graphql_query
+export -f get_or_create_project
+export -f setup_custom_fields
+export -f create_single_select_field
+export -f create_text_field
+export -f get_project_field
+export -f add_issue_to_project
+export -f set_project_item_status
+export -f set_project_item_agent
+export -f set_project_item_priority
+export -f get_field_option_id
+export -f update_project_item_field
+

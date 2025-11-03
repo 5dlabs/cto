@@ -103,3 +103,6 @@ echo "   1. Upload to .github repo: $OUTPUT_DIR/${AGENT_LOWER}-avatar.png"
 echo "   2. GitHub will use this as the app avatar"
 echo "════════════════════════════════════════════════════════════════"
 
+
+
+

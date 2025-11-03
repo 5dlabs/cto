@@ -1,0 +1,135 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: atlas-conflict-detection
+  namespace: agent-platform
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    - name: pr-update
+      eventSourceName: github-webhook
+      eventName: pull_request
+      filters:
+        data:
+          # Trigger on PR updates (synchronize, opened, reopened)
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          - path: body.action
+            type: string
+            value:
+              - synchronize
+              - opened
+              - reopened
+          # Only trigger if PR has merge conflicts
+          - path: body.pull_request.mergeable
+            type: bool
+            value:
+              - "false"
+          # Or if merge state indicates conflicts
+          - path: body.pull_request.mergeable_state
+            type: string
+            value:
+              - dirty
+              - unstable
+
+  triggers:
+    - template:
+        name: create-atlas-coderun
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: agents.platform/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-atlas-conflict-
+                namespace: agent-platform
+                labels:
+                  agent: atlas
+                  task-id: "" # Extracted from PR labels
+              spec:
+                githubApp: 5DLabs-Atlas
+                cli: Claude
+                model: claude-sonnet-4-20250514
+                repositoryUrl: "" # Extracted from webhook
+                workingDirectory: "."
+                continueSession: false
+                overwriteMemory: false
+                env:
+                  - name: PR_NUMBER
+                    value: "" # Extracted from webhook
+                  - name: PR_URL
+                    value: "" # Extracted from webhook
+          parameters:
+            # Repository info from webhook
+            - src:
+                dependencyName: pr-update
+                dataKey: body.repository.full_name
+              dest: spec.repositoryUrl
+
+            # PR context
+            - src:
+                dependencyName: pr-update
+                dataKey: body.pull_request.number
+              dest: spec.env.0.value
+              operation: append
+
+            - src:
+                dependencyName: pr-update
+                dataKey: body.pull_request.html_url
+              dest: spec.env.1.value
+              operation: append
+
+            # Extract task ID from PR labels
+            - src:
+                dependencyName: pr-update
+                dataTemplate: |
+                  {{- range .Input.body.pull_request.labels -}}
+                    {{- if hasPrefix .name "task-" -}}
+                      {{- trimPrefix "task-" .name -}}
+                    {{- end -}}
+                  {{- end -}}
+              dest: metadata.labels.task-id
+
+            # Generate CodeRun name with task ID
+            - src:
+                dependencyName: pr-update
+                dataTemplate: "coderun-atlas-task-{{ (index .Input.body.pull_request.labels 0).name }}-"
+              dest: metadata.generateName
+              operation: prepend
+
+---
+# Helper: Correlation Labels Configmap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-correlation-config
+  namespace: agent-platform
+data:
+  correlation-strategy.md: |
+    # Atlas Correlation Strategy
+
+    Atlas identifies PRs to work on using multiple methods:
+
+    ## Primary Method: PR Labels
+    - Look for `task-N` labels on PRs
+    - Example: PR with `task-15` label → Atlas resolves conflicts for task 15
+
+    ## Secondary Method: Branch Names
+    - Parse branch names like `feature/task-15-implementation`
+    - Extract task ID from branch pattern
+
+    ## Tertiary Method: Explicit Environment Variables
+    - `PR_NUMBER` - Direct PR number to work on
+    - `PR_URL` - Direct PR URL to work on
+
+    ## Conflict Detection
+    Atlas only activates when:
+    1. `mergeable: false` in PR webhook
+    2. `mergeable_state: "dirty"` or `"unstable"`
+    3. GitHub indicates actual merge conflicts exist

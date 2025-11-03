@@ -2267,7 +2267,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "claude/container-tess.sh.hbs",
+            "5DLabs-Tess" => "integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
                 // Default to the generic container template for unknown agents
                 debug!(
@@ -2288,7 +2290,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
         };
 
@@ -2302,7 +2306,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/codex/agents-blaze.md.hbs",
             "5DLabs-Cipher" => "code/codex/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/codex/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/codex/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/codex/agents.md.hbs",
         };
 
@@ -2318,7 +2324,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
         };
 
@@ -2334,7 +2342,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/opencode/agents-blaze.md.hbs",
             "5DLabs-Cipher" => "code/opencode/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/opencode/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/opencode/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/opencode/agents.md.hbs",
         };
 
@@ -2348,7 +2358,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
         };
 
@@ -2362,7 +2374,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/cursor/agents-blaze.md.hbs",
             "5DLabs-Cipher" => "code/cursor/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/cursor/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/cursor/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/cursor/agents.md.hbs",
         };
 
@@ -2376,7 +2390,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };
@@ -2391,7 +2407,9 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/factory/agents-blaze.md.hbs",
             "5DLabs-Cipher" => "code/factory/agents-cipher.md.hbs",
             "5DLabs-Cleo" => "code/factory/agents-cleo.md.hbs",
-            "5DLabs-Tess" => "code/factory/agents-tess.md.hbs",
+            "5DLabs-Tess" => "agents/tess-system-prompt.md.hbs",
+            "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
+            "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/factory/agents.md.hbs",
         };
 
@@ -2415,6 +2433,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "cipher",
             "5DLabs-Cleo" => "cleo",
             "5DLabs-Tess" => "tess",
+            "5DLabs-Atlas" => "atlas",
+            "5DLabs-Bolt" => "bolt",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
                     "Unknown GitHub app '{github_app}' - no corresponding agent found"
@@ -2584,7 +2604,7 @@ mod tests {
     fn test_tess_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/claude/container-tess.sh.hbs");
+        assert_eq!(template_path, "code/integration/container-tess.sh.hbs");
     }
 
     #[test]
@@ -2592,6 +2612,20 @@ mod tests {
         let code_run = create_test_code_run(Some("5DLabs-Cipher".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
         assert_eq!(template_path, "code/claude/container-cipher.sh.hbs");
+    }
+
+    #[test]
+    fn test_atlas_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/integration/container-atlas.sh.hbs");
+    }
+
+    #[test]
+    fn test_bolt_agent_template_selection() {
+        let code_run = create_test_code_run(Some("5DLabs-Bolt".to_string()));
+        let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
+        assert_eq!(template_path, "code/integration/container-bolt.sh.hbs");
     }
 
     #[test]

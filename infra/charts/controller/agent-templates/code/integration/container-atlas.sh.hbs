@@ -1,0 +1,88 @@
+#!/bin/sh
+# Atlas - Merge Conflict Resolution Agent
+
+echo "Atlas: Resolving merge conflicts for PR #${PR_NUMBER:-unknown}"
+
+# Source common setup from shared functions
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || {
+    # Minimal fallback if shared functions unavailable
+    setup_github_auth() { echo "Setting up GitHub auth..."; }
+    clone_repository() { echo "Cloning repository..."; }
+}
+
+# Setup GitHub authentication
+setup_github_auth
+
+# Get PR from environment or discover via task label
+PR_NUMBER="${PR_NUMBER:-}"
+if [ -z "$PR_NUMBER" ]; then
+    TASK_LABEL="task-{{task_id}}"
+    PR_NUMBER=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+fi
+
+if [ -z "$PR_NUMBER" ]; then
+    echo "No PR found - exiting"
+    exit 0
+fi
+
+# Check PR merge status
+MERGEABLE=$(gh pr view "$PR_NUMBER" --json mergeable --jq '.mergeable')
+if [ "$MERGEABLE" = "MERGEABLE" ]; then
+    gh pr comment "$PR_NUMBER" --body "✅ No conflicts - PR is clean"
+    exit 0
+fi
+
+# Get PR details
+PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+PR_BASE=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
+
+# Clone and checkout PR
+git clone "{{repository_url}}" repo && cd repo
+git checkout "$PR_BRANCH"
+git fetch origin "$PR_BASE"
+
+# Attempt automatic rebase
+if git rebase "origin/$PR_BASE"; then
+    git push --force-with-lease origin "$PR_BRANCH"
+    gh pr comment "$PR_NUMBER" --body "✅ Conflicts resolved via automatic rebase"
+    exit 0
+fi
+
+# Manual resolution needed - use Claude
+CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+mkdir -p /tmp/conflicts
+
+# Create context for each conflict
+for file in $CONFLICT_FILES; do
+    cat > "/tmp/conflicts/${file//\//_}.md" <<EOF
+# Conflict: $file
+Ours: $(git show :2:"$file" 2>/dev/null | head -50)
+Theirs: $(git show :3:"$file" 2>/dev/null | head -50)
+EOF
+done
+
+# Prepare prompt for Claude
+cat > CLAUDE.md <<EOF
+# Resolve conflicts in: $CONFLICT_FILES
+See /tmp/conflicts/ for details.
+1. Preserve both intents when possible
+2. Remove conflict markers
+3. git add resolved files
+4. git rebase --continue
+5. Push branch
+EOF
+
+# Start Claude with conflict resolution
+claude -p --system-prompt /config/agents/{{github_app}}_system-prompt.md \
+    < <(echo "Resolve merge conflicts. See CLAUDE.md for details.")
+
+# Verify and push
+if [ $(git diff --name-only --diff-filter=U | wc -l) -eq 0 ]; then
+    git push --force-with-lease origin "$PR_BRANCH"
+    gh pr comment "$PR_NUMBER" --body "✅ Conflicts resolved by Atlas"
+    exit 0
+else
+    gh pr comment "$PR_NUMBER" --body "⚠️ Some conflicts need manual review"
+    exit 1
+fi
+

@@ -1,0 +1,2 @@
+cargo:rustc-env=BUILD_TIMESTAMP=2025-11-01T17:49:08-0700
+cargo:rerun-if-changed=build.rs

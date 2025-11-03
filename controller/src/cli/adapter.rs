@@ -523,9 +523,6 @@ impl ResultProcessor {
             CLIType::Codex => {
                 self.process_codex_output(result, &mut processed);
             }
-            CLIType::Cursor => {
-                self.process_generic_output(result, &mut processed);
-            }
             CLIType::OpenCode => {
                 self.process_opencode_output(result, &mut processed);
             }

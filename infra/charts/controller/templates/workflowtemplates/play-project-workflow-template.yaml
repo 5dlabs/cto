@@ -131,10 +131,25 @@ spec:
       - name: model
         value: "claude-3-5-sonnet-20241022"
 
+  # Shared volume for Morgan PM state
+  volumeClaimTemplates:
+    - metadata:
+        name: morgan-pm-workspace
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.storage.storageClassName | quote }}
+        resources:
+          requests:
+            storage: 1Gi
+
   templates:
     # Main orchestration template
     - name: orchestrate-project
       steps:
+        # Step 0: Launch Morgan PM daemon (runs throughout workflow)
+        - - name: launch-morgan-pm
+            template: morgan-project-manager
+        
         # Step 1: Discover all tasks
         - - name: discover-tasks
             template: task-discovery
@@ -1376,6 +1391,86 @@ spec:
           echo "════════════════════════════════════════"
           echo "🎉 ALL TASKS COMPLETED SUCCESSFULLY!"
           echo "════════════════════════════════════════"
+
+    # Morgan Project Manager - Daemon template
+    - name: morgan-project-manager
+      daemon: true  # Keeps running throughout workflow lifecycle
+      container:
+        image: {{ .Values.agent.cliImages.claude.repository }}:{{ .Values.agent.cliImages.claude.tag }}
+        command: ["/bin/bash"]
+        args: ["-c"]
+        # Render templates then execute
+        source: |
+          #!/bin/bash
+          set -euo pipefail
+          
+          echo "🔧 Rendering Morgan PM templates..."
+          
+          # Render templates with Handlebars-like substitution
+          export repository_url="{{`{{workflow.parameters.repository}}`}}"
+          export workflow_name="{{`{{workflow.name}}`}}"
+          export namespace={{ .Release.Namespace | quote }}
+          
+          # Source helpers first
+          cat /pm-templates/github-projects-helpers.sh.hbs | envsubst > /workspace/github-projects-helpers.sh
+          chmod +x /workspace/github-projects-helpers.sh
+          
+          # Render main script
+          cat /pm-templates/morgan-pm.sh.hbs | envsubst > /workspace/morgan-pm.sh
+          chmod +x /workspace/morgan-pm.sh
+          
+          # Render comment processor
+          cat /pm-templates/process-issue-comment.sh.hbs | envsubst > /workspace/process-issue-comment.sh
+          chmod +x /workspace/process-issue-comment.sh
+          
+          echo "✅ Templates rendered, starting Morgan PM..."
+          exec /workspace/morgan-pm.sh
+        env:
+          # GitHub App credentials for Morgan
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+          # Workflow context
+          - name: WORKFLOW_NAME
+            value: "{{`{{workflow.name}}`}}"
+          - name: NAMESPACE
+            value: {{ .Release.Namespace | quote }}
+          # Repository information
+          - name: REPOSITORY_URL
+            value: "{{`{{workflow.parameters.repository}}`}}"
+          - name: DOCS_REPOSITORY
+            value: "{{`{{workflow.parameters.docs-repository}}`}}"
+          - name: DOCS_BRANCH
+            value: "{{`{{workflow.parameters.docs-branch}}`}}"
+          - name: DOCS_PROJECT_DIRECTORY
+            value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
+          - name: SERVICE_NAME
+            value: "{{`{{workflow.parameters.service}}`}}"
+        volumeMounts:
+          - name: morgan-pm-workspace
+            mountPath: /shared
+          - name: pm-templates
+            mountPath: /pm-templates
+            readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+        - name: pm-templates
+          configMap:
+            name: {{ include "controller.fullname" . }}-agent-templates-pm
+            defaultMode: 0755
 
 {{- end }}
 
