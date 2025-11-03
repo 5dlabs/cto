@@ -695,7 +695,7 @@ ingress:
 resources:
   limits:
     cpu: 1000m
-    # No memory limit - controller is critical infrastructure
+    memory: 4Gi  # Prevent runaway memory consumption while allowing headroom
   requests:
     cpu: 500m
     memory: 1Gi
