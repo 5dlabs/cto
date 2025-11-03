@@ -39,11 +39,15 @@
 
 ## **Meet Your AI Development Dream Team**
 
-*Five specialized agents with distinct personalities working together 24/7*
+*Eight specialized agents with distinct personalities working together 24/7*
+
+<div align="center">
+
+### **🎯 Team Lead**
 
 <table>
 <tr>
-<td align="center" width="33%">
+<td align="center" width="100%">
 
 ### **Morgan**
 #### *The Knowledge Architect*
@@ -59,6 +63,13 @@
 **Morgan generates comprehensive documentation via `docs()` MCP calls, creating the foundation for all development work.**
 
 </td>
+</tr>
+</table>
+
+### **💻 Implementation Squad**
+
+<table>
+<tr>
 <td align="center" width="33%">
 
 ### **Rex**
@@ -91,8 +102,6 @@
 **Blaze creates stunning frontends and user experiences, working alongside Rex for full-stack projects.**
 
 </td>
-</tr>
-<tr>
 <td align="center" width="33%">
 
 ### **Cleo**
@@ -102,11 +111,34 @@
 <img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/cleo-avatar.png" width="180" height="180" alt="Cleo Avatar">
 </div>
 
-🎨 **Personality:** Meticulous & wise  
-🔍 **Superpower:** Spots improvements instantly  
+🔍 **Personality:** Meticulous & wise  
+✨ **Superpower:** Spots improvements instantly  
 💬 **Motto:** *"Excellence isn't negotiable!"*
 
-**Cleo reviews code, refactors for quality, and ensures enterprise-grade standards in the QA phase of `play()` workflows.**
+**Cleo reviews code, refactors for quality, and ensures enterprise-grade standards in the quality phase of `play()` workflows.**
+
+</td>
+</tr>
+</table>
+
+### **🛡️ Quality Assurance Squad**
+
+<table>
+<tr>
+<td align="center" width="33%">
+
+### **Cipher**
+#### *The Security Sentinel*
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/cipher-avatar.png" width="180" height="180" alt="Cipher Avatar">
+</div>
+
+🛡️ **Personality:** Vigilant & protective  
+🔒 **Superpower:** Spots vulnerabilities early  
+💬 **Motto:** *"Trust, but verify everything twice!"*
+
+**Cipher handles security reviews, vulnerability scanning, and ensures enterprise-grade security across all workflows.**
 
 </td>
 <td align="center" width="33%">
@@ -127,22 +159,47 @@
 </td>
 <td align="center" width="33%">
 
-### **Cipher**
-#### *The Security Sentinel*
+### **Atlas**
+#### *The Integration Master*
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/cipher-avatar.png" width="180" height="180" alt="Cipher Avatar">
+<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/atlas-avatar.png" width="180" height="180" alt="Atlas Avatar">
 </div>
 
-🛡️ **Personality:** Vigilant & protective  
-🔒 **Superpower:** Spots vulnerabilities early  
-💬 **Motto:** *"Trust, but verify everything twice!"*
+🔗 **Personality:** Systematic & reliable  
+🌉 **Superpower:** Resolves conflicts seamlessly  
+💬 **Motto:** *"Every branch finds its way home!"*
 
-**Cipher handles security reviews, vulnerability scanning, and ensures enterprise-grade security across all workflows.**
+**Atlas manages PR merges, resolves conflicts automatically, and ensures clean integration with the main branch.**
 
 </td>
 </tr>
 </table>
+
+### **🚀 Operations Squad**
+
+<table>
+<tr>
+<td align="center" width="100%">
+
+### **Bolt**
+#### *The Deployment Specialist*
+
+<div align="center">
+<img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/bolt-avatar.png" width="180" height="180" alt="Bolt Avatar">
+</div>
+
+⚡ **Personality:** Fast & action-oriented  
+🚀 **Superpower:** Lightning-speed deployments  
+💬 **Motto:** *"Ship it fast, ship it right!"*
+
+**Bolt handles infrastructure operations, monitors deployments, and ensures applications are accessible and healthy in production.**
+
+</td>
+</tr>
+</table>
+
+</div>
 
 ---
 

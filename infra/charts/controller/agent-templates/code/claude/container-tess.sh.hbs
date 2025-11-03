@@ -1415,22 +1415,23 @@ if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
   # Tess in QA/Testing mode - should REVIEW existing PR, not create new one
   SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
 
-## 🚨 PULL REQUEST REVIEW REQUIREMENT 🚨
+## 🚨 QA REVIEW MODE - PR #${PR_NUMBER:-UNKNOWN} 🚨
 
-**⛔ CRITICAL: YOU ARE IN QA/TESTING MODE - REVIEW THE EXISTING PR ⛔**
+**PRE-APPROVAL STEPS:**
+1. Check mergeable: \`gh pr view ${PR_NUMBER} --json mergeable\`
+2. If conflicts: checkout PR, merge main, resolve, test, push
+3. Run quality checks on merged code
+4. Validate acceptance criteria
+5. Approve: \`gh pr review ${PR_NUMBER} --approve\`
 
-**MANDATORY RESPONSIBILITIES:**
-- **MUST** review the existing PR #${PR_NUMBER:-UNKNOWN}
-- **MUST** test the implementation against acceptance criteria
-- **MUST** validate end-to-end functionality
-- **MUST** use \`gh pr review\` to approve or request changes
-- **DO NOT** create a new pull request - one already exists
-- **THE TASK IS INCOMPLETE IF YOU DON'T REVIEW THE PR**
+**REQUIREMENTS:**
+- MUST resolve merge conflicts before approval
+- MUST test merged code (not just original branch)
+- Use \`gh pr review\` to approve/request changes
+- DO NOT create new PRs
+- DO NOT approve PRs with conflicts
 
-**YOU ARE A QA AGENT, NOT AN IMPLEMENTATION AGENT.**
-**YOUR JOB IS TO VERIFY AND APPROVE THE EXISTING PR, NOT CREATE A NEW ONE.**
-
-**Remember**: Focus on thorough testing and validation of existing work."
+**You are QA, not implementation. Your job: verify, resolve conflicts, approve existing PR.**"
 else
   # Tess in Implementation mode (shouldn't normally happen)
   SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
@@ -2039,97 +2040,57 @@ fi
 echo "Claude has completed successfully."
 
 # =============================================================================
-# CRITICAL PR VERIFICATION - MUST HAVE CREATED A PR
+# PR VERIFICATION - TESS TESTS EXISTING PRs CREATED BY REX
 # =============================================================================
 echo ""
-echo "🔍 VERIFYING PULL REQUEST CREATION (MANDATORY)..."
+echo "🔍 CHECKING FOR EXISTING PULL REQUEST (FOR TESTING)..."
 echo ""
+
+# Tess is a QA/testing agent - it tests PRs created by Rex, not creates them
+# So we check for an existing PR but don't fail if one doesn't exist
 
 # Give GitHub API a moment to register the PR if just created
 sleep 3
 
-# Check if a PR was created for this branch
+# Check if a PR exists for this branch (created by Rex)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-PR_CHECK_FAILED=false
+PR_NUMBER=""
 
 if [ "$CURRENT_BRANCH" != "unknown" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
     echo "📋 Checking for PR on branch: $CURRENT_BRANCH"
     
     # Try to find PR by branch (need to specify repo)
-    PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
     
-    if [ -z "$PR_EXISTS" ]; then
+    if [ -z "$PR_NUMBER" ]; then
         # Also check by task label as backup
         TASK_LABEL="task-${TASK_ID}"
-        PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
-    fi
-
-    # If still not found, run the stop hook one more time (idempotent) then re-check
-    if [ -z "$PR_EXISTS" ] && [ -f "/task-files/hooks-stop-code-pr-creation.sh" ]; then
-        echo "🔁 No PR detected yet; retrying stop hook once more..."
-        
-        # Use the same writable copy approach for retry
-        HOOK_SCRIPT="/tmp/hooks-stop-code-pr-creation.sh"
-        if [ ! -f "$HOOK_SCRIPT" ]; then
-            cp "/task-files/hooks-stop-code-pr-creation.sh" "$HOOK_SCRIPT"
-            chmod +x "$HOOK_SCRIPT"
-        fi
-        
-        (
-          cd "$CLAUDE_WORK_DIR" && "$HOOK_SCRIPT"
-        ) || echo "⚠️ Stop hook retry failed"
-        echo "⏳ Waiting briefly before re-checking PR..."
-        sleep 3
-        PR_EXISTS=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+        PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
     fi
     
-    if [ -z "$PR_EXISTS" ]; then
-        echo "❌ CRITICAL ERROR: No pull request found!"
+    if [ -z "$PR_NUMBER" ]; then
+        echo "⚠️ WARNING: No pull request found for testing"
         echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "║                    PR CREATION FAILED                        ║"
-        echo "═══════════════════════════════════════════════════════════════"
-        echo ""
-        echo "Rex was required to create a pull request but failed to do so."
-        echo "This is a MANDATORY requirement that was not met."
-        echo ""
-        echo "Possible reasons:"
-        echo "  1. No code changes were made"
-        echo "  2. Changes were not committed"
-        echo "  3. Branch was not pushed to remote"
-        echo "  4. PR creation command failed"
-        echo "  5. GitHub authentication issues"
+        echo "Tess is configured to test PRs created by Rex, but no PR was found."
+        echo "This may be expected if:"
+        echo "  1. Rex has not yet created the PR"
+        echo "  2. The PR was created on a different branch"
+        echo "  3. The PR was already merged"
         echo ""
         echo "Diagnostic information:"
         echo "  Branch: $CURRENT_BRANCH"
         echo "  Task ID: ${TASK_ID}"
-        
-        # Check if there are uncommitted changes
-        if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-            echo "  ⚠️ There are uncommitted changes in the repository"
-        fi
-        
-        # Check if branch exists on remote
-        if ! git ls-remote --heads origin "$CURRENT_BRANCH" | grep -q "$CURRENT_BRANCH"; then
-            echo "  ⚠️ Branch not found on remote repository"
-        fi
-        
+        echo "  Agent: Tess (QA/Testing)"
         echo ""
-        echo "🔚 FAILING CONTAINER: Rex did not create required pull request"
-        
-        # Write failure marker
-        echo "rex-no-pr-created:$(date -u +%Y-%m-%dT%H:%M:%SZ):branch-$CURRENT_BRANCH" > /workspace/.rex-pr-failed
-        
-        # Exit with error
-        exit 1
+        echo "ℹ️ Continuing without PR operations (non-fatal for Tess)"
     else
-        echo "✅ Pull request #${PR_EXISTS} found successfully"
-        echo "Rex has completed the task and created the required PR."
+        echo "✅ Pull request #${PR_NUMBER} found - will proceed with testing"
+        PR_EXISTS="$PR_NUMBER"
     fi
 else
     echo "⚠️ WARNING: Unable to verify PR (branch detection failed)"
     echo "Branch: $CURRENT_BRANCH"
-    # Don't fail here as this might be a git configuration issue
+    echo "ℹ️ Continuing without PR operations (non-fatal for Tess)"
 fi
 
 # =============================================================================
@@ -2166,41 +2127,46 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
   fi
 
   RETRY_COUNT=0
-  PR_NUMBER=""
-
-  while true; do
-    if [ "$UNLIMITED_PR_CHECK" != "1" ] && [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-      break
-    fi
-
-    if [ $RETRY_COUNT -gt 0 ]; then
-      if [ "$UNLIMITED_PR_CHECK" = "1" ]; then
-        echo "⏳ Retry $RETRY_COUNT (unlimited mode): Waiting for PR to appear in GitHub API..."
-      else
-        echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES: Waiting for PR to appear in GitHub API..."
+  # If PR_NUMBER was already found in earlier verification, skip retry loop
+  if [ -z "$PR_NUMBER" ]; then
+    echo "🔍 PR not found in initial check - searching with retries..."
+    
+    while true; do
+      if [ "$UNLIMITED_PR_CHECK" != "1" ] && [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        break
       fi
-      sleep 3
-    fi
 
-    # First, try to find PR by task label (Claude may have added task-N label)
-    TASK_LABEL="task-${TASK_ID}"
-    PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
-
-    # If not found by label, try by branch name (current branch)
-    if [ -z "$PR_NUMBER" ]; then
-      CURRENT_BRANCH=$(cd "$CLAUDE_WORK_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
-      if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
-        echo "🔍 Checking for PR on branch: $CURRENT_BRANCH"
-        PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+      if [ $RETRY_COUNT -gt 0 ]; then
+        if [ "$UNLIMITED_PR_CHECK" = "1" ]; then
+          echo "⏳ Retry $RETRY_COUNT (unlimited mode): Waiting for PR to appear in GitHub API..."
+        else
+          echo "⏳ Retry $RETRY_COUNT/$MAX_RETRIES: Waiting for PR to appear in GitHub API..."
+        fi
+        sleep 3
       fi
-    fi
 
-    if [ -n "$PR_NUMBER" ]; then
-      break
-    fi
+      # First, try to find PR by task label (Claude may have added task-N label)
+      TASK_LABEL="task-${TASK_ID}"
+      PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
 
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-  done
+      # If not found by label, try by branch name (current branch)
+      if [ -z "$PR_NUMBER" ]; then
+        CURRENT_BRANCH=$(cd "$CLAUDE_WORK_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+        if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ]; then
+          echo "🔍 Checking for PR on branch: $CURRENT_BRANCH"
+          PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+        fi
+      fi
+
+      if [ -n "$PR_NUMBER" ]; then
+        break
+      fi
+
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+    done
+  else
+    echo "✅ Using PR #${PR_NUMBER} found in initial verification"
+  fi
 
   if [ -n "$PR_NUMBER" ]; then
     echo "✅ Found PR #${PR_NUMBER}"
@@ -2440,144 +2406,52 @@ fi
 # Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
 touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
 
-  # Check if implementation was successful
-  # Rex is successful if Claude exited cleanly (PR should be created)
-  if [ ${CLAUDE_PID:-0} -ne 0 ]; then
-    wait $CLAUDE_PID 2>/dev/null || true
-    CLAUDE_EXIT_CODE=$?
-  fi
-  
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    echo "✅ Attempt $ATTEMPT: Implementation completed successfully"
-    SUCCESS=1
-    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
-    break
-  else
-    echo "⚠️ Attempt $ATTEMPT: Implementation incomplete (exit code: $CLAUDE_EXIT_CODE)"
-    COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
-    
-    if [ $ATTEMPT -lt $MAX_RETRIES ]; then
-      echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
-      ATTEMPT=$((ATTEMPT + 1))
-      echo ""
-      # Brief pause before retry
-      sleep 2
-    else
-      echo "❌ Maximum retry attempts reached"
-      break
-    fi
-  fi
-done
-
-FINAL_ATTEMPTS=$COMPLETED_ATTEMPTS
-if [ "${FINAL_ATTEMPTS:-0}" -le 0 ]; then
-  FINAL_ATTEMPTS=$((ATTEMPT - 1))
-fi
-if [ $FINAL_ATTEMPTS -gt $MAX_RETRIES ]; then
-  FINAL_ATTEMPTS=$MAX_RETRIES
+# Tess completion - check if Claude (testing) completed successfully
+if [ ${CLAUDE_PID:-0} -ne 0 ]; then
+  wait $CLAUDE_PID 2>/dev/null || true
+  CLAUDE_EXIT_CODE=$?
+else
+  CLAUDE_EXIT_CODE=0
 fi
 
-# Report final status
+# Report final status for Tess
 echo ""
 echo "════════════════════════════════════════════════════════════════"
-if [ $SUCCESS -eq 1 ]; then
-  echo "✅ REX IMPLEMENTATION SUCCESSFUL"
-  echo "   Completed after $FINAL_ATTEMPTS attempt(s)"
-else
-  echo "⚠️ REX IMPLEMENTATION INCOMPLETE"
-  echo "   Attempted $FINAL_ATTEMPTS time(s)"
-  echo "   Implementation not completed"
-  
-  # Document remaining work for downstream agents (Cleo/Tess)
-  echo ""
-  echo "📝 Creating handoff document for Cleo..."
-  HANDOFF_FILE="$CLAUDE_WORK_DIR/task/rex-handoff.md"
-  mkdir -p "$CLAUDE_WORK_DIR/task"
-  
-  # Prepare handoff content with proper variable expansion
-  HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-  
-  cat > "$HANDOFF_FILE" << EOF
-# Rex Implementation Handoff
-
-**Status**: Incomplete after $FINAL_ATTEMPTS iterations (max: $MAX_RETRIES)
-**Date**: $HANDOFF_DATE
-**Task**: {{task_id}}
-
-## What Was Accomplished
-
-Rex made $FINAL_ATTEMPTS attempts to complete this task. Review the PR and commit history for details on what was implemented.
-
-## Remaining Work
-
-Review Claude's output in the logs above for details on what remains to be done.
-Compare current implementation against acceptance criteria in task/acceptance-criteria.md.
-
-## Next Steps for Cleo
-
-1. Review the PR created by Rex
-2. Identify gaps between current implementation and acceptance criteria
-3. Complete any remaining implementation work
-4. Ensure all quality checks pass before handing off to Tess
-
-## Acceptance Criteria Reference
-
-See \`task/acceptance-criteria.md\` for complete requirements.
-
----
-*Generated by Rex (Claude CLI) after $FINAL_ATTEMPTS implementation attempts*
-EOF
-
-  echo "✅ Handoff document created at task/rex-handoff.md"
-  
-  # Commit and push the handoff document
-  cd "$CLAUDE_WORK_DIR"
-  git add task/rex-handoff.md 2>/dev/null || true
-  git commit -m "docs(task-{{task_id}}): add Rex handoff document
-
-Rex completed $FINAL_ATTEMPTS implementation iterations with incomplete status (max: $MAX_RETRIES).
-Handoff document created for Cleo to continue work." 2>/dev/null || echo "⚠️ Could not commit handoff document"
-  
-  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-  if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
-    git push origin HEAD 2>/dev/null || echo "⚠️ Could not push handoff document"
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  echo "✅ TESS QA TESTING COMPLETED"
+  echo "   Testing and validation finished successfully"
+  if [ -n "$PR_NUMBER" ]; then
+    echo "   PR #${PR_NUMBER} reviewed and status updated"
+  else
+    echo "   ⚠️ No PR found - tests completed but PR review skipped"
   fi
-  
-  echo ""
-  echo "════════════════════════════════════════════════════════════════"
-  echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
-  echo "════════════════════════════════════════════════════════════════"
-  echo ""
-  echo "🔄 NEXT STEPS:"
-  echo "   - Handoff document created at task/rex-handoff.md"
-  echo "   - Workflow will continue to Cleo for completion"
-  echo "   - Cleo will review PR and finish remaining work"
-  echo ""
-  echo "════════════════════════════════════════════════════════════════"
+else
+  echo "⚠️ TESS QA TESTING COMPLETED WITH ISSUES"
+  echo "   Exit code: $CLAUDE_EXIT_CODE"
+  if [ -n "$PR_NUMBER" ]; then
+    echo "   PR #${PR_NUMBER} - changes requested"
+  fi
 fi
 echo "════════════════════════════════════════════════════════════════"
 
-# Final termination sequence
+# Final termination sequence for Tess
 echo '════════════════════════════════════════════════════════════════'
-echo '║                 REX CONTAINER TERMINATION                    ║'
+echo '║                 TESS CONTAINER TERMINATION                   ║'
 echo '════════════════════════════════════════════════════════════════'
 echo "Container PID: $$"
 echo "Final Process Check:"
 ps aux | head -5
 
 # Write completion marker for workflow tracking
-echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
+echo "tess-testing-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
 
 # Explicitly stop Docker sidecar before exiting
 echo "🛑 Explicitly stopping Docker sidecar..."
 stop_docker_sidecar || true
 
-# Always exit with success to allow workflow to continue to Cleo
-if [ $SUCCESS -eq 1 ]; then
-  echo "🔚 Terminating container with success status..."
-  exit 0
-else
-  echo "🔚 Terminating container with success status (handoff to Cleo)..."
-  echo "📝 Implementation incomplete after $FINAL_ATTEMPTS attempt(s) - Cleo will continue"
-  exit 0  # Changed from exit 1 to allow Cleo to continue
-fi
+# Tess always exits successfully - workflow resumes via PR review sensor
+# If tests fail, Tess posts REQUEST_CHANGES which triggers remediation
+# If tests pass, Tess posts APPROVE which triggers workflow resume
+echo "🔚 Terminating Tess container with success status..."
+echo "ℹ️ Workflow will resume via PR review sensor when Tess approves PR"
+exit 0
