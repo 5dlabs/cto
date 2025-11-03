@@ -2291,8 +2291,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/codex/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/codex/container-bolt.sh.hbs",
+            // Atlas and Bolt fall back to base template for codex
             _ => "code/codex/container.sh.hbs",
         };
 
@@ -2323,8 +2322,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/opencode/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/opencode/container-bolt.sh.hbs",
+            // Atlas and Bolt fall back to base template for opencode
             _ => "code/opencode/container.sh.hbs",
         };
 
@@ -2355,8 +2353,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/cursor/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/cursor/container-bolt.sh.hbs",
+            // Atlas and Bolt fall back to base template for cursor
             _ => "code/cursor/container.sh.hbs",
         };
 
@@ -2385,9 +2382,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/factory/container-atlas.sh.hbs",
-            "5DLabs-Bolt" => "code/factory/container-bolt.sh.hbs",
             "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
+            // Atlas and Bolt fall back to base template for factory
             _ => "code/factory/container.sh.hbs",
         };
 
@@ -2425,6 +2421,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "cipher",
             "5DLabs-Cleo" => "cleo",
             "5DLabs-Tess" => "tess",
+            "5DLabs-Atlas" => "atlas",
+            "5DLabs-Bolt" => "bolt",
             _ => {
                 return Err(crate::tasks::types::Error::ConfigError(format!(
                     "Unknown GitHub app '{github_app}' - no corresponding agent found"

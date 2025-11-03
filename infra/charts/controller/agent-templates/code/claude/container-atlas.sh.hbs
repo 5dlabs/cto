@@ -1,472 +1,88 @@
 #!/bin/sh
-# Atlas - Integration & Merge Conflict Resolution Agent
-# Specializes in detecting and resolving merge conflicts automatically
+# Atlas - Merge Conflict Resolution Agent
 
-echo '════════════════════════════════════════════════════════════════'
-printf '║  🔗 AGENT: %-50s║\n' '{{github_app}}'
-echo '║  ATLAS INTEGRATION & MERGE RESOLUTION STARTING               ║'
-echo '║  Merge Conflict Detection and Resolution Specialist          ║'
-echo '════════════════════════════════════════════════════════════════'
-echo "📋 Task ID: {{task_id}}"
-echo "🎯 Mission: Resolve merge conflicts and ensure clean integration"
+echo "Atlas: Resolving merge conflicts for PR #${PR_NUMBER:-unknown}"
 
-# Task-specific workspace for isolation
-TASK_WORKSPACE="/workspace/task-{{task_id}}"
-mkdir -p /workspace
-mkdir -p "$TASK_WORKSPACE"
-echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+# Source common setup from shared functions
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || {
+    # Minimal fallback if shared functions unavailable
+    setup_github_auth() { echo "Setting up GitHub auth..."; }
+    clone_repository() { echo "Cloning repository..."; }
+}
 
-# Disable interactive Git prompts
-export GIT_TERMINAL_PROMPT=0
-export GIT_ASKPASS=/bin/true
-export SSH_ASKPASS=/bin/true
+# Setup GitHub authentication
+setup_github_auth
 
-# Repository URL
-REPO_URL="{{repository_url}}"
-
-# GitHub App authentication
-echo "Using GitHub App authentication"
-
-# Authenticate with GitHub App (reusing pattern from other agents)
-if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
-    echo "Authenticating with GitHub App..."
-
-    # Create temporary private key file
-    TEMP_KEY_FILE="/tmp/github-app-key.pem"
-    printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
-    chmod 600 "$TEMP_KEY_FILE"
-
-    # Generate JWT token
-    JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    NOW=$(date +%s)
-    EXP=$((NOW + 600))
-    JWT_PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    JWT_SIGNATURE=$(printf '%s.%s' "$JWT_HEADER" "$JWT_PAYLOAD" | openssl dgst -sha256 -sign "$TEMP_KEY_FILE" -binary | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    JWT_TOKEN="$JWT_HEADER.$JWT_PAYLOAD.$JWT_SIGNATURE"
-
-    # Get installation ID
-    INPUT_REPO="{{repository_url}}"
-    if echo "$INPUT_REPO" | grep -qE '^https://github.com/'; then
-        REPO_OWNER=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/([^/]+)/.*|\1|')
-        REPO_NAME=$(echo "$INPUT_REPO" | sed -E 's|https://github.com/[^/]+/([^/]+)(\.git)?|\1|')
-    else
-        SLUG=$(echo "$INPUT_REPO" | sed -E 's|\.git$||')
-        REPO_OWNER=$(echo "$SLUG" | cut -d'/' -f1)
-        REPO_NAME=$(echo "$SLUG" | cut -d'/' -f2)
-    fi
-
-    echo "Getting installation ID for $REPO_OWNER/$REPO_NAME..."
-    INSTALLATION_RESPONSE=$(curl -sS -H "Authorization: Bearer $JWT_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
-    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
-
-    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-        echo "Failed to get installation ID, trying org installation..."
-        ORG_INSTALLATION=$(curl -sS -H "Authorization: Bearer $JWT_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/orgs/$REPO_OWNER/installation")
-        INSTALLATION_ID=$(echo "$ORG_INSTALLATION" | jq -r '.id')
-    fi
-
-    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
-        echo "❌ Failed to get installation ID"
-        exit 1
-    fi
-
-    # Get installation access token
-    TOKEN_RESPONSE=$(curl -sS -X POST \
-        -H "Authorization: Bearer $JWT_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-
-    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
-        echo "❌ Failed to get installation token"
-        exit 1
-    fi
-
-    rm -f "$TEMP_KEY_FILE"
-    export GITHUB_TOKEN
-
-    # Configure git
-    git config --global credential.helper store
-    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-    echo "$GITHUB_TOKEN" | gh auth login --with-token
-
-    echo "✓ GitHub App authenticated"
-else
-    echo "❌ Missing GitHub App credentials"
-    exit 1
-fi
-
-# Git configuration
-git config --global --add safe.directory "$TASK_WORKSPACE"
-git config --global user.name "atlas[bot]"
-git config --global user.email "atlas[bot]@users.noreply.github.com"
-
-echo "✓ Git configured"
-
-# Clone or update repository
-cd "$TASK_WORKSPACE"
-REPO_SLUG="$REPO_OWNER/$REPO_NAME"
-
-if [ -d "$REPO_NAME/.git" ]; then
-    echo "📁 Repository exists, updating..."
-    cd "$REPO_NAME"
-    git fetch origin --prune
-else
-    echo "📥 Cloning repository..."
-    if ! git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO_SLUG}.git" "$REPO_NAME"; then
-        echo "❌ Failed to clone repository"
-        exit 1
-    fi
-    cd "$REPO_NAME"
-fi
-
-echo "✓ Repository ready"
-
-# ════════════════════════════════════════════════════════════════════════════
-# ATLAS CORE LOGIC: Merge Conflict Detection and Resolution
-# ════════════════════════════════════════════════════════════════════════════
-
-echo ""
-echo "════════════════════════════════════════════════════════════════════════"
-echo "║  🔍 ATLAS MERGE CONFLICT DETECTION                                    ║"
-echo "════════════════════════════════════════════════════════════════════════"
-
-# Get PR information from environment or discover it
+# Get PR from environment or discover via task label
 PR_NUMBER="${PR_NUMBER:-}"
-
 if [ -z "$PR_NUMBER" ]; then
-    # Try to find PR by task label
     TASK_LABEL="task-{{task_id}}"
-    PR_NUMBER=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    PR_NUMBER=$(gh pr list --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || echo "")
 fi
 
 if [ -z "$PR_NUMBER" ]; then
-    echo "⚠️  No PR found for conflict resolution"
-    echo "Atlas requires an existing PR to check for conflicts"
-    echo "This may be expected if:"
-    echo "  1. No PR has been created yet"
-    echo "  2. PR was already merged"
-    echo "  3. PR was closed"
-    exit 0  # Exit successfully - no work needed
-fi
-
-echo "✅ Found PR #${PR_NUMBER} for conflict resolution"
-
-# Get PR details
-PR_BRANCH=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json headRefName --jq '.headRefName')
-PR_BASE=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json baseRefName --jq '.baseRefName')
-MERGEABLE=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json mergeable --jq '.mergeable')
-MERGEABLE_STATE=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json mergeStateStatus --jq '.mergeStateStatus')
-
-echo "📊 PR Details:"
-echo "  Branch: $PR_BRANCH"
-echo "  Base: $PR_BASE"
-echo "  Mergeable: $MERGEABLE"
-echo "  State: $MERGEABLE_STATE"
-
-# Check if PR has conflicts
-if [ "$MERGEABLE" = "MERGEABLE" ] || [ "$MERGEABLE_STATE" = "CLEAN" ]; then
-    echo "✅ No merge conflicts detected - PR is clean"
-    echo "🎉 Atlas work complete - no conflicts to resolve"
-
-    # Post comment confirming clean state
-    gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body "## 🔗 Atlas Integration Check
-
-✅ **No merge conflicts detected**
-
-PR is cleanly mergeable with \`$PR_BASE\`. No Atlas intervention needed.
-
-**Status:** Ready for review and merge
-**Integration:** Clean
-
----
-*Merge conflict check by Atlas*"
-
+    echo "No PR found - exiting"
     exit 0
 fi
 
-echo "⚠️  MERGE CONFLICTS DETECTED"
-echo "🔗 Atlas will attempt automatic resolution..."
+# Check PR merge status
+MERGEABLE=$(gh pr view "$PR_NUMBER" --json mergeable --jq '.mergeable')
+if [ "$MERGEABLE" = "MERGEABLE" ]; then
+    gh pr comment "$PR_NUMBER" --body "✅ No conflicts - PR is clean"
+    exit 0
+fi
 
-# Checkout the PR branch
-echo "📥 Checking out PR branch: $PR_BRANCH"
-git fetch origin "$PR_BRANCH"
+# Get PR details
+PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+PR_BASE=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
+
+# Clone and checkout PR
+git clone "{{repository_url}}" repo && cd repo
 git checkout "$PR_BRANCH"
-git pull origin "$PR_BRANCH"
-
-# Fetch latest base branch
-echo "📥 Fetching latest $PR_BASE..."
 git fetch origin "$PR_BASE"
 
 # Attempt automatic rebase
-echo "🔄 Attempting automatic rebase onto $PR_BASE..."
 if git rebase "origin/$PR_BASE"; then
-    echo "✅ Rebase successful - no manual conflict resolution needed"
-
-    # Push the rebased branch
-    echo "📤 Pushing resolved branch..."
-    if git push --force-with-lease origin "$PR_BRANCH"; then
-        echo "✅ Successfully pushed conflict resolution"
-
-        # Post success comment
-        gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body "## 🔗 Atlas Conflict Resolution
-
-✅ **Conflicts resolved automatically**
-
-Successfully rebased \`$PR_BRANCH\` onto latest \`$PR_BASE\`.
-
-**Resolution Method:** Automatic rebase
-**Conflicts:** None (clean rebase)
-**Status:** PR updated and ready for re-review
-
-**Next Steps:**
-- Cleo will re-run code quality checks
-- Tess will re-validate end-to-end tests
-
----
-*Merge conflict resolution by Atlas*"
-
-        exit 0
-    else
-        echo "❌ Failed to push resolved branch"
-        exit 1
-    fi
+    git push --force-with-lease origin "$PR_BRANCH"
+    gh pr comment "$PR_NUMBER" --body "✅ Conflicts resolved via automatic rebase"
+    exit 0
 fi
 
-# Rebase failed - conflicts need manual resolution
-echo "⚠️  Automatic rebase failed - conflicts require analysis"
-echo "🔍 Atlas will use Claude to intelligently resolve conflicts..."
-
-# Get list of conflicted files
+# Manual resolution needed - use Claude
 CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
-CONFLICT_COUNT=$(echo "$CONFLICT_FILES" | wc -w)
-
-echo "📝 Conflicted files ($CONFLICT_COUNT):"
-echo "$CONFLICT_FILES" | sed 's/^/  - /'
-
-# For each conflicted file, extract conflict information
 mkdir -p /tmp/conflicts
+
+# Create context for each conflict
 for file in $CONFLICT_FILES; do
-    echo "🔍 Analyzing conflict in: $file"
-
-    # Create conflict context file for Claude
     cat > "/tmp/conflicts/${file//\//_}.md" <<EOF
-# Merge Conflict in $file
-
-## Our Changes (${PR_BRANCH}):
-\`\`\`
-$(git show :2:"$file" 2>/dev/null || echo "File not available")
-\`\`\`
-
-## Their Changes (${PR_BASE}):
-\`\`\`
-$(git show :3:"$file" 2>/dev/null || echo "File not available")
-\`\`\`
-
-## Base Version:
-\`\`\`
-$(git show :1:"$file" 2>/dev/null || echo "File not available")
-\`\`\`
-
-## Current Conflicted State:
-\`\`\`
-$(cat "$file")
-\`\`\`
+# Conflict: $file
+Ours: $(git show :2:"$file" 2>/dev/null | head -50)
+Theirs: $(git show :3:"$file" 2>/dev/null | head -50)
 EOF
 done
 
-# Prepare Atlas prompt for Claude
-ATLAS_PROMPT="# 🔗 Atlas Merge Conflict Resolution
-
-You are Atlas, the Integration Specialist. You have detected merge conflicts in PR #${PR_NUMBER}.
-
-## Your Task
-Resolve the merge conflicts intelligently by:
-1. Understanding the intent of both changes
-2. Preserving functionality from both branches when possible
-3. Maintaining code quality and consistency
-4. Ensuring tests still pass after resolution
-
-## Conflicted Files
-$(echo "$CONFLICT_FILES" | sed 's/^/- /')
-
-## Conflict Analysis
-Review the conflict context files in \`/tmp/conflicts/\` and resolve each conflict.
-
-## Resolution Strategy
-- Preserve intent of both changes where possible
-- Choose the safer option when intent conflicts
-- Maintain backward compatibility
-- Follow project coding standards
-
-## Instructions
-1. Read each conflict context file
-2. Analyze the differences and understand intent
-3. Resolve conflicts in the actual files
-4. Remove conflict markers (<<<<<<<, =======, >>>>>>>)
-5. Stage resolved files with \`git add\`
-6. Continue the rebase with \`git rebase --continue\`
-7. Run tests to verify resolution
-8. Push the resolved branch
-
-Begin conflict resolution now."
-
-# Create CLAUDE.md memory file
-cat > "$TASK_WORKSPACE/$REPO_NAME/CLAUDE.md" <<EOF
-# Atlas Merge Conflict Resolution
-
-## Context
-- PR: #${PR_NUMBER}
-- Branch: ${PR_BRANCH}
-- Base: ${PR_BASE}
-- Files with conflicts: ${CONFLICT_COUNT}
-
-## Your Role
-You are Atlas, resolving merge conflicts to ensure clean PR integration.
-
-## Files to Resolve
-$(echo "$CONFLICT_FILES" | sed 's/^/- /')
-
-See conflict analysis in /tmp/conflicts/ directory.
+# Prepare prompt for Claude
+cat > CLAUDE.md <<EOF
+# Resolve conflicts in: $CONFLICT_FILES
+See /tmp/conflicts/ for details.
+1. Preserve both intents when possible
+2. Remove conflict markers
+3. git add resolved files
+4. git rebase --continue
+5. Push branch
 EOF
 
-# Change to working directory
-cd "$TASK_WORKSPACE/$REPO_NAME"
+# Start Claude with conflict resolution
+claude -p --system-prompt /config/agents/{{github_app}}_system-prompt.md \
+    < <(echo "Resolve merge conflicts. See CLAUDE.md for details.")
 
-# Setup MCP configuration if available
-if [ -f "/task-files/mcp.json" ]; then
-    cp /task-files/mcp.json "$TASK_WORKSPACE/$REPO_NAME/.mcp.json"
-    echo "✓ MCP configuration copied"
-fi
-
-# Start Claude with conflict resolution prompt
-CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
-
-# Add MCP configuration if available
-if [ -f "/workspace/.mcp.json" ]; then
-    CLAUDE_CMD="$CLAUDE_CMD --mcp-config /workspace/.mcp.json"
-fi
-
-# Add system prompt for Atlas
-if [ -f "/config/agents/{{github_app}}_system-prompt.md" ]; then
-    CLAUDE_CMD="$CLAUDE_CMD --system-prompt /config/agents/{{github_app}}_system-prompt.md"
-fi
-
-echo "════════════════════════════════════════════════════════════════════════"
-echo "║  STARTING CLAUDE FOR CONFLICT RESOLUTION                              ║"
-echo "════════════════════════════════════════════════════════════════════════"
-
-# Use FIFO for input
-FIFO_PATH="/workspace/agent-input.jsonl"
-rm -f "$FIFO_PATH" 2>/dev/null || true
-mkfifo "$FIFO_PATH"
-chmod 666 "$FIFO_PATH" || true
-
-# Start Claude in background
-$CLAUDE_CMD < "$FIFO_PATH" &
-CLAUDE_PID=$!
-
-# Send Atlas prompt
-USER_COMBINED=$(printf "%s" "$ATLAS_PROMPT" | jq -Rs .)
-if printf '{"text":%s}\n' "$USER_COMBINED" | \
-     curl -fsS -X POST http://127.0.0.1:8080/input \
-       -H 'Content-Type: application/json' \
-       --data-binary @- >/dev/null 2>&1; then
-    echo "✓ Conflict resolution prompt sent to Claude"
+# Verify and push
+if [ $(git diff --name-only --diff-filter=U | wc -l) -eq 0 ]; then
+    git push --force-with-lease origin "$PR_BRANCH"
+    gh pr comment "$PR_NUMBER" --body "✅ Conflicts resolved by Atlas"
+    exit 0
 else
-    # Fallback: write directly to FIFO
-    exec 9>"$FIFO_PATH"
-    printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-fi
-
-# Wait for Claude to complete
-echo "⏳ Waiting for Claude to resolve conflicts..."
-wait "$CLAUDE_PID"
-CLAUDE_EXIT_CODE=$?
-
-# Close FIFO
-exec 9>&- 2>/dev/null || true
-rm -f "$FIFO_PATH"
-
-echo "════════════════════════════════════════════════════════════════════════"
-
-if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    echo "✅ ATLAS CONFLICT RESOLUTION COMPLETED"
-    echo ""
-
-    # Verify resolution was successful
-    REMAINING_CONFLICTS=$(git diff --name-only --diff-filter=U | wc -l)
-
-    if [ "$REMAINING_CONFLICTS" -eq 0 ]; then
-        echo "✅ All conflicts resolved successfully"
-
-        # Check if rebase is in progress and complete it
-        if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
-            echo "🔄 Completing rebase..."
-            git rebase --continue || {
-                echo "⚠️  Rebase continuation failed - may need manual intervention"
-            }
-        fi
-
-        # Post detailed resolution comment
-        gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body "## 🔗 Atlas Conflict Resolution - COMPLETED
-
-✅ **Successfully resolved ${CONFLICT_COUNT} conflicted file(s)**
-
-**Resolved Files:**
-$(echo "$CONFLICT_FILES" | sed 's/^/- /')
-
-**Resolution Strategy:** Intelligent conflict analysis preserving intent of both changes
-
-**Status:** PR branch updated with conflict resolution
-
-**Next Steps:**
-- Cleo will re-run code quality checks
-- Tess will re-validate end-to-end tests
-- PR is ready for continued review
-
----
-*Automated merge conflict resolution by Atlas*"
-
-        exit 0
-    else
-        echo "⚠️  Some conflicts remain unresolved: $REMAINING_CONFLICTS files"
-
-        gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body "## 🔗 Atlas Conflict Resolution - PARTIAL
-
-⚠️  **Partial resolution completed**
-
-**Status:** Some conflicts require manual review
-
-**Remaining Conflicts:** $REMAINING_CONFLICTS file(s)
-
-Atlas attempted automatic resolution but some conflicts need human judgment. Please review and resolve manually.
-
----
-*Automated merge conflict resolution by Atlas*"
-
-        exit 1
-    fi
-else
-    echo "❌ Claude conflict resolution failed (exit code: $CLAUDE_EXIT_CODE)"
-
-    gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body "## 🔗 Atlas Conflict Resolution - FAILED
-
-❌ **Automatic conflict resolution unsuccessful**
-
-**Status:** Conflicts require manual resolution
-
-**Files with Conflicts:** ${CONFLICT_COUNT}
-
-Please resolve conflicts manually and push updates.
-
----
-*Automated merge conflict resolution by Atlas*"
-
+    gh pr comment "$PR_NUMBER" --body "⚠️ Some conflicts need manual review"
     exit 1
 fi
 

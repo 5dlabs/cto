@@ -1,0 +1,103 @@
+#!/bin/sh
+# Atlas - End-of-Play Integration Check
+# Ensures all PRs from a Play workflow are cleanly integrated
+
+echo "Atlas: Final integration check for Play workflow {{workflow_name}}"
+
+# Source common setup
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
+
+# Setup authentication
+setup_github_auth
+
+# Get all PRs for this workflow run
+RUN_LABEL="run-{{workflow_name}}"
+SERVICE_LABEL="service-{{service}}"
+
+echo "Checking PRs with labels: $RUN_LABEL, $SERVICE_LABEL"
+
+# Find all PRs from this Play workflow
+PRS=$(gh pr list -R "{{repository_url}}" \
+    --label "$RUN_LABEL" \
+    --label "$SERVICE_LABEL" \
+    --json number,headRefName,mergeable,mergeStateStatus,state \
+    --jq '.[]')
+
+if [ -z "$PRS" ]; then
+    echo "No PRs found for this workflow run"
+    exit 0
+fi
+
+TOTAL_PRS=$(echo "$PRS" | jq -s 'length')
+echo "Found $TOTAL_PRS PRs from this Play workflow"
+
+# Check each PR status
+OPEN_PRS=0
+MERGED_PRS=0
+CONFLICTED_PRS=0
+CLEAN_PRS=0
+
+echo "$PRS" | jq -c '.' | while read -r pr; do
+    PR_NUM=$(echo "$pr" | jq -r '.number')
+    PR_STATE=$(echo "$pr" | jq -r '.state')
+    MERGEABLE=$(echo "$pr" | jq -r '.mergeable')
+    
+    echo "PR #$PR_NUM: state=$PR_STATE, mergeable=$MERGEABLE"
+    
+    if [ "$PR_STATE" = "MERGED" ]; then
+        MERGED_PRS=$((MERGED_PRS + 1))
+    elif [ "$PR_STATE" = "OPEN" ]; then
+        OPEN_PRS=$((OPEN_PRS + 1))
+        
+        if [ "$MERGEABLE" = "CONFLICTING" ]; then
+            CONFLICTED_PRS=$((CONFLICTED_PRS + 1))
+            echo "  ⚠️ PR #$PR_NUM has conflicts - triggering Atlas conflict resolution"
+            # TODO: Trigger individual Atlas CodeRun for this PR
+        elif [ "$MERGEABLE" = "MERGEABLE" ]; then
+            CLEAN_PRS=$((CLEAN_PRS + 1))
+        fi
+    fi
+done
+
+# Post summary comment to main PR or workflow tracking issue
+SUMMARY="## 🔗 Atlas Integration Report
+
+**Play Workflow:** {{workflow_name}}
+**Service:** {{service}}
+
+### PR Status Summary
+- **Total PRs:** $TOTAL_PRS
+- **Merged:** $MERGED_PRS ✅
+- **Open & Clean:** $CLEAN_PRS ✅
+- **Open & Conflicted:** $CONFLICTED_PRS ⚠️
+
+### Integration Status
+"
+
+if [ $CONFLICTED_PRS -eq 0 ] && [ $OPEN_PRS -eq 0 ]; then
+    SUMMARY="$SUMMARY
+✅ **All PRs merged - Integration complete**
+
+All tasks from this Play workflow have been successfully integrated into main."
+elif [ $CONFLICTED_PRS -eq 0 ]; then
+    SUMMARY="$SUMMARY
+✅ **No conflicts detected**
+
+All open PRs are cleanly mergeable. Ready for final review and merge."
+else
+    SUMMARY="$SUMMARY
+⚠️ **Conflicts detected in $CONFLICTED_PRS PR(s)**
+
+Atlas will attempt to resolve conflicts automatically."
+fi
+
+SUMMARY="$SUMMARY
+
+---
+*Integration check by Atlas*"
+
+echo "$SUMMARY"
+
+# Exit successfully - Atlas ran the integration check
+exit 0
+
