@@ -526,7 +526,7 @@ impl ResultProcessor {
             CLIType::OpenCode => {
                 self.process_opencode_output(result, &mut processed);
             }
-            CLIType::Cursor | _ => {
+            _ => {
                 self.process_generic_output(result, &mut processed);
             }
         }

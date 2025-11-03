@@ -63,7 +63,7 @@ fn get_docs_schema() -> Value {
 fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
     json!({
         "name": "play",
-        "description": "Submit a Play workflow for multi-agent orchestration (Rex/Blaze → Cleo → Tess) with event-driven coordination",
+        "description": "Submit a Play workflow for multi-agent orchestration (Rex/Blaze → Cleo → Tess → Atlas → Bolt) with event-driven coordination",
         "inputSchema": {
             "type": "object",
             "properties": {
