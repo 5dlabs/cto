@@ -1,8 +1,15 @@
 #!/bin/sh
-# Atlas - End-of-Play Integration Check
-# Ensures all PRs from a Play workflow are cleanly integrated
+# Atlas - Batch/End-of-Play Integration Check
+# Ensures all PRs from a batch or entire Play workflow are cleanly integrated
 
-echo "Atlas: Final integration check for Play workflow {{workflow_name}}"
+INTEGRATION_TYPE="${INTEGRATION_TYPE:-end-of-play}"
+BATCH_NUMBER="${BATCH_NUMBER:-}"
+
+if [ "$INTEGRATION_TYPE" = "batch" ]; then
+    echo "Atlas: Batch $BATCH_NUMBER integration check for Play workflow {{workflow_name}}"
+else
+    echo "Atlas: Final integration check for Play workflow {{workflow_name}}"
+fi
 
 # Source common setup
 source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
@@ -10,26 +17,38 @@ source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
 # Setup authentication
 setup_github_auth
 
-# Get all PRs for this workflow run
-RUN_LABEL="run-{{workflow_name}}"
-SERVICE_LABEL="service-{{service}}"
+# Determine which PRs to check
+if [ "$INTEGRATION_TYPE" = "batch" ] && [ -n "$BATCH_NUMBER" ]; then
+    # Batch integration: Check PRs from specific batch
+    BATCH_LABEL="batch-$BATCH_NUMBER"
+    echo "Checking PRs with label: $BATCH_LABEL"
+    PR_FILTER="--label $BATCH_LABEL"
+else
+    # End-of-play: Check all PRs from this workflow
+    RUN_LABEL="run-{{workflow_name}}"
+    SERVICE_LABEL="service-{{service}}"
+    echo "Checking PRs with labels: $RUN_LABEL, $SERVICE_LABEL"
+    PR_FILTER="--label $RUN_LABEL --label $SERVICE_LABEL"
+fi
 
-echo "Checking PRs with labels: $RUN_LABEL, $SERVICE_LABEL"
-
-# Find all PRs from this Play workflow
-PRS=$(gh pr list -R "{{repository_url}}" \
-    --label "$RUN_LABEL" \
-    --label "$SERVICE_LABEL" \
-    --json number,headRefName,mergeable,mergeStateStatus,state \
-    --jq '.[]')
+# Find all relevant PRs
+eval "PRS=\$(gh pr list -R \"{{repository_url}}\" $PR_FILTER --json number,headRefName,mergeable,mergeStateStatus,state --jq '.[]')"
 
 if [ -z "$PRS" ]; then
-    echo "No PRs found for this workflow run"
+    if [ "$INTEGRATION_TYPE" = "batch" ]; then
+        echo "No PRs found for batch $BATCH_NUMBER"
+    else
+        echo "No PRs found for this workflow run"
+    fi
     exit 0
 fi
 
 TOTAL_PRS=$(echo "$PRS" | jq -s 'length')
-echo "Found $TOTAL_PRS PRs from this Play workflow"
+if [ "$INTEGRATION_TYPE" = "batch" ]; then
+    echo "Found $TOTAL_PRS PRs from batch $BATCH_NUMBER"
+else
+    echo "Found $TOTAL_PRS PRs from this Play workflow"
+fi
 
 # Check each PR status
 OPEN_PRS=0
@@ -60,7 +79,23 @@ echo "$PRS" | jq -c '.' | while read -r pr; do
 done
 
 # Post summary comment to main PR or workflow tracking issue
-SUMMARY="## 🔗 Atlas Integration Report
+if [ "$INTEGRATION_TYPE" = "batch" ]; then
+    SUMMARY="## 🔗 Atlas Batch $BATCH_NUMBER Integration Report
+
+**Play Workflow:** {{workflow_name}}
+**Batch:** $BATCH_NUMBER
+**Service:** {{service}}
+
+### PR Status Summary
+- **Total PRs in Batch:** $TOTAL_PRS
+- **Merged:** $MERGED_PRS ✅
+- **Open & Clean:** $CLEAN_PRS ✅
+- **Open & Conflicted:** $CONFLICTED_PRS ⚠️
+
+### Batch Integration Status
+"
+else
+    SUMMARY="## 🔗 Atlas Final Integration Report
 
 **Play Workflow:** {{workflow_name}}
 **Service:** {{service}}
@@ -71,19 +106,27 @@ SUMMARY="## 🔗 Atlas Integration Report
 - **Open & Clean:** $CLEAN_PRS ✅
 - **Open & Conflicted:** $CONFLICTED_PRS ⚠️
 
-### Integration Status
+### Final Integration Status
 "
+fi
 
 if [ $CONFLICTED_PRS -eq 0 ] && [ $OPEN_PRS -eq 0 ]; then
-    SUMMARY="$SUMMARY
+    if [ "$INTEGRATION_TYPE" = "batch" ]; then
+        SUMMARY="$SUMMARY
+✅ **Batch $BATCH_NUMBER complete - All PRs merged**
+
+All tasks from batch $BATCH_NUMBER have been successfully integrated. Ready for next batch."
+    else
+        SUMMARY="$SUMMARY
 ✅ **All PRs merged - Integration complete**
 
 All tasks from this Play workflow have been successfully integrated into main."
+    fi
 elif [ $CONFLICTED_PRS -eq 0 ]; then
     SUMMARY="$SUMMARY
 ✅ **No conflicts detected**
 
-All open PRs are cleanly mergeable. Ready for final review and merge."
+All open PRs are cleanly mergeable. Ready for review and merge."
 else
     SUMMARY="$SUMMARY
 ⚠️ **Conflicts detected in $CONFLICTED_PRS PR(s)**
@@ -94,7 +137,7 @@ fi
 SUMMARY="$SUMMARY
 
 ---
-*Integration check by Atlas*"
+*Batch integration check by Atlas*"
 
 echo "$SUMMARY"
 

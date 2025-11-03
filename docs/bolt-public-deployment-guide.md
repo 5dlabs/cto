@@ -22,21 +22,27 @@ Bolt is responsible for taking code that's been merged and making it **publicly 
 
 ## When Bolt Runs
 
-Bolt fits into the multi-agent workflow **after code is merged** and **before QA testing**:
+Bolt is the **FINAL STEP** in the workflow - it only runs **AFTER Atlas merges the PR**:
 
 ```
 Rex implements code
   ↓
 Cleo reviews quality
   ↓
-Atlas merges PR
+Tess runs QA tests (in staging/test environment)
   ↓
-🚀 BOLT PUBLISHES APPLICATION 🚀
+Tess approves ✅ (adds "ready-for-production" label)
   ↓
-Tess runs E2E tests (using Bolt's public URL)
+Atlas merges PR to main
   ↓
-Done
+🚀 BOLT PUBLISHES TO PRODUCTION 🚀
+  ↓
+Done - App is publicly accessible
 ```
+
+**Why this order?** We never want to publish untested code publicly. Bolt only runs after:
+1. Tess validates QA and adds the "ready-for-production" label
+2. Atlas merges the PR (Atlas handles ALL merging)
 
 ---
 
@@ -152,17 +158,25 @@ Bolt receives these from the workflow:
 
 ## Example Workflow
 
-### Scenario: Deploy a Web App
+### Scenario: Deploy a Web App to Production
 
-**User Action:** Merge PR #42 with a new React app
+**Complete Workflow:** PR #42 with a new React app
 
-**Bolt's Workflow:**
+**Full Agent Sequence:**
 
-1. **Trigger:** Deployment webhook or workflow completion
+1. **Rex implements** → Creates PR #42
+2. **Cleo reviews** → Code quality: APPROVE
+3. **Atlas merges** → PR merged to main
+4. **Tess tests** → QA in staging: APPROVE + adds "ready-for-production" label
+5. **Bolt triggers** → Tess approval detected
+
+**Bolt's Production Deployment:**
+
+1. **Trigger:** Tess approval + "ready-for-production" label
 2. **Create ArgoCD App:**
    ```bash
    kubectl apply -f argocd-app.yaml
-   # Creates: react-app in argocd namespace
+   # Creates: react-app in argocd namespace (production)
    ```
 
 3. **Wait for Sync:**
@@ -178,9 +192,9 @@ Bolt receives these from the workflow:
    # Creates: react-app-ngrok in agent-platform
    ```
 
-5. **Get URL:**
+5. **Get Production URL:**
    ```
-   Public URL: https://7a2b3c4d.ngrok.io ✅
+   Production URL: https://7a2b3c4d.ngrok.io ✅
    ```
 
 6. **Verify:**
@@ -190,11 +204,14 @@ Bolt receives these from the workflow:
    ```
 
 7. **Post to PR #42:**
-   > 🚀 **Bolt: Application Published**
+   > 🚀 **Bolt: Application Published to Production**
    >
-   > Your React app is live at: https://7a2b3c4d.ngrok.io
+   > ✅ All quality gates passed  
+   > 🔗 Production URL: https://7a2b3c4d.ngrok.io
+   >
+   > Your React app is live and ready for users!
 
-**Result:** Team can immediately access and test the deployed app!
+**Result:** App is publicly accessible ONLY after passing all quality checks!
 
 ---
 
@@ -293,23 +310,24 @@ Automatic certificate provisioning:
 
 ### With Rex (Implementation)
 - Rex creates the code
-- Bolt deploys and publishes it
-- Rex can reference Bolt's URLs in documentation
-
-### With Atlas (Integration)
-- Atlas ensures PRs are cleanly merged
-- Bolt publishes the merged result
-- Atlas validates deployment succeeded
-
-### With Tess (QA/Testing)
-- Tess waits for Bolt to provide public URL
-- Tess runs E2E tests against Bolt's URL
-- Tess validates functionality matches requirements
+- Eventually Bolt will publish it (after QA)
+- Rex references will include production URLs
 
 ### With Cleo (Code Quality)
 - Cleo ensures code quality before merge
-- Bolt deploys the quality-checked code
-- Bolt verifies deployment health
+- Bolt only deploys code that passed quality checks
+- Quality gates prevent bad code from reaching production
+
+### With Atlas (Integration)
+- Atlas ensures PRs are cleanly merged to main
+- Bolt deploys the merged result (after QA approval)
+- Atlas ensures no conflicts in production code
+
+### With Tess (QA/Testing) - **Critical Integration**
+- Tess tests in staging/test environment FIRST
+- Tess validates all acceptance criteria
+- **Tess approves → Bolt publishes to production**
+- Bolt's production URL is the final deliverable after QA validation
 
 ---
 

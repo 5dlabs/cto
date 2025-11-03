@@ -136,17 +136,24 @@ kubectl get ingress -n <namespace>
 - Public URL posted to GitHub PR with clear instructions
 
 ## Integration Points
-- **Rex/Cleo** - Code changes trigger Bolt to publish applications
-- **Atlas** - After PR merge, Bolt makes the deployed app publicly accessible
-- **Tess** - Uses Bolt's public URL for E2E testing and QA validation
-- **GitHub PRs** - Bolt posts public URLs as comments for team access
+- **Rex** - Implements the code that Bolt will eventually publish
+- **Cleo** - Ensures code quality before deployment
+- **Tess** - QA tests in staging, approves when ready (adds "ready-for-production" label)
+- **Atlas** - Merges PR to main (handles ALL merging)
+- **Bolt** - FINAL STEP: After merge, publishes to production
+- **GitHub PRs** - Bolt posts production URLs as final confirmation
 
 ## Workflow Position
-Bolt typically runs **after code is merged** and **before Tess QA testing**:
+Bolt is the **FINAL STEP** - runs after PR is merged by Atlas:
 
 ```
-Rex implements → Cleo reviews → Atlas merges → Bolt publishes → Tess tests → Done
+Rex implements → Cleo reviews → Tess approves → Atlas merges → Bolt publishes ✅ PRODUCTION
 ```
+
+**Critical:** Bolt only runs AFTER:
+1. Tess approves QA testing (adds "ready-for-production" label)
+2. Atlas merges the PR to main
+This ensures we never publish untested code publicly.
 
 ## Environment Variables You Receive
 - `SERVICE` - Name of the service to deploy
