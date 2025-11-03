@@ -150,12 +150,12 @@ create_task_issues() {
     # Generate issue body from task details
     ISSUE_BODY=$(generate_issue_body "$task" "$TASKS_JSON_PATH")
     
-    # Create GitHub issue
+    # Create GitHub issue with workflow-specific labels
     ISSUE_NUMBER=$(gh issue create \
       --repo "$REPO_OWNER/$REPO_NAME" \
       --title "Task $TASK_ID: $TASK_TITLE" \
       --body "$ISSUE_BODY" \
-      --label "taskmaster-task,task-$TASK_ID,priority-$TASK_PRIORITY,status-$TASK_STATUS" \
+      --label "taskmaster-task,task-$TASK_ID,priority-$TASK_PRIORITY,status-$TASK_STATUS,workflow-$WORKFLOW_NAME" \
       2>/dev/null | grep -oP '\d+$' || echo "")
     
     if [[ -z "$ISSUE_NUMBER" ]]; then
@@ -397,6 +397,8 @@ $test_strategy
 - **Priority**: $priority
 - **Dependencies**: ${dependencies:-None}
 - **Status**: Pending
+- **Workflow Run**: \`$WORKFLOW_NAME\`
+- **Started**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 ---
 
@@ -405,6 +407,7 @@ $test_strategy
 This issue is automatically synchronized with TaskMaster.
 
 **Task File**: \`$tasks_json_path\`  
+**Service**: \`$SERVICE_NAME\`  
 **Workflow**: \`$WORKFLOW_NAME\`
 
 ### Agent Pipeline
@@ -415,7 +418,16 @@ This issue is automatically synchronized with TaskMaster.
 
 ---
 
-*This issue is managed by Morgan (Project Manager). Updates will be posted automatically as the workflow progresses.*
+## 📡 Live Status
+
+This issue is monitored by Morgan PM. Status updates are posted automatically as agents progress through the workflow.
+
+**Current Status**: View the Project board for real-time updates  
+**Feedback**: Comment with \`@morgan\` to request scope changes or clarifications
+
+---
+
+*This issue is managed by Morgan (Project Manager) for workflow \`$WORKFLOW_NAME\`.*
 EOF
 }
 
@@ -443,5 +455,6 @@ trap 'log "❌ Morgan PM encountered an error on line $LINENO"' ERR
 
 # Run main
 main
+
 
 
