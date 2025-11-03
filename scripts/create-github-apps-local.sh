@@ -516,3 +516,5 @@ if ! grep -q ".agent-credentials.env" .gitignore 2>/dev/null; then
   echo "   .bolt-private-key.pem"
 fi
 
+
+

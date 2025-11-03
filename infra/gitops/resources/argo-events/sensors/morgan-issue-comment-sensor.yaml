@@ -216,6 +216,6 @@ spec:
                 volumes:
                   - name: agent-templates
                     configMap:
-                      name: agent-templates
+                      name: controller-agent-templates-pm
                       defaultMode: 0755
 

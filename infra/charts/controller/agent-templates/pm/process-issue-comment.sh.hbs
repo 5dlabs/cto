@@ -12,10 +12,9 @@ echo "Issue #$ISSUE_NUMBER | Author: $COMMENT_AUTHOR | Intent: $INTENT_TYPE"
 # CONFIGURATION
 # ============================================================================
 
-REPO_URL="{{repository_url}}"
 TASK_DIR="/tmp/task-docs"
 
-# Parse owner/repo from URL
+# Parse owner/repo from REPOSITORY environment variable (format: "owner/repo")
 if [[ "$REPOSITORY" =~ ([^/]+)/([^/]+) ]]; then
   REPO_OWNER="${BASH_REMATCH[1]}"
   REPO_NAME="${BASH_REMATCH[2]}"
@@ -184,5 +183,6 @@ $message
 
 process_comment
 echo "✅ Comment processing complete"
+
 
 
