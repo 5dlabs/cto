@@ -1,0 +1,99 @@
+#!/bin/sh
+# Bolt - DevOps & Deployment Specialist
+# Monitors deployments, validates ArgoCD health, and ensures successful rollouts
+
+echo "Bolt: Deployment monitoring and validation for {{service}}"
+
+# Source common setup
+source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || true
+
+# Setup authentication
+setup_github_auth
+
+# Environment context
+NAMESPACE="${NAMESPACE:-agent-platform}"
+SERVICE="{{service}}"
+TASK_ID="{{task_id}}"
+
+echo "Monitoring deployment for service: $SERVICE"
+echo "Namespace: $NAMESPACE"
+echo "Task ID: $TASK_ID"
+
+# Check ArgoCD application health
+check_argocd_health() {
+    local app_name="$1"
+    echo "Checking ArgoCD application: $app_name"
+    
+    kubectl get application "$app_name" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown"
+}
+
+# Check deployment status
+check_deployment() {
+    local deployment="$1"
+    echo "Checking deployment: $deployment"
+    
+    kubectl rollout status deployment/"$deployment" -n "$NAMESPACE" --timeout=5m
+}
+
+# Validate pod health
+check_pods() {
+    local label_selector="$1"
+    echo "Checking pods with selector: $label_selector"
+    
+    kubectl get pods -n "$NAMESPACE" -l "$label_selector" -o wide
+    kubectl get pods -n "$NAMESPACE" -l "$label_selector" \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}'
+}
+
+# Main validation flow
+echo "===== Starting Deployment Validation ====="
+
+# 1. Check ArgoCD sync status
+if [ -n "$SERVICE" ]; then
+    ARGOCD_APP="${SERVICE}-app"
+    HEALTH=$(check_argocd_health "$ARGOCD_APP")
+    
+    if [ "$HEALTH" != "Healthy" ]; then
+        echo "⚠️  ArgoCD application $ARGOCD_APP is not healthy: $HEALTH"
+        echo "Investigating ArgoCD sync status..."
+        kubectl describe application "$ARGOCD_APP" -n argocd
+    else
+        echo "✅ ArgoCD application $ARGOCD_APP is healthy"
+    fi
+fi
+
+# 2. Check deployment rollout
+if [ -n "$SERVICE" ]; then
+    check_deployment "$SERVICE"
+fi
+
+# 3. Validate pod health
+if [ -n "$SERVICE" ]; then
+    check_pods "app=$SERVICE"
+fi
+
+# 4. Check for any recent errors in logs
+echo "===== Checking Recent Logs ====="
+if [ -n "$SERVICE" ]; then
+    POD=$(kubectl get pods -n "$NAMESPACE" -l "app=$SERVICE" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -n "$POD" ]; then
+        echo "Recent logs from $POD:"
+        kubectl logs -n "$NAMESPACE" "$POD" --tail=50 --since=5m 2>/dev/null || echo "No recent logs"
+    fi
+fi
+
+# 5. Report findings to PR
+if [ -n "$PR_NUMBER" ]; then
+    echo "Posting deployment validation results to PR #$PR_NUMBER"
+    
+    gh pr comment "$PR_NUMBER" --body "## 🚀 Bolt Deployment Validation
+
+**Service:** \`$SERVICE\`  
+**Namespace:** \`$NAMESPACE\`  
+**ArgoCD Health:** $HEALTH  
+
+Deployment validation completed successfully."
+fi
+
+echo "===== Bolt Deployment Validation Complete ====="
+

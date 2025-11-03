@@ -1,0 +1,184 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: bolt-deployment-monitor
+  namespace: agent-platform
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    - name: argocd-sync
+      eventSourceName: github-webhook
+      eventName: deployment_status
+      filters:
+        data:
+          # Trigger on deployment status events
+          - path: body.X-GitHub-Event
+            type: string
+            value:
+              - deployment_status
+          # Only trigger on success/failure states
+          - path: body.deployment_status.state
+            type: string
+            value:
+              - success
+              - failure
+              - error
+
+  triggers:
+    - template:
+        name: bolt-deployment-validation
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-bolt-deploy-
+                namespace: agent-platform
+                labels:
+                  agent: bolt
+                  trigger: deployment-status
+              spec:
+                githubApp: "5DLabs-Bolt"
+                cli: "Claude"
+                model: "claude-sonnet-4-20250514"
+                maxTokens: 4096
+                temperature: 0.3
+                repositoryUrl: ""
+                env:
+                  - name: DEPLOYMENT_STATE
+                    value: ""
+                  - name: DEPLOYMENT_URL
+                    value: ""
+                  - name: PR_NUMBER
+                    value: ""
+                  - name: SERVICE
+                    value: ""
+
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: bolt-deployment-
+                namespace: agent-platform
+              spec:
+                serviceAccountName: agent-workflow-sa
+                entrypoint: validate-deployment
+                arguments:
+                  parameters:
+                    - name: deployment-state
+                      value: ""
+                    - name: service-name
+                      value: ""
+                templates:
+                  - name: validate-deployment
+                    steps:
+                      - - name: run-bolt
+                          template: bolt-validation
+
+                  - name: bolt-validation
+                    resource:
+                      action: create
+                      manifest: |
+                        apiVersion: agents.platform.5dlabs.ai/v1alpha1
+                        kind: CodeRun
+                        metadata:
+                          generateName: coderun-bolt-
+                          namespace: agent-platform
+                        spec:
+                          githubApp: "5DLabs-Bolt"
+                          cli: "Claude"
+                          model: "claude-sonnet-4-20250514"
+
+        parameters:
+          - src:
+              dependencyName: argocd-sync
+              dataKey: body.deployment_status.state
+            dest: spec.env.0.value
+
+          - src:
+              dependencyName: argocd-sync
+              dataKey: body.deployment_status.target_url
+            dest: spec.env.1.value
+
+          - src:
+              dependencyName: argocd-sync
+              dataKey: body.deployment.ref
+            dest: spec.env.2.value
+            operation: append
+
+          - src:
+              dependencyName: argocd-sync
+              dataKey: body.deployment.environment
+            dest: spec.env.3.value
+
+          - src:
+              dependencyName: argocd-sync
+              dataKey: body.repository.clone_url
+            dest: spec.repositoryUrl
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bolt-deployment-strategy
+  namespace: agent-platform
+data:
+  strategy.md: |
+    # Bolt Deployment Monitoring Strategy
+
+    ## Trigger Patterns
+
+    Bolt activates in three scenarios:
+
+    ### 1. Real-Time Deployment Monitoring
+    - GitHub deployment_status webhook events
+    - Triggers when deployment succeeds or fails
+    - Validates ArgoCD sync and Kubernetes health
+
+    ### 2. End-of-Play Integration
+    - Triggered after all Play workflow tasks complete
+    - Comprehensive validation of all deployed services
+    - Ensures no pending deployments or issues
+
+    ### 3. Manual Invocation
+    - Via GitHub PR comment: `/bolt check`
+    - On-demand deployment health validation
+    - Useful for troubleshooting specific issues
+
+    ## Validation Workflow
+
+    ```
+    Deployment Status Event
+      ↓
+    Bolt CodeRun Created
+      ↓
+    Check ArgoCD Health
+      ↓
+    Validate Kubernetes Resources
+      ↓
+    Review Pod Logs
+      ↓
+    Post PR Comment with Results
+    ```
+
+    ## Integration with Other Agents
+
+    - **Rex/Cleo** → Code merged → ArgoCD syncs → **Bolt validates**
+    - **Atlas** → PRs integrated → Deployment triggered → **Bolt monitors**
+    - **Tess** → Awaits **Bolt** validation before E2E tests
+
+    ## Success Criteria
+
+    Bolt marks deployment as ✅ when:
+    1. ArgoCD application status: `Healthy` + `Synced`
+    2. All pods in `Running` state with ready containers
+    3. No errors in recent pod logs (last 5 minutes)
+    4. Resource utilization within acceptable limits
+
