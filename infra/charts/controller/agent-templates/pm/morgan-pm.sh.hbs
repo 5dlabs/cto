@@ -134,10 +134,21 @@ echo "  DOCS_BRANCH: ${DOCS_BRANCH:-NOT SET}"
 echo "  DOCS_PROJECT_DIRECTORY: ${DOCS_PROJECT_DIRECTORY:-NOT SET}"
 echo "  SERVICE_NAME: ${SERVICE_NAME:-NOT SET}"
 
-DOCS_REPO="${DOCS_REPOSITORY}"
+# Normalize DOCS_REPOSITORY to full URL if needed
+DOCS_REPO_INPUT="${DOCS_REPOSITORY}"
+if [[ "$DOCS_REPO_INPUT" =~ ^https?:// ]] || [[ "$DOCS_REPO_INPUT" =~ ^git@ ]]; then
+    # Already a full URL
+    DOCS_REPO="$DOCS_REPO_INPUT"
+else
+    # Short format (owner/repo) - convert to HTTPS URL
+    DOCS_REPO="https://github.com/$DOCS_REPO_INPUT"
+fi
+
 DOCS_BRANCH="${DOCS_BRANCH:-main}"
 DOCS_DIR="${DOCS_PROJECT_DIRECTORY}"
 SERVICE_NAME="${SERVICE_NAME}"
+
+echo "🔍 DEBUG: Normalized DOCS_REPO to: $DOCS_REPO"
 
 # Shared state directory
 SHARED_DIR="/shared/morgan-pm"
@@ -322,48 +333,142 @@ create_task_issues() {
 }
 
 # ============================================================================
-# PHASE 3: CONTINUOUS MONITORING
+# PHASE 3: CONTINUOUS MONITORING (EVENT-DRIVEN)
 # ============================================================================
 
 monitor_and_sync() {
-  log "👀 Phase 3: Continuous Monitoring & Synchronization"
-  log "🔄 Starting monitoring loop (updates every 30 seconds)..."
+  log "👀 Phase 3: Event-Driven Monitoring & Synchronization"
+  log "🔄 Starting real-time workflow watch..."
   
   PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
-  ITERATION=0
   
-  while true; do
-    ITERATION=$((ITERATION + 1))
+  # Initial sync of all tasks
+  log "📊 Performing initial sync..."
+  sync_all_tasks "$PROJECT_ID"
+  
+  # Generate initial project summary
+  update_project_summary "$PROJECT_ID"
+  
+  # Background process to watch parent workflow
+  watch_parent_workflow &
+  PARENT_WATCH_PID=$!
+  
+  # Background process to periodically update summary (every 5 minutes)
+  (
+    while true; do
+      sleep 300  # 5 minutes
+      update_project_summary "$PROJECT_ID" 2>/dev/null || true
+    done
+  ) &
+  SUMMARY_UPDATE_PID=$!
+  
+  # Main event loop: Watch all task workflows
+  log "👁️  Watching for workflow changes (real-time)..."
+  kubectl get workflows -n "$NAMESPACE" \
+    -l "parent-workflow=$WORKFLOW_NAME" \
+    --watch -o json 2>/dev/null | \
+  while read -r event_line; do
+    # Skip empty lines
+    [[ -z "$event_line" ]] && continue
     
-    # Check parent workflow status
+    # Parse event
+    EVENT_TYPE=$(echo "$event_line" | jq -r '.type // "UNKNOWN"')
+    WORKFLOW_OBJ=$(echo "$event_line" | jq -r '.object // {}')
+    
+    # Extract workflow details
+    TASK_ID=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["task-id"] // ""')
+    WORKFLOW_NAME_LOCAL=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.name // ""')
+    CURRENT_STAGE=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["current-stage"] // "pending"')
+    WORKFLOW_PHASE=$(echo "$WORKFLOW_OBJ" | jq -r '.status.phase // "Pending"')
+    
+    [[ -z "$TASK_ID" ]] && continue
+    
+    log "📡 Event: $EVENT_TYPE for task-$TASK_ID (stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE)"
+    
+    # Update GitHub for this specific task
+    handle_task_event "$PROJECT_ID" "$TASK_ID" "$WORKFLOW_NAME_LOCAL" "$CURRENT_STAGE" "$WORKFLOW_PHASE"
+  done
+  
+  # Cleanup background processes
+  kill $PARENT_WATCH_PID 2>/dev/null || true
+  kill $SUMMARY_UPDATE_PID 2>/dev/null || true
+  
+  # Final summary update
+  update_project_summary "$PROJECT_ID" 2>/dev/null || true
+  
+  log "🎉 Monitoring complete"
+}
+
+watch_parent_workflow() {
+  # Watch parent workflow in background
+  while true; do
     WORKFLOW_STATUS=$(kubectl get workflow "$WORKFLOW_NAME" \
       -n "$NAMESPACE" \
       -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
     
-    log "📊 Iteration $ITERATION: Workflow status = $WORKFLOW_STATUS"
-    
     if [[ "$WORKFLOW_STATUS" == "Succeeded" ]] || [[ "$WORKFLOW_STATUS" == "Failed" ]] || [[ "$WORKFLOW_STATUS" == "Error" ]]; then
       log "✅ Parent workflow completed with status: $WORKFLOW_STATUS"
       
-      # Final sync
+      # Trigger final sync
+      PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
       sync_all_tasks "$PROJECT_ID"
       
-      break
+      # Kill main watch process
+      pkill -P $$ kubectl || true
+      exit 0
     fi
     
-    if [[ "$WORKFLOW_STATUS" == "NotFound" ]]; then
-      log "⚠️  Workflow not found, waiting..."
-      sleep 30
-      continue
-    fi
-    
-    # Sync task statuses
-    sync_all_tasks "$PROJECT_ID"
-    
-    sleep 30
+    sleep 10
   done
+}
+
+handle_task_event() {
+  local project_id="$1"
+  local task_id="$2"
+  local workflow_name="$3"
+  local current_stage="$4"
+  local workflow_phase="$5"
   
-  log "🎉 Monitoring complete"
+  # Get issue details from mapping
+  local entry=$(jq -r --arg tid "$task_id" '.[$tid] // empty' "$TASK_ISSUE_MAP")
+  [[ -z "$entry" ]] && return 0
+  
+  local issue_number=$(echo "$entry" | jq -r '.issue_number')
+  local item_id=$(echo "$entry" | jq -r '.item_id')
+  
+  # Map stage to agent and status
+  local current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
+  local task_status=$(map_workflow_to_status "$current_stage" "$workflow_phase")
+  
+  log "🔄 Updating task-$task_id: $current_agent | $task_status"
+  
+  # Update project item
+  set_project_item_status "$project_id" "$item_id" "$task_status"
+  set_project_item_agent "$project_id" "$item_id" "$current_agent"
+  
+  # Update issue labels
+  update_issue_labels "$issue_number" "$task_status" "$current_agent"
+  
+  # NEW: Add structured status history
+  add_status_history "$issue_number" "$task_id" "$current_stage" "$current_agent" "$task_status" "$workflow_phase"
+  
+  # NEW: Check for errors/failures
+  check_task_health "$task_id" "$workflow_name" "$current_stage" "$issue_number"
+  
+  # NEW: Track and report agent progress
+  update_progress_comment "$issue_number" "$task_id" "$workflow_name" "$current_stage"
+  
+  # NEW: GitHub Checks API integration (if PR exists)
+  local pr_number=$(find_pr_for_task "$task_id")
+  if [[ -n "$pr_number" ]]; then
+    create_or_update_github_check "$task_id" "$pr_number" "$current_agent" "$current_stage" "$workflow_phase"
+  fi
+  
+  # NEW: Stream significant agent activity
+  stream_significant_events "$task_id" "$workflow_name" "$issue_number"
+  
+  # NEW: Update heartbeat timestamp
+  update_heartbeat "$issue_number"
 }
 
 sync_all_tasks() {
@@ -493,6 +598,507 @@ update_issue_labels() {
     --repo "$REPO_OWNER/$REPO_NAME" \
     --add-label "$status_label" \
     2>/dev/null || true
+}
+
+# ============================================================================
+# PHASE 1 ENHANCEMENTS: HEALTH CHECKS & STATUS TRACKING
+# ============================================================================
+
+add_status_history() {
+  local issue_number="$1"
+  local task_id="$2"
+  local stage="$3"
+  local agent="$4"
+  local status="$5"
+  local phase="$6"
+  
+  local timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  local argo_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
+  
+  # Create structured status update comment
+  gh issue comment "$issue_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --body "**📊 Status Update**
+
+| Field | Value |
+|-------|-------|
+| ⏰ Time | $timestamp |
+| 🎯 Stage | \`$stage\` |
+| 🤖 Agent | $agent |
+| 📋 Status | $status |
+| 🔄 Phase | $phase |
+| 🔗 Workflow | [View in Argo]($argo_url) |
+
+---
+*Auto-updated by Morgan PM*" 2>/dev/null || true
+  
+  log "📝 Added status history for task-$task_id"
+}
+
+check_task_health() {
+  local task_id="$1"
+  local workflow_name="$2"
+  local current_stage="$3"
+  local issue_number="$4"
+  
+  # Find CodeRun for this task/stage
+  local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
+    -l "task-id=$task_id,workflow-name=$workflow_name" \
+    --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+  
+  [[ -z "$coderun_name" ]] && return 0
+  
+  # Check CodeRun status
+  local coderun_phase=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+  
+  local coderun_error=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
+    -o jsonpath='{.status.error}' 2>/dev/null || echo "")
+  
+  # Check pod status for more details
+  local pod_name=$(kubectl get pods -n "$NAMESPACE" \
+    -l "coderun=$coderun_name" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  
+  local pod_phase=""
+  local pod_reason=""
+  if [[ -n "$pod_name" ]]; then
+    pod_phase=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
+      -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    pod_reason=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
+      -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || echo "")
+  fi
+  
+  # Detect problems
+  local has_error=false
+  local error_message=""
+  
+  if [[ "$coderun_phase" == "Failed" ]]; then
+    has_error=true
+    error_message="CodeRun failed: $coderun_error"
+  elif [[ "$pod_reason" == "CrashLoopBackOff" ]] || [[ "$pod_reason" == "Error" ]]; then
+    has_error=true
+    error_message="Agent pod crashed: $pod_reason"
+  elif [[ "$pod_phase" == "Failed" ]]; then
+    has_error=true
+    error_message="Agent pod failed"
+  fi
+  
+  # Report errors to GitHub
+  if [[ "$has_error" == true ]]; then
+    log "⚠️  Health check failed for task-$task_id: $error_message"
+    
+    # Get recent logs for context
+    local error_logs=""
+    if [[ -n "$pod_name" ]]; then
+      error_logs=$(kubectl logs "$pod_name" -n "$NAMESPACE" --tail=20 2>/dev/null || echo "Logs unavailable")
+    fi
+    
+    gh issue comment "$issue_number" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --body "## ⚠️ Agent Error Detected
+
+**CodeRun:** \`$coderun_name\`  
+**Error:** $error_message  
+**Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+<details>
+<summary>Recent Logs (last 20 lines)</summary>
+
+\`\`\`
+$error_logs
+\`\`\`
+
+</details>
+
+**Next Steps:**
+- Review logs above for root cause
+- Check if this is a transient issue that will auto-retry
+- Manual intervention may be required
+
+---
+*Auto-detected by Morgan PM Health Check*" 2>/dev/null || true
+  fi
+}
+
+update_heartbeat() {
+  local issue_number="$1"
+  local timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  
+  # Update or create heartbeat comment
+  # Use a unique marker so we can find and update the same comment
+  local heartbeat_marker="<!-- morgan-heartbeat -->"
+  
+  # For now, just track in sync log (avoid spamming issues)
+  # Could be enhanced to update a single pinned comment
+  echo "$timestamp - Heartbeat for issue #$issue_number" >> "$SYNC_LOG"
+}
+
+# ============================================================================
+# PHASE 2: SUB-STAGE PROGRESS TRACKING
+# ============================================================================
+
+get_agent_progress() {
+  local task_id="$1"
+  local workflow_name="$2"
+  local current_stage="$3"
+  
+  # Find most recent CodeRun for this task/stage
+  local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
+    -l "task-id=$task_id,workflow-name=$workflow_name" \
+    --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+  
+  [[ -z "$coderun_name" ]] && echo "" && return 0
+  
+  # Check for progress annotation (future: agents could set this)
+  local progress=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
+    -o jsonpath='{.metadata.annotations.agent-progress}' 2>/dev/null || echo "")
+  
+  # If no annotation, try to parse from pod logs
+  if [[ -z "$progress" ]]; then
+    local pod_name=$(kubectl get pods -n "$NAMESPACE" \
+      -l "coderun=$coderun_name" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -n "$pod_name" ]]; then
+      # Look for common progress indicators in logs
+      # Match patterns like "Progress: 45%" or "Step 3/10" etc
+      local log_progress=$(kubectl logs "$pod_name" -n "$NAMESPACE" --tail=100 2>/dev/null | \
+        grep -oiE '(progress:? ?[0-9]+%|[0-9]+%|step [0-9]+/[0-9]+)' | \
+        tail -1 || echo "")
+      
+      if [[ -n "$log_progress" ]]; then
+        progress="$log_progress"
+      fi
+    fi
+  fi
+  
+  echo "$progress"
+}
+
+update_progress_comment() {
+  local issue_number="$1"
+  local task_id="$2"
+  local workflow_name="$3"
+  local current_stage="$4"
+  
+  local progress=$(get_agent_progress "$task_id" "$workflow_name" "$current_stage")
+  
+  [[ -z "$progress" ]] && return 0
+  
+  # Post progress update as a comment
+  gh issue comment "$issue_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --body "🔄 **Progress Update** - Stage: \`$current_stage\`
+
+Current progress: **$progress**
+
+*Updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")*  
+*Auto-updated by Morgan PM*" 2>/dev/null || true
+  
+  log "📈 Progress for task-$task_id: $progress"
+}
+
+# ============================================================================
+# PHASE 3: GITHUB CHECKS API INTEGRATION
+# ============================================================================
+
+create_or_update_github_check() {
+  local task_id="$1"
+  local pr_number="$2"
+  local agent_name="$3"
+  local current_stage="$4"
+  local workflow_phase="$5"
+  
+  # Get PR head SHA
+  local pr_head_sha=$(gh pr view "$pr_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --json headRefOid \
+    --jq '.headRefOid' 2>/dev/null || echo "")
+  
+  [[ -z "$pr_head_sha" ]] && return 0
+  
+  # Map workflow phase to check status
+  local check_status="in_progress"
+  local check_conclusion=""
+  
+  case "$workflow_phase" in
+    "Succeeded")
+      check_status="completed"
+      check_conclusion="success"
+      ;;
+    "Failed"|"Error")
+      check_status="completed"
+      check_conclusion="failure"
+      ;;
+    "Running")
+      check_status="in_progress"
+      ;;
+    *)
+      check_status="queued"
+      ;;
+  esac
+  
+  # Create/update check run
+  local check_name="$agent_name Quality Gate"
+  local argo_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
+  
+  # Check if check run already exists
+  local existing_check=$(gh api \
+    "/repos/$REPO_OWNER/$REPO_NAME/commits/$pr_head_sha/check-runs" \
+    --jq ".check_runs[] | select(.name == \"$check_name\") | .id" 2>/dev/null || echo "")
+  
+  if [[ -n "$existing_check" ]]; then
+    # Update existing check
+    local update_payload="{
+      \"status\": \"$check_status\",
+      \"details_url\": \"$argo_url\",
+      \"output\": {
+        \"title\": \"$agent_name is reviewing this PR\",
+        \"summary\": \"Current stage: $current_stage\",
+        \"text\": \"Task ID: $task_id\\nWorkflow: $WORKFLOW_NAME\\nPhase: $workflow_phase\"
+      }"
+    
+    if [[ -n "$check_conclusion" ]]; then
+      update_payload="$update_payload,\"conclusion\": \"$check_conclusion\""
+    fi
+    
+    update_payload="$update_payload}"
+    
+    gh api \
+      --method PATCH \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/$REPO_OWNER/$REPO_NAME/check-runs/$existing_check" \
+      --input - <<< "$update_payload" 2>/dev/null || true
+    
+    log "✅ Updated GitHub check for $agent_name on PR #$pr_number"
+  else
+    # Create new check
+    local create_payload="{
+      \"name\": \"$check_name\",
+      \"head_sha\": \"$pr_head_sha\",
+      \"status\": \"$check_status\",
+      \"details_url\": \"$argo_url\",
+      \"output\": {
+        \"title\": \"$agent_name is reviewing this PR\",
+        \"summary\": \"Current stage: $current_stage\",
+        \"text\": \"Task ID: $task_id\\nWorkflow: $WORKFLOW_NAME\\nPhase: $workflow_phase\"
+      }"
+    
+    if [[ -n "$check_conclusion" ]]; then
+      create_payload="$create_payload,\"conclusion\": \"$check_conclusion\""
+    fi
+    
+    create_payload="$create_payload}"
+    
+    gh api \
+      --method POST \
+      -H "Accept: application/vnd.github+json" \
+      "/repos/$REPO_OWNER/$REPO_NAME/check-runs" \
+      --input - <<< "$create_payload" 2>/dev/null || true
+    
+    log "✅ Created GitHub check for $agent_name on PR #$pr_number"
+  fi
+}
+
+find_pr_for_task() {
+  local task_id="$1"
+  
+  # Find PR with task label
+  local pr_number=$(gh pr list \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --label "task-$task_id" \
+    --state open \
+    --json number \
+    --jq '.[0].number' 2>/dev/null || echo "")
+  
+  echo "$pr_number"
+}
+
+# ============================================================================
+# PHASE 3: AGENT LOG STREAMING
+# ============================================================================
+
+stream_significant_events() {
+  local task_id="$1"
+  local workflow_name="$2"
+  local issue_number="$3"
+  
+  # Find CodeRun pod
+  local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
+    -l "task-id=$task_id,workflow-name=$workflow_name" \
+    --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+  
+  [[ -z "$coderun_name" ]] && return 0
+  
+  local pod_name=$(kubectl get pods -n "$NAMESPACE" \
+    -l "coderun=$coderun_name" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  
+  [[ -z "$pod_name" ]] && return 0
+  
+  # Get recent logs and look for significant events
+  local significant_logs=$(kubectl logs "$pod_name" -n "$NAMESPACE" --tail=50 2>/dev/null | \
+    grep -iE '(creating pr|running tests?|error|failed|success|completed|starting)' | \
+    tail -5 || echo "")
+  
+  if [[ -n "$significant_logs" ]]; then
+    gh issue comment "$issue_number" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --body "🤖 **Agent Activity** (Last 5 significant events)
+
+\`\`\`
+$significant_logs
+\`\`\`
+
+*Updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")*  
+*Auto-captured by Morgan PM*" 2>/dev/null || true
+    
+    log "📡 Posted agent activity for task-$task_id"
+  fi
+}
+
+# ============================================================================
+# PHASE 3: PROMETHEUS METRICS
+# ============================================================================
+
+export_prometheus_metrics() {
+  local project_id="$1"
+  
+  # Calculate metrics
+  local total_tasks=$(jq 'length' "$TASK_ISSUE_MAP")
+  local completed_tasks=0
+  local in_progress_tasks=0
+  local blocked_tasks=0
+  local pending_tasks=0
+  
+  # Count by stage
+  jq -c 'to_entries[]' "$TASK_ISSUE_MAP" | while read -r entry; do
+    local task_id=$(echo "$entry" | jq -r '.key')
+    
+    # Find workflow for this task
+    local task_workflow=$(kubectl get workflows -n "$NAMESPACE" \
+      -l "task-id=$task_id,parent-workflow=$WORKFLOW_NAME" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -z "$task_workflow" ]]; then
+      pending_tasks=$((pending_tasks + 1))
+      continue
+    fi
+    
+    local workflow_phase=$(kubectl get workflow "$task_workflow" \
+      -n "$NAMESPACE" \
+      -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
+    
+    case "$workflow_phase" in
+      "Succeeded") completed_tasks=$((completed_tasks + 1)) ;;
+      "Running") in_progress_tasks=$((in_progress_tasks + 1)) ;;
+      "Failed"|"Error") blocked_tasks=$((blocked_tasks + 1)) ;;
+      *) pending_tasks=$((pending_tasks + 1)) ;;
+    esac
+  done
+  
+  # Calculate average sync lag (time since last update)
+  local sync_timestamp=$(date +%s)
+  
+  # Export metrics to file (Prometheus can scrape this)
+  mkdir -p /shared/metrics
+  cat > /shared/metrics/morgan.prom <<EOF
+# HELP morgan_total_tasks Total number of tasks in this project
+# TYPE morgan_total_tasks gauge
+morgan_total_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $total_tasks
+
+# HELP morgan_completed_tasks Number of completed tasks
+# TYPE morgan_completed_tasks gauge
+morgan_completed_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $completed_tasks
+
+# HELP morgan_in_progress_tasks Number of tasks currently in progress
+# TYPE morgan_in_progress_tasks gauge
+morgan_in_progress_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $in_progress_tasks
+
+# HELP morgan_blocked_tasks Number of blocked/failed tasks
+# TYPE morgan_blocked_tasks gauge
+morgan_blocked_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $blocked_tasks
+
+# HELP morgan_pending_tasks Number of pending tasks
+# TYPE morgan_pending_tasks gauge
+morgan_pending_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $pending_tasks
+
+# HELP morgan_last_sync_timestamp Unix timestamp of last sync
+# TYPE morgan_last_sync_timestamp gauge
+morgan_last_sync_timestamp{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $sync_timestamp
+
+# HELP morgan_project_completion_percentage Project completion percentage
+# TYPE morgan_project_completion_percentage gauge
+morgan_project_completion_percentage{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $(( total_tasks > 0 ? (completed_tasks * 100) / total_tasks : 0 ))
+EOF
+  
+  log "📊 Exported Prometheus metrics: $completed_tasks/$total_tasks tasks complete"
+}
+
+# ============================================================================
+# PHASE 3: AI STATUS SUMMARIES
+# ============================================================================
+
+generate_ai_summary() {
+  local project_id="$1"
+  
+  # Gather project statistics
+  local total_tasks=$(jq 'length' "$TASK_ISSUE_MAP")
+  local project_title=$(jq -r '.project_title' "$PROJECT_CONFIG")
+  
+  # Get task statuses
+  local tasks_status=$(kubectl get workflows -n "$NAMESPACE" \
+    -l "parent-workflow=$WORKFLOW_NAME" \
+    -o json 2>/dev/null || echo '{"items":[]}')
+  
+  local completed_count=$(echo "$tasks_status" | jq '[.items[] | select(.status.phase == "Succeeded")] | length')
+  local in_progress_count=$(echo "$tasks_status" | jq '[.items[] | select(.status.phase == "Running")] | length')
+  local failed_count=$(echo "$tasks_status" | jq '[.items[] | select(.status.phase == "Failed" or .status.phase == "Error")] | length')
+  
+  # Create human-readable summary
+  local summary_text=""
+  
+  if [[ $completed_count -eq $total_tasks ]]; then
+    summary_text="🎉 **All tasks completed!** The $SERVICE_NAME project workflow has successfully finished all $total_tasks tasks."
+  elif [[ $failed_count -gt 0 ]]; then
+    summary_text="⚠️ **Attention needed:** $failed_count task(s) have failed. $in_progress_count task(s) in progress, $completed_count/$total_tasks completed."
+  elif [[ $in_progress_count -gt 0 ]]; then
+    summary_text="🔄 **In progress:** $in_progress_count task(s) actively being worked on. $completed_count/$total_tasks tasks completed so far."
+  else
+    summary_text="⏸️ **Waiting:** $completed_count/$total_tasks tasks completed. Remaining tasks are pending."
+  fi
+  
+  # Update project description with summary
+  # Note: GitHub Projects V2 GraphQL API doesn't support description updates yet
+  # Instead, post summary as a pinned issue comment or use GitHub Project README
+  
+  log "📝 Generated AI summary: $summary_text"
+  echo "$summary_text"
+}
+
+update_project_summary() {
+  local project_id="$1"
+  
+  local summary=$(generate_ai_summary "$project_id")
+  
+  # Find the first issue to pin the summary
+  local first_issue=$(jq -r 'to_entries[0].value.issue_number' "$TASK_ISSUE_MAP" 2>/dev/null || echo "")
+  
+  if [[ -n "$first_issue" ]]; then
+    # Check if summary comment exists
+    local summary_marker="<!-- morgan-project-summary -->"
+    
+    # For now, just log the summary
+    # Future: Could create a dedicated "Project Status" issue
+    log "📊 Project Summary: $summary"
+  fi
+  
+  # Export metrics along with summary
+  export_prometheus_metrics "$project_id"
 }
 
 generate_issue_body() {
