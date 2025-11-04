@@ -3,19 +3,19 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: bolt-production-deployment
-  namespace: agent-platform
+  namespace: argo
 spec:
   template:
     serviceAccountName: argo-events-sa
 
   dependencies:
     - name: pr-merged
-      eventSourceName: github-webhook
-      eventName: pull_request
+      eventSourceName: github
+      eventName: org
       filters:
         data:
           # Trigger on PR merged events
-          - path: body.X-GitHub-Event
+          - path: headers.X-Github-Event
             type: string
             value:
               - pull_request
@@ -129,7 +129,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: bolt-production-deployment-strategy
-  namespace: agent-platform
+  namespace: argo
 data:
   strategy.md: |
     # Bolt Production Deployment Strategy
