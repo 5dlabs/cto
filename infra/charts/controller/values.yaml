@@ -695,7 +695,7 @@ ingress:
 resources:
   limits:
     cpu: 1000m
-    memory: 4Gi  # Prevent runaway memory consumption while allowing headroom
+    memory: 8Gi  # Increased from 4Gi to handle controller workload on worker node
   requests:
     cpu: 500m
     memory: 1Gi

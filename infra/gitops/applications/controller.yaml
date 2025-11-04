@@ -45,7 +45,7 @@ spec:
         - name: resources.limits.cpu
           value: 1000m
         - name: resources.limits.memory
-          value: 4Gi  # Prevents runaway memory consumption
+          value: 8Gi  # Increased from 4Gi to handle controller workload on worker node
         - name: resources.requests.cpu
           value: 500m
         - name: resources.requests.memory
