@@ -36,6 +36,7 @@ spec:
     - 'https://charts.ngrok.com'
     - 'https://github.com/kubernetes-sigs/gateway-api'
     - 'https://kubernetes-sigs.github.io/external-dns/'
+    - 'https://kubernetes-sigs.github.io/metrics-server/'
     # Removed Mailu Helm chart repository
     # Database operator Helm chart repositories
     - 'https://opensource.zalando.com/postgres-operator/charts/postgres-operator'
