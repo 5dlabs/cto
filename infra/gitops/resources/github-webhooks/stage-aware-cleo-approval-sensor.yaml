@@ -20,7 +20,7 @@ spec:
       eventName: org
       filters:
         data:
-          - path: headers.X-Github-Event
+          - path: headers.X-GitHub-Event
             type: string
             value: ["pull_request_review"]
           - path: body.action
