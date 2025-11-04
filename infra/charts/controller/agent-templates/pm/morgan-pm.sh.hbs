@@ -294,13 +294,14 @@ create_task_issues() {
     log "🔍 DEBUG: Issue body length: ${#ISSUE_BODY} characters"
     
     # Create GitHub issue with workflow-specific labels
-    # First, try to create without errors suppressed to see what's wrong
+    # First, create issue without labels (labels might not exist)
     ISSUE_CREATE_OUTPUT=$(gh issue create \
       --repo "$REPO_OWNER/$REPO_NAME" \
       --title "Task $TASK_ID: $TASK_TITLE" \
       --body "$ISSUE_BODY" \
-      --label "taskmaster-task,task-$TASK_ID,priority-$TASK_PRIORITY,status-$TASK_STATUS,workflow-$WORKFLOW_NAME" \
       2>&1 || echo "ERROR")
+    
+    log "🔍 DEBUG: Issue create output: $ISSUE_CREATE_OUTPUT"
     
     if [[ "$ISSUE_CREATE_OUTPUT" == "ERROR" ]] || [[ "$ISSUE_CREATE_OUTPUT" == *"error"* ]] || [[ "$ISSUE_CREATE_OUTPUT" == *"failed"* ]]; then
       log "⚠️  Failed to create issue for task $TASK_ID"
@@ -318,6 +319,20 @@ create_task_issues() {
     fi
     
     log "✅ Created issue #$ISSUE_NUMBER for task $TASK_ID"
+    
+    # Add labels to the issue (create if they don't exist)
+    log "🏷️  Adding labels to issue #$ISSUE_NUMBER..."
+    gh label create "taskmaster-task" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
+    gh label create "task-$TASK_ID" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
+    gh label create "priority-$TASK_PRIORITY" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
+    gh label create "status-$TASK_STATUS" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
+    gh label create "workflow-$WORKFLOW_NAME" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
+    
+    # Apply labels to issue
+    gh issue edit "$ISSUE_NUMBER" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --add-label "taskmaster-task,task-$TASK_ID,priority-$TASK_PRIORITY,status-$TASK_STATUS,workflow-$WORKFLOW_NAME" \
+      2>/dev/null || log "⚠️  Could not add all labels to issue #$ISSUE_NUMBER"
     
     # Get issue node ID for GraphQL
     ISSUE_NODE_ID=$(gh issue view "$ISSUE_NUMBER" \
@@ -387,22 +402,39 @@ monitor_and_sync() {
   
   # Main event loop: Watch all task workflows
   log "👁️  Watching for workflow changes (real-time)..."
+  
+  # kubectl watch outputs JSON objects one per line, not a JSON array
+  # Use --watch-only to get only changes (not initial list)
   kubectl get workflows -n "$NAMESPACE" \
     -l "parent-workflow=$WORKFLOW_NAME" \
-    --watch -o json 2>/dev/null | \
-  while read -r event_line; do
+    --watch-only -o json 2>/dev/null | \
+  while IFS= read -r event_line; do
     # Skip empty lines
     [[ -z "$event_line" ]] && continue
     
-    # Parse event
-    EVENT_TYPE=$(echo "$event_line" | jq -r '.type // "UNKNOWN"')
-    WORKFLOW_OBJ=$(echo "$event_line" | jq -r '.object // {}')
+    # Validate JSON before parsing
+    if ! echo "$event_line" | jq empty 2>/dev/null; then
+      log "⚠️  Skipping invalid JSON line"
+      continue
+    fi
+    
+    # Parse event - kubectl watch outputs {type, object} format
+    EVENT_TYPE=$(echo "$event_line" | jq -r '.type // "MODIFIED"' 2>/dev/null || echo "MODIFIED")
+    
+    # Handle different watch formats
+    if echo "$event_line" | jq -e '.object' >/dev/null 2>&1; then
+      # Standard watch format: {type: "MODIFIED", object: {...}}
+      WORKFLOW_OBJ=$(echo "$event_line" | jq -r '.object')
+    else
+      # Direct object format
+      WORKFLOW_OBJ="$event_line"
+    fi
     
     # Extract workflow details
-    TASK_ID=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["task-id"] // ""')
-    WORKFLOW_NAME_LOCAL=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.name // ""')
-    CURRENT_STAGE=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["current-stage"] // "pending"')
-    WORKFLOW_PHASE=$(echo "$WORKFLOW_OBJ" | jq -r '.status.phase // "Pending"')
+    TASK_ID=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["task-id"] // ""' 2>/dev/null || echo "")
+    WORKFLOW_NAME_LOCAL=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.name // ""' 2>/dev/null || echo "")
+    CURRENT_STAGE=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["current-stage"] // "pending"' 2>/dev/null || echo "pending")
+    WORKFLOW_PHASE=$(echo "$WORKFLOW_OBJ" | jq -r '.status.phase // "Pending"' 2>/dev/null || echo "Pending")
     
     [[ -z "$TASK_ID" ]] && continue
     
@@ -998,8 +1030,8 @@ export_prometheus_metrics() {
   local blocked_tasks=0
   local pending_tasks=0
   
-  # Count by stage
-  jq -c 'to_entries[]' "$TASK_ISSUE_MAP" | while read -r entry; do
+  # Count by stage - use process substitution to avoid subshell variable scope bug
+  while read -r entry; do
     local task_id=$(echo "$entry" | jq -r '.key')
     
     # Find workflow for this task
@@ -1022,7 +1054,7 @@ export_prometheus_metrics() {
       "Failed"|"Error") blocked_tasks=$((blocked_tasks + 1)) ;;
       *) pending_tasks=$((pending_tasks + 1)) ;;
     esac
-  done
+  done < <(jq -c 'to_entries[]' "$TASK_ISSUE_MAP")
   
   # Calculate average sync lag (time since last update)
   local sync_timestamp=$(date +%s)
