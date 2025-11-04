@@ -1395,11 +1395,9 @@ spec:
     # Morgan Project Manager - Daemon template
     - name: morgan-project-manager
       daemon: true  # Keeps running throughout workflow lifecycle
-      container:
+      script:
         image: {{ .Values.agent.cliImages.claude.repository }}:{{ .Values.agent.cliImages.claude.tag }}
         command: ["/bin/bash"]
-        args: ["-c"]
-        # Render templates then execute
         source: |
           #!/bin/bash
           set -euo pipefail
