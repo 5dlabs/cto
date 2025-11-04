@@ -109,7 +109,7 @@ get_or_create_project() {
   
   local create_result=$(gh api graphql \
     -f query="$create_mutation" \
-    -f ownerId="$owner_id" \
+    -f ownerId="$repo_id" \
     -f title="$title" 2>&1)
   
   # Check for errors in response
