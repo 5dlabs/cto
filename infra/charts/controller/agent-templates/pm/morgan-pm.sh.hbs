@@ -170,17 +170,22 @@ log() {
 # ============================================================================
 
 initialize_project() {
+  echo "🔍 DEBUG: Entered initialize_project()"
   log "📊 Phase 1: Project Initialization"
   
   # Clone docs repository to get TaskMaster data
   log "📥 Cloning documentation repository..."
+  echo "🔍 DEBUG: DOCS_REPO=$DOCS_REPO, DOCS_BRANCH=$DOCS_BRANCH"
   TEMP_CLONE="/tmp/docs-repo"
   rm -rf "$TEMP_CLONE"
   
+  echo "🔍 DEBUG: About to git clone..."
   git clone --depth 1 --branch "$DOCS_BRANCH" "$DOCS_REPO" "$TEMP_CLONE" || {
     log "❌ Failed to clone docs repository"
+    echo "❌ DEBUG: Git clone failed with exit code $?"
     exit 1
   }
+  echo "🔍 DEBUG: Git clone succeeded"
   
   cd "$TEMP_CLONE/$DOCS_DIR"
   
@@ -559,25 +564,33 @@ EOF
 # ============================================================================
 
 main() {
+  echo "🔍 DEBUG: Entered main() function"
   log "🚀 Morgan PM starting..."
   
+  echo "🔍 DEBUG: About to call initialize_project()"
   # Phase 1: Initialize project
   initialize_project
+  echo "🔍 DEBUG: initialize_project() completed"
   
   # Phase 2: Create issues
   create_task_issues
   
   # Phase 3: Monitor and sync
+  echo "🔍 DEBUG: About to call monitor_and_sync()"
   monitor_and_sync
   
   log "✅ Morgan PM completed successfully"
+  echo "🔍 DEBUG: main() function completed"
 }
 
 # Trap errors and cleanup
-trap 'log "❌ Morgan PM encountered an error on line $LINENO"' ERR
+trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2; exit 1' ERR
 
+echo "🔍 DEBUG: About to call main()..."
 # Run main
 main
+
+echo "✅ DEBUG: main() completed successfully"
 
 
 
