@@ -1402,26 +1402,30 @@ spec:
           #!/bin/bash
           set -euo pipefail
           
-          echo "📦 Installing envsubst..."
-          apt-get update -qq && apt-get install -y -qq gettext-base > /dev/null 2>&1
-          
           echo "🔧 Rendering Morgan PM templates..."
           
-          # Render templates with Handlebars-like substitution
-          export repository_url="{{`{{workflow.parameters.repository}}`}}"
-          export workflow_name="{{`{{workflow.name}}`}}"
-          export namespace={{ .Release.Namespace | quote }}
+          # Define template variables
+          REPOSITORY_URL="{{`{{workflow.parameters.repository}}`}}"
+          WORKFLOW_NAME="{{`{{workflow.name}}`}}"
+          NAMESPACE={{ .Release.Namespace | quote }}
           
-          # Source helpers first
-          cat /pm-templates/github-projects-helpers.sh.hbs | envsubst > /workspace/github-projects-helpers.sh
+          # Render templates using sed (no root required, already installed)
+          sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
+              -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
+              -e "s|{{namespace}}|$NAMESPACE|g" \
+              /pm-templates/github-projects-helpers.sh.hbs > /workspace/github-projects-helpers.sh
           chmod +x /workspace/github-projects-helpers.sh
           
-          # Render main script
-          cat /pm-templates/morgan-pm.sh.hbs | envsubst > /workspace/morgan-pm.sh
+          sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
+              -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
+              -e "s|{{namespace}}|$NAMESPACE|g" \
+              /pm-templates/morgan-pm.sh.hbs > /workspace/morgan-pm.sh
           chmod +x /workspace/morgan-pm.sh
           
-          # Render comment processor
-          cat /pm-templates/process-issue-comment.sh.hbs | envsubst > /workspace/process-issue-comment.sh
+          sed -e "s|{{repository_url}}|$REPOSITORY_URL|g" \
+              -e "s|{{workflow_name}}|$WORKFLOW_NAME|g" \
+              -e "s|{{namespace}}|$NAMESPACE|g" \
+              /pm-templates/process-issue-comment.sh.hbs > /workspace/process-issue-comment.sh
           chmod +x /workspace/process-issue-comment.sh
           
           echo "✅ Templates rendered, starting Morgan PM..."
