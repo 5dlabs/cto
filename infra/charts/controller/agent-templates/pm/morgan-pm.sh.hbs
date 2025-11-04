@@ -134,10 +134,21 @@ echo "  DOCS_BRANCH: ${DOCS_BRANCH:-NOT SET}"
 echo "  DOCS_PROJECT_DIRECTORY: ${DOCS_PROJECT_DIRECTORY:-NOT SET}"
 echo "  SERVICE_NAME: ${SERVICE_NAME:-NOT SET}"
 
-DOCS_REPO="${DOCS_REPOSITORY}"
+# Normalize DOCS_REPOSITORY to full URL if needed
+DOCS_REPO_INPUT="${DOCS_REPOSITORY}"
+if [[ "$DOCS_REPO_INPUT" =~ ^https?:// ]] || [[ "$DOCS_REPO_INPUT" =~ ^git@ ]]; then
+    # Already a full URL
+    DOCS_REPO="$DOCS_REPO_INPUT"
+else
+    # Short format (owner/repo) - convert to HTTPS URL
+    DOCS_REPO="https://github.com/$DOCS_REPO_INPUT"
+fi
+
 DOCS_BRANCH="${DOCS_BRANCH:-main}"
 DOCS_DIR="${DOCS_PROJECT_DIRECTORY}"
 SERVICE_NAME="${SERVICE_NAME}"
+
+echo "🔍 DEBUG: Normalized DOCS_REPO to: $DOCS_REPO"
 
 # Shared state directory
 SHARED_DIR="/shared/morgan-pm"
