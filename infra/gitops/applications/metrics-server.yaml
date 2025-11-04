@@ -76,10 +76,11 @@ spec:
             maxUnavailable: 0
             maxSurge: 1
 
-        # Pod annotations for monitoring
+        # Pod annotations for monitoring (for documentation - endpoint discovery is used)
         podAnnotations:
           prometheus.io/scrape: "true"
           prometheus.io/port: "4443"
+          prometheus.io/scheme: "https"
 
         # Affinity for pod distribution
         affinity:
