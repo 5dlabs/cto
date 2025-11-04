@@ -45,52 +45,54 @@ graphql_query() {
 
 get_or_create_project() {
   local owner="$1"
-  local title="$2"
+  local repo_name="$2"
+  local title="$3"
   
-  # Try to find existing project
+  # Try to find existing repository-level project
   local query='
-    query($owner: String!) {
-      repositoryOwner(login: $owner) {
-        ... on Organization {
-          projectsV2(first: 20) {
-            nodes {
-              id
-              title
-            }
-          }
-        }
-        ... on User {
-          projectsV2(first: 20) {
-            nodes {
-              id
-              title
-            }
+    query($owner: String!, $repo: String!) {
+      repository(owner: $owner, name: $repo) {
+        projectsV2(first: 20) {
+          nodes {
+            id
+            title
           }
         }
       }
     }
   '
   
-  local result=$(gh api graphql -f query="$query" -f owner="$owner")
+  local result=$(gh api graphql -f query="$query" -f owner="$owner" -f repo="$repo_name")
   
   # Check if project exists
   local project_id=$(echo "$result" | jq -r \
     --arg title "$title" \
-    '.data.repositoryOwner.projectsV2.nodes[] | select(.title == $title) | .id')
+    '.data.repository.projectsV2.nodes[] | select(.title == $title) | .id')
   
   if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
     echo "$project_id"
     return 0
   fi
   
-  # Create new project
-  local owner_id=$(gh api graphql -f query='
-    query($owner: String!) {
-      repositoryOwner(login: $owner) {
+  # Get repository node ID (not owner ID) for repo-level projects
+  local repo_result=$(gh api graphql -f query='
+    query($owner: String!, $repo: String!) {
+      repository(owner: $owner, name: $repo) {
         id
       }
     }
-  ' -f owner="$owner" | jq -r '.data.repositoryOwner.id')
+  ' -f owner="$owner" -f repo="$repo_name" 2>&1)
+  
+  local repo_id=$(echo "$repo_result" | jq -r '.data.repository.id // ""')
+  
+  if [[ -z "$repo_id" ]] || [[ "$repo_id" == "null" ]]; then
+    echo "ERROR: Could not get repository ID for $owner/$repo_name" >&2
+    echo "$repo_result" >&2
+    echo ""
+    return 1
+  fi
+  
+  echo "Creating repository-level project for $owner/$repo_name (ID: $repo_id)" >&2
   
   local create_mutation='
     mutation($ownerId: ID!, $title: String!) {
@@ -108,9 +110,26 @@ get_or_create_project() {
   local create_result=$(gh api graphql \
     -f query="$create_mutation" \
     -f ownerId="$owner_id" \
-    -f title="$title")
+    -f title="$title" 2>&1)
   
-  echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id'
+  # Check for errors in response
+  if echo "$create_result" | jq -e '.errors' >/dev/null 2>&1; then
+    echo "ERROR: Failed to create project" >&2
+    echo "$create_result" | jq -r '.errors[0].message' >&2
+    echo ""
+    return 1
+  fi
+  
+  local project_id=$(echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id // ""')
+  
+  if [[ -z "$project_id" ]] || [[ "$project_id" == "null" ]]; then
+    echo "ERROR: No project ID returned" >&2
+    echo "$create_result" >&2
+    echo ""
+    return 1
+  fi
+  
+  echo "$project_id"
 }
 
 # ============================================================================
