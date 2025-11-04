@@ -106,3 +106,4 @@ charts-repo/
 # tasks.json
 # tasks/
 **/target/*docs/tasks-reference/
+target/

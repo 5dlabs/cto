@@ -626,3 +626,4 @@ annotations:
 
 Once merged and GitHub Apps are installed, Atlas and Bolt will immediately start automating merge conflicts and production deployments for your entire development pipeline.
 
+
