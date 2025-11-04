@@ -79,7 +79,7 @@ spec:
         # Pod annotations for monitoring
         podAnnotations:
           prometheus.io/scrape: "true"
-          prometheus.io/port: "10250"
+          prometheus.io/port: "4443"
 
         # Affinity for pod distribution
         affinity:
