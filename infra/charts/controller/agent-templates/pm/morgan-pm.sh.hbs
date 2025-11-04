@@ -1030,8 +1030,8 @@ export_prometheus_metrics() {
   local blocked_tasks=0
   local pending_tasks=0
   
-  # Count by stage
-  jq -c 'to_entries[]' "$TASK_ISSUE_MAP" | while read -r entry; do
+  # Count by stage - use process substitution to avoid subshell variable scope bug
+  while read -r entry; do
     local task_id=$(echo "$entry" | jq -r '.key')
     
     # Find workflow for this task
@@ -1054,7 +1054,7 @@ export_prometheus_metrics() {
       "Failed"|"Error") blocked_tasks=$((blocked_tasks + 1)) ;;
       *) pending_tasks=$((pending_tasks + 1)) ;;
     esac
-  done
+  done < <(jq -c 'to_entries[]' "$TASK_ISSUE_MAP")
   
   # Calculate average sync lag (time since last update)
   local sync_timestamp=$(date +%s)
