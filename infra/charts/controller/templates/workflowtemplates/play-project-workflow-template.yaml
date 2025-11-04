@@ -1402,8 +1402,8 @@ spec:
           #!/bin/bash
           set -euo pipefail
           
-          echo "📦 Installing envsubst..."
-          apt-get update -qq && apt-get install -y -qq gettext-base > /dev/null 2>&1
+          # Note: envsubst is not needed - we use sed for template rendering
+          # sed is already installed in the claude image and doesn't require root
           
           echo "🔧 Rendering Morgan PM templates..."
           
