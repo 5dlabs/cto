@@ -110,8 +110,8 @@ if [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ] && [ -n "${GITHUB_APP_ID:-}" ]; then
     git config --global --replace-all credential.helper store
     echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
 
-    # Authenticate gh CLI with the token
-    echo "$GITHUB_TOKEN" | gh auth login --with-token
+    # Note: gh CLI will automatically use GITHUB_TOKEN env var
+    # No explicit auth login needed
 
     echo "✅ GitHub App authenticated successfully"
 
