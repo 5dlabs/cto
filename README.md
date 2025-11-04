@@ -43,14 +43,14 @@
 
 <div align="center">
 
-### **💻 Implementation Squad**
+### **🎯 Project Management & Architecture**
 
 <table>
 <tr>
-<td align="center" width="25%">
+<td align="center" width="100%">
 
 ### **Morgan**
-#### *The Knowledge Architect*
+#### *The Overseer*
 
 <div align="center">
 <img src="https://raw.githubusercontent.com/5dlabs/.github/main/profile/assets/morgan-avatar.png" width="180" height="180" alt="Morgan Avatar">
@@ -60,10 +60,17 @@
 📖 **Superpower:** Explains complex things simply  
 💬 **Motto:** *"Knowledge shared is knowledge squared!"*
 
-**Morgan generates comprehensive documentation and manages GitHub projects via `docs()` MCP calls, creating the foundation for all development work.**
+**Morgan oversees project architecture, generates comprehensive documentation, and manages GitHub projects via `docs()` MCP calls, creating the foundation for all development work.**
 
 </td>
-<td align="center" width="25%">
+</tr>
+</table>
+
+### **💻 Implementation Squad**
+
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
 
 ### **Rex**
 #### *The Backend Powerhouse*
@@ -79,7 +86,7 @@
 **Rex builds APIs, services, and backend infrastructure through `play()` workflows, specializing in Rust and high-performance systems.**
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="33%">
 
 ### **Blaze**
 #### *The Interface Maestro*
@@ -95,7 +102,7 @@
 **Blaze creates stunning frontends and user experiences, working alongside Rex for full-stack projects.**
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="33%">
 
 ### **Cleo**
 #### *The Quality Guardian*
