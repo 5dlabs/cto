@@ -47,7 +47,7 @@
 
 <table>
 <tr>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ### **Morgan**
 #### *The Knowledge Architect*
@@ -63,7 +63,7 @@
 **Morgan generates comprehensive documentation and manages GitHub projects via `docs()` MCP calls, creating the foundation for all development work.**
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ### **Rex**
 #### *The Backend Powerhouse*
@@ -79,7 +79,7 @@
 **Rex builds APIs, services, and backend infrastructure through `play()` workflows, specializing in Rust and high-performance systems.**
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ### **Blaze**
 #### *The Interface Maestro*
@@ -95,7 +95,7 @@
 **Blaze creates stunning frontends and user experiences, working alongside Rex for full-stack projects.**
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ### **Cleo**
 #### *The Quality Guardian*
