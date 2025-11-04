@@ -91,9 +91,12 @@ server:
               namespaces:
                 names:
                   - kube-system
+<<<<<<< HEAD
           scheme: https
           tls_config:
             insecure_skip_verify: true  # metrics-server uses self-signed certs
+=======
+>>>>>>> 7890501f14235a28efa3dd0cfab3a43a127ccc96
           relabel_configs:
             - source_labels: [__meta_kubernetes_service_name]
               action: keep
