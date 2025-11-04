@@ -307,6 +307,12 @@ map_stage_to_agent() {
     "testing-in-progress"|"qa-in-progress")
       echo "Tess (QA)"
       ;;
+    "integration-in-progress"|"merging")
+      echo "Atlas (Integration)"
+      ;;
+    "deployment-in-progress"|"deploying")
+      echo "Bolt (Deployment)"
+      ;;
     "completed"|"done")
       echo "Complete ✅"
       ;;
@@ -413,8 +419,10 @@ This issue is automatically synchronized with TaskMaster.
 ### Agent Pipeline
 1. **Rex** - Implementation
 2. **Cleo** - Code Quality Review
-3. **Cipher** - Security Analysis
+3. **Cipher** - Security Analysis (if enabled)
 4. **Tess** - QA Testing
+5. **Atlas** - Integration & Merge
+6. **Bolt** - Production Deployment
 
 ---
 

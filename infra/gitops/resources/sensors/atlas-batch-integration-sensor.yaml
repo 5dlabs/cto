@@ -16,7 +16,7 @@ spec:
       filters:
         data:
           # Trigger on PR comments from workflow
-          - path: headers.X-Github-Event
+          - path: headers.X-GitHub-Event
             type: string
             value:
               - issue_comment

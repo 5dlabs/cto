@@ -15,7 +15,7 @@ spec:
       filters:
         data:
           # Trigger on PR merged events
-          - path: headers.X-Github-Event
+          - path: headers.X-GitHub-Event
             type: string
             value:
               - pull_request
