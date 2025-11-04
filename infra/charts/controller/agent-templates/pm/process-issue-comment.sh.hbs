@@ -9,30 +9,101 @@ echo "💬 Morgan - Processing Issue Comment"
 echo "Issue #$ISSUE_NUMBER | Author: $COMMENT_AUTHOR | Intent: $INTENT_TYPE"
 
 # ============================================================================
+# GITHUB APP AUTHENTICATION
+# ============================================================================
+
+echo "🔐 Authenticating with GitHub App..."
+
+if [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ] && [ -n "${GITHUB_APP_ID:-}" ]; then
+    # Parse repository info early
+    if [[ "$REPOSITORY" =~ ([^/]+)/([^/]+) ]]; then
+        REPO_OWNER="${BASH_REMATCH[1]}"
+        REPO_NAME="${BASH_REMATCH[2]}"
+    else
+        echo "❌ Failed to parse repository: $REPOSITORY"
+        exit 1
+    fi
+
+    # Create temporary key file
+    TEMP_KEY_FILE="/tmp/github-app-key-$$"
+    echo "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY_FILE"
+    chmod 600 "$TEMP_KEY_FILE"
+
+    # Generate JWT token
+    JWT_TOKEN=$(ruby -r openssl -r json -r base64 -e "
+    key = OpenSSL::PKey::RSA.new(File.read('$TEMP_KEY_FILE'))
+    payload = {
+        iat: Time.now.to_i - 60,
+        exp: Time.now.to_i + (10 * 60),
+        iss: '$GITHUB_APP_ID'
+    }
+    header = { alg: 'RS256', typ: 'JWT' }
+
+    header_enc = Base64.urlsafe_encode64(header.to_json).gsub('=', '')
+    payload_enc = Base64.urlsafe_encode64(payload.to_json).gsub('=', '')
+    signature = Base64.urlsafe_encode64(key.sign(OpenSSL::Digest::SHA256.new, \"#{header_enc}.#{payload_enc}\")).gsub('=', '')
+
+    puts \"#{header_enc}.#{payload_enc}.#{signature}\"
+    ")
+
+    # Get installation ID
+    INSTALLATION_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/installation")
+
+    INSTALLATION_ID=$(echo "$INSTALLATION_RESPONSE" | jq -r '.id')
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "⚠️  No repo installation, trying organization..."
+        ORG_INSTALLATION_RESPONSE=$(curl -s -H "Authorization: Bearer $JWT_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$REPO_OWNER/installation")
+        
+        INSTALLATION_ID=$(echo "$ORG_INSTALLATION_RESPONSE" | jq -r '.id')
+    fi
+
+    if [ "$INSTALLATION_ID" = "null" ] || [ -z "$INSTALLATION_ID" ]; then
+        echo "❌ Failed to get installation ID"
+        rm -f "$TEMP_KEY_FILE"
+        exit 1
+    fi
+
+    # Get installation access token
+    TOKEN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer $JWT_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+    GITHUB_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+    if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
+        echo "❌ Failed to get installation access token"
+        echo "Response: $TOKEN_RESPONSE"
+        rm -f "$TEMP_KEY_FILE"
+        exit 1
+    fi
+
+    rm -f "$TEMP_KEY_FILE"
+
+    # Export and configure authentication
+    export GITHUB_TOKEN
+    git config --global --replace-all credential.helper store
+    echo "https://x-access-token:${GITHUB_TOKEN}@github.com" > ~/.git-credentials
+    echo "$GITHUB_TOKEN" | gh auth login --with-token
+    git config --global --add safe.directory /tmp/task-docs
+
+    echo "✅ GitHub App authenticated successfully"
+
+else
+    echo "❌ GITHUB_APP_PRIVATE_KEY or GITHUB_APP_ID not found"
+    exit 1
+fi
+
+# ============================================================================
 # CONFIGURATION
 # ============================================================================
-#
-# Expected environment variables (provided by morgan-issue-comment-sensor):
-#   REPOSITORY          - Repository in "owner/repo" format
-#   REPOSITORY_URL      - Full clone URL for the repository
-#   ISSUE_NUMBER        - GitHub issue number
-#   COMMENT_BODY        - Full text of the comment
-#   COMMENT_AUTHOR      - GitHub username of comment author
-#   TASK_ID             - TaskMaster task ID extracted from issue labels
-#   INTENT_TYPE         - Classified intent (scope-change, clarification, priority-change)
-#   GITHUB_APP_ID       - GitHub App ID for authentication
-#   GITHUB_APP_PRIVATE_KEY - GitHub App private key
 
 TASK_DIR="/tmp/task-docs"
-
-# Parse owner/repo from REPOSITORY environment variable (format: "owner/repo")
-if [[ "$REPOSITORY" =~ ([^/]+)/([^/]+) ]]; then
-  REPO_OWNER="${BASH_REMATCH[1]}"
-  REPO_NAME="${BASH_REMATCH[2]}"
-else
-  echo "❌ Failed to parse repository: $REPOSITORY"
-  exit 1
-fi
 
 # ============================================================================
 # MAIN PROCESSING
