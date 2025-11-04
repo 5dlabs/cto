@@ -308,7 +308,8 @@ create_task_issues() {
       continue
     fi
     
-    ISSUE_NUMBER=$(echo "$ISSUE_CREATE_OUTPUT" | grep -oP '\d+$' || echo "")
+    # Extract issue number using portable method (Alpine grep doesn't support -P)
+    ISSUE_NUMBER=$(echo "$ISSUE_CREATE_OUTPUT" | grep -Eo '[0-9]+$' | tail -1 || echo "")
     
     if [[ -z "$ISSUE_NUMBER" ]]; then
       log "⚠️  Could not extract issue number for task $TASK_ID"
