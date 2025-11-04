@@ -169,7 +169,8 @@ spec:
                           # Extract task ID from labels using jq if available, otherwise use grep
                           if command -v jq >/dev/null 2>&1; then
                             TASK_ID=$(echo "$TASK_LABELS_JSON" \
-                              | jq -r '.[]? | select(.name) | .name | ascii_downcase | select(test("task-[0-9]+")) | capture("task-(?<id>[0-9]+)") | .id' \
+                              | jq -r '.[]? | select(.name) | .name | ascii_downcase
+                                | select(test("task-[0-9]+")) | capture("task-(?<id>[0-9]+)") | .id' \
                               | head -1 2>/dev/null || echo "")
                           fi
                         fi

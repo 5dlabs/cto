@@ -25,4 +25,3 @@ spec:
       - CreateNamespace=false
       - PruneLast=true
 
-
