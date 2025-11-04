@@ -16,11 +16,18 @@ echo "🔐 Authenticating with GitHub App..."
 
 if [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ] && [ -n "${GITHUB_APP_ID:-}" ]; then
     # Parse repository info early
-    if [[ "$REPOSITORY" =~ ([^/]+)/([^/]+) ]]; then
+    # Handle both full URL and short format (owner/repo)
+    if [[ "$REPOSITORY" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+        # Full URL format
+        REPO_OWNER="${BASH_REMATCH[1]}"
+        REPO_NAME="${BASH_REMATCH[2]}"
+    elif [[ "$REPOSITORY" =~ ^([^/]+)/([^/]+)$ ]]; then
+        # Short format: owner/repo
         REPO_OWNER="${BASH_REMATCH[1]}"
         REPO_NAME="${BASH_REMATCH[2]}"
     else
         echo "❌ Failed to parse repository: $REPOSITORY"
+        echo "Expected formats: 'owner/repo' or 'https://github.com/owner/repo'"
         exit 1
     fi
 
