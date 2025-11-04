@@ -218,12 +218,16 @@ initialize_project() {
   
   # Get or create GitHub Project
   log "🏗️  Setting up GitHub Project..."
+  log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, SERVICE_NAME=$SERVICE_NAME"
   
   PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
+  log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
+  
   PROJECT_ID=$(get_or_create_project "$REPO_OWNER" "$PROJECT_TITLE")
   
-  if [[ -z "$PROJECT_ID" ]]; then
+  if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
     log "❌ Failed to create or find project"
+    log "🔍 DEBUG: PROJECT_ID returned: '$PROJECT_ID'"
     exit 1
   fi
   
@@ -281,16 +285,34 @@ create_task_issues() {
     # Generate issue body from task details
     ISSUE_BODY=$(generate_issue_body "$task" "$TASKS_JSON_PATH")
     
+    # Debug: Check if body was generated
+    if [[ -z "$ISSUE_BODY" ]]; then
+      log "⚠️  Failed to generate issue body for task $TASK_ID"
+      continue
+    fi
+    
+    log "🔍 DEBUG: Issue body length: ${#ISSUE_BODY} characters"
+    
     # Create GitHub issue with workflow-specific labels
-    ISSUE_NUMBER=$(gh issue create \
+    # First, try to create without errors suppressed to see what's wrong
+    ISSUE_CREATE_OUTPUT=$(gh issue create \
       --repo "$REPO_OWNER/$REPO_NAME" \
       --title "Task $TASK_ID: $TASK_TITLE" \
       --body "$ISSUE_BODY" \
       --label "taskmaster-task,task-$TASK_ID,priority-$TASK_PRIORITY,status-$TASK_STATUS,workflow-$WORKFLOW_NAME" \
-      2>/dev/null | grep -oP '\d+$' || echo "")
+      2>&1 || echo "ERROR")
+    
+    if [[ "$ISSUE_CREATE_OUTPUT" == "ERROR" ]] || [[ "$ISSUE_CREATE_OUTPUT" == *"error"* ]] || [[ "$ISSUE_CREATE_OUTPUT" == *"failed"* ]]; then
+      log "⚠️  Failed to create issue for task $TASK_ID"
+      log "Error details: $ISSUE_CREATE_OUTPUT"
+      continue
+    fi
+    
+    ISSUE_NUMBER=$(echo "$ISSUE_CREATE_OUTPUT" | grep -oP '\d+$' || echo "")
     
     if [[ -z "$ISSUE_NUMBER" ]]; then
-      log "⚠️  Failed to create issue for task $TASK_ID, skipping..."
+      log "⚠️  Could not extract issue number for task $TASK_ID"
+      log "Output was: $ISSUE_CREATE_OUTPUT"
       continue
     fi
     
