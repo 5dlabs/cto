@@ -43,11 +43,11 @@
 
 <div align="center">
 
-### **🎯 Team Lead**
+### **💻 Implementation Squad**
 
 <table>
 <tr>
-<td align="center" width="100%">
+<td align="center" width="25%">
 
 ### **Morgan**
 #### *The Knowledge Architect*
@@ -60,17 +60,10 @@
 📖 **Superpower:** Explains complex things simply  
 💬 **Motto:** *"Knowledge shared is knowledge squared!"*
 
-**Morgan generates comprehensive documentation via `docs()` MCP calls, creating the foundation for all development work.**
+**Morgan generates comprehensive documentation and manages GitHub projects via `docs()` MCP calls, creating the foundation for all development work.**
 
 </td>
-</tr>
-</table>
-
-### **💻 Implementation Squad**
-
-<table>
-<tr>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 ### **Rex**
 #### *The Backend Powerhouse*
@@ -86,7 +79,7 @@
 **Rex builds APIs, services, and backend infrastructure through `play()` workflows, specializing in Rust and high-performance systems.**
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 ### **Blaze**
 #### *The Interface Maestro*
@@ -102,7 +95,7 @@
 **Blaze creates stunning frontends and user experiences, working alongside Rex for full-stack projects.**
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="25%">
 
 ### **Cleo**
 #### *The Quality Guardian*
@@ -125,7 +118,7 @@
 
 <table>
 <tr>
-<td align="center" width="33%">
+<td align="center" width="50%">
 
 ### **Cipher**
 #### *The Security Sentinel*
@@ -141,7 +134,7 @@
 **Cipher handles security reviews, vulnerability scanning, and ensures enterprise-grade security across all workflows.**
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="50%">
 
 ### **Tess**
 #### *The Testing Genius*
@@ -157,7 +150,14 @@
 **Tess creates comprehensive tests, validates functionality, and ensures reliability in the testing phase of `play()` workflows.**
 
 </td>
-<td align="center" width="33%">
+</tr>
+</table>
+
+### **🚀 Operations Squad**
+
+<table>
+<tr>
+<td align="center" width="50%">
 
 ### **Atlas**
 #### *The Integration Master*
@@ -173,14 +173,7 @@
 **Atlas manages PR merges, resolves conflicts automatically, and ensures clean integration with the main branch.**
 
 </td>
-</tr>
-</table>
-
-### **🚀 Operations Squad**
-
-<table>
-<tr>
-<td align="center" width="100%">
+<td align="center" width="50%">
 
 ### **Bolt**
 #### *The Deployment Specialist*
