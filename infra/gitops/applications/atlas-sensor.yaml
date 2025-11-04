@@ -16,7 +16,7 @@ spec:
       include: atlas-conflict-detection-sensor.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: agent-platform
+    namespace: argo
   syncPolicy:
     automated:
       prune: true

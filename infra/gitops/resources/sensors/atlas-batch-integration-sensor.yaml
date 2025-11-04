@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: atlas-batch-integration
-  namespace: agent-platform
+  namespace: argo
 spec:
   template:
     serviceAccountName: argo-events-sa
@@ -11,12 +11,12 @@ spec:
   dependencies:
     # Batch completion in parallel execution
     - name: batch-complete
-      eventSourceName: github-webhook
-      eventName: issue_comment
+      eventSourceName: github
+      eventName: org
       filters:
         data:
           # Trigger on PR comments from workflow
-          - path: body.X-GitHub-Event
+          - path: headers.X-Github-Event
             type: string
             value:
               - issue_comment
@@ -84,7 +84,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: atlas-batch-integration-strategy
-  namespace: agent-platform
+  namespace: argo
 data:
   strategy.md: |
     # Atlas Batch Integration Strategy
