@@ -43,11 +43,19 @@ if [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ] && [ -n "${GITHUB_APP_ID:-}" ]; then
 
     # Parse repository info early
     REPO_URL="{{repository_url}}"
-    if [[ "$REPO_URL" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+    
+    # Handle both full URL and short format (owner/repo)
+    if [[ "$REPO_URL" =~ github\.com[:/]([^/]+)/([^/\.]+)(\.git)?$ ]]; then
+        # Full URL format: https://github.com/owner/repo or git@github.com:owner/repo.git
+        REPO_OWNER="${BASH_REMATCH[1]}"
+        REPO_NAME="${BASH_REMATCH[2]}"
+    elif [[ "$REPO_URL" =~ ^([^/]+)/([^/]+)$ ]]; then
+        # Short format: owner/repo (allows dots in repo name)
         REPO_OWNER="${BASH_REMATCH[1]}"
         REPO_NAME="${BASH_REMATCH[2]}"
     else
         echo "❌ Failed to parse repository URL: $REPO_URL"
+        echo "Expected formats: 'owner/repo' or 'https://github.com/owner/repo'"
         exit 1
     fi
 
