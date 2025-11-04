@@ -1402,6 +1402,9 @@ spec:
           #!/bin/bash
           set -euo pipefail
           
+          echo "📦 Installing envsubst..."
+          apt-get update -qq && apt-get install -y -qq gettext-base > /dev/null 2>&1
+          
           echo "🔧 Rendering Morgan PM templates..."
           
           # Define template variables
