@@ -128,8 +128,14 @@ fi
 # CONFIGURATION
 # ============================================================================
 
+echo "🔍 DEBUG: Configuration"
+echo "  DOCS_REPOSITORY: ${DOCS_REPOSITORY:-NOT SET}"
+echo "  DOCS_BRANCH: ${DOCS_BRANCH:-NOT SET}"
+echo "  DOCS_PROJECT_DIRECTORY: ${DOCS_PROJECT_DIRECTORY:-NOT SET}"
+echo "  SERVICE_NAME: ${SERVICE_NAME:-NOT SET}"
+
 DOCS_REPO="${DOCS_REPOSITORY}"
-DOCS_BRANCH="${DOCS_BRANCH}"
+DOCS_BRANCH="${DOCS_BRANCH:-main}"
 DOCS_DIR="${DOCS_PROJECT_DIRECTORY}"
 SERVICE_NAME="${SERVICE_NAME}"
 
@@ -141,10 +147,15 @@ TASK_ISSUE_MAP="$SHARED_DIR/task-issue-map.json"
 PROJECT_CONFIG="$SHARED_DIR/project-config.json"
 SYNC_LOG="$SHARED_DIR/sync.log"
 
+echo "🔍 DEBUG: Sourcing helper functions..."
 # Source helper functions
-source /workspace/github-projects-helpers.sh
+source /workspace/github-projects-helpers.sh || {
+  echo "❌ Failed to source github-projects-helpers.sh"
+  exit 1
+}
 
 echo "📦 Repository: $REPO_OWNER/$REPO_NAME"
+echo "🔍 DEBUG: Starting initialization..."
 
 # ============================================================================
 # HELPER FUNCTIONS
