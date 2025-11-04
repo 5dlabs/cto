@@ -709,12 +709,15 @@ autoscaling:
 
 nodeSelector: {}
 
-tolerations:
-  - key: node-role.kubernetes.io/control-plane
-    operator: Exists
-    effect: NoSchedule
+tolerations: []  # No tolerations - must NOT run on control plane
 
-affinity: {}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: node-role.kubernetes.io/control-plane
+          operator: DoesNotExist  # Explicitly exclude control plane nodes
 
 # Configuration for the controller service
 config:
