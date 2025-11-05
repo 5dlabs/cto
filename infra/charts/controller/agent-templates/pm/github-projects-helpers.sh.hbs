@@ -790,18 +790,25 @@ set_project_item_status() {
   local item_id="$2"
   local status="$3"
   
+  log "🔍 DEBUG: set_project_item_status called - item=$item_id, status=$status"
+  
   local field_id=$(get_project_field "$project_id" "Stage")
+  log "🔍 DEBUG: Stage field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    log "⚠️  DEBUG: Stage field_id is null or empty, returning"
     return 0
   fi
   
   local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
+  log "🔍 DEBUG: Status option_id=$option_id for status=$status"
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    log "⚠️  DEBUG: Status option_id is null or empty for status=$status, returning"
     return 0
   fi
   
+  log "✅ DEBUG: Calling update_project_item_field for status update"
   update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
 }
 
@@ -810,18 +817,25 @@ set_project_item_agent() {
   local item_id="$2"
   local agent="$3"
   
+  log "🔍 DEBUG: set_project_item_agent called - item=$item_id, agent=$agent"
+  
   local field_id=$(get_project_field "$project_id" "Current Agent")
+  log "🔍 DEBUG: Current Agent field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    log "⚠️  DEBUG: Current Agent field_id is null or empty, returning"
     return 0
   fi
   
   local option_id=$(get_field_option_id "$project_id" "$field_id" "$agent")
+  log "🔍 DEBUG: Agent option_id=$option_id for agent=$agent"
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    log "⚠️  DEBUG: Agent option_id is null or empty for agent=$agent, returning"
     return 0
   fi
   
+  log "✅ DEBUG: Calling update_project_item_field for agent update"
   update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
 }
 
