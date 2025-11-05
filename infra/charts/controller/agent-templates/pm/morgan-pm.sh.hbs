@@ -385,20 +385,26 @@ monitor_and_sync() {
   PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
   
   # Initial sync of all tasks
-  log "📊 Performing initial sync..."
+  log "📊 Performing initial sync of all tasks..."
+  log "🔍 This will detect any tasks that are already running"
   sync_all_tasks "$PROJECT_ID"
+  log "✅ Initial sync complete - GitHub Projects updated with current state"
   
   # Generate initial project summary
+  log "📊 Generating project summary..."
   update_project_summary "$PROJECT_ID"
+  log "✅ Project summary complete"
   
   # Background process to watch parent workflow
   watch_parent_workflow &
   PARENT_WATCH_PID=$!
   
-  # Background process to periodically update summary (every 5 minutes)
+  # Background process to periodically update summary and re-sync (every 2 minutes)
   (
     while true; do
-      sleep 300  # 5 minutes
+      sleep 120  # 2 minutes
+      log "🔄 Periodic re-sync (backup to event-driven monitoring)"
+      sync_all_tasks "$PROJECT_ID" 2>/dev/null || true
       update_project_summary "$PROJECT_ID" 2>/dev/null || true
     done
   ) &
@@ -536,11 +542,11 @@ handle_task_event() {
 sync_all_tasks() {
   local project_id="$1"
   
-  # Iterate through all task mappings
-  jq -c 'to_entries[]' "$TASK_ISSUE_MAP" | while read -r entry; do
+  log "🔄 Syncing all tasks with GitHub..."
+  
+  # Iterate through all task mappings - use process substitution to avoid subshell
+  while read -r entry; do
     TASK_ID=$(echo "$entry" | jq -r '.key')
-    ISSUE_NUMBER=$(echo "$entry" | jq -r '.value.issue_number')
-    ITEM_ID=$(echo "$entry" | jq -r '.value.item_id')
     
     # Find workflow for this task
     TASK_WORKFLOW=$(kubectl get workflows -n "$NAMESPACE" \
@@ -548,6 +554,7 @@ sync_all_tasks() {
       -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     
     if [[ -z "$TASK_WORKFLOW" ]]; then
+      log "⏭️  No workflow found for task-$TASK_ID (not started yet)"
       continue
     fi
     
@@ -561,17 +568,14 @@ sync_all_tasks() {
       -n "$NAMESPACE" \
       -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
     
-    # Map stage to agent and status
-    CURRENT_AGENT=$(map_stage_to_agent "$CURRENT_STAGE" "$WORKFLOW_PHASE")
-    TASK_STATUS=$(map_workflow_to_status "$CURRENT_STAGE" "$WORKFLOW_PHASE")
+    log "🔍 Syncing task-$TASK_ID: stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE"
     
-    # Update project item
-    set_project_item_status "$project_id" "$ITEM_ID" "$TASK_STATUS"
-    set_project_item_agent "$project_id" "$ITEM_ID" "$CURRENT_AGENT"
-    
-    # Update issue labels to reflect current state
-    update_issue_labels "$ISSUE_NUMBER" "$TASK_STATUS" "$CURRENT_AGENT"
-  done
+    # Use the full event handler for comprehensive updates
+    # This ensures assignees, status history, health checks, etc. all run
+    handle_task_event "$project_id" "$TASK_ID" "$TASK_WORKFLOW" "$CURRENT_STAGE" "$WORKFLOW_PHASE"
+  done < <(jq -c 'to_entries[]' "$TASK_ISSUE_MAP")
+  
+  log "✅ Sync complete"
 }
 
 map_stage_to_agent() {
@@ -652,22 +656,24 @@ update_issue_assignee() {
   # Get GitHub username for agent
   local github_username=$(map_agent_to_github_username "$agent")
   
-  # If agent completed or no username, remove assignees
-  if [[ -z "$github_username" ]] || [[ "$agent" == "Complete ✅" ]]; then
-    log "📝 Removing assignees from issue #$issue_number (task complete)"
-    gh issue edit "$issue_number" \
-      --repo "$REPO_OWNER/$REPO_NAME" \
-      --remove-assignee "@me" 2>/dev/null || true
-    return 0
-  fi
+  # Note: GitHub App bots can't be assignees unless they're collaborators
+  # Instead, we'll post a comment indicating the current agent
+  # The "Current Agent" field in Projects board serves as the primary indicator
   
-  # Assign the agent's bot user to the issue
-  log "👤 Assigning $github_username to issue #$issue_number"
-  gh issue edit "$issue_number" \
-    --repo "$REPO_OWNER/$REPO_NAME" \
-    --add-assignee "$github_username" 2>/dev/null || {
-      log "⚠️  Could not assign $github_username (may not have permissions)"
-    }
+  # Post agent assignment as a comment for visibility
+  if [[ -n "$github_username" ]] && [[ "$agent" != "Complete ✅" ]]; then
+    log "👤 Noting $agent is working on issue #$issue_number"
+    
+    # Post comment with agent assignment (non-fatal if fails)
+    gh issue comment "$issue_number" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --body "🤖 **Agent Assignment**
+
+**Current Agent:** $agent (\`@$github_username\`)
+
+---
+*Auto-assigned by Morgan PM*" 2>/dev/null || true
+  fi
 }
 
 map_workflow_to_status() {
