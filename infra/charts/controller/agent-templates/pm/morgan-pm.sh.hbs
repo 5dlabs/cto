@@ -174,7 +174,7 @@ echo "🔍 DEBUG: Starting initialization..."
 # ============================================================================
 
 log() {
-  echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $*" | tee -a "$SYNC_LOG"
+  echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $*" | tee -a "$SYNC_LOG" >&2
 }
 
 # State tracking helpers to prevent duplicate comments
