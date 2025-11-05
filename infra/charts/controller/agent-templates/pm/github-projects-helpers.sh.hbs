@@ -8,6 +8,39 @@
 # GraphQL QUERY HELPERS WITH RETRY LOGIC
 # ============================================================================
 
+retry_with_backoff() {
+  local max_attempts="$1"
+  shift
+  local operation_name="$1"
+  shift
+  # Remaining args are the command to execute
+  
+  local attempt=1
+  local delay=2
+  
+  while [[ $attempt -le $max_attempts ]]; do
+    log "🔄 Attempt $attempt/$max_attempts: $operation_name"
+    
+    # Execute the command
+    if "$@"; then
+      log "✅ $operation_name succeeded on attempt $attempt"
+      return 0
+    fi
+    
+    local exit_code=$?
+    
+    if [[ $attempt -lt $max_attempts ]]; then
+      log "⏳ Attempt $attempt failed (exit $exit_code), retrying in ${delay}s..."
+      sleep $delay
+      delay=$((delay * 2))  # Exponential backoff: 2s, 4s, 8s, 16s...
+      attempt=$((attempt + 1))
+    else
+      log "❌ All $max_attempts attempts failed for: $operation_name"
+      return $exit_code
+    fi
+  done
+}
+
 graphql_query() {
   local query="$1"
   local variables="${2:-{}}"
@@ -43,7 +76,127 @@ graphql_query() {
 # PROJECT MANAGEMENT
 # ============================================================================
 
-get_or_create_project() {
+get_or_create_project_smart() {
+  local owner="$1"
+  local repo_name="$2"
+  local title="$3"
+  local prefer_repo_level="${4:-false}"  # Can be set via env var or param
+  
+  local project_id=""
+  
+  # Try repo-level first if preferred (simpler permissions, auto-linked)
+  if [[ "$prefer_repo_level" == "true" ]]; then
+    log "📊 Attempting repo-level project (preferred mode)..."
+    project_id=$(get_or_create_repo_project "$owner" "$repo_name" "$title")
+    
+    if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+      log "✅ Using repo-level project: $project_id"
+      echo "$project_id"
+      return 0
+    else
+      log "⚠️  Repo-level project creation failed, falling back to org-level..."
+    fi
+  fi
+  
+  # Try org-level (default or fallback)
+  log "📊 Attempting org-level project..."
+  project_id=$(get_or_create_org_project "$owner" "$repo_name" "$title")
+  
+  if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+    log "✅ Using org-level project: $project_id"
+    echo "$project_id"
+    return 0
+  fi
+  
+  # If org-level failed and we haven't tried repo-level yet
+  if [[ "$prefer_repo_level" != "true" ]]; then
+    log "⚠️  Org-level project failed, trying repo-level as fallback..."
+    project_id=$(get_or_create_repo_project "$owner" "$repo_name" "$title")
+    
+    if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+      log "✅ Using repo-level project (fallback): $project_id"
+      echo "$project_id"
+      return 0
+    fi
+  fi
+  
+  log "❌ Failed to create project at any level"
+  echo "null"
+  return 1
+}
+
+get_or_create_repo_project() {
+  local owner="$1"
+  local repo_name="$2"
+  local title="$3"
+  
+  # Get repository ID
+  local repo_id=$(get_repository_id "$owner" "$repo_name")
+  
+  if [[ -z "$repo_id" ]] || [[ "$repo_id" == "null" ]]; then
+    return 1
+  fi
+  
+  # Try to find existing repo-level project
+  local find_query='
+    query($owner: String!, $repo: String!) {
+      repository(owner: $owner, name: $repo) {
+        projectsV2(first: 20) {
+          nodes {
+            id
+            title
+            owner {
+              __typename
+            }
+          }
+        }
+      }
+    }
+  '
+  
+  local result=$(gh api graphql -f query="$find_query" -f owner="$owner" -f repo="$repo_name")
+  
+  # Find repo-level project (owner type is Repository, not Organization)
+  local existing_id=$(echo "$result" | jq -r --arg title "$title" \
+    '.data.repository.projectsV2.nodes[] | select(.title == $title and .owner.__typename == "Repository") | .id' | head -1)
+  
+  if [[ -n "$existing_id" ]] && [[ "$existing_id" != "null" ]]; then
+    echo "$existing_id"
+    return 0
+  fi
+  
+  # Create new repo-level project
+  local create_mutation='
+    mutation($repositoryId: ID!, $title: String!) {
+      createProjectV2(input: {
+        repositoryId: $repositoryId
+        title: $title
+      }) {
+        projectV2 {
+          id
+          title
+        }
+      }
+    }
+  '
+  
+  local create_result=$(gh api graphql \
+    -f query="$create_mutation" \
+    -f repositoryId="$repo_id" \
+    -f title="$title")
+  
+  if echo "$create_result" | jq -e '.errors' >/dev/null 2>&1; then
+    echo "$create_result" | jq '.errors' >&2
+    echo "null"
+    return 1
+  fi
+  
+  local project_id=$(echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id // "null"')
+  
+  echo "$project_id"
+}
+
+get_or_create_org_project() {
   local owner="$1"
   local repo_name="$2"
   local title="$3"
@@ -179,6 +332,90 @@ get_or_create_project() {
   
   # Return only the project ID (not mutation output)
   echo "$project_id"
+}
+
+ensure_project_linked_to_repository() {
+  local project_id="$1"
+  local repo_owner="$2"
+  local repo_name="$3"
+  
+  log "🔗 Verifying project is linked to repository $repo_owner/$repo_name..."
+  
+  # Check if already linked
+  local check_query='
+    query($projectId: ID!) {
+      node(id: $projectId) {
+        ... on ProjectV2 {
+          repositories(first: 20) {
+            nodes {
+              owner {
+                login
+              }
+              name
+            }
+          }
+        }
+      }
+    }
+  '
+  
+  local result=$(gh api graphql -f query="$check_query" -f projectId="$project_id")
+  
+  # Check if our repo is in the list
+  local is_linked=$(echo "$result" | jq -r --arg owner "$repo_owner" --arg name "$repo_name" \
+    '.data.node.repositories.nodes[] | select(.owner.login == $owner and .name == $name) | .name' | head -1)
+  
+  if [[ -n "$is_linked" ]]; then
+    log "✅ Project already linked to repository"
+    return 0
+  fi
+  
+  log "📎 Linking project to repository..."
+  
+  # Get repository ID
+  local repo_id=$(get_repository_id "$repo_owner" "$repo_name")
+  
+  if [[ -z "$repo_id" ]] || [[ "$repo_id" == "null" ]]; then
+    log "❌ Could not get repository ID"
+    return 1
+  fi
+  
+  # Link project to repository
+  local link_mutation='
+    mutation($projectId: ID!, $repositoryId: ID!) {
+      linkProjectV2ToRepository(input: {
+        projectId: $projectId
+        repositoryId: $repositoryId
+      }) {
+        repository {
+          id
+          nameWithOwner
+        }
+      }
+    }
+  '
+  
+  local link_result=$(gh api graphql \
+    -f query="$link_mutation" \
+    -f projectId="$project_id" \
+    -f repositoryId="$repo_id")
+  
+  # Check for errors
+  if echo "$link_result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "❌ Failed to link project to repository:"
+    echo "$link_result" | jq '.errors'
+    return 1
+  fi
+  
+  local linked_repo=$(echo "$link_result" | jq -r '.data.linkProjectV2ToRepository.repository.nameWithOwner // ""')
+  
+  if [[ "$linked_repo" == "$repo_owner/$repo_name" ]]; then
+    log "✅ Successfully verified project link to: $linked_repo"
+    return 0
+  else
+    log "❌ Link verification failed - expected $repo_owner/$repo_name, got $linked_repo"
+    return 1
+  fi
 }
 
 create_default_board_view() {
@@ -403,6 +640,7 @@ get_project_field() {
 add_issue_to_project() {
   local project_id="$1"
   local issue_node_id="$2"
+  local issue_number="${3:-unknown}"  # Optional: for better logging
   
   local mutation='
     mutation($projectId: ID!, $contentId: ID!) {
@@ -412,25 +650,109 @@ add_issue_to_project() {
       }) {
         item {
           id
+          project {
+            id
+            title
+          }
+          content {
+            ... on Issue {
+              number
+              projectItems(first: 5) {
+                totalCount
+                nodes {
+                  id
+                }
+              }
+            }
+          }
         }
       }
     }
   '
   
+  log "🔗 Linking issue #$issue_number to project $project_id..."
+  
   local result=$(gh api graphql \
     -f query="$mutation" \
     -f projectId="$project_id" \
-    -f contentId="$issue_node_id")
+    -f contentId="$issue_node_id" 2>&1)
+  
+  # Save full response for debugging
+  if [[ "$issue_number" != "unknown" ]]; then
+    echo "$result" | jq '.' > "/tmp/add-project-item-${issue_number}.json" 2>/dev/null || true
+  fi
   
   # Check for errors in the response
   if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
-    log "⚠️  GraphQL error adding issue to project:"
-    echo "$result" | jq '.errors' >&2
+    log "❌ GraphQL ERROR adding issue #$issue_number to project:"
+    echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
+    
+    # Categorize and provide actionable guidance
+    local error_type=$(echo "$result" | jq -r '.errors[0].type // ""')
+    local error_msg=$(echo "$result" | jq -r '.errors[0].message // ""')
+    
+    case "$error_type" in
+      "INSUFFICIENT_SCOPES"|"FORBIDDEN")
+        log "🔐 Permission Error: $error_msg"
+        log "💡 Action: Check GitHub App permissions for organization_projects and repository_projects"
+        log "💡 Verify: gh auth status and GitHub App installation permissions"
+        # Track metric
+        echo $(($(cat /tmp/morgan-graphql-permission-errors 2>/dev/null || echo "0") + 1)) > /tmp/morgan-graphql-permission-errors
+        ;;
+      "NOT_FOUND")
+        log "🔍 Resource Not Found: $error_msg"
+        log "💡 Debug: Project ID=$project_id, Issue Node=$issue_node_id"
+        log "💡 Action: Verify project exists and issue is valid"
+        # Track metric
+        echo $(($(cat /tmp/morgan-graphql-notfound-errors 2>/dev/null || echo "0") + 1)) > /tmp/morgan-graphql-notfound-errors
+        ;;
+      "INTERNAL"|"RATE_LIMITED")
+        log "⏳ GitHub API Issue: $error_msg"
+        log "💡 Action: Will retry automatically with backoff"
+        # Track metric
+        echo $(($(cat /tmp/morgan-graphql-ratelimit-errors 2>/dev/null || echo "0") + 1)) > /tmp/morgan-graphql-ratelimit-errors
+        ;;
+      *)
+        log "⚠️  Unknown Error Type: $error_type"
+        log "📋 Message: $error_msg"
+        # Track metric
+        echo $(($(cat /tmp/morgan-graphql-other-errors 2>/dev/null || echo "0") + 1)) > /tmp/morgan-graphql-other-errors
+        ;;
+    esac
+    
     echo "null"
     return 1
   fi
   
-  echo "$result" | jq -r '.data.addProjectV2ItemById.item.id'
+  # Extract item ID
+  local item_id=$(echo "$result" | jq -r '.data.addProjectV2ItemById.item.id // "null"')
+  
+  if [[ "$item_id" == "null" ]] || [[ -z "$item_id" ]]; then
+    log "❌ Failed to extract item ID from GraphQL response"
+    echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
+    echo "null"
+    return 1
+  fi
+  
+  # CRITICAL: Verify the link actually persisted
+  local total_count=$(echo "$result" | jq -r '.data.addProjectV2ItemById.item.content.projectItems.totalCount // 0' 2>/dev/null)
+  
+  if [[ "$total_count" -gt 0 ]]; then
+    log "✅ Verified: Issue #$issue_number linked to project (${total_count} project links total)"
+    # Increment success metric
+    echo $(($(cat /tmp/morgan-link-success 2>/dev/null || echo "0") + 1)) > /tmp/morgan-link-success
+  else
+    log "⚠️  WARNING: GraphQL returned item ID but issue has 0 project links!"
+    log "💡 This may indicate:"
+    log "   - Async operation still in progress (wait 2-5 seconds)"
+    log "   - Permission issue after initial validation"
+    log "   - Project not properly linked to repository"
+    log "📋 Item ID returned: $item_id"
+    # Increment failure metric
+    echo $(($(cat /tmp/morgan-link-failure 2>/dev/null || echo "0") + 1)) > /tmp/morgan-link-failure
+  fi
+  
+  echo "$item_id"
 }
 
 # ============================================================================

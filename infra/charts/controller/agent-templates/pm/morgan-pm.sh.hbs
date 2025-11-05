@@ -290,8 +290,11 @@ initialize_project() {
   PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
   log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
   
-  # Create repository-level project (not org-level)
-  PROJECT_ID=$(get_or_create_project "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE")
+  # Try to create project with smart fallback
+  # Prefers org-level for better visibility, falls back to repo-level if issues
+  # Set PREFER_REPO_LEVEL_PROJECTS=true env var to change behavior
+  local prefer_repo="${PREFER_REPO_LEVEL_PROJECTS:-false}"
+  PROJECT_ID=$(get_or_create_project_smart "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE" "$prefer_repo")
   
   if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
     log "❌ Failed to create or find project"
@@ -300,6 +303,14 @@ initialize_project() {
   fi
   
   log "✅ Project ID: $PROJECT_ID"
+  
+  # CRITICAL: Verify project is linked to repository
+  # This is essential for issues to be addable to the project
+  if ! ensure_project_linked_to_repository "$PROJECT_ID" "$REPO_OWNER" "$REPO_NAME"; then
+    log "❌ FATAL: Could not verify project-repository link"
+    log "💡 This will prevent issues from being added to the project"
+    log "💡 Continuing anyway, but expect linking failures..."
+  fi
   
   # Setup custom fields
   log "🔧 Setting up custom fields..."
@@ -407,17 +418,36 @@ create_task_issues() {
       --repo "$REPO_OWNER/$REPO_NAME" \
       --json id --jq '.id')
     
-    # Add issue to project
+    # Add issue to project with retry logic
     PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
-    ITEM_ID=$(add_issue_to_project "$PROJECT_ID" "$ISSUE_NODE_ID")
+    ITEM_ID=""
+    
+    # Retry adding issue to project (handles transient failures)
+    if ! ITEM_ID=$(retry_with_backoff 3 "Link issue #$ISSUE_NUMBER to project" \
+      add_issue_to_project "$PROJECT_ID" "$ISSUE_NODE_ID" "$ISSUE_NUMBER"); then
+      log "❌ CRITICAL: Failed to add issue #$ISSUE_NUMBER to project after retries"
+      log "💡 Continuing with other tasks, but this issue won't appear in project"
+      continue
+    fi
+    
+    # Verify we got a valid item ID
+    if [[ -z "$ITEM_ID" ]] || [[ "$ITEM_ID" == "null" ]]; then
+      log "❌ No valid item ID returned for issue #$ISSUE_NUMBER"
+      continue
+    fi
     
     if [[ -n "$ITEM_ID" ]]; then
       log "✅ Added issue #$ISSUE_NUMBER to project (Item ID: $ITEM_ID)"
       
-      # Set initial field values
-      set_project_item_status "$PROJECT_ID" "$ITEM_ID" "$TASK_STATUS"
-      set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
-      set_project_item_agent "$PROJECT_ID" "$ITEM_ID" "Pending"
+      # Set initial field values with retry
+      retry_with_backoff 3 "Set status for task $TASK_ID" \
+        set_project_item_status "$PROJECT_ID" "$ITEM_ID" "$TASK_STATUS"
+      
+      retry_with_backoff 3 "Set priority for task $TASK_ID" \
+        set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
+      
+      retry_with_backoff 3 "Set agent for task $TASK_ID" \
+        set_project_item_agent "$PROJECT_ID" "$ITEM_ID" "Pending"
       
       # Set initial assignee (Morgan creates the tasks)
       update_issue_assignee "$ISSUE_NUMBER" "Morgan (PM)"
@@ -483,45 +513,64 @@ monitor_and_sync() {
   # Main event loop: Watch all task workflows
   log "👁️  Watching for workflow changes (real-time)..."
   
-  # kubectl watch outputs JSON objects one per line, not a JSON array
-  # Use --watch-only to get only changes (not initial list)
+  # kubectl watch outputs JSON objects, but format varies
+  # We use --watch (not --watch-only) with proper buffering control
   kubectl get workflows -n "$NAMESPACE" \
     -l "parent-workflow=$WORKFLOW_NAME" \
-    --watch-only -o json 2>/dev/null | \
-  while IFS= read -r event_line; do
+    --watch -o json 2>&1 | \
+  stdbuf -oL cat | \
+  while IFS= read -r line; do
     # Skip empty lines
-    [[ -z "$event_line" ]] && continue
+    [[ -z "$line" ]] && continue
     
-    # Validate JSON before parsing
-    if ! echo "$event_line" | jq empty 2>/dev/null; then
-      log "⚠️  Skipping invalid JSON line"
+    # Skip non-JSON lines (kubernetes informational messages)
+    # Check if line starts with '{' or is likely JSON
+    if [[ ! "$line" =~ ^\{ ]]; then
       continue
     fi
     
-    # Parse event - kubectl watch outputs {type, object} format
-    EVENT_TYPE=$(echo "$event_line" | jq -r '.type // "MODIFIED"' 2>/dev/null || echo "MODIFIED")
-    
-    # Handle different watch formats
-    if echo "$event_line" | jq -e '.object' >/dev/null 2>&1; then
-      # Standard watch format: {type: "MODIFIED", object: {...}}
-      WORKFLOW_OBJ=$(echo "$event_line" | jq -r '.object')
-    else
-      # Direct object format
-      WORKFLOW_OBJ="$event_line"
+    # Validate JSON structure before parsing
+    if ! echo "$line" | jq empty 2>/dev/null; then
+      # Not valid JSON - skip silently (don't spam logs)
+      continue
     fi
     
-    # Extract workflow details
-    TASK_ID=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["task-id"] // ""' 2>/dev/null || echo "")
-    WORKFLOW_NAME_LOCAL=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.name // ""' 2>/dev/null || echo "")
-    CURRENT_STAGE=$(echo "$WORKFLOW_OBJ" | jq -r '.metadata.labels["current-stage"] // "pending"' 2>/dev/null || echo "pending")
-    WORKFLOW_PHASE=$(echo "$WORKFLOW_OBJ" | jq -r '.status.phase // "Pending"' 2>/dev/null || echo "Pending")
+    # Determine if this is a watch event or direct object
+    local has_object=$(echo "$line" | jq 'has("object")' 2>/dev/null || echo "false")
+    local has_metadata=$(echo "$line" | jq 'has("metadata")' 2>/dev/null || echo "false")
     
+    local workflow_obj=""
+    
+    if [[ "$has_object" == "true" ]]; then
+      # Watch event format: {type: "ADDED|MODIFIED|DELETED", object: {...}}
+      EVENT_TYPE=$(echo "$line" | jq -r '.type // "MODIFIED"')
+      workflow_obj=$(echo "$line" | jq -c '.object')
+    elif [[ "$has_metadata" == "true" ]]; then
+      # Direct workflow object format (from --watch without events)
+      EVENT_TYPE="MODIFIED"
+      workflow_obj="$line"
+    else
+      # Unknown format - skip
+      continue
+    fi
+    
+    # Extract workflow details with robust error handling
+    TASK_ID=$(echo "$workflow_obj" | jq -r '.metadata.labels["task-id"] // ""' 2>/dev/null)
+    WORKFLOW_NAME_LOCAL=$(echo "$workflow_obj" | jq -r '.metadata.name // ""' 2>/dev/null)
+    CURRENT_STAGE=$(echo "$workflow_obj" | jq -r '.metadata.labels["current-stage"] // "pending"' 2>/dev/null)
+    WORKFLOW_PHASE=$(echo "$workflow_obj" | jq -r '.status.phase // "Pending"' 2>/dev/null)
+    
+    # Validate we got required fields
     [[ -z "$TASK_ID" ]] && continue
+    [[ -z "$WORKFLOW_NAME_LOCAL" ]] && continue
     
-    log "📡 Event: $EVENT_TYPE for task-$TASK_ID (stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE)"
+    log "📡 Workflow event: task-$TASK_ID ($EVENT_TYPE) - stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE"
+    
+    # Track event processing metric
+    echo $(($(cat /tmp/morgan-events-processed 2>/dev/null || echo "0") + 1)) > /tmp/morgan-events-processed
     
     # Update GitHub for this specific task
-    handle_task_event "$PROJECT_ID" "$TASK_ID" "$WORKFLOW_NAME_LOCAL" "$CURRENT_STAGE" "$WORKFLOW_PHASE"
+    handle_task_event "$PROJECT_ID" "$TASK_ID" "$WORKFLOW_NAME_LOCAL" "$CURRENT_STAGE" "$WORKFLOW_PHASE" "false"
   done
   
   # Cleanup background processes
@@ -588,14 +637,23 @@ handle_task_event() {
     log "⏭️  No change for task-$task_id (skipping comment posting)"
   fi
   
-  # ALWAYS update project fields (idempotent operations)
-  set_project_item_status "$project_id" "$item_id" "$task_status"
-  set_project_item_agent "$project_id" "$item_id" "$current_agent"
+  # ═══════════════════════════════════════════════════════════
+  # CRITICAL: ALWAYS update project fields (idempotent, cheap operations)
+  # These GraphQL calls ensure project fields stay in sync
+  # even if deduplication skips comments
+  # ═══════════════════════════════════════════════════════════
+  set_project_item_status "$project_id" "$item_id" "$task_status" 2>/dev/null || \
+    log "⚠️  Could not update project status for item $item_id"
+    
+  set_project_item_agent "$project_id" "$item_id" "$current_agent" 2>/dev/null || \
+    log "⚠️  Could not update project agent for item $item_id"
   
   # ALWAYS update issue labels (idempotent)
   update_issue_labels "$issue_number" "$task_status" "$current_agent"
   
-  # ONLY post comments if state changed (prevents spam)
+  # ═══════════════════════════════════════════════════════════
+  # CONDITIONAL: ONLY post comments if state changed (prevents spam)
+  # ═══════════════════════════════════════════════════════════
   if [[ "$state_changed" == true ]]; then
     # Update issue assignee to current agent (posts comment)
     update_issue_assignee "$issue_number" "$current_agent"
@@ -1353,6 +1411,33 @@ morgan_blocked_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $blocked_
 # TYPE morgan_pending_tasks gauge
 morgan_pending_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $pending_tasks
 
+# HELP morgan_completion_percentage Workflow completion percentage
+# TYPE morgan_completion_percentage gauge
+morgan_completion_percentage{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $((completed_tasks * 100 / (total_tasks > 0 ? total_tasks : 1)))
+
+# HELP morgan_last_sync_timestamp Unix timestamp of last successful sync
+# TYPE morgan_last_sync_timestamp gauge
+morgan_last_sync_timestamp{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $sync_timestamp
+
+# HELP morgan_event_processing_total Total number of workflow events processed
+# TYPE morgan_event_processing_total counter
+morgan_event_processing_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $(cat /tmp/morgan-events-processed 2>/dev/null || echo "0")
+
+# HELP morgan_graphql_errors_total Total number of GraphQL errors encountered
+# TYPE morgan_graphql_errors_total counter
+morgan_graphql_errors_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME",type="permission"} $(cat /tmp/morgan-graphql-permission-errors 2>/dev/null || echo "0")
+morgan_graphql_errors_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME",type="not_found"} $(cat /tmp/morgan-graphql-notfound-errors 2>/dev/null || echo "0")
+morgan_graphql_errors_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME",type="rate_limit"} $(cat /tmp/morgan-graphql-ratelimit-errors 2>/dev/null || echo "0")
+morgan_graphql_errors_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME",type="other"} $(cat /tmp/morgan-graphql-other-errors 2>/dev/null || echo "0")
+
+# HELP morgan_issue_link_success_total Successful issue-to-project links
+# TYPE morgan_issue_link_success_total counter
+morgan_issue_link_success_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $(cat /tmp/morgan-link-success 2>/dev/null || echo "0")
+
+# HELP morgan_issue_link_failure_total Failed issue-to-project links
+# TYPE morgan_issue_link_failure_total counter
+morgan_issue_link_failure_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $(cat /tmp/morgan-link-failure 2>/dev/null || echo "0")
+
 # HELP morgan_last_sync_timestamp Unix timestamp of last sync
 # TYPE morgan_last_sync_timestamp gauge
 morgan_last_sync_timestamp{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $sync_timestamp
@@ -1409,22 +1494,152 @@ generate_ai_summary() {
 update_project_summary() {
   local project_id="$1"
   
-  local summary=$(generate_ai_summary "$project_id")
+  # Generate comprehensive summary with metrics
+  local timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  local workflow_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
   
-  # Find the first issue to pin the summary
-  local first_issue=$(jq -r 'to_entries[0].value.issue_number' "$TASK_ISSUE_MAP" 2>/dev/null || echo "")
+  # Calculate task metrics
+  local total_tasks=$(jq 'length' "$TASK_ISSUE_MAP")
+  local completed=0
+  local in_progress=0
+  local pending=0
+  local blocked=0
   
-  if [[ -n "$first_issue" ]]; then
-    # Check if summary comment exists
-    local summary_marker="<!-- morgan-project-summary -->"
+  # Count agent distribution
+  declare -A agent_counts
+  
+  while read -r entry; do
+    local task_id=$(echo "$entry" | jq -r '.key')
+    local task_workflow=$(kubectl get workflows -n "$NAMESPACE" \
+      -l "task-id=$task_id,parent-workflow=$WORKFLOW_NAME" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     
-    # For now, just log the summary
-    # Future: Could create a dedicated "Project Status" issue
-    log "📊 Project Summary: $summary"
+    if [[ -z "$task_workflow" ]]; then
+      pending=$((pending + 1))
+      continue
+    fi
+    
+    local stage=$(kubectl get workflow "$task_workflow" -n "$NAMESPACE" \
+      -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "pending")
+    local phase=$(kubectl get workflow "$task_workflow" -n "$NAMESPACE" \
+      -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
+    
+    local agent=$(map_stage_to_agent "$stage" "$phase")
+    agent_counts["$agent"]=$((${agent_counts["$agent"]:-0} + 1))
+    
+    case "$phase" in
+      "Succeeded") completed=$((completed + 1)) ;;
+      "Running") in_progress=$((in_progress + 1)) ;;
+      "Failed"|"Error") blocked=$((blocked + 1)) ;;
+      *) pending=$((pending + 1)) ;;
+    esac
+  done < <(jq -c 'to_entries[]' "$TASK_ISSUE_MAP")
+  
+  # Calculate completion percentage
+  local completion_pct=0
+  if [[ $total_tasks -gt 0 ]]; then
+    completion_pct=$((completed * 100 / total_tasks))
   fi
   
-  # Export metrics along with summary
+  # Build agent distribution table
+  local agent_table=""
+  for agent in "${!agent_counts[@]}"; do
+    local count=${agent_counts[$agent]}
+    agent_table+="| $agent | $count |\n"
+  done
+  
+  # Generate beautiful README-style summary
+  local summary=$(cat <<EOF
+# 🎯 $SERVICE_NAME - TaskMaster Workflow
+
+**Last Updated**: $timestamp  
+**Workflow**: [\`$WORKFLOW_NAME\`]($workflow_url)  
+**Status**: $(get_workflow_status_emoji $in_progress $blocked $completed) | **Completion**: $completion_pct% ($completed/$total_tasks tasks)
+
+---
+
+## 📊 Progress Overview
+
+| Phase | Count | Percentage |
+|-------|-------|------------|
+| ✅ Complete | $completed | $((completed * 100 / total_tasks))% |
+| 🔄 In Progress | $in_progress | $((in_progress * 100 / total_tasks))% |
+| 📋 Pending | $pending | $((pending * 100 / total_tasks))% |
+| 🚫 Blocked | $blocked | $((blocked * 100 / total_tasks))% |
+
+## 🤖 Current Agent Distribution
+
+| Agent | Active Tasks |
+|-------|--------------|
+$(echo -e "$agent_table")
+
+## ⚡ Real-Time Status
+
+This project is monitored by **Morgan PM** with real-time synchronization to GitHub Projects.
+
+- **Live Updates**: < 10 second latency
+- **Agent Tracking**: Automatic assignment to current working agent
+- **Quality Gates**: Automated Rex → Cleo → Tess pipeline
+- **Workflow Visibility**: [View in Argo Workflows]($workflow_url)
+
+---
+
+*Auto-generated by Morgan PM at $timestamp*
+EOF
+)
+  
+  # Update project README/description
+  update_project_readme "$project_id" "$summary"
+  
+  # Also log to console
+  log "📊 Project Summary:"
+  log "$summary"
+  
+  # Export metrics
   export_prometheus_metrics "$project_id"
+}
+
+get_workflow_status_emoji() {
+  local in_progress="$1"
+  local blocked="$2"
+  local completed="$3"
+  
+  if [[ $blocked -gt 0 ]]; then
+    echo "🚫 Blocked"
+  elif [[ $in_progress -gt 0 ]]; then
+    echo "🔄 In Progress"
+  elif [[ $completed -gt 0 ]]; then
+    echo "✅ Active"
+  else
+    echo "📋 Pending"
+  fi
+}
+
+update_project_readme() {
+  local project_id="$1"
+  local readme_content="$2"
+  
+  # Update project README via GraphQL
+  local update_mutation='
+    mutation($projectId: ID!, $readme: String!) {
+      updateProjectV2(input: {
+        projectId: $projectId
+        readme: $readme
+      }) {
+        projectV2 {
+          id
+          readme
+        }
+      }
+    }
+  '
+  
+  gh api graphql \
+    -f query="$update_mutation" \
+    -f projectId="$project_id" \
+    -f readme="$readme_content" >/dev/null 2>&1 || {
+    log "⚠️  Could not update project README (not critical)"
+  }
 }
 
 generate_issue_body() {
