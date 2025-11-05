@@ -1417,6 +1417,12 @@ export_prometheus_metrics() {
   # Calculate average sync lag (time since last update)
   local sync_timestamp=$(date +%s)
   
+  # Calculate completion percentage (avoid division by zero)
+  local completion_percentage=0
+  if [[ $total_tasks -gt 0 ]]; then
+    completion_percentage=$((completed_tasks * 100 / total_tasks))
+  fi
+  
   # Export metrics to file (Prometheus can scrape this)
   mkdir -p /shared/metrics
   cat > /shared/metrics/morgan.prom <<EOF
@@ -1442,7 +1448,7 @@ morgan_pending_tasks{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $pending_
 
 # HELP morgan_completion_percentage Workflow completion percentage
 # TYPE morgan_completion_percentage gauge
-morgan_completion_percentage{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $((completed_tasks * 100 / (total_tasks > 0 ? total_tasks : 1)))
+morgan_completion_percentage{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $completion_percentage
 
 # HELP morgan_last_sync_timestamp Unix timestamp of last successful sync
 # TYPE morgan_last_sync_timestamp gauge

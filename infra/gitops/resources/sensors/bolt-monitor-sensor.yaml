@@ -75,12 +75,12 @@ metadata:
 data:
   strategy.md: |
     # Bolt Monitor Strategy
-    
+
     ## Purpose: Continuous Deployment Health Monitoring
-    
-    Bolt-Monitor runs as a **daemon** (always on) to provide continuous visibility 
+
+    Bolt-Monitor runs as a **daemon** (always on) to provide continuous visibility
     into ALL deployments across the platform.
-    
+
     ### Monitoring Scope
     - ALL ArgoCD applications in the cluster
     - Both preview and production environments
@@ -88,43 +88,42 @@ data:
     - Sync status (Synced, OutOfSync, Unknown)
     - Pod health (Running, Pending, Failed, CrashLoopBackOff)
     - Recent logs for errors/warnings
-    
+
     ### Check Interval
     - Runs every 30 seconds
     - Only posts PR updates on status changes (avoids spam)
     - Maintains a state cache to detect changes
-    
+
     ### Correlation Logic
     Applications are correlated to PRs via:
     1. Task ID in app name: `task-{id}-preview` or `task-{id}-prod`
     2. GitHub PR labels: `task-{id}`
     3. ArgoCD app labels: `task-id: "{id}"`
-    
+
     ### Comment Format
     Posts a single, continuously updated comment per PR:
-    
+
     ```markdown
     ## 📊 Bolt Monitor: Deployment Health
-    
+
     ### Preview Deployments
     - **task-5-preview** ✅ Healthy | Synced 2m ago
       - Pods: 3/3 Running
       - URL: https://task-5-preview.ngrok.io
-    
+
     ### Production Deployments
     - **task-3-prod** ✅ Healthy | Synced 15m ago
-      - Pods: 2/2 Running  
+      - Pods: 2/2 Running
       - URL: https://task-3-prod.ngrok.io
-    
+
     **Last Check:** 2025-11-05 10:45:00 UTC
     ```
-    
+
     ### Integration with Other Modes
     - **Bolt-Preview** creates preview deployments
     - **Bolt-Monitor** tracks preview health (this mode)
     - **Bolt-Production** creates production deployments
     - **Bolt-Monitor** tracks production health (this mode)
-    
-    Monitor mode provides **continuous visibility** across all deployment modes.
 
+    Monitor mode provides **continuous visibility** across all deployment modes.
 
