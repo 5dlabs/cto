@@ -2253,7 +2253,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
         echo "   📝 Creating label '$label'..."
         case "$label" in
-          task-*) COLOR="f29513"; DESC="Task correlation" ;;
+          task-*) COLOR="28a745"; DESC="Task correlation" ;;
           run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
           service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
           *) COLOR="ededed"; DESC="Correlation label" ;;
@@ -2285,7 +2285,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
           # Create the missing label
           echo "   📝 Creating label '$label'..."
           case "$label" in
-            task-*) COLOR="f29513"; DESC="Task correlation" ;;
+            task-*) COLOR="28a745"; DESC="Task correlation" ;;
             run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
             service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
             *) COLOR="ededed"; DESC="Unknown label type" ;;

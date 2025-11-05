@@ -312,7 +312,7 @@ The Claude agent has completed the implementation and addressed all acceptance c
         for label in "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL"; do
           if ! gh label list -R "$REPO_SLUG" --search "$label" | grep -q "^$label"; then
             case "$label" in
-              task-*) COLOR="f29513"; DESC="Task correlation" ;;
+              task-*) COLOR="28a745"; DESC="Task correlation" ;;
               run-*) COLOR="0366d6"; DESC="Workflow run correlation" ;;
               service-*) COLOR="0e8a16"; DESC="Service correlation" ;;
               *) COLOR="ededed"; DESC="Correlation label" ;;

@@ -33,7 +33,7 @@ You are the **implementation agent** responsible for shipping Task {{task_id}} e
 
 ```bash
 # Create labels first if they don't exist
-gh label create "task-{{task_id}}" --force --color "f29513" --description "Task correlation" 2>/dev/null || true
+gh label create "task-{{task_id}}" --force --color "28a745" --description "Task correlation" 2>/dev/null || true
 gh label create "service-{{service}}" --force --color "0e8a16" --description "Service correlation" 2>/dev/null || true
 gh label create "run-{{workflow_name}}" --force --color "0366d6" --description "Workflow correlation" 2>/dev/null || true
 

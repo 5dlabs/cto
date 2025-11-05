@@ -157,6 +157,7 @@ mkdir -p "$SHARED_DIR"
 TASK_ISSUE_MAP="$SHARED_DIR/task-issue-map.json"
 PROJECT_CONFIG="$SHARED_DIR/project-config.json"
 SYNC_LOG="$SHARED_DIR/sync.log"
+TASK_STATE_CACHE="$SHARED_DIR/task-state-cache.json"
 
 echo "🔍 DEBUG: Sourcing helper functions..."
 # Source helper functions
@@ -174,6 +175,72 @@ echo "🔍 DEBUG: Starting initialization..."
 
 log() {
   echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $*" | tee -a "$SYNC_LOG"
+}
+
+# State tracking helpers to prevent duplicate comments
+init_state_cache() {
+  if [[ ! -f "$TASK_STATE_CACHE" ]]; then
+    echo "{}" > "$TASK_STATE_CACHE"
+  fi
+}
+
+get_cached_state() {
+  local task_id="$1"
+  jq -r --arg tid "$task_id" '.[$tid] // "{}"' "$TASK_STATE_CACHE" 2>/dev/null || echo "{}"
+}
+
+update_cached_state() {
+  local task_id="$1"
+  local stage="$2"
+  local agent="$3"
+  local status="$4"
+  local phase="$5"
+  
+  local temp_cache=$(mktemp)
+  jq --arg tid "$task_id" \
+     --arg stage "$stage" \
+     --arg agent "$agent" \
+     --arg status "$status" \
+     --arg phase "$phase" \
+     --arg timestamp "$(date +%s)" \
+     '.[$tid] = {
+       "stage": $stage,
+       "agent": $agent,
+       "status": $status,
+       "phase": $phase,
+       "last_update": $timestamp
+     }' "$TASK_STATE_CACHE" > "$temp_cache"
+  mv "$temp_cache" "$TASK_STATE_CACHE"
+}
+
+has_state_changed() {
+  local task_id="$1"
+  local new_stage="$2"
+  local new_agent="$3"
+  local new_status="$4"
+  local new_phase="$5"
+  
+  local cached=$(get_cached_state "$task_id")
+  
+  # If no cached state, it's a change (first time)
+  if [[ "$cached" == "{}" ]]; then
+    return 0
+  fi
+  
+  local cached_stage=$(echo "$cached" | jq -r '.stage // ""')
+  local cached_agent=$(echo "$cached" | jq -r '.agent // ""')
+  local cached_status=$(echo "$cached" | jq -r '.status // ""')
+  local cached_phase=$(echo "$cached" | jq -r '.phase // ""')
+  
+  # Return 0 (true) if anything changed
+  if [[ "$new_stage" != "$cached_stage" ]] || \
+     [[ "$new_agent" != "$cached_agent" ]] || \
+     [[ "$new_status" != "$cached_status" ]] || \
+     [[ "$new_phase" != "$cached_phase" ]]; then
+    return 0
+  fi
+  
+  return 1
 }
 
 # ============================================================================
@@ -384,21 +451,30 @@ monitor_and_sync() {
   
   PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
   
+  # Initialize state cache for deduplication
+  init_state_cache
+  
   # Initial sync of all tasks
-  log "📊 Performing initial sync..."
-  sync_all_tasks "$PROJECT_ID"
+  log "📊 Performing initial sync of all tasks..."
+  log "🔍 This will detect any tasks that are already running"
+  sync_all_tasks "$PROJECT_ID" true  # true = is_initial_sync
+  log "✅ Initial sync complete - GitHub Projects updated with current state"
   
   # Generate initial project summary
+  log "📊 Generating project summary..."
   update_project_summary "$PROJECT_ID"
+  log "✅ Project summary complete"
   
   # Background process to watch parent workflow
   watch_parent_workflow &
   PARENT_WATCH_PID=$!
   
-  # Background process to periodically update summary (every 5 minutes)
+  # Background process to periodically update summary and re-sync (every 2 minutes)
   (
     while true; do
-      sleep 300  # 5 minutes
+      sleep 120  # 2 minutes
+      log "🔄 Periodic re-sync (backup to event-driven monitoring)"
+      sync_all_tasks "$PROJECT_ID" false 2>/dev/null || true  # false = not initial sync
       update_project_summary "$PROJECT_ID" 2>/dev/null || true
     done
   ) &
@@ -470,7 +546,7 @@ watch_parent_workflow() {
       
       # Trigger final sync
       PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
-      sync_all_tasks "$PROJECT_ID"
+      sync_all_tasks "$PROJECT_ID" false  # false = not initial, check for changes
       
       # Kill main watch process
       pkill -P $$ kubectl || true
@@ -487,6 +563,7 @@ handle_task_event() {
   local workflow_name="$3"
   local current_stage="$4"
   local workflow_phase="$5"
+  local is_sync="${6:-false}"  # true for periodic sync, false for real-time events
   
   # Get issue details from mapping
   local entry=$(jq -r --arg tid "$task_id" '.[$tid] // empty' "$TASK_ISSUE_MAP")
@@ -499,48 +576,62 @@ handle_task_event() {
   local current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
   local task_status=$(map_workflow_to_status "$current_stage" "$workflow_phase")
   
-  log "🔄 Updating task-$task_id: $current_agent | $task_status"
+  # Check if state actually changed
+  local state_changed=false
+  if has_state_changed "$task_id" "$current_stage" "$current_agent" "$task_status" "$workflow_phase"; then
+    state_changed=true
+    log "🔄 State change detected for task-$task_id: $current_agent | $task_status"
+  else
+    log "⏭️  No change for task-$task_id (skipping comment posting)"
+  fi
   
-  # Update project item
+  # ALWAYS update project fields (idempotent operations)
   set_project_item_status "$project_id" "$item_id" "$task_status"
   set_project_item_agent "$project_id" "$item_id" "$current_agent"
   
-  # Update issue labels
+  # ALWAYS update issue labels (idempotent)
   update_issue_labels "$issue_number" "$task_status" "$current_agent"
   
-  # Update issue assignee to current agent
-  update_issue_assignee "$issue_number" "$current_agent"
+  # ONLY post comments if state changed (prevents spam)
+  if [[ "$state_changed" == true ]]; then
+    # Update issue assignee to current agent (posts comment)
+    update_issue_assignee "$issue_number" "$current_agent"
+    
+    # Add structured status history (posts comment)
+    add_status_history "$issue_number" "$task_id" "$current_stage" "$current_agent" "$task_status" "$workflow_phase"
+    
+    # Check for errors/failures (posts comment on errors)
+    check_task_health "$task_id" "$workflow_name" "$current_stage" "$issue_number"
+    
+    # Track and report agent progress (posts comment if progress found)
+    update_progress_comment "$issue_number" "$task_id" "$workflow_name" "$current_stage"
+    
+    # Stream significant agent activity (posts comment if events found)
+    stream_significant_events "$task_id" "$workflow_name" "$issue_number"
+  fi
   
-  # NEW: Add structured status history
-  add_status_history "$issue_number" "$task_id" "$current_stage" "$current_agent" "$task_status" "$workflow_phase"
-  
-  # NEW: Check for errors/failures
-  check_task_health "$task_id" "$workflow_name" "$current_stage" "$issue_number"
-  
-  # NEW: Track and report agent progress
-  update_progress_comment "$issue_number" "$task_id" "$workflow_name" "$current_stage"
-  
-  # NEW: GitHub Checks API integration (if PR exists)
+  # ALWAYS update GitHub Checks API (idempotent)
   local pr_number=$(find_pr_for_task "$task_id")
   if [[ -n "$pr_number" ]]; then
     create_or_update_github_check "$task_id" "$pr_number" "$current_agent" "$current_stage" "$workflow_phase"
   fi
   
-  # NEW: Stream significant agent activity
-  stream_significant_events "$task_id" "$workflow_name" "$issue_number"
-  
-  # NEW: Update heartbeat timestamp
+  # ALWAYS update heartbeat (just logs)
   update_heartbeat "$issue_number"
+  
+  # Update state cache after processing
+  update_cached_state "$task_id" "$current_stage" "$current_agent" "$task_status" "$workflow_phase"
 }
 
 sync_all_tasks() {
   local project_id="$1"
+  local is_initial_sync="${2:-false}"
   
-  # Iterate through all task mappings
-  jq -c 'to_entries[]' "$TASK_ISSUE_MAP" | while read -r entry; do
+  log "🔄 Syncing all tasks with GitHub..."
+  
+  # Iterate through all task mappings - use process substitution to avoid subshell
+  while read -r entry; do
     TASK_ID=$(echo "$entry" | jq -r '.key')
-    ISSUE_NUMBER=$(echo "$entry" | jq -r '.value.issue_number')
-    ITEM_ID=$(echo "$entry" | jq -r '.value.item_id')
     
     # Find workflow for this task
     TASK_WORKFLOW=$(kubectl get workflows -n "$NAMESPACE" \
@@ -548,6 +639,7 @@ sync_all_tasks() {
       -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     
     if [[ -z "$TASK_WORKFLOW" ]]; then
+      log "⏭️  No workflow found for task-$TASK_ID (not started yet)"
       continue
     fi
     
@@ -561,17 +653,18 @@ sync_all_tasks() {
       -n "$NAMESPACE" \
       -o jsonpath='{.status.phase}' 2>/dev/null || echo "Pending")
     
-    # Map stage to agent and status
-    CURRENT_AGENT=$(map_stage_to_agent "$CURRENT_STAGE" "$WORKFLOW_PHASE")
-    TASK_STATUS=$(map_workflow_to_status "$CURRENT_STAGE" "$WORKFLOW_PHASE")
+    log "🔍 Syncing task-$TASK_ID: stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE"
     
-    # Update project item
-    set_project_item_status "$project_id" "$ITEM_ID" "$TASK_STATUS"
-    set_project_item_agent "$project_id" "$ITEM_ID" "$CURRENT_AGENT"
-    
-    # Update issue labels to reflect current state
-    update_issue_labels "$ISSUE_NUMBER" "$TASK_STATUS" "$CURRENT_AGENT"
-  done
+    # Use the full event handler for updates
+    # Pass is_sync=true for periodic syncs to enable deduplication
+    local is_sync="true"
+    if [[ "$is_initial_sync" == "true" ]]; then
+      is_sync="false"  # Initial sync posts all comments (first time state detection)
+    fi
+    handle_task_event "$project_id" "$TASK_ID" "$TASK_WORKFLOW" "$CURRENT_STAGE" "$WORKFLOW_PHASE" "$is_sync"
+  done < <(jq -c 'to_entries[]' "$TASK_ISSUE_MAP")
+  
+  log "✅ Sync complete"
 }
 
 map_stage_to_agent() {
@@ -652,22 +745,24 @@ update_issue_assignee() {
   # Get GitHub username for agent
   local github_username=$(map_agent_to_github_username "$agent")
   
-  # If agent completed or no username, remove assignees
-  if [[ -z "$github_username" ]] || [[ "$agent" == "Complete ✅" ]]; then
-    log "📝 Removing assignees from issue #$issue_number (task complete)"
-    gh issue edit "$issue_number" \
-      --repo "$REPO_OWNER/$REPO_NAME" \
-      --remove-assignee "@me" 2>/dev/null || true
-    return 0
-  fi
+  # Note: GitHub App bots can't be assignees unless they're collaborators
+  # Instead, we'll post a comment indicating the current agent
+  # The "Current Agent" field in Projects board serves as the primary indicator
   
-  # Assign the agent's bot user to the issue
-  log "👤 Assigning $github_username to issue #$issue_number"
-  gh issue edit "$issue_number" \
-    --repo "$REPO_OWNER/$REPO_NAME" \
-    --add-assignee "$github_username" 2>/dev/null || {
-      log "⚠️  Could not assign $github_username (may not have permissions)"
-    }
+  # Post agent assignment as a comment for visibility
+  if [[ -n "$github_username" ]] && [[ "$agent" != "Complete ✅" ]]; then
+    log "👤 Noting $agent is working on issue #$issue_number"
+    
+    # Post comment with agent assignment (non-fatal if fails)
+    gh issue comment "$issue_number" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --body "🤖 **Agent Assignment**
+
+**Current Agent:** $agent (\`@$github_username\`)
+
+---
+*Auto-assigned by Morgan PM*" 2>/dev/null || true
+  fi
 }
 
 map_workflow_to_status() {
