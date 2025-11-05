@@ -559,7 +559,7 @@ create_single_select_field() {
     return 0
   fi
   
-  # Build options JSON
+  # Build options JSON array
   local options_json="["
   local colors=("RED" "BLUE" "GREEN" "YELLOW" "ORANGE" "PURPLE" "PINK" "GRAY")
   for i in "${!options[@]}"; do
@@ -571,28 +571,35 @@ create_single_select_field() {
   done
   options_json+="]"
   
-  local mutation='
-    mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
-      createProjectV2Field(input: {
-        projectId: $projectId
-        dataType: SINGLE_SELECT
-        name: $name
-        singleSelectOptions: $options
-      }) {
-        projectV2Field {
-          ... on ProjectV2SingleSelectField {
-            id
-          }
-        }
-      }
-    }
-  '
+  log "🔧 Creating field '$field_name' with ${#options[@]} options..."
+  debug "options_json = $options_json"
   
-  gh api graphql \
-    -f query="$mutation" \
-    -f projectId="$project_id" \
-    -f name="$field_name" \
-    -f options="$options_json" >/dev/null 2>&1 || true
+  # Build complete GraphQL payload with query and variables
+  local payload=$(jq -n \
+    --arg projectId "$project_id" \
+    --arg name "$field_name" \
+    --argjson options "$options_json" \
+    '{
+      query: "mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) { createProjectV2Field(input: { projectId: $projectId, dataType: SINGLE_SELECT, name: $name, singleSelectOptions: $options }) { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }",
+      variables: {
+        projectId: $projectId,
+        name: $name,
+        options: $options
+      }
+    }')
+  
+  debug "variables = $(echo "$payload" | jq -c '.variables')"
+  
+  local result=$(echo "$payload" | gh api graphql --input - 2>&1)
+  
+  local field_id=$(echo "$result" | jq -r '.data.createProjectV2Field.projectV2Field.id // empty' 2>/dev/null)
+  
+  if [[ -n "$field_id" ]]; then
+    log "✅ Created field '$field_name' (ID: $field_id)"
+  else
+    log "⚠️  Field creation failed or field already exists"
+    debug "$result"
+  fi
 }
 
 create_text_field() {
@@ -605,26 +612,30 @@ create_text_field() {
     return 0
   fi
   
-  local mutation='
-    mutation($projectId: ID!, $name: String!) {
-      createProjectV2Field(input: {
-        projectId: $projectId
-        dataType: TEXT
-        name: $name
-      }) {
-        projectV2Field {
-          ... on ProjectV2Field {
-            id
-          }
-        }
-      }
-    }
-  '
+  log "🔧 Creating text field '$field_name'..."
   
-  gh api graphql \
-    -f query="$mutation" \
-    -f projectId="$project_id" \
-    -f name="$field_name" >/dev/null 2>&1 || true
+  # Build complete GraphQL payload
+  local payload=$(jq -n \
+    --arg projectId "$project_id" \
+    --arg name "$field_name" \
+    '{
+      query: "mutation($projectId: ID!, $name: String!) { createProjectV2Field(input: { projectId: $projectId, dataType: TEXT, name: $name }) { projectV2Field { ... on ProjectV2Field { id } } } }",
+      variables: {
+        projectId: $projectId,
+        name: $name
+      }
+    }')
+  
+  local result=$(echo "$payload" | gh api graphql --input - 2>&1)
+  
+  local field_id=$(echo "$result" | jq -r '.data.createProjectV2Field.projectV2Field.id // empty' 2>/dev/null)
+  
+  if [[ -n "$field_id" ]]; then
+    log "✅ Created text field '$field_name' (ID: $field_id)"
+  else
+    log "⚠️  Text field creation failed or field already exists"
+    debug "$result"
+  fi
 }
 
 get_project_field() {
