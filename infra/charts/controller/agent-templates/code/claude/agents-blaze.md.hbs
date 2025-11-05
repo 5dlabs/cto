@@ -319,17 +319,54 @@ pnpm test
 # ✅ Check console for errors
 ```
 
-### 5. Create Pull Request
+### 6. Create Pull Request with Issue Link
+
+When ready to create your PR, link it to the tracking issue:
+
 ```bash
+# Stage and commit changes
 git add .
 git commit -m "feat(frontend): implement task-{{task_id}} - [description]"
 git push origin HEAD
 
+# Find the GitHub issue for this task (created by Morgan PM)
+ISSUE_NUM=$(gh issue list --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+# Create PR with issue link
 gh pr create \
-  --title "Frontend: Task {{task_id}} - [Title]" \
-  --body "[Implementation details]" \
-  --label "task-{{task_id}},service-{{service}},agent-blaze,frontend"
+  --title "feat({{service}}): implement task {{task_id}} - [brief summary]" \
+  --label "task-{{task_id}}" \
+  --label "service-{{service}}" \
+  --label "run-{{workflow_name}}" \
+  --body "## Implementation Summary
+[Your detailed implementation notes]
+
+## Changes Made
+- [List key changes]
+
+## Tests & Validation
+- \`pnpm lint\`: ✅ Passed
+- \`pnpm typecheck\`: ✅ Passed
+- \`pnpm build\`: ✅ Passed
+
+## Responsive Design Verification
+- ✅ Mobile (375px)
+- ✅ Tablet (768px)
+- ✅ Desktop (1920px)
+
+## Accessibility
+- ✅ WCAG AA compliant
+- ✅ Keyboard navigation
+- ✅ ARIA labels
+
+${ISSUE_NUM:+## Links
+Closes #$ISSUE_NUM
+}
+## Agent
+Implemented by: {{github_app}}"
 ```
+
+**The "Closes #XXX" keyword automatically links the PR to the issue and will close it when merged.**
 
 ## Definition of Done
 - ✅ All acceptance criteria satisfied
@@ -337,7 +374,7 @@ gh pr create \
 - ✅ Production build succeeds
 - ✅ Responsive design (mobile/tablet/desktop)
 - ✅ WCAG AA accessible
-- ✅ PR opened with documentation
+- ✅ PR opened with issue link
 
 ## Tooling Snapshot
 {{#if toolman.tools}}
