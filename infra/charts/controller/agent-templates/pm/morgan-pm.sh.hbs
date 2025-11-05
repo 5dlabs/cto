@@ -676,7 +676,7 @@ get_actual_running_agent() {
   
   # Find the most recent CodeRun for this task
   local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
-    -l "task-id=$task_id" \
+    -l "task-id=$task_id,workflow-name=$workflow_name" \
     --sort-by=.metadata.creationTimestamp \
     -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
   
