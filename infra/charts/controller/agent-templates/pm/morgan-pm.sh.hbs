@@ -218,12 +218,13 @@ initialize_project() {
   
   # Get or create GitHub Project
   log "🏗️  Setting up GitHub Project..."
-  log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, SERVICE_NAME=$SERVICE_NAME"
+  log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, REPO_NAME=$REPO_NAME, SERVICE_NAME=$SERVICE_NAME"
   
   PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
   log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
   
-  PROJECT_ID=$(get_or_create_project "$REPO_OWNER" "$PROJECT_TITLE")
+  # Create repository-level project (not org-level)
+  PROJECT_ID=$(get_or_create_project "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE")
   
   if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
     log "❌ Failed to create or find project"
