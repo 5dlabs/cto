@@ -125,23 +125,40 @@ ENV PATH="/home/runner/.cargo/bin:${PATH}"
 # Install essential Rust tools only (no pre-warming)
 RUN ~/.cargo/bin/rustup component add clippy rustfmt
 
+# Create .cargo/bin directory for pre-built binaries
+RUN mkdir -p ~/.cargo/bin
+
 # Install sccache from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) SCCACHE_ARCH=x86_64 ;; \
+        arm64) SCCACHE_ARCH=aarch64 ;; \
+        *) SCCACHE_ARCH=$ARCH ;; \
+    esac && \
     SCCACHE_VERSION="0.8.2" && \
+    SCCACHE_TARGET="${SCCACHE_ARCH}-unknown-linux-musl" && \
     curl -fsSL -o sccache.tar.gz \
-        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" && \
+        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" && \
     tar xzf sccache.tar.gz && \
-    mv "sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl/sccache" ~/.cargo/bin/ && \
+    mv "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" ~/.cargo/bin/ && \
     chmod +x ~/.cargo/bin/sccache && \
     sccache --version
 
 # Install cargo-nextest from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
     cd /tmp/downloads && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) NEXTEST_ARCH=x86_64 ;; \
+        arm64) NEXTEST_ARCH=aarch64 ;; \
+        *) NEXTEST_ARCH=$ARCH ;; \
+    esac && \
     NEXTEST_VERSION=$(curl -s https://api.github.com/repos/nextest-rs/nextest/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    NEXTEST_TARGET="${NEXTEST_ARCH}-unknown-linux-gnu" && \
     curl -fsSL -o cargo-nextest.tar.gz \
-        "https://github.com/nextest-rs/nextest/releases/download/${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-x86_64-unknown-linux-gnu.tar.gz" && \
+        "https://github.com/nextest-rs/nextest/releases/download/${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-${NEXTEST_TARGET}.tar.gz" && \
     tar xzf cargo-nextest.tar.gz && \
     mv cargo-nextest ~/.cargo/bin/ && \
     chmod +x ~/.cargo/bin/cargo-nextest && \
