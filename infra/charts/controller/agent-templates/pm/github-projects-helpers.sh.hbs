@@ -466,12 +466,16 @@ create_default_board_view() {
     }
   '
   
-  local views_result=$(gh api graphql \
+  local views_result
+  views_result=$(gh api graphql \
     -f query="$views_query" \
-    -f projectId="$project_id" 2>&1)
+    -f projectId="$project_id" 2>/dev/null) || {
+    echo "⚠️  Could not query existing views" >&2
+    return 1
+  }
   
   # Find the default table view to delete
-  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[] | select(.layout == "TABLE_LAYOUT") | .id' | head -1)
+  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null | head -1)
   
   # Create our board view
   local view_mutation='
@@ -489,12 +493,16 @@ create_default_board_view() {
     }
   '
   
-  local view_result=$(gh api graphql \
+  local view_result
+  view_result=$(gh api graphql \
     -f query="$view_mutation" \
-    -f projectId="$project_id" 2>&1)
+    -f projectId="$project_id" 2>/dev/null) || {
+    echo "⚠️  Could not create board view" >&2
+    return 1
+  }
   
-  local view_id=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.id // ""')
-  local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""')
+  local view_id=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.id // ""' 2>/dev/null)
+  local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""' 2>/dev/null)
   
   if [[ -n "$view_id" ]] && [[ "$view_id" != "null" ]]; then
     echo "✅ Created board view (ID: $view_id, Number: $view_number)" >&2
@@ -537,14 +545,16 @@ setup_custom_fields() {
   
   # Create "Current Agent" field
   create_single_select_field "$project_id" "Current Agent" \
-    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
+    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅" || true
   
-  # Create "Stage" field
+  # Create "Stage" field - must match values returned by map_workflow_to_status()
   create_single_select_field "$project_id" "Stage" \
-    "Pending" "Implementation" "Code Review" "Security Check" "QA Testing" "Done"
+    "To Do" "In Progress" "In Review" "Done" "Blocked"
   
   # Create "Task ID" field (text)
-  create_text_field "$project_id" "Task ID"
+  create_text_field "$project_id" "Task ID" || true
+  
+  echo "✅ Custom fields setup completed" >&2
 }
 
 create_single_select_field() {
@@ -556,20 +566,46 @@ create_single_select_field() {
   # Check if field already exists
   local existing_field=$(get_project_field "$project_id" "$field_name")
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
+    log "✅ Field '$field_name' already exists, skipping creation"
     return 0
   fi
   
-  # Build options JSON
-  local options_json="["
+  log "🔧 Creating field '$field_name' with ${#options[@]} options..."
+  
+  # Build options JSON using jq for proper formatting
+  # Note: GitHub's ProjectV2SingleSelectFieldOptionInput requires name, color, AND description (all NON_NULL)
+  local options_json="[]"
   local colors=("RED" "BLUE" "GREEN" "YELLOW" "ORANGE" "PURPLE" "PINK" "GRAY")
   for i in "${!options[@]}"; do
     local color="${colors[$((i % ${#colors[@]}))]}"
-    options_json+="{\"name\": \"${options[$i]}\", \"color\": \"$color\"}"
-    if [[ $i -lt $((${#options[@]} - 1)) ]]; then
-      options_json+=","
-    fi
+    local option_name="${options[$i]}"
+    # Use option name as description for simplicity
+    options_json=$(echo "$options_json" | jq --arg name "$option_name" --arg color "$color" --arg desc "$option_name" \
+      '. += [{"name": $name, "color": $color, "description": $desc}]')
   done
-  options_json+="]"
+  
+  log "🔍 DEBUG: options_json = $options_json"
+  
+  # Validate that all options have required fields (name, color, description)
+  local validation_errors=$(echo "$options_json" | jq -r '
+    map(
+      select(
+        (.name == null or .name == "") or 
+        (.color == null or .color == "") or 
+        (.description == null)
+      )
+    ) | 
+    if length > 0 then 
+      "Missing required fields in options: " + (map(.name // "unnamed") | join(", "))
+    else 
+      ""
+    end
+  ')
+  
+  if [[ -n "$validation_errors" ]]; then
+    log "❌ Validation error: $validation_errors"
+    return 1
+  fi
   
   local mutation='
     mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
@@ -588,11 +624,32 @@ create_single_select_field() {
     }
   '
   
-  gh api graphql \
-    -f query="$mutation" \
-    -f projectId="$project_id" \
-    -f name="$field_name" \
-    -f options="$options_json" >/dev/null 2>&1 || true
+  log "🔍 DEBUG: project_id=$project_id, field_name=$field_name"
+  
+  # Build full GraphQL request body with variables
+  local request_body=$(jq -n \
+    --arg query "$mutation" \
+    --arg projectId "$project_id" \
+    --arg name "$field_name" \
+    --argjson options "$options_json" \
+    '{query: $query, variables: {projectId: $projectId, name: $name, options: $options}}')
+  
+  # Pass complete request via stdin
+  local result=$(echo "$request_body" | gh api graphql --input - 2>&1)
+  
+  if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "❌ Failed to create field '$field_name':"
+    echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
+    return 1
+  fi
+  
+  local field_id=$(echo "$result" | jq -r '.data.createProjectV2Field.projectV2Field.id // ""')
+  if [[ -n "$field_id" ]] && [[ "$field_id" != "null" ]]; then
+    log "✅ Created field '$field_name' (ID: $field_id)"
+  else
+    log "⚠️  Field creation returned success but no ID"
+    echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
+  fi
 }
 
 create_text_field() {
@@ -602,8 +659,11 @@ create_text_field() {
   # Check if field already exists
   local existing_field=$(get_project_field "$project_id" "$field_name")
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
+    log "✅ Field '$field_name' already exists, skipping creation"
     return 0
   fi
+  
+  log "🔧 Creating text field '$field_name'..."
   
   local mutation='
     mutation($projectId: ID!, $name: String!) {
@@ -621,10 +681,24 @@ create_text_field() {
     }
   '
   
-  gh api graphql \
+  local result=$(gh api graphql \
     -f query="$mutation" \
     -f projectId="$project_id" \
-    -f name="$field_name" >/dev/null 2>&1 || true
+    -f name="$field_name" 2>&1)
+  
+  if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "❌ Failed to create text field '$field_name':"
+    echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
+    return 1
+  fi
+  
+  local field_id=$(echo "$result" | jq -r '.data.createProjectV2Field.projectV2Field.id // ""')
+  if [[ -n "$field_id" ]] && [[ "$field_id" != "null" ]]; then
+    log "✅ Created text field '$field_name' (ID: $field_id)"
+  else
+    log "⚠️  Text field creation returned success but no ID"
+    echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
+  fi
 }
 
 get_project_field() {
@@ -790,18 +864,25 @@ set_project_item_status() {
   local item_id="$2"
   local status="$3"
   
+  log "🔍 DEBUG: set_project_item_status called - item=$item_id, status=$status"
+  
   local field_id=$(get_project_field "$project_id" "Stage")
+  log "🔍 DEBUG: Stage field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    log "⚠️  DEBUG: Stage field_id is null or empty, returning"
     return 0
   fi
   
   local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
+  log "🔍 DEBUG: Status option_id=$option_id for status=$status"
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    log "⚠️  DEBUG: Status option_id is null or empty for status=$status, returning"
     return 0
   fi
   
+  log "✅ DEBUG: Calling update_project_item_field for status update"
   update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
 }
 
@@ -810,18 +891,25 @@ set_project_item_agent() {
   local item_id="$2"
   local agent="$3"
   
+  log "🔍 DEBUG: set_project_item_agent called - item=$item_id, agent=$agent"
+  
   local field_id=$(get_project_field "$project_id" "Current Agent")
+  log "🔍 DEBUG: Current Agent field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    log "⚠️  DEBUG: Current Agent field_id is null or empty, returning"
     return 0
   fi
   
   local option_id=$(get_field_option_id "$project_id" "$field_id" "$agent")
+  log "🔍 DEBUG: Agent option_id=$option_id for agent=$agent"
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    log "⚠️  DEBUG: Agent option_id is null or empty for agent=$agent, returning"
     return 0
   fi
   
+  log "✅ DEBUG: Calling update_project_item_field for agent update"
   update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
 }
 

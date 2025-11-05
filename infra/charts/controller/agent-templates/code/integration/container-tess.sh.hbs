@@ -1417,21 +1417,30 @@ if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
 
 ## 🚨 QA REVIEW MODE - PR #${PR_NUMBER:-UNKNOWN} 🚨
 
-**PRE-APPROVAL STEPS:**
-1. Check mergeable: \`gh pr view ${PR_NUMBER} --json mergeable\`
-2. If conflicts: checkout PR, merge main, resolve, test, push
-3. Run quality checks on merged code
-4. Validate acceptance criteria
-5. Approve: \`gh pr review ${PR_NUMBER} --approve\`
+**⛔️ CRITICAL: YOU ARE IN QA REVIEW MODE - NOT IMPLEMENTATION MODE ⛔️**
 
-**REQUIREMENTS:**
-- MUST resolve merge conflicts before approval
-- MUST test merged code (not just original branch)
-- Use \`gh pr review\` to approve/request changes
-- DO NOT create new PRs
-- DO NOT approve PRs with conflicts
+**WHAT YOU MUST DO:**
+1. Checkout the existing PR branch: \`gh pr checkout ${PR_NUMBER}\`
+2. Check mergeable state: \`gh pr view ${PR_NUMBER} --json mergeable\`
+3. If merge conflicts exist: merge main, resolve conflicts, test, push updates
+4. Run quality checks on the merged code (cargo fmt, clippy, tests)
+5. Validate ALL acceptance criteria are met through testing
+6. Review the PR: \`gh pr review ${PR_NUMBER} --approve\` (if passing) or \`gh pr review ${PR_NUMBER} --request-changes\` (if issues found)
 
-**You are QA, not implementation. Your job: verify, resolve conflicts, approve existing PR.**"
+**⛔️ WHAT YOU MUST NOT DO - THESE ARE PROHIBITED: ⛔️**
+- ❌ DO NOT create new PRs under ANY circumstances
+- ❌ DO NOT run \`gh pr create\` - this command is FORBIDDEN in QA mode
+- ❌ DO NOT push to new branches - only push to the existing PR branch
+- ❌ DO NOT approve PRs with merge conflicts
+- ❌ DO NOT claim you're implementing features - you are ONLY reviewing
+
+**YOUR ROLE: Quality Assurance Reviewer**
+- You are NOT an implementation agent
+- You are NOT creating new features
+- You are ONLY reviewing PR #${PR_NUMBER} created by the implementation agent
+- Your job is to verify, test, resolve conflicts, and approve/reject the EXISTING PR
+
+**IF YOU CREATE A NEW PR IN QA MODE, YOU HAVE COMPLETELY FAILED YOUR TASK.**"
 else
   # Tess in Implementation mode (shouldn't normally happen)
   SYSTEM_PROMPT="${SYSTEM_PROMPT_BASE}
@@ -1469,6 +1478,29 @@ COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
 
 # Ensure we pass the combined system prompt
 CLAUDE_CMD="$CLAUDE_CMD --system-prompt $COMBINED_SYS_PROMPT"
+
+# =========================================================================
+# QA Mode Safeguard: Prevent PR creation when in testing mode
+# =========================================================================
+if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
+  echo "🛡️  QA Review Mode: Installing PR creation safeguard"
+  
+  # Create a wrapper function that blocks 'gh pr create' in QA mode
+  gh() {
+    if [[ "$1" == "pr" && "$2" == "create" ]]; then
+      echo "❌ ERROR: 'gh pr create' is FORBIDDEN in QA review mode (WORKFLOW_STAGE=testing)"
+      echo "❌ You are reviewing PR #${PR_NUMBER}, not creating a new one"
+      echo "❌ Use 'gh pr checkout ${PR_NUMBER}' to work on the existing PR"
+      echo "❌ Use 'gh pr review ${PR_NUMBER}' to approve/reject the PR"
+      return 1
+    fi
+    command gh "$@"
+  }
+  export -f gh
+  
+  echo "✅ Safeguard installed: 'gh pr create' is now blocked"
+  echo "✅ You can only review PR #${PR_NUMBER}"
+fi
 
 # Initialize retry loop variables
 MAX_RETRIES=${CLAUDE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
