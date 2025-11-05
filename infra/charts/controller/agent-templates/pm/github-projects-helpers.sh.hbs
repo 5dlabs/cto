@@ -601,19 +601,14 @@ create_single_select_field() {
     }
   '
   
-  # Build complete variables JSON object for GraphQL
-  local variables=$(jq -n \
-    --arg projectId "$project_id" \
-    --arg name "$field_name" \
-    --argjson options "$options_json" \
-    '{projectId: $projectId, name: $name, options: $options}')
+  log "🔍 DEBUG: project_id=$project_id, field_name=$field_name"
   
-  log "🔍 DEBUG: variables = $variables"
-  
-  # Pass variables as a single JSON object using --raw-field
+  # Pass variables individually using -f and -F flags
   local result=$(gh api graphql \
     -f query="$mutation" \
-    --raw-field variables="$variables" 2>&1)
+    -f projectId="$project_id" \
+    -f name="$field_name" \
+    -F options="$options_json" 2>&1)
   
   if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
     log "❌ Failed to create field '$field_name':"
