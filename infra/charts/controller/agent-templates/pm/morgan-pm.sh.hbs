@@ -352,6 +352,9 @@ create_task_issues() {
       set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
       set_project_item_agent "$PROJECT_ID" "$ITEM_ID" "Pending"
       
+      # Set initial assignee (Morgan creates the tasks)
+      update_issue_assignee "$ISSUE_NUMBER" "Morgan (PM)"
+      
       # Store mapping
       TEMP_MAP=$(mktemp)
       jq --arg task_id "$TASK_ID" \
@@ -505,6 +508,9 @@ handle_task_event() {
   # Update issue labels
   update_issue_labels "$issue_number" "$task_status" "$current_agent"
   
+  # Update issue assignee to current agent
+  update_issue_assignee "$issue_number" "$current_agent"
+  
   # NEW: Add structured status history
   add_status_history "$issue_number" "$task_id" "$current_stage" "$current_agent" "$task_status" "$workflow_phase"
   
@@ -605,6 +611,63 @@ map_stage_to_agent() {
       fi
       ;;
   esac
+}
+
+map_agent_to_github_username() {
+  local agent="$1"
+  
+  # Map agent display name to GitHub App bot username
+  case "$agent" in
+    "Rex (Implementation)")
+      echo "rex-5dlabs[bot]"
+      ;;
+    "Cleo (Quality)")
+      echo "cleo-5dlabs[bot]"
+      ;;
+    "Cipher (Security)")
+      echo "cipher-5dlabs[bot]"
+      ;;
+    "Tess (QA)")
+      echo "tess-5dlabs[bot]"
+      ;;
+    "Atlas (Integration)")
+      echo "atlas-5dlabs[bot]"
+      ;;
+    "Bolt (Deployment)")
+      echo "bolt-5dlabs[bot]"
+      ;;
+    "Morgan (PM)")
+      echo "morgan-5dlabs[bot]"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+update_issue_assignee() {
+  local issue_number="$1"
+  local agent="$2"
+  
+  # Get GitHub username for agent
+  local github_username=$(map_agent_to_github_username "$agent")
+  
+  # If agent completed or no username, remove assignees
+  if [[ -z "$github_username" ]] || [[ "$agent" == "Complete ✅" ]]; then
+    log "📝 Removing assignees from issue #$issue_number (task complete)"
+    gh issue edit "$issue_number" \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --remove-assignee "@me" 2>/dev/null || true
+    return 0
+  fi
+  
+  # Assign the agent's bot user to the issue
+  log "👤 Assigning $github_username to issue #$issue_number"
+  gh issue edit "$issue_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --add-assignee "$github_username" 2>/dev/null || {
+      log "⚠️  Could not assign $github_username (may not have permissions)"
+    }
 }
 
 map_workflow_to_status() {

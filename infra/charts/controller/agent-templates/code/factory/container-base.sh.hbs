@@ -558,8 +558,17 @@ ensure_pr_created() {
     rm -f /tmp/gh-label-create.log
   done
 
+  # Find the GitHub issue for this task (created by Morgan PM)
+  ISSUE_NUMBER=$(gh issue list -R "$REPO_SLUG" --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+  
+  ISSUE_LINK=""
+  if [ -n "$ISSUE_NUMBER" ]; then
+    echo "🔗 Found GitHub issue #$ISSUE_NUMBER for task {{task_id}}"
+    ISSUE_LINK="Closes #$ISSUE_NUMBER"
+  fi
+
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
-  read -r -d '' PR_BODY <<'EOF' || true
+  read -r -d '' PR_BODY <<EOF || true
 ## Summary
 - Auto-generated fallback PR because the Factory agent finished without opening one
 - Task {{task_id}} for service {{service}} is ready for review
@@ -567,8 +576,11 @@ ensure_pr_created() {
 ## Metadata
 - Agent: {{github_app}}
 - Workflow: {{workflow_name}}
-- Branch: \\`$CURRENT_BRANCH\\` → \\`$BASE_BRANCH\\`
-
+- Branch: \`$CURRENT_BRANCH\` → \`$BASE_BRANCH\`
+${ISSUE_LINK:+
+## Links
+$ISSUE_LINK
+}
 _This PR was created automatically by the Factory container._
 EOF
 
@@ -1204,13 +1216,29 @@ echo "📄 Using prompt file: $PROMPT_FILE"
 echo "startingTask:{{task_id}}"
 echo ""
 
-PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "❌ Prompt file not found: $PROMPT_FILE"
+  exit 1
+fi
 
-echo "🧾 Resolved prompt content (truncated to 2000 chars for log safety):"
-PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
-printf '%s\n' "$PROMPT_PREVIEW"
-PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
+PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE" 2>&1)" || {
+  echo "❌ Failed to read prompt file: $PROMPT_FILE"
+  exit 1
+}
+
+PROMPT_BYTES=${#PROMPT_CONTENT}
 echo "📏 Prompt size: $PROMPT_BYTES bytes"
+
+if [ "$PROMPT_BYTES" -eq 0 ]; then
+  echo "❌ Prompt content is empty!"
+  exit 1
+fi
+
+echo "🧾 Resolved prompt content (first 500 chars):"
+# Use parameter expansion instead of pipe to avoid set -e issues
+PROMPT_PREVIEW="${PROMPT_CONTENT:0:500}"
+printf '%s\n' "$PROMPT_PREVIEW"
+echo "..."
 
 MAX_RETRIES=${FACTORY_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
 ATTEMPT=1
