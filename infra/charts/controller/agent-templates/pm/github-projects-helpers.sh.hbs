@@ -466,12 +466,16 @@ create_default_board_view() {
     }
   '
   
-  local views_result=$(gh api graphql \
+  local views_result
+  views_result=$(gh api graphql \
     -f query="$views_query" \
-    -f projectId="$project_id" 2>&1)
+    -f projectId="$project_id" 2>/dev/null) || {
+    echo "⚠️  Could not query existing views" >&2
+    return 1
+  }
   
   # Find the default table view to delete
-  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[] | select(.layout == "TABLE_LAYOUT") | .id' | head -1)
+  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null | head -1)
   
   # Create our board view
   local view_mutation='
@@ -489,12 +493,16 @@ create_default_board_view() {
     }
   '
   
-  local view_result=$(gh api graphql \
+  local view_result
+  view_result=$(gh api graphql \
     -f query="$view_mutation" \
-    -f projectId="$project_id" 2>&1)
+    -f projectId="$project_id" 2>/dev/null) || {
+    echo "⚠️  Could not create board view" >&2
+    return 1
+  }
   
-  local view_id=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.id // ""')
-  local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""')
+  local view_id=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.id // ""' 2>/dev/null)
+  local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""' 2>/dev/null)
   
   if [[ -n "$view_id" ]] && [[ "$view_id" != "null" ]]; then
     echo "✅ Created board view (ID: $view_id, Number: $view_number)" >&2
@@ -537,14 +545,16 @@ setup_custom_fields() {
   
   # Create "Current Agent" field
   create_single_select_field "$project_id" "Current Agent" \
-    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
+    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅" || true
   
   # Create "Stage" field
   create_single_select_field "$project_id" "Stage" \
-    "Pending" "Implementation" "Code Review" "Security Check" "QA Testing" "Done"
+    "Pending" "Implementation" "Code Review" "Security Check" "QA Testing" "Done" || true
   
   # Create "Task ID" field (text)
-  create_text_field "$project_id" "Task ID"
+  create_text_field "$project_id" "Task ID" || true
+  
+  echo "✅ Custom fields setup completed" >&2
 }
 
 create_single_select_field() {
@@ -553,21 +563,24 @@ create_single_select_field() {
   shift 2
   local options=("$@")
   
+  echo "🔧 Creating field '$field_name' with ${#options[@]} options..." >&2
+  
   # Check if field already exists
   local existing_field=$(get_project_field "$project_id" "$field_name")
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
+    echo "✅ Field '$field_name' already exists" >&2
     return 0
   fi
   
-  # Build options JSON
+  # Build options JSON with proper formatting
   local options_json="["
   local colors=("RED" "BLUE" "GREEN" "YELLOW" "ORANGE" "PURPLE" "PINK" "GRAY")
   for i in "${!options[@]}"; do
     local color="${colors[$((i % ${#colors[@]}))]}"
-    options_json+="{\"name\": \"${options[$i]}\", \"color\": \"$color\"}"
-    if [[ $i -lt $((${#options[@]} - 1)) ]]; then
+    if [[ $i -gt 0 ]]; then
       options_json+=","
     fi
+    options_json+="{\"name\":\"${options[$i]}\",\"color\":\"$color\"}"
   done
   options_json+="]"
   
@@ -588,11 +601,26 @@ create_single_select_field() {
     }
   '
   
-  gh api graphql \
+  local response
+  response=$(gh api graphql \
     -f query="$mutation" \
     -f projectId="$project_id" \
     -f name="$field_name" \
-    -f options="$options_json" >/dev/null 2>&1 || true
+    -F options="$options_json" 2>&1) || {
+    echo "⚠️  Failed to create field '$field_name'" >&2
+    echo "$response" >&2
+    return 1
+  }
+  
+  local field_id=$(echo "$response" | jq -r '.data.createProjectV2Field.projectV2Field.id // empty' 2>/dev/null)
+  
+  if [[ -n "$field_id" ]] && [[ "$field_id" != "null" ]]; then
+    echo "✅ Created field '$field_name' (ID: $field_id)" >&2
+    return 0
+  else
+    echo "⚠️  Field creation returned no ID" >&2
+    return 1
+  fi
 }
 
 create_text_field() {
