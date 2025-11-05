@@ -233,9 +233,20 @@ spec:
                 - name: verify-update
                   value: "true"
 
+          # Stage 1: Update to implementation stage before Rex starts
+          - name: update-to-implementation
+            dependencies: [initialize-stage]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "implementation-in-progress"
+                - name: verify-update
+                  value: "false"
+
           # Remediation loop: Rex → Cleo → Tess until approved
           - name: remediation-iteration
-            dependencies: [initialize-stage]
+            dependencies: [update-to-implementation]
             template: remediation-iteration
 
           # Update stage after successful remediation (approved status)

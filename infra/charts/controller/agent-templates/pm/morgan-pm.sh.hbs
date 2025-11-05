@@ -1232,17 +1232,24 @@ generate_issue_body() {
   local priority=$(echo "$task" | jq -r '.priority // "medium"')
   local dependencies=$(echo "$task" | jq -r '.dependencies // [] | join(", ")')
   
+  # Try to read full task content from docs directory
+  local task_dir="$TEMP_CLONE/$DOCS_DIR/.taskmaster/docs/task-$task_id"
+  local task_md_content=""
+  local acceptance_criteria=""
+  
+  if [[ -f "$task_dir/task.md" ]]; then
+    task_md_content=$(cat "$task_dir/task.md" 2>/dev/null || echo "")
+  fi
+  
+  if [[ -f "$task_dir/acceptance-criteria.md" ]]; then
+    acceptance_criteria=$(cat "$task_dir/acceptance-criteria.md" 2>/dev/null || echo "")
+  fi
+  
   cat <<EOF
 # Task $task_id: $title
 
-## 📋 Description
+## 📋 Quick Summary
 $description
-
-## 🎯 Implementation Details
-$details
-
-## 🧪 Test Strategy
-$test_strategy
 
 ## 📊 Metadata
 - **Priority**: $priority
@@ -1252,12 +1259,33 @@ $test_strategy
 - **Started**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 ---
+${task_md_content:+
+## 📖 Full Task Details
+
+$task_md_content
+
+---
+}${acceptance_criteria:+
+## ✅ Acceptance Criteria
+
+$acceptance_criteria
+
+---
+}
+## 🎯 Implementation Notes (from tasks.json)
+$details
+
+## 🧪 Test Strategy (from tasks.json)
+$test_strategy
+
+---
 
 ## 🔗 Task Master Integration
 
 This issue is automatically synchronized with TaskMaster.
 
 **Task File**: \`$tasks_json_path\`  
+**Task Details**: \`.taskmaster/docs/task-$task_id/\`  
 **Service**: \`$SERVICE_NAME\`  
 **Workflow**: \`$WORKFLOW_NAME\`
 
