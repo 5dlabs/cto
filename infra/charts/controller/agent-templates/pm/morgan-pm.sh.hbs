@@ -1438,10 +1438,6 @@ morgan_issue_link_success_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME"
 # TYPE morgan_issue_link_failure_total counter
 morgan_issue_link_failure_total{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $(cat /tmp/morgan-link-failure 2>/dev/null || echo "0")
 
-# HELP morgan_last_sync_timestamp Unix timestamp of last sync
-# TYPE morgan_last_sync_timestamp gauge
-morgan_last_sync_timestamp{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $sync_timestamp
-
 # HELP morgan_project_completion_percentage Project completion percentage
 # TYPE morgan_project_completion_percentage gauge
 morgan_project_completion_percentage{project="$WORKFLOW_NAME",service="$SERVICE_NAME"} $(( total_tasks > 0 ? (completed_tasks * 100) / total_tasks : 0 ))
