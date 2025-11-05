@@ -1186,9 +1186,17 @@ spec:
             # Define valid transitions (Rex → Cleo → Cipher → Tess flow)
             case $current_stage in
               "pending")
+                # Implementation path: pending → implementation-in-progress (Rex starts)
+                [[ $new_stage == "implementation-in-progress" ]] && return 0
                 # Primary path: pending → quality-in-progress
                 [[ $new_stage == "quality-in-progress" ]] && return 0
                 # Legacy paths for backward compatibility
+                [[ $new_stage == "waiting-quality-complete" ]] && return 0
+                [[ $new_stage == "waiting-pr-created" ]] && return 0
+                ;;
+              "implementation-in-progress")
+                # After implementation: → quality or waiting states
+                [[ $new_stage == "quality-in-progress" ]] && return 0
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 [[ $new_stage == "waiting-pr-created" ]] && return 0
                 ;;
