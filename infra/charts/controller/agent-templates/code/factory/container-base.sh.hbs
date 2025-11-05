@@ -879,25 +879,60 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     echo "🔄 Cleaning workspace before checkout (preserving task/ directory)"
     
+    # Use unique backup name to avoid PID collisions (PID + timestamp + random)
+    BACKUP_DIR="/tmp/task-backup-$$-$(date +%s)-$RANDOM"
+    
     # Save task/ directory if it exists
     if [ -d "task" ]; then
-      echo "📦 Temporarily saving task/ directory"
-      cp -r task /tmp/task-backup-$$ 2>/dev/null || true
+      echo "📦 Backing up task/ directory to $BACKUP_DIR"
+      
+      # Copy with verification - fail if backup fails
+      if ! cp -r task "$BACKUP_DIR" 2>/dev/null; then
+        echo "❌ CRITICAL: Failed to backup task/ directory!"
+        echo "   Aborting workspace cleanup to prevent data loss"
+        exit 1
+      fi
+      
+      # Verify backup succeeded
+      if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A "$BACKUP_DIR" 2>/dev/null)" ]; then
+        echo "❌ CRITICAL: Backup verification failed - directory empty or missing!"
+        echo "   Aborting to prevent data loss"
+        rm -rf "$BACKUP_DIR" 2>/dev/null || true
+        exit 1
+      fi
+      
+      echo "✅ Backup verified: $(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1) in $BACKUP_DIR"
     fi
     
-    # Reset all changes aggressively
+    # NOW safe to wipe workspace (backup verified)
+    echo "🧹 Resetting workspace (backup secured)"
     git reset --hard HEAD 2>/dev/null || true
     git clean -fdx -e task/ 2>/dev/null || true
     
-    # Restore task/ directory
-    if [ -d "/tmp/task-backup-$$" ]; then
-      echo "📦 Restoring task/ directory"
+    # Restore task/ directory from verified backup
+    if [ -d "$BACKUP_DIR" ]; then
+      echo "📦 Restoring task/ directory from backup"
       rm -rf task 2>/dev/null || true
-      cp -r /tmp/task-backup-$$ task 2>/dev/null || true
-      rm -rf /tmp/task-backup-$$ 2>/dev/null || true
+      
+      if ! cp -r "$BACKUP_DIR" task 2>/dev/null; then
+        echo "❌ CRITICAL: Failed to restore task/ directory!"
+        echo "   Backup is at: $BACKUP_DIR (preserved for manual recovery)"
+        exit 1
+      fi
+      
+      # Verify restore
+      if [ ! -d "task" ]; then
+        echo "❌ CRITICAL: Restore verification failed!"
+        echo "   Backup preserved at: $BACKUP_DIR"
+        exit 1
+      fi
+      
+      # Cleanup backup only after successful restore
+      rm -rf "$BACKUP_DIR" 2>/dev/null || true
+      echo "✅ Task directory restored successfully"
     fi
     
-    echo "✅ Workspace cleaned"
+    echo "✅ Workspace cleaned and task/ preserved"
   fi
   
   # Now checkout should work
