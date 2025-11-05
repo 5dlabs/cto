@@ -174,8 +174,50 @@ get_or_create_project() {
       echo "WARNING: Could not link project to repository (project still works)" >&2
     }
   
+  # Create board view and set as default
+  create_default_board_view "$project_id"
+  
   # Return only the project ID (not mutation output)
   echo "$project_id"
+}
+
+create_default_board_view() {
+  local project_id="$1"
+  
+  echo "Creating board view for project..." >&2
+  
+  # Create a board view
+  local view_mutation='
+    mutation($projectId: ID!) {
+      createProjectV2View(input: {
+        projectId: $projectId
+        name: "Task Board"
+        layout: BOARD_LAYOUT
+      }) {
+        projectV2View {
+          id
+          number
+        }
+      }
+    }
+  '
+  
+  local view_result=$(gh api graphql \
+    -f query="$view_mutation" \
+    -f projectId="$project_id" 2>&1)
+  
+  local view_id=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.id // ""')
+  local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""')
+  
+  if [[ -n "$view_id" ]] && [[ "$view_id" != "null" ]]; then
+    echo "✅ Created board view (ID: $view_id, Number: $view_number)" >&2
+    
+    # Note: GitHub Projects V2 API doesn't expose setting default view via GraphQL yet
+    # The first view created is typically the default, but users may need to manually set it
+    # Future enhancement: Use REST API if/when endpoint becomes available
+  else
+    echo "⚠️  Could not create board view (project still works)" >&2
+  fi
 }
 
 # ============================================================================
