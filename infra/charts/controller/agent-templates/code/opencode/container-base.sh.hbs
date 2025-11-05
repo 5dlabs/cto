@@ -558,8 +558,17 @@ ensure_pr_created() {
     rm -f /tmp/gh-label-create.log
   done
 
+  # Find the GitHub issue for this task (created by Morgan PM)
+  ISSUE_NUMBER=$(gh issue list -R "$REPO_SLUG" --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+  
+  ISSUE_LINK=""
+  if [ -n "$ISSUE_NUMBER" ]; then
+    echo "🔗 Found GitHub issue #$ISSUE_NUMBER for task {{task_id}}"
+    ISSUE_LINK="Closes #$ISSUE_NUMBER"
+  fi
+
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
-  read -r -d '' PR_BODY <<'EOF' || true
+  read -r -d '' PR_BODY <<EOF || true
 ## Summary
 - Auto-generated fallback PR because the OpenCode agent finished without opening one
 - Task {{task_id}} for service {{service}} is ready for review
@@ -568,7 +577,10 @@ ensure_pr_created() {
 - Agent: {{github_app}}
 - Workflow: {{workflow_name}}
 - Branch: \`$CURRENT_BRANCH\` → \`$BASE_BRANCH\`
-
+${ISSUE_LINK:+
+## Links
+$ISSUE_LINK
+}
 _This PR was created automatically by the OpenCode container._
 EOF
 
