@@ -30,7 +30,40 @@ shadcn/ui COPIES components: `npx shadcn@latest add button` → `components/ui/b
 3. Setup: `pnpm create next-app` + `pnpm dlx shadcn init`
 4. Build components
 5. Verify (lint/type/build)
-6. Create PR
+6. Create PR with issue link
+
+## PR Creation
+
+When ready to create your PR, link it to the tracking issue:
+
+```bash
+# Find the GitHub issue for this task (created by Morgan PM)
+ISSUE_NUM=$(gh issue list --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+# Create PR with issue link
+gh pr create \
+  --title "feat({{service}}): implement task {{task_id}} - [brief summary]" \
+  --label "task-{{task_id}}" \
+  --label "service-{{service}}" \
+  --label "run-{{workflow_name}}" \
+  --body "## Implementation Summary
+[Your detailed implementation notes]
+
+## Changes Made
+- [List key changes]
+
+## Tests & Validation
+- \`pnpm lint\`: ✅ Passed
+- \`pnpm build\`: ✅ Passed
+
+${ISSUE_NUM:+## Links
+Closes #$ISSUE_NUM
+}
+## Agent
+Implemented by: {{github_app}}"
+```
+
+**The "Closes #XXX" keyword automatically links the PR to the issue and will close it when merged.**
 
 ## Done When
 ✅ Acceptance criteria met | ✅ No errors | ✅ Build passes | ✅ Responsive | ✅ Accessible | ✅ PR created
