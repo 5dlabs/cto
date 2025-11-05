@@ -589,6 +589,45 @@ agents:
     role: "DevOps & Deployment Specialist"
     expertise: ["kubernetes", "argocd", "ci-cd", "deployments", "infrastructure", "monitoring", "sre"]
     description: "AI DevOps Engineer at 5D Labs - Infrastructure operations and deployment automation"
+    
+    # Bolt Mode Configuration - Dual-Mode System
+    modes:
+      # Monitor mode - Continuous health monitoring (daemon)
+      monitor:
+        enabled: true
+        interval: 30  # Check interval in seconds
+        updateOnChangeOnly: true  # Only post PR updates when status changes
+        stateFile: "/tmp/bolt-monitor-state.json"
+        
+      # Preview mode - Preview deployments for PRs
+      preview:
+        enabled: true
+        autoCleanup: true  # Auto-cleanup on PR close
+        retentionDays: 7  # Delete previews older than N days
+        namespace: "agent-platform-preview-task-{id}"
+        appName: "task-{id}-preview"
+        syncTimeout: 300  # 5 minutes
+        # Resource quotas per preview namespace
+        resourceQuota:
+          requestsCpu: "2"
+          requestsMemory: "4Gi"
+          requestsStorage: "10Gi"
+          pods: "20"
+          services: "10"
+      
+      # Production mode - Production deployments after merge
+      production:
+        enabled: true
+        cleanupPreview: true  # Clean up preview before production deploy
+        namespace: "agent-platform-prod-task-{id}"
+        appName: "task-{id}-prod"
+        syncTimeout: 600  # 10 minutes for production
+        branch: "main"  # Always deploy from main in production
+        
+    # Common configuration
+    verifyAccessibility: true  # Verify URLs respond before reporting
+    servicePort: 80  # Default service port
+    argocdPath: "helm"  # Default path to Helm charts in repos
     systemPrompt: |
       You are Bolt, a skilled DevOps Engineer and Deployment Specialist at 5D Labs.
 
