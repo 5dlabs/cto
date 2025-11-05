@@ -125,11 +125,9 @@ ENV PATH="/home/runner/.cargo/bin:${PATH}"
 # Install essential Rust tools only (no pre-warming)
 RUN ~/.cargo/bin/rustup component add clippy rustfmt
 
-# Create .cargo/bin directory for pre-built binaries
-RUN mkdir -p ~/.cargo/bin
-
 # Install sccache from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
+    mkdir -p ~/.cargo/bin && \
     cd /tmp/downloads && \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
@@ -148,6 +146,7 @@ RUN --mount=type=cache,target=/tmp/downloads \
 
 # Install cargo-nextest from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
+    mkdir -p ~/.cargo/bin && \
     cd /tmp/downloads && \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
