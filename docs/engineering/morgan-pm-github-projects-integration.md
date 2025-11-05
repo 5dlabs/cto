@@ -238,10 +238,21 @@ agents:
 
 Morgan's GitHub App needs these permissions:
 
-- **Projects**: Read/Write (for creating and updating projects)
+- **Organization projects**: Read/Write (for creating and updating Projects v2)
+  - ⚠️ **Important**: This must be set to "Read and write" in the GitHub App settings
+  - Without this, Morgan can create projects but cannot add issues to them
 - **Issues**: Read/Write (for creating issues and processing comments)
 - **Metadata**: Read (for repository access)
 - **Contents**: Read (for accessing TaskMaster files)
+
+#### Setting Up Morgan's Permissions
+
+1. Go to your organization's GitHub Apps settings
+2. Find the Morgan GitHub App
+3. Navigate to "Permissions & events"
+4. Under "Organization permissions", set:
+   - **Projects**: **Read and write**
+5. Save changes and reinstall the app if needed
 
 ### Webhook Events
 
