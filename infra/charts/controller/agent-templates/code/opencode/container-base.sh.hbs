@@ -558,11 +558,59 @@ ensure_pr_created() {
     rm -f /tmp/gh-label-create.log
   done
 
+  # VALIDATION: Check for problematic commits before creating PR
+  echo "🔍 Validating changes before PR creation..."
+  
+  # Check total diff size
+  TOTAL_ADDITIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$1} END {print sum+0}')
+  TOTAL_DELETIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$2} END {print sum+0}')
+  TOTAL_CHANGES=$((TOTAL_ADDITIONS + TOTAL_DELETIONS))
+  
+  echo "   📊 Total changes: +$TOTAL_ADDITIONS -$TOTAL_DELETIONS (total: $TOTAL_CHANGES lines)"
+  
+  # Warn if commit is suspiciously large
+  if [[ $TOTAL_CHANGES -gt 100000 ]]; then
+    echo "   ⚠️  WARNING: Very large commit detected ($TOTAL_CHANGES lines)!"
+    echo "   This may include unwanted files like node_modules or build artifacts"
+  fi
+  
+  # Check for commonly ignored files that shouldn't be committed
+  PROBLEMATIC_FILES=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | grep -E "(node_modules/|\.next/|dist/|build/|target/debug/|\.pyc$|__pycache__/)" || echo "")
+  
+  if [[ -n "$PROBLEMATIC_FILES" ]]; then
+    echo "   ❌ ERROR: Detected files that should be gitignored!"
+    echo "$PROBLEMATIC_FILES" | head -10 | sed 's/^/      /'
+    if [[ $(echo "$PROBLEMATIC_FILES" | wc -l) -gt 10 ]]; then
+      echo "      ... and $(($(echo "$PROBLEMATIC_FILES" | wc -l) - 10)) more"
+    fi
+    echo ""
+    echo "   🛑 BLOCKING PR CREATION"
+    echo "   Please add a .gitignore file and remove these files from git"
+    echo "   Suggested .gitignore entries:"
+    echo "      node_modules/"
+    echo "      dist/"
+    echo "      build/"
+    echo "      target/debug/"
+    echo "      __pycache__/"
+    return 1
+  fi
+  
+  # Check file count
+  FILE_COUNT=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | wc -l)
+  echo "   📁 Files changed: $FILE_COUNT"
+  
+  if [[ $FILE_COUNT -gt 100 ]]; then
+    echo "   ⚠️  WARNING: Large number of files changed ($FILE_COUNT)"
+    echo "   Verify this is intentional and not due to dependency/build commits"
+  fi
+  
+  echo "   ✅ Validation passed"
+  
   # Find the GitHub issue for this task (created by Morgan PM)
   ISSUE_NUMBER=$(gh issue list -R "$REPO_SLUG" --label "task-{{task_id}}" --json number --jq '.[0].number' 2>/dev/null || echo "")
   
   ISSUE_LINK=""
-  if [ -n "$ISSUE_NUMBER" ]; then
+  if [[ -n "$ISSUE_NUMBER" ]]; then
     echo "🔗 Found GitHub issue #$ISSUE_NUMBER for task {{task_id}}"
     ISSUE_LINK="Closes #$ISSUE_NUMBER"
   fi
