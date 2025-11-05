@@ -422,6 +422,14 @@ add_issue_to_project() {
     -f projectId="$project_id" \
     -f contentId="$issue_node_id")
   
+  # Check for errors in the response
+  if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "⚠️  GraphQL error adding issue to project:"
+    echo "$result" | jq '.errors' >&2
+    echo "null"
+    return 1
+  fi
+  
   echo "$result" | jq -r '.data.addProjectV2ItemById.item.id'
 }
 
