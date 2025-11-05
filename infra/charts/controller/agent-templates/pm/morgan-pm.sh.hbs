@@ -960,7 +960,8 @@ map_workflow_to_status() {
       esac
       ;;
     *)
-      echo "Todo"
+      # Match field option exactly: "To Do" not "Todo"
+      echo "To Do"
       ;;
   esac
 }
