@@ -920,8 +920,12 @@ update_project_item_field() {
 
 # Export functions for use in other scripts
 export -f graphql_query
+export -f retry_with_backoff
 export -f get_repository_id
-export -f get_or_create_project
+export -f get_or_create_project_smart
+export -f get_or_create_repo_project
+export -f get_or_create_org_project
+export -f ensure_project_linked_to_repository
 export -f setup_custom_fields
 export -f create_single_select_field
 export -f create_text_field
