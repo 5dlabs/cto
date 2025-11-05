@@ -126,8 +126,9 @@ ENV PATH="/home/runner/.cargo/bin:${PATH}"
 RUN /home/runner/.cargo/bin/rustup component add clippy rustfmt
 
 # Install sccache from pre-built binaries (much faster than cargo install)
-RUN mkdir -p /home/runner/.cargo/bin && \
-    cd /tmp && \
+RUN --mount=type=cache,target=/tmp/downloads \
+    mkdir -p /home/runner/.cargo/bin && \
+    cd /tmp/downloads && \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
         amd64) SCCACHE_ARCH=x86_64 ;; \
@@ -139,14 +140,13 @@ RUN mkdir -p /home/runner/.cargo/bin && \
     curl -fsSL -o sccache.tar.gz \
         "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" && \
     tar xzf sccache.tar.gz && \
-    mv "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" /home/runner/.cargo/bin/ && \
-    rm -rf sccache.tar.gz "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}" && \
-    chmod +x /home/runner/.cargo/bin/sccache && \
+    install -m 755 "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" /home/runner/.cargo/bin/sccache && \
     /home/runner/.cargo/bin/sccache --version
 
 # Install cargo-nextest from pre-built binaries (much faster than cargo install)
-RUN mkdir -p /home/runner/.cargo/bin && \
-    cd /tmp && \
+RUN --mount=type=cache,target=/tmp/downloads \
+    mkdir -p /home/runner/.cargo/bin && \
+    cd /tmp/downloads && \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
         amd64) NEXTEST_ARCH=x86_64 ;; \
@@ -158,9 +158,7 @@ RUN mkdir -p /home/runner/.cargo/bin && \
     curl -fsSL -o cargo-nextest.tar.gz \
         "https://github.com/nextest-rs/nextest/releases/download/${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-${NEXTEST_TARGET}.tar.gz" && \
     tar xzf cargo-nextest.tar.gz && \
-    mv cargo-nextest /home/runner/.cargo/bin/ && \
-    rm -f cargo-nextest.tar.gz && \
-    chmod +x /home/runner/.cargo/bin/cargo-nextest && \
+    install -m 755 cargo-nextest /home/runner/.cargo/bin/cargo-nextest && \
     /home/runner/.cargo/bin/cargo-nextest --version
 
 # Set up optimized Cargo config (stay as runner user)
