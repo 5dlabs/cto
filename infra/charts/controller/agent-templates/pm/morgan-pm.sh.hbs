@@ -1537,8 +1537,17 @@ update_project_summary() {
   
   # Calculate completion percentage
   local completion_pct=0
+  local completed_pct=0
+  local in_progress_pct=0
+  local pending_pct=0
+  local blocked_pct=0
+  
   if [[ $total_tasks -gt 0 ]]; then
     completion_pct=$((completed * 100 / total_tasks))
+    completed_pct=$((completed * 100 / total_tasks))
+    in_progress_pct=$((in_progress * 100 / total_tasks))
+    pending_pct=$((pending * 100 / total_tasks))
+    blocked_pct=$((blocked * 100 / total_tasks))
   fi
   
   # Build agent distribution table
@@ -1562,10 +1571,10 @@ update_project_summary() {
 
 | Phase | Count | Percentage |
 |-------|-------|------------|
-| ✅ Complete | $completed | $((completed * 100 / total_tasks))% |
-| 🔄 In Progress | $in_progress | $((in_progress * 100 / total_tasks))% |
-| 📋 Pending | $pending | $((pending * 100 / total_tasks))% |
-| 🚫 Blocked | $blocked | $((blocked * 100 / total_tasks))% |
+| ✅ Complete | $completed | ${completed_pct}% |
+| 🔄 In Progress | $in_progress | ${in_progress_pct}% |
+| 📋 Pending | $pending | ${pending_pct}% |
+| 🚫 Blocked | $blocked | ${blocked_pct}% |
 
 ## 🤖 Current Agent Distribution
 

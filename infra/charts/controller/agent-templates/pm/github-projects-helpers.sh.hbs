@@ -76,6 +76,32 @@ graphql_query() {
 # PROJECT MANAGEMENT
 # ============================================================================
 
+get_repository_id() {
+  local owner="$1"
+  local repo_name="$2"
+  
+  local query='
+    query($owner: String!, $repo: String!) {
+      repository(owner: $owner, name: $repo) {
+        id
+      }
+    }
+  '
+  
+  local result=$(gh api graphql -f query="$query" -f owner="$owner" -f repo="$repo_name" 2>&1)
+  
+  local repo_id=$(echo "$result" | jq -r '.data.repository.id // ""')
+  
+  if [[ -z "$repo_id" ]] || [[ "$repo_id" == "null" ]]; then
+    log "❌ Could not get repository ID for $owner/$repo_name" >&2
+    echo "$result" >&2
+    echo ""
+    return 1
+  fi
+  
+  echo "$repo_id"
+}
+
 get_or_create_project_smart() {
   local owner="$1"
   local repo_name="$2"
@@ -894,6 +920,7 @@ update_project_item_field() {
 
 # Export functions for use in other scripts
 export -f graphql_query
+export -f get_repository_id
 export -f get_or_create_project
 export -f setup_custom_fields
 export -f create_single_select_field
