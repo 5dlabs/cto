@@ -1346,6 +1346,29 @@ if [ -n "$DEFAULT_MODEL" ]; then
   echo "🎯 Default model: $DEFAULT_MODEL"
 fi
 
+# =========================================================================
+# QA Mode Safeguard: Prevent PR creation when in testing mode
+# =========================================================================
+if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
+  echo "🛡️  QA Review Mode: Installing PR creation safeguard"
+  
+  # Create a wrapper function that blocks 'gh pr create' in QA mode
+  gh() {
+    if [[ "$1" == "pr" && "$2" == "create" ]]; then
+      echo "❌ ERROR: 'gh pr create' is FORBIDDEN in QA review mode (WORKFLOW_STAGE=testing)"
+      echo "❌ You are reviewing PR #${PR_NUMBER}, not creating a new one"
+      echo "❌ Use 'gh pr checkout ${PR_NUMBER}' to work on the existing PR"
+      echo "❌ Use 'gh pr review ${PR_NUMBER}' to approve/reject the PR"
+      return 1
+    fi
+    command gh "$@"
+  }
+  export -f gh
+  
+  echo "✅ Safeguard installed: 'gh pr create' is now blocked"
+  echo "✅ You can only review PR #${PR_NUMBER}"
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"

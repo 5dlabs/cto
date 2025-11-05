@@ -547,9 +547,9 @@ setup_custom_fields() {
   create_single_select_field "$project_id" "Current Agent" \
     "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅" || true
   
-  # Create "Stage" field
+  # Create "Stage" field - must match values returned by map_workflow_to_status()
   create_single_select_field "$project_id" "Stage" \
-    "Pending" "Implementation" "Code Review" "Security Check" "QA Testing" "Done" || true
+    "To Do" "In Progress" "In Review" "Done" "Blocked"
   
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true
@@ -563,26 +563,26 @@ create_single_select_field() {
   shift 2
   local options=("$@")
   
-  echo "🔧 Creating field '$field_name' with ${#options[@]} options..." >&2
-  
   # Check if field already exists
   local existing_field=$(get_project_field "$project_id" "$field_name")
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
-    echo "✅ Field '$field_name' already exists" >&2
+    log "✅ Field '$field_name' already exists, skipping creation"
     return 0
   fi
   
-  # Build options JSON with proper formatting
-  local options_json="["
+  log "🔧 Creating field '$field_name' with ${#options[@]} options..."
+  
+  # Build options JSON using jq for proper formatting
+  local options_json="[]"
   local colors=("RED" "BLUE" "GREEN" "YELLOW" "ORANGE" "PURPLE" "PINK" "GRAY")
   for i in "${!options[@]}"; do
     local color="${colors[$((i % ${#colors[@]}))]}"
-    if [[ $i -gt 0 ]]; then
-      options_json+=","
-    fi
-    options_json+="{\"name\":\"${options[$i]}\",\"color\":\"$color\"}"
+    local option_name="${options[$i]}"
+    options_json=$(echo "$options_json" | jq --arg name "$option_name" --arg color "$color" \
+      '. += [{"name": $name, "color": $color}]')
   done
-  options_json+="]"
+  
+  log "🔍 DEBUG: options_json = $options_json"
   
   local mutation='
     mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
@@ -601,25 +601,25 @@ create_single_select_field() {
     }
   '
   
-  local response
-  response=$(gh api graphql \
+  # Pass options as JSON (-F flag) instead of string (-f flag)
+  local result=$(gh api graphql \
     -f query="$mutation" \
     -f projectId="$project_id" \
     -f name="$field_name" \
-    -F options="$options_json" 2>&1) || {
-    echo "⚠️  Failed to create field '$field_name'" >&2
-    echo "$response" >&2
+    -F options="$options_json" 2>&1)
+  
+  if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "❌ Failed to create field '$field_name':"
+    echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
     return 1
-  }
+  fi
   
-  local field_id=$(echo "$response" | jq -r '.data.createProjectV2Field.projectV2Field.id // empty' 2>/dev/null)
-  
+  local field_id=$(echo "$result" | jq -r '.data.createProjectV2Field.projectV2Field.id // ""')
   if [[ -n "$field_id" ]] && [[ "$field_id" != "null" ]]; then
-    echo "✅ Created field '$field_name' (ID: $field_id)" >&2
-    return 0
+    log "✅ Created field '$field_name' (ID: $field_id)"
   else
-    echo "⚠️  Field creation returned no ID" >&2
-    return 1
+    log "⚠️  Field creation returned success but no ID"
+    echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
   fi
 }
 
@@ -630,8 +630,11 @@ create_text_field() {
   # Check if field already exists
   local existing_field=$(get_project_field "$project_id" "$field_name")
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
+    log "✅ Field '$field_name' already exists, skipping creation"
     return 0
   fi
+  
+  log "🔧 Creating text field '$field_name'..."
   
   local mutation='
     mutation($projectId: ID!, $name: String!) {
@@ -649,10 +652,24 @@ create_text_field() {
     }
   '
   
-  gh api graphql \
+  local result=$(gh api graphql \
     -f query="$mutation" \
     -f projectId="$project_id" \
-    -f name="$field_name" >/dev/null 2>&1 || true
+    -f name="$field_name" 2>&1)
+  
+  if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "❌ Failed to create text field '$field_name':"
+    echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
+    return 1
+  fi
+  
+  local field_id=$(echo "$result" | jq -r '.data.createProjectV2Field.projectV2Field.id // ""')
+  if [[ -n "$field_id" ]] && [[ "$field_id" != "null" ]]; then
+    log "✅ Created text field '$field_name' (ID: $field_id)"
+  else
+    log "⚠️  Text field creation returned success but no ID"
+    echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
+  fi
 }
 
 get_project_field() {
@@ -818,18 +835,25 @@ set_project_item_status() {
   local item_id="$2"
   local status="$3"
   
+  log "🔍 DEBUG: set_project_item_status called - item=$item_id, status=$status"
+  
   local field_id=$(get_project_field "$project_id" "Stage")
+  log "🔍 DEBUG: Stage field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    log "⚠️  DEBUG: Stage field_id is null or empty, returning"
     return 0
   fi
   
   local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
+  log "🔍 DEBUG: Status option_id=$option_id for status=$status"
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    log "⚠️  DEBUG: Status option_id is null or empty for status=$status, returning"
     return 0
   fi
   
+  log "✅ DEBUG: Calling update_project_item_field for status update"
   update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
 }
 
@@ -838,18 +862,25 @@ set_project_item_agent() {
   local item_id="$2"
   local agent="$3"
   
+  log "🔍 DEBUG: set_project_item_agent called - item=$item_id, agent=$agent"
+  
   local field_id=$(get_project_field "$project_id" "Current Agent")
+  log "🔍 DEBUG: Current Agent field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
+    log "⚠️  DEBUG: Current Agent field_id is null or empty, returning"
     return 0
   fi
   
   local option_id=$(get_field_option_id "$project_id" "$field_id" "$agent")
+  log "🔍 DEBUG: Agent option_id=$option_id for agent=$agent"
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
+    log "⚠️  DEBUG: Agent option_id is null or empty for agent=$agent, returning"
     return 0
   fi
   
+  log "✅ DEBUG: Calling update_project_item_field for agent update"
   update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
 }
 
