@@ -874,12 +874,33 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
     echo "✓ Git operations reset"
   fi
   
-  # Stash any local changes from previous runs to avoid checkout conflicts
-  # Exclude task/ directory to preserve task files that were just copied
+  # Clean up any local changes from previous runs to avoid checkout conflicts
+  # Preserve task/ directory since it was just copied
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    echo "🔄 Stashing local changes and untracked files (excluding task/) before checkout"
-    git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
+    echo "🔄 Cleaning workspace before checkout (preserving task/ directory)"
+    
+    # Save task/ directory if it exists
+    if [ -d "task" ]; then
+      echo "📦 Temporarily saving task/ directory"
+      cp -r task /tmp/task-backup-$$ 2>/dev/null || true
+    fi
+    
+    # Reset all changes aggressively
+    git reset --hard HEAD 2>/dev/null || true
+    git clean -fdx -e task/ 2>/dev/null || true
+    
+    # Restore task/ directory
+    if [ -d "/tmp/task-backup-$$" ]; then
+      echo "📦 Restoring task/ directory"
+      rm -rf task 2>/dev/null || true
+      cp -r /tmp/task-backup-$$ task 2>/dev/null || true
+      rm -rf /tmp/task-backup-$$ 2>/dev/null || true
+    fi
+    
+    echo "✅ Workspace cleaned"
   fi
+  
+  # Now checkout should work
   git checkout "$FEATURE_BRANCH"
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
