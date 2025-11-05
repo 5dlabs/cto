@@ -55,7 +55,7 @@ jobs:
           - id: rust-builder
             name: Rust Builder
             image: rust-builder
-            context: .
+            context: ./infra/images/builder
             file: ./infra/images/builder/Dockerfile
             version: "latest"
             description: "Rust development environment with pre-warmed dependencies for CI/CD"
