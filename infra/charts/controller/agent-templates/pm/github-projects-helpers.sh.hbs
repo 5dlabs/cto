@@ -592,7 +592,7 @@ create_single_select_field() {
     -f query="$mutation" \
     -f projectId="$project_id" \
     -f name="$field_name" \
-    -f options="$options_json" >/dev/null 2>&1 || true
+    -F options="$options_json" >/dev/null 2>&1 || true
 }
 
 create_text_field() {
