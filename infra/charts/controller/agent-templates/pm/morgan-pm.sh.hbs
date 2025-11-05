@@ -388,13 +388,13 @@ create_task_issues() {
     
     log "✅ Created issue #$ISSUE_NUMBER for task $TASK_ID"
     
-    # Add labels to the issue (create if they don't exist)
+    # Add labels to the issue (create if they don't exist with bright, angelic colors)
     log "🏷️  Adding labels to issue #$ISSUE_NUMBER..."
-    gh label create "taskmaster-task" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
-    gh label create "task-$TASK_ID" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
-    gh label create "priority-$TASK_PRIORITY" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
-    gh label create "status-$TASK_STATUS" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
-    gh label create "workflow-$WORKFLOW_NAME" --repo "$REPO_OWNER/$REPO_NAME" --force 2>/dev/null || true
+    gh label create "taskmaster-task" --repo "$REPO_OWNER/$REPO_NAME" --color "1d76db" --description "TaskMaster managed task" --force 2>/dev/null || true
+    gh label create "task-$TASK_ID" --repo "$REPO_OWNER/$REPO_NAME" --color "0e8a16" --description "Task ID correlation" --force 2>/dev/null || true
+    gh label create "priority-$TASK_PRIORITY" --repo "$REPO_OWNER/$REPO_NAME" --color "$(get_priority_color "$TASK_PRIORITY")" --description "Task priority level" --force 2>/dev/null || true
+    gh label create "status-$TASK_STATUS" --repo "$REPO_OWNER/$REPO_NAME" --color "$(get_status_color "$TASK_STATUS")" --description "Current task status" --force 2>/dev/null || true
+    gh label create "workflow-$WORKFLOW_NAME" --repo "$REPO_OWNER/$REPO_NAME" --color "5319e7" --description "Workflow correlation" --force 2>/dev/null || true
     
     # Apply labels to issue
     gh issue edit "$ISSUE_NUMBER" \
@@ -572,8 +572,11 @@ handle_task_event() {
   local issue_number=$(echo "$entry" | jq -r '.issue_number')
   local item_id=$(echo "$entry" | jq -r '.item_id')
   
-  # Map stage to agent and status
-  local current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
+  # Get actual running agent from cluster (more accurate than stage mapping)
+  local actual_agent=$(get_actual_running_agent "$task_id" "$workflow_name")
+  
+  # Fall back to stage mapping if we can't detect actual agent
+  local current_agent="${actual_agent:-$(map_stage_to_agent "$current_stage" "$workflow_phase")}"
   local task_status=$(map_workflow_to_status "$current_stage" "$workflow_phase")
   
   # Check if state actually changed
@@ -667,6 +670,71 @@ sync_all_tasks() {
   log "✅ Sync complete"
 }
 
+get_actual_running_agent() {
+  local task_id="$1"
+  local workflow_name="$2"
+  
+  # Find the most recent CodeRun for this task
+  local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
+    -l "task-id=$task_id" \
+    --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+  
+  if [[ -z "$coderun_name" ]]; then
+    # No CodeRun found, return empty
+    return 0
+  fi
+  
+  # Get the agent from CodeRun spec
+  local agent=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
+    -o jsonpath='{.spec.githubApp}' 2>/dev/null || echo "")
+  
+  if [[ -z "$agent" ]]; then
+    # Try to get from pod labels
+    local pod_name=$(kubectl get pods -n "$NAMESPACE" \
+      -l "coderun=$coderun_name" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -n "$pod_name" ]]; then
+      # Check if pod is running
+      local pod_phase=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+      
+      if [[ "$pod_phase" == "Running" ]]; then
+        # Extract agent from pod name or labels
+        agent=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
+          -o jsonpath='{.metadata.labels.agent}' 2>/dev/null || echo "")
+      fi
+    fi
+  fi
+  
+  # Map agent name to display format
+  case "$agent" in
+    "rex"|"Rex")
+      echo "Rex (Implementation)"
+      ;;
+    "cleo"|"Cleo")
+      echo "Cleo (Quality)"
+      ;;
+    "cipher"|"Cipher")
+      echo "Cipher (Security)"
+      ;;
+    "tess"|"Tess")
+      echo "Tess (QA)"
+      ;;
+    "atlas"|"Atlas")
+      echo "Atlas (Integration)"
+      ;;
+    "bolt"|"Bolt")
+      echo "Bolt (Deployment)"
+      ;;
+    *)
+      # Return empty if we can't determine the agent
+      echo ""
+      ;;
+  esac
+}
+
 map_stage_to_agent() {
   local stage="$1"
   local phase="$2"
@@ -706,30 +774,74 @@ map_stage_to_agent() {
   esac
 }
 
+get_priority_color() {
+  local priority="$1"
+  
+  case "$priority" in
+    "high"|"critical")
+      echo "d73a4a"  # Bright red
+      ;;
+    "medium")
+      echo "fbca04"  # Bright yellow
+      ;;
+    "low")
+      echo "0e8a16"  # Bright green
+      ;;
+    *)
+      echo "1d76db"  # Bright blue (default)
+      ;;
+  esac
+}
+
+get_status_color() {
+  local status="$1"
+  
+  case "$status" in
+    "pending"|"todo")
+      echo "bfdadc"  # Light cyan
+      ;;
+    "in-progress"|"in progress")
+      echo "0052cc"  # Bright blue
+      ;;
+    "in-review"|"in review")
+      echo "5319e7"  # Bright purple
+      ;;
+    "done"|"complete"|"completed")
+      echo "0e8a16"  # Bright green
+      ;;
+    "blocked"|"failed")
+      echo "d73a4a"  # Bright red
+      ;;
+    *)
+      echo "1d76db"  # Bright blue (default)
+      ;;
+  esac
+}
+
 map_agent_to_github_username() {
   local agent="$1"
   
   # Map agent display name to GitHub App bot username
   case "$agent" in
-    "Rex (Implementation)")
+    "Rex (Implementation)"|"Rex")
       echo "rex-5dlabs[bot]"
       ;;
-    "Cleo (Quality)")
+    "Cleo (Quality)"|"Cleo")
       echo "cleo-5dlabs[bot]"
       ;;
-    "Cipher (Security)")
+    "Cipher (Security)"|"Cipher")
       echo "cipher-5dlabs[bot]"
       ;;
-    "Tess (QA)")
+    "Tess (QA)"|"Tess")
       echo "tess-5dlabs[bot]"
       ;;
-    "Atlas (Integration)")
+    "Atlas (Integration)"|"Atlas")
       echo "atlas-5dlabs[bot]"
       ;;
-    "Bolt (Deployment)")
+    "Bolt (Deployment)"|"Bolt")
       echo "bolt-5dlabs[bot]"
       ;;
-    "Morgan (PM)")
+    "Morgan (PM)"|"Morgan")
       echo "morgan-5dlabs[bot]"
       ;;
     *)
