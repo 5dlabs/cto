@@ -155,13 +155,15 @@ get_or_create_project() {
     }
   '
   
+  # Redirect both stdout and stderr to avoid contaminating the return value
   gh api graphql \
     -f query="$link_mutation" \
     -f projectId="$project_id" \
-    -f repositoryId="$repo_id" 2>/dev/null || {
+    -f repositoryId="$repo_id" >/dev/null 2>&1 || {
       echo "WARNING: Could not link project to repository (project still works)" >&2
     }
   
+  # Return only the project ID (not mutation output)
   echo "$project_id"
 }
 
