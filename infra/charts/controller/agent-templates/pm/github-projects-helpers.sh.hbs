@@ -573,16 +573,39 @@ create_single_select_field() {
   log "🔧 Creating field '$field_name' with ${#options[@]} options..."
   
   # Build options JSON using jq for proper formatting
+  # Note: GitHub's ProjectV2SingleSelectFieldOptionInput requires name, color, AND description (all NON_NULL)
   local options_json="[]"
   local colors=("RED" "BLUE" "GREEN" "YELLOW" "ORANGE" "PURPLE" "PINK" "GRAY")
   for i in "${!options[@]}"; do
     local color="${colors[$((i % ${#colors[@]}))]}"
     local option_name="${options[$i]}"
-    options_json=$(echo "$options_json" | jq --arg name "$option_name" --arg color "$color" \
-      '. += [{"name": $name, "color": $color}]')
+    # Use option name as description for simplicity
+    options_json=$(echo "$options_json" | jq --arg name "$option_name" --arg color "$color" --arg desc "$option_name" \
+      '. += [{"name": $name, "color": $color, "description": $desc}]')
   done
   
   log "🔍 DEBUG: options_json = $options_json"
+  
+  # Validate that all options have required fields (name, color, description)
+  local validation_errors=$(echo "$options_json" | jq -r '
+    map(
+      select(
+        (.name == null or .name == "") or 
+        (.color == null or .color == "") or 
+        (.description == null)
+      )
+    ) | 
+    if length > 0 then 
+      "Missing required fields in options: " + (map(.name // "unnamed") | join(", "))
+    else 
+      ""
+    end
+  ')
+  
+  if [[ -n "$validation_errors" ]]; then
+    log "❌ Validation error: $validation_errors"
+    return 1
+  fi
   
   local mutation='
     mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
