@@ -96,13 +96,24 @@ get_or_create_project() {
   # Get owner ID for project creation
   echo "Creating org-level project and linking to repository $owner/$repo_name" >&2
   
-  local owner_id=$(gh api graphql -f query='
+  local owner_result=$(gh api graphql -f query='
     query($owner: String!) {
       repositoryOwner(login: $owner) {
         id
       }
     }
-  ' -f owner="$owner" | jq -r '.data.repositoryOwner.id')
+  ' -f owner="$owner" 2>&1)
+  
+  local owner_id=$(echo "$owner_result" | jq -r '.data.repositoryOwner.id // ""')
+  
+  if [[ -z "$owner_id" ]] || [[ "$owner_id" == "null" ]]; then
+    echo "ERROR: Could not get owner ID for $owner" >&2
+    echo "$owner_result" >&2
+    echo ""
+    return 1
+  fi
+  
+  echo "Owner ID: $owner_id" >&2
   
   local create_mutation='
     mutation($ownerId: ID!, $title: String!) {
