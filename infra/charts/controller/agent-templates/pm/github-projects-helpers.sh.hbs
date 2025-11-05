@@ -184,9 +184,33 @@ get_or_create_project() {
 create_default_board_view() {
   local project_id="$1"
   
-  echo "Creating board view for project..." >&2
+  echo "Setting up board view as default..." >&2
   
-  # Create a board view
+  # First, get existing views (GitHub auto-creates a default table view)
+  local views_query='
+    query($projectId: ID!) {
+      node(id: $projectId) {
+        ... on ProjectV2 {
+          views(first: 10) {
+            nodes {
+              id
+              name
+              layout
+            }
+          }
+        }
+      }
+    }
+  '
+  
+  local views_result=$(gh api graphql \
+    -f query="$views_query" \
+    -f projectId="$project_id" 2>&1)
+  
+  # Find the default table view to delete
+  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[] | select(.layout == "TABLE_LAYOUT") | .id' | head -1)
+  
+  # Create our board view
   local view_mutation='
     mutation($projectId: ID!) {
       createProjectV2View(input: {
@@ -212,9 +236,30 @@ create_default_board_view() {
   if [[ -n "$view_id" ]] && [[ "$view_id" != "null" ]]; then
     echo "✅ Created board view (ID: $view_id, Number: $view_number)" >&2
     
-    # Note: GitHub Projects V2 API doesn't expose setting default view via GraphQL yet
-    # The first view created is typically the default, but users may need to manually set it
-    # Future enhancement: Use REST API if/when endpoint becomes available
+    # Delete the default table view if it exists (makes board the default)
+    if [[ -n "$default_view_id" ]] && [[ "$default_view_id" != "null" ]]; then
+      echo "Removing default table view to make board the default..." >&2
+      
+      local delete_mutation='
+        mutation($viewId: ID!) {
+          deleteProjectV2View(input: {
+            viewId: $viewId
+          }) {
+            projectV2View {
+              id
+            }
+          }
+        }
+      '
+      
+      if gh api graphql \
+        -f query="$delete_mutation" \
+        -f viewId="$default_view_id" >/dev/null 2>&1; then
+        echo "✅ Deleted default table view - board is now the default!" >&2
+      else
+        echo "⚠️  Could not delete table view (board view still available)" >&2
+      fi
+    fi
   else
     echo "⚠️  Could not create board view (project still works)" >&2
   fi
