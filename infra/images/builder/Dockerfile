@@ -117,17 +117,17 @@ WORKDIR /home/runner
 
 # Install Rust as runner user
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
-    echo 'source ~/.cargo/env' >> ~/.bashrc
+    echo 'source ~/.cargo/env' >> /home/runner/.bashrc
 
 # Add Rust to PATH
 ENV PATH="/home/runner/.cargo/bin:${PATH}"
 
 # Install essential Rust tools only (no pre-warming)
-RUN ~/.cargo/bin/rustup component add clippy rustfmt
+RUN /home/runner/.cargo/bin/rustup component add clippy rustfmt
 
 # Install sccache from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
-    mkdir -p ~/.cargo/bin && \
+    mkdir -p /home/runner/.cargo/bin && \
     cd /tmp/downloads && \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
@@ -140,13 +140,12 @@ RUN --mount=type=cache,target=/tmp/downloads \
     curl -fsSL -o sccache.tar.gz \
         "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" && \
     tar xzf sccache.tar.gz && \
-    mv "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" ~/.cargo/bin/ && \
-    chmod +x ~/.cargo/bin/sccache && \
-    sccache --version
+    install -m 755 "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" /home/runner/.cargo/bin/sccache && \
+    /home/runner/.cargo/bin/sccache --version
 
 # Install cargo-nextest from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
-    mkdir -p ~/.cargo/bin && \
+    mkdir -p /home/runner/.cargo/bin && \
     cd /tmp/downloads && \
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
@@ -159,9 +158,8 @@ RUN --mount=type=cache,target=/tmp/downloads \
     curl -fsSL -o cargo-nextest.tar.gz \
         "https://github.com/nextest-rs/nextest/releases/download/${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-${NEXTEST_TARGET}.tar.gz" && \
     tar xzf cargo-nextest.tar.gz && \
-    mv cargo-nextest ~/.cargo/bin/ && \
-    chmod +x ~/.cargo/bin/cargo-nextest && \
-    cargo nextest --version
+    install -m 755 cargo-nextest /home/runner/.cargo/bin/cargo-nextest && \
+    /home/runner/.cargo/bin/cargo-nextest --version
 
 # Set up optimized Cargo config (stay as runner user)
 RUN mkdir -p /home/runner/.cargo && cat > /home/runner/.cargo/config.toml << 'EOF'
