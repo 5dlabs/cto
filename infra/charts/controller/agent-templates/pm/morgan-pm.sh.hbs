@@ -439,9 +439,13 @@ create_task_issues() {
     if [[ -n "$ITEM_ID" ]]; then
       log "✅ Added issue #$ISSUE_NUMBER to project (Item ID: $ITEM_ID)"
       
+      # Map TaskMaster status to GitHub Project Stage value
+      GITHUB_STAGE=$(map_taskmaster_status_to_stage "$TASK_STATUS")
+      log "🔍 DEBUG: Mapping TaskMaster status '$TASK_STATUS' → GitHub Stage '$GITHUB_STAGE'"
+      
       # Set initial field values with retry
       retry_with_backoff 3 "Set status for task $TASK_ID" \
-        set_project_item_status "$PROJECT_ID" "$ITEM_ID" "$TASK_STATUS"
+        set_project_item_status "$PROJECT_ID" "$ITEM_ID" "$GITHUB_STAGE"
       
       retry_with_backoff 3 "Set priority for task $TASK_ID" \
         set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
@@ -961,6 +965,30 @@ map_workflow_to_status() {
       ;;
     *)
       # Match field option exactly: "To Do" not "Todo"
+      echo "To Do"
+      ;;
+  esac
+}
+
+map_taskmaster_status_to_stage() {
+  # Maps TaskMaster status values (from tasks.json) to GitHub Project "Stage" field values
+  local taskmaster_status="$1"
+  
+  case "$taskmaster_status" in
+    "done"|"completed")
+      echo "Done"
+      ;;
+    "in-progress"|"in_progress"|"active")
+      echo "In Progress"
+      ;;
+    "review"|"in-review"|"in_review")
+      echo "In Review"
+      ;;
+    "blocked"|"deferred"|"cancelled")
+      echo "Blocked"
+      ;;
+    "pending"|*)
+      # Default to "To Do" for pending or unknown statuses
       echo "To Do"
       ;;
   esac
