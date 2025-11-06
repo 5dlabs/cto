@@ -150,23 +150,30 @@ RUN mkdir -p /home/runner/.cargo/bin && \
         echo "✅ sccache installed via cargo"; \
     }
 
-# Install cargo-nextest from pre-built binaries (much faster than cargo install)
-RUN --mount=type=cache,target=/tmp/downloads \
-    mkdir -p /home/runner/.cargo/bin && \
-    cd /tmp/downloads && \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in \
-        amd64) NEXTEST_ARCH=x86_64 ;; \
-        arm64) NEXTEST_ARCH=aarch64 ;; \
-        *) NEXTEST_ARCH=$ARCH ;; \
-    esac && \
-    NEXTEST_VERSION=$(curl -s https://api.github.com/repos/nextest-rs/nextest/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
-    NEXTEST_TARGET="${NEXTEST_ARCH}-unknown-linux-gnu" && \
-    curl -fsSL -o cargo-nextest.tar.gz \
-        "https://github.com/nextest-rs/nextest/releases/download/${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-${NEXTEST_TARGET}.tar.gz" && \
-    tar xzf cargo-nextest.tar.gz && \
-    install -m 755 cargo-nextest /home/runner/.cargo/bin/cargo-nextest && \
-    /home/runner/.cargo/bin/cargo-nextest --version
+# Install cargo-nextest with robust error handling
+RUN mkdir -p /home/runner/.cargo/bin && \
+    { \
+        cd /tmp && \
+        ARCH=$(dpkg --print-architecture) && \
+        case "$ARCH" in \
+            amd64) NEXTEST_ARCH=x86_64 ;; \
+            arm64) NEXTEST_ARCH=aarch64 ;; \
+            *) NEXTEST_ARCH=$ARCH ;; \
+        esac && \
+        NEXTEST_VERSION="0.9.82" && \
+        NEXTEST_TARGET="${NEXTEST_ARCH}-unknown-linux-gnu" && \
+        echo "Attempting to download cargo-nextest v${NEXTEST_VERSION}..." && \
+        curl -fsSL "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-${NEXTEST_VERSION}/cargo-nextest-${NEXTEST_VERSION}-${NEXTEST_TARGET}.tar.gz" | \
+        tar xz -C /home/runner/.cargo/bin && \
+        chmod +x /home/runner/.cargo/bin/cargo-nextest && \
+        /home/runner/.cargo/bin/cargo-nextest --version && \
+        echo "✅ cargo-nextest installed from binary"; \
+    } || { \
+        echo "Binary install failed, falling back to cargo install..." && \
+        . /home/runner/.cargo/env && \
+        cargo install cargo-nextest --locked && \
+        echo "✅ cargo-nextest installed via cargo"; \
+    }
 
 # Set up optimized Cargo config (stay as runner user)
 RUN mkdir -p /home/runner/.cargo && cat > /home/runner/.cargo/config.toml << 'EOF'
