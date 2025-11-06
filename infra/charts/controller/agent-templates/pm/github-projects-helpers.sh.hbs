@@ -219,6 +219,12 @@ get_or_create_repo_project() {
   
   local project_id=$(echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id // "null"')
   
+  # CRITICAL FIX: Create board view for repo-level projects too
+  # This was missing and caused board columns not to be configured
+  if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+    create_default_board_view "$project_id"
+  fi
+  
   echo "$project_id"
 }
 
@@ -447,7 +453,16 @@ ensure_project_linked_to_repository() {
 create_default_board_view() {
   local project_id="$1"
   
-  echo "Setting up board view as default..." >&2
+  echo "Setting up agent-based board view as default..." >&2
+  
+  # First, get the Stage field ID (needed for grouping)
+  local stage_field_id=$(get_project_field "$project_id" "Stage")
+  
+  if [[ -z "$stage_field_id" ]] || [[ "$stage_field_id" == "null" ]]; then
+    echo "⚠️  Could not find Stage field - board won't group by agent" >&2
+  else
+    echo "✅ Found Stage field for board grouping: $stage_field_id" >&2
+  fi
   
   # First, get existing views (GitHub auto-creates a default table view)
   local views_query='
@@ -477,12 +492,12 @@ create_default_board_view() {
   # Find the default table view to delete
   local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null | head -1)
   
-  # Create our board view
+  # Create board view with Stage field grouping
   local view_mutation='
     mutation($projectId: ID!) {
       createProjectV2View(input: {
         projectId: $projectId
-        name: "Task Board"
+        name: "Agent Workflow Board"
         layout: BOARD_LAYOUT
       }) {
         projectV2View {
@@ -505,7 +520,17 @@ create_default_board_view() {
   local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""' 2>/dev/null)
   
   if [[ -n "$view_id" ]] && [[ "$view_id" != "null" ]]; then
-    echo "✅ Created board view (ID: $view_id, Number: $view_number)" >&2
+    echo "✅ Created agent workflow board view (ID: $view_id, Number: $view_number)" >&2
+    
+    # Note: GitHub Projects V2 API doesn't support setting groupByFieldId during creation via GraphQL
+    # The board will use default grouping (by Status typically)
+    # Users can manually configure grouping by "Stage" field in the UI
+    # The Stage field contains agent names: Pending, Rex (Implementation), Cleo (Quality), etc.
+    
+    echo "💡 To group by agents in the UI:" >&2
+    echo "   1. Open the project board" >&2
+    echo "   2. Click 'Group by' → Select 'Stage'" >&2
+    echo "   3. Columns will show: Pending | Rex | Cleo | Cipher | Tess | Atlas | Bolt | Complete ✅" >&2
     
     # Delete the default table view if it exists (makes board the default)
     if [[ -n "$default_view_id" ]] && [[ "$default_view_id" != "null" ]]; then
@@ -526,7 +551,7 @@ create_default_board_view() {
       if gh api graphql \
         -f query="$delete_mutation" \
         -f viewId="$default_view_id" >/dev/null 2>&1; then
-        echo "✅ Deleted default table view - board is now the default!" >&2
+        echo "✅ Deleted default table view - agent board is now the default!" >&2
       else
         echo "⚠️  Could not delete table view (board view still available)" >&2
       fi
@@ -543,16 +568,17 @@ create_default_board_view() {
 setup_custom_fields() {
   local project_id="$1"
   
-  # Create "Current Agent" field
-  create_single_select_field "$project_id" "Current Agent" \
-    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅" || true
-  
-  # Create "Stage" field - must match values returned by map_workflow_to_status()
+  # Create "Stage" field - agent-based workflow stages that map to board columns
+  # This is the PRIMARY field that drives the board visualization
   create_single_select_field "$project_id" "Stage" \
-    "To Do" "In Progress" "In Review" "Done" "Blocked"
+    "Pending" "Rex" "Blaze" "Cleo" "Cipher" "Tess" "Complete ✅"
   
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true
+  
+  # Create "Priority" field for filtering
+  create_single_select_field "$project_id" "Priority" \
+    "High" "Medium" "Low" || true
   
   echo "✅ Custom fields setup completed" >&2
 }
@@ -859,58 +885,52 @@ add_issue_to_project() {
 # FIELD VALUE UPDATES
 # ============================================================================
 
-set_project_item_status() {
+set_project_item_stage() {
   local project_id="$1"
   local item_id="$2"
-  local status="$3"
+  local stage="$3"
   
-  log "🔍 DEBUG: set_project_item_status called - item=$item_id, status=$status"
+  log "🔍 Setting project item stage: item=$item_id, stage='$stage'"
   
   local field_id=$(get_project_field "$project_id" "Stage")
-  log "🔍 DEBUG: Stage field_id=$field_id"
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
-    log "⚠️  DEBUG: Stage field_id is null or empty, returning"
-    return 0
+    log "❌ FAILED: Stage field not found in project $project_id"
+    log "💡 Action: Run setup_custom_fields() to initialize project fields"
+    return 1
   fi
   
-  local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
-  log "🔍 DEBUG: Status option_id=$option_id for status=$status"
+  log "✅ Found Stage field: $field_id"
+  
+  local option_id=$(get_field_option_id "$project_id" "$field_id" "$stage")
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
-    log "⚠️  DEBUG: Status option_id is null or empty for status=$status, returning"
-    return 0
+    log "❌ FAILED: Stage option '$stage' not found in field"
+    log "💡 Available options should include: Pending, Rex (Implementation), Cleo (Quality), etc."
+    log "💡 Check if custom fields were set up correctly"
+    return 1
   fi
   
-  log "✅ DEBUG: Calling update_project_item_field for status update"
-  update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
+  log "✅ Found option ID for '$stage': $option_id"
+  log "🔄 Updating project item field..."
+  
+  if update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"; then
+    log "✅ Successfully updated stage to: $stage"
+    return 0
+  else
+    log "❌ Failed to update project item field"
+    return 1
+  fi
 }
 
+# Legacy function - now stage and agent are the same thing (agent-based columns)
 set_project_item_agent() {
   local project_id="$1"
   local item_id="$2"
   local agent="$3"
   
-  log "🔍 DEBUG: set_project_item_agent called - item=$item_id, agent=$agent"
-  
-  local field_id=$(get_project_field "$project_id" "Current Agent")
-  log "🔍 DEBUG: Current Agent field_id=$field_id"
-  
-  if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
-    log "⚠️  DEBUG: Current Agent field_id is null or empty, returning"
-    return 0
-  fi
-  
-  local option_id=$(get_field_option_id "$project_id" "$field_id" "$agent")
-  log "🔍 DEBUG: Agent option_id=$option_id for agent=$agent"
-  
-  if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
-    log "⚠️  DEBUG: Agent option_id is null or empty for agent=$agent, returning"
-    return 0
-  fi
-  
-  log "✅ DEBUG: Calling update_project_item_field for agent update"
-  update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"
+  # Simply call set_project_item_stage since agent names are now stages
+  set_project_item_stage "$project_id" "$item_id" "$agent"
 }
 
 set_project_item_priority() {
@@ -998,12 +1018,29 @@ update_project_item_field() {
     }
   '
   
-  gh api graphql \
+  local result=$(gh api graphql \
     -f query="$mutation" \
     -f projectId="$project_id" \
     -f itemId="$item_id" \
     -f fieldId="$field_id" \
-    -f value="$value" >/dev/null 2>&1 || true
+    -f value="$value" 2>&1)
+  
+  # Check for errors
+  if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+    log "❌ GraphQL error updating project item field:"
+    echo "$result" | jq '.errors' >&2
+    return 1
+  fi
+  
+  # Verify update succeeded
+  local updated_item_id=$(echo "$result" | jq -r '.data.updateProjectV2ItemFieldValue.projectV2Item.id // ""')
+  
+  if [[ -z "$updated_item_id" ]] || [[ "$updated_item_id" == "null" ]]; then
+    log "⚠️  Update returned but no item ID confirmed"
+    return 1
+  fi
+  
+  return 0
 }
 
 # Export functions for use in other scripts
@@ -1019,7 +1056,7 @@ export -f create_single_select_field
 export -f create_text_field
 export -f get_project_field
 export -f add_issue_to_project
-export -f set_project_item_status
+export -f set_project_item_stage
 export -f set_project_item_agent
 export -f set_project_item_priority
 export -f get_field_option_id
