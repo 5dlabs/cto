@@ -1164,7 +1164,7 @@ spec:
           metadata:
             name: "{{`{{inputs.parameters.coderun-name}}`}}"
             namespace: {{.Release.Namespace}}
-        successCondition: status.phase == Succeeded
+        successCondition: status.workCompleted == true || status.phase == Succeeded
         failureCondition: status.phase == Failed
       retryStrategy:
         limit: 200
