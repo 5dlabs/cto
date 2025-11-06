@@ -835,38 +835,38 @@ format_agent_name() {
   # This handles formats like: 5DLabs-Rex, 5DLabs-Blaze[bot], rex, Blaze, etc.
   local agent_name=$(echo "$agent" | sed -E 's/^.*[Ll]abs-//; s/\[bot\]$//; s/^[0-9]+-//' | tr '[:upper:]' '[:lower:]')
   
-  # Normalize agent name to display format
+  # Normalize agent name to display format (simplified to match Stage field options)
   case "$agent_name" in
     "rex")
-      echo "Rex (Implementation)"
+      echo "Rex"
       ;;
     "blaze")
-      echo "Blaze (Frontend)"
+      echo "Blaze"
       ;;
     "cleo")
-      echo "Cleo (Quality)"
+      echo "Cleo"
       ;;
     "cipher")
-      echo "Cipher (Security)"
+      echo "Cipher"
       ;;
     "tess")
-      echo "Tess (QA)"
+      echo "Tess"
       ;;
     "atlas")
-      echo "Atlas (Integration)"
+      echo "Atlas"
       ;;
     "bolt")
-      echo "Bolt (Deployment)"
+      echo "Bolt"
       ;;
     "morgan")
-      echo "Morgan (PM)"
+      echo "Morgan"
       ;;
     "stitch")
-      echo "Stitch (Workflow)"
+      echo "Stitch"
       ;;
     *)
-      # Unknown agent - return as-is but formatted
-      echo "${agent_name^} (Unknown)"  # ${agent_name^} capitalizes first letter
+      # Unknown agent - return capitalized name
+      echo "${agent_name^}"  # ${agent_name^} capitalizes first letter
       ;;
   esac
 }
@@ -1033,7 +1033,7 @@ map_workflow_to_status() {
 
 map_taskmaster_status_to_stage() {
   # Maps TaskMaster status values (from tasks.json) to GitHub Project "Stage" field values
-  # Now using agent-based stages
+  # Using simplified agent names to match Stage field options
   local taskmaster_status="$1"
   
   case "$taskmaster_status" in
@@ -1041,13 +1041,13 @@ map_taskmaster_status_to_stage() {
       echo "Complete ✅"
       ;;
     "in-progress"|"in_progress"|"active")
-      echo "Rex (Implementation)"  # Default to Rex for active tasks
+      echo "Rex"  # Default to Rex for active tasks
       ;;
     "review"|"in-review"|"in_review")
-      echo "Cleo (Quality)"  # Tasks in review go to Cleo
+      echo "Cleo"  # Tasks in review go to Cleo
       ;;
     "testing"|"qa")
-      echo "Tess (QA)"
+      echo "Tess"
       ;;
     "blocked"|"deferred"|"cancelled")
       echo "Pending"  # Blocked tasks go back to Pending
