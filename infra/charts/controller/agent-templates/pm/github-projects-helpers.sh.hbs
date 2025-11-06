@@ -455,14 +455,8 @@ create_default_board_view() {
   
   echo "Setting up agent-based board view as default..." >&2
   
-  # First, get the Stage field ID (needed for grouping)
-  local stage_field_id=$(get_project_field "$project_id" "Stage")
-  
-  if [[ -z "$stage_field_id" ]] || [[ "$stage_field_id" == "null" ]]; then
-    echo "⚠️  Could not find Stage field - board won't group by agent" >&2
-  else
-    echo "✅ Found Stage field for board grouping: $stage_field_id" >&2
-  fi
+  # Using built-in Status field - board columns auto-create!
+  echo "✅ Board will use Status field for automatic column creation" >&2
   
   # First, get existing views (GitHub auto-creates a default table view)
   local views_query='
@@ -568,9 +562,10 @@ create_default_board_view() {
 setup_custom_fields() {
   local project_id="$1"
   
-  # Create "Stage" field - agent-based workflow stages that map to board columns
-  # This is the PRIMARY field that drives the board visualization
-  create_single_select_field "$project_id" "Stage" \
+  # CRITICAL: Use GitHub's BUILT-IN "Status" field with agent names
+  # This causes board columns to AUTO-CREATE without manual configuration!
+  # Pattern from 5dlabs/tasks - Status field triggers automatic column creation
+  create_single_select_field "$project_id" "Status" \
     "Pending" "Rex" "Blaze" "Cleo" "Cipher" "Tess" "Complete ✅"
   
   # Create "Task ID" field (text)
