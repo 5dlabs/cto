@@ -887,33 +887,26 @@ set_project_item_stage() {
   
   log "🔍 Setting project item stage: item=$item_id, stage='$stage'"
   
-  local field_id=$(get_project_field "$project_id" "Stage")
+  # Use built-in "Status" field - enables AUTO-COLUMN CREATION!
+  local field_id=$(get_project_field "$project_id" "Status")
   
   if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
-    log "❌ FAILED: Stage field not found in project $project_id"
-    log "💡 Action: Run setup_custom_fields() to initialize project fields"
+    log "❌ Status field not found"
     return 1
   fi
   
-  log "✅ Found Stage field: $field_id"
-  
-  local option_id=$(get_field_option_id "$project_id" "$field_id" "$stage")
+  local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
-    log "❌ FAILED: Stage option '$stage' not found in field"
-    log "💡 Available options should include: Pending, Rex (Implementation), Cleo (Quality), etc."
-    log "💡 Check if custom fields were set up correctly"
+    log "❌ Status option '$status' not found"
     return 1
   fi
   
-  log "✅ Found option ID for '$stage': $option_id"
-  log "🔄 Updating project item field..."
-  
   if update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"; then
-    log "✅ Successfully updated stage to: $stage"
+    log "✅ Updated status to: $status"
     return 0
   else
-    log "❌ Failed to update project item field"
+    log "❌ Failed to update status"
     return 1
   fi
 }
