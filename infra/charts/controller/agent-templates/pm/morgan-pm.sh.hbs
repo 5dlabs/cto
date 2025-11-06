@@ -835,38 +835,34 @@ format_agent_name() {
   # This handles formats like: 5DLabs-Rex, 5DLabs-Blaze[bot], rex, Blaze, etc.
   local agent_name=$(echo "$agent" | sed -E 's/^.*[Ll]abs-//; s/\[bot\]$//; s/^[0-9]+-//' | tr '[:upper:]' '[:lower:]')
   
-  # Normalize agent name to display format (simplified to match Stage field options)
+  # Return full names WITH role descriptions to match Status field options
   case "$agent_name" in
     "rex")
-      echo "Rex"
+      echo "Rex (Implementation)"
       ;;
     "blaze")
-      echo "Blaze"
+      echo "Blaze (Frontend)"
       ;;
     "cleo")
-      echo "Cleo"
+      echo "Cleo (Quality)"
       ;;
     "cipher")
-      echo "Cipher"
+      echo "Cipher (Security)"
       ;;
     "tess")
-      echo "Tess"
+      echo "Tess (QA)"
       ;;
     "atlas")
-      echo "Atlas"
+      echo "Atlas (Integration)"
       ;;
     "bolt")
-      echo "Bolt"
+      echo "Bolt (Deployment)"
       ;;
     "morgan")
-      echo "Morgan"
-      ;;
-    "stitch")
-      echo "Stitch"
+      echo "Morgan (PM)"
       ;;
     *)
-      # Unknown agent - return capitalized name
-      echo "${agent_name^}"  # ${agent_name^} capitalizes first letter
+      echo "Pending"
       ;;
   esac
 }
@@ -894,22 +890,28 @@ map_stage_to_agent() {
   
   case "$stage" in
     "pending"|"waiting-pr-created")
-      echo "Rex"
+      echo "Pending"
       ;;
     "implementation"|"implementation-in-progress")
-      echo "Rex"
+      echo "Rex (Implementation)"
       ;;
     "frontend-in-progress")
-      echo "Blaze"
+      echo "Blaze (Frontend)"
       ;;
     "quality-in-progress"|"waiting-ready-for-qa")
-      echo "Cleo"
+      echo "Cleo (Quality)"
       ;;
     "security-in-progress")
-      echo "Cipher"
+      echo "Cipher (Security)"
       ;;
     "testing-in-progress"|"qa-in-progress")
-      echo "Tess"
+      echo "Tess (QA)"
+      ;;
+    "integration-in-progress"|"merging")
+      echo "Atlas (Integration)"
+      ;;
+    "deployment-in-progress"|"deploying")
+      echo "Bolt (Deployment)"
       ;;
     "completed"|"done")
       echo "Complete ✅"
