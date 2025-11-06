@@ -21,7 +21,7 @@ spec:
       filters:
         data:
           # Filter for pull_request opened events
-          - path: headers.X-GitHub-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["pull_request"]
           - path: body.action
@@ -621,7 +621,7 @@ spec:
       filters:
         data:
           # Filter for push events from Rex implementation agent
-          - path: headers.X-GitHub-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["push"]
           - path: body.pusher.name
@@ -801,7 +801,7 @@ spec:
       filters:
         data:
           # Filter for pull_request labeled events
-          - path: headers.X-GitHub-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["pull_request"]
           - path: body.action
@@ -1141,7 +1141,7 @@ spec:
       filters:
         data:
           # Filter for pull_request labeled events
-          - path: headers.X-GitHub-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["pull_request"]
           - path: body.action
