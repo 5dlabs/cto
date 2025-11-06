@@ -137,8 +137,12 @@ RUN --mount=type=cache,target=/tmp/downloads \
     esac && \
     SCCACHE_VERSION="0.8.2" && \
     SCCACHE_TARGET="${SCCACHE_ARCH}-unknown-linux-musl" && \
+    echo "Downloading sccache v${SCCACHE_VERSION} for ${SCCACHE_TARGET}..." && \
     curl -fsSL -o sccache.tar.gz \
-        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" && \
+        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" || { \
+        echo "Download failed, trying cargo install fallback..."; \
+        . /home/runner/.cargo/env && cargo install sccache --version ${SCCACHE_VERSION} && exit 0; \
+    } && \
     tar xzf sccache.tar.gz && \
     install -m 755 "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" /home/runner/.cargo/bin/sccache && \
     /home/runner/.cargo/bin/sccache --version
