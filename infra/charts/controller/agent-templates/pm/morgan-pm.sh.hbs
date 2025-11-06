@@ -623,16 +623,34 @@ handle_task_event() {
   local issue_number=$(echo "$entry" | jq -r '.issue_number')
   local item_id=$(echo "$entry" | jq -r '.item_id')
   
-  # Get actual running agent from cluster (PRIMARY SOURCE OF TRUTH)
-  local actual_agent=$(get_actual_running_agent "$task_id" "$workflow_name")
-  
-  # Only fall back to stage mapping if we absolutely can't detect actual agent
-  if [[ -n "$actual_agent" ]]; then
-    local current_agent="$actual_agent"
-    log "✅ Using actual running agent from cluster: $current_agent"
+  # CRITICAL: Check workflow phase FIRST - completed workflows override running agents
+  # This prevents edge case where pod is still running but workflow already succeeded
+  local current_agent=""
+  if [[ "$workflow_phase" == "Succeeded" ]]; then
+    current_agent="Complete ✅"
+    log "✅ Workflow succeeded - marking as complete"
+  elif [[ "$workflow_phase" == "Failed" ]] || [[ "$workflow_phase" == "Error" ]]; then
+    # For failed workflows, try to detect which agent failed
+    local failed_agent=$(get_actual_running_agent "$task_id" "$workflow_name")
+    if [[ -n "$failed_agent" ]]; then
+      current_agent="$failed_agent"
+      log "⚠️  Workflow failed while $current_agent was working"
+    else
+      # Fall back to stage mapping for failed workflows
+      current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
+      log "⚠️  Workflow failed, using stage mapping: $current_agent"
+    fi
   else
-    local current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
-    log "⚠️  No running agent detected, using stage mapping: $current_agent"
+    # Workflow still running - detect actual running agent from cluster
+    local actual_agent=$(get_actual_running_agent "$task_id" "$workflow_name")
+    
+    if [[ -n "$actual_agent" ]]; then
+      current_agent="$actual_agent"
+      log "✅ Using actual running agent from cluster: $current_agent"
+    else
+      current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
+      log "⚠️  No running agent detected, using stage mapping: $current_agent"
+    fi
   fi
   
   # Agent name IS the status in agent-based columns
@@ -1397,13 +1415,17 @@ link_pr_to_project() {
   
   log "✅ Got PR node ID: $pr_node_id"
   
-  # Check if PR is already in project
-  local pr_project_items=$(gh pr view "$pr_number" \
+  # Check if PR is already in THIS specific project (not just any project)
+  local pr_in_this_project=$(gh pr view "$pr_number" \
     --repo "$REPO_OWNER/$REPO_NAME" \
-    --json projectItems --jq '.projectItems | length' 2>/dev/null || echo "0")
+    --json projectItems --jq --arg pid "$project_id" \
+    '.projectItems[] | select(.project.id == $pid) | .id' 2>/dev/null || echo "")
   
-  if [[ "$pr_project_items" -gt 0 ]]; then
-    log "✅ PR #$pr_number already linked to a project"
+  if [[ -n "$pr_in_this_project" ]]; then
+    log "✅ PR #$pr_number already linked to this project (item ID: $pr_in_this_project)"
+    # Update stage even if already linked (PR stage might have changed)
+    set_project_item_stage "$project_id" "$pr_in_this_project" "$current_stage" 2>/dev/null || \
+      log "⚠️  Could not update PR #$pr_number stage"
     return 0
   fi
   
