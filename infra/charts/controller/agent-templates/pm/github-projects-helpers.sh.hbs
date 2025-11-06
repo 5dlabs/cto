@@ -885,7 +885,7 @@ set_project_item_stage() {
   local item_id="$2"
   local stage="$3"
   
-  log "🔍 Setting project item stage: item=$item_id, stage='$stage'"
+  log "🔍 Setting Status field: item=$item_id, status='$stage'"
   
   # Use built-in "Status" field - enables AUTO-COLUMN CREATION!
   local field_id=$(get_project_field "$project_id" "Status")
@@ -895,15 +895,15 @@ set_project_item_stage() {
     return 1
   fi
   
-  local option_id=$(get_field_option_id "$project_id" "$field_id" "$status")
+  local option_id=$(get_field_option_id "$project_id" "$field_id" "$stage")
   
   if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
-    log "❌ Status option '$status' not found"
+    log "❌ Status option '$stage' not found"
     return 1
   fi
   
   if update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"; then
-    log "✅ Updated status to: $status"
+    log "✅ Updated status to: $stage"
     return 0
   else
     log "❌ Failed to update status"
