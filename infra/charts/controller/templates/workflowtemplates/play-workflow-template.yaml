@@ -685,10 +685,14 @@ spec:
             echo "ℹ️ Morgan credentials not available; using unauthenticated GitHub API"
           fi
 
-          # Poll with reduced attempts for faster failure detection
-          # Agents should create PRs quickly; 20s total wait (4 x 5s) is sufficient
-          # Previous: 12 attempts = 60s total (too long for typical PR creation)
-          attempts=4
+          # Poll for PR creation with reasonable timeout
+          # Implementation agents (Factory/Rex) can take 30-90s to create PR after code completion
+          # Quality/Security/Testing should be faster as PR already exists
+          if [ "$STAGE" = "implementation" ]; then
+            attempts=18  # 90s total (18 × 5s) for implementation PR creation
+          else
+            attempts=8   # 40s total (8 × 5s) for existing PR detection
+          fi
           while [ $attempts -gt 0 ]; do
             # First, try to find PR by labels (fast path for already-labeled PRs)
             q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
@@ -724,17 +728,29 @@ spec:
             if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
               echo "$pr_url" > /tmp/pr-url.txt
               echo "$pr_number" > /tmp/pr-number.txt
-              echo "✅ Found PR #$pr_number"
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+              echo "✅ PR FOUND: #$pr_number"
+              echo "  URL: $pr_url"
+              echo "  Stage: ${STAGE}"
+              echo "  Repository: ${REPO}"
               if [ -n "$TOKEN" ]; then
+                echo "  Adding correlation labels..."
                 add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
-                curl -s -X POST \
+                if curl -s -X POST \
                   -H "Authorization: Bearer $TOKEN" \
                   -H "Accept: application/vnd.github+json" \
                   -H "Content-Type: application/json" \
                   -d "$add_labels_payload" \
-                  "https://api.github.com/repos/${REPO}/issues/${pr_number}/labels" >/dev/null 2>&1 || true
-                echo "🏷️ Ensured PR #$pr_number has labels: $LABEL, $RUN_LABEL, $SERVICE_LABEL"
+                  "https://api.github.com/repos/${REPO}/issues/${pr_number}/labels" >/dev/null 2>&1; then
+                  echo "  ✅ Labels added: $LABEL, $RUN_LABEL, $SERVICE_LABEL"
+                else
+                  echo "  ⚠️ Failed to add labels (PR still usable)"
+                fi
+              else
+                echo "  ⚠️ No auth token - skipping label update"
               fi
+              echo "  Proceeding to next workflow stage..."
+              echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
               exit 0
             fi
 
@@ -743,19 +759,39 @@ spec:
             sleep 5
           done
 
-          if [ "$STAGE" = "quality" ] || [ "$STAGE" = "security" ] || [ "$STAGE" = "testing" ]; then
-            echo "❌ No PR found with labels ${LABEL} and ${RUN_LABEL}. This indicates the implementation stage hasn't created a PR yet."
-            # For quality/security/testing, this is an error condition
-            > /tmp/pr-url.txt
-            > /tmp/pr-number.txt
-            exit 1
+          # PR not found after polling - provide detailed error info
+          echo "❌ ERROR: No PR found after waiting for ${STAGE} stage"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 Search Details:"
+          echo "  Task ID: ${TASK_ID}"
+          echo "  Repository: ${REPO}"
+          echo "  Stage: ${STAGE}"
+          echo "  Expected Branch: feature/task-${TASK_ID}-implementation"
+          echo "  Expected Labels: ${LABEL}, ${RUN_LABEL}, ${SERVICE_LABEL}"
+          echo ""
+          echo "🔍 Possible Causes:"
+          if [ "$STAGE" = "implementation" ]; then
+            echo "  1. Implementation agent hasn't created PR yet (waited 90s)"
+            echo "  2. Implementation failed before PR creation"
+            echo "  3. PR created with different branch name or labels"
+            echo "  4. Network/API issues preventing PR creation"
+            echo ""
+            echo "💡 Recommendation:"
+            echo "  Check implementation CodeRun logs for errors"
+            echo "  Verify GitHub App has PR creation permissions"
           else
-            echo "❌ No PR found with labels ${LABEL} and ${RUN_LABEL} after waiting."
-            # Leave outputs empty; upstream can decide to re-run implementation
-            > /tmp/pr-url.txt
-            > /tmp/pr-number.txt
-            exit 0
+            echo "  1. Implementation agent didn't create a PR"
+            echo "  2. PR was created but lacks required labels"
+            echo "  3. PR branch name doesn't match expected pattern"
+            echo ""
+            echo "💡 Recommendation:"
+            echo "  Verify implementation stage completed successfully"
+            echo "  Check if PR exists with correct labels: ${LABEL}, ${RUN_LABEL}"
           fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          > /tmp/pr-url.txt
+          > /tmp/pr-number.txt
+          exit 1
     # Evaluate PR labels to determine remediation outcome
     - name: assess-remediation-outcome
       inputs:
