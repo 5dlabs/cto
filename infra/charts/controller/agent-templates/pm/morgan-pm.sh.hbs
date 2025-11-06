@@ -335,6 +335,14 @@ EOF
 # ============================================================================
 
 create_task_issues() {
+  # Check if issue creation should be skipped (PR-only tracking)
+  if [[ "${SKIP_ISSUE_CREATION:-false}" == "true" ]]; then
+    log "⏭️  Phase 2: Skipped (SKIP_ISSUE_CREATION=true)"
+    log "📋 Morgan will track PRs only (no initial issues created)"
+    echo "{}" > "$TASK_ISSUE_MAP"
+    return 0
+  fi
+  
   log "📝 Phase 2: Creating Issues for Tasks"
   
   cd "$TEMP_CLONE/$DOCS_DIR"
