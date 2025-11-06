@@ -565,7 +565,7 @@ setup_custom_fields() {
   # Create "Stage" field - agent-based workflow stages that map to board columns
   # This is the PRIMARY field that drives the board visualization
   create_single_select_field "$project_id" "Stage" \
-    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
+    "Pending" "Rex" "Blaze" "Cleo" "Cipher" "Tess" "Complete ✅"
   
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true

@@ -876,25 +876,22 @@ map_stage_to_agent() {
   
   case "$stage" in
     "pending"|"waiting-pr-created")
-      echo "Rex (Implementation)"
+      echo "Rex"
       ;;
     "implementation"|"implementation-in-progress")
-      echo "Rex (Implementation)"
+      echo "Rex"
+      ;;
+    "frontend-in-progress")
+      echo "Blaze"
       ;;
     "quality-in-progress"|"waiting-ready-for-qa")
-      echo "Cleo (Quality)"
+      echo "Cleo"
       ;;
     "security-in-progress")
-      echo "Cipher (Security)"
+      echo "Cipher"
       ;;
     "testing-in-progress"|"qa-in-progress")
-      echo "Tess (QA)"
-      ;;
-    "integration-in-progress"|"merging")
-      echo "Atlas (Integration)"
-      ;;
-    "deployment-in-progress"|"deploying")
-      echo "Bolt (Deployment)"
+      echo "Tess"
       ;;
     "completed"|"done")
       echo "Complete ✅"
@@ -905,7 +902,7 @@ map_stage_to_agent() {
         log "⚠️  Unknown stage '$stage' with Running phase - defaulting to Pending"
         echo "Pending"
       else
-        # For non-running workflows with unknown stage, mark as Pending
+        # For non-running workflows with unknown stage, mark as Pending"
         echo "Pending"
       fi
       ;;
@@ -964,6 +961,9 @@ map_agent_to_github_username() {
     "Rex (Implementation)"|"Rex")
       echo "rex-5dlabs[bot]"
       ;;
+    "Blaze (Frontend)"|"Blaze")
+      echo "blaze-5dlabs[bot]"
+      ;;
     "Cleo (Quality)"|"Cleo")
       echo "cleo-5dlabs[bot]"
       ;;
@@ -972,12 +972,6 @@ map_agent_to_github_username() {
       ;;
     "Tess (QA)"|"Tess")
       echo "tess-5dlabs[bot]"
-      ;;
-    "Atlas (Integration)"|"Atlas")
-      echo "atlas-5dlabs[bot]"
-      ;;
-    "Bolt (Deployment)"|"Bolt")
-      echo "bolt-5dlabs[bot]"
       ;;
     "Morgan (PM)"|"Morgan")
       echo "morgan-5dlabs[bot]"
