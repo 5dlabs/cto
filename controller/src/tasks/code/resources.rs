@@ -767,6 +767,24 @@ impl<'a> CodeResourceManager<'a> {
             let docker_daemon_spec = json!({
                 "name": "docker-daemon",
                 "image": "docker:dind",
+                "command": ["/bin/sh", "-c"],
+                "args": [
+                    format!("dockerd-entrypoint.sh & DOCKER_PID=$!; \
+                     while true; do \
+                       if [ -f /data/task-{}/.agent_done ]; then \
+                         echo 'Agent done signal detected, stopping docker daemon...'; \
+                         kill -TERM $DOCKER_PID 2>/dev/null || true; \
+                         sleep 2; \
+                         kill -KILL $DOCKER_PID 2>/dev/null || true; \
+                         exit 0; \
+                       fi; \
+                       if ! kill -0 $DOCKER_PID 2>/dev/null; then \
+                         echo 'Docker daemon exited unexpectedly'; \
+                         exit 1; \
+                       fi; \
+                       sleep 5; \
+                     done", code_run.spec.task_id)
+                ],
                 "securityContext": {
                     "privileged": true,
                     "allowPrivilegeEscalation": true,
