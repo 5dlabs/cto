@@ -219,6 +219,12 @@ get_or_create_repo_project() {
   
   local project_id=$(echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id // "null"')
   
+  # CRITICAL FIX: Create board view for repo-level projects too
+  # This was missing and caused board columns not to be configured
+  if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+    create_default_board_view "$project_id"
+  fi
+  
   echo "$project_id"
 }
 
@@ -565,7 +571,7 @@ setup_custom_fields() {
   # Create "Stage" field - agent-based workflow stages that map to board columns
   # This is the PRIMARY field that drives the board visualization
   create_single_select_field "$project_id" "Stage" \
-    "Pending" "Rex (Implementation)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
+    "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
   
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true
