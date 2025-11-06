@@ -770,25 +770,38 @@ get_actual_running_agent() {
     fi
   fi
   
+  # Extract agent name from GitHub App identifier (e.g., "5DLabs-Blaze" -> "blaze")
+  # This handles formats like: 5DLabs-Rex, 5DLabs-Blaze[bot], rex, Blaze, etc.
+  local agent_name=$(echo "$agent" | sed -E 's/^.*[Ll]abs-//; s/\[bot\]$//; s/^[0-9]+-//' | tr '[:upper:]' '[:lower:]')
+  
   # Map agent name to display format
-  case "$agent" in
-    "rex"|"Rex")
+  case "$agent_name" in
+    "rex")
       echo "Rex (Implementation)"
       ;;
-    "cleo"|"Cleo")
+    "blaze")
+      echo "Blaze (Frontend)"
+      ;;
+    "cleo")
       echo "Cleo (Quality)"
       ;;
-    "cipher"|"Cipher")
+    "cipher")
       echo "Cipher (Security)"
       ;;
-    "tess"|"Tess")
+    "tess")
       echo "Tess (QA)"
       ;;
-    "atlas"|"Atlas")
+    "atlas")
       echo "Atlas (Integration)"
       ;;
-    "bolt"|"Bolt")
+    "bolt")
       echo "Bolt (Deployment)"
+      ;;
+    "morgan")
+      echo "Morgan (PM)"
+      ;;
+    "stitch")
+      echo "Stitch (Workflow)"
       ;;
     *)
       # Return empty if we can't determine the agent
