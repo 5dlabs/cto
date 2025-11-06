@@ -813,12 +813,19 @@ get_actual_running_agent() {
 format_agent_name() {
   local agent="$1"
   
+  # Extract agent name from GitHub App identifier (e.g., "5DLabs-Blaze" -> "blaze")
+  # This handles formats like: 5DLabs-Rex, 5DLabs-Blaze[bot], rex, Blaze, etc.
+  local agent_name=$(echo "$agent" | sed -E 's/^.*[Ll]abs-//; s/\[bot\]$//; s/^[0-9]+-//' | tr '[:upper:]' '[:lower:]')
+  
   # Normalize agent name to display format
-  case "${agent,,}" in  # ${agent,,} converts to lowercase
+  case "$agent_name" in
     "rex")
       echo "Rex (Implementation)"
       ;;
-    "cleo"|"blaze")  # Blaze is quality agent too
+    "blaze")
+      echo "Blaze (Frontend)"
+      ;;
+    "cleo")
       echo "Cleo (Quality)"
       ;;
     "cipher")
@@ -833,9 +840,15 @@ format_agent_name() {
     "bolt")
       echo "Bolt (Deployment)"
       ;;
+    "morgan")
+      echo "Morgan (PM)"
+      ;;
+    "stitch")
+      echo "Stitch (Workflow)"
+      ;;
     *)
       # Unknown agent - return as-is but formatted
-      echo "${agent^} (Unknown)"  # ${agent^} capitalizes first letter
+      echo "${agent_name^} (Unknown)"  # ${agent_name^} capitalizes first letter
       ;;
   esac
 }
