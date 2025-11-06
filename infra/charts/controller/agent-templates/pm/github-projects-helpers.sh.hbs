@@ -599,10 +599,21 @@ create_single_select_field() {
         opts_json=$(echo "$opts_json" | jq --arg n "${options[$i]}" --arg c "$color" '. += [{"name": $n, "color": $c, "description": $n}]')
       done
       
-      local upd=$(jq -n --arg q 'mutation($fieldId: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) { updateProjectV2Field(input: {fieldId: $fieldId, singleSelectOptions: $options}) { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }' --arg fieldId "$existing_field" --argjson options "$opts_json" '{query: $q, variables: {fieldId: $fieldId, options: $options}}')
+      local upd=$(jq -n --arg q 'mutation($fieldId: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) { updateProjectV2Field(input: {fieldId: $fieldId, singleSelectOptions: $options}) { projectV2Field { ... on ProjectV2SingleSelectField { id options { name } } } } }' --arg fieldId "$existing_field" --argjson options "$opts_json" '{query: $q, variables: {fieldId: $fieldId, options: $options}}')
       
-      if echo "$upd" | gh api graphql --input - >/dev/null 2>&1; then
-        log "✅ Added agent options to Status field"
+      log "🔍 DEBUG: Updating Status field with options: $(echo "$opts_json" | jq -c '[.[] | .name]')"
+      
+      local result=$(echo "$upd" | gh api graphql --input - 2>&1)
+      
+      if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
+        log "❌ GraphQL ERROR updating Status field options:"
+        echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
+      elif echo "$result" | jq -e '.data.updateProjectV2Field.projectV2Field.options' >/dev/null 2>&1; then
+        local added_opts=$(echo "$result" | jq -r '.data.updateProjectV2Field.projectV2Field.options[].name' | tr '\n' ', ')
+        log "✅ Added agent options to Status field: $added_opts"
+      else
+        log "⚠️  Status field update returned but no confirmation"
+        echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
       fi
     fi
     
