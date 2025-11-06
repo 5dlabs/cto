@@ -439,22 +439,19 @@ create_task_issues() {
     if [[ -n "$ITEM_ID" ]]; then
       log "✅ Added issue #$ISSUE_NUMBER to project (Item ID: $ITEM_ID)"
       
-      # Map TaskMaster status to GitHub Project Stage value
+      # Map TaskMaster status to GitHub Project Stage value (agent-based)
       GITHUB_STAGE=$(map_taskmaster_status_to_stage "$TASK_STATUS")
-      log "🔍 DEBUG: Mapping TaskMaster status '$TASK_STATUS' → GitHub Stage '$GITHUB_STAGE'"
+      log "🔍 Mapping TaskMaster status '$TASK_STATUS' → GitHub Stage (Agent) '$GITHUB_STAGE'"
       
       # Set initial field values with retry
-      retry_with_backoff 3 "Set status for task $TASK_ID" \
-        set_project_item_status "$PROJECT_ID" "$ITEM_ID" "$GITHUB_STAGE"
+      retry_with_backoff 3 "Set stage for task $TASK_ID" \
+        set_project_item_stage "$PROJECT_ID" "$ITEM_ID" "$GITHUB_STAGE"
       
       retry_with_backoff 3 "Set priority for task $TASK_ID" \
         set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
       
-      retry_with_backoff 3 "Set agent for task $TASK_ID" \
-        set_project_item_agent "$PROJECT_ID" "$ITEM_ID" "Pending"
-      
-      # Set initial assignee (Morgan creates the tasks)
-      update_issue_assignee "$ISSUE_NUMBER" "Morgan (PM)"
+      # Note: No assignee set on creation to keep this public-friendly
+      # Agent assignment comments will be posted when tasks move to active agents
       
       # Store mapping
       TEMP_MAP=$(mktemp)
@@ -569,11 +566,12 @@ monitor_and_sync() {
     [[ -z "$WORKFLOW_NAME_LOCAL" ]] && continue
     
     log "📡 Workflow event: task-$TASK_ID ($EVENT_TYPE) - stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE"
+    log "🔍 Event details: workflow=$WORKFLOW_NAME_LOCAL, namespace=$NAMESPACE"
     
     # Track event processing metric
     echo $(($(cat /tmp/morgan-events-processed 2>/dev/null || echo "0") + 1)) > /tmp/morgan-events-processed
     
-    # Update GitHub for this specific task
+    # Update GitHub based on ACTUAL cluster state
     handle_task_event "$PROJECT_ID" "$TASK_ID" "$WORKFLOW_NAME_LOCAL" "$CURRENT_STAGE" "$WORKFLOW_PHASE" "false"
   done
   
@@ -625,12 +623,20 @@ handle_task_event() {
   local issue_number=$(echo "$entry" | jq -r '.issue_number')
   local item_id=$(echo "$entry" | jq -r '.item_id')
   
-  # Get actual running agent from cluster (more accurate than stage mapping)
+  # Get actual running agent from cluster (PRIMARY SOURCE OF TRUTH)
   local actual_agent=$(get_actual_running_agent "$task_id" "$workflow_name")
   
-  # Fall back to stage mapping if we can't detect actual agent
-  local current_agent="${actual_agent:-$(map_stage_to_agent "$current_stage" "$workflow_phase")}"
-  local task_status=$(map_workflow_to_status "$current_stage" "$workflow_phase")
+  # Only fall back to stage mapping if we absolutely can't detect actual agent
+  if [[ -n "$actual_agent" ]]; then
+    local current_agent="$actual_agent"
+    log "✅ Using actual running agent from cluster: $current_agent"
+  else
+    local current_agent=$(map_stage_to_agent "$current_stage" "$workflow_phase")
+    log "⚠️  No running agent detected, using stage mapping: $current_agent"
+  fi
+  
+  # Agent name IS the status in agent-based columns
+  local task_status="$current_agent"
   
   # Check if state actually changed
   local state_changed=false
@@ -646,11 +652,10 @@ handle_task_event() {
   # These GraphQL calls ensure project fields stay in sync
   # even if deduplication skips comments
   # ═══════════════════════════════════════════════════════════
-  set_project_item_status "$project_id" "$item_id" "$task_status" 2>/dev/null || \
-    log "⚠️  Could not update project status for item $item_id"
-    
-  set_project_item_agent "$project_id" "$item_id" "$current_agent" 2>/dev/null || \
-    log "⚠️  Could not update project agent for item $item_id"
+  # Use current_agent as the stage since we now have agent-based columns
+  # task_status and current_agent should be the same (both return agent name from mapping)
+  set_project_item_stage "$project_id" "$item_id" "$current_agent" || \
+    log "⚠️  Could not update project stage for item $item_id to $current_agent"
   
   # ALWAYS update issue labels (idempotent)
   update_issue_labels "$issue_number" "$task_status" "$current_agent"
@@ -675,10 +680,15 @@ handle_task_event() {
     stream_significant_events "$task_id" "$workflow_name" "$issue_number"
   fi
   
-  # ALWAYS update GitHub Checks API (idempotent)
+  # ALWAYS update GitHub Checks API and link PR to project (idempotent)
   local pr_number=$(find_pr_for_task "$task_id")
   if [[ -n "$pr_number" ]]; then
+    # Create/update GitHub check
     create_or_update_github_check "$task_id" "$pr_number" "$current_agent" "$current_stage" "$workflow_phase"
+    
+    # Link PR to project (idempotent - will skip if already linked)
+    link_pr_to_project "$project_id" "$pr_number" "$task_id" "$current_agent" 2>/dev/null || \
+      log "⚠️  Could not link PR #$pr_number to project"
   fi
   
   # ALWAYS update heartbeat (just logs)
@@ -736,70 +746,120 @@ get_actual_running_agent() {
   local task_id="$1"
   local workflow_name="$2"
   
-  # Find the most recent CodeRun for this task
-  local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
-    -l "task-id=$task_id,workflow-name=$workflow_name" \
-    --sort-by=.metadata.creationTimestamp \
-    -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+  log "🔍 Detecting actual running agent for task-$task_id from cluster..."
   
-  if [[ -z "$coderun_name" ]]; then
-    # No CodeRun found, return empty
-    return 0
-  fi
+  # Strategy 1: Check for RUNNING CodeRun pods (most accurate - shows who's working NOW)
+  local running_pods=$(kubectl get pods -n "$NAMESPACE" \
+    -l "task-id=$task_id" \
+    --field-selector=status.phase=Running \
+    -o json 2>/dev/null || echo "{}")
   
-  # Get the agent from CodeRun spec
-  local agent=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
-    -o jsonpath='{.spec.githubApp}' 2>/dev/null || echo "")
-  
-  if [[ -z "$agent" ]]; then
-    # Try to get from pod labels
-    local pod_name=$(kubectl get pods -n "$NAMESPACE" \
-      -l "coderun=$coderun_name" \
-      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ "$running_pods" != "{}" ]]; then
+    local pod_count=$(echo "$running_pods" | jq -r '.items | length')
     
-    if [[ -n "$pod_name" ]]; then
-      # Check if pod is running
-      local pod_phase=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
-        -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [[ "$pod_count" -gt 0 ]]; then
+      # Get agent from the most recent running pod
+      local agent=$(echo "$running_pods" | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.labels.agent // ""')
       
-      if [[ "$pod_phase" == "Running" ]]; then
-        # Extract agent from pod name or labels
-        agent=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
-          -o jsonpath='{.metadata.labels.agent}' 2>/dev/null || echo "")
+      if [[ -n "$agent" ]]; then
+        log "✅ Found RUNNING pod with agent: $agent"
+        format_agent_name "$agent"
+        return 0
       fi
     fi
   fi
   
-  # Map agent name to display format
-  case "$agent" in
-    "rex"|"Rex")
+  # Strategy 2: Check most recent CodeRun (even if pod completed)
+  local coderun_name=$(kubectl get coderuns -n "$NAMESPACE" \
+    -l "task-id=$task_id" \
+    --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+  
+  if [[ -n "$coderun_name" ]]; then
+    log "🔍 Checking CodeRun: $coderun_name"
+    
+    # Get agent from CodeRun spec
+    local agent=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
+      -o jsonpath='{.spec.githubApp}' 2>/dev/null || echo "")
+    
+    if [[ -n "$agent" ]]; then
+      # Check if CodeRun is still active (not completed)
+      local coderun_phase=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+      
+      if [[ "$coderun_phase" == "Running" ]] || [[ "$coderun_phase" == "Pending" ]]; then
+        log "✅ Found active CodeRun with agent: $agent (phase: $coderun_phase)"
+        format_agent_name "$agent"
+        return 0
+      else
+        log "⚠️  CodeRun $coderun_name is not active (phase: $coderun_phase)"
+      fi
+    fi
+  fi
+  
+  # Strategy 3: Check workflow labels for current stage (fallback)
+  local workflow_stage=$(kubectl get workflow "$workflow_name" -n "$NAMESPACE" \
+    -o jsonpath='{.metadata.labels.current-stage}' 2>/dev/null || echo "")
+  
+  if [[ -n "$workflow_stage" ]] && [[ "$workflow_stage" != "pending" ]]; then
+    log "⚠️  No running agent found, using workflow stage: $workflow_stage"
+  fi
+  
+  # Return empty - will fall back to stage mapping
+  log "⚠️  Could not detect actual running agent from cluster"
+  echo ""
+}
+
+format_agent_name() {
+  local agent="$1"
+  
+  # Normalize agent name to display format
+  case "${agent,,}" in  # ${agent,,} converts to lowercase
+    "rex")
       echo "Rex (Implementation)"
       ;;
-    "cleo"|"Cleo")
+    "cleo"|"blaze")  # Blaze is quality agent too
       echo "Cleo (Quality)"
       ;;
-    "cipher"|"Cipher")
+    "cipher")
       echo "Cipher (Security)"
       ;;
-    "tess"|"Tess")
+    "tess")
       echo "Tess (QA)"
       ;;
-    "atlas"|"Atlas")
+    "atlas")
       echo "Atlas (Integration)"
       ;;
-    "bolt"|"Bolt")
+    "bolt")
       echo "Bolt (Deployment)"
       ;;
     *)
-      # Return empty if we can't determine the agent
-      echo ""
+      # Unknown agent - return as-is but formatted
+      echo "${agent^} (Unknown)"  # ${agent^} capitalizes first letter
       ;;
   esac
 }
 
 map_stage_to_agent() {
+  # FALLBACK ONLY - actual cluster state should be detected by get_actual_running_agent()
+  # This function provides best-guess mapping when we can't detect actual running agent
   local stage="$1"
   local phase="$2"
+  
+  log "⚠️  Using fallback stage mapping (cluster detection failed)"
+  
+  # Handle completed workflows first
+  if [[ "$phase" == "Succeeded" ]]; then
+    echo "Complete ✅"
+    return 0
+  fi
+  
+  # Handle failed/error workflows
+  if [[ "$phase" == "Failed" ]] || [[ "$phase" == "Error" ]]; then
+    # Failed tasks stay in their current stage for visibility
+    # This requires checking what stage they were in when they failed
+    log "⚠️  Workflow failed/errored in stage: $stage"
+  fi
   
   case "$stage" in
     "pending"|"waiting-pr-created")
@@ -827,10 +887,13 @@ map_stage_to_agent() {
       echo "Complete ✅"
       ;;
     *)
-      if [[ "$phase" == "Succeeded" ]]; then
-        echo "Complete ✅"
+      # For unknown stages with active workflows, default to Pending
+      if [[ "$phase" == "Running" ]]; then
+        log "⚠️  Unknown stage '$stage' with Running phase - defaulting to Pending"
+        echo "Pending"
       else
-        echo "In Progress"
+        # For non-running workflows with unknown stage, mark as Pending
+        echo "Pending"
       fi
       ;;
   esac
@@ -916,23 +979,17 @@ update_issue_assignee() {
   local issue_number="$1"
   local agent="$2"
   
-  # Get GitHub username for agent
-  local github_username=$(map_agent_to_github_username "$agent")
-  
-  # Note: GitHub App bots can't be assignees unless they're collaborators
-  # Instead, we'll post a comment indicating the current agent
-  # The "Current Agent" field in Projects board serves as the primary indicator
-  
   # Post agent assignment as a comment for visibility
-  if [[ -n "$github_username" ]] && [[ "$agent" != "Complete ✅" ]]; then
-    log "👤 Noting $agent is working on issue #$issue_number"
+  # Note: We don't assign to a specific user to keep this public-friendly
+  if [[ "$agent" != "Complete ✅" ]] && [[ "$agent" != "Pending" ]]; then
+    log "📝 Posting agent assignment comment for $agent on issue #$issue_number"
     
     # Post comment with agent assignment (non-fatal if fails)
     gh issue comment "$issue_number" \
       --repo "$REPO_OWNER/$REPO_NAME" \
       --body "🤖 **Agent Assignment**
 
-**Current Agent:** $agent (\`@$github_username\`)
+**Current Agent:** $agent
 
 ---
 *Auto-assigned by Morgan PM*" 2>/dev/null || true
@@ -940,56 +997,39 @@ update_issue_assignee() {
 }
 
 map_workflow_to_status() {
+  # This function now returns the agent-based stage (column name)
+  # It's essentially the same as map_stage_to_agent
   local stage="$1"
   local phase="$2"
   
-  case "$phase" in
-    "Succeeded")
-      echo "Done"
-      ;;
-    "Failed"|"Error")
-      echo "Blocked"
-      ;;
-    "Running")
-      case "$stage" in
-        "implementation"*|"pending")
-          echo "In Progress"
-          ;;
-        "quality"*|"security"*|"testing"*)
-          echo "In Review"
-          ;;
-        *)
-          echo "In Progress"
-          ;;
-      esac
-      ;;
-    *)
-      # Match field option exactly: "To Do" not "Todo"
-      echo "To Do"
-      ;;
-  esac
+  # Just call map_stage_to_agent since status and agent are now unified
+  map_stage_to_agent "$stage" "$phase"
 }
 
 map_taskmaster_status_to_stage() {
   # Maps TaskMaster status values (from tasks.json) to GitHub Project "Stage" field values
+  # Now using agent-based stages
   local taskmaster_status="$1"
   
   case "$taskmaster_status" in
     "done"|"completed")
-      echo "Done"
+      echo "Complete ✅"
       ;;
     "in-progress"|"in_progress"|"active")
-      echo "In Progress"
+      echo "Rex (Implementation)"  # Default to Rex for active tasks
       ;;
     "review"|"in-review"|"in_review")
-      echo "In Review"
+      echo "Cleo (Quality)"  # Tasks in review go to Cleo
+      ;;
+    "testing"|"qa")
+      echo "Tess (QA)"
       ;;
     "blocked"|"deferred"|"cancelled")
-      echo "Blocked"
+      echo "Pending"  # Blocked tasks go back to Pending
       ;;
     "pending"|*)
-      # Default to "To Do" for pending or unknown statuses
-      echo "To Do"
+      # Default to "Pending" for pending or unknown statuses
+      echo "Pending"
       ;;
   esac
 }
@@ -1328,6 +1368,60 @@ find_pr_for_task() {
     --jq '.[0].number' 2>/dev/null || echo "")
   
   echo "$pr_number"
+}
+
+link_pr_to_project() {
+  local project_id="$1"
+  local pr_number="$2"
+  local task_id="$3"
+  local current_stage="$4"
+  
+  log "🔗 Linking PR #$pr_number to project for task-$task_id..."
+  
+  # Get PR node ID
+  local pr_node_id=$(gh pr view "$pr_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --json id --jq '.id' 2>/dev/null || echo "")
+  
+  if [[ -z "$pr_node_id" ]] || [[ "$pr_node_id" == "null" ]]; then
+    log "⚠️  Could not get node ID for PR #$pr_number"
+    return 1
+  fi
+  
+  log "✅ Got PR node ID: $pr_node_id"
+  
+  # Check if PR is already in project
+  local pr_project_items=$(gh pr view "$pr_number" \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --json projectItems --jq '.projectItems | length' 2>/dev/null || echo "0")
+  
+  if [[ "$pr_project_items" -gt 0 ]]; then
+    log "✅ PR #$pr_number already linked to a project"
+    return 0
+  fi
+  
+  # Add PR to project (with retry)
+  local pr_item_id=""
+  if ! pr_item_id=$(retry_with_backoff 3 "Link PR #$pr_number to project" \
+    add_issue_to_project "$project_id" "$pr_node_id" "$pr_number"); then
+    log "❌ Failed to add PR #$pr_number to project after retries"
+    return 1
+  fi
+  
+  if [[ -z "$pr_item_id" ]] || [[ "$pr_item_id" == "null" ]]; then
+    log "⚠️  No item ID returned for PR #$pr_number"
+    return 1
+  fi
+  
+  log "✅ Added PR #$pr_number to project (Item ID: $pr_item_id)"
+  
+  # Set PR stage to match task stage
+  retry_with_backoff 3 "Set PR #$pr_number stage" \
+    set_project_item_stage "$project_id" "$pr_item_id" "$current_stage"
+  
+  log "✅ Set PR #$pr_number stage to: $current_stage"
+  
+  return 0
 }
 
 # ============================================================================
