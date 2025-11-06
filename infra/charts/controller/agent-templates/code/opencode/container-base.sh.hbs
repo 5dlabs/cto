@@ -2418,12 +2418,19 @@ touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
 echo "🛑 Explicitly stopping Docker sidecar..."
 stop_docker_sidecar || true
 
+# Kill any remaining background processes to ensure clean exit
+echo "🧹 Cleaning up background processes..."
+pkill -P $$ 2>/dev/null || true
+
 if [ $SUCCESS -ne 1 ]; then
   {{#if agent_completion_message}}
 echo "{{agent_completion_message}}"
   {{else}}
 echo "⚠️ OpenCode execution incomplete"
   {{/if}}
+  # Force exit to ensure container stops
+  kill -TERM $$ 2>/dev/null || true
+  sleep 1
   exit $EXIT_CODE
 fi
 
@@ -2432,4 +2439,9 @@ echo "{{agent_completion_message}}"
 {{else}}
 echo "✅ OpenCode execution complete"
 {{/if}}
+
+# Ensure container exits by terminating the shell process
+echo "🏁 Terminating container..."
+kill -TERM $$ 2>/dev/null || true
+sleep 1
 exit $EXIT_CODE
