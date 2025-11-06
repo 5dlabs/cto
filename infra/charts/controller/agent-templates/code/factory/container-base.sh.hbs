@@ -2330,9 +2330,7 @@ echo "{{agent_completion_message}}"
   {{else}}
 echo "⚠️ Factory execution incomplete"
   {{/if}}
-  # Force exit to ensure container stops
-  kill -TERM $$ 2>/dev/null || true
-  sleep 1
+  # Exit with failure code
   exit $EXIT_CODE
 fi
 
@@ -2342,8 +2340,6 @@ echo "{{agent_completion_message}}"
 echo "✅ Factory execution complete"
 {{/if}}
 
-# Ensure container exits by terminating the shell process
+# Exit cleanly with the actual exit code
 echo "🏁 Terminating container..."
-kill -TERM $$ 2>/dev/null || true
-sleep 1
 exit $EXIT_CODE
