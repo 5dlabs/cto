@@ -21,7 +21,7 @@ spec:
       filters:
         data:
           # Filter for pull_request closed events with merged=true
-          - path: headers.X-GitHub-Event
+          - path: body.X-GitHub-Event
             type: string
             value: ["pull_request"]
           - path: body.action
