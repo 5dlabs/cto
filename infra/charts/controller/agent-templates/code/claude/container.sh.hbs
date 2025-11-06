@@ -1250,8 +1250,19 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           ) & HANG_DIAG_PID=$!
         fi
 
-        # Wait for Claude process to complete, then stop diagnostics if running
-        wait "$CLAUDE_PID"
+        # Wait for Claude process with timeout safety
+        # Claude should exit after completing work, but sometimes hangs
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
+        
+        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+          echo "✅ Claude process completed normally"
+        else
+          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+          sleep 2
+          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+        fi
+        
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
         # Close FIFO writer if it was opened (in fallback) now that Claude has exited
         exec 9>&- 2>/dev/null || true
