@@ -450,8 +450,8 @@ create_task_issues() {
       retry_with_backoff 3 "Set priority for task $TASK_ID" \
         set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
       
-      # Set initial assignee to kaseonedge
-      update_issue_assignee "$ISSUE_NUMBER" "Pending"
+      # Note: No assignee set on creation to keep this public-friendly
+      # Agent assignment comments will be posted when tasks move to active agents
       
       # Store mapping
       TEMP_MAP=$(mktemp)
