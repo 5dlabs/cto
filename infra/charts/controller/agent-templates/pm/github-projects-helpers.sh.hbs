@@ -587,7 +587,25 @@ create_single_select_field() {
   # Check if field already exists
   local existing_field=$(get_project_field "$project_id" "$field_name")
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
-    log "✅ Field '$field_name' already exists, skipping creation"
+    log "✅ Field '$field_name' already exists"
+    
+    # CRITICAL: Status field may exist but have NO options - add them!
+    if [[ "$field_name" == "Status" ]]; then
+      log "🔧 Ensuring Status field has agent options..."
+      local colors=("GRAY" "RED" "ORANGE" "YELLOW" "GREEN" "BLUE" "PURPLE" "PINK")
+      local opts_json="[]"
+      for i in "${!options[@]}"; do
+        local color="${colors[$((i % ${#colors[@]}))]}"
+        opts_json=$(echo "$opts_json" | jq --arg n "${options[$i]}" --arg c "$color" '. += [{"name": $n, "color": $c, "description": $n}]')
+      done
+      
+      local upd=$(jq -n --arg q 'mutation($fieldId: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) { updateProjectV2Field(input: {fieldId: $fieldId, singleSelectOptions: $options}) { projectV2Field { ... on ProjectV2SingleSelectField { id } } } }' --arg fieldId "$existing_field" --argjson options "$opts_json" '{query: $q, variables: {fieldId: $fieldId, options: $options}}')
+      
+      if echo "$upd" | gh api graphql --input - >/dev/null 2>&1; then
+        log "✅ Added agent options to Status field"
+      fi
+    fi
+    
     return 0
   fi
   
