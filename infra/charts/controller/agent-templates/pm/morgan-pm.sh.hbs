@@ -706,15 +706,15 @@ handle_task_event() {
     stream_significant_events "$task_id" "$workflow_name" "$issue_number"
   fi
   
-  # ALWAYS update GitHub Checks API and link PR to project (idempotent)
+  # ALWAYS update GitHub Checks API (PRs NOT added to project - linked via issue instead)
   local pr_number=$(find_pr_for_task "$task_id")
   if [[ -n "$pr_number" ]]; then
     # Create/update GitHub check
     create_or_update_github_check "$task_id" "$pr_number" "$current_agent" "$current_stage" "$workflow_phase"
     
-    # Link PR to project (idempotent - will skip if already linked)
-    link_pr_to_project "$project_id" "$pr_number" "$task_id" "$current_agent" 2>/dev/null || \
-      log "⚠️  Could not link PR #$pr_number to project"
+    # NOTE: PRs are NOT added to project board to avoid duplication
+    # PRs are linked to issues via "Closes #XXX" in PR description
+    # This keeps one item per task in the project (the issue)
   fi
   
   # ALWAYS update heartbeat (just logs)
