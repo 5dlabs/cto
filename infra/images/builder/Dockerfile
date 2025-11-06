@@ -125,27 +125,30 @@ ENV PATH="/home/runner/.cargo/bin:${PATH}"
 # Install essential Rust tools only (no pre-warming)
 RUN /home/runner/.cargo/bin/rustup component add clippy rustfmt
 
-# Install sccache from pre-built binaries (much faster than cargo install)
-RUN --mount=type=cache,target=/tmp/downloads \
-    mkdir -p /home/runner/.cargo/bin && \
-    cd /tmp/downloads && \
-    ARCH=$(dpkg --print-architecture) && \
-    case "$ARCH" in \
-        amd64) SCCACHE_ARCH=x86_64 ;; \
-        arm64) SCCACHE_ARCH=aarch64 ;; \
-        *) SCCACHE_ARCH=$ARCH ;; \
-    esac && \
-    SCCACHE_VERSION="0.8.2" && \
-    SCCACHE_TARGET="${SCCACHE_ARCH}-unknown-linux-musl" && \
-    echo "Downloading sccache v${SCCACHE_VERSION} for ${SCCACHE_TARGET}..." && \
-    curl -fsSL -o sccache.tar.gz \
-        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" || { \
-        echo "Download failed, trying cargo install fallback..."; \
-        . /home/runner/.cargo/env && cargo install sccache --version ${SCCACHE_VERSION} && exit 0; \
-    } && \
-    tar xzf sccache.tar.gz && \
-    install -m 755 "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" /home/runner/.cargo/bin/sccache && \
-    /home/runner/.cargo/bin/sccache --version
+# Install sccache with robust error handling
+RUN mkdir -p /home/runner/.cargo/bin && \
+    { \
+        cd /tmp && \
+        ARCH=$(dpkg --print-architecture) && \
+        case "$ARCH" in \
+            amd64) SCCACHE_ARCH=x86_64 ;; \
+            arm64) SCCACHE_ARCH=aarch64 ;; \
+            *) SCCACHE_ARCH=$ARCH ;; \
+        esac && \
+        SCCACHE_VERSION="0.8.2" && \
+        SCCACHE_TARGET="${SCCACHE_ARCH}-unknown-linux-musl" && \
+        echo "Attempting to download sccache v${SCCACHE_VERSION}..." && \
+        curl -fsSL "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}.tar.gz" | \
+        tar xz -C /home/runner/.cargo/bin --strip-components=1 "sccache-v${SCCACHE_VERSION}-${SCCACHE_TARGET}/sccache" && \
+        chmod +x /home/runner/.cargo/bin/sccache && \
+        /home/runner/.cargo/bin/sccache --version && \
+        echo "✅ sccache installed from binary"; \
+    } || { \
+        echo "Binary install failed, falling back to cargo install..." && \
+        . /home/runner/.cargo/env && \
+        cargo install sccache --locked && \
+        echo "✅ sccache installed via cargo"; \
+    }
 
 # Install cargo-nextest from pre-built binaries (much faster than cargo install)
 RUN --mount=type=cache,target=/tmp/downloads \
