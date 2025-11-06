@@ -562,11 +562,11 @@ create_default_board_view() {
 setup_custom_fields() {
   local project_id="$1"
   
-  # CRITICAL: Use GitHub's BUILT-IN "Status" field with agent names
+  # CRITICAL: Use GitHub's BUILT-IN "Status" field with agent names and roles
   # This causes board columns to AUTO-CREATE without manual configuration!
   # Pattern from 5dlabs/tasks - Status field triggers automatic column creation
   create_single_select_field "$project_id" "Status" \
-    "Pending" "Rex" "Blaze" "Cleo" "Cipher" "Tess" "Complete ✅"
+    "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Complete ✅"
   
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true
