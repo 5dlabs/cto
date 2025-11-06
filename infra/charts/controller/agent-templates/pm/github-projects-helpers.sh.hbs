@@ -219,6 +219,12 @@ get_or_create_repo_project() {
   
   local project_id=$(echo "$create_result" | jq -r '.data.createProjectV2.projectV2.id // "null"')
   
+  # CRITICAL FIX: Create board view for repo-level projects too
+  # This was missing and caused board columns not to be configured
+  if [[ -n "$project_id" ]] && [[ "$project_id" != "null" ]]; then
+    create_default_board_view "$project_id"
+  fi
+  
   echo "$project_id"
 }
 
