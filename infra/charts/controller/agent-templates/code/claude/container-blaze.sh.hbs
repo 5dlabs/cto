@@ -2046,6 +2046,17 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
     PR_URL="https://github.com/${REPO_SLUG}/pull/${PR_NUMBER}"
     echo "📝 PR URL: $PR_URL"
 
+    # Link PR to GitHub Project (Morgan PM creates project for task management)
+    echo "🔗 Linking PR to GitHub Project..."
+    PROJECT_TITLE="{{service}} - TaskMaster Workflow"
+    
+    if gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-project "$PROJECT_TITLE" >/dev/null 2>&1; then
+      echo "✅ Linked PR #$PR_NUMBER to project: $PROJECT_TITLE"
+    else
+      echo "⚠️ Could not link PR to project (project may not exist yet or PR already linked)"
+      echo "   Morgan PM will create/link the project during workflow execution"
+    fi
+
     ensure_status_labels "$REPO_SLUG" \
       "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
       "${STATUS_LABEL_FIXING}:fbca04:Rex is actively applying fixes" \

@@ -655,6 +655,20 @@ EOF
 
   if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
+    
+    # Link PR to GitHub Project (Morgan PM creates project for task management)
+    echo "🔗 Linking PR to GitHub Project..."
+    PROJECT_TITLE="{{service}} - TaskMaster Workflow"
+    PR_NUMBER=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    
+    if [ -n "$PR_NUMBER" ]; then
+      if gh pr edit "$PR_NUMBER" --add-project "$PROJECT_TITLE" >/dev/null 2>&1; then
+        echo "✅ Linked PR #$PR_NUMBER to project: $PROJECT_TITLE"
+      else
+        echo "⚠️ Could not link PR to project (project may not exist yet or PR already linked)"
+        echo "   Morgan PM will create/link the project during workflow execution"
+      fi
+    fi
   else
     echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
   fi
