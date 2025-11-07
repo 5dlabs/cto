@@ -49,8 +49,8 @@ spec:
       lock_timeout: "10s"
       idle_in_transaction_session_timeout: "60s"
 
-  # 2 instances for HA
-  numberOfInstances: 2
+  # Single instance for dev environment (HA not needed in homelab)
+  numberOfInstances: 1
 
   # Storage configuration
   volume:
@@ -123,10 +123,10 @@ spec:
       extensions:
         pg_stat_statements: "public"
 
-  # Connection pooler
+  # Connection pooler - single instance for dev
   enableConnectionPooler: true
   connectionPooler:
-    numberOfInstances: 2
+    numberOfInstances: 1
     mode: "transaction"
     schema: "pooler"
     user: "pooler"
