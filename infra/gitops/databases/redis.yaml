@@ -97,13 +97,13 @@ data:
     tcp-keepalive 60
     databases 16
     timeout 300
-    
+
     # Persistence
     dir /data
     dbfilename dump.rdb
     appendonly yes
     appendfilename "appendonly.aof"
-    
+
     # Security
     protected-mode no
     bind 0.0.0.0

@@ -126,6 +126,9 @@ spec:
       - name: conflict-detection
         value: "true"
         description: "Detect overlapping changed files across PRs within a level"
+      - name: auto-merge
+        value: "false"
+        description: "Whether Tess should automatically merge PRs after approval (true/false)"
 
       # Model configuration
       - name: model
@@ -149,6 +152,8 @@ spec:
         # Step 0: Launch Morgan PM daemon (runs throughout workflow)
         - - name: launch-morgan-pm
             template: morgan-project-manager
+            # CRITICAL FIX: Run as daemon to avoid blocking subsequent steps
+            daemon: true
         
         # Step 1: Discover all tasks
         - - name: discover-tasks
