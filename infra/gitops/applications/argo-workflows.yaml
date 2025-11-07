@@ -33,6 +33,14 @@ spec:
           workflowDefaults:
             spec:
               parallelism: 10
+              # Global TTL for automatic cleanup of completed workflows
+              ttlStrategy:
+                secondsAfterCompletion: 3600   # Clean up after 1 hour by default
+                secondsAfterFailure: 10800     # Keep failed workflows for 3 hours
+              # Pod garbage collection to free up resources immediately
+              podGC:
+                strategy: OnPodCompletion
+                deleteDelayDuration: 60s
         server:
           image:
             tag: v3.7.1

@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/component: cache
 spec:
   sentinel:
-    replicas: 3
+    replicas: 1  # Reduced for dev environment
     resources:
       requests:
         cpu: 100m
@@ -24,7 +24,7 @@ spec:
       - "parallel-syncs 1"
 
   redis:
-    replicas: 3
+    replicas: 1  # Reduced for dev environment
     resources:
       requests:
         cpu: 200m

@@ -1392,9 +1392,8 @@ spec:
           echo "🎉 ALL TASKS COMPLETED SUCCESSFULLY!"
           echo "════════════════════════════════════════"
 
-    # Morgan Project Manager - Daemon template
+    # Morgan Project Manager - Runs once during workflow initialization
     - name: morgan-project-manager
-      daemon: true  # Keeps running throughout workflow lifecycle
       script:
         image: {{ .Values.agent.cliImages.claude.repository }}:{{ .Values.agent.cliImages.claude.tag }}
         command: ["/bin/bash"]
