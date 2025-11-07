@@ -126,6 +126,9 @@ spec:
       - name: conflict-detection
         value: "true"
         description: "Detect overlapping changed files across PRs within a level"
+      - name: auto-merge
+        value: "false"
+        description: "Whether Tess should automatically merge PRs after approval (true/false)"
 
       # Model configuration
       - name: model
