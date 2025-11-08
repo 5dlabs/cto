@@ -146,55 +146,59 @@ spec:
             storage: 1Gi
 
   templates:
-    # Main orchestration template
+    # Main orchestration template - using DAG to allow Morgan PM to run in parallel
     - name: orchestrate-project
-      steps:
-        # Step 0: Launch Morgan PM daemon (runs throughout workflow)
-        - - name: launch-morgan-pm
-            template: morgan-project-manager
-            # CRITICAL FIX: Run as daemon to avoid blocking subsequent steps
-            daemon: true
+      dag:
+        tasks:
+        # Morgan PM runs as daemon throughout workflow (no dependencies, starts immediately)
+        - name: launch-morgan-pm
+          template: morgan-project-manager
         
-        # Step 1: Discover all tasks
-        - - name: discover-tasks
-            template: task-discovery
-            arguments:
-              parameters:
-              - name: docs-directory
-                value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
-              - name: start-from
-                value: "{{`{{workflow.parameters.start-from-task}}`}}"
-              - name: max-tasks
-                value: "{{`{{workflow.parameters.max-tasks}}`}}"
+        # Discover all tasks (no dependencies, can start immediately)
+        - name: discover-tasks
+          template: task-discovery
+          arguments:
+            parameters:
+            - name: docs-directory
+              value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
+            - name: start-from
+              value: "{{`{{workflow.parameters.start-from-task}}`}}"
+            - name: max-tasks
+              value: "{{`{{workflow.parameters.max-tasks}}`}}"
 
-        # Step 2: Build dependency graph (if parallel execution enabled)
-        - - name: build-dependency-graph
-            template: dependency-graph-builder
-            arguments:
-              parameters:
-              - name: docs-directory
-                value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
-            when: "{{`{{workflow.parameters.parallel-execution}}`}}"
+        # Build dependency graph (depends on discover-tasks, only if parallel execution enabled)
+        - name: build-dependency-graph
+          dependencies: [discover-tasks]
+          template: dependency-graph-builder
+          arguments:
+            parameters:
+            - name: docs-directory
+              value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
+          when: "{{`{{workflow.parameters.parallel-execution}}`}}"
 
-        # Step 3: Process tasks (parallel or sequential based on parameter)
-        - - name: process-tasks-parallel
-            template: parallel-task-processor
-            arguments:
-              parameters:
-              - name: execution-levels
-                value: "{{`{{steps.build-dependency-graph.outputs.parameters.execution-levels}}`}}"
-              - name: task-count
-                value: "{{`{{steps.discover-tasks.outputs.parameters.task-count}}`}}"
-            when: "{{`{{workflow.parameters.parallel-execution}}`}}"
-          - name: process-tasks-sequential
-            template: sequential-task-processor
-            arguments:
-              parameters:
-              - name: task-list
-                value: "{{`{{steps.discover-tasks.outputs.parameters.task-list}}`}}"
-              - name: task-count
-                value: "{{`{{steps.discover-tasks.outputs.parameters.task-count}}`}}"
-            when: "!{{`{{workflow.parameters.parallel-execution}}`}}"
+        # Process tasks in parallel (depends on build-dependency-graph)
+        - name: process-tasks-parallel
+          dependencies: [build-dependency-graph]
+          template: parallel-task-processor
+          arguments:
+            parameters:
+            - name: execution-levels
+              value: "{{`{{tasks.build-dependency-graph.outputs.parameters.execution-levels}}`}}"
+            - name: task-count
+              value: "{{`{{tasks.discover-tasks.outputs.parameters.task-count}}`}}"
+          when: "{{`{{workflow.parameters.parallel-execution}}`}}"
+        
+        # Process tasks sequentially (depends on discover-tasks)
+        - name: process-tasks-sequential
+          dependencies: [discover-tasks]
+          template: sequential-task-processor
+          arguments:
+            parameters:
+            - name: task-list
+              value: "{{`{{tasks.discover-tasks.outputs.parameters.task-list}}`}}"
+            - name: task-count
+              value: "{{`{{tasks.discover-tasks.outputs.parameters.task-count}}`}}"
+          when: "!{{`{{workflow.parameters.parallel-execution}}`}}"
 
     # Task discovery template
     - name: task-discovery
