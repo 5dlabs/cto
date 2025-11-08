@@ -1277,6 +1277,11 @@ spec:
                 [[ $new_stage == "testing-in-progress" ]] && return 0
                 ;;
               "waiting-pr-merged")
+                # Allow re-entering remediation stages during retry loops
+                [[ $new_stage == "quality-in-progress" ]] && return 0
+                [[ $new_stage == "security-in-progress" ]] && return 0
+                [[ $new_stage == "testing-in-progress" ]] && return 0
+                # Normal forward progression to completion
                 [[ $new_stage == "completed" ]] && return 0
                 ;;
             esac
