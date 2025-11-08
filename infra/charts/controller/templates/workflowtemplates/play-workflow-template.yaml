@@ -1252,14 +1252,21 @@ spec:
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 ;;
               "security-in-progress")
-                # Security → testing
+                # Security → testing (support both new and legacy stage names)
+                [[ $new_stage == "testing-in-progress" ]] && return 0
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
+                ;;
+              "testing-in-progress")
+                # Testing → completion (Tess done)
+                [[ $new_stage == "waiting-pr-merged" ]] && return 0
+                [[ $new_stage == "completed" ]] && return 0
                 ;;
               "waiting-quality-complete")
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-ready-for-qa")
                 [[ $new_stage == "waiting-pr-merged" ]] && return 0
+                [[ $new_stage == "testing-in-progress" ]] && return 0
                 ;;
               "waiting-pr-merged")
                 [[ $new_stage == "completed" ]] && return 0
