@@ -519,9 +519,9 @@ spec:
                 - name: reason
                   value: "security-agent, security-cli, or security-model not configured"
             when: "'{{`{{workflow.parameters.security-agent}}`}}' == '' || '{{`{{workflow.parameters.security-cli}}`}}' == '' || '{{`{{workflow.parameters.security-model}}`}}' == ''"
-        # No suspend needed after Cipher - proceed directly to Tess
-        # Cipher hands off to Tess, which is final approver
-        # continueOn.failed allows Tess to run even if Cipher raises security concerns
+        # Proceed directly to Tess testing after Cipher completes
+        # No suspension needed - Tess runs automatically after security review
+        # continueOn.failed allows workflow to complete even if Tess finds issues
         - - name: check-testing-completion
             template: check-pr-merge-status
             arguments:
@@ -532,8 +532,19 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: stage-name
                   value: "testing"
+        - - name: update-to-testing
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "testing-in-progress"
+                - name: verify-update
+                  value: "true"
+            when: "'{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
         - - name: testing-work
             template: agent-coderun
+            continueOn:
+              failed: true
             when: "'{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
             arguments:
               parameters:
@@ -557,27 +568,21 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.testing-max-retries}}`}}"
+                - name: qa-ready
+                  value: "true"
                 - name: auto-merge
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: final-task
                   value: "{{`{{workflow.parameters.final-task}}`}}"
-        - - name: update-to-waiting-qa
+        # After Tess completes testing, update to waiting for PR merge
+        - - name: update-to-waiting-merge
             template: update-workflow-stage
             arguments:
               parameters:
                 - name: new-stage
-                  value: "waiting-ready-for-qa"
+                  value: "waiting-pr-merged"
                 - name: verify-update
                   value: "true"
-        # Tess approval happens via GitHub PR review - sensor resumes at waiting-ready-for-qa
-        - - name: wait-for-tess-approval
-            template: suspend-for-event
-            arguments:
-              parameters:
-                - name: event-type
-                  value: "tess-approval"
-                - name: stage-name
-                  value: "waiting-ready-for-qa"
         - - name: evaluate-remediation
             template: assess-remediation-outcome
             arguments:
@@ -1164,7 +1169,7 @@ spec:
           metadata:
             name: "{{`{{inputs.parameters.coderun-name}}`}}"
             namespace: {{.Release.Namespace}}
-        successCondition: status.workCompleted == true || status.phase == Succeeded
+        successCondition: status.phase == Succeeded
         failureCondition: status.phase == Failed
       retryStrategy:
         limit: 200

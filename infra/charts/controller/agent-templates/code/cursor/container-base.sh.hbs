@@ -662,6 +662,7 @@ EOF
 
   if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
+    echo "ℹ️  Morgan PM will link this PR to the GitHub Project during workflow execution"
   else
     echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
   fi

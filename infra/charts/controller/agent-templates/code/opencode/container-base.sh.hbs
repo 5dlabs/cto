@@ -663,6 +663,8 @@ EOF
         echo "   ⚠️ Could not add label: $label (PR still created)"
       fi
     done
+    
+    echo "ℹ️  Morgan PM will link this PR to the GitHub Project during workflow execution"
   else
     echo "⚠️ Failed to create pull request: $PR_URL"
     echo "   This may be because a PR already exists or there's an authentication issue"

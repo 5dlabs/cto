@@ -1852,6 +1852,7 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
     # Get the PR URL
     PR_URL="https://github.com/${REPO_SLUG}/pull/${PR_NUMBER}"
     echo "📝 PR URL: $PR_URL"
+    echo "ℹ️  Morgan PM will link this PR to the GitHub Project during workflow execution"
 
     ensure_status_labels "$REPO_SLUG" \
       "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
