@@ -248,6 +248,10 @@ spec:
           - name: remediation-iteration
             dependencies: [update-to-implementation]
             template: remediation-iteration
+            arguments:
+              parameters:
+                - name: max-retries
+                  value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
           # Update stage after successful remediation (approved status)
           - name: update-to-waiting-merge
@@ -363,6 +367,10 @@ spec:
 
     # Run a full remediation iteration (Rex → Cleo → Tess) with automatic retries
     - name: remediation-iteration
+      inputs:
+        parameters:
+          - name: max-retries
+            value: "10"
       outputs:
         parameters:
           - name: pr-url
@@ -376,7 +384,7 @@ spec:
               parameter: "{{`{{steps.evaluate-remediation.outputs.parameters.remediation-status}}`}}"
       retryStrategy:
         retryPolicy: Always
-        limit: 0
+        limit: "{{`{{inputs.parameters.max-retries}}`}}"
         backoff:
           duration: "60s"
           factor: 2
