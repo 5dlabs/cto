@@ -1397,6 +1397,7 @@ spec:
 
     # Morgan Project Manager - Runs once during workflow initialization
     - name: morgan-project-manager
+      daemon: true  # Run as background daemon - doesn't block workflow progression
       script:
         image: {{ .Values.agent.cliImages.claude.repository }}:{{ .Values.agent.cliImages.claude.tag }}
         command: ["/bin/bash"]
