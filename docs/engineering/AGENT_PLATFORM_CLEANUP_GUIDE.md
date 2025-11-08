@@ -272,3 +272,4 @@ kubectl get coderuns -n agent-platform --no-headers | wc -l
 - ✅ **Controller cleanup**: CodeRun/DocsRun automatic cleanup
 - 📋 **Consider**: Setting up CronJob for regular automated cleanup
 
+
