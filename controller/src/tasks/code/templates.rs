@@ -2267,15 +2267,6 @@ impl CodeTemplateGenerator {
     /// Select the appropriate container template based on the github_app field
     fn get_agent_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        
-        // Check if this is a remediation cycle (retry > 0)
-        let retry_count = code_run
-            .status
-            .as_ref()
-            .and_then(|s| s.retry_count)
-            .unwrap_or(0);
-        
-        let is_remediation = retry_count > 0;
 
         // Check if this is a remediation cycle (retry > 0)
         let retry_count = code_run
