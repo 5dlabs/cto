@@ -446,10 +446,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .status
                 .as_ref()
                 .and_then(|s| s.pull_request_url.as_ref());
-            
+
             // Validate PR URL is present, non-empty, and not the "no-pr" placeholder
             let has_valid_pr = pr_url.is_some_and(|url| !url.is_empty() && url != "no-pr");
-            
+
             if is_implementation_stage && !has_valid_pr {
                 warn!(
                     "Implementation agent completed but DID NOT create PR - failing CodeRun {}",
