@@ -698,12 +698,12 @@ spec:
               fi
             done
 
-            # Wait for all tasks in this level to complete
-            echo ""
-            echo "⏳ Waiting for all tasks in level $level_index to complete..."
-            max_wait=7200  # 2 hours max wait per level
-            elapsed=0
-            interval=30
+          # Wait for all tasks in this level to complete
+          echo ""
+          echo "⏳ Waiting for all tasks in level $level_index to complete..."
+          max_wait=604800  # 7 days max wait per level (workflows can take hours/days with retries)
+          elapsed=0
+          interval=30
 
             while [ $elapsed -lt $max_wait ]; do
               all_done=true
@@ -1286,11 +1286,11 @@ spec:
 
             echo "✅ Created workflow: $workflow_name"
 
-            # Wait for workflow completion
-            echo "⏳ Waiting for task-$task_id to complete..."
-            max_wait=7200  # 2 hours max wait per task
-            elapsed=0
-            interval=30
+          # Wait for workflow completion
+          echo "⏳ Waiting for task-$task_id to complete..."
+          max_wait=604800  # 7 days max wait per task (workflows can take hours/days with retries)
+          elapsed=0
+          interval=30
 
             while [ $elapsed -lt $max_wait ]; do
               status=$(kubectl get workflow "$workflow_name" \
