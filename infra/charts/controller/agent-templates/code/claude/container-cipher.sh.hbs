@@ -2157,6 +2157,11 @@ Rex will address these issues and resubmit for review.
 
 ---
 *Security review by Cipher*" || echo "⚠️ PR review command failed"
+    
+    # Add needs-fixes label so evaluate-remediation can detect it
+    echo "🏷️  Adding 'needs-fixes' label to trigger remediation"
+    timeout 30 gh pr edit "$PR_NUMBER" --add-label "needs-fixes" || echo "⚠️ Failed to add needs-fixes label"
+    
     update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   fi
 else
