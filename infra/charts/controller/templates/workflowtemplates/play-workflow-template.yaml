@@ -248,6 +248,10 @@ spec:
           - name: remediation-iteration
             dependencies: [update-to-implementation]
             template: remediation-iteration
+            arguments:
+              parameters:
+                - name: max-retries
+                  value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
           # Update stage after successful remediation (approved status)
           - name: update-to-waiting-merge
@@ -363,6 +367,10 @@ spec:
 
     # Run a full remediation iteration (Rex → Cleo → Tess) with automatic retries
     - name: remediation-iteration
+      inputs:
+        parameters:
+          - name: max-retries
+            value: "10"
       outputs:
         parameters:
           - name: pr-url
@@ -376,7 +384,7 @@ spec:
               parameter: "{{`{{steps.evaluate-remediation.outputs.parameters.remediation-status}}`}}"
       retryStrategy:
         retryPolicy: Always
-        limit: 0
+        limit: "{{`{{inputs.parameters.max-retries}}`}}"
         backoff:
           duration: "60s"
           factor: 2
@@ -1252,16 +1260,28 @@ spec:
                 [[ $new_stage == "waiting-quality-complete" ]] && return 0
                 ;;
               "security-in-progress")
-                # Security → testing
+                # Security → testing (support both new and legacy stage names)
+                [[ $new_stage == "testing-in-progress" ]] && return 0
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
+                ;;
+              "testing-in-progress")
+                # Testing → completion (Tess done)
+                [[ $new_stage == "waiting-pr-merged" ]] && return 0
+                [[ $new_stage == "completed" ]] && return 0
                 ;;
               "waiting-quality-complete")
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-ready-for-qa")
                 [[ $new_stage == "waiting-pr-merged" ]] && return 0
+                [[ $new_stage == "testing-in-progress" ]] && return 0
                 ;;
               "waiting-pr-merged")
+                # Allow re-entering remediation stages during retry loops
+                [[ $new_stage == "quality-in-progress" ]] && return 0
+                [[ $new_stage == "security-in-progress" ]] && return 0
+                [[ $new_stage == "testing-in-progress" ]] && return 0
+                # Normal forward progression to completion
                 [[ $new_stage == "completed" ]] && return 0
                 ;;
             esac

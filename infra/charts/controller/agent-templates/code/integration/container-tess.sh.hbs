@@ -2379,12 +2379,30 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
       echo "   - service-${SERVICE_NAME}"
     fi
     
+    # Check Claude exit code BEFORE using it for PR review
+    if [ ${CLAUDE_PID:-0} -ne 0 ]; then
+      wait $CLAUDE_PID 2>/dev/null || true
+      CLAUDE_EXIT_CODE=$?
+    else
+      CLAUDE_EXIT_CODE=0
+    fi
+    
     # Post QA Testing approval/comment after labeling
     echo ""
     echo "💬 Posting Tess QA testing review to PR #${PR_NUMBER}..."
     if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
       echo "✅ All tests passed - posting APPROVE review"
-      timeout 30 gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body "### 🧪 QA Testing - APPROVED
+      # Add approved label FIRST (most important for workflow progression)
+      echo "🏷️ Adding 'approved' label"
+      if timeout 30 gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "approved" 2>&1; then
+        echo "✅ Added 'approved' label successfully"
+      else
+        echo "⚠️ Failed to add approved label - continuing anyway"
+      fi
+      
+      # Try to post APPROVE review (may fail if other agents requested changes)
+      echo "📝 Posting APPROVE review..."
+      REVIEW_OUTPUT=$(timeout 30 gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body "### 🧪 QA Testing - APPROVED
 
 All end-to-end and integration tests have passed:
 - End-to-end tests passed
@@ -2396,11 +2414,13 @@ All end-to-end and integration tests have passed:
 **Result:** All quality gates passed
 
 ---
-*QA testing by Tess*" || echo "⚠️ PR approval command failed"
-      
-      # Add approved label
-      echo "🏷️ Adding 'approved' label"
-      timeout 30 gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "approved" || echo "⚠️ Failed to add approved label"
+*QA testing by Tess*" 2>&1) || {
+        REVIEW_EXIT=$?
+        echo "⚠️ PR approval review failed (exit code: $REVIEW_EXIT)"
+        echo "   This is expected if other agents have requested changes"
+        echo "   Output: $REVIEW_OUTPUT"
+        echo "ℹ️  Label added successfully - workflow will proceed"
+      }
       
       # Auto-merge if enabled (Tess only)
       if [ "${AUTO_MERGE:-false}" = "true" ]; then
@@ -2438,15 +2458,7 @@ fi
 # Write sentinel file to signal sidecar to stop (Kubernetes-native file watch)
 touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
 
-# Tess completion - check if Claude (testing) completed successfully
-if [ ${CLAUDE_PID:-0} -ne 0 ]; then
-  wait $CLAUDE_PID 2>/dev/null || true
-  CLAUDE_EXIT_CODE=$?
-else
-  CLAUDE_EXIT_CODE=0
-fi
-
-# Report final status for Tess
+# Report final status for Tess (CLAUDE_EXIT_CODE already set above)
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 if [ $CLAUDE_EXIT_CODE -eq 0 ]; then

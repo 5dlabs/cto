@@ -771,6 +771,12 @@ impl CodeTemplateGenerator {
                 ))
             })?;
 
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -779,6 +785,7 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "working_directory": Self::get_working_directory(code_run),
             "continue_session": Self::get_continue_session(code_run),
+            "attempts": retry_count + 1,  // Current attempt number (1-indexed)
             "overwrite_memory": code_run.spec.overwrite_memory,
             "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
