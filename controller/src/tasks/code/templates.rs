@@ -2277,6 +2277,15 @@ impl CodeTemplateGenerator {
         
         let is_remediation = retry_count > 0;
 
+        // Check if this is a remediation cycle (retry > 0)
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         // Map GitHub App to agent-specific container template
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => {
@@ -2307,16 +2316,17 @@ impl CodeTemplateGenerator {
 
     fn get_codex_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        
+
         // Check if this is a remediation cycle
         let retry_count = code_run
             .status
             .as_ref()
             .and_then(|s| s.retry_count)
             .unwrap_or(0);
-        
+
         let is_remediation = retry_count > 0;
-        
+
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => {
                 if is_remediation {
@@ -2355,16 +2365,17 @@ impl CodeTemplateGenerator {
 
     fn get_opencode_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        
+
         // Check if this is a remediation cycle
         let retry_count = code_run
             .status
             .as_ref()
             .and_then(|s| s.retry_count)
             .unwrap_or(0);
-        
+
         let is_remediation = retry_count > 0;
-        
+
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
                 if is_remediation {
@@ -2405,16 +2416,17 @@ impl CodeTemplateGenerator {
 
     fn get_cursor_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        
+
         // Check if this is a remediation cycle
         let retry_count = code_run
             .status
             .as_ref()
             .and_then(|s| s.retry_count)
             .unwrap_or(0);
-        
+
         let is_remediation = retry_count > 0;
-        
+
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => {
                 if is_remediation {
@@ -2453,16 +2465,17 @@ impl CodeTemplateGenerator {
 
     fn get_factory_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
-        
+
         // Check if this is a remediation cycle
         let retry_count = code_run
             .status
             .as_ref()
             .and_then(|s| s.retry_count)
             .unwrap_or(0);
-        
+
         let is_remediation = retry_count > 0;
-        
+
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
                 if is_remediation {
