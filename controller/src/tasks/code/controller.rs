@@ -426,7 +426,49 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 return Ok(Action::await_change());
             }
 
-            debug!("Job completed successfully - marking work as completed");
+            debug!("Job completed successfully - validating before marking complete");
+
+            // CRITICAL: Implementation agents MUST create a PR
+            // Validate PR URL exists for implementation stages
+            let stage = latest_code_run
+                .metadata
+                .labels
+                .as_ref()
+                .and_then(|labels| labels.get("stage"))
+                .map(|s| s.as_str());
+            
+            let is_implementation_stage = matches!(
+                stage,
+                Some("implementation") | Some("frontend") | None  // None = legacy/default implementation
+            );
+            
+            let pr_url = latest_code_run
+                .status
+                .as_ref()
+                .and_then(|s| s.pull_request_url.as_ref());
+            
+            if is_implementation_stage && pr_url.is_none() {
+                warn!(
+                    "Implementation agent completed but DID NOT create PR - failing CodeRun {}",
+                    code_run_name
+                );
+                
+                update_code_status_with_completion(
+                    &latest_code_run,
+                    ctx,
+                    "Failed",
+                    "Implementation agent must create a pull request (PR URL not found in status)",
+                    false,
+                    None,
+                )
+                .await?;
+                
+                handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
+                
+                return Ok(Action::await_change());
+            }
+            
+            debug!("Validation passed - marking work as completed");
 
             update_code_status_with_completion(
                 &latest_code_run,
