@@ -14,6 +14,7 @@ pub mod config;
 pub mod docs;
 pub mod github;
 pub mod label;
+pub mod play;
 pub mod template_paths;
 pub mod tool_catalog;
 pub mod types;
