@@ -199,15 +199,15 @@ pub fn find_blocked_tasks(repo_path: &Path) -> Result<Vec<u32>> {
                 continue;
             }
 
-            // Check if ALL dependencies are still pending/in-progress
-            let all_deps_blocked = deps.iter().all(|dep_id| {
+            // Check if ANY dependency is still pending/in-progress
+            let has_incomplete_deps = deps.iter().any(|dep_id| {
                 task_map
                     .get(dep_id)
                     .map(|dep| dep.status != "done" && dep.status != "completed")
                     .unwrap_or(true)
             });
 
-            if all_deps_blocked {
+            if has_incomplete_deps {
                 blocked.push(task.id);
             }
         }
