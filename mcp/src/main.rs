@@ -823,12 +823,588 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 }
 
+// ========== Play Progress Tracking Helpers ==========
+
+/// Play workflow status
+#[derive(Debug, Clone, PartialEq)]
+enum PlayStatus {
+    InProgress,
+    Suspended,
+    Failed,
+    Completed,
+}
+
+impl std::fmt::Display for PlayStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InProgress => write!(f, "in-progress"),
+            Self::Suspended => write!(f, "suspended"),
+            Self::Failed => write!(f, "failed"),
+            Self::Completed => write!(f, "completed"),
+        }
+    }
+}
+
+/// Play progress data
+#[derive(Debug, Clone)]
+struct PlayProgress {
+    repository: String,
+    branch: String,
+    current_task_id: Option<u32>,
+    workflow_name: Option<String>,
+    status: PlayStatus,
+    stage: Option<String>,
+}
+
+/// Generate ConfigMap name from repository
+fn configmap_name(repo: &str) -> String {
+    format!("play-progress-{}", repo.replace('/', "-"))
+}
+
+/// Read play progress from ConfigMap
+fn read_play_progress(repo: &str) -> Result<Option<PlayProgress>> {
+    let name = configmap_name(repo);
+    let kubectl_cmd = find_command("kubectl");
+    
+    let output = Command::new(&kubectl_cmd)
+        .args(["get", "configmap", &name, "-n", "agent-platform", "-o", "json"])
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let cm: Value = serde_json::from_slice(&out.stdout)?;
+            let data = cm.get("data");
+            
+            if let Some(data_obj) = data.and_then(|d| d.as_object()) {
+                let repository = data_obj
+                    .get("repository")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(repo)
+                    .to_string();
+                
+                let branch = data_obj
+                    .get("branch")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("main")
+                    .to_string();
+                
+                let current_task_id = data_obj
+                    .get("current-task-id")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<u32>().ok());
+                
+                let workflow_name = data_obj
+                    .get("workflow-name")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                
+                let status = data_obj
+                    .get("status")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "in-progress" => Some(PlayStatus::InProgress),
+                        "suspended" => Some(PlayStatus::Suspended),
+                        "failed" => Some(PlayStatus::Failed),
+                        "completed" => Some(PlayStatus::Completed),
+                        _ => None,
+                    })
+                    .unwrap_or(PlayStatus::InProgress);
+                
+                let stage = data_obj
+                    .get("stage")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                
+                Ok(Some(PlayProgress {
+                    repository,
+                    branch,
+                    current_task_id,
+                    workflow_name,
+                    status,
+                    stage,
+                }))
+            } else {
+                Ok(None)
+            }
+        }
+        Ok(_) | Err(_) => Ok(None), // ConfigMap doesn't exist or error
+    }
+}
+
+/// Write play progress to ConfigMap
+fn write_play_progress(progress: &PlayProgress) -> Result<()> {
+    let name = configmap_name(&progress.repository);
+    let kubectl_cmd = find_command("kubectl");
+    
+    // Build ConfigMap JSON
+    let mut data = serde_json::Map::new();
+    data.insert("repository".to_string(), json!(progress.repository));
+    data.insert("branch".to_string(), json!(progress.branch));
+    
+    if let Some(task_id) = progress.current_task_id {
+        data.insert("current-task-id".to_string(), json!(task_id.to_string()));
+    }
+    
+    if let Some(ref workflow_name) = progress.workflow_name {
+        data.insert("workflow-name".to_string(), json!(workflow_name));
+    }
+    
+    data.insert("status".to_string(), json!(progress.status.to_string()));
+    
+    if let Some(ref stage) = progress.stage {
+        data.insert("stage".to_string(), json!(stage));
+    }
+    
+    let now = chrono::Utc::now().to_rfc3339();
+    data.insert("last-updated".to_string(), json!(now));
+    
+    let cm = json!({
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {
+            "name": name,
+            "namespace": "agent-platform",
+            "labels": {
+                "play-tracking": "true"
+            }
+        },
+        "data": data
+    });
+    
+    // Try to create or update
+    let cm_json = serde_json::to_string(&cm)?;
+    let mut temp_file = NamedTempFile::new()?;
+    temp_file.write_all(cm_json.as_bytes())?;
+    temp_file.flush()?;
+    
+    let result = Command::new(&kubectl_cmd)
+        .args(["apply", "-f", temp_file.path().to_str().unwrap()])
+        .output();
+    
+    match result {
+        Ok(out) if out.status.success() => Ok(()),
+        Ok(out) => Err(anyhow!(
+            "Failed to write ConfigMap: {}",
+            String::from_utf8_lossy(&out.stderr)
+        )),
+        Err(e) => Err(anyhow!("Failed to execute kubectl: {}", e)),
+    }
+}
+
+/// Clear play progress ConfigMap
+fn clear_play_progress(repo: &str) -> Result<()> {
+    let name = configmap_name(repo);
+    let kubectl_cmd = find_command("kubectl");
+    
+    let _ = Command::new(&kubectl_cmd)
+        .args(["delete", "configmap", &name, "-n", "agent-platform", "--ignore-not-found=true"])
+        .output();
+    
+    Ok(())
+}
+
+/// Query active play workflows for a repository
+fn find_active_play_workflow(repo: &str) -> Result<Option<(String, u32, String)>> {
+    let argo_cmd = find_command("argo");
+    
+    // Query workflows with play labels
+    let output = Command::new(&argo_cmd)
+        .args([
+            "list",
+            "-n",
+            "agent-platform",
+            "-l",
+            &format!("repository={}", repo.replace('/', "-")),
+            "-l",
+            "workflow-type=play",
+            "-o",
+            "json",
+        ])
+        .output()?;
+    
+    if !output.status.success() {
+        return Ok(None);
+    }
+    
+    let workflows: Vec<Value> = serde_json::from_slice(&output.stdout)
+        .unwrap_or_default();
+    
+    // Find a running or suspended workflow
+    for wf in workflows {
+        if let Some(status) = wf.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()) {
+            if status == "Running" || status == "Suspended" {
+                let workflow_name = wf.get("metadata")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                
+                let task_id = wf.get("metadata")
+                    .and_then(|m| m.get("labels"))
+                    .and_then(|l| l.get("task-id"))
+                    .and_then(|t| t.as_str())
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(0);
+                
+                let phase = status.to_string();
+                
+                if !workflow_name.is_empty() && task_id > 0 {
+                    return Ok(Some((workflow_name, task_id, phase)));
+                }
+            }
+        }
+    }
+    
+    Ok(None)
+}
+
+// ========== TaskMaster Integration Helpers ==========
+
+#[derive(Debug, Clone, Deserialize)]
+struct TaskMasterTask {
+    id: u32,
+    title: String,
+    status: String,
+    #[serde(default)]
+    priority: Option<String>,
+    #[serde(default)]
+    dependencies: Option<Vec<u32>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TasksFile {
+    tasks: Vec<TaskMasterTask>,
+}
+
+/// Find tasks.json in repository
+fn find_tasks_file() -> Option<std::path::PathBuf> {
+    // Try to get workspace directory
+    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
+        .ok()
+        .and_then(|paths| {
+            paths.split(',').next().map(|p| std::path::PathBuf::from(p.trim()))
+        })
+        .or_else(|| std::env::current_dir().ok())?;
+    
+    let candidates = vec![
+        workspace_dir.join(".taskmaster").join("tasks").join("tasks.json"),
+        workspace_dir.join(".taskmaster").join("tasks.json"),
+        workspace_dir.join("tasks.json"),
+    ];
+    
+    candidates.into_iter().find(|p| p.exists())
+}
+
+/// Get next available task from TaskMaster
+fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
+    let tasks_file = find_tasks_file()
+        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+    
+    let content = std::fs::read_to_string(&tasks_file)
+        .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
+    
+    let tasks_data: TasksFile = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
+    
+    let tasks = tasks_data.tasks;
+    
+    // Build task map for dependency checking
+    let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
+    
+    // Filter available tasks (not done, all deps satisfied)
+    let mut available_tasks: Vec<&TaskMasterTask> = tasks
+        .iter()
+        .filter(|task| {
+            // Skip done tasks
+            if task.status == "done" || task.status == "completed" {
+                return false;
+            }
+            
+            // Check dependencies
+            if let Some(deps) = &task.dependencies {
+                for dep_id in deps {
+                    if let Some(dep_task) = task_map.get(dep_id) {
+                        if dep_task.status != "done" && dep_task.status != "completed" {
+                            return false;
+                        }
+                    } else {
+                        return false; // Non-existent dependency
+                    }
+                }
+            }
+            
+            true
+        })
+        .collect();
+    
+    if available_tasks.is_empty() {
+        return Ok(None);
+    }
+    
+    // Sort by priority (high > medium > low), then by ID
+    available_tasks.sort_by(|a, b| {
+        let priority_order = |p: &Option<String>| match p.as_deref() {
+            Some("high") => 0,
+            Some("medium") => 1,
+            Some("low") => 2,
+            _ => 1,
+        };
+        
+        let a_priority = priority_order(&a.priority);
+        let b_priority = priority_order(&b.priority);
+        
+        match a_priority.cmp(&b_priority) {
+            std::cmp::Ordering::Equal => a.id.cmp(&b.id),
+            other => other,
+        }
+    });
+    
+    Ok(available_tasks.first().map(|&t| t.clone()))
+}
+
+/// Find blocked tasks (tasks with all pending dependencies)
+fn find_blocked_taskmaster_tasks() -> Result<Vec<TaskMasterTask>> {
+    let tasks_file = find_tasks_file()
+        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+    
+    let content = std::fs::read_to_string(&tasks_file)
+        .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
+    
+    let tasks_data: TasksFile = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
+    
+    let tasks = tasks_data.tasks;
+    let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
+    
+    let mut blocked = Vec::new();
+    
+    for task in &tasks {
+        // Skip done tasks
+        if task.status == "done" || task.status == "completed" {
+            continue;
+        }
+        
+        // Check if this task has dependencies
+        if let Some(deps) = &task.dependencies {
+            if deps.is_empty() {
+                continue;
+            }
+            
+            // Check if ALL dependencies are still pending/in-progress
+            let all_deps_blocked = deps.iter().all(|dep_id| {
+                task_map
+                    .get(dep_id)
+                    .map(|dep| dep.status != "done" && dep.status != "completed")
+                    .unwrap_or(true)
+            });
+            
+            if all_deps_blocked {
+                blocked.push(task.clone());
+            }
+        }
+    }
+    
+    Ok(blocked)
+}
+
+/// Handle play status query
+#[allow(clippy::disallowed_macros)]
+fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
+    let config = CTO_CONFIG.get().unwrap();
+
+    // Handle repository - use provided value or config default
+    let repository = arguments
+        .get("repository")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| config.defaults.play.repository.clone())
+        .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
+
+    // Read progress from ConfigMap
+    let progress = read_play_progress(&repository)?;
+    
+    // Check for active workflow in Argo
+    let active_workflow = find_active_play_workflow(&repository)?;
+    
+    // Check for blocked tasks
+    let blocked_tasks = find_blocked_taskmaster_tasks().unwrap_or_default();
+    
+    // Build comprehensive status response
+    match (progress, active_workflow) {
+        (Some(prog), Some((wf_name, wf_task, wf_phase))) => {
+            // Active workflow found
+            Ok(json!({
+                "success": true,
+                "status": "active",
+                "repository": repository,
+                "current_task_id": wf_task,
+                "workflow_name": wf_name,
+                "workflow_phase": wf_phase,
+                "stage": prog.stage,
+                "configmap_status": prog.status.to_string(),
+                "argo_url": format!("https://argo.5dlabs.com/workflows/agent-platform/{}", wf_name),
+            }))
+        }
+        (Some(prog), None) => {
+            // ConfigMap exists but no active workflow - orphaned
+            eprintln!("⚠️  Orphaned ConfigMap detected for {}", repository);
+            Ok(json!({
+                "success": true,
+                "status": "orphaned",
+                "repository": repository,
+                "last_task_id": prog.current_task_id,
+                "last_workflow_name": prog.workflow_name,
+                "message": "ConfigMap exists but workflow not found. ConfigMap will be cleared on next play submission.",
+            }))
+        }
+        (None, Some((wf_name, wf_task, wf_phase))) => {
+            // Workflow exists but no ConfigMap - legacy or external workflow
+            Ok(json!({
+                "success": true,
+                "status": "active_legacy",
+                "repository": repository,
+                "current_task_id": wf_task,
+                "workflow_name": wf_name,
+                "workflow_phase": wf_phase,
+                "message": "Workflow active but no progress tracking (legacy workflow)",
+                "argo_url": format!("https://argo.5dlabs.com/workflows/agent-platform/{}", wf_name),
+            }))
+        }
+        (None, None) => {
+            // No active workflow
+            
+            // Try to get next task
+            let next_task = get_next_taskmaster_task()?;
+            
+            if let Some(task) = next_task {
+                Ok(json!({
+                    "success": true,
+                    "status": "idle",
+                    "repository": repository,
+                    "message": "No active workflow",
+                    "next_available_task": {
+                        "id": task.id,
+                        "title": task.title,
+                        "priority": task.priority,
+                    },
+                }))
+            } else {
+                // No tasks available
+                let message = if blocked_tasks.is_empty() {
+                    "All tasks completed".to_string()
+                } else {
+                    format!("{} task(s) blocked by dependencies", blocked_tasks.len())
+                };
+                
+                Ok(json!({
+                    "success": true,
+                    "status": "idle",
+                    "repository": repository,
+                    "message": message,
+                    "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                        "id": t.id,
+                        "title": t.title,
+                        "dependencies": t.dependencies
+                    })).collect::<Vec<_>>(),
+                }))
+            }
+        }
+    }
+}
+
 #[allow(clippy::disallowed_macros)]
 fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
-    let task_id = arguments
-        .get("task_id")
-        .and_then(|v| v.as_u64())
-        .ok_or(anyhow!("Missing required parameter: task_id"))?;
+    let config = CTO_CONFIG.get().unwrap();
+
+    // Handle repository - use provided value or config default
+    let repository = arguments
+        .get("repository")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+        .or_else(|| config.defaults.play.repository.clone())
+        .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
+
+    // Validate repository URL
+    validate_repository_url(&repository)?;
+
+    // Check if task_id is provided
+    let task_id = if let Some(id_value) = arguments.get("task_id") {
+        // Explicit task_id provided
+        Some(id_value.as_u64().ok_or(anyhow!("Invalid task_id parameter"))? as u32)
+    } else {
+        // Auto-detection mode
+        eprintln!("🔍 Auto-detecting next task (no task_id provided)...");
+        
+        // 1. Check ConfigMap for current progress
+        if let Some(progress) = read_play_progress(&repository)? {
+            eprintln!("📋 Found existing progress for {}", repository);
+            
+            // 2. Validate against Argo
+            if let Some(workflow_name) = &progress.workflow_name {
+                if let Some((active_wf, active_task, phase)) = find_active_play_workflow(&repository)? {
+                    if active_wf == *workflow_name {
+                        // Workflow still active
+                        return Ok(json!({
+                            "success": false,
+                            "message": format!(
+                                "Play workflow already active for {}: task {} (phase: {})",
+                                repository, active_task, phase
+                            ),
+                            "workflow_name": active_wf,
+                            "task_id": active_task,
+                            "phase": phase,
+                            "status": progress.status.to_string(),
+                        }));
+                    }
+                }
+                
+                // Workflow not found but ConfigMap exists - orphaned state
+                eprintln!("⚠️  Orphaned progress detected: ConfigMap exists but workflow not found");
+                clear_play_progress(&repository)?;
+            }
+        }
+        
+        // 3. Query TaskMaster for next task
+        eprintln!("🔍 Querying TaskMaster for next available task...");
+        match get_next_taskmaster_task()? {
+            Some(task) => {
+                eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                Some(task.id)
+            }
+            None => {
+                // Check for blocked tasks to provide helpful feedback
+                let blocked_tasks = find_blocked_taskmaster_tasks().unwrap_or_default();
+                
+                let message = if blocked_tasks.is_empty() {
+                    "No tasks available - all tasks are completed".to_string()
+                } else {
+                    let blocked_ids: Vec<String> = blocked_tasks
+                        .iter()
+                        .map(|t| format!("Task {} ({})", t.id, t.title))
+                        .collect();
+                    
+                    format!(
+                        "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                        blocked_tasks.len(),
+                        blocked_ids.join("\n")
+                    )
+                };
+                
+                return Ok(json!({
+                    "success": false,
+                    "message": message,
+                    "repository": repository,
+                    "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                        "id": t.id,
+                        "title": t.title,
+                        "dependencies": t.dependencies
+                    })).collect::<Vec<_>>(),
+                }));
+            }
+        }
+    };
+
+    let task_id = task_id.ok_or(anyhow!("Failed to determine task_id"))?;
 
     let config = CTO_CONFIG.get().unwrap();
 
@@ -1522,6 +2098,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         params.push("task-requirements=".to_string());
     }
 
+    // Build labels for workflow tracking
+    let repo_label = format!("repository={}", repository.replace('/', "-"));
+    let workflow_type_label = "workflow-type=play".to_string();
+    let task_id_label = format!("task-id={}", task_id);
+    
     let mut args: Vec<&str> = vec![
         "submit",
         "--from",
@@ -1529,6 +2110,14 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "-n",
         "agent-platform",
     ];
+    
+    // Add labels for workflow tracking (enables auto-detection)
+    args.push("-l");
+    args.push(&repo_label);
+    args.push("-l");
+    args.push(&workflow_type_label);
+    args.push("-l");
+    args.push(&task_id_label);
 
     // Add all parameters to the command
     for param in &params {
@@ -1537,30 +2126,60 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     }
 
     match run_argo_cli(&args) {
-        Ok(output) => Ok(json!({
-            "success": true,
-            "message": "Play workflow submitted successfully",
-            "output": output,
-            "task_id": task_id,
-            "repository": repository,
-            "service": service,
-            "docs_repository": docs_repository,
-            "docs_project_directory": docs_project_directory,
-            "implementation_agent": implementation_agent,
-            "implementation_cli": implementation_cli,
-            "implementation_model": implementation_model,
-            "quality_agent": quality_agent,
-            "quality_cli": quality_cli,
-            "quality_model": quality_model,
-            "security_agent": security_agent,
-            "security_cli": security_cli,
-            "security_model": security_model,
-            "testing_agent": testing_agent,
-            "testing_cli": testing_cli,
-            "testing_model": testing_model,
-            "model": implementation_model,
-            "parameters": params
-        })),
+        Ok(output) => {
+            // Extract workflow name from output
+            let workflow_name = if let Ok(wf_json) = serde_json::from_str::<Value>(&output) {
+                wf_json.get("metadata")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .map(String::from)
+            } else {
+                None
+            };
+
+            // Write progress ConfigMap if we got a workflow name
+            if let Some(ref wf_name) = workflow_name {
+                let progress = PlayProgress {
+                    repository: repository.clone(),
+                    branch: "main".to_string(),
+                    current_task_id: Some(task_id),
+                    workflow_name: Some(wf_name.clone()),
+                    status: PlayStatus::InProgress,
+                    stage: Some("implementation".to_string()),
+                };
+
+                if let Err(e) = write_play_progress(&progress) {
+                    eprintln!("⚠️  Failed to write progress ConfigMap: {}", e);
+                    eprintln!("   (This won't affect workflow execution)");
+                }
+            }
+
+            Ok(json!({
+                "success": true,
+                "message": "Play workflow submitted successfully",
+                "output": output,
+                "task_id": task_id,
+                "repository": repository,
+                "service": service,
+                "docs_repository": docs_repository,
+                "docs_project_directory": docs_project_directory,
+                "implementation_agent": implementation_agent,
+                "implementation_cli": implementation_cli,
+                "implementation_model": implementation_model,
+                "quality_agent": quality_agent,
+                "quality_cli": quality_cli,
+                "quality_model": quality_model,
+                "security_agent": security_agent,
+                "security_cli": security_cli,
+                "security_model": security_model,
+                "testing_agent": testing_agent,
+                "testing_cli": testing_cli,
+                "testing_model": testing_model,
+                "model": implementation_model,
+                "parameters": params,
+                "workflow_name": workflow_name,
+            }))
+        }
         Err(e) => Err(anyhow!("Failed to submit play workflow: {}", e)),
     }
 }
@@ -1874,6 +2493,12 @@ fn handle_tool_calls(method: &str, params_map: &HashMap<String, Value>) -> Optio
                     }]
                 }))),
                 Ok("play") => Some(handle_play_workflow(&arguments).map(|result| json!({
+                    "content": [{
+                        "type": "text",
+                        "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())
+                    }]
+                }))),
+                Ok("play_status") => Some(handle_play_status(&arguments).map(|result| json!({
                     "content": [{
                         "type": "text",
                         "text": serde_json::to_string_pretty(&result).unwrap_or_else(|_| result.to_string())

@@ -7,6 +7,7 @@ pub fn get_tool_schemas() -> Value {
         "tools": [
             get_docs_schema(),
             get_play_schema(&HashMap::new()),
+            get_play_status_schema(),
             get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
@@ -22,6 +23,7 @@ pub fn get_tool_schemas_with_config(agents: &HashMap<String, crate::AgentConfig>
         "tools": [
             get_docs_schema(),
             get_play_schema(agents),
+            get_play_status_schema(),
             get_intake_prd_schema(),
             get_jobs_schema(),
             get_stop_job_schema(),
@@ -69,7 +71,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
             "properties": {
                 "task_id": {
                     "type": "integer",
-                    "description": "Task ID to implement from task files",
+                    "description": "Task ID to implement from task files. Optional - if not provided, will auto-detect next available task from TaskMaster based on dependencies and priority.",
                     "minimum": 1
                 },
                 "repository": {
@@ -143,7 +145,24 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": "CLI tool to use for all agents (optional, defaults to configuration)"
                 }
             },
-            "required": ["task_id"]
+            "required": []
+        }
+    })
+}
+
+fn get_play_status_schema() -> Value {
+    json!({
+        "name": "play_status",
+        "description": "Query current play workflow status and progress. Shows active workflows, next available tasks, and blocked tasks.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "repository": {
+                    "type": "string",
+                    "description": "Target repository URL (e.g., 5dlabs/cto). Optional if defaults.play.repository is set in config."
+                }
+            },
+            "required": []
         }
     })
 }
