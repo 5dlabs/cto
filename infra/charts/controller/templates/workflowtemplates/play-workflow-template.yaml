@@ -2043,8 +2043,8 @@ spec:
               -H "$AUTH_HEADER" \
               "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/reviews")
 
-            # Get the most recent review from this agent (reviews are ordered newest first)
-            LATEST_REVIEW_STATE=$(echo "$REVIEWS_DATA" | jq -r --arg bot "$AGENT_BOT" '[.[] | select(.user.login == $bot)] | first | .state // "NONE"')
+            # Get the most recent review from this agent (GitHub API returns reviews oldest first)
+            LATEST_REVIEW_STATE=$(echo "$REVIEWS_DATA" | jq -r --arg bot "$AGENT_BOT" '[.[] | select(.user.login == $bot)] | last | .state // "NONE"')
 
             if [ "$LATEST_REVIEW_STATE" = "APPROVED" ]; then
               echo "✅ $AGENT_BOT has already APPROVED this PR"
