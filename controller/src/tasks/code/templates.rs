@@ -2268,9 +2268,24 @@ impl CodeTemplateGenerator {
     fn get_agent_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
 
+        // Check if this is a remediation cycle (retry > 0)
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         // Map GitHub App to agent-specific container template
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "claude/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "claude/container-rex-remediation.sh.hbs"
+                } else {
+                    "claude/container-rex.sh.hbs"
+                }
+            }
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
@@ -2292,8 +2307,24 @@ impl CodeTemplateGenerator {
 
     fn get_codex_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/codex/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "code/codex/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/codex/container-rex.sh.hbs"
+                }
+            }
             "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
@@ -2324,9 +2355,23 @@ impl CodeTemplateGenerator {
 
     fn get_opencode_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
-                "code/opencode/container-rex.sh.hbs"
+                if is_remediation {
+                    "code/opencode/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/opencode/container-rex.sh.hbs"
+                }
             }
             "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
@@ -2360,8 +2405,24 @@ impl CodeTemplateGenerator {
 
     fn get_cursor_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/cursor/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "code/cursor/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/cursor/container-rex.sh.hbs"
+                }
+            }
             "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
@@ -2392,15 +2453,30 @@ impl CodeTemplateGenerator {
 
     fn get_factory_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
         let template_name = match github_app {
-            "5DLabs-Rex" | "5DLabs-Morgan" => "code/factory/container-rex.sh.hbs",
+            "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
+                if is_remediation {
+                    "code/factory/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/factory/container-rex.sh.hbs"
+                }
+            }
             "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
             "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
-            "5DLabs-Rex-Remediation" => "code/factory/container-rex-remediation.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };
 

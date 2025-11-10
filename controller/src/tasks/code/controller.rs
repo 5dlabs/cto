@@ -439,7 +439,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
             let is_implementation_stage = matches!(
                 stage,
-                Some("implementation") | Some("frontend") | None // None = legacy/default implementation
+                Some("implementation" | "frontend") | None // None = legacy/default implementation
             );
 
             let pr_url = latest_code_run
@@ -447,7 +447,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .as_ref()
                 .and_then(|s| s.pull_request_url.as_ref());
 
-            if is_implementation_stage && pr_url.is_none() {
+            // Validate PR URL is present, non-empty, and not the "no-pr" placeholder
+            let has_valid_pr = pr_url.is_some_and(|url| !url.is_empty() && url != "no-pr");
+
+            if is_implementation_stage && !has_valid_pr {
                 warn!(
                     "Implementation agent completed but DID NOT create PR - failing CodeRun {}",
                     code_run_name
@@ -464,6 +467,38 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .await?;
 
                 handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
+
+                // Skip cleanup for workflow-managed jobs (let workflow handle it)
+                let has_workflow_owner = latest_code_run
+                    .metadata
+                    .owner_references
+                    .as_ref()
+                    .and_then(|refs| refs.iter().find(|r| r.kind == "Workflow"))
+                    .is_some();
+
+                if has_workflow_owner {
+                    info!(
+                        "Skipping cleanup for workflow-managed job {} (PR validation failed, workflow will manage lifecycle)",
+                        job_name
+                    );
+                } else if ctx.config.cleanup.enabled {
+                    let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
+                    if cleanup_delay_minutes == 0 {
+                        if let Err(err) = jobs.delete(&job_name, &DeleteParams::default()).await {
+                            match err {
+                                KubeError::Api(api_err) if api_err.code == 404 => {}
+                                other => {
+                                    warn!(
+                                        "Failed to delete job {} after PR validation failure for CodeRun {}: {}",
+                                        job_name,
+                                        latest_code_run.name_any(),
+                                        other
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
 
                 return Ok(Action::await_change());
             }
