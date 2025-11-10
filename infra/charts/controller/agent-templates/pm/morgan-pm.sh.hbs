@@ -1329,8 +1329,8 @@ create_or_update_github_check() {
       ;;
   esac
   
-  # Create/update check run
-  local check_name="$agent_name Quality Gate"
+  # Create/update check run - Include workflow name to scope check per run
+  local check_name="$agent_name Quality Gate ($WORKFLOW_NAME)"
   local argo_url="https://argo.5dlabs.com/workflows/agent-platform/$WORKFLOW_NAME"
   
   # Check if check run already exists
