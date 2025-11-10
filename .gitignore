@@ -72,6 +72,7 @@ Chart.lock
 **/CLAUDE.md
 controller/target/
 mcp/target/
+mcp/dist/
 sidecar/target/
 
 # Agent files
