@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
 /// Task from TaskMaster tasks.json
@@ -38,26 +38,23 @@ struct TasksFile {
 
 /// Find the tasks.json file in a repository
 /// Looks in common locations: .taskmaster/tasks/tasks.json, tasks.json
-fn find_tasks_file(repo_path: &PathBuf) -> Option<PathBuf> {
+fn find_tasks_file(repo_path: &Path) -> Option<PathBuf> {
     let candidates = vec![
-        repo_path.join(".taskmaster").join("tasks").join("tasks.json"),
+        repo_path
+            .join(".taskmaster")
+            .join("tasks")
+            .join("tasks.json"),
         repo_path.join(".taskmaster").join("tasks.json"),
         repo_path.join("tasks.json"),
     ];
 
-    for candidate in candidates {
-        if candidate.exists() {
-            return Some(candidate);
-        }
-    }
-
-    None
+    candidates.into_iter().find(|candidate| candidate.exists())
 }
 
 /// Read tasks from tasks.json file
-fn read_tasks_file(repo_path: &PathBuf) -> Result<Vec<Task>> {
-    let tasks_file = find_tasks_file(repo_path)
-        .ok_or_else(|| anyhow!("tasks.json not found in repository"))?;
+fn read_tasks_file(repo_path: &Path) -> Result<Vec<Task>> {
+    let tasks_file =
+        find_tasks_file(repo_path).ok_or_else(|| anyhow!("tasks.json not found in repository"))?;
 
     info!("Reading tasks from: {}", tasks_file.display());
 
@@ -71,7 +68,7 @@ fn read_tasks_file(repo_path: &PathBuf) -> Result<Vec<Task>> {
 }
 
 /// Get the next available task based on dependencies, status, and priority
-pub fn get_next_task(repo_path: &PathBuf) -> Result<Option<Task>> {
+pub fn get_next_task(repo_path: &Path) -> Result<Option<Task>> {
     let tasks = read_tasks_file(repo_path)?;
 
     // Build a map of task ID -> Task for dependency checking
@@ -97,7 +94,10 @@ pub fn get_next_task(repo_path: &PathBuf) -> Result<Option<Task>> {
                             return false;
                         }
                     } else {
-                        warn!("Task {} references non-existent dependency {}", task.id, dep_id);
+                        warn!(
+                            "Task {} references non-existent dependency {}",
+                            task.id, dep_id
+                        );
                         // Treat as unsatisfied dependency
                         return false;
                     }
@@ -134,9 +134,9 @@ pub fn get_next_task(repo_path: &PathBuf) -> Result<Option<Task>> {
 }
 
 /// Update task status in tasks.json
-pub fn update_task_status(repo_path: &PathBuf, task_id: u32, status: &str) -> Result<()> {
-    let tasks_file = find_tasks_file(repo_path)
-        .ok_or_else(|| anyhow!("tasks.json not found in repository"))?;
+pub fn update_task_status(repo_path: &Path, task_id: u32, status: &str) -> Result<()> {
+    let tasks_file =
+        find_tasks_file(repo_path).ok_or_else(|| anyhow!("tasks.json not found in repository"))?;
 
     info!(
         "Updating task {} status to {} in: {}",
@@ -163,12 +163,12 @@ pub fn update_task_status(repo_path: &PathBuf, task_id: u32, status: &str) -> Re
     }
 
     if !found {
-        return Err(anyhow!("Task {} not found in tasks.json", task_id));
+        return Err(anyhow!("Task {task_id} not found in tasks.json"));
     }
 
     // Write back to file
-    let updated_content = serde_json::to_string_pretty(&tasks_data)
-        .context("Failed to serialize updated tasks")?;
+    let updated_content =
+        serde_json::to_string_pretty(&tasks_data).context("Failed to serialize updated tasks")?;
 
     fs::write(&tasks_file, updated_content)
         .with_context(|| format!("Failed to write tasks file: {}", tasks_file.display()))?;
@@ -181,7 +181,7 @@ pub fn update_task_status(repo_path: &PathBuf, task_id: u32, status: &str) -> Re
 /// Check if any tasks are blocked by unsatisfied dependencies
 /// Returns a list of task IDs that have all pending dependencies
 #[allow(dead_code)]
-pub fn find_blocked_tasks(repo_path: &PathBuf) -> Result<Vec<u32>> {
+pub fn find_blocked_tasks(repo_path: &Path) -> Result<Vec<u32>> {
     let tasks = read_tasks_file(repo_path)?;
     let task_map: HashMap<u32, &Task> = tasks.iter().map(|t| (t.id, t)).collect();
 
@@ -225,13 +225,13 @@ mod tests {
     fn create_test_tasks_file(dir: &TempDir, tasks: &TasksFile) -> PathBuf {
         let taskmaster_dir = dir.path().join(".taskmaster").join("tasks");
         fs::create_dir_all(&taskmaster_dir).unwrap();
-        
+
         let tasks_file = taskmaster_dir.join("tasks.json");
         let content = serde_json::to_string_pretty(tasks).unwrap();
-        
+
         let mut file = fs::File::create(&tasks_file).unwrap();
         file.write_all(content.as_bytes()).unwrap();
-        
+
         dir.path().to_path_buf()
     }
 
@@ -374,4 +374,3 @@ mod tests {
         assert!(blocked.contains(&3));
     }
 }
-

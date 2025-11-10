@@ -78,24 +78,24 @@ impl PlayProgress {
         let mut data = BTreeMap::new();
         data.insert("repository".to_string(), self.repository.clone());
         data.insert("branch".to_string(), self.branch.clone());
-        
+
         if let Some(task_id) = self.current_task_id {
             data.insert("current-task-id".to_string(), task_id.to_string());
         }
-        
+
         if let Some(ref workflow_name) = self.workflow_name {
             data.insert("workflow-name".to_string(), workflow_name.clone());
         }
-        
+
         data.insert("status".to_string(), self.status.to_string());
-        
+
         if let Some(ref stage) = self.stage {
             data.insert("stage".to_string(), stage.clone());
         }
-        
+
         data.insert("started-at".to_string(), self.started_at.to_rfc3339());
         data.insert("last-updated".to_string(), self.last_updated.to_rfc3339());
-        
+
         data
     }
 
@@ -176,7 +176,7 @@ pub async fn read_progress(client: &Client, repo: &str) -> Result<Option<PlayPro
             }
         }
         Err(kube::Error::Api(e)) if e.code == 404 => Ok(None),
-        Err(e) => Err(anyhow!("Failed to read progress ConfigMap: {}", e)),
+        Err(e) => Err(anyhow!("Failed to read progress ConfigMap: {e}")),
     }
 }
 
@@ -221,7 +221,7 @@ pub async fn write_progress(client: &Client, progress: &PlayProgress) -> Result<
             info!("Created progress ConfigMap for {}", progress.repository);
         }
         Err(e) => {
-            return Err(anyhow!("Failed to check for existing ConfigMap: {}", e));
+            return Err(anyhow!("Failed to check for existing ConfigMap: {e}"));
         }
     }
 
@@ -242,10 +242,9 @@ pub async fn clear_progress(client: &Client, repo: &str) -> Result<()> {
             // Already deleted, that's fine
             Ok(())
         }
-        Err(e) => Err(anyhow!("Failed to delete progress ConfigMap: {}", e)),
+        Err(e) => Err(anyhow!("Failed to delete progress ConfigMap: {e}")),
     }
 }
 
 // Note: Workflow reconciliation is handled by the MCP server via argo CLI commands
 // to avoid complexity with Kubernetes dynamic clients and workflow CRDs
-

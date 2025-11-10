@@ -1,6 +1,5 @@
 mod progress;
 mod taskmaster;
 
-pub use progress::{PlayProgress, PlayStatus, read_progress, write_progress, clear_progress};
-pub use taskmaster::{Task, get_next_task, update_task_status};
-
+pub use progress::{clear_progress, read_progress, write_progress, PlayProgress, PlayStatus};
+pub use taskmaster::{get_next_task, update_task_status, Task};

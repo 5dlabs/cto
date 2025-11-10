@@ -1,6 +1,6 @@
 //! Test module for Task 2: Flexible CLI Model Configuration
 //!
-//! Tests the new permissive validate_model_name function
+//! Tests the new permissive `validate_model_name` function
 
 use crate::validate_model_name;
 

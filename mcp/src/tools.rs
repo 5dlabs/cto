@@ -96,7 +96,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": if agents.is_empty() {
                         "Agent for backend/general implementation work (e.g., 5DLabs-Rex)".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
                         format!("Agent for backend/general implementation work. Available agents: {agent_list}")
                     }
                 },
@@ -105,7 +105,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": if agents.is_empty() {
                         "Agent for frontend tasks (React, UI components) (e.g., 5DLabs-Blaze). Optional if defaults.play.frontendAgent is set in config.".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
                         format!("Agent for frontend tasks (React, UI components). Available agents: {agent_list}")
                     }
                 },
@@ -114,7 +114,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": if agents.is_empty() {
                         "Agent for quality assurance (e.g., 5DLabs-Cleo)".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
                         format!("Agent for quality assurance. Available agents: {agent_list}")
                     }
                 },
@@ -123,7 +123,7 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "description": if agents.is_empty() {
                         "Agent for testing and validation (e.g., 5DLabs-Tess)".to_string()
                     } else {
-                        let agent_list = agents.keys().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+                        let agent_list = agents.keys().map(std::string::String::as_str).collect::<Vec<_>>().join(", ");
                         format!("Agent for testing and validation. Available agents: {agent_list}")
                     }
                 },
