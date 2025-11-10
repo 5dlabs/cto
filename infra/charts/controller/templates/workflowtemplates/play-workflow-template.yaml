@@ -2031,23 +2031,30 @@ spec:
               ;;
           esac
 
-          # Check if the stage-specific agent has already reviewed this PR
+          # Check if the stage-specific agent has already approved this PR
+          # Only skip if the MOST RECENT review is an approval
+          # This allows remediation loops: Request Changes → Fix → Re-review → Approve
           if [ -n "$AGENT_BOT" ]; then
             echo ""
-            echo "🔍 Checking if $AGENT_BOT has already reviewed PR #$PR_NUMBER..."
+            echo "🔍 Checking $AGENT_BOT review status for PR #$PR_NUMBER..."
             
             REVIEWS_DATA=$(curl -s -L \
               -H "Accept: application/vnd.github+json" \
               -H "$AUTH_HEADER" \
               "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/reviews")
 
-            AGENT_REVIEW_COUNT=$(echo "$REVIEWS_DATA" | jq -r --arg bot "$AGENT_BOT" '[.[] | select(.user.login == $bot)] | length')
+            # Get the most recent review from this agent (reviews are ordered newest first)
+            LATEST_REVIEW_STATE=$(echo "$REVIEWS_DATA" | jq -r --arg bot "$AGENT_BOT" '[.[] | select(.user.login == $bot)] | first | .state // "NONE"')
 
-            if [ "$AGENT_REVIEW_COUNT" != "null" ] && [ "$AGENT_REVIEW_COUNT" -gt 0 ]; then
-              echo "✅ $AGENT_BOT has already reviewed this PR ($AGENT_REVIEW_COUNT review(s) found)"
+            if [ "$LATEST_REVIEW_STATE" = "APPROVED" ]; then
+              echo "✅ $AGENT_BOT has already APPROVED this PR"
               echo "   Skipping $STAGE_NAME stage to prevent duplicate execution"
               echo "true" > /tmp/skip-stage.txt
               exit 0
+            elif [ "$LATEST_REVIEW_STATE" = "CHANGES_REQUESTED" ]; then
+              echo "🔄 $AGENT_BOT previously requested changes - allowing re-review after fixes"
+            elif [ "$LATEST_REVIEW_STATE" = "COMMENTED" ]; then
+              echo "💬 $AGENT_BOT previously commented - allowing full review"
             else
               echo "ℹ️ $AGENT_BOT has not yet reviewed this PR"
             fi
