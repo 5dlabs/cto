@@ -1924,7 +1924,7 @@ spec:
           STAGE_NAME="{{`{{inputs.parameters.stage-name}}`}}"
 
           echo "========================================="
-          echo "Checking PR Merge Status"
+          echo "Checking PR Merge Status & Agent Completion"
           echo "========================================="
           echo "Repository: $REPO"
           echo "PR Number: $PR_NUMBER"
@@ -2015,6 +2015,42 @@ spec:
             echo ""
             echo "🎯 Skipping $STAGE_NAME stage - work already complete"
             exit 0
+          fi
+
+          # Determine which agent bot to check for based on stage
+          AGENT_BOT=""
+          case "$STAGE_NAME" in
+            "quality")
+              AGENT_BOT="5dlabs-cleo[bot]"
+              ;;
+            "security")
+              AGENT_BOT="5dlabs-cipher[bot]"
+              ;;
+            "testing")
+              AGENT_BOT="5dlabs-tess[bot]"
+              ;;
+          esac
+
+          # Check if the stage-specific agent has already reviewed this PR
+          if [ -n "$AGENT_BOT" ]; then
+            echo ""
+            echo "🔍 Checking if $AGENT_BOT has already reviewed PR #$PR_NUMBER..."
+            
+            REVIEWS_DATA=$(curl -s -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "$AUTH_HEADER" \
+              "https://api.github.com/repos/$REPO/pulls/$PR_NUMBER/reviews")
+
+            AGENT_REVIEW_COUNT=$(echo "$REVIEWS_DATA" | jq -r --arg bot "$AGENT_BOT" '[.[] | select(.user.login == $bot)] | length')
+
+            if [ "$AGENT_REVIEW_COUNT" != "null" ] && [ "$AGENT_REVIEW_COUNT" -gt 0 ]; then
+              echo "✅ $AGENT_BOT has already reviewed this PR ($AGENT_REVIEW_COUNT review(s) found)"
+              echo "   Skipping $STAGE_NAME stage to prevent duplicate execution"
+              echo "true" > /tmp/skip-stage.txt
+              exit 0
+            else
+              echo "ℹ️ $AGENT_BOT has not yet reviewed this PR"
+            fi
           fi
 
           echo "✓ PR is open and not merged - stage should proceed"
