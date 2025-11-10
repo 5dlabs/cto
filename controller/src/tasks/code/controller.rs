@@ -436,7 +436,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .as_ref()
                 .and_then(|labels| labels.get("stage"))
                 .map(|s| s.as_str());
-
+            
             let is_implementation_stage = matches!(
                 stage,
                 Some("implementation" | "frontend") | None // None = legacy/default implementation
@@ -450,12 +450,13 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             // Validate PR URL is present, non-empty, and not the "no-pr" placeholder
             let has_valid_pr = pr_url.is_some_and(|url| !url.is_empty() && url != "no-pr");
 
+
             if is_implementation_stage && !has_valid_pr {
                 warn!(
                     "Implementation agent completed but DID NOT create PR - failing CodeRun {}",
                     code_run_name
                 );
-
+                
                 update_code_status_with_completion(
                     &latest_code_run,
                     ctx,
@@ -465,7 +466,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     None,
                 )
                 .await?;
-
+                
                 handle_workflow_resumption_on_failure(&latest_code_run, ctx).await?;
 
                 // Skip cleanup for workflow-managed jobs (let workflow handle it)
@@ -502,7 +503,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
                 return Ok(Action::await_change());
             }
-
+            
             debug!("Validation passed - marking work as completed");
 
             update_code_status_with_completion(
