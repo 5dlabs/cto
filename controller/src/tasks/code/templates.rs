@@ -2317,6 +2317,7 @@ impl CodeTemplateGenerator {
 
         let is_remediation = retry_count > 0;
 
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => {
                 if is_remediation {
@@ -2364,6 +2365,7 @@ impl CodeTemplateGenerator {
             .unwrap_or(0);
 
         let is_remediation = retry_count > 0;
+
 
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
@@ -2415,6 +2417,7 @@ impl CodeTemplateGenerator {
 
         let is_remediation = retry_count > 0;
 
+
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" => {
                 if is_remediation {
@@ -2462,6 +2465,7 @@ impl CodeTemplateGenerator {
             .unwrap_or(0);
 
         let is_remediation = retry_count > 0;
+
 
         let template_name = match github_app {
             "5DLabs-Rex" | "5DLabs-Morgan" | "5DLabs-Rex-Remediation" => {
