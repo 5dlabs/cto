@@ -1100,8 +1100,17 @@ struct TaskMasterTask {
 }
 
 #[derive(Debug, Deserialize)]
-struct TasksFile {
+struct TaskTag {
     tasks: Vec<TaskMasterTask>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum TasksFile {
+    /// New tagged format: { "master": { "tasks": [...] }, "other-tag": { "tasks": [...] } }
+    Tagged(HashMap<String, TaskTag>),
+    /// Legacy flat format: { "tasks": [...] }
+    Flat { tasks: Vec<TaskMasterTask> },
 }
 
 /// Find tasks.json in repository, optionally starting from a working directory
@@ -1150,8 +1159,8 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
 
 /// Get next available task from `TaskMaster`
 fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMasterTask>> {
-    let tasks_file =
-        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+    let tasks_file = find_tasks_file(working_dir)
+        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1159,7 +1168,17 @@ fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMast
     let tasks_data: TasksFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
 
-    let tasks = tasks_data.tasks;
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
 
     // Build task map for dependency checking
     let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
@@ -1216,8 +1235,8 @@ fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMast
 
 /// Find blocked tasks (tasks with all pending dependencies)
 fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMasterTask>> {
-    let tasks_file =
-        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+    let tasks_file = find_tasks_file(working_dir)
+        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1225,7 +1244,17 @@ fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMa
     let tasks_data: TasksFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
 
-    let tasks = tasks_data.tasks;
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
     let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
 
     let mut blocked = Vec::new();
