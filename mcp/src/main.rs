@@ -2217,14 +2217,13 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                         workflow["status"]["phase"].as_str(),
                     ) {
                         // Parse RFC3339 timestamp
-                        if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at)
-                        {
+                        if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at) {
                             let created_secs = created_time.timestamp();
                             // Only process workflows with valid (non-negative) timestamps
                             if created_secs >= 0 {
                                 #[allow(clippy::cast_sign_loss)]
                                 let created_secs_u64 = created_secs as u64;
-                                
+
                                 // Handle clock skew: if workflow timestamp is in the future, treat as age 0
                                 let age_secs = if created_secs_u64 > now {
                                     eprintln!(
@@ -2256,8 +2255,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                         eprintln!(
                                             "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
                                         );
-                                        let _ = run_argo_cli(&["stop", name, "-n", "agent-platform"]);
-                                        let _ = run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                        let _ =
+                                            run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                        let _ =
+                                            run_argo_cli(&["delete", name, "-n", "agent-platform"]);
                                     }
                                     None => {
                                         eprintln!(
