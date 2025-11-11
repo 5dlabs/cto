@@ -364,6 +364,16 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
+        - - name: cleanup-old-checks
+            template: cancel-old-checks
+            arguments:
+              parameters:
+                - name: pr-number
+                  value: "{{`{{steps.wait-for-pr.outputs.parameters.pr-number}}`}}"
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: github-app
+                  value: "{{`{{inputs.parameters.github-app}}`}}"
 
     # Run a full remediation iteration (Rex → Cleo → Tess) with automatic retries
     - name: remediation-iteration
@@ -2062,6 +2072,55 @@ spec:
           fi
 
           echo "✓ PR is open and not merged - stage should proceed"
+
+    # Cancel old GitHub checks to prevent stale "Pending" status
+    - name: cancel-old-checks
+      inputs:
+        parameters:
+          - name: pr-number
+          - name: repository
+          - name: github-app
+      script:
+        image: ghcr.io/cli/cli:latest
+        command: [sh]
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "{{`{{inputs.parameters.github-app}}`}}"
+                key: github-token
+        source: |
+          #!/bin/sh
+          set -e
+          
+          PR_NUMBER="{{`{{inputs.parameters.pr-number}}`}}"
+          REPOSITORY="{{`{{inputs.parameters.repository}}`}}"
+          WORKFLOW_NAME="{{`{{workflow.name}}`}}"
+          
+          echo "🧹 Checking for old GitHub checks on PR #${PR_NUMBER}..."
+          
+          # List all checks on the PR
+          CHECKS_JSON=$(gh pr view "${PR_NUMBER}" \
+            --repo "${REPOSITORY}" \
+            --json statusCheckRollup 2>/dev/null || echo '{"statusCheckRollup":[]}')
+          
+          # Count pending checks (excluding current workflow)
+          PENDING_COUNT=$(echo "$CHECKS_JSON" | jq -r '
+            .statusCheckRollup[] |
+            select(.state=="PENDING" or .state=="IN_PROGRESS") |
+            select(.name | contains("'"${WORKFLOW_NAME}"'") | not) |
+            .name
+          ' | wc -l | tr -d ' ')
+          
+          if [ "$PENDING_COUNT" -gt 0 ]; then
+            echo "⚠️  Found ${PENDING_COUNT} old pending check(s)"
+            echo "   Note: GitHub checks cannot be cancelled via API"
+            echo "   They will auto-timeout after 6 hours"
+          else
+            echo "✅ No old pending checks found"
+          fi
+          
+          exit 0
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
