@@ -2187,6 +2187,32 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let workflow_type_label = "workflow-type=play".to_string();
     let task_id_label = format!("task-id={task_id}");
 
+    // CLEANUP: Delete old play workflows for this repository before starting new one
+    // This ensures old GitHub checks get cancelled properly
+    eprintln!("🧹 Checking for old play workflows to clean up...");
+    let cleanup_result = run_argo_cli(&[
+        "list",
+        "-n",
+        "agent-platform",
+        "-l",
+        &repo_label,
+        "-l",
+        &workflow_type_label,
+        "-o",
+        "name",
+    ]);
+
+    if let Ok(old_workflows) = cleanup_result {
+        for old_wf in old_workflows.lines() {
+            let old_wf = old_wf.trim();
+            if !old_wf.is_empty() {
+                eprintln!("  🗑️  Deleting old workflow: {}", old_wf);
+                let _ = run_argo_cli(&["stop", old_wf, "-n", "agent-platform"]);
+                let _ = run_argo_cli(&["delete", old_wf, "-n", "agent-platform"]);
+            }
+        }
+    }
+
     let mut args: Vec<&str> = vec![
         "submit",
         "--from",
