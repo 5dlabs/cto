@@ -2211,9 +2211,10 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     .as_secs();
 
                 for workflow in items {
-                    if let (Some(name), Some(created_at)) = (
+                    if let (Some(name), Some(created_at), phase) = (
                         workflow["metadata"]["name"].as_str(),
                         workflow["metadata"]["creationTimestamp"].as_str(),
+                        workflow["status"]["phase"].as_str(),
                     ) {
                         // Parse RFC3339 timestamp
                         if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at)
@@ -2233,9 +2234,26 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                     continue;
                                 }
 
-                                eprintln!("  🗑️  Deleting old workflow ({age_secs}s old): {name}");
-                                let _ = run_argo_cli(&["stop", name, "-n", "agent-platform"]);
-                                let _ = run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                // Check workflow status - only delete completed/failed workflows
+                                // Skip running or pending workflows to avoid data loss
+                                let phase_lower = phase.map(str::to_lowercase);
+                                match phase_lower.as_deref() {
+                                    Some("running" | "pending") => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping active workflow (status: {phase:?}): {name}"
+                                        );
+                                    }
+                                    Some("succeeded" | "failed" | "error") | None => {
+                                        eprintln!(
+                                            "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
+                                        );
+                                        let _ = run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                        let _ = run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                    }
+                                    Some(other) => {
+                                        eprintln!("  ⚠️  Unknown workflow status '{other}': {name}");
+                                    }
+                                }
                             }
                         }
                     }
