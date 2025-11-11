@@ -2065,6 +2065,29 @@ spec:
 
     # Log information about GitHub checks (diagnostic only)
 
+    # Cleanup handler for workflow completion/failure
+    - name: cleanup-handler
+      script:
+        image: alpine:3.20
+        command: [sh]
+        source: |
+          #!/bin/sh
+          echo "========================================="
+          echo "Workflow Cleanup Handler"
+          echo "========================================="
+          echo "Workflow Name: {{`{{workflow.name}}`}}"
+          echo "Status: {{`{{workflow.status}}`}}"
+          echo "Task ID: {{`{{workflow.parameters.task-id}}`}}"
+
+          # Log final workflow state
+          if [ "{{`{{workflow.status}}`}}" = "Succeeded" ]; then
+            echo "✅ Workflow completed successfully"
+          else
+            echo "❌ Workflow failed or was terminated"
+          fi
+
+          echo "Cleanup completed"
+
   # TTL strategy for workflow cleanup
   ttlStrategy:
     secondsAfterCompletion: 86400    # Keep completed workflows for 24 hours
