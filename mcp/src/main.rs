@@ -2244,7 +2244,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                 }
 
                                 // Check workflow status - only delete completed/failed workflows
-                                // Skip running or pending workflows to avoid data loss
+                                // Skip running, pending, or uninitialized workflows to avoid data loss
                                 let phase_lower = phase.map(str::to_lowercase);
                                 match phase_lower.as_deref() {
                                     Some("running" | "pending") => {
@@ -2252,15 +2252,22 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                                             "  ⏭️  Skipping active workflow (status: {phase:?}): {name}"
                                         );
                                     }
-                                    Some("succeeded" | "failed" | "error") | None => {
+                                    Some("succeeded" | "failed" | "error") => {
                                         eprintln!(
                                             "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
                                         );
                                         let _ = run_argo_cli(&["stop", name, "-n", "agent-platform"]);
                                         let _ = run_argo_cli(&["delete", name, "-n", "agent-platform"]);
                                     }
+                                    None => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with no phase (may be initializing): {name}"
+                                        );
+                                    }
                                     Some(other) => {
-                                        eprintln!("  ⚠️  Unknown workflow status '{other}': {name}");
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with unknown status '{other}': {name}"
+                                        );
                                     }
                                 }
                             }
