@@ -485,6 +485,9 @@ create_task_issues() {
 # ============================================================================
 
 monitor_and_sync() {
+  # Set monitoring phase flag so ERR trap is lenient
+  export MONITORING_PHASE=true
+  
   log "👀 Phase 3: Event-Driven Monitoring & Synchronization"
   log "🔄 Starting real-time workflow watch..."
   
@@ -1928,11 +1931,16 @@ main() {
 }
 
 # Trap errors and cleanup
-trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2; exit 1' ERR
+# Only exit on errors during initialization - monitoring phase should be resilient
+trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2; if [[ "${MONITORING_PHASE:-false}" != "true" ]]; then exit 1; fi' ERR
 
 echo "🔍 DEBUG: About to call main()..."
-# Run main
-main
+# Run main with error handling - if monitoring fails, log but don't fail workflow
+main || {
+  echo "⚠️ Morgan PM encountered an error, but continuing as daemon..."
+  # Log the error but don't exit - daemon should keep running
+  exit 0
+}
 
 echo "✅ DEBUG: main() completed successfully"
 
