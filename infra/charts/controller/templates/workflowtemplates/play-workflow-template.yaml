@@ -720,7 +720,7 @@ spec:
             pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
             pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
 
-            # If not found by exact labels, try searching by branch name
+            # If not found by exact labels, try searching by branch name (open PRs first)
             if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
               echo "🔍 No PR found by labels, searching by branch name..."
               url="https://api.github.com/repos/${REPO}/pulls?state=open&head=${OWNER}:${EXPECTED_BRANCH}"
@@ -735,6 +735,23 @@ spec:
               
               if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
                 echo "✅ Found PR #$pr_number by branch name: $EXPECTED_BRANCH"
+              else
+                # If no open PR found, check for closed PRs (may indicate previous run)
+                echo "🔍 No open PR found, checking for closed PRs on same branch..."
+                url="https://api.github.com/repos/${REPO}/pulls?state=closed&head=${OWNER}:${EXPECTED_BRANCH}&sort=updated&direction=desc&per_page=1"
+                if [ -n "$AUTH_HEADER" ]; then
+                  resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
+                else
+                  resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
+                fi
+                
+                closed_pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
+                if [ -n "$closed_pr_number" ] && [ "$closed_pr_number" != "null" ]; then
+                  echo "⚠️ Found CLOSED PR #$closed_pr_number for branch $EXPECTED_BRANCH"
+                  echo "   This indicates a PR was created but closed (merged or manually closed)"
+                  echo "   Implementation agent should create a new PR, but none found"
+                  echo "   This may indicate PR creation failed or implementation didn't complete"
+                fi
               fi
             fi
 
@@ -764,7 +781,10 @@ spec:
                   fi
                   
                   pr_branch=$(echo "$pr_detail" | jq -r '.head.ref // ""')
-                  if [ "$pr_branch" = "$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')" ] || [ "$pr_branch" = "$EXPECTED_BRANCH" ]; then
+                  # Normalize both branches for comparison (handle with/without feature/ prefix)
+                  expected_normalized=$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')
+                  pr_branch_normalized=$(echo "$pr_branch" | sed 's|^feature/||')
+                  if [ "$pr_branch_normalized" = "$expected_normalized" ] || [ "$pr_branch" = "$EXPECTED_BRANCH" ]; then
                     pr_url=$(echo "$pr_item" | jq -r '.html_url')
                     pr_number="$candidate_pr_number"
                     found_valid_pr=true
@@ -832,11 +852,14 @@ spec:
             echo "  1. Implementation agent hasn't created PR yet (waited 90s)"
             echo "  2. Implementation failed before PR creation"
             echo "  3. PR created with different branch name or labels"
-            echo "  4. Network/API issues preventing PR creation"
+            echo "  4. All PRs for this branch are CLOSED (previous runs)"
+            echo "  5. Network/API issues preventing PR creation"
             echo ""
             echo "💡 Recommendation:"
             echo "  Check implementation CodeRun logs for errors"
             echo "  Verify GitHub App has PR creation permissions"
+            echo "  If closed PRs exist, implementation agent should create a new PR"
+            echo "  Check if implementation agent completed successfully"
           else
             echo "  1. Implementation agent didn't create a PR"
             echo "  2. PR was created but lacks required labels"
