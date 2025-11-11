@@ -781,14 +781,10 @@ spec:
                   fi
                   
                   pr_branch=$(echo "$pr_detail" | jq -r '.head.ref // ""')
-<<<<<<< HEAD
                   # Normalize both branches for comparison (handle with/without feature/ prefix)
                   expected_normalized=$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')
                   pr_branch_normalized=$(echo "$pr_branch" | sed 's|^feature/||')
                   if [ "$pr_branch_normalized" = "$expected_normalized" ] || [ "$pr_branch" = "$EXPECTED_BRANCH" ]; then
-=======
-                  if [ "$pr_branch" = "$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')" ] || [ "$pr_branch" = "$EXPECTED_BRANCH" ]; then
->>>>>>> a08321e55773528bab08ba84347416004ede72e4
                     pr_url=$(echo "$pr_item" | jq -r '.html_url')
                     pr_number="$candidate_pr_number"
                     found_valid_pr=true
