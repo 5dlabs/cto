@@ -1931,8 +1931,9 @@ main() {
 }
 
 # Trap errors and cleanup
-# Only exit on errors during initialization - monitoring phase should be resilient
-trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2; if [[ "${MONITORING_PHASE:-false}" != "true" ]]; then exit 1; fi' ERR
+# Only log errors - let them propagate so main || { ... } block can handle them
+# The trap should not call exit directly, as that prevents error handling logic from executing
+trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2' ERR
 
 echo "🔍 DEBUG: About to call main()..."
 # Run main with error handling - only catch errors during monitoring phase
