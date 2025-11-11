@@ -636,15 +636,16 @@ spec:
           set -e
           REPO="{{`{{inputs.parameters.repository}}`}}"
           TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
-          LABEL="task-${TASK_ID}"
+          TASK_LABEL="task-${TASK_ID}"
           RUN_LABEL="run-{{`{{workflow.name}}`}}"
           SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
+          EXPECTED_BRANCH="feature/task-${TASK_ID}-implementation"
 
           # For single-repo setups, we need to find PRs from the current workflow run
           # Always use both task label AND run label to avoid finding old PRs from previous runs
           STAGE="{{`{{inputs.parameters.stage}}`}}"
 
-          echo "🔎 Stage $STAGE: Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
+          echo "🔎 Stage $STAGE: Looking for PR with labels ${TASK_LABEL} and ${RUN_LABEL} in ${REPO}"
 
           # Ensure tools
           apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
@@ -708,7 +709,7 @@ spec:
           fi
           while [ $attempts -gt 0 ]; do
             # First, try to find PR by labels (fast path for already-labeled PRs)
-            q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
+            q_labels=$(printf "%s" "$TASK_LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
             url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
             if [ -n "$AUTH_HEADER" ]; then
               resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
@@ -722,8 +723,7 @@ spec:
             # If not found by exact labels, try searching by branch name
             if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
               echo "🔍 No PR found by labels, searching by branch name..."
-              BRANCH_NAME="feature/task-${TASK_ID}-implementation"
-              url="https://api.github.com/repos/${REPO}/pulls?state=open&head=${OWNER}:${BRANCH_NAME}"
+              url="https://api.github.com/repos/${REPO}/pulls?state=open&head=${OWNER}:${EXPECTED_BRANCH}"
               if [ -n "$AUTH_HEADER" ]; then
                 resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
               else
@@ -734,15 +734,15 @@ spec:
               pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
               
               if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
-                echo "✅ Found PR #$pr_number by branch name: $BRANCH_NAME"
+                echo "✅ Found PR #$pr_number by branch name: $EXPECTED_BRANCH"
               fi
             fi
 
-            # If still not found, try searching by task label only (more lenient)
-            # This handles cases where PR was created but run label doesn't match
+            # If still not found, try searching by task label only (lenient fallback)
+            # CRITICAL: Must verify branch matches to avoid using PRs from previous runs
             if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
               echo "🔍 No PR found by branch, trying task label only (lenient search)..."
-              q_task_label=$(printf "%s" "$LABEL" | sed 's/,/%2C/g')
+              q_task_label=$(printf "%s" "$TASK_LABEL" | sed 's/,/%2C/g')
               url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_task_label}"
               if [ -n "$AUTH_HEADER" ]; then
                 resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
@@ -750,12 +750,36 @@ spec:
                 resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
               fi
               
-              pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
-              pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
+              # Check all PRs with task label and verify branch matches
+              found_valid_pr=false
+              for pr_item in $(echo "$resp" | jq -c '.[] | select(.pull_request != null)'); do
+                candidate_pr_number=$(echo "$pr_item" | jq -r '.number')
+                if [ -n "$candidate_pr_number" ] && [ "$candidate_pr_number" != "null" ]; then
+                  # Fetch PR details to check branch name
+                  pr_detail_url="https://api.github.com/repos/${REPO}/pulls/${candidate_pr_number}"
+                  if [ -n "$AUTH_HEADER" ]; then
+                    pr_detail=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$pr_detail_url") || pr_detail="{}"
+                  else
+                    pr_detail=$(curl -sL -H "Accept: application/vnd.github+json" "$pr_detail_url") || pr_detail="{}"
+                  fi
+                  
+                  pr_branch=$(echo "$pr_detail" | jq -r '.head.ref // ""')
+                  if [ "$pr_branch" = "$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')" ] || [ "$pr_branch" = "$EXPECTED_BRANCH" ]; then
+                    pr_url=$(echo "$pr_item" | jq -r '.html_url')
+                    pr_number="$candidate_pr_number"
+                    found_valid_pr=true
+                    echo "✅ Found PR #$pr_number by task label with matching branch: $pr_branch"
+                    echo "⚠️ Note: Run label ($RUN_LABEL) may not match, but branch matches - proceeding"
+                    break
+                  fi
+                fi
+              done
               
-              if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
-                echo "✅ Found PR #$pr_number by task label only: $LABEL"
-                echo "⚠️ Note: Run label ($RUN_LABEL) may not match, but PR exists - proceeding"
+              if [ "$found_valid_pr" = "false" ]; then
+                echo "⚠️ Found PR(s) with task label but none match expected branch ($EXPECTED_BRANCH)"
+                echo "   Skipping to avoid using PRs from previous workflow runs"
+                pr_number=""
+                pr_url=""
               fi
             fi
 
@@ -769,14 +793,14 @@ spec:
               echo "  Repository: ${REPO}"
               if [ -n "$TOKEN" ]; then
                 echo "  Adding correlation labels..."
-                add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
+                add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
                 if curl -s -X POST \
                   -H "Authorization: Bearer $TOKEN" \
                   -H "Accept: application/vnd.github+json" \
                   -H "Content-Type: application/json" \
                   -d "$add_labels_payload" \
                   "https://api.github.com/repos/${REPO}/issues/${pr_number}/labels" >/dev/null 2>&1; then
-                  echo "  ✅ Labels added: $LABEL, $RUN_LABEL, $SERVICE_LABEL"
+                  echo "  ✅ Labels added: $TASK_LABEL, $RUN_LABEL, $SERVICE_LABEL"
                 else
                   echo "  ⚠️ Failed to add labels (PR still usable)"
                 fi
@@ -800,8 +824,8 @@ spec:
           echo "  Task ID: ${TASK_ID}"
           echo "  Repository: ${REPO}"
           echo "  Stage: ${STAGE}"
-          echo "  Expected Branch: feature/task-${TASK_ID}-implementation"
-          echo "  Expected Labels: ${LABEL}, ${RUN_LABEL}, ${SERVICE_LABEL}"
+          echo "  Expected Branch: ${EXPECTED_BRANCH}"
+          echo "  Expected Labels: ${TASK_LABEL}, ${RUN_LABEL}, ${SERVICE_LABEL}"
           echo ""
           echo "🔍 Possible Causes:"
           if [ "$STAGE" = "implementation" ]; then
@@ -820,7 +844,7 @@ spec:
             echo ""
             echo "💡 Recommendation:"
             echo "  Verify implementation stage completed successfully"
-            echo "  Check if PR exists with correct labels: ${LABEL}, ${RUN_LABEL}"
+            echo "  Check if PR exists with correct labels: ${TASK_LABEL}, ${RUN_LABEL}"
           fi
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           > /tmp/pr-url.txt
