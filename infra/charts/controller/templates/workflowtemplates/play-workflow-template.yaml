@@ -1116,6 +1116,7 @@ spec:
               github-app: "{{`{{inputs.parameters.github-app}}`}}"
               workflow-name: "{{`{{workflow.name}}`}}"
               workflow-run: "{{`{{workflow.name}}`}}"
+              stage: "{{`{{inputs.parameters.stage}}`}}"
               workflow-stage: "{{`{{inputs.parameters.stage}}`}}"
               workflow-type: "play-orchestration"
             annotations:
@@ -2106,6 +2107,8 @@ spec:
           fi
 
           echo "✓ PR is open and not merged - stage should proceed"
+
+    # Log information about GitHub checks (diagnostic only)
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
