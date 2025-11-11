@@ -2199,16 +2199,47 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         "-l",
         &workflow_type_label,
         "-o",
-        "name",
+        "json",
     ]);
 
-    if let Ok(old_workflows) = cleanup_result {
-        for old_wf in old_workflows.lines() {
-            let old_wf = old_wf.trim();
-            if !old_wf.is_empty() {
-                eprintln!("  🗑️  Deleting old workflow: {}", old_wf);
-                let _ = run_argo_cli(&["stop", old_wf, "-n", "agent-platform"]);
-                let _ = run_argo_cli(&["delete", old_wf, "-n", "agent-platform"]);
+    if let Ok(workflows_json) = cleanup_result {
+        if let Ok(workflows) = serde_json::from_str::<serde_json::Value>(&workflows_json) {
+            if let Some(items) = workflows.as_array() {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
+                for workflow in items {
+                    if let (Some(name), Some(created_at)) = (
+                        workflow["metadata"]["name"].as_str(),
+                        workflow["metadata"]["creationTimestamp"].as_str(),
+                    ) {
+                        // Parse RFC3339 timestamp
+                        if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at)
+                        {
+                            let created_secs = created_time.timestamp();
+                            // Only process workflows with valid (non-negative) timestamps
+                            if created_secs >= 0 {
+                                #[allow(clippy::cast_sign_loss)]
+                                let created_secs = created_secs as u64;
+                                let age_secs = now.saturating_sub(created_secs);
+
+                                // Skip workflows created within the last 10 seconds to avoid race conditions
+                                if age_secs < 10 {
+                                    eprintln!(
+                                        "  ⏭️  Skipping recent workflow ({age_secs}s old): {name}"
+                                    );
+                                    continue;
+                                }
+
+                                eprintln!("  🗑️  Deleting old workflow ({age_secs}s old): {name}");
+                                let _ = run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                let _ = run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
