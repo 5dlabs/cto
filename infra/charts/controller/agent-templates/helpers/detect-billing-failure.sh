@@ -45,15 +45,17 @@ detect_billing_failure() {
     echo "🚨 BILLING FAILURE DETECTED: ${matched_pattern}"
     echo "   Posting alert comment to PR #${pr_number}..."
     
+    # Use tilde fences instead of backticks to avoid conflicts with CLI output
+    # This completely sidesteps the issue of backticks in the output breaking the fence
     local comment_body="## 🚨 Billing/Quota Failure Alert
 
 **Agent**: ${agent_name}  
 **Error Type**: Billing/quota issue detected
 
 ### Error Details
-\`\`\`
+~~~
 ${cli_output}
-\`\`\`
+~~~
 
 ### Action Required
 This agent failed due to billing or quota issues. Please:
