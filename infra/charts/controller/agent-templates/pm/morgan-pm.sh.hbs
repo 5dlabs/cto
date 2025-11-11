@@ -1933,6 +1933,7 @@ main() {
 # Trap errors and cleanup
 # Only log errors - let them propagate so main || { ... } block can handle them
 # The trap should not call exit directly, as that prevents error handling logic from executing
+# Errors will cause exit via 'set -euo pipefail' (line 2), allowing main || { ... } to handle them
 trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2' ERR
 
 # Trap SIGTERM for graceful daemon shutdown (Argo sends SIGTERM when workflow fails/completes)
@@ -1941,7 +1942,8 @@ trap 'echo "🛑 Received SIGTERM - shutting down Morgan PM daemon gracefully...
 
 echo "🔍 DEBUG: About to call main()..."
 # Run main with error handling - only catch errors during monitoring phase
-# Initialization errors should fail the workflow (ERR trap will exit 1)
+# Initialization errors will fail the workflow via 'set -euo pipefail' (line 2)
+# The ERR trap logs errors but doesn't exit - 'set -e' handles the exit
 main || {
   EXIT_CODE=$?
   # Only convert to success if we're in monitoring phase
