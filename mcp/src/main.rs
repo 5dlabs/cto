@@ -1150,8 +1150,8 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
 
 /// Get next available task from `TaskMaster`
 fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMasterTask>> {
-    let tasks_file = find_tasks_file(working_dir)
-        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+    let tasks_file =
+        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1216,8 +1216,8 @@ fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMast
 
 /// Find blocked tasks (tasks with all pending dependencies)
 fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMasterTask>> {
-    let tasks_file = find_tasks_file(working_dir)
-        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+    let tasks_file =
+        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
