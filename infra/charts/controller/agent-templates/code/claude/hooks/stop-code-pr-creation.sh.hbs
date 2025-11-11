@@ -242,17 +242,26 @@ The Claude agent has completed the implementation and addressed all acceptance c
     echo "Base: main"
     echo "Head: $CURRENT_BRANCH"
     
-    # First, check if a PR already exists for this branch
-    echo "🔍 Checking for existing PR..."
-    EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+    # First, check if an OPEN PR already exists for this branch
+    # CRITICAL: Only check for open PRs - closed PRs should not prevent new PR creation
+    echo "🔍 Checking for existing OPEN PR..."
+    EXISTING_PR=$(gh pr list --head "$CURRENT_BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
     
     if [ -n "$EXISTING_PR" ]; then
-        echo "✅ PR already exists: #$EXISTING_PR"
+        echo "✅ Open PR already exists: #$EXISTING_PR"
         echo "ℹ️  Skipping PR creation (already created by agent)"
         PR_NUMBER="$EXISTING_PR"
         PR_URL=$(gh pr view "$PR_NUMBER" --json url -q .url 2>/dev/null || echo "")
         echo "$PR_URL" > .pr-url
-    elif gh pr create \
+    else
+        # Check for closed PRs for informational purposes
+        CLOSED_PR=$(gh pr list --head "$CURRENT_BRANCH" --state closed --json number --jq '.[0].number' 2>/dev/null || echo "")
+        if [ -n "$CLOSED_PR" ]; then
+            echo "ℹ️  Found closed PR #$CLOSED_PR for this branch (from previous run)"
+            echo "   Creating new PR for current workflow run..."
+        fi
+        
+        if gh pr create \
         --title "$PR_TITLE" \
         --body "$PR_BODY" \
         --base "main" \
