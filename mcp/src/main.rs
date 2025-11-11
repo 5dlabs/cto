@@ -2223,8 +2223,17 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                             // Only process workflows with valid (non-negative) timestamps
                             if created_secs >= 0 {
                                 #[allow(clippy::cast_sign_loss)]
-                                let created_secs = created_secs as u64;
-                                let age_secs = now.saturating_sub(created_secs);
+                                let created_secs_u64 = created_secs as u64;
+                                
+                                // Handle clock skew: if workflow timestamp is in the future, treat as age 0
+                                let age_secs = if created_secs_u64 > now {
+                                    eprintln!(
+                                        "  ⚠️  Workflow has future timestamp (clock skew detected): {name}"
+                                    );
+                                    0
+                                } else {
+                                    now - created_secs_u64
+                                };
 
                                 // Skip workflows created within the last 10 seconds to avoid race conditions
                                 if age_secs < 10 {

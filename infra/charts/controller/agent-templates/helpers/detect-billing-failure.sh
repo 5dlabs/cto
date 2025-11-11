@@ -45,6 +45,10 @@ detect_billing_failure() {
     echo "🚨 BILLING FAILURE DETECTED: ${matched_pattern}"
     echo "   Posting alert comment to PR #${pr_number}..."
     
+    # Escape backticks in CLI output to prevent breaking markdown code fences
+    # Replace triple backticks with backtick-space-backtick to prevent fence breakage
+    local escaped_output="${cli_output//\`\`\`/\`\` \`}"
+    
     local comment_body="## 🚨 Billing/Quota Failure Alert
 
 **Agent**: ${agent_name}  
@@ -52,7 +56,7 @@ detect_billing_failure() {
 
 ### Error Details
 \`\`\`
-${cli_output}
+${escaped_output}
 \`\`\`
 
 ### Action Required
