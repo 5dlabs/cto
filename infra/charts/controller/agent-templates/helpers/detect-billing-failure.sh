@@ -70,12 +70,13 @@ Matched: \`${matched_pattern}\`
     
     # Post comment using gh CLI
     if command -v gh >/dev/null 2>&1 && [[ -n "$GITHUB_TOKEN" ]]; then
-      echo "$comment_body" | gh pr comment "$pr_number" \
+      if echo "$comment_body" | gh pr comment "$pr_number" \
         --repo "$repo" \
-        --body-file - 2>/dev/null || {
+        --body-file - 2>/dev/null; then
+        echo "✅ Alert comment posted to PR #${pr_number}"
+      else
         echo "⚠️  Failed to post comment (continuing anyway)"
-      }
-      echo "✅ Alert comment posted to PR #${pr_number}"
+      fi
     else
       echo "⚠️  GitHub CLI not available or no token, cannot post comment"
     fi
