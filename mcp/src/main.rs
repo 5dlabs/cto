@@ -2204,7 +2204,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     if let Ok(workflows_json) = cleanup_result {
         if let Ok(workflows) = serde_json::from_str::<serde_json::Value>(&workflows_json) {
-            if let Some(items) = workflows.as_array() {
+            if let Some(items) = workflows.get("items").and_then(|v| v.as_array()) {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
