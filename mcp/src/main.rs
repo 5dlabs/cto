@@ -200,6 +200,8 @@ struct PlayDefaults {
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
+    #[serde(rename = "workingDirectory")]
+    working_directory: Option<String>,
     #[serde(rename = "maxRetries")]
     max_retries: Option<u32>,
     #[serde(rename = "implementationMaxRetries")]
@@ -1098,12 +1100,21 @@ struct TaskMasterTask {
 }
 
 #[derive(Debug, Deserialize)]
-struct TasksFile {
+struct TaskTag {
     tasks: Vec<TaskMasterTask>,
 }
 
-/// Find tasks.json in repository
-fn find_tasks_file() -> Option<std::path::PathBuf> {
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum TasksFile {
+    /// New tagged format: { "master": { "tasks": [...] }, "other-tag": { "tasks": [...] } }
+    Tagged(HashMap<String, TaskTag>),
+    /// Legacy flat format: { "tasks": [...] }
+    Flat { tasks: Vec<TaskMasterTask> },
+}
+
+/// Find tasks.json in repository, optionally starting from a working directory
+fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
     // Try to get workspace directory
     let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
         .ok()
@@ -1115,22 +1126,41 @@ fn find_tasks_file() -> Option<std::path::PathBuf> {
         })
         .or_else(|| std::env::current_dir().ok())?;
 
-    let candidates = vec![
-        workspace_dir
+    // If working_dir is provided, use it as the base directory
+    let base_dir = if let Some(wd) = working_dir {
+        workspace_dir.join(wd)
+    } else {
+        workspace_dir.clone()
+    };
+
+    let mut candidates = vec![
+        base_dir
             .join(".taskmaster")
             .join("tasks")
             .join("tasks.json"),
-        workspace_dir.join(".taskmaster").join("tasks.json"),
-        workspace_dir.join("tasks.json"),
+        base_dir.join(".taskmaster").join("tasks.json"),
+        base_dir.join("tasks.json"),
     ];
+
+    // If working_dir was provided, also try workspace root as fallback
+    if working_dir.is_some() {
+        candidates.push(
+            workspace_dir
+                .join(".taskmaster")
+                .join("tasks")
+                .join("tasks.json"),
+        );
+        candidates.push(workspace_dir.join(".taskmaster").join("tasks.json"));
+        candidates.push(workspace_dir.join("tasks.json"));
+    }
 
     candidates.into_iter().find(|p| p.exists())
 }
 
 /// Get next available task from `TaskMaster`
-fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
-    let tasks_file =
-        find_tasks_file().ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMasterTask>> {
+    let tasks_file = find_tasks_file(working_dir)
+        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1138,7 +1168,17 @@ fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
     let tasks_data: TasksFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
 
-    let tasks = tasks_data.tasks;
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
 
     // Build task map for dependency checking
     let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
@@ -1194,9 +1234,9 @@ fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
 }
 
 /// Find blocked tasks (tasks with all pending dependencies)
-fn find_blocked_taskmaster_tasks() -> Result<Vec<TaskMasterTask>> {
-    let tasks_file =
-        find_tasks_file().ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMasterTask>> {
+    let tasks_file = find_tasks_file(working_dir)
+        .ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1204,7 +1244,17 @@ fn find_blocked_taskmaster_tasks() -> Result<Vec<TaskMasterTask>> {
     let tasks_data: TasksFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
 
-    let tasks = tasks_data.tasks;
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
     let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
 
     let mut blocked = Vec::new();
@@ -1250,6 +1300,14 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| config.defaults.play.repository.clone())
         .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
 
+    // Get working directory from config
+    let working_dir = config
+        .defaults
+        .play
+        .working_directory
+        .as_ref()
+        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+
     // Read progress from ConfigMap
     let progress = read_play_progress(&repository)?;
 
@@ -1257,7 +1315,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let active_workflow = find_active_play_workflow(&repository)?;
 
     // Check for blocked tasks
-    let blocked_tasks = find_blocked_taskmaster_tasks().unwrap_or_default();
+    let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
 
     // Build comprehensive status response
     match (progress, active_workflow) {
@@ -1304,7 +1362,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
             // No active workflow
 
             // Try to get next task
-            let next_task = get_next_taskmaster_task()?;
+            let next_task = get_next_taskmaster_task(working_dir)?;
 
             if let Some(task) = next_task {
                 Ok(json!({
@@ -1359,6 +1417,14 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Validate repository URL
     validate_repository_url(&repository)?;
 
+    // Get working directory from config
+    let working_dir = config
+        .defaults
+        .play
+        .working_directory
+        .as_ref()
+        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
         // Explicit task_id provided
@@ -1407,12 +1473,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
         // 3. Query TaskMaster for next task
         eprintln!("🔍 Querying TaskMaster for next available task...");
-        if let Some(task) = get_next_taskmaster_task()? {
+        if let Some(task) = get_next_taskmaster_task(working_dir)? {
             eprintln!("✅ Found next task: {} - {}", task.id, task.title);
             Some(task.id)
         } else {
             // Check for blocked tasks to provide helpful feedback
-            let blocked_tasks = find_blocked_taskmaster_tasks().unwrap_or_default();
+            let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
 
             let message = if blocked_tasks.is_empty() {
                 "No tasks available - all tasks are completed".to_string()
