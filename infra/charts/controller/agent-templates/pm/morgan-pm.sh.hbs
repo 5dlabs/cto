@@ -1931,15 +1931,28 @@ main() {
 }
 
 # Trap errors and cleanup
-# Only exit on errors during initialization - monitoring phase should be resilient
-trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2; if [[ "${MONITORING_PHASE:-false}" != "true" ]]; then exit 1; fi' ERR
+# Only log errors - let them propagate so main || { ... } block can handle them
+# The trap should not call exit directly, as that prevents error handling logic from executing
+trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2' ERR
 
 echo "🔍 DEBUG: About to call main()..."
-# Run main with error handling - if monitoring fails, log but don't fail workflow
+# Run main with error handling - only catch errors during monitoring phase
+# Initialization errors should fail the workflow (ERR trap will exit 1)
 main || {
-  echo "⚠️ Morgan PM encountered an error, but continuing as daemon..."
-  # Log the error but don't exit - daemon should keep running
-  exit 0
+  EXIT_CODE=$?
+  # Only convert to success if we're in monitoring phase
+  # Initialization failures (before MONITORING_PHASE=true) should fail
+  if [[ "${MONITORING_PHASE:-false}" == "true" ]]; then
+    echo "⚠️ Morgan PM encountered an error during monitoring, but continuing as daemon..."
+    echo "   Error code: $EXIT_CODE"
+    # Log the error but don't fail workflow - monitoring errors are non-fatal
+    exit 0
+  else
+    echo "❌ Morgan PM initialization failed with exit code: $EXIT_CODE"
+    echo "   This is a fatal error - workflow should fail"
+    # Propagate the error - initialization failures should fail the workflow
+    exit $EXIT_CODE
+  fi
 }
 
 echo "✅ DEBUG: main() completed successfully"
