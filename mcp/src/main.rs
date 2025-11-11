@@ -2187,6 +2187,97 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let workflow_type_label = "workflow-type=play".to_string();
     let task_id_label = format!("task-id={task_id}");
 
+    // CLEANUP: Delete old play workflows for this repository before starting new one
+    // This ensures old GitHub checks get cancelled properly
+    eprintln!("🧹 Checking for old play workflows to clean up...");
+    let cleanup_result = run_argo_cli(&[
+        "list",
+        "-n",
+        "agent-platform",
+        "-l",
+        &repo_label,
+        "-l",
+        &workflow_type_label,
+        "-o",
+        "json",
+    ]);
+
+    if let Ok(workflows_json) = cleanup_result {
+        if let Ok(workflows) = serde_json::from_str::<serde_json::Value>(&workflows_json) {
+            if let Some(items) = workflows.get("items").and_then(|v| v.as_array()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
+                for workflow in items {
+                    if let (Some(name), Some(created_at), phase) = (
+                        workflow["metadata"]["name"].as_str(),
+                        workflow["metadata"]["creationTimestamp"].as_str(),
+                        workflow["status"]["phase"].as_str(),
+                    ) {
+                        // Parse RFC3339 timestamp
+                        if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at)
+                        {
+                            let created_secs = created_time.timestamp();
+                            // Only process workflows with valid (non-negative) timestamps
+                            if created_secs >= 0 {
+                                #[allow(clippy::cast_sign_loss)]
+                                let created_secs_u64 = created_secs as u64;
+                                
+                                // Handle clock skew: if workflow timestamp is in the future, treat as age 0
+                                let age_secs = if created_secs_u64 > now {
+                                    eprintln!(
+                                        "  ⚠️  Workflow has future timestamp (clock skew detected): {name}"
+                                    );
+                                    0
+                                } else {
+                                    now - created_secs_u64
+                                };
+
+                                // Skip workflows created within the last 10 seconds to avoid race conditions
+                                if age_secs < 10 {
+                                    eprintln!(
+                                        "  ⏭️  Skipping recent workflow ({age_secs}s old): {name}"
+                                    );
+                                    continue;
+                                }
+
+                                // Check workflow status - only delete completed/failed workflows
+                                // Skip running, pending, or uninitialized workflows to avoid data loss
+                                let phase_lower = phase.map(str::to_lowercase);
+                                match phase_lower.as_deref() {
+                                    Some("running" | "pending") => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping active workflow (status: {phase:?}): {name}"
+                                        );
+                                    }
+                                    Some("succeeded" | "failed" | "error") => {
+                                        eprintln!(
+                                            "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
+                                        );
+                                        let _ = run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                        let _ = run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                    }
+                                    None => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with no phase (may be initializing): {name}"
+                                        );
+                                    }
+                                    Some(other) => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with unknown status '{other}': {name}"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let mut args: Vec<&str> = vec![
         "submit",
         "--from",
