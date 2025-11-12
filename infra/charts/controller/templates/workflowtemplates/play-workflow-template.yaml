@@ -659,12 +659,12 @@ spec:
           fi
 
           # Poll for PR creation with reasonable timeout
-          # Implementation agents (Factory/Rex) can take 30-90s to create PR after code completion
+          # Implementation agents (Factory/Rex) can take 2-5 minutes to create PR after code completion
           # Quality/Security/Testing should be faster as PR already exists
           if [ "$STAGE" = "implementation" ]; then
-            attempts=18  # 90s total (18 × 5s) for implementation PR creation
+            attempts=60  # 300s (5 minutes) total (60 × 5s) for implementation PR creation
           else
-            attempts=8   # 40s total (8 × 5s) for existing PR detection
+            attempts=12  # 60s total (12 × 5s) for existing PR detection
           fi
           while [ $attempts -gt 0 ]; do
             # First, try to find PR by labels (fast path for already-labeled PRs)
