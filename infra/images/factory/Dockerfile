@@ -34,7 +34,9 @@ RUN set -eux; \
     rm -f /root/.local/bin/droid; \
     install -d -m 0755 /home/${USERNAME}/.factory/bin; \
     ln -sf /usr/local/bin/rg /home/${USERNAME}/.factory/bin/rg; \
-    rm -rf /root/.factory || true
+    install -d -m 0755 /root/.factory/bin; \
+    ln -sf /usr/local/bin/rg /root/.factory/bin/rg; \
+    chmod 755 /root/.factory /root/.factory/bin
 
 # Make sure the user can persist Factory CLI state and binaries
 RUN install -d -m 0775 /home/${USERNAME}/.factory/logs /home/${USERNAME}/.factory/cache && \
