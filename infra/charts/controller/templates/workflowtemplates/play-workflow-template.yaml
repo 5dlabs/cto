@@ -576,6 +576,13 @@ spec:
             valueFrom:
               path: /tmp/pr-number.txt
             default: ""
+      retryStrategy:
+        limit: 10
+        retryPolicy: "OnFailure"
+        backoff:
+          duration: "60s"
+          factor: 2
+          maxDuration: "10m"
       script:
         image: alpine:3.20
         env:
