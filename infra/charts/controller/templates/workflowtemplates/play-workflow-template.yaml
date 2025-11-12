@@ -244,19 +244,18 @@ spec:
                 - name: verify-update
                   value: "false"
 
-          # Remediation loop: Rex → Cleo → Tess until approved
-          - name: remediation-iteration
+          # Agent execution sequence: Rex → Cleo → Cipher → Tess
+          - name: agent-sequence
             dependencies: [update-to-implementation]
-            template: remediation-iteration
+            template: agent-sequence
             arguments:
               parameters:
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
-          # Update stage after successful remediation (approved status)
+          # Update stage after agents complete
           - name: update-to-waiting-merge
-            dependencies: [remediation-iteration]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == approved"
+            dependencies: [agent-sequence]
             template: update-workflow-stage
             arguments:
               parameters:
@@ -265,11 +264,9 @@ spec:
                 - name: verify-update
                   value: "true"
 
-          # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
-          # Suspend point 3: Wait for PR merged to main
+          # Wait for PR merged to main
           - name: wait-merge-to-main
             dependencies: [update-to-waiting-merge]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == approved"
             template: suspend-for-event
             arguments:
               parameters:
@@ -280,29 +277,15 @@ spec:
 
           - name: complete-task
             dependencies: [wait-merge-to-main]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == approved"
             template: task-completion
             arguments:
               parameters:
                 - name: task-id
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: approval-status
-                  value: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}}"
+                  value: "completed"
                 - name: merge-sha
                   value: "{{`{{workflow.parameters.merge-sha}}`}}"
-
-          - name: complete-task-failed
-            dependencies: [remediation-iteration]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == failed"
-            template: task-completion
-            arguments:
-              parameters:
-                - name: task-id
-                  value: "{{`{{workflow.parameters.task-id}}`}}"
-                - name: approval-status
-                  value: "failed"
-                - name: merge-sha
-                  value: ""
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
     # Implementation cycle: run Rex, then check/poll for PR; if not found, repeat by failing upstream
@@ -365,8 +348,8 @@ spec:
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
 
-    # Run a full remediation iteration (Rex → Cleo → Tess) with automatic retries
-    - name: remediation-iteration
+    # Run agent sequence: Rex → Cleo → Cipher → Tess (no remediation loop)
+    - name: agent-sequence
       inputs:
         parameters:
           - name: max-retries
@@ -379,15 +362,6 @@ spec:
           - name: pr-number
             valueFrom:
               parameter: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
-          - name: remediation-status
-            valueFrom:
-              parameter: "{{`{{steps.evaluate-remediation.outputs.parameters.remediation-status}}`}}"
-      retryStrategy:
-        retryPolicy: Always
-        limit: "{{`{{inputs.parameters.max-retries}}`}}"
-        backoff:
-          duration: "60s"
-          factor: 2
       steps:
         - - name: determine-agent
             template: determine-task-agent
@@ -582,23 +556,8 @@ spec:
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: final-task
                   value: "{{`{{workflow.parameters.final-task}}`}}"
-        # After Tess completes testing, update to waiting for PR merge
-        - - name: update-to-waiting-merge
-            template: update-workflow-stage
-            arguments:
-              parameters:
-                - name: new-stage
-                  value: "waiting-pr-merged"
-                - name: verify-update
-                  value: "true"
-        - - name: evaluate-remediation
-            template: assess-remediation-outcome
-            arguments:
-              parameters:
-                - name: repository
-                  value: "{{`{{workflow.parameters.repository}}`}}"
-                - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+        # After Tess completes testing, agents are done
+        # Workflow will proceed to wait for PR merge
 
     # Template to check/poll GitHub for PR existence for task label
     - name: check-or-wait-for-pr
@@ -872,132 +831,6 @@ spec:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           > /tmp/pr-url.txt
           > /tmp/pr-number.txt
-          exit 1
-    # Evaluate PR labels to determine remediation outcome
-    - name: assess-remediation-outcome
-      inputs:
-        parameters:
-          - name: repository
-          - name: pr-number
-      outputs:
-        parameters:
-          - name: remediation-status
-            valueFrom:
-              path: /tmp/remediation-status.txt
-            default: "needs-fixes"
-      script:
-        image: alpine:3.20
-        env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: app-id
-          - name: GITHUB_APP_PRIVATE_KEY
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: private-key
-        command: [sh]
-        source: |
-          #!/bin/sh
-          set -e
-
-          REPO="{{`{{inputs.parameters.repository}}`}}"
-          PR_NUMBER="{{`{{inputs.parameters.pr-number}}`}}"
-
-          if [ -z "$PR_NUMBER" ]; then
-            echo "⚠️ No PR number available; assuming remediation still required"
-            echo "needs-fixes" > /tmp/remediation-status.txt
-            exit 1
-          fi
-
-          apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
-
-          OWNER=$(echo "$REPO" | cut -d'/' -f1)
-          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
-
-          AUTH_HEADER=""
-          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
-            TEMP_KEY="/tmp/github-app-key.pem"
-            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
-            chmod 600 "$TEMP_KEY"
-
-            NOW=$(date +%s)
-            EXP=$((NOW + 600))
-            HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
-            HDR=$(echo -n "$HDR" | tr '+/' '-_' | tr -d '=')
-            PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64)
-            PAY=$(echo -n "$PAY" | tr '+/' '-_' | tr -d '=')
-            SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
-            SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
-            JWT="$HDR.$PAY.$SIG"
-
-            INSTALLATION_ID=$(curl -s -L               -H "Authorization: Bearer $JWT"               -H "Accept: application/vnd.github+json"               "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
-
-            if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
-              INSTALLATION_ID=$(curl -s -L                 -H "Authorization: Bearer $JWT"                 -H "Accept: application/vnd.github+json"                 "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
-            fi
-
-            if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
-              TOKEN=$(curl -s -X POST                 -H "Authorization: Bearer $JWT"                 -H "Accept: application/vnd.github+json"                 "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
-              if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
-                AUTH_HEADER="Authorization: Bearer $TOKEN"
-              fi
-            fi
-
-            rm -f "$TEMP_KEY"
-          fi
-
-          MAX_ATTEMPTS=30
-          SLEEP_SECONDS=10
-
-          attempt=1
-          while [ $attempt -le $MAX_ATTEMPTS ]; do
-            echo "🔍 Checking PR #$PR_NUMBER labels (attempt $attempt/$MAX_ATTEMPTS)"
-
-            if [ -n "$AUTH_HEADER" ]; then
-              ISSUE=$(curl -s -L                 -H "Accept: application/vnd.github+json"                 -H "$AUTH_HEADER"                 "https://api.github.com/repos/$REPO/issues/$PR_NUMBER")
-            else
-              ISSUE=$(curl -s -L                 -H "Accept: application/vnd.github+json"                 "https://api.github.com/repos/$REPO/issues/$PR_NUMBER")
-            fi
-
-            LABELS=$(echo "$ISSUE" | jq -r '.labels[].name')
-
-            if echo "$LABELS" | grep -q '^approved$'; then
-              echo "approved" > /tmp/remediation-status.txt
-              echo "✅ PR approved by Tess"
-              exit 0
-            fi
-
-            if echo "$LABELS" | grep -q '^failed-remediation$'; then
-              echo "failed" > /tmp/remediation-status.txt
-              echo "⛔ Remediation marked as failed"
-              exit 0
-            fi
-
-            if echo "$LABELS" | grep -q '^needs-fixes$'; then
-              echo "needs-fixes" > /tmp/remediation-status.txt
-              echo "🔁 Needs-fixes label detected; triggering another remediation pass"
-              exit 1
-            fi
-
-            # Note: Stage transitions are now driven by GitHub PR reviews (Cleo/Tess approvals)
-            # Labels are only used for correlation (task-*, service-*, run-*) and remediation (needs-fixes)
-            if [ -z "$LABELS" ]; then
-              echo "ℹ️ PR currently has no workflow labels; waiting"
-            else
-              echo "ℹ️ Current labels: $LABELS"
-            fi
-
-            attempt=$((attempt + 1))
-            if [ $attempt -le $MAX_ATTEMPTS ]; then
-              sleep $SLEEP_SECONDS
-            fi
-          done
-
-          echo "needs-fixes" > /tmp/remediation-status.txt
-          echo "⚠️ Timed out waiting for remediation decision; retrying iteration"
           exit 1
     - name: agent-coderun
       inputs:
