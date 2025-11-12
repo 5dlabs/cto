@@ -65,28 +65,31 @@ spec:
                   pr-number: ""  # Extracted from webhook
                   repository: "cto"
               spec:
-                githubApp: "5DLabs-Atlas"
-                cli: "Claude"
-                model: "claude-sonnet-4-20250514"
-                maxTokens: 8192
-                temperature: 0.3
+                # Required fields for CodeRun CRD
+                taskId: 0  # Atlas doesn't use TaskMaster, use 0 as placeholder
+                service: "atlas-pr-guardian"  # Service identifier
                 repositoryUrl: ""  # Extracted from webhook
+                docsRepositoryUrl: "https://github.com/5dlabs/cto.git"  # Same as target repo for Atlas
+                docsProjectDirectory: "docs"  # Atlas uses CTO repo docs
                 workingDirectory: "."
+                model: "claude-sonnet-4-20250514"
+                githubApp: "5DLabs-Atlas"
                 continueSession: true  # Keep session alive across events
                 overwriteMemory: false
+                # Environment variables as HashMap (not array!)
                 env:
-                  - name: PR_NUMBER
-                    value: ""  # Extracted from webhook
-                  - name: PR_URL
-                    value: ""  # Extracted from webhook
-                  - name: REPOSITORY_FULL_NAME
-                    value: ""  # Extracted from webhook
-                  - name: GUARDIAN_MODE
-                    value: "active"
-                  - name: TARGET_REPOSITORY
-                    value: "5dlabs/cto"  # Atlas only watches CTO repo
-                  - name: MERGE_STRATEGY
-                    value: "squash"
+                  PR_NUMBER: ""  # Extracted from webhook
+                  PR_URL: ""  # Extracted from webhook
+                  REPOSITORY_FULL_NAME: ""  # Extracted from webhook
+                  GUARDIAN_MODE: "active"
+                  TARGET_REPOSITORY: "5dlabs/cto"
+                  MERGE_STRATEGY: "squash"
+                # CLI configuration (new format)
+                cliConfig:
+                  cliType: "claude"
+                  model: "claude-sonnet-4-20250514"
+                  maxTokens: 8192
+                  temperature: 0.3
 
           parameters:
             # Single dependency with conditional extraction based on event type
@@ -98,7 +101,7 @@ spec:
                 dataKey: body.repository.clone_url
               dest: spec.repositoryUrl
 
-            # PR Number - conditional based on event type
+            # PR Number - conditional based on event type (HashMap format)
             - src:
                 dependencyName: pr-events
                 dataTemplate: |
@@ -107,9 +110,9 @@ spec:
                   {{- else if .Input.body.issue.number -}}
                   {{ .Input.body.issue.number }}
                   {{- end -}}
-              dest: spec.env.0.value
+              dest: spec.env.PR_NUMBER
 
-            # PR URL - conditional based on event type
+            # PR URL - conditional based on event type (HashMap format)
             - src:
                 dependencyName: pr-events
                 dataTemplate: |
@@ -118,13 +121,13 @@ spec:
                   {{- else if .Input.body.issue.html_url -}}
                   {{ .Input.body.issue.html_url }}
                   {{- end -}}
-              dest: spec.env.1.value
+              dest: spec.env.PR_URL
 
-            # Repository full name (same for both)
+            # Repository full name (HashMap format)
             - src:
                 dependencyName: pr-events
                 dataKey: body.repository.full_name
-              dest: spec.env.2.value
+              dest: spec.env.REPOSITORY_FULL_NAME
 
             # PR number label - conditional
             - src:
