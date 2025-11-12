@@ -78,6 +78,13 @@ spec:
               spec:
                 serviceAccountName: agent-workflow-sa
                 entrypoint: validate-deployment
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: deployment-state
