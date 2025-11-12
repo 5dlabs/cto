@@ -279,4 +279,3 @@ data:
     - **CI recovery rate**: % of CI failures fixed automatically
     - **Blocked rate**: % of PRs requiring human intervention
 
-
