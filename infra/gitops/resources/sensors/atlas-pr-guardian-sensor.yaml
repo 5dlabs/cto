@@ -21,12 +21,13 @@ spec:
             type: string
             value:
               - "5dlabs/cto"
-          # Accept both pull_request and issue_comment events
+          # Accept pull_request, issue_comment, and pull_request_review events
           - path: body.X-GitHub-Event
             type: string
             value:
               - pull_request
               - issue_comment
+              - pull_request_review
           # Filter PR actions to relevant ones only
           - path: body.action
             type: string
@@ -36,6 +37,7 @@ spec:
               - synchronize
               - ready_for_review
               - created
+              - submitted
         # Use exprs to ensure issue_comment events are only on PRs
         exprs:
           # For issue_comment events, verify it's on a PR (not a regular issue)
