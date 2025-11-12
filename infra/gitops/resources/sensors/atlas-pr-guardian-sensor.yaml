@@ -27,6 +27,22 @@ spec:
             value:
               - pull_request
               - issue_comment
+          # Filter PR actions to relevant ones only
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+              - ready_for_review
+              - created
+        # Use exprs to ensure issue_comment events are only on PRs
+        exprs:
+          # For issue_comment events, verify it's on a PR (not a regular issue)
+          - expr: 'body.X-GitHub-Event != "issue_comment" || body.issue.pull_request != null'
+            fields:
+              - name: is_pr_comment
+                path: body.issue.pull_request
 
   triggers:
     - template:
