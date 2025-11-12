@@ -54,7 +54,7 @@ spec:
           operation: create
           source:
             resource:
-              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              apiVersion: agents.platform/v1
               kind: CodeRun
               metadata:
                 generateName: coderun-atlas-pr-
@@ -170,6 +170,7 @@ data:
     - Monitor for comments from Cursor Bugbot (https://github.com/apps/cursor)
     - Analyze Bugbot feedback and apply fixes
     - Push fixes to PR branch
+    - **IMPORTANT**: After pushing fixes, re-initialize Bugbot by adding a comment: "@bugbot run"
     - Verify Bugbot is satisfied (no open threads)
 
     ### 2. CI Failure Recovery
