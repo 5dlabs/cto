@@ -60,28 +60,10 @@ spec:
             value:
               - "5dlabs/cto"
 
-    # Trigger on status/check updates (CI failures)
-    - name: status-event
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          - path: headers.X-GitHub-Event
-            type: string
-            value:
-              - status
-              - check_run
-              - check_suite
-          # Only 5dlabs/cto repository
-          - path: body.repository.full_name
-            type: string
-            value:
-              - "5dlabs/cto"
-
   triggers:
     - template:
         name: create-or-resume-atlas-guardian
-        conditions: "pr-event || comment-event || status-event"
+        conditions: "pr-event || comment-event"
         k8s:
           # Note: operation: create will spawn new CodeRuns for each event.
           # The controller should implement deduplication logic to:
@@ -212,36 +194,6 @@ spec:
               dest: metadata.labels.repository
               operation: override
 
-            # Extract PR information from status event
-            # Note: Status events don't directly contain PR info, but they reference commits
-            # The controller or Atlas agent must query GitHub API to find associated PR
-            # For now, we extract what's available and let Atlas discover the PR
-            - src:
-                dependencyName: status-event
-                dataKey: body.repository.clone_url
-              dest: spec.repositoryUrl
-              operation: override
-
-            - src:
-                dependencyName: status-event
-                dataKey: body.repository.full_name
-              dest: spec.env.2.value
-              operation: override
-
-            - src:
-                dependencyName: status-event
-                dataTemplate: "{{ .Input.body.repository.name }}"
-              dest: metadata.labels.repository
-              operation: override
-
-            # For status events, Atlas must query GitHub API to find PR number
-            # using the commit SHA from the status event
-            - src:
-                dependencyName: status-event
-                dataKey: body.sha
-              dest: spec.env.0.value
-              operation: override
-
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -260,6 +212,8 @@ data:
     - **Trigger**: PR opened, reopened, synchronized, or new comments added
     - **Scope**: Only 5dlabs/cto repository
     - **Lifecycle**: One Atlas instance per PR, stays active until PR is merged or closed
+    - **Note**: CI status events not used as triggers due to payload schema complexity;
+      Atlas detects CI changes via PR synchronize events and comment notifications
 
     ## Responsibilities
 
