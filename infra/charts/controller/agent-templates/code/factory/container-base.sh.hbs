@@ -419,11 +419,12 @@ ensure_pr_created() {
   fi
 
   # Check if PR already exists for this branch (with explicit repo context)
+  # First check for open PRs, then closed PRs if needed
   refresh_token_if_needed || true
   if [ -n "$REPO_SLUG" ]; then
-    PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number,state --limit 1 2>&1)
   else
-  PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number,state --limit 1 2>&1)
   fi
   PR_EXIT_CODE=$?
 
@@ -432,9 +433,9 @@ ensure_pr_created() {
     refresh_github_token || true
     ensure_gh_authenticated
     if [ -n "$REPO_SLUG" ]; then
-      PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+      PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state open --head "$CURRENT_BRANCH" --json number,state --limit 1 2>&1)
     else
-    PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number --limit 1 2>&1)
+      PR_OUTPUT=$(gh pr list --state open --head "$CURRENT_BRANCH" --json number,state --limit 1 2>&1)
     fi
     PR_EXIT_CODE=$?
   fi
@@ -450,9 +451,26 @@ ensure_pr_created() {
     PR_DATA="[]"
   fi
 
+  # Check if open PR exists
   if [ "$(printf '%s' "$PR_DATA" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
-    echo "✅ Pull request already exists for branch $CURRENT_BRANCH"
+    EXISTING_PR_NUM=$(printf '%s' "$PR_DATA" | jq -r '.[0].number // empty')
+    echo "✅ Pull request already exists for branch $CURRENT_BRANCH: PR #$EXISTING_PR_NUM"
     return
+  fi
+
+  # If no open PR, check for closed PRs (may indicate previous run)
+  # If closed PR exists, we should still create a new PR for this run
+  if [ -n "$REPO_SLUG" ]; then
+    CLOSED_PR_OUTPUT=$(gh pr list -R "$REPO_SLUG" --state closed --head "$CURRENT_BRANCH" --json number,state --limit 1 2>&1)
+  else
+    CLOSED_PR_OUTPUT=$(gh pr list --state closed --head "$CURRENT_BRANCH" --json number,state --limit 1 2>&1)
+  fi
+  
+  if [ "$(printf '%s' "$CLOSED_PR_OUTPUT" | jq 'length' 2>/dev/null || echo 0)" -gt 0 ]; then
+    CLOSED_PR_NUM=$(printf '%s' "$CLOSED_PR_OUTPUT" | jq -r '.[0].number // empty')
+    echo "ℹ️ Found CLOSED PR #$CLOSED_PR_NUM for branch $CURRENT_BRANCH (from previous run)"
+    echo "   Creating new PR for current workflow run..."
+    # Continue to create new PR below
   fi
 
   BASE_BRANCH="${PR_BASE_BRANCH:-main}"
@@ -653,11 +671,19 @@ EOF
   # Note: Critical guards (PR_NUMBER and WORKFLOW_STAGE checks) are now at the top of this function
   # to prevent duplicate PRs before any PR creation setup occurs
 
-  if gh pr create "${LABEL_ARGS[@]}"; then
+  if gh pr create "${LABEL_ARGS[@]}" 2>&1; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
     echo "ℹ️  Morgan PM will link this PR to the GitHub Project during workflow execution"
   else
-    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+    PR_CREATE_EXIT=$?
+    echo "⚠️ Failed to create pull request automatically (exit code: $PR_CREATE_EXIT)"
+    echo "   Possible reasons:"
+    echo "   - PR already exists for this branch (even if closed)"
+    echo "   - Authentication failed"
+    echo "   - Branch has no commits ahead of base"
+    echo "   - Network/API issues"
+    # Don't fail the workflow - PR creation is best-effort
+    return 0
   fi
 }
 

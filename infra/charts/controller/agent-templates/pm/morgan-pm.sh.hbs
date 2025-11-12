@@ -485,6 +485,9 @@ create_task_issues() {
 # ============================================================================
 
 monitor_and_sync() {
+  # Set monitoring phase flag so ERR trap is lenient
+  export MONITORING_PHASE=true
+  
   log "👀 Phase 3: Event-Driven Monitoring & Synchronization"
   log "🔄 Starting real-time workflow watch..."
   
@@ -1928,11 +1931,35 @@ main() {
 }
 
 # Trap errors and cleanup
-trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2; exit 1' ERR
+# Only log errors - let them propagate so main || { ... } block can handle them
+# The trap should not call exit directly, as that prevents error handling logic from executing
+# Errors will cause exit via 'set -euo pipefail' (line 2), allowing main || { ... } to handle them
+trap 'echo "❌ Morgan PM error on line $LINENO: $BASH_COMMAND" >&2' ERR
+
+# Trap SIGTERM for graceful daemon shutdown (Argo sends SIGTERM when workflow fails/completes)
+# Daemon should exit gracefully with code 0 when terminated
+trap 'echo "🛑 Received SIGTERM - shutting down Morgan PM daemon gracefully..."; exit 0' TERM
 
 echo "🔍 DEBUG: About to call main()..."
-# Run main
-main
+# Run main with error handling - only catch errors during monitoring phase
+# Initialization errors will fail the workflow via 'set -euo pipefail' (line 2)
+# The ERR trap logs errors but doesn't exit - 'set -e' handles the exit
+main || {
+  EXIT_CODE=$?
+  # Only convert to success if we're in monitoring phase
+  # Initialization failures (before MONITORING_PHASE=true) should fail
+  if [[ "${MONITORING_PHASE:-false}" == "true" ]]; then
+    echo "⚠️ Morgan PM encountered an error during monitoring, but continuing as daemon..."
+    echo "   Error code: $EXIT_CODE"
+    # Log the error but don't fail workflow - monitoring errors are non-fatal
+    exit 0
+  else
+    echo "❌ Morgan PM initialization failed with exit code: $EXIT_CODE"
+    echo "   This is a fatal error - workflow should fail"
+    # Propagate the error - initialization failures should fail the workflow
+    exit $EXIT_CODE
+  fi
+}
 
 echo "✅ DEBUG: main() completed successfully"
 

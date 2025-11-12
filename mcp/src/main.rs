@@ -200,6 +200,8 @@ struct PlayDefaults {
     docs_repository: Option<String>,
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
+    #[serde(rename = "workingDirectory")]
+    working_directory: Option<String>,
     #[serde(rename = "maxRetries")]
     max_retries: Option<u32>,
     #[serde(rename = "implementationMaxRetries")]
@@ -1098,12 +1100,21 @@ struct TaskMasterTask {
 }
 
 #[derive(Debug, Deserialize)]
-struct TasksFile {
+struct TaskTag {
     tasks: Vec<TaskMasterTask>,
 }
 
-/// Find tasks.json in repository
-fn find_tasks_file() -> Option<std::path::PathBuf> {
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum TasksFile {
+    /// New tagged format: { "master": { "tasks": [...] }, "other-tag": { "tasks": [...] } }
+    Tagged(HashMap<String, TaskTag>),
+    /// Legacy flat format: { "tasks": [...] }
+    Flat { tasks: Vec<TaskMasterTask> },
+}
+
+/// Find tasks.json in repository, optionally starting from a working directory
+fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
     // Try to get workspace directory
     let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
         .ok()
@@ -1115,22 +1126,41 @@ fn find_tasks_file() -> Option<std::path::PathBuf> {
         })
         .or_else(|| std::env::current_dir().ok())?;
 
-    let candidates = vec![
-        workspace_dir
+    // If working_dir is provided, use it as the base directory
+    let base_dir = if let Some(wd) = working_dir {
+        workspace_dir.join(wd)
+    } else {
+        workspace_dir.clone()
+    };
+
+    let mut candidates = vec![
+        base_dir
             .join(".taskmaster")
             .join("tasks")
             .join("tasks.json"),
-        workspace_dir.join(".taskmaster").join("tasks.json"),
-        workspace_dir.join("tasks.json"),
+        base_dir.join(".taskmaster").join("tasks.json"),
+        base_dir.join("tasks.json"),
     ];
+
+    // If working_dir was provided, also try workspace root as fallback
+    if working_dir.is_some() {
+        candidates.push(
+            workspace_dir
+                .join(".taskmaster")
+                .join("tasks")
+                .join("tasks.json"),
+        );
+        candidates.push(workspace_dir.join(".taskmaster").join("tasks.json"));
+        candidates.push(workspace_dir.join("tasks.json"));
+    }
 
     candidates.into_iter().find(|p| p.exists())
 }
 
 /// Get next available task from `TaskMaster`
-fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
+fn get_next_taskmaster_task(working_dir: Option<&str>) -> Result<Option<TaskMasterTask>> {
     let tasks_file =
-        find_tasks_file().ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1138,7 +1168,17 @@ fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
     let tasks_data: TasksFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
 
-    let tasks = tasks_data.tasks;
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
 
     // Build task map for dependency checking
     let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
@@ -1194,9 +1234,9 @@ fn get_next_taskmaster_task() -> Result<Option<TaskMasterTask>> {
 }
 
 /// Find blocked tasks (tasks with all pending dependencies)
-fn find_blocked_taskmaster_tasks() -> Result<Vec<TaskMasterTask>> {
+fn find_blocked_taskmaster_tasks(working_dir: Option<&str>) -> Result<Vec<TaskMasterTask>> {
     let tasks_file =
-        find_tasks_file().ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
+        find_tasks_file(working_dir).ok_or_else(|| anyhow!("tasks.json not found in workspace"))?;
 
     let content = std::fs::read_to_string(&tasks_file)
         .with_context(|| format!("Failed to read tasks file: {}", tasks_file.display()))?;
@@ -1204,7 +1244,17 @@ fn find_blocked_taskmaster_tasks() -> Result<Vec<TaskMasterTask>> {
     let tasks_data: TasksFile = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse tasks.json: {}", tasks_file.display()))?;
 
-    let tasks = tasks_data.tasks;
+    // Extract tasks from either format
+    let tasks = match tasks_data {
+        TasksFile::Tagged(mut tags) => {
+            // Use "master" tag by default, or first available tag
+            tags.remove("master")
+                .or_else(|| tags.into_values().next())
+                .ok_or_else(|| anyhow!("No task tags found in tasks.json"))?
+                .tasks
+        }
+        TasksFile::Flat { tasks } => tasks,
+    };
     let task_map: HashMap<u32, &TaskMasterTask> = tasks.iter().map(|t| (t.id, t)).collect();
 
     let mut blocked = Vec::new();
@@ -1250,6 +1300,14 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| config.defaults.play.repository.clone())
         .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
 
+    // Get working directory from config
+    let working_dir = config
+        .defaults
+        .play
+        .working_directory
+        .as_ref()
+        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+
     // Read progress from ConfigMap
     let progress = read_play_progress(&repository)?;
 
@@ -1257,7 +1315,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let active_workflow = find_active_play_workflow(&repository)?;
 
     // Check for blocked tasks
-    let blocked_tasks = find_blocked_taskmaster_tasks().unwrap_or_default();
+    let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
 
     // Build comprehensive status response
     match (progress, active_workflow) {
@@ -1304,7 +1362,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
             // No active workflow
 
             // Try to get next task
-            let next_task = get_next_taskmaster_task()?;
+            let next_task = get_next_taskmaster_task(working_dir)?;
 
             if let Some(task) = next_task {
                 Ok(json!({
@@ -1359,6 +1417,14 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Validate repository URL
     validate_repository_url(&repository)?;
 
+    // Get working directory from config
+    let working_dir = config
+        .defaults
+        .play
+        .working_directory
+        .as_ref()
+        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
         // Explicit task_id provided
@@ -1407,12 +1473,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
         // 3. Query TaskMaster for next task
         eprintln!("🔍 Querying TaskMaster for next available task...");
-        if let Some(task) = get_next_taskmaster_task()? {
+        if let Some(task) = get_next_taskmaster_task(working_dir)? {
             eprintln!("✅ Found next task: {} - {}", task.id, task.title);
             Some(task.id)
         } else {
             // Check for blocked tasks to provide helpful feedback
-            let blocked_tasks = find_blocked_taskmaster_tasks().unwrap_or_default();
+            let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
 
             let message = if blocked_tasks.is_empty() {
                 "No tasks available - all tasks are completed".to_string()
@@ -2120,6 +2186,98 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let repo_label = format!("repository={}", repository.replace('/', "-"));
     let workflow_type_label = "workflow-type=play".to_string();
     let task_id_label = format!("task-id={task_id}");
+
+    // CLEANUP: Delete old play workflows for this repository before starting new one
+    // This ensures old GitHub checks get cancelled properly
+    eprintln!("🧹 Checking for old play workflows to clean up...");
+    let cleanup_result = run_argo_cli(&[
+        "list",
+        "-n",
+        "agent-platform",
+        "-l",
+        &repo_label,
+        "-l",
+        &workflow_type_label,
+        "-o",
+        "json",
+    ]);
+
+    if let Ok(workflows_json) = cleanup_result {
+        if let Ok(workflows) = serde_json::from_str::<serde_json::Value>(&workflows_json) {
+            if let Some(items) = workflows.get("items").and_then(|v| v.as_array()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
+                for workflow in items {
+                    if let (Some(name), Some(created_at), phase) = (
+                        workflow["metadata"]["name"].as_str(),
+                        workflow["metadata"]["creationTimestamp"].as_str(),
+                        workflow["status"]["phase"].as_str(),
+                    ) {
+                        // Parse RFC3339 timestamp
+                        if let Ok(created_time) = chrono::DateTime::parse_from_rfc3339(created_at) {
+                            let created_secs = created_time.timestamp();
+                            // Only process workflows with valid (non-negative) timestamps
+                            if created_secs >= 0 {
+                                #[allow(clippy::cast_sign_loss)]
+                                let created_secs_u64 = created_secs as u64;
+
+                                // Handle clock skew: if workflow timestamp is in the future, treat as age 0
+                                let age_secs = if created_secs_u64 > now {
+                                    eprintln!(
+                                        "  ⚠️  Workflow has future timestamp (clock skew detected): {name}"
+                                    );
+                                    0
+                                } else {
+                                    now - created_secs_u64
+                                };
+
+                                // Skip workflows created within the last 10 seconds to avoid race conditions
+                                if age_secs < 10 {
+                                    eprintln!(
+                                        "  ⏭️  Skipping recent workflow ({age_secs}s old): {name}"
+                                    );
+                                    continue;
+                                }
+
+                                // Check workflow status - only delete completed/failed workflows
+                                // Skip running, pending, or uninitialized workflows to avoid data loss
+                                let phase_lower = phase.map(str::to_lowercase);
+                                match phase_lower.as_deref() {
+                                    Some("running" | "pending") => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping active workflow (status: {phase:?}): {name}"
+                                        );
+                                    }
+                                    Some("succeeded" | "failed" | "error") => {
+                                        eprintln!(
+                                            "  🗑️  Deleting completed workflow ({age_secs}s old, status: {phase:?}): {name}"
+                                        );
+                                        let _ =
+                                            run_argo_cli(&["stop", name, "-n", "agent-platform"]);
+                                        let _ =
+                                            run_argo_cli(&["delete", name, "-n", "agent-platform"]);
+                                    }
+                                    None => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with no phase (may be initializing): {name}"
+                                        );
+                                    }
+                                    Some(other) => {
+                                        eprintln!(
+                                            "  ⏭️  Skipping workflow with unknown status '{other}': {name}"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let mut args: Vec<&str> = vec![
         "submit",
