@@ -124,35 +124,27 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Test 4: Validate Event Dependencies"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Note: Sensor was refactored to use single pr-or-comment dependency
-# instead of separate pr-event and comment-event dependencies.
-# This is required because Argo Events doesn't allow the same eventName
-# to be referenced by multiple dependencies.
+# Note: Sensor uses two separate dependencies for different event types
+# pr-lifecycle: for PR open/sync/ready events
+# pr-comments: for issue comment events (Bugbot feedback)
 
-if grep -q "name: pr-or-comment" "$SENSOR_FILE"; then
-  pass "Combined pr-or-comment dependency configured (Argo Events compliant)"
+if grep -q "name: pr-lifecycle" "$SENSOR_FILE"; then
+  pass "PR lifecycle dependency configured"
 else
-  fail "pr-or-comment dependency missing"
+  fail "PR lifecycle dependency missing"
 fi
 
-# Check for old separate dependencies (should not exist)
-if grep -q "name: pr-event" "$SENSOR_FILE"; then
-  warn "Old pr-event dependency found (should be merged into pr-or-comment)"
+if grep -q "name: pr-comments" "$SENSOR_FILE"; then
+  pass "PR comments dependency configured"
+else
+  fail "PR comments dependency missing"
 fi
 
-if grep -q "name: comment-event" "$SENSOR_FILE"; then
-  warn "Old comment-event dependency found (should be merged into pr-or-comment)"
-fi
-
+# Check that status-event is not present (removed to avoid schema complexity)
 if grep -q "name: status-event" "$SENSOR_FILE"; then
   warn "Status event dependency found (should be removed for schema simplicity)"
-fi
-
-# Check for expr-based filtering
-if grep -q "exprs:" "$SENSOR_FILE"; then
-  pass "Expression-based filtering configured for complex OR logic"
 else
-  warn "Expression-based filtering not found (needed for multi-event matching)"
+  pass "Status event dependency correctly omitted"
 fi
 
 # Test 5: Check CodeRun trigger
