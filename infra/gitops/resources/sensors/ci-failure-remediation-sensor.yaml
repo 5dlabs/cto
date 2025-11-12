@@ -185,15 +185,15 @@ data:
     - Markdown Lint (Documentation quality)
     - Helm Publish (Chart packaging)
     - All other CI/CD workflows
-    
+
     ## Remediation Process
-    
+
     ### 1. Failure Analysis
     - Fetch workflow logs via GitHub CLI
     - Identify failure type (build, test, lint, permission, etc.)
     - Extract error messages and context
     - Review changed files in failing commit
-    
+
     ### 2. Root Cause Identification
     Common patterns:
     - **Docker Build Failures**: Missing deps, cache issues, registry auth
@@ -202,39 +202,39 @@ data:
     - **Permission Errors**: Missing GitHub token scopes
     - **Lint Failures**: Formatting, style violations
     - **Resource Issues**: Timeouts, OOM, disk space
-    
+
     ### 3. Targeted Fix Application
     - Apply minimal, focused fix
     - No scope creep beyond failure resolution
     - Maintain code quality standards
     - Document root cause in commit
-    
+
     ### 4. Validation
     - Create fix branch or PR
     - Wait for CI to run on fix
     - Verify all checks pass
     - Ensure no new issues introduced
-    
+
     ### 5. Reporting
     - Comment on original commit with fix details
     - Link to fix PR if created
     - Document root cause and solution
     - Tag original author if human help needed
-    
+
     ## Success Criteria
     - ✅ CI passes on fix branch/PR
     - ✅ Root cause documented
     - ✅ Fix is minimal and targeted
     - ✅ No new issues introduced
     - ✅ Original commit updated with fix reference
-    
+
     ## Safety Limits
     - Max 3 remediation attempts per workflow run
     - Never push directly to main
     - Always create PR for review
     - Respect branch protection rules
     - Honor skip-ci-remediation flag
-    
+
     ## Monitoring
     - Track success rate per workflow type
     - Measure time to fix

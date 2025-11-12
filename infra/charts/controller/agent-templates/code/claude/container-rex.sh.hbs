@@ -1417,7 +1417,10 @@ Common failure patterns and their fixes:
 git fetch origin
 git checkout {{env.FAILURE_BRANCH}}
 git pull origin {{env.FAILURE_BRANCH}}
-git checkout -b fix/ci-{{env.WORKFLOW_NAME}}-$(date +%s)
+
+# Sanitize workflow name for branch (replace spaces with hyphens)
+WORKFLOW_SLUG=$(echo "{{env.WORKFLOW_NAME}}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+git checkout -b fix/ci-${WORKFLOW_SLUG}-$(date +%s)
 
 # Make your fixes
 # ... apply changes ...
