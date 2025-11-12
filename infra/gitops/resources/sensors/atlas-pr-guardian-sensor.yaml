@@ -110,89 +110,110 @@ spec:
                     value: "squash"
 
           parameters:
-            # Extract repository URL
+            # Use conditional templates to extract data based on which event triggered
+            # This prevents empty values from non-triggered events from overwriting valid data
+
+            # Extract repository URL (works for both event types)
             - src:
                 dependencyName: pr-event
-                dataKey: body.repository.clone_url
+                dataTemplate: |
+                  {{- if .Input.body.repository.clone_url -}}
+                  {{ .Input.body.repository.clone_url }}
+                  {{- end -}}
               dest: spec.repositoryUrl
-              operation: override
 
-            # Extract PR number from PR event
-            - src:
-                dependencyName: pr-event
-                dataKey: body.pull_request.number
-              dest: spec.env.0.value
-              operation: override
-
-            # Extract PR URL from PR event
-            - src:
-                dependencyName: pr-event
-                dataKey: body.pull_request.html_url
-              dest: spec.env.1.value
-              operation: override
-
-            # Extract repository full name from PR event
-            - src:
-                dependencyName: pr-event
-                dataKey: body.repository.full_name
-              dest: spec.env.2.value
-              operation: override
-
-            # Label with PR number from PR event
-            - src:
-                dependencyName: pr-event
-                dataTemplate: "{{ .Input.body.pull_request.number }}"
-              dest: metadata.labels.pr-number
-              operation: override
-
-            # Label with repository from PR event
-            - src:
-                dependencyName: pr-event
-                dataTemplate: "{{ .Input.body.repository.name }}"
-              dest: metadata.labels.repository
-              operation: override
-
-            # Extract PR number from comment event
             - src:
                 dependencyName: comment-event
-                dataKey: body.issue.number
-              dest: spec.env.0.value
-              operation: override
-
-            # Extract PR URL from comment event
-            - src:
-                dependencyName: comment-event
-                dataKey: body.issue.html_url
-              dest: spec.env.1.value
-              operation: override
-
-            # Extract repository full name from comment event
-            - src:
-                dependencyName: comment-event
-                dataKey: body.repository.full_name
-              dest: spec.env.2.value
-              operation: override
-
-            # Extract repository URL from comment event
-            - src:
-                dependencyName: comment-event
-                dataKey: body.repository.clone_url
+                dataTemplate: |
+                  {{- if .Input.body.repository.clone_url -}}
+                  {{ .Input.body.repository.clone_url }}
+                  {{- end -}}
               dest: spec.repositoryUrl
-              operation: override
 
-            # Label with PR number from comment event
+            # Extract PR number
+            - src:
+                dependencyName: pr-event
+                dataTemplate: |
+                  {{- if .Input.body.pull_request.number -}}
+                  {{ .Input.body.pull_request.number }}
+                  {{- end -}}
+              dest: spec.env.0.value
+
             - src:
                 dependencyName: comment-event
-                dataTemplate: "{{ .Input.body.issue.number }}"
+                dataTemplate: |
+                  {{- if .Input.body.issue.number -}}
+                  {{ .Input.body.issue.number }}
+                  {{- end -}}
+              dest: spec.env.0.value
+
+            # Extract PR URL
+            - src:
+                dependencyName: pr-event
+                dataTemplate: |
+                  {{- if .Input.body.pull_request.html_url -}}
+                  {{ .Input.body.pull_request.html_url }}
+                  {{- end -}}
+              dest: spec.env.1.value
+
+            - src:
+                dependencyName: comment-event
+                dataTemplate: |
+                  {{- if .Input.body.issue.html_url -}}
+                  {{ .Input.body.issue.html_url }}
+                  {{- end -}}
+              dest: spec.env.1.value
+
+            # Extract repository full name
+            - src:
+                dependencyName: pr-event
+                dataTemplate: |
+                  {{- if .Input.body.repository.full_name -}}
+                  {{ .Input.body.repository.full_name }}
+                  {{- end -}}
+              dest: spec.env.2.value
+
+            - src:
+                dependencyName: comment-event
+                dataTemplate: |
+                  {{- if .Input.body.repository.full_name -}}
+                  {{ .Input.body.repository.full_name }}
+                  {{- end -}}
+              dest: spec.env.2.value
+
+            # Label with PR number
+            - src:
+                dependencyName: pr-event
+                dataTemplate: |
+                  {{- if .Input.body.pull_request.number -}}
+                  {{ .Input.body.pull_request.number }}
+                  {{- end -}}
               dest: metadata.labels.pr-number
-              operation: override
 
-            # Label with repository from comment event
             - src:
                 dependencyName: comment-event
-                dataTemplate: "{{ .Input.body.repository.name }}"
+                dataTemplate: |
+                  {{- if .Input.body.issue.number -}}
+                  {{ .Input.body.issue.number }}
+                  {{- end -}}
+              dest: metadata.labels.pr-number
+
+            # Label with repository name
+            - src:
+                dependencyName: pr-event
+                dataTemplate: |
+                  {{- if .Input.body.repository.name -}}
+                  {{ .Input.body.repository.name }}
+                  {{- end -}}
               dest: metadata.labels.repository
-              operation: override
+
+            - src:
+                dependencyName: comment-event
+                dataTemplate: |
+                  {{- if .Input.body.repository.name -}}
+                  {{ .Input.body.repository.name }}
+                  {{- end -}}
+              dest: metadata.labels.repository
 
 ---
 apiVersion: v1
