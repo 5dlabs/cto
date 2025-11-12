@@ -827,7 +827,7 @@ spec:
           echo ""
           echo "🔍 Possible Causes:"
           if [ "$STAGE" = "implementation" ]; then
-            echo "  1. Implementation agent hasn't created PR yet (waited 90s)"
+            echo "  1. Implementation agent hasn't created PR yet (waited 300s / 5 minutes)"
             echo "  2. Implementation failed before PR creation"
             echo "  3. PR created with different branch name or labels"
             echo "  4. All PRs for this branch are CLOSED (previous runs)"
