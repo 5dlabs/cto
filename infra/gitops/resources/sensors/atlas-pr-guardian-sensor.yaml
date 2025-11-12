@@ -1,1 +1,389 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: atlas-pr-guardian
+  namespace: argo
+spec:
+  template:
+    serviceAccountName: argo-events-sa
+
+  dependencies:
+    # Trigger on PR lifecycle events
+    - name: pr-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Only pull_request events
+          - path: headers.X-GitHub-Event
+            type: string
+            value:
+              - pull_request
+          # Trigger on PR open, reopen, sync, or ready_for_review
+          - path: body.action
+            type: string
+            value:
+              - opened
+              - reopened
+              - synchronize
+              - ready_for_review
+          # Only 5dlabs/cto repository
+          - path: body.repository.full_name
+            type: string
+            value:
+              - "5dlabs/cto"
+
+    # Trigger on new issue comments (for Bugbot feedback)
+    - name: comment-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-GitHub-Event
+            type: string
+            value:
+              - issue_comment
+          - path: body.action
+            type: string
+            value:
+              - created
+          # Only on PRs (not plain issues)
+          - path: body.issue.pull_request
+            type: string
+            comparator: "!="
+            value:
+              - ""
+          # Only 5dlabs/cto repository
+          - path: body.repository.full_name
+            type: string
+            value:
+              - "5dlabs/cto"
+
+    # Trigger on status/check updates (CI failures)
+    - name: status-event
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          - path: headers.X-GitHub-Event
+            type: string
+            value:
+              - status
+              - check_run
+              - check_suite
+          # Only 5dlabs/cto repository
+          - path: body.repository.full_name
+            type: string
+            value:
+              - "5dlabs/cto"
+
+  triggers:
+    - template:
+        name: create-or-resume-atlas-guardian
+        conditions: "pr-event || comment-event || status-event"
+        k8s:
+          # Note: operation: create will spawn new CodeRuns for each event.
+          # The controller should implement deduplication logic to:
+          # 1. Check if a CodeRun with matching pr-number label already exists
+          # 2. If exists and Running, skip creation (let existing session handle it)
+          # 3. If exists and Completed/Failed, create new CodeRun for fresh start
+          # 4. If not exists, create new CodeRun
+          # This ensures one Atlas instance per PR while allowing recovery from failures.
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-atlas-pr-
+                namespace: agent-platform
+                labels:
+                  agent: atlas
+                  role: pr-guardian
+                  pr-number: ""  # Extracted from webhook
+                  repository: "cto"
+              spec:
+                githubApp: "5DLabs-Atlas"
+                cli: "Claude"
+                model: "claude-sonnet-4-20250514"
+                maxTokens: 8192
+                temperature: 0.3
+                repositoryUrl: ""  # Extracted from webhook
+                workingDirectory: "."
+                continueSession: true  # Keep session alive across events
+                overwriteMemory: false
+                env:
+                  - name: PR_NUMBER
+                    value: ""  # Extracted from webhook
+                  - name: PR_URL
+                    value: ""  # Extracted from webhook
+                  - name: REPOSITORY_FULL_NAME
+                    value: ""  # Extracted from webhook
+                  - name: GUARDIAN_MODE
+                    value: "active"
+                  - name: TARGET_REPOSITORY
+                    value: "5dlabs/cto"  # Atlas only watches CTO repo
+                  - name: MERGE_STRATEGY
+                    value: "squash"
+
+          parameters:
+            # Extract repository URL
+            - src:
+                dependencyName: pr-event
+                dataKey: body.repository.clone_url
+              dest: spec.repositoryUrl
+              operation: override
+
+            # Extract PR number from PR event
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.number
+              dest: spec.env.0.value
+              operation: override
+
+            # Extract PR URL from PR event
+            - src:
+                dependencyName: pr-event
+                dataKey: body.pull_request.html_url
+              dest: spec.env.1.value
+              operation: override
+
+            # Extract repository full name from PR event
+            - src:
+                dependencyName: pr-event
+                dataKey: body.repository.full_name
+              dest: spec.env.2.value
+              operation: override
+
+            # Label with PR number from PR event
+            - src:
+                dependencyName: pr-event
+                dataTemplate: "{{ .Input.body.pull_request.number }}"
+              dest: metadata.labels.pr-number
+              operation: override
+
+            # Label with repository from PR event
+            - src:
+                dependencyName: pr-event
+                dataTemplate: "{{ .Input.body.repository.name }}"
+              dest: metadata.labels.repository
+              operation: override
+
+            # Extract PR number from comment event
+            - src:
+                dependencyName: comment-event
+                dataKey: body.issue.number
+              dest: spec.env.0.value
+              operation: override
+
+            # Extract PR URL from comment event
+            - src:
+                dependencyName: comment-event
+                dataKey: body.issue.html_url
+              dest: spec.env.1.value
+              operation: override
+
+            # Extract repository full name from comment event
+            - src:
+                dependencyName: comment-event
+                dataKey: body.repository.full_name
+              dest: spec.env.2.value
+              operation: override
+
+            # Extract repository URL from comment event
+            - src:
+                dependencyName: comment-event
+                dataKey: body.repository.clone_url
+              dest: spec.repositoryUrl
+              operation: override
+
+            # Label with PR number from comment event
+            - src:
+                dependencyName: comment-event
+                dataTemplate: "{{ .Input.body.issue.number }}"
+              dest: metadata.labels.pr-number
+              operation: override
+
+            # Label with repository from comment event
+            - src:
+                dependencyName: comment-event
+                dataTemplate: "{{ .Input.body.repository.name }}"
+              dest: metadata.labels.repository
+              operation: override
+
+            # Extract PR information from status event
+            # Note: Status events don't directly contain PR info, but they reference commits
+            # The controller or Atlas agent must query GitHub API to find associated PR
+            # For now, we extract what's available and let Atlas discover the PR
+            - src:
+                dependencyName: status-event
+                dataKey: body.repository.clone_url
+              dest: spec.repositoryUrl
+              operation: override
+
+            - src:
+                dependencyName: status-event
+                dataKey: body.repository.full_name
+              dest: spec.env.2.value
+              operation: override
+
+            - src:
+                dependencyName: status-event
+                dataTemplate: "{{ .Input.body.repository.name }}"
+              dest: metadata.labels.repository
+              operation: override
+
+            # For status events, Atlas must query GitHub API to find PR number
+            # using the commit SHA from the status event
+            - src:
+                dependencyName: status-event
+                dataKey: body.sha
+              dest: spec.env.0.value
+              operation: override
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-pr-guardian-strategy
+  namespace: argo
+data:
+  guardian-strategy.md: |
+    # Atlas PR Guardian Strategy
+
+    ## Mission
+    Atlas acts as a **per-PR guardian** that watches a pull request from creation to merge,
+    ensuring it stays clean, passes CI, and has no Bugbot comments before auto-merging.
+
+    ## Activation
+    - **Trigger**: PR opened, reopened, synchronized, or new comments added
+    - **Scope**: Only 5dlabs/cto repository
+    - **Lifecycle**: One Atlas instance per PR, stays active until PR is merged or closed
+
+    ## Responsibilities
+
+    ### 1. Bugbot Comment Resolution
+    - Monitor for comments from Cursor Bugbot (https://github.com/apps/cursor)
+    - Analyze Bugbot feedback and apply fixes
+    - Push fixes to PR branch
+    - Verify Bugbot is satisfied (no open threads)
+
+    ### 2. CI Failure Recovery
+    - Watch for failing status checks and CI runs
+    - Analyze failure logs
+    - Apply minimal fixes to get CI green
+    - Re-run checks if needed
+
+    ### 3. Merge Conflict Resolution
+    - Detect when PR becomes unmergeable
+    - Rebase or merge main into PR branch
+    - Resolve conflicts intelligently
+    - Ensure clean merge state
+
+    ### 4. Auto-Merge When Ready
+    - **Merge Criteria**:
+      - ✅ No open Bugbot comment threads
+      - ✅ All CI checks passing
+      - ✅ No merge conflicts
+      - ✅ PR is mergeable
+    - **Merge Strategy**: Always squash merge
+    - **Post-Merge**: Comment with summary and close Atlas session
+
+    ### 5. Blocked State Handling
+    - If Atlas cannot resolve issues after 3 attempts:
+      - Add `blocked` label to PR
+      - Post detailed comment explaining blockers
+      - Tag PR author for human intervention
+      - Suspend Atlas session until new activity
+
+    ## Workflow Loop
+
+    ```
+    PR Event (open/sync/comment) → Atlas Activated
+      ↓
+    Check PR State:
+      - Bugbot comments? → Resolve
+      - CI failing? → Fix
+      - Merge conflicts? → Resolve
+      ↓
+    Push fixes → Wait for CI
+      ↓
+    All checks pass? → Auto-merge (squash)
+      ↓
+    Success → Post summary, close session
+    ```
+
+    ## Session Continuity
+    - `continueSession: true` ensures Atlas remembers context across events
+    - Each PR gets its own Atlas workspace
+    - Session persists until PR is merged or closed
+
+    ## Error Handling
+    - **Transient failures**: Retry up to 3 times
+    - **Persistent failures**: Add `blocked` label, request human help
+    - **Rate limits**: Back off and retry
+    - **Permissions issues**: Alert in PR comment
+
+    ## Example Scenarios
+
+    ### Scenario A: Bugbot Feedback Loop
+    ```
+    1. Developer opens PR
+    2. Atlas activates, checks PR
+    3. Bugbot comments: "Missing error handling in api.rs:42"
+    4. Atlas analyzes, adds error handling
+    5. Atlas pushes fix
+    6. Bugbot satisfied, no more comments
+    7. CI passes
+    8. Atlas squash-merges PR
+    ```
+
+    ### Scenario B: CI Failure Recovery
+    ```
+    1. PR opened, CI fails (clippy error)
+    2. Atlas activates, sees red CI
+    3. Atlas reads clippy logs
+    4. Atlas fixes clippy warnings
+    5. Atlas pushes fix
+    6. CI re-runs, passes
+    7. Atlas squash-merges PR
+    ```
+
+    ### Scenario C: Merge Conflict Resolution
+    ```
+    1. PR open, another PR merges to main
+    2. Original PR now has conflicts
+    3. Atlas detects unmergeable state
+    4. Atlas rebases PR on latest main
+    5. Atlas resolves conflicts
+    6. Atlas pushes resolution
+    7. CI passes
+    8. Atlas squash-merges PR
+    ```
+
+    ### Scenario D: Blocked State
+    ```
+    1. PR has complex issue Atlas can't fix
+    2. Atlas tries 3 times, fails
+    3. Atlas adds `blocked` label
+    4. Atlas comments: "Unable to resolve X, Y, Z. @author please review."
+    5. Atlas suspends session
+    6. Human fixes issue
+    7. New push triggers Atlas
+    8. Atlas sees clean state, merges
+    ```
+
+    ## Integration with Existing Agents
+    - Atlas is **independent** of Rex/Cleo/Tess workflow
+    - Atlas watches **all PRs** in cto repo, regardless of origin
+    - Atlas does **not** interfere with multi-agent play workflows
+    - Atlas **only** acts on PRs that need help (Bugbot comments, CI failures, conflicts)
+
+    ## Success Metrics
+    - **Auto-merge rate**: % of PRs merged without human intervention
+    - **Time to merge**: Average time from PR open to merge
+    - **Bugbot resolution rate**: % of Bugbot comments resolved automatically
+    - **CI recovery rate**: % of CI failures fixed automatically
+    - **Blocked rate**: % of PRs requiring human intervention
 
