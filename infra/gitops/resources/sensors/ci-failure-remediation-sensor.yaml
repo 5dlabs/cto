@@ -1,0 +1,243 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ci-failure-remediation
+  namespace: argo
+  labels:
+    app: ci-remediation
+    component: failure-sensor
+spec:
+  replicas: 1
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    serviceAccountName: argo-events-sa
+    container:
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "300m"
+  dependencies:
+    - name: workflow-failure
+      eventSourceName: github
+      eventName: org
+      filters:
+        data:
+          # Only workflow_run events
+          - path: body.X-GitHub-Event
+            type: string
+            value: ["workflow_run"]
+          # Only completed workflows
+          - path: body.action
+            type: string
+            value: ["completed"]
+          # Only failures
+          - path: body.workflow_run.conclusion
+            type: string
+            value: ["failure"]
+          # Only 5dlabs/cto repository
+          - path: body.repository.full_name
+            type: string
+            value: ["5dlabs/cto"]
+          # Exclude workflows with skip-ci-remediation label
+          - path: body.workflow_run.head_commit.message
+            type: string
+            comparator: "!~"
+            value: ["\\[skip-ci-remediation\\]"]
+        exprs:
+          # Additional validation
+          - expr: 'body.workflow_run.id != ""'
+            fields:
+              - name: workflow_run_id
+                path: body.workflow_run.id
+          - expr: 'body.workflow_run.head_branch != ""'
+            fields:
+              - name: head_branch
+                path: body.workflow_run.head_branch
+  triggers:
+    - template:
+        name: trigger-ci-remediation
+        conditions: "workflow-failure"
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: agents.platform.5dlabs.ai/v1alpha1
+              kind: CodeRun
+              metadata:
+                generateName: coderun-ci-fix-
+                namespace: agent-platform
+                labels:
+                  agent: rex
+                  role: ci-remediation
+                  workflow-run-id: ""  # Extracted from webhook
+                  workflow-name: ""    # Extracted from webhook
+                  repository: "cto"
+              spec:
+                githubApp: "5DLabs-Rex"
+                cli: "Claude"
+                model: "claude-sonnet-4-20250514"
+                maxTokens: 16384
+                temperature: 0.2  # Lower temperature for focused fixes
+                repositoryUrl: "https://github.com/5dlabs/cto"
+                workingDirectory: "."
+                continueSession: false  # Fresh context per failure
+                overwriteMemory: false
+                env:
+                  - name: REMEDIATION_MODE
+                    value: "ci-failure"
+                  - name: WORKFLOW_NAME
+                    value: ""  # Extracted from webhook
+                  - name: WORKFLOW_RUN_ID
+                    value: ""  # Extracted from webhook
+                  - name: WORKFLOW_RUN_URL
+                    value: ""  # Extracted from webhook
+                  - name: FAILURE_BRANCH
+                    value: ""  # Branch where failure occurred
+                  - name: FAILURE_COMMIT_SHA
+                    value: ""  # Commit that triggered failure
+                  - name: FAILURE_COMMIT_MESSAGE
+                    value: ""  # Commit message
+                  - name: WORKFLOW_CONCLUSION
+                    value: "failure"
+          parameters:
+            # Extract workflow name
+            - src:
+                dependencyName: workflow-failure
+                dataKey: body.workflow_run.name
+              dest: spec.env.1.value
+            
+            # Extract workflow run ID
+            - src:
+                dependencyName: workflow-failure
+                dataTemplate: "{{ .Input.body.workflow_run.id }}"
+              dest: spec.env.2.value
+            
+            # Extract workflow run URL
+            - src:
+                dependencyName: workflow-failure
+                dataKey: body.workflow_run.html_url
+              dest: spec.env.3.value
+            
+            # Extract failure branch
+            - src:
+                dependencyName: workflow-failure
+                dataKey: body.workflow_run.head_branch
+              dest: spec.env.4.value
+            
+            # Extract failure commit SHA
+            - src:
+                dependencyName: workflow-failure
+                dataKey: body.workflow_run.head_sha
+              dest: spec.env.5.value
+            
+            # Extract commit message
+            - src:
+                dependencyName: workflow-failure
+                dataKey: body.workflow_run.head_commit.message
+              dest: spec.env.6.value
+            
+            # Add workflow run ID label
+            - src:
+                dependencyName: workflow-failure
+                dataTemplate: "{{ .Input.body.workflow_run.id }}"
+              dest: metadata.labels.workflow-run-id
+            
+            # Add workflow name label (sanitized)
+            - src:
+                dependencyName: workflow-failure
+                dataTemplate: "{{ .Input.body.workflow_run.name | lower | replace \" \" \"-\" }}"
+              dest: metadata.labels.workflow-name
+        retryStrategy:
+          steps: 2
+          duration: "10s"
+          factor: 2
+          jitter: 0.1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ci-remediation-strategy
+  namespace: argo
+data:
+  remediation-strategy.md: |
+    # CI Failure Remediation Strategy
+    
+    ## Mission
+    Automatically detect and fix GitHub Actions workflow failures in the 5dlabs/cto repository.
+    
+    ## Activation
+    - **Trigger**: workflow_run event with conclusion=failure
+    - **Scope**: Only 5dlabs/cto repository
+    - **Exclusions**: Commits with [skip-ci-remediation] in message
+    
+    ## Workflow Coverage
+    - Infrastructure Images (Docker builds, GHCR pushes)
+    - Controller CI (Rust clippy, tests, formatting)
+    - Agent Templates Check (Handlebars validation)
+    - Markdown Lint (Documentation quality)
+    - Helm Publish (Chart packaging)
+    - All other CI/CD workflows
+    
+    ## Remediation Process
+    
+    ### 1. Failure Analysis
+    - Fetch workflow logs via GitHub CLI
+    - Identify failure type (build, test, lint, permission, etc.)
+    - Extract error messages and context
+    - Review changed files in failing commit
+    
+    ### 2. Root Cause Identification
+    Common patterns:
+    - **Docker Build Failures**: Missing deps, cache issues, registry auth
+    - **Clippy Failures**: New warnings, pedantic violations
+    - **Test Failures**: Broken tests, environment issues
+    - **Permission Errors**: Missing GitHub token scopes
+    - **Lint Failures**: Formatting, style violations
+    - **Resource Issues**: Timeouts, OOM, disk space
+    
+    ### 3. Targeted Fix Application
+    - Apply minimal, focused fix
+    - No scope creep beyond failure resolution
+    - Maintain code quality standards
+    - Document root cause in commit
+    
+    ### 4. Validation
+    - Create fix branch or PR
+    - Wait for CI to run on fix
+    - Verify all checks pass
+    - Ensure no new issues introduced
+    
+    ### 5. Reporting
+    - Comment on original commit with fix details
+    - Link to fix PR if created
+    - Document root cause and solution
+    - Tag original author if human help needed
+    
+    ## Success Criteria
+    - ✅ CI passes on fix branch/PR
+    - ✅ Root cause documented
+    - ✅ Fix is minimal and targeted
+    - ✅ No new issues introduced
+    - ✅ Original commit updated with fix reference
+    
+    ## Safety Limits
+    - Max 3 remediation attempts per workflow run
+    - Never push directly to main
+    - Always create PR for review
+    - Respect branch protection rules
+    - Honor skip-ci-remediation flag
+    
+    ## Monitoring
+    - Track success rate per workflow type
+    - Measure time to fix
+    - Monitor false positive rate
+    - Alert on repeated failures
+
