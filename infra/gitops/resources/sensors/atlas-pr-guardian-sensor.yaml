@@ -43,6 +43,9 @@ spec:
           # For pull_request and pull_request_review events, always pass (they are PRs by definition)
           # For issue_comment events, verify it's on a PR (not a regular issue)
           - expr: 'body.X-GitHub-Event == "pull_request" || body.X-GitHub-Event == "pull_request_review" || (body.X-GitHub-Event == "issue_comment" && has(body.issue.pull_request))'
+            fields:
+              - name: event_type
+                path: body.X-GitHub-Event
 
   triggers:
     - template:
