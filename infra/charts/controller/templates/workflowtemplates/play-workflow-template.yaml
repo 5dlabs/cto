@@ -244,19 +244,18 @@ spec:
                 - name: verify-update
                   value: "false"
 
-          # Remediation loop: Rex → Cleo → Tess until approved
-          - name: remediation-iteration
+          # Agent execution sequence: Rex → Cleo → Cipher → Tess
+          - name: agent-sequence
             dependencies: [update-to-implementation]
-            template: remediation-iteration
+            template: agent-sequence
             arguments:
               parameters:
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
-          # Update stage after successful remediation (approved status)
+          # Update stage after agents complete
           - name: update-to-waiting-merge
-            dependencies: [remediation-iteration]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == approved"
+            dependencies: [agent-sequence]
             template: update-workflow-stage
             arguments:
               parameters:
@@ -265,11 +264,9 @@ spec:
                 - name: verify-update
                   value: "true"
 
-          # SKIP PR APPROVAL - GO STRAIGHT TO MERGE
-          # Suspend point 3: Wait for PR merged to main
+          # Wait for PR merged to main
           - name: wait-merge-to-main
             dependencies: [update-to-waiting-merge]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == approved"
             template: suspend-for-event
             arguments:
               parameters:
@@ -280,29 +277,15 @@ spec:
 
           - name: complete-task
             dependencies: [wait-merge-to-main]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == approved"
             template: task-completion
             arguments:
               parameters:
                 - name: task-id
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: approval-status
-                  value: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}}"
+                  value: "completed"
                 - name: merge-sha
                   value: "{{`{{workflow.parameters.merge-sha}}`}}"
-
-          - name: complete-task-failed
-            dependencies: [remediation-iteration]
-            when: "{{`{{tasks.remediation-iteration.outputs.parameters.remediation-status}}`}} == failed"
-            template: task-completion
-            arguments:
-              parameters:
-                - name: task-id
-                  value: "{{`{{workflow.parameters.task-id}}`}}"
-                - name: approval-status
-                  value: "failed"
-                - name: merge-sha
-                  value: ""
 
     # Template for creating CodeRun CRDs for agent execution and waiting for completion
     # Implementation cycle: run Rex, then check/poll for PR; if not found, repeat by failing upstream
@@ -365,8 +348,8 @@ spec:
                 - name: stage
                   value: "{{`{{inputs.parameters.stage}}`}}"
 
-    # Run a full remediation iteration (Rex → Cleo → Tess) with automatic retries
-    - name: remediation-iteration
+    # Run agent sequence: Rex → Cleo → Cipher → Tess (no remediation loop)
+    - name: agent-sequence
       inputs:
         parameters:
           - name: max-retries
@@ -379,15 +362,6 @@ spec:
           - name: pr-number
             valueFrom:
               parameter: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
-          - name: remediation-status
-            valueFrom:
-              parameter: "{{`{{steps.evaluate-remediation.outputs.parameters.remediation-status}}`}}"
-      retryStrategy:
-        retryPolicy: Always
-        limit: "{{`{{inputs.parameters.max-retries}}`}}"
-        backoff:
-          duration: "60s"
-          factor: 2
       steps:
         - - name: determine-agent
             template: determine-task-agent
@@ -582,23 +556,8 @@ spec:
                   value: "{{`{{workflow.parameters.auto-merge}}`}}"
                 - name: final-task
                   value: "{{`{{workflow.parameters.final-task}}`}}"
-        # After Tess completes testing, update to waiting for PR merge
-        - - name: update-to-waiting-merge
-            template: update-workflow-stage
-            arguments:
-              parameters:
-                - name: new-stage
-                  value: "waiting-pr-merged"
-                - name: verify-update
-                  value: "true"
-        - - name: evaluate-remediation
-            template: assess-remediation-outcome
-            arguments:
-              parameters:
-                - name: repository
-                  value: "{{`{{workflow.parameters.repository}}`}}"
-                - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+        # After Tess completes testing, agents are done
+        # Workflow will proceed to wait for PR merge
 
     # Template to check/poll GitHub for PR existence for task label
     - name: check-or-wait-for-pr
@@ -636,15 +595,16 @@ spec:
           set -e
           REPO="{{`{{inputs.parameters.repository}}`}}"
           TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
-          LABEL="task-${TASK_ID}"
+          TASK_LABEL="task-${TASK_ID}"
           RUN_LABEL="run-{{`{{workflow.name}}`}}"
           SERVICE_LABEL="service-{{`{{workflow.parameters.service}}`}}"
+          EXPECTED_BRANCH="feature/task-${TASK_ID}-implementation"
 
           # For single-repo setups, we need to find PRs from the current workflow run
           # Always use both task label AND run label to avoid finding old PRs from previous runs
           STAGE="{{`{{inputs.parameters.stage}}`}}"
 
-          echo "🔎 Stage $STAGE: Looking for PR with labels ${LABEL} and ${RUN_LABEL} in ${REPO}"
+          echo "🔎 Stage $STAGE: Looking for PR with labels ${TASK_LABEL} and ${RUN_LABEL} in ${REPO}"
 
           # Ensure tools
           apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
@@ -708,7 +668,7 @@ spec:
           fi
           while [ $attempts -gt 0 ]; do
             # First, try to find PR by labels (fast path for already-labeled PRs)
-            q_labels=$(printf "%s" "$LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
+            q_labels=$(printf "%s" "$TASK_LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
             url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
             if [ -n "$AUTH_HEADER" ]; then
               resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
@@ -719,11 +679,10 @@ spec:
             pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
             pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
 
-            # If not found by labels, try searching by branch name
+            # If not found by exact labels, try searching by branch name (open PRs first)
             if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
               echo "🔍 No PR found by labels, searching by branch name..."
-              BRANCH_NAME="feature/task-${TASK_ID}-implementation"
-              url="https://api.github.com/repos/${REPO}/pulls?state=open&head=${OWNER}:${BRANCH_NAME}"
+              url="https://api.github.com/repos/${REPO}/pulls?state=open&head=${OWNER}:${EXPECTED_BRANCH}"
               if [ -n "$AUTH_HEADER" ]; then
                 resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
               else
@@ -734,7 +693,72 @@ spec:
               pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
               
               if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
-                echo "✅ Found PR #$pr_number by branch name: $BRANCH_NAME"
+                echo "✅ Found PR #$pr_number by branch name: $EXPECTED_BRANCH"
+              else
+                # If no open PR found, check for closed PRs (may indicate previous run)
+                echo "🔍 No open PR found, checking for closed PRs on same branch..."
+                url="https://api.github.com/repos/${REPO}/pulls?state=closed&head=${OWNER}:${EXPECTED_BRANCH}&sort=updated&direction=desc&per_page=1"
+                if [ -n "$AUTH_HEADER" ]; then
+                  resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
+                else
+                  resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
+                fi
+                
+                closed_pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
+                if [ -n "$closed_pr_number" ] && [ "$closed_pr_number" != "null" ]; then
+                  echo "⚠️ Found CLOSED PR #$closed_pr_number for branch $EXPECTED_BRANCH"
+                  echo "   This indicates a PR was created but closed (merged or manually closed)"
+                  echo "   Implementation agent should create a new PR, but none found"
+                  echo "   This may indicate PR creation failed or implementation didn't complete"
+                fi
+              fi
+            fi
+
+            # If still not found, try searching by task label only (lenient fallback)
+            # CRITICAL: Must verify branch matches to avoid using PRs from previous runs
+            if [ -z "$pr_number" ] || [ "$pr_number" = "null" ]; then
+              echo "🔍 No PR found by branch, trying task label only (lenient search)..."
+              q_task_label=$(printf "%s" "$TASK_LABEL" | sed 's/,/%2C/g')
+              url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_task_label}"
+              if [ -n "$AUTH_HEADER" ]; then
+                resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
+              else
+                resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
+              fi
+              
+              # Check all PRs with task label and verify branch matches
+              found_valid_pr=false
+              for pr_item in $(echo "$resp" | jq -c '.[] | select(.pull_request != null)'); do
+                candidate_pr_number=$(echo "$pr_item" | jq -r '.number')
+                if [ -n "$candidate_pr_number" ] && [ "$candidate_pr_number" != "null" ]; then
+                  # Fetch PR details to check branch name
+                  pr_detail_url="https://api.github.com/repos/${REPO}/pulls/${candidate_pr_number}"
+                  if [ -n "$AUTH_HEADER" ]; then
+                    pr_detail=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$pr_detail_url") || pr_detail="{}"
+                  else
+                    pr_detail=$(curl -sL -H "Accept: application/vnd.github+json" "$pr_detail_url") || pr_detail="{}"
+                  fi
+                  
+                  pr_branch=$(echo "$pr_detail" | jq -r '.head.ref // ""')
+                  # Normalize both branches for comparison (handle with/without feature/ prefix)
+                  expected_normalized=$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')
+                  pr_branch_normalized=$(echo "$pr_branch" | sed 's|^feature/||')
+                  if [ "$pr_branch_normalized" = "$expected_normalized" ] || [ "$pr_branch" = "$EXPECTED_BRANCH" ]; then
+                    pr_url=$(echo "$pr_item" | jq -r '.html_url')
+                    pr_number="$candidate_pr_number"
+                    found_valid_pr=true
+                    echo "✅ Found PR #$pr_number by task label with matching branch: $pr_branch"
+                    echo "⚠️ Note: Run label ($RUN_LABEL) may not match, but branch matches - proceeding"
+                    break
+                  fi
+                fi
+              done
+              
+              if [ "$found_valid_pr" = "false" ]; then
+                echo "⚠️ Found PR(s) with task label but none match expected branch ($EXPECTED_BRANCH)"
+                echo "   Skipping to avoid using PRs from previous workflow runs"
+                pr_number=""
+                pr_url=""
               fi
             fi
 
@@ -748,14 +772,14 @@ spec:
               echo "  Repository: ${REPO}"
               if [ -n "$TOKEN" ]; then
                 echo "  Adding correlation labels..."
-                add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
+                add_labels_payload=$(printf '{"labels":["%s","%s","%s"]}' "$TASK_LABEL" "$RUN_LABEL" "$SERVICE_LABEL")
                 if curl -s -X POST \
                   -H "Authorization: Bearer $TOKEN" \
                   -H "Accept: application/vnd.github+json" \
                   -H "Content-Type: application/json" \
                   -d "$add_labels_payload" \
                   "https://api.github.com/repos/${REPO}/issues/${pr_number}/labels" >/dev/null 2>&1; then
-                  echo "  ✅ Labels added: $LABEL, $RUN_LABEL, $SERVICE_LABEL"
+                  echo "  ✅ Labels added: $TASK_LABEL, $RUN_LABEL, $SERVICE_LABEL"
                 else
                   echo "  ⚠️ Failed to add labels (PR still usable)"
                 fi
@@ -779,19 +803,22 @@ spec:
           echo "  Task ID: ${TASK_ID}"
           echo "  Repository: ${REPO}"
           echo "  Stage: ${STAGE}"
-          echo "  Expected Branch: feature/task-${TASK_ID}-implementation"
-          echo "  Expected Labels: ${LABEL}, ${RUN_LABEL}, ${SERVICE_LABEL}"
+          echo "  Expected Branch: ${EXPECTED_BRANCH}"
+          echo "  Expected Labels: ${TASK_LABEL}, ${RUN_LABEL}, ${SERVICE_LABEL}"
           echo ""
           echo "🔍 Possible Causes:"
           if [ "$STAGE" = "implementation" ]; then
             echo "  1. Implementation agent hasn't created PR yet (waited 90s)"
             echo "  2. Implementation failed before PR creation"
             echo "  3. PR created with different branch name or labels"
-            echo "  4. Network/API issues preventing PR creation"
+            echo "  4. All PRs for this branch are CLOSED (previous runs)"
+            echo "  5. Network/API issues preventing PR creation"
             echo ""
             echo "💡 Recommendation:"
             echo "  Check implementation CodeRun logs for errors"
             echo "  Verify GitHub App has PR creation permissions"
+            echo "  If closed PRs exist, implementation agent should create a new PR"
+            echo "  Check if implementation agent completed successfully"
           else
             echo "  1. Implementation agent didn't create a PR"
             echo "  2. PR was created but lacks required labels"
@@ -799,137 +826,11 @@ spec:
             echo ""
             echo "💡 Recommendation:"
             echo "  Verify implementation stage completed successfully"
-            echo "  Check if PR exists with correct labels: ${LABEL}, ${RUN_LABEL}"
+            echo "  Check if PR exists with correct labels: ${TASK_LABEL}, ${RUN_LABEL}"
           fi
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           > /tmp/pr-url.txt
           > /tmp/pr-number.txt
-          exit 1
-    # Evaluate PR labels to determine remediation outcome
-    - name: assess-remediation-outcome
-      inputs:
-        parameters:
-          - name: repository
-          - name: pr-number
-      outputs:
-        parameters:
-          - name: remediation-status
-            valueFrom:
-              path: /tmp/remediation-status.txt
-            default: "needs-fixes"
-      script:
-        image: alpine:3.20
-        env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: app-id
-          - name: GITHUB_APP_PRIVATE_KEY
-            valueFrom:
-              secretKeyRef:
-                name: github-app-5dlabs-morgan
-                key: private-key
-        command: [sh]
-        source: |
-          #!/bin/sh
-          set -e
-
-          REPO="{{`{{inputs.parameters.repository}}`}}"
-          PR_NUMBER="{{`{{inputs.parameters.pr-number}}`}}"
-
-          if [ -z "$PR_NUMBER" ]; then
-            echo "⚠️ No PR number available; assuming remediation still required"
-            echo "needs-fixes" > /tmp/remediation-status.txt
-            exit 1
-          fi
-
-          apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
-
-          OWNER=$(echo "$REPO" | cut -d'/' -f1)
-          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
-
-          AUTH_HEADER=""
-          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
-            TEMP_KEY="/tmp/github-app-key.pem"
-            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
-            chmod 600 "$TEMP_KEY"
-
-            NOW=$(date +%s)
-            EXP=$((NOW + 600))
-            HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
-            HDR=$(echo -n "$HDR" | tr '+/' '-_' | tr -d '=')
-            PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64)
-            PAY=$(echo -n "$PAY" | tr '+/' '-_' | tr -d '=')
-            SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
-            SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
-            JWT="$HDR.$PAY.$SIG"
-
-            INSTALLATION_ID=$(curl -s -L               -H "Authorization: Bearer $JWT"               -H "Accept: application/vnd.github+json"               "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
-
-            if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
-              INSTALLATION_ID=$(curl -s -L                 -H "Authorization: Bearer $JWT"                 -H "Accept: application/vnd.github+json"                 "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
-            fi
-
-            if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
-              TOKEN=$(curl -s -X POST                 -H "Authorization: Bearer $JWT"                 -H "Accept: application/vnd.github+json"                 "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
-              if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
-                AUTH_HEADER="Authorization: Bearer $TOKEN"
-              fi
-            fi
-
-            rm -f "$TEMP_KEY"
-          fi
-
-          MAX_ATTEMPTS=30
-          SLEEP_SECONDS=10
-
-          attempt=1
-          while [ $attempt -le $MAX_ATTEMPTS ]; do
-            echo "🔍 Checking PR #$PR_NUMBER labels (attempt $attempt/$MAX_ATTEMPTS)"
-
-            if [ -n "$AUTH_HEADER" ]; then
-              ISSUE=$(curl -s -L                 -H "Accept: application/vnd.github+json"                 -H "$AUTH_HEADER"                 "https://api.github.com/repos/$REPO/issues/$PR_NUMBER")
-            else
-              ISSUE=$(curl -s -L                 -H "Accept: application/vnd.github+json"                 "https://api.github.com/repos/$REPO/issues/$PR_NUMBER")
-            fi
-
-            LABELS=$(echo "$ISSUE" | jq -r '.labels[].name')
-
-            if echo "$LABELS" | grep -q '^approved$'; then
-              echo "approved" > /tmp/remediation-status.txt
-              echo "✅ PR approved by Tess"
-              exit 0
-            fi
-
-            if echo "$LABELS" | grep -q '^failed-remediation$'; then
-              echo "failed" > /tmp/remediation-status.txt
-              echo "⛔ Remediation marked as failed"
-              exit 0
-            fi
-
-            if echo "$LABELS" | grep -q '^needs-fixes$'; then
-              echo "needs-fixes" > /tmp/remediation-status.txt
-              echo "🔁 Needs-fixes label detected; triggering another remediation pass"
-              exit 1
-            fi
-
-            # Note: Stage transitions are now driven by GitHub PR reviews (Cleo/Tess approvals)
-            # Labels are only used for correlation (task-*, service-*, run-*) and remediation (needs-fixes)
-            if [ -z "$LABELS" ]; then
-              echo "ℹ️ PR currently has no workflow labels; waiting"
-            else
-              echo "ℹ️ Current labels: $LABELS"
-            fi
-
-            attempt=$((attempt + 1))
-            if [ $attempt -le $MAX_ATTEMPTS ]; then
-              sleep $SLEEP_SECONDS
-            fi
-          done
-
-          echo "needs-fixes" > /tmp/remediation-status.txt
-          echo "⚠️ Timed out waiting for remediation decision; retrying iteration"
           exit 1
     - name: agent-coderun
       inputs:
@@ -1071,6 +972,7 @@ spec:
               github-app: "{{`{{inputs.parameters.github-app}}`}}"
               workflow-name: "{{`{{workflow.name}}`}}"
               workflow-run: "{{`{{workflow.name}}`}}"
+              stage: "{{`{{inputs.parameters.stage}}`}}"
               workflow-stage: "{{`{{inputs.parameters.stage}}`}}"
               workflow-type: "play-orchestration"
             annotations:
@@ -2061,6 +1963,8 @@ spec:
           fi
 
           echo "✓ PR is open and not merged - stage should proceed"
+
+    # Log information about GitHub checks (diagnostic only)
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler

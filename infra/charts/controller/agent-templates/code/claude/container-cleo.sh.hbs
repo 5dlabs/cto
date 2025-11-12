@@ -2105,6 +2105,45 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
     echo "✅ Cleo quality checks passed - handing off to Tess for E2E testing"
     
+    # Post APPROVE review so workflow can detect completion and skip re-runs
+    echo "✅ Posting APPROVE review to signal quality checks passed"
+    REVIEW_BODY="### ✅ Code Quality Review - APPROVED
+
+All quality checks have passed:
+- Code formatting verified
+- Linting passed
+- Unit tests successful
+- Quality standards met
+
+**Status:** Ready for end-to-end testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
+    
+    # Retry approval submission - critical for workflow progression
+    APPROVAL_RETRIES=3
+    APPROVAL_SUCCESS=false
+    for retry in $(seq 1 $APPROVAL_RETRIES); do
+      if timeout 30 gh pr review "$PR_NUMBER" --approve --body "$REVIEW_BODY" 2>&1; then
+        APPROVAL_SUCCESS=true
+        echo "✅ PR approval posted successfully"
+        break
+      else
+        echo "⚠️ PR review command failed (attempt $retry/$APPROVAL_RETRIES)"
+        if [ $retry -lt $APPROVAL_RETRIES ]; then
+          sleep 2
+        fi
+      fi
+    done
+    
+    if [ "$APPROVAL_SUCCESS" != "true" ]; then
+      echo "❌ CRITICAL: Failed to post PR approval after $APPROVAL_RETRIES attempts"
+      echo "   Quality gate cannot be bypassed - workflow should fail"
+      echo "   This prevents Cleo from proceeding without proper GitHub approval"
+      exit 1
+    fi
+    
     # Add ready-for-qa label to signal Tess (comment already posted above)
     echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
     timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-qa" || echo "⚠️ Failed to add ready-for-qa label"
