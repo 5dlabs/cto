@@ -25,11 +25,11 @@ spec:
         exprs:
           # Match PR events OR comment events
           - expr: |
-              (body.X-GitHub-Event == "pull_request" &&
-               (body.action == "opened" || body.action == "reopened" ||
+              (body.X-GitHub-Event == "pull_request" && 
+               (body.action == "opened" || body.action == "reopened" || 
                 body.action == "synchronize" || body.action == "ready_for_review")) ||
-              (body.X-GitHub-Event == "issue_comment" &&
-               body.action == "created" &&
+              (body.X-GitHub-Event == "issue_comment" && 
+               body.action == "created" && 
                body.issue.pull_request != null)
             fields:
               - name: event_type
@@ -287,4 +287,5 @@ data:
     - **Bugbot resolution rate**: % of Bugbot comments resolved automatically
     - **CI recovery rate**: % of CI failures fixed automatically
     - **Blocked rate**: % of PRs requiring human intervention
+
 
