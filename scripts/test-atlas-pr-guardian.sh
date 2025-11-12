@@ -136,10 +136,13 @@ else
   fail "Comment event dependency missing"
 fi
 
+# Note: status-event dependency was intentionally removed to avoid
+# payload schema mismatch issues. Atlas detects CI changes via
+# PR synchronize events and comment notifications instead.
 if grep -q "name: status-event" "$SENSOR_FILE"; then
-  pass "Status event dependency configured"
+  warn "Status event dependency found (should be removed for schema simplicity)"
 else
-  fail "Status event dependency missing"
+  pass "Status event dependency correctly omitted (avoids payload schema mismatch)"
 fi
 
 # Test 5: Check CodeRun trigger
