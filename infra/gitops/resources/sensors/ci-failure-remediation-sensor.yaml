@@ -113,43 +113,43 @@ spec:
                 dependencyName: workflow-failure
                 dataKey: body.workflow_run.name
               dest: spec.env.1.value
-            
+
             # Extract workflow run ID
             - src:
                 dependencyName: workflow-failure
                 dataTemplate: "{{ .Input.body.workflow_run.id }}"
               dest: spec.env.2.value
-            
+
             # Extract workflow run URL
             - src:
                 dependencyName: workflow-failure
                 dataKey: body.workflow_run.html_url
               dest: spec.env.3.value
-            
+
             # Extract failure branch
             - src:
                 dependencyName: workflow-failure
                 dataKey: body.workflow_run.head_branch
               dest: spec.env.4.value
-            
+
             # Extract failure commit SHA
             - src:
                 dependencyName: workflow-failure
                 dataKey: body.workflow_run.head_sha
               dest: spec.env.5.value
-            
+
             # Extract commit message
             - src:
                 dependencyName: workflow-failure
                 dataKey: body.workflow_run.head_commit.message
               dest: spec.env.6.value
-            
+
             # Add workflow run ID label
             - src:
                 dependencyName: workflow-failure
                 dataTemplate: "{{ .Input.body.workflow_run.id }}"
               dest: metadata.labels.workflow-run-id
-            
+
             # Add workflow name label (sanitized)
             - src:
                 dependencyName: workflow-failure
@@ -169,15 +169,15 @@ metadata:
 data:
   remediation-strategy.md: |
     # CI Failure Remediation Strategy
-    
+
     ## Mission
     Automatically detect and fix GitHub Actions workflow failures in the 5dlabs/cto repository.
-    
+
     ## Activation
     - **Trigger**: workflow_run event with conclusion=failure
     - **Scope**: Only 5dlabs/cto repository
     - **Exclusions**: Commits with [skip-ci-remediation] in message
-    
+
     ## Workflow Coverage
     - Infrastructure Images (Docker builds, GHCR pushes)
     - Controller CI (Rust clippy, tests, formatting)
