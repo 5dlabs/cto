@@ -124,25 +124,35 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Test 4: Validate Event Dependencies"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-if grep -q "name: pr-event" "$SENSOR_FILE"; then
-  pass "PR event dependency configured"
+# Note: Sensor was refactored to use single pr-or-comment dependency
+# instead of separate pr-event and comment-event dependencies.
+# This is required because Argo Events doesn't allow the same eventName
+# to be referenced by multiple dependencies.
+
+if grep -q "name: pr-or-comment" "$SENSOR_FILE"; then
+  pass "Combined pr-or-comment dependency configured (Argo Events compliant)"
 else
-  fail "PR event dependency missing"
+  fail "pr-or-comment dependency missing"
+fi
+
+# Check for old separate dependencies (should not exist)
+if grep -q "name: pr-event" "$SENSOR_FILE"; then
+  warn "Old pr-event dependency found (should be merged into pr-or-comment)"
 fi
 
 if grep -q "name: comment-event" "$SENSOR_FILE"; then
-  pass "Comment event dependency configured"
-else
-  fail "Comment event dependency missing"
+  warn "Old comment-event dependency found (should be merged into pr-or-comment)"
 fi
 
-# Note: status-event dependency was intentionally removed to avoid
-# payload schema mismatch issues. Atlas detects CI changes via
-# PR synchronize events and comment notifications instead.
 if grep -q "name: status-event" "$SENSOR_FILE"; then
   warn "Status event dependency found (should be removed for schema simplicity)"
+fi
+
+# Check for expr-based filtering
+if grep -q "exprs:" "$SENSOR_FILE"; then
+  pass "Expression-based filtering configured for complex OR logic"
 else
-  pass "Status event dependency correctly omitted (avoids payload schema mismatch)"
+  warn "Expression-based filtering not found (needed for multi-event matching)"
 fi
 
 # Test 5: Check CodeRun trigger
