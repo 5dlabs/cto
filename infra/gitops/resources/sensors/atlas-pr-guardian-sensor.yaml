@@ -9,61 +9,38 @@ spec:
     serviceAccountName: argo-events-sa
 
   dependencies:
-    # Trigger on PR lifecycle events
-    - name: pr-event
+    # Single dependency that handles both PR events and comments
+    # Note: Argo Events requires unique eventName per dependency from same EventSource
+    - name: pr-or-comment
       eventSourceName: github
       eventName: org
       filters:
         data:
-          # Only pull_request events
-          - path: headers.X-GitHub-Event
-            type: string
-            value:
-              - pull_request
-          # Trigger on PR open, reopen, sync, or ready_for_review
-          - path: body.action
-            type: string
-            value:
-              - opened
-              - reopened
-              - synchronize
-              - ready_for_review
-          # Only 5dlabs/cto repository
+          # Only 5dlabs/cto repository (applies to all events)
           - path: body.repository.full_name
             type: string
             value:
               - "5dlabs/cto"
-
-    # Trigger on new issue comments (for Bugbot feedback)
-    - name: comment-event
-      eventSourceName: github
-      eventName: org
-      filters:
-        data:
-          - path: headers.X-GitHub-Event
-            type: string
-            value:
-              - issue_comment
-          - path: body.action
-            type: string
-            value:
-              - created
-          # Only on PRs (not plain issues)
-          - path: body.issue.pull_request
-            type: string
-            comparator: "!="
-            value:
-              - ""
-          # Only 5dlabs/cto repository
-          - path: body.repository.full_name
-            type: string
-            value:
-              - "5dlabs/cto"
+        # Use exprs for complex OR logic between event types
+        exprs:
+          # Match PR events OR comment events
+          - expr: |
+              (body.X-GitHub-Event == "pull_request" &&
+               (body.action == "opened" || body.action == "reopened" ||
+                body.action == "synchronize" || body.action == "ready_for_review")) ||
+              (body.X-GitHub-Event == "issue_comment" &&
+               body.action == "created" &&
+               body.issue.pull_request != null)
+            fields:
+              - name: event_type
+                path: body.X-GitHub-Event
+              - name: action
+                path: body.action
 
   triggers:
     - template:
         name: create-or-resume-atlas-guardian
-        conditions: "pr-event || comment-event"
+        conditions: "pr-or-comment"
         k8s:
           # Note: operation: create will spawn new CodeRuns for each event.
           # The controller should implement deduplication logic to:
@@ -110,109 +87,58 @@ spec:
                     value: "squash"
 
           parameters:
-            # Use conditional templates to extract data based on which event triggered
-            # This prevents empty values from non-triggered events from overwriting valid data
+            # Use conditional templates to extract data based on event type
+            # Single dependency means no conflicts - we check event type in template
 
-            # Extract repository URL (works for both event types)
+            # Extract repository URL
             - src:
-                dependencyName: pr-event
-                dataTemplate: |
-                  {{- if .Input.body.repository.clone_url -}}
-                  {{ .Input.body.repository.clone_url }}
-                  {{- end -}}
+                dependencyName: pr-or-comment
+                dataKey: body.repository.clone_url
               dest: spec.repositoryUrl
 
+            # Extract PR number (from PR event or issue event)
             - src:
-                dependencyName: comment-event
+                dependencyName: pr-or-comment
                 dataTemplate: |
-                  {{- if .Input.body.repository.clone_url -}}
-                  {{ .Input.body.repository.clone_url }}
-                  {{- end -}}
-              dest: spec.repositoryUrl
-
-            # Extract PR number
-            - src:
-                dependencyName: pr-event
-                dataTemplate: |
-                  {{- if .Input.body.pull_request.number -}}
+                  {{- if eq .Input.body.X-GitHub-Event "pull_request" -}}
                   {{ .Input.body.pull_request.number }}
-                  {{- end -}}
-              dest: spec.env.0.value
-
-            - src:
-                dependencyName: comment-event
-                dataTemplate: |
-                  {{- if .Input.body.issue.number -}}
+                  {{- else if eq .Input.body.X-GitHub-Event "issue_comment" -}}
                   {{ .Input.body.issue.number }}
                   {{- end -}}
               dest: spec.env.0.value
 
-            # Extract PR URL
+            # Extract PR URL (from PR event or issue event)
             - src:
-                dependencyName: pr-event
+                dependencyName: pr-or-comment
                 dataTemplate: |
-                  {{- if .Input.body.pull_request.html_url -}}
+                  {{- if eq .Input.body.X-GitHub-Event "pull_request" -}}
                   {{ .Input.body.pull_request.html_url }}
-                  {{- end -}}
-              dest: spec.env.1.value
-
-            - src:
-                dependencyName: comment-event
-                dataTemplate: |
-                  {{- if .Input.body.issue.html_url -}}
+                  {{- else if eq .Input.body.X-GitHub-Event "issue_comment" -}}
                   {{ .Input.body.issue.html_url }}
                   {{- end -}}
               dest: spec.env.1.value
 
             # Extract repository full name
             - src:
-                dependencyName: pr-event
-                dataTemplate: |
-                  {{- if .Input.body.repository.full_name -}}
-                  {{ .Input.body.repository.full_name }}
-                  {{- end -}}
-              dest: spec.env.2.value
-
-            - src:
-                dependencyName: comment-event
-                dataTemplate: |
-                  {{- if .Input.body.repository.full_name -}}
-                  {{ .Input.body.repository.full_name }}
-                  {{- end -}}
+                dependencyName: pr-or-comment
+                dataKey: body.repository.full_name
               dest: spec.env.2.value
 
             # Label with PR number
             - src:
-                dependencyName: pr-event
+                dependencyName: pr-or-comment
                 dataTemplate: |
-                  {{- if .Input.body.pull_request.number -}}
+                  {{- if eq .Input.body.X-GitHub-Event "pull_request" -}}
                   {{ .Input.body.pull_request.number }}
-                  {{- end -}}
-              dest: metadata.labels.pr-number
-
-            - src:
-                dependencyName: comment-event
-                dataTemplate: |
-                  {{- if .Input.body.issue.number -}}
+                  {{- else if eq .Input.body.X-GitHub-Event "issue_comment" -}}
                   {{ .Input.body.issue.number }}
                   {{- end -}}
               dest: metadata.labels.pr-number
 
             # Label with repository name
             - src:
-                dependencyName: pr-event
-                dataTemplate: |
-                  {{- if .Input.body.repository.name -}}
-                  {{ .Input.body.repository.name }}
-                  {{- end -}}
-              dest: metadata.labels.repository
-
-            - src:
-                dependencyName: comment-event
-                dataTemplate: |
-                  {{- if .Input.body.repository.name -}}
-                  {{ .Input.body.repository.name }}
-                  {{- end -}}
+                dependencyName: pr-or-comment
+                dataKey: body.repository.name
               dest: metadata.labels.repository
 
 ---
