@@ -276,13 +276,14 @@ The Claude agent has completed the implementation and addressed all acceptance c
             echo "🔗 PR URL: $PR_URL"
             echo "$PR_URL" > .pr-url
         fi
-    else
-        echo "❌ PR creation failed"
-        echo "Possible reasons:"
-        echo "- PR already exists for this branch"
-        echo "- GitHub CLI authentication issue"
-        echo "- Network connectivity issue"
-        echo "- Repository permissions issue"
+        else
+            echo "❌ PR creation failed"
+            echo "Possible reasons:"
+            echo "- PR already exists for this branch"
+            echo "- GitHub CLI authentication issue"
+            echo "- Network connectivity issue"
+            echo "- Repository permissions issue"
+        fi
     fi
 
     # Attempt to add correlation labels (task/run/service) even if PR already existed
