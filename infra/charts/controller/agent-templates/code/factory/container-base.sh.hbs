@@ -2047,29 +2047,71 @@ Reason: $LAST_COMPLETION_REASON"
     fi
   fi
   
-  # Always exit successfully to allow workflow to continue to Cleo
-  # Print detailed summary
-  echo ""
-  echo "════════════════════════════════════════════════════════════════"
-  echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
-  echo "════════════════════════════════════════════════════════════════"
-  echo ""
-  if [ -n "$LAST_COMPLETION_REASON" ]; then
-    echo "📋 REASON FOR INCOMPLETION:"
-    echo "$LAST_COMPLETION_REASON"
-  else
-    echo "⚠️ Factory reported task incomplete without providing a reason"
+  # Check if Rex made any commits before deciding to handoff vs fail
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  REMOTE_BASE="origin/${BASE_BRANCH:-main}"
+  COMMITS_MADE=0
+  
+  if [ -n "$CURRENT_BRANCH" ]; then
+    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+    if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
+      COMMITS_MADE=1
+      echo "✅ Rex made $AHEAD_COUNT commit(s) - will handoff to Cleo"
+    else
+      echo "⚠️ Rex made NO commits - cannot handoff without progress"
+    fi
   fi
-  echo ""
-  echo "🔄 NEXT STEPS:"
-  echo "   - Handoff document created at task/rex-handoff.md"
-  echo "   - Workflow will continue to Cleo for completion"
-  echo "   - Cleo will review PR and finish remaining work"
-  echo "   - Check the logs above for Factory's detailed responses"
-  echo ""
-  echo "════════════════════════════════════════════════════════════════"
-  echo ""
-  EXIT_CODE=0  # Always exit successfully to allow Cleo to continue
+  
+  if [ "$COMMITS_MADE" -eq 1 ]; then
+    # Rex made progress - handoff to Cleo
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    if [ -n "$LAST_COMPLETION_REASON" ]; then
+      echo "📋 REASON FOR INCOMPLETION:"
+      echo "$LAST_COMPLETION_REASON"
+    else
+      echo "⚠️ Factory reported task incomplete without providing a reason"
+    fi
+    echo ""
+    echo "🔄 NEXT STEPS:"
+    echo "   - Handoff document created at task/rex-handoff.md"
+    echo "   - Workflow will continue to Cleo for completion"
+    echo "   - Cleo will review PR and finish remaining work"
+    echo "   - Check the logs above for Factory's detailed responses"
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    EXIT_CODE=0  # Exit successfully to allow Cleo to continue
+  else
+    # Rex made NO progress - this is a failure, should retry
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║          TASK COMPLETION STATUS: FAILED - NO PROGRESS         ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "❌ Rex failed to make any commits after $MAX_RETRIES attempts"
+    echo ""
+    if [ -n "$LAST_COMPLETION_REASON" ]; then
+      echo "📋 LAST COMPLETION REASON:"
+      echo "$LAST_COMPLETION_REASON"
+    else
+      echo "⚠️ Factory did not provide a reason for incompletion"
+      echo "   This may indicate an error occurred before Factory could respond"
+    fi
+    echo ""
+    echo "🔄 NEXT STEPS:"
+    echo "   - Check Factory logs above for errors"
+    echo "   - CodeRun will retry this task"
+    echo "   - If retries exhausted, workflow will fail"
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    EXIT_CODE=1  # Exit with failure to trigger retry
+  fi
 else
   echo "✅ Factory confirmed task completion"
   if [ ${FACTORY_EXIT:-0} -ne 0 ]; then
