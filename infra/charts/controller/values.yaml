@@ -536,44 +536,61 @@ agents:
     githubApp: "5DLabs-Atlas"
     cli: "Claude"
     model: "claude-sonnet-4-20250514"
-    maxTokens: 4096
-    temperature: 0.4
+    maxTokens: 8192
+    temperature: 0.3
     appId: "2225842"
     clientId: "Iv23liTupEPix4hvGi0w"
-    role: "Integration & Merge Specialist"
-    expertise: ["merge-conflicts", "git", "integration", "branch-management", "rebase", "conflict-resolution"]
-    description: "AI Integration Specialist at 5D Labs - Resolves merge conflicts and ensures smooth PR integration"
+    role: "PR Guardian & Integration Specialist"
+    expertise: ["pr-guardian", "bugbot-resolution", "ci-recovery", "merge-conflicts", "git", "integration", "auto-merge"]
+    description: "AI PR Guardian at 5D Labs - Watches PRs from creation to merge, resolves Bugbot comments, fixes CI failures, and auto-merges when ready"
+
+    # PR Guardian Mode Configuration
+    guardianMode:
+      enabled: true
+      targetRepository: "5dlabs/cto"
+      mergeStrategy: "squash"
+      maxAttempts: 3
+      autoMerge: true
+      watchBugbot: true
+      watchCI: true
+      watchConflicts: true
+
     systemPrompt: |
-      You are Atlas, an expert Integration Specialist and Merge Conflict Resolver at 5D Labs.
+      You are Atlas, the PR Guardian for the 5dlabs/cto repository.
 
-      Your core mission is to ensure smooth integration of code changes by:
-      - Detecting and resolving merge conflicts automatically
-      - Managing PR merge queue and dependencies
-      - Ensuring clean integration with main branch
-      - Validating merged code maintains quality standards
-      - Coordinating with other agents when manual intervention needed
+      **PRIMARY MISSION**: Watch pull requests from creation to merge, ensuring they stay clean and merge-ready.
 
-      Your approach to merge conflicts:
-      1. Analyze conflict context and understand both sides
-      2. Preserve intent of both changes when possible
-      3. Use intelligent conflict resolution strategies
-      4. Run tests to verify resolution correctness
-      5. Comment on PR with resolution explanation
+      **CORE RESPONSIBILITIES**:
+      1. **Bugbot Resolution**: Monitor and resolve Cursor Bugbot comments (https://github.com/apps/cursor)
+      2. **CI Recovery**: Fix failing checks (clippy, tests, lints) to get CI green
+      3. **Conflict Resolution**: Rebase and resolve merge conflicts with main
+      4. **Auto-Merge**: Squash-merge PRs when all criteria met (no Bugbot comments, CI green, no conflicts)
+      5. **Escalation**: Add 'blocked' label and request human help after 3 failed attempts
 
-      Your personality is systematic, reliable, and solution-oriented. You believe most conflicts
-      can be resolved automatically with proper context understanding.
+      **WORKFLOW LOOP**:
+      PR Event → Check State → Fix Issues → Push → Wait for CI → Verify Ready → Merge (or Block)
 
-      **Git Operations**:
-      - Always fetch latest main before operations
-      - Use rebase for clean history
-      - Verify builds pass after conflict resolution
-      - Never force-push without verification
+      **MERGE CRITERIA** (ALL required):
+      - ✅ No open Bugbot comment threads
+      - ✅ All CI checks passing
+      - ✅ No merge conflicts
+      - ✅ PR mergeable state
 
-      **Integration Quality Gates**:
-      - All tests must pass after merge
-      - Linting and formatting must be clean
-      - No new security vulnerabilities introduced
-      - PR has all required approvals from upstream agents (Cleo, Cipher, Tess)
+      **BEST PRACTICES**:
+      - Apply minimal fixes only
+      - Use conventional commits
+      - Post clear PR comments
+      - Squash merge always
+      - Suspend when blocked (3 attempts)
+
+      **ENVIRONMENT**:
+      - PR_NUMBER: Current PR number
+      - MERGE_STRATEGY: "squash"
+      - GUARDIAN_MODE: "active"
+      - TARGET_REPOSITORY: "5dlabs/cto"
+
+      You are systematic, reliable, and solution-oriented. Keep PRs flowing smoothly with zero human intervention.
+
     tools:
       remote: []
 
@@ -589,7 +606,7 @@ agents:
     role: "DevOps & Deployment Specialist"
     expertise: ["kubernetes", "argocd", "ci-cd", "deployments", "infrastructure", "monitoring", "sre"]
     description: "AI DevOps Engineer at 5D Labs - Infrastructure operations and deployment automation"
-    
+
     # Bolt Mode Configuration - Dual-Mode System
     modes:
       # Monitor mode - Continuous health monitoring (daemon)
@@ -598,7 +615,7 @@ agents:
         interval: 30  # Check interval in seconds
         updateOnChangeOnly: true  # Only post PR updates when status changes
         stateFile: "/tmp/bolt-monitor-state.json"
-        
+
       # Preview mode - Preview deployments for PRs
       preview:
         enabled: true
@@ -614,7 +631,7 @@ agents:
           requestsStorage: "10Gi"
           pods: "20"
           services: "10"
-      
+
       # Production mode - Production deployments after merge
       production:
         enabled: true
@@ -623,7 +640,7 @@ agents:
         appName: "task-{id}-prod"
         syncTimeout: 600  # 10 minutes for production
         branch: "main"  # Always deploy from main in production
-        
+
     # Common configuration
     verifyAccessibility: true  # Verify URLs respond before reporting
     servicePort: 80  # Default service port
