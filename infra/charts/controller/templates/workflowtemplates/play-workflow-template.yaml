@@ -705,11 +705,23 @@ spec:
                 fi
                 
                 closed_pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
+                closed_pr_merged=$(echo "$resp" | jq -r '.[0].merged // false' | head -n1)
+                
                 if [ -n "$closed_pr_number" ] && [ "$closed_pr_number" != "null" ]; then
-                  echo "⚠️ Found CLOSED PR #$closed_pr_number for branch $EXPECTED_BRANCH"
-                  echo "   This indicates a PR was created but closed (merged or manually closed)"
-                  echo "   Implementation agent should create a new PR, but none found"
-                  echo "   This may indicate PR creation failed or implementation didn't complete"
+                  if [ "$closed_pr_merged" = "true" ]; then
+                    # PR was merged - task is complete!
+                    echo "✅ Found MERGED PR #$closed_pr_number for branch $EXPECTED_BRANCH"
+                    echo "   Task already complete - PR was successfully merged"
+                    echo "$closed_pr_number" > /tmp/pr-number.txt
+                    echo "https://github.com/${REPO}/pull/${closed_pr_number}" > /tmp/pr-url.txt
+                    exit 0
+                  else
+                    # PR was closed without merge
+                    echo "⚠️ Found CLOSED PR #$closed_pr_number for branch $EXPECTED_BRANCH"
+                    echo "   This PR was closed without merging"
+                    echo "   Implementation agent should create a new PR, but none found"
+                    echo "   This may indicate PR creation failed or implementation didn't complete"
+                  fi
                 fi
               fi
             fi
