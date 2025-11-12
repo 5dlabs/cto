@@ -16,6 +16,13 @@ RUN mkdir -p /workspace /home/${USERNAME}/.factory /tmp/factory-cli-images && \
 
 WORKDIR /workspace
 
+# Install ripgrep separately to ensure it's available for Factory's grep-utils module
+RUN set -eux; \
+    curl -fsSLO https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz; \
+    tar xzf ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz; \
+    install -m 0755 ripgrep-14.1.1-x86_64-unknown-linux-musl/rg /usr/local/bin/rg; \
+    rm -rf ripgrep-14.1.1-x86_64-unknown-linux-musl*
+
 # Install Factory Droid CLI in a location accessible to all users
 RUN set -eux; \
     curl -fsSL https://app.factory.ai/cli | sh; \
@@ -26,9 +33,7 @@ RUN set -eux; \
     install -m 0755 /root/.local/bin/droid /usr/local/bin/droid; \
     rm -f /root/.local/bin/droid; \
     install -d -m 0755 /home/${USERNAME}/.factory/bin; \
-    if [ -f /root/.factory/bin/rg ]; then \
-      install -m 0755 /root/.factory/bin/rg /home/${USERNAME}/.factory/bin/rg; \
-    fi; \
+    ln -sf /usr/local/bin/rg /home/${USERNAME}/.factory/bin/rg; \
     rm -rf /root/.factory || true
 
 # Make sure the user can persist Factory CLI state and binaries
