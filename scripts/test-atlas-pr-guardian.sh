@@ -124,27 +124,23 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Test 4: Validate Event Dependencies"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Note: Sensor uses two separate dependencies for different event types
-# pr-lifecycle: for PR open/sync/ready events
-# pr-comments: for issue comment events (Bugbot feedback)
+# Note: Sensor uses single dependency due to Argo Events v1.9.7 constraint
+# Argo Events doesn't support multiple dependencies with same eventName
+# pr-events: Handles both pull_request and issue_comment events
 
-if grep -q "name: pr-lifecycle" "$SENSOR_FILE"; then
-  pass "PR lifecycle dependency configured"
+if grep -q "name: pr-events" "$SENSOR_FILE"; then
+  pass "Single pr-events dependency configured (Argo Events v1.9.7 compliant)"
 else
-  fail "PR lifecycle dependency missing"
+  fail "pr-events dependency missing"
+fi
+
+# Check that we don't have multiple dependencies (causes InvalidDependencies error)
+if grep -q "name: pr-lifecycle" "$SENSOR_FILE"; then
+  warn "Multiple dependencies found (Argo Events v1.9.7 doesn't support this)"
 fi
 
 if grep -q "name: pr-comments" "$SENSOR_FILE"; then
-  pass "PR comments dependency configured"
-else
-  fail "PR comments dependency missing"
-fi
-
-# Check that status-event is not present (removed to avoid schema complexity)
-if grep -q "name: status-event" "$SENSOR_FILE"; then
-  warn "Status event dependency found (should be removed for schema simplicity)"
-else
-  pass "Status event dependency correctly omitted"
+  warn "Multiple dependencies found (Argo Events v1.9.7 doesn't support this)"
 fi
 
 # Test 5: Check CodeRun trigger
