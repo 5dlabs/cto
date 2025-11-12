@@ -2,7 +2,7 @@ name: Sync Agent Templates ConfigMap
 
 on:
   push:
-    branches: [main]
+    branches: ['**']  # Run on all branches for faster testing iteration
     paths:
       - 'infra/charts/controller/agent-templates/**'
       - 'infra/charts/controller/templates/agent-templates-*.yaml'
