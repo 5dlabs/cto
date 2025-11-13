@@ -68,7 +68,7 @@ spec:
   taskId: 0
   service: "atlas-pr-guardian"
   githubApp: "5DLabs-Atlas"
-  model: "claude-sonnet-4-20250514"
+  model: "claude-sonnet-4-5-20250929"
   repositoryUrl: "$CLONE_URL"
   docsRepositoryUrl: "https://github.com/5dlabs/cto.git"
   docsProjectDirectory: "docs"
@@ -79,7 +79,7 @@ spec:
   overwriteMemory: false
   cliConfig:
     cliType: "claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-5-20250929"
     maxTokens: 8192
     temperature: 0.3
   env:

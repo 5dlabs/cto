@@ -39,10 +39,8 @@ spec:
         # Use exprs to ensure issue_comment events are only on PRs
         exprs:
           # For issue_comment events, verify it's on a PR (not a regular issue)
+          # Note: Fields extraction removed to prevent filtering non-PR events
           - expr: 'body.X-GitHub-Event != "issue_comment" || body.issue.pull_request != null'
-            fields:
-              - name: is_pr_comment
-                path: body.issue.pull_request
 
   triggers:
     - template:
@@ -132,6 +130,7 @@ spec:
                           taskId: 0
                           service: "atlas-pr-guardian"
                           githubApp: "5DLabs-Atlas"
+                          model: "claude-sonnet-4-5-20250929"
                           repositoryUrl: "{{ .Input.body.repository.clone_url }}"
                           docsRepositoryUrl: "{{ .Input.body.repository.clone_url }}"
                           docsProjectDirectory: "docs"
@@ -140,7 +139,7 @@ spec:
                           overwriteMemory: false
                           cliConfig:
                             cliType: "claude"
-                            model: "claude-sonnet-4-20250514"
+                            model: "claude-sonnet-4-5-20250929"
                             maxTokens: 8192
                             temperature: 0.3
                           env:
