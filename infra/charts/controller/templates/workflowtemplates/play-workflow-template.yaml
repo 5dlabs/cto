@@ -349,6 +349,7 @@ spec:
                   value: "{{`{{inputs.parameters.stage}}`}}"
 
     # Run agent sequence: Rex → Cleo → Cipher → Tess (no remediation loop)
+    # Now supports resume from ConfigMap - skips already-completed stages
     - name: agent-sequence
       inputs:
         parameters:
@@ -363,8 +364,29 @@ spec:
             valueFrom:
               parameter: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
       steps:
+        # Step 0: Determine resume point from ConfigMap
+        - - name: check-resume-point
+            template: determine-resume-point
+            arguments:
+              parameters:
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+
+        # Step 1: Check if implementation stage should run
+        - - name: should-run-implementation
+            template: check-stage-needed
+            arguments:
+              parameters:
+                - name: resume-stage
+                  value: "{{`{{steps.check-resume-point.outputs.parameters.resume-stage}}`}}"
+                - name: current-stage
+                  value: "implementation"
+
         - - name: determine-agent
             template: determine-task-agent
+            when: "'{{`{{steps.should-run-implementation.outputs.parameters.should-run}}`}}' == 'true'"
             arguments:
               parameters:
                 - name: task-id
@@ -374,6 +396,7 @@ spec:
                 - name: docs-project-directory
                   value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
         - - name: implementation
+            when: "'{{`{{steps.should-run-implementation.outputs.parameters.should-run}}`}}' == 'true'"
             template: implementation-cycle
             arguments:
               parameters:
@@ -398,8 +421,20 @@ spec:
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
+
+        # Step 2: Check if quality stage should run
+        - - name: should-run-quality
+            template: check-stage-needed
+            arguments:
+              parameters:
+                - name: resume-stage
+                  value: "{{`{{steps.check-resume-point.outputs.parameters.resume-stage}}`}}"
+                - name: current-stage
+                  value: "quality"
+
         - - name: update-to-quality-in-progress
             template: update-workflow-stage
+            when: "'{{`{{steps.should-run-quality.outputs.parameters.should-run}}`}}' == 'true'"
             arguments:
               parameters:
                 - name: new-stage
@@ -407,6 +442,7 @@ spec:
                 - name: verify-update
                   value: "true"
         - - name: check-quality-completion
+            when: "'{{`{{steps.should-run-quality.outputs.parameters.should-run}}`}}' == 'true'"
             template: check-pr-merge-status
             arguments:
               parameters:
@@ -420,7 +456,7 @@ spec:
             template: agent-coderun
             continueOn:
               failed: true  # Allow workflow to proceed to Cipher even if Cleo finds issues
-            when: "'{{`{{steps.check-quality-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
+            when: "'{{`{{steps.should-run-quality.outputs.parameters.should-run}}`}}' == 'true' && '{{`{{steps.check-quality-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
             arguments:
               parameters:
                 - name: github-app
@@ -445,6 +481,18 @@ spec:
                   value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
         # Proceed to Cipher security scanning after Cleo quality checks
         # Skip security stage if agent/cli/model are not configured
+
+        # Step 3: Check if security stage should run
+        - - name: should-run-security
+            template: check-stage-needed
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
+            arguments:
+              parameters:
+                - name: resume-stage
+                  value: "{{`{{steps.check-resume-point.outputs.parameters.resume-stage}}`}}"
+                - name: current-stage
+                  value: "security"
+
         - - name: update-to-security-in-progress
             template: update-workflow-stage
             arguments:
@@ -453,8 +501,9 @@ spec:
                   value: "security-in-progress"
                 - name: verify-update
                   value: "true"
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true'"
         - - name: check-security-completion
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true'"
             template: check-pr-merge-status
             arguments:
               parameters:
@@ -491,7 +540,7 @@ spec:
                   value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.security-max-retries}}`}}"
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.check-security-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true' && '{{`{{steps.check-security-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
         - - name: skip-security-stage
             template: skip-stage-notice
             arguments:
@@ -504,8 +553,20 @@ spec:
         # Proceed directly to Tess testing after Cipher completes
         # No suspension needed - Tess runs automatically after security review
         # continueOn.failed allows workflow to complete even if Tess finds issues
+
+        # Step 4: Check if testing stage should run
+        - - name: should-run-testing
+            template: check-stage-needed
+            arguments:
+              parameters:
+                - name: resume-stage
+                  value: "{{`{{steps.check-resume-point.outputs.parameters.resume-stage}}`}}"
+                - name: current-stage
+                  value: "testing"
+
         - - name: check-testing-completion
             template: check-pr-merge-status
+            when: "'{{`{{steps.should-run-testing.outputs.parameters.should-run}}`}}' == 'true'"
             arguments:
               parameters:
                 - name: repository
@@ -522,12 +583,12 @@ spec:
                   value: "testing-in-progress"
                 - name: verify-update
                   value: "true"
-            when: "'{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
+            when: "'{{`{{steps.should-run-testing.outputs.parameters.should-run}}`}}' == 'true' && '{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
         - - name: testing-work
             template: agent-coderun
             continueOn:
               failed: true
-            when: "'{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
+            when: "'{{`{{steps.should-run-testing.outputs.parameters.should-run}}`}}' == 'true' && '{{`{{steps.check-testing-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
             arguments:
               parameters:
                 - name: github-app
@@ -1345,6 +1406,32 @@ spec:
             exit 1
           fi
 
+          # Update ConfigMap with stage transition (for resume functionality)
+          echo ""
+          echo "Updating ConfigMap for resume tracking..."
+
+          REPO="{{`{{workflow.parameters.repository}}`}}"
+          TASK_ID="{{`{{workflow.parameters.task-id}}`}}"
+          CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')"
+          CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Check if ConfigMap exists
+          if kubectl get configmap "$CONFIGMAP_NAME" -n {{ .Release.Namespace }} >/dev/null 2>&1; then
+            echo "ConfigMap exists, patching with stage update..."
+
+            # Patch existing ConfigMap
+            kubectl patch configmap "$CONFIGMAP_NAME" \
+              -n {{ .Release.Namespace }} \
+              --type merge \
+              -p "{\"data\":{\"stage\":\"{{`{{inputs.parameters.new-stage}}`}}\",\"last-updated\":\"$CURRENT_TIMESTAMP\",\"workflow-name\":\"{{`{{workflow.name}}`}}\",\"current-task-id\":\"$TASK_ID\"}}" || {
+              echo "⚠️ ConfigMap patch failed, but workflow stage was updated successfully"
+            }
+
+            echo "✅ ConfigMap updated with stage: {{`{{inputs.parameters.new-stage}}`}}"
+          else
+            echo "ConfigMap does not exist yet - will be created by controller"
+          fi
+
           # Output monitoring metrics
           cat <<EOF > /tmp/stage-transition-metrics.json
           {
@@ -1984,6 +2071,168 @@ spec:
           echo "✓ PR is open and not merged - stage should proceed"
 
     # Log information about GitHub checks (diagnostic only)
+
+    # Template to determine workflow resume point from ConfigMap
+    # Reads play-progress ConfigMap and outputs which stage to resume from
+    - name: determine-resume-point
+      inputs:
+        parameters:
+          - name: task-id
+          - name: repository
+      outputs:
+        parameters:
+          - name: resume-stage
+            valueFrom:
+              path: /tmp/resume-stage.txt
+      script:
+        image: alpine/k8s:1.31.0
+        command: [bash]
+        source: |
+          #!/bin/bash
+          set -e
+
+          # Install jq if not available
+          if ! command -v jq >/dev/null 2>&1; then
+            apk add --no-cache jq
+          fi
+
+          REPO="{{`{{inputs.parameters.repository}}`}}"
+          TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
+          CONFIGMAP_NAME="play-progress-$(echo $REPO | tr '/' '-')"
+
+          echo "=== Checking for Existing Progress ==="
+          echo "Repository: $REPO"
+          echo "Task ID: $TASK_ID"
+          echo "ConfigMap: $CONFIGMAP_NAME"
+
+          # Try to get ConfigMap
+          if ! PROGRESS=$(kubectl get configmap "$CONFIGMAP_NAME" -n {{ .Release.Namespace }} -o json 2>/dev/null); then
+            echo "No existing progress found - starting from beginning"
+            echo "implementation" > /tmp/resume-stage.txt
+            exit 0
+          fi
+
+          # Extract progress data
+          STORED_TASK_ID=$(echo "$PROGRESS" | jq -r '.data["current-task-id"] // ""')
+          STORED_STAGE=$(echo "$PROGRESS" | jq -r '.data["stage"] // "implementation"')
+          STORED_STATUS=$(echo "$PROGRESS" | jq -r '.data["status"] // "in-progress"')
+          WORKFLOW_NAME=$(echo "$PROGRESS" | jq -r '.data["workflow-name"] // ""')
+
+          echo "Found existing progress:"
+          echo "  Task ID: $STORED_TASK_ID"
+          echo "  Stage: $STORED_STAGE"
+          echo "  Status: $STORED_STATUS"
+          echo "  Workflow: $WORKFLOW_NAME"
+
+          # Validate task ID matches
+          if [ "$STORED_TASK_ID" != "$TASK_ID" ]; then
+            echo "⚠️  ConfigMap has different task ($STORED_TASK_ID vs $TASK_ID)"
+            echo "Starting from beginning for new task"
+            echo "implementation" > /tmp/resume-stage.txt
+            exit 0
+          fi
+
+          # Check if workflow still exists (prevent concurrent execution)
+          if [ -n "$WORKFLOW_NAME" ]; then
+            if kubectl get workflow "$WORKFLOW_NAME" -n {{ .Release.Namespace }} >/dev/null 2>&1; then
+              echo "⚠️  Workflow $WORKFLOW_NAME still exists!"
+              echo "This indicates concurrent execution attempt"
+              exit 1  # Prevent duplicate workflows
+            fi
+          fi
+
+          # Determine resume stage based on stored stage
+          # User decision: If stage partially completes, restart from beginning of that stage
+          case "$STORED_STAGE" in
+            "pending"|"implementation-in-progress")
+              RESUME_STAGE="implementation"
+              echo "✅ Resuming at: Implementation"
+              ;;
+            "quality-in-progress")
+              RESUME_STAGE="quality"
+              echo "✅ Resuming at: Code Quality (Cleo)"
+              ;;
+            "security-in-progress")
+              RESUME_STAGE="security"
+              echo "✅ Resuming at: Security (Cipher)"
+              ;;
+            "testing-in-progress")
+              RESUME_STAGE="testing"
+              echo "✅ Resuming at: Testing (Tess)"
+              ;;
+            "waiting-pr-merged")
+              RESUME_STAGE="waiting-merge"
+              echo "✅ Resuming at: Waiting for Merge"
+              ;;
+            "completed")
+              # Task already completed - still allow restart for idempotency
+              RESUME_STAGE="completed"
+              echo "✅ Task already completed (allowing restart)"
+              ;;
+            *)
+              echo "⚠️  Unknown stage: $STORED_STAGE, starting from beginning"
+              RESUME_STAGE="implementation"
+              ;;
+          esac
+
+          echo "$RESUME_STAGE" > /tmp/resume-stage.txt
+
+    # Template to check if a stage should run based on resume point
+    # Compares resume-stage with current-stage to decide if stage should be skipped
+    - name: check-stage-needed
+      inputs:
+        parameters:
+          - name: resume-stage
+            description: "Stage to resume from (from ConfigMap)"
+          - name: current-stage
+            description: "Current stage being evaluated"
+      outputs:
+        parameters:
+          - name: should-run
+            valueFrom:
+              path: /tmp/should-run.txt
+      script:
+        image: alpine/k8s:1.31.0
+        command: [bash]
+        source: |
+          #!/bin/bash
+          set -e
+
+          RESUME_STAGE="{{`{{inputs.parameters.resume-stage}}`}}"
+          CURRENT_STAGE="{{`{{inputs.parameters.current-stage}}`}}"
+
+          echo "=== Stage Skip Check ==="
+          echo "Resume from: $RESUME_STAGE"
+          echo "Current stage: $CURRENT_STAGE"
+
+          # Stage order (must match workflow progression)
+          # implementation → quality → security → testing → waiting-merge → completed
+          STAGES=("implementation" "quality" "security" "testing" "waiting-merge" "completed")
+
+          # Find indices
+          RESUME_IDX=-1
+          CURRENT_IDX=-1
+
+          for i in "${!STAGES[@]}"; do
+            if [ "${STAGES[$i]}" = "$RESUME_STAGE" ]; then
+              RESUME_IDX=$i
+            fi
+            if [ "${STAGES[$i]}" = "$CURRENT_STAGE" ]; then
+              CURRENT_IDX=$i
+            fi
+          done
+
+          echo "Resume index: $RESUME_IDX"
+          echo "Current index: $CURRENT_IDX"
+
+          # If current stage is before resume stage, skip it (already completed)
+          if [ $CURRENT_IDX -lt $RESUME_IDX ]; then
+            echo "⏭️  Skipping $CURRENT_STAGE (already completed, resuming at $RESUME_STAGE)"
+            echo "false" > /tmp/should-run.txt
+          else
+            echo "▶️  Running $CURRENT_STAGE"
+            echo "true" > /tmp/should-run.txt
+          fi
 
     # Cleanup handler for workflow completion/failure
     - name: cleanup-handler
