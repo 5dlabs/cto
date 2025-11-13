@@ -52,7 +52,7 @@ spec:
               spec:
                 githubApp: "5DLabs-Bolt"
                 cli: "Claude"
-                model: "claude-sonnet-4-20250514"
+                model: "claude-sonnet-4-5-20250929"
                 maxTokens: 4096
                 temperature: 0.3
                 repositoryUrl: ""
@@ -78,6 +78,13 @@ spec:
               spec:
                 serviceAccountName: agent-workflow-sa
                 entrypoint: validate-deployment
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: deployment-state
@@ -102,7 +109,7 @@ spec:
                         spec:
                           githubApp: "5DLabs-Bolt"
                           cli: "Claude"
-                          model: "claude-sonnet-4-20250514"
+                          model: "claude-sonnet-4-5-20250929"
 
         parameters:
           - src:

@@ -778,6 +778,37 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
     git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
   fi
   git checkout "$FEATURE_BRANCH"
+  
+  # Check if upstream branch is gone (deleted after previous PR was closed)
+  UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+  if [ -n "$UPSTREAM_BRANCH" ]; then
+    if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
+      echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
+      echo "🔍 Checking for closed PRs from previous runs..."
+      
+      # Check if there's a CLOSED PR for this branch
+      refresh_token_if_needed || true
+      CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+      
+      if [ -n "$CLOSED_PR" ]; then
+        echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
+        echo "🔄 Deleting stale branch and recreating fresh from $REMOTE_BASE"
+        
+        # Switch off the branch before deleting it
+        git checkout "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-cleanup-branch "$REMOTE_BASE"
+        git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+        
+        # Recreate fresh branch
+        git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+        echo "✅ Created fresh branch $FEATURE_BRANCH from $REMOTE_BASE"
+        echo "ℹ️ Previous PR was closed - starting with clean slate"
+      else
+        echo "ℹ️ No closed PRs found - will unset upstream and continue"
+        git branch --unset-upstream 2>/dev/null || true
+      fi
+    fi
+  fi
+  
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
     if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then

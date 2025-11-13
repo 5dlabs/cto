@@ -9,8 +9,6 @@ spec:
     serviceAccountName: argo-events-sa
 
   dependencies:
-    # Single dependency for all PR-related events
-    # Note: Argo Events v1.9.7 doesn't support multiple dependencies with same eventName
     - name: pr-events
       eventSourceName: github
       eventName: org
@@ -21,7 +19,7 @@ spec:
             type: string
             value:
               - "5dlabs/cto"
-          # Accept pull_request, issue_comment, and pull_request_review events
+          # Accept both pull_request and issue_comment events
           - path: body.X-GitHub-Event
             type: string
             value:
@@ -40,116 +38,130 @@ spec:
               - submitted
         # Use exprs to ensure issue_comment events are only on PRs
         exprs:
-          # For pull_request and pull_request_review events, always pass (they are PRs by definition)
           # For issue_comment events, verify it's on a PR (not a regular issue)
-          - expr: 'body.X-GitHub-Event == "pull_request" || body.X-GitHub-Event == "pull_request_review" || (body.X-GitHub-Event == "issue_comment" && has(body.issue.pull_request))'
-            fields:
-              - name: event_type
-                path: body.X-GitHub-Event
+          # Note: Fields extraction removed to prevent filtering non-PR events
+          - expr: 'body.X-GitHub-Event != "issue_comment" || body.issue.pull_request != null'
 
   triggers:
     - template:
         name: create-or-resume-atlas-guardian
         conditions: "pr-events"
-        k8s:
-          # Note: operation: create will spawn new CodeRuns for each event.
-          # The controller should implement deduplication logic to:
-          # 1. Check if a CodeRun with matching pr-number label already exists
-          # 2. If exists and Running, skip creation (let existing session handle it)
-          # 3. If exists and Completed/Failed, create new CodeRun for fresh start
-          # 4. If not exists, create new CodeRun
-          # This ensures one Atlas instance per PR while allowing recovery from failures.
-          operation: create
+        argoWorkflow:
+          operation: submit
           source:
             resource:
-              apiVersion: agents.platform.5dlabs.ai/v1alpha1
-              kind: CodeRun
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
               metadata:
-                generateName: coderun-atlas-pr-
+                generateName: atlas-dedup-
                 namespace: agent-platform
-                labels:
-                  agent: atlas
-                  role: pr-guardian
-                  pr-number: ""  # Extracted from webhook
-                  repository: "cto"
               spec:
-                githubApp: "5DLabs-Atlas"
-                cli: "Claude"
-                model: "claude-sonnet-4-20250514"
-                maxTokens: 8192
-                temperature: 0.3
-                repositoryUrl: ""  # Extracted from webhook
-                workingDirectory: "."
-                continueSession: true  # Keep session alive across events
-                overwriteMemory: false
-                env:
-                  - name: PR_NUMBER
-                    value: ""  # Extracted from webhook
-                  - name: PR_URL
-                    value: ""  # Extracted from webhook
-                  - name: REPOSITORY_FULL_NAME
-                    value: ""  # Extracted from webhook
-                  - name: GUARDIAN_MODE
-                    value: "active"
-                  - name: TARGET_REPOSITORY
-                    value: "5dlabs/cto"  # Atlas only watches CTO repo
-                  - name: MERGE_STRATEGY
-                    value: "squash"
+                entrypoint: deduplicate-and-create
+                serviceAccountName: argo-workflow
+                templates:
+                  - name: deduplicate-and-create
+                    script:
+                      image: alpine/k8s:1.31.0
+                      command: [bash]
+                      source: |
+                        #!/bin/bash
+                        set -e
 
-          parameters:
-            # Single dependency with conditional extraction based on event type
-            # Check X-GitHub-Event header to determine which fields to extract
+                        # Ensure jq is available
+                        if ! command -v jq >/dev/null 2>&1; then
+                          if command -v apk >/dev/null 2>&1; then
+                            apk add --no-cache jq
+                          fi
+                        fi
 
-            # Repository URL (same for both event types)
-            - src:
-                dependencyName: pr-events
-                dataKey: body.repository.clone_url
-              dest: spec.repositoryUrl
+                        echo "=== Atlas PR Guardian Deduplication ==="
+                        echo "PR Number: {{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
+                        echo "Event: {{ .Input.body.X-GitHub-Event }}"
+                        echo "Action: {{ .Input.body.action }}"
 
-            # PR Number - conditional based on event type
-            - src:
-                dependencyName: pr-events
-                dataTemplate: |
-                  {{- if .Input.body.pull_request.number -}}
-                  {{ .Input.body.pull_request.number }}
-                  {{- else if .Input.body.issue.number -}}
-                  {{ .Input.body.issue.number }}
-                  {{- end -}}
-              dest: spec.env.0.value
+                        PR_NUMBER="{{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
 
-            # PR URL - conditional based on event type
-            - src:
-                dependencyName: pr-events
-                dataTemplate: |
-                  {{- if .Input.body.pull_request.html_url -}}
-                  {{ .Input.body.pull_request.html_url }}
-                  {{- else if .Input.body.issue.html_url -}}
-                  {{ .Input.body.issue.html_url }}
-                  {{- end -}}
-              dest: spec.env.1.value
+                        # Validate PR_NUMBER is not empty (prevents edge cases in GitHub webhooks)
+                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+                          echo "❌ No PR number found in webhook event - skipping"
+                          exit 0
+                        fi
 
-            # Repository full name (same for both)
-            - src:
-                dependencyName: pr-events
-                dataKey: body.repository.full_name
-              dest: spec.env.2.value
+                        # Check for existing CodeRun for this PR
+                        EXISTING=$(kubectl get coderuns -n agent-platform \
+                          -l agent=atlas,pr-number="$PR_NUMBER" \
+                          -o json 2>/dev/null || echo '{"items":[]}')
 
-            # PR number label - conditional
-            - src:
-                dependencyName: pr-events
-                dataTemplate: |
-                  {{- if .Input.body.pull_request.number -}}
-                  {{ .Input.body.pull_request.number }}
-                  {{- else if .Input.body.issue.number -}}
-                  {{ .Input.body.issue.number }}
-                  {{- end -}}
-              dest: metadata.labels.pr-number
+                        COUNT=$(echo "$EXISTING" | jq '.items | length')
+                        echo "Found $COUNT existing CodeRun(s) for PR #$PR_NUMBER"
 
-            # Repository name label (same for both)
-            - src:
-                dependencyName: pr-events
-                dataKey: body.repository.name
-              dest: metadata.labels.repository
+                        if [ "$COUNT" -gt 0 ]; then
+                          # Check for active CodeRuns:
+                          # 1. Running or Pending phase (normal cases)
+                          # 2. No status yet (newly created, not reconciled) - check if created within last 30 seconds
+                          ACTIVE=$(echo "$EXISTING" | jq -r '.items[] | select(
+                            (.status.phase == "Running" or .status.phase == "Pending") or
+                            (.status == null and (now - (.metadata.creationTimestamp | fromdateiso8601) < 30))
+                          ) | .metadata.name' | head -1)
+
+                          if [ -n "$ACTIVE" ]; then
+                            echo "✅ CodeRun already active: $ACTIVE"
+                            echo "   Session continuity will handle this event"
+                            exit 0
+                          fi
+
+                          echo "⚠️  Existing CodeRun(s) are not active (likely Completed/Failed)"
+                          echo "   Creating new CodeRun for PR #$PR_NUMBER"
+                        fi
+
+                        # Create new CodeRun
+                        cat <<EOF | kubectl create -f - 2>&1 | tee /tmp/create-output.txt
+                        apiVersion: agents.platform/v1
+                        kind: CodeRun
+                        metadata:
+                          generateName: coderun-atlas-pr-
+                          namespace: agent-platform
+                          labels:
+                            agent: atlas
+                            role: pr-guardian
+                            pr-number: "$PR_NUMBER"
+                            repository: "cto"
+                        spec:
+                          taskId: 0
+                          service: "atlas-pr-guardian"
+                          githubApp: "5DLabs-Atlas"
+                          model: "claude-sonnet-4-5-20250929"
+                          repositoryUrl: "{{ .Input.body.repository.clone_url }}"
+                          docsRepositoryUrl: "{{ .Input.body.repository.clone_url }}"
+                          docsProjectDirectory: "docs"
+                          workingDirectory: "."
+                          continueSession: true
+                          overwriteMemory: false
+                          cliConfig:
+                            cliType: "claude"
+                            model: "claude-sonnet-4-5-20250929"
+                            maxTokens: 8192
+                            temperature: 0.3
+                          env:
+                            PR_NUMBER: "$PR_NUMBER"
+                            PR_URL: "{{ .Input.body.pull_request.html_url | default .Input.body.issue.html_url }}"
+                            REPOSITORY_FULL_NAME: "{{ .Input.body.repository.full_name }}"
+                            GUARDIAN_MODE: "active"
+                            TARGET_REPOSITORY: "5dlabs/cto"
+                            MERGE_STRATEGY: "squash"
+                        EOF
+
+                        if grep -q "created" /tmp/create-output.txt; then
+                          CODERUN_NAME=$(grep "created" /tmp/create-output.txt | awk '{print $1}' | cut -d'/' -f2)
+                          echo "✅ Created new CodeRun: $CODERUN_NAME"
+                        else
+                          echo "⚠️  CodeRun creation output:"
+                          cat /tmp/create-output.txt
+                        fi
+      retryStrategy:
+        steps: 3
+        duration: "10s"
+        factor: 2
 
 ---
 apiVersion: v1
@@ -165,12 +177,17 @@ data:
     Atlas acts as a **per-PR guardian** that watches a pull request from creation to merge,
     ensuring it stays clean, passes CI, and has no Bugbot comments before auto-merging.
 
+    ## Deduplication Logic (NEW)
+    - Before creating a CodeRun, check if one already exists for the PR
+    - If Running: Skip creation (session continuity handles new events)
+    - If Completed/Failed: Create new CodeRun for fresh start
+    - If none exist: Create new CodeRun
+    - **Result**: One Atlas instance per PR, no duplicates
+
     ## Activation
     - **Trigger**: PR opened, reopened, synchronized, or new comments added
     - **Scope**: Only 5dlabs/cto repository
     - **Lifecycle**: One Atlas instance per PR, stays active until PR is merged or closed
-    - **Note**: CI status events not used as triggers due to payload schema complexity;
-      Atlas detects CI changes via PR synchronize events and comment notifications
 
     ## Responsibilities
 
@@ -207,94 +224,3 @@ data:
       - Post detailed comment explaining blockers
       - Tag PR author for human intervention
       - Suspend Atlas session until new activity
-
-    ## Workflow Loop
-
-    ```
-    PR Event (open/sync/comment) → Atlas Activated
-      ↓
-    Check PR State:
-      - Bugbot comments? → Resolve
-      - CI failing? → Fix
-      - Merge conflicts? → Resolve
-      ↓
-    Push fixes → Wait for CI
-      ↓
-    All checks pass? → Auto-merge (squash)
-      ↓
-    Success → Post summary, close session
-    ```
-
-    ## Session Continuity
-    - `continueSession: true` ensures Atlas remembers context across events
-    - Each PR gets its own Atlas workspace
-    - Session persists until PR is merged or closed
-
-    ## Error Handling
-    - **Transient failures**: Retry up to 3 times
-    - **Persistent failures**: Add `blocked` label, request human help
-    - **Rate limits**: Back off and retry
-    - **Permissions issues**: Alert in PR comment
-
-    ## Example Scenarios
-
-    ### Scenario A: Bugbot Feedback Loop
-    ```
-    1. Developer opens PR
-    2. Atlas activates, checks PR
-    3. Bugbot comments: "Missing error handling in api.rs:42"
-    4. Atlas analyzes, adds error handling
-    5. Atlas pushes fix
-    6. Bugbot satisfied, no more comments
-    7. CI passes
-    8. Atlas squash-merges PR
-    ```
-
-    ### Scenario B: CI Failure Recovery
-    ```
-    1. PR opened, CI fails (clippy error)
-    2. Atlas activates, sees red CI
-    3. Atlas reads clippy logs
-    4. Atlas fixes clippy warnings
-    5. Atlas pushes fix
-    6. CI re-runs, passes
-    7. Atlas squash-merges PR
-    ```
-
-    ### Scenario C: Merge Conflict Resolution
-    ```
-    1. PR open, another PR merges to main
-    2. Original PR now has conflicts
-    3. Atlas detects unmergeable state
-    4. Atlas rebases PR on latest main
-    5. Atlas resolves conflicts
-    6. Atlas pushes resolution
-    7. CI passes
-    8. Atlas squash-merges PR
-    ```
-
-    ### Scenario D: Blocked State
-    ```
-    1. PR has complex issue Atlas can't fix
-    2. Atlas tries 3 times, fails
-    3. Atlas adds `blocked` label
-    4. Atlas comments: "Unable to resolve X, Y, Z. @author please review."
-    5. Atlas suspends session
-    6. Human fixes issue
-    7. New push triggers Atlas
-    8. Atlas sees clean state, merges
-    ```
-
-    ## Integration with Existing Agents
-    - Atlas is **independent** of Rex/Cleo/Tess workflow
-    - Atlas watches **all PRs** in cto repo, regardless of origin
-    - Atlas does **not** interfere with multi-agent play workflows
-    - Atlas **only** acts on PRs that need help (Bugbot comments, CI failures, conflicts)
-
-    ## Success Metrics
-    - **Auto-merge rate**: % of PRs merged without human intervention
-    - **Time to merge**: Average time from PR open to merge
-    - **Bugbot resolution rate**: % of Bugbot comments resolved automatically
-    - **CI recovery rate**: % of CI failures fixed automatically
-    - **Blocked rate**: % of PRs requiring human intervention
-

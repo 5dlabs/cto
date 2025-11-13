@@ -153,7 +153,7 @@ agents:
     name: "Cleo"
     githubApp: "5DLabs-Cleo"
     cli: "Claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-5-20250929"
     maxTokens: 2048
     temperature: 0.3
     appId: "1794540"
@@ -186,7 +186,7 @@ agents:
     name: "Tess"
     githubApp: "5DLabs-Tess"
     cli: "Claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-5-20250929"
     maxTokens: 4096
     temperature: 0.7
     appId: "1794556"
@@ -505,7 +505,7 @@ agents:
     name: "Stitch"
     githubApp: "5DLabs-Stitch"
     cli: "Claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-5-20250929"
     maxTokens: 2048
     temperature: 0.5
     appId: "1794583"
@@ -535,7 +535,7 @@ agents:
     name: "Atlas"
     githubApp: "5DLabs-Atlas"
     cli: "Claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-5-20250929"
     maxTokens: 8192
     temperature: 0.3
     appId: "2225842"
@@ -562,8 +562,12 @@ agents:
 
       **CORE RESPONSIBILITIES**:
       1. **Bugbot Resolution**: Monitor and resolve Cursor Bugbot comments (https://github.com/apps/cursor)
+         - After pushing ANY fixes, ALWAYS trigger new Bugbot review by commenting: "@bugbot review"
+         - This ensures Bugbot re-checks the code after your changes
       2. **CI Recovery**: Fix failing checks (clippy, tests, lints) to get CI green
+         - After pushing CI fixes, ALWAYS comment "@bugbot review" to re-validate
       3. **Conflict Resolution**: Rebase and resolve merge conflicts with main
+         - After resolving conflicts, ALWAYS comment "@bugbot review" to re-validate
       4. **Auto-Merge**: Squash-merge PRs when all criteria met (no Bugbot comments, CI green, no conflicts)
       5. **Escalation**: Add 'blocked' label and request human help after 3 failed attempts
 
@@ -576,41 +580,114 @@ agents:
       - ✅ No merge conflicts
       - ✅ PR mergeable state
 
+      **HOW TO RESOLVE MERGE CONFLICTS**:
+      When a PR has merge conflicts (mergeable: false, mergeableState: "dirty"), follow these steps:
+
+      1. **Fetch Latest Main**:
+         ```bash
+         git fetch origin main
+         ```
+
+      2. **Attempt Automatic Rebase**:
+         ```bash
+         # Try to rebase on latest main
+         git rebase origin/main
+         ```
+
+      3. **If Conflicts Occur**:
+         ```bash
+         # List conflicted files
+         git diff --name-only --diff-filter=U
+
+         # For each conflicted file, review conflict markers
+         # Resolve by preserving intent of both changes when possible
+         # Edit files to remove <<<<<<< ======= >>>>>>> markers
+
+         # After resolving each file
+         git add <resolved-file>
+         ```
+
+      4. **Complete the Rebase**:
+         ```bash
+         # Continue rebase after resolving all conflicts
+         git rebase --continue
+         ```
+
+      5. **Force Push Resolution**:
+         ```bash
+         # Push resolved conflicts to PR branch
+         git push --force-with-lease origin <pr-branch>
+         ```
+
+      6. **Verify CI Passes**:
+         ```bash
+         # Check that CI runs successfully after conflict resolution
+         gh pr checks $PR_NUMBER
+         ```
+
+      7. **Post Resolution Comment**:
+         ```bash
+         gh pr comment $PR_NUMBER --body "## 🔗 Atlas: Merge Conflicts Resolved
+
+         Successfully resolved merge conflicts with main branch.
+
+         **Files Resolved**: <list files>
+         **Strategy**: Intelligent merge preserving intent of both changes
+         **Verification**: CI checks running
+
+         ---
+         *Resolved by Atlas PR Guardian at $(date -u)*"
+         ```
+
+      8. **CRITICAL: Trigger Bugbot Review**:
+         ```bash
+         # ALWAYS trigger Bugbot review after conflict resolution
+         gh pr comment $PR_NUMBER --body "@bugbot review"
+         ```
+
       **HOW TO MERGE A PR**:
       When ALL merge criteria are satisfied, execute the merge with these exact steps:
-      
+
       1. **Verify Merge Readiness**:
          ```bash
          # Check PR status
          gh pr view $PR_NUMBER --json mergeable,mergeStateStatus,statusCheckRollup
          ```
-      
+
       2. **Execute Squash Merge**:
          ```bash
          # Merge the PR with squash strategy (immediate merge)
          gh pr merge $PR_NUMBER --squash
          ```
-      
+
       3. **Post Success Comment**:
          ```bash
          gh pr comment $PR_NUMBER --body "## ✅ Atlas: PR Merged
-         
+
          Successfully merged PR #$PR_NUMBER using squash merge.
-         
+
          **Merge Criteria Met**:
          - ✅ No Bugbot comments
          - ✅ All CI checks passing
          - ✅ No merge conflicts
          - ✅ PR was mergeable
-         
+
          ---
          *Merged by Atlas PR Guardian at $(date -u)*"
          ```
 
+      **CRITICAL RULE - ALWAYS TRIGGER BUGBOT REVIEW**:
+      After pushing ANY code changes (fixes, conflict resolutions, CI fixes), you MUST:
+      ```bash
+      gh pr comment $PR_NUMBER --body "@bugbot review"
+      ```
+      This ensures Bugbot re-validates the code after your changes.
+
       **BEST PRACTICES**:
       - Apply minimal fixes only
       - Use conventional commits
-      - Post clear PR comments
+      - Post clear PR comments explaining your changes
+      - ALWAYS trigger "@bugbot review" after pushing code changes
       - ALWAYS use squash merge strategy
       - Suspend when blocked (3 attempts)
       - Check merge criteria BEFORE attempting merge
@@ -630,7 +707,7 @@ agents:
     name: "Bolt"
     githubApp: "5DLabs-Bolt"
     cli: "Claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-5-20250929"
     maxTokens: 4096
     temperature: 0.3
     appId: "2225782"
@@ -803,9 +880,9 @@ affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
-      - matchExpressions:
-        - key: node-role.kubernetes.io/control-plane
-          operator: DoesNotExist  # Explicitly exclude control plane nodes
+        - matchExpressions:
+            - key: node-role.kubernetes.io/control-plane
+              operator: DoesNotExist  # Explicitly exclude control plane nodes
 
 # Configuration for the controller service
 config:
