@@ -644,7 +644,7 @@ EOF
       if [ -z "$label" ]; then
         continue
       fi
-      
+
       # Try to create label if it doesn't exist
       if ! gh label view "$label" -R "$REPO_SLUG" >/dev/null 2>&1; then
         case "$label" in
@@ -655,7 +655,7 @@ EOF
         esac
         gh label create "$label" --force -R "$REPO_SLUG" --color "$COLOR" --description "$DESC" >/dev/null 2>&1 || true
       fi
-      
+
       # Add label to PR (continue even if it fails)
       if gh pr edit "$CURRENT_BRANCH" --add-label "$label" >/dev/null 2>&1; then
         echo "   ✓ Added label: $label"
@@ -663,8 +663,29 @@ EOF
         echo "   ⚠️ Could not add label: $label (PR still created)"
       fi
     done
-    
-    echo "ℹ️  Morgan PM will link this PR to the GitHub Project during workflow execution"
+
+    # Add PR to GitHub Project (works for all CLIs: Claude, Codex, Cursor, Factory, OpenCode, Blaze, Rex)
+    echo "=== Linking PR to GitHub Project ==="
+
+    # Get PR number for this branch
+    PR_NUMBER=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+    if [ -n "$PR_NUMBER" ]; then
+      # Use organization project number 1 (Task Master / CTO Project)
+      # This works across all repos and agents
+      PROJECT_NUMBER="1"
+
+      echo "🔗 Adding PR #$PR_NUMBER to Project #$PROJECT_NUMBER..."
+
+      # Use gh project item-add command (simpler than GraphQL)
+      if gh project item-add "$PROJECT_NUMBER" --owner 5dlabs --url "https://github.com/$REPO_SLUG/pull/$PR_NUMBER" 2>&1 | grep -q "Added\|already"; then
+        echo "✅ PR linked to GitHub Project #$PROJECT_NUMBER"
+      else
+        echo "⚠️ Could not link PR to project (may already be linked or permissions issue)"
+      fi
+    else
+      echo "⚠️ Could not get PR number for project linking"
+    fi
   else
     echo "⚠️ Failed to create pull request: $PR_URL"
     echo "   This may be because a PR already exists or there's an authentication issue"
