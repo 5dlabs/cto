@@ -98,8 +98,13 @@ spec:
                         echo "Found $COUNT existing CodeRun(s) for PR #$PR_NUMBER"
 
                         if [ "$COUNT" -gt 0 ]; then
-                          # Check status of existing CodeRuns (both Running AND Pending to prevent race conditions)
-                          ACTIVE=$(echo "$EXISTING" | jq -r '.items[] | select(.status.phase == "Running" or .status.phase == "Pending") | .metadata.name' | head -1)
+                          # Check for active CodeRuns:
+                          # 1. Running or Pending phase (normal cases)
+                          # 2. No status yet (newly created, not reconciled) - check if created within last 30 seconds
+                          ACTIVE=$(echo "$EXISTING" | jq -r '.items[] | select(
+                            (.status.phase == "Running" or .status.phase == "Pending") or
+                            (.status == null and (now - (.metadata.creationTimestamp | fromdateiso8601) < 30))
+                          ) | .metadata.name' | head -1)
 
                           if [ -n "$ACTIVE" ]; then
                             echo "✅ CodeRun already active: $ACTIVE"
