@@ -19,6 +19,13 @@ spec:
             type: string
             value:
               - "5dlabs/cto"
+          # CRITICAL: Only process webhooks from 5DLabs-Atlas GitHub App
+          # Prevents webhook amplification from other apps (Rex, Cleo, Tess, Morgan, etc.)
+          # Without this filter, EVERY app's webhook triggers Atlas workflows
+          - path: body.installation.app_slug
+            type: string
+            value:
+              - "5dlabs-atlas"
           # Accept both pull_request and issue_comment events
           - path: body.X-GitHub-Event
             type: string
@@ -36,11 +43,26 @@ spec:
               - ready_for_review
               - created
               - submitted
+        exprs:
+          # CRITICAL: Only process issue_comment events that are on pull requests
+          # Regular GitHub issues also use issue_comment events, but we only want PR comments
+          # This prevents the workflow from treating issue numbers as PR numbers
+          - expr: 'body.X-GitHub-Event != "issue_comment" || has(body.issue.pull_request)'
+            fields:
+              - name: body.X-GitHub-Event
+                path: body.X-GitHub-Event
+              - name: body.issue.pull_request
+                path: body.issue.pull_request
 
   triggers:
     - template:
         name: create-or-resume-atlas-guardian
         conditions: "pr-events"
+        # Rate limiting to prevent runaway workflow creation
+        # Max 10 workflows per minute across all PR events
+        rateLimit:
+          unit: Minute
+          requestsPerUnit: 10
         argoWorkflow:
           operation: submit
           source:
@@ -70,11 +92,26 @@ spec:
                         fi
 
                         echo "=== Atlas PR Guardian Deduplication ==="
-                        echo "PR Number: {{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
                         echo "Event: {{ .Input.body.X-GitHub-Event }}"
                         echo "Action: {{ .Input.body.action }}"
 
-                        PR_NUMBER="{{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
+                        # Extract PR number based on event type
+                        EVENT_TYPE="{{ .Input.body.X-GitHub-Event }}"
+
+                        if [ "$EVENT_TYPE" = "issue_comment" ]; then
+                          # For issue_comment: verify it's on a PR, not a regular issue
+                          IS_PR="{{ .Input.body.issue.pull_request }}"
+                          if [ -z "$IS_PR" ] || [ "$IS_PR" = "null" ]; then
+                            echo "ℹ️ Issue comment on regular issue (not PR) - skipping"
+                            exit 0
+                          fi
+                          PR_NUMBER="{{ .Input.body.issue.number }}"
+                        else
+                          # For pull_request/pull_request_review events
+                          PR_NUMBER="{{ .Input.body.pull_request.number }}"
+                        fi
+
+                        echo "PR Number: $PR_NUMBER"
 
                         # Validate PR_NUMBER is not empty (prevents edge cases in GitHub webhooks)
                         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
