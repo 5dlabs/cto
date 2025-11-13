@@ -899,6 +899,35 @@ if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
     BRANCH_EXISTS="true"
     echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
     git checkout $FEATURE_BRANCH
+    
+    # Check if upstream branch is gone (deleted after previous PR was closed)
+    UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+    if [ -n "$UPSTREAM_BRANCH" ]; then
+        if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
+            echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
+            echo "🔍 Checking for closed PRs from previous runs..."
+            
+            # Check if there's a CLOSED PR for this branch
+            CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+            
+            if [ -n "$CLOSED_PR" ]; then
+                echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
+                echo "🔄 Deleting stale branch and recreating fresh from origin/main"
+                
+                # Switch off the branch before deleting it
+                git checkout origin/main 2>/dev/null || git checkout -b temp-cleanup-branch origin/main
+                git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+                
+                # Recreate fresh branch
+                git checkout -b "$FEATURE_BRANCH" origin/main
+                echo "✅ Created fresh branch $FEATURE_BRANCH from origin/main"
+                echo "ℹ️ Previous PR was closed - starting with clean slate"
+            else
+                echo "ℹ️ No closed PRs found - will unset upstream and continue"
+                git branch --unset-upstream 2>/dev/null || true
+            fi
+        fi
+    fi
 
     echo "📥 Merging latest main into $FEATURE_BRANCH..."
     if git merge origin/main --no-edit; then

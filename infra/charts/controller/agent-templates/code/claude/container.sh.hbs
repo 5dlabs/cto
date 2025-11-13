@@ -457,15 +457,22 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
         echo "🔍 DEBUG: Preserved files:"
         ls -la "$TEMP_TASK_DIR/" || echo "No files in temp directory"
     else
-        echo "❌ Task Master directory not found at: $PRESERVE_FROM"
-        echo "❌ CRITICAL: TaskMaster files must exist at the specified location"
-        echo "❌ Expected location: $PRESERVE_FROM"
-        echo "❌ This job cannot continue without the specified TaskMaster files"
-        echo "❌ Verify that:"
-        echo "   1. The docs-project-directory parameter is correct"
-        echo "   2. The task-id exists in the TaskMaster directory"
-        echo "   3. The docs-branch contains the TaskMaster files"
-        exit 1
+        # Special case: taskId 0 is used for non-TaskMaster workflows (e.g., Atlas PR Guardian)
+        if [ "{{task_id}}" = "0" ]; then
+            echo "ℹ️ TaskId 0 detected - skipping TaskMaster file requirements"
+            echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+            echo "  Proceeding without TaskMaster files..."
+        else
+            echo "❌ Task Master directory not found at: $PRESERVE_FROM"
+            echo "❌ CRITICAL: TaskMaster files must exist at the specified location"
+            echo "❌ Expected location: $PRESERVE_FROM"
+            echo "❌ This job cannot continue without the specified TaskMaster files"
+            echo "❌ Verify that:"
+            echo "   1. The docs-project-directory parameter is correct"
+            echo "   2. The task-id exists in the TaskMaster directory"
+            echo "   3. The docs-branch contains the TaskMaster files"
+            exit 1
+        fi
     fi
     cd "$TASK_WORKSPACE"
 
@@ -582,9 +589,16 @@ else
 
         echo "✓ Task {{task_id}} files copied from $TASK_DIR"
     else
-        echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
-        echo "🔍 DEBUG: Available directories in docs:"
-        find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+        # Special case: taskId 0 is used for non-TaskMaster workflows (e.g., Atlas PR Guardian)
+        if [ "{{task_id}}" = "0" ]; then
+            echo "ℹ️ TaskId 0 detected - skipping TaskMaster file requirements"
+            echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+            echo "  Proceeding without TaskMaster files..."
+        else
+            echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
+            echo "🔍 DEBUG: Available directories in docs:"
+            find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+        fi
     fi
 
     # Copy architecture.md from docs root
