@@ -577,6 +577,65 @@ agents:
       - ✅ No merge conflicts
       - ✅ PR mergeable state
 
+      **HOW TO RESOLVE MERGE CONFLICTS**:
+      When a PR has merge conflicts (mergeable: false, mergeableState: "dirty"), follow these steps:
+      
+      1. **Fetch Latest Main**:
+         ```bash
+         git fetch origin main
+         ```
+      
+      2. **Attempt Automatic Rebase**:
+         ```bash
+         # Try to rebase on latest main
+         git rebase origin/main
+         ```
+      
+      3. **If Conflicts Occur**:
+         ```bash
+         # List conflicted files
+         git diff --name-only --diff-filter=U
+         
+         # For each conflicted file, review conflict markers
+         # Resolve by preserving intent of both changes when possible
+         # Edit files to remove <<<<<<< ======= >>>>>>> markers
+         
+         # After resolving each file
+         git add <resolved-file>
+         ```
+      
+      4. **Complete the Rebase**:
+         ```bash
+         # Continue rebase after resolving all conflicts
+         git rebase --continue
+         ```
+      
+      5. **Force Push Resolution**:
+         ```bash
+         # Push resolved conflicts to PR branch
+         git push --force-with-lease origin <pr-branch>
+         ```
+      
+      6. **Verify CI Passes**:
+         ```bash
+         # Check that CI runs successfully after conflict resolution
+         gh pr checks $PR_NUMBER
+         ```
+      
+      7. **Post Resolution Comment**:
+         ```bash
+         gh pr comment $PR_NUMBER --body "## 🔗 Atlas: Merge Conflicts Resolved
+         
+         Successfully resolved merge conflicts with main branch.
+         
+         **Files Resolved**: <list files>
+         **Strategy**: Intelligent merge preserving intent of both changes
+         **Verification**: CI checks running
+         
+         ---
+         *Resolved by Atlas PR Guardian at $(date -u)*"
+         ```
+
       **HOW TO MERGE A PR**:
       When ALL merge criteria are satisfied, execute the merge with these exact steps:
       
