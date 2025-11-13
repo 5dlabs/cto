@@ -82,11 +82,26 @@ spec:
                         fi
 
                         echo "=== Atlas PR Guardian Deduplication ==="
-                        echo "PR Number: {{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
                         echo "Event: {{ .Input.body.X-GitHub-Event }}"
                         echo "Action: {{ .Input.body.action }}"
 
-                        PR_NUMBER="{{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
+                        # Extract PR number based on event type
+                        EVENT_TYPE="{{ .Input.body.X-GitHub-Event }}"
+
+                        if [ "$EVENT_TYPE" = "issue_comment" ]; then
+                          # For issue_comment: verify it's on a PR, not a regular issue
+                          IS_PR="{{ .Input.body.issue.pull_request }}"
+                          if [ -z "$IS_PR" ] || [ "$IS_PR" = "null" ]; then
+                            echo "ℹ️ Issue comment on regular issue (not PR) - skipping"
+                            exit 0
+                          fi
+                          PR_NUMBER="{{ .Input.body.issue.number }}"
+                        else
+                          # For pull_request/pull_request_review events
+                          PR_NUMBER="{{ .Input.body.pull_request.number }}"
+                        fi
+
+                        echo "PR Number: $PR_NUMBER"
 
                         # Validate PR_NUMBER is not empty (prevents edge cases in GitHub webhooks)
                         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then

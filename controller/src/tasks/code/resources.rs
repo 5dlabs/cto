@@ -771,7 +771,7 @@ impl<'a> CodeResourceManager<'a> {
                 "args": [
                     format!("dockerd-entrypoint.sh & DOCKER_PID=$!; \
                      while true; do \
-                       if [ -f /data/task-{}/.agent_done ]; then \
+                       if [ -f /workspace/task-{}/.agent_done ]; then \
                          echo 'Agent done signal detected, stopping docker daemon...'; \
                          kill -TERM $DOCKER_PID 2>/dev/null || true; \
                          sleep 2; \
