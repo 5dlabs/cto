@@ -1,8 +1,11 @@
 #!/bin/sh
 
+# Task-specific workspace for parallel execution isolation
+# Define BEFORE cleanup function so cleanup uses correct path
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+
 # Signal docker-daemon to shut down on ANY exit (success or failure)
 # This prevents docker-daemon from running indefinitely when Claude crashes
-TASK_WORKSPACE="/data/task-{{task_id}}"
 cleanup_docker() {
     echo "🧹 Cleanup: Signaling docker-daemon to shut down..."
     touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
@@ -48,8 +51,7 @@ printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
 echo '║  IMPLEMENTATION TASK STARTING                                ║'
 echo '════════════════════════════════════════════════════════════════'
 
-# Task-specific workspace for parallel execution isolation
-TASK_WORKSPACE="/workspace/task-{{task_id}}"
+# Ensure workspace directories exist (TASK_WORKSPACE already defined above)
 mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
@@ -1188,10 +1190,33 @@ else
         echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
         echo "  Claude will use its system prompt and environment variables"
 
-        # Launch Claude directly without prompt
-        echo "🚀 Launching Claude Code (Task ID 0 mode)..."
-        $CLAUDE_CMD &
+        # For task ID 0, provide FIFO with initial message to avoid hanging
+        # Claude expects stream-json input, so we must provide it via FIFO
+        FIFO_PATH="/workspace/agent-input.jsonl"
+        rm -f "$FIFO_PATH" 2>/dev/null || true
+        mkfifo "$FIFO_PATH"
+        chmod 666 "$FIFO_PATH" || true
+        
+        # Start Claude (reader) in background
+        $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
+        
+        # Send a simple initial message to unblock Claude
+        # Use sidecar HTTP endpoint if available, otherwise direct FIFO write
+        INITIAL_MSG='{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Begin execution."}]}}'
+        if printf '{"text":%s}\n' "$(printf '%s' "Begin execution." | jq -Rs .)" | \
+             curl -fsS -X POST http://127.0.0.1:8080/input \
+               -H 'Content-Type: application/json' \
+               --data-binary @- >/dev/null 2>&1; then
+          echo "✓ Initial message sent via sidecar /input"
+        else
+          echo "⚠️ Sidecar /input failed, using direct FIFO write"
+          exec 9>"$FIFO_PATH"
+          printf '%s\n' "$INITIAL_MSG" >&9
+          exec 9>&-  # Close writer immediately after sending initial message
+        fi
+        
+        echo "🚀 Launching Claude Code (Task ID 0 mode)..."
 
         # Wait for Claude to complete
         CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
