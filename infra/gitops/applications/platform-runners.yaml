@@ -34,7 +34,7 @@ spec:
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
         minRunners: 2
-        maxRunners: 8  # Increased to 8 after pod limit increase (was 4, originally 10)
+        maxRunners: 8  # Restored to 8 after pod limit increase (reduced to 4 during capacity issues)
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds

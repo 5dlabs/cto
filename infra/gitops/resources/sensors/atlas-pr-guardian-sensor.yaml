@@ -130,6 +130,7 @@ spec:
                           taskId: 0
                           service: "atlas-pr-guardian"
                           githubApp: "5DLabs-Atlas"
+                          model: "claude-sonnet-4-5-20250929"
                           repositoryUrl: "{{ .Input.body.repository.clone_url }}"
                           docsRepositoryUrl: "{{ .Input.body.repository.clone_url }}"
                           docsProjectDirectory: "docs"
