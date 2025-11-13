@@ -46,6 +46,13 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pr-branch-ref
@@ -665,6 +672,13 @@ spec:
               spec:
                 entrypoint: enhanced-cancellation-workflow
                 serviceAccountName: agent-cancellation-sa
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pusher-name
@@ -829,6 +843,13 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pr-number
@@ -1169,6 +1190,13 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                # Cleanup configuration for sensor-triggered workflows
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterSuccess: 300
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pr-number
