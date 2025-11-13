@@ -1491,7 +1491,7 @@ ${NEXT_ITERATION_GUIDANCE}"
     "--skip-git-repo-check"
     "--output-last-message" "$LAST_MESSAGE_FILE"
     "--cd" "$CODEX_WORK_DIR"
-    "--settings" "shell_environment_policy.inherit=all"
+    "-c" "shell_environment_policy.inherit=all"
   )
   if [ -n "$CURRENT_MODEL" ]; then
     CODEX_CMD+=("--model" "$CURRENT_MODEL")
