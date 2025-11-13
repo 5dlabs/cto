@@ -34,7 +34,7 @@ spec:
         githubConfigSecret: github-pat
         runnerScaleSetName: "k8s-runner"
         minRunners: 2
-        maxRunners: 10
+        maxRunners: 4
         runnerGroup: "Default"
 
         # Docker-in-Docker configuration for container builds
