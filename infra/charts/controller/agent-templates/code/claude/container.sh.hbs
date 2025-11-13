@@ -1,5 +1,14 @@
 #!/bin/sh
 
+# Signal docker-daemon to shut down on ANY exit (success or failure)
+# This prevents docker-daemon from running indefinitely when Claude crashes
+TASK_WORKSPACE="/data/task-{{task_id}}"
+cleanup_docker() {
+    echo "🧹 Cleanup: Signaling docker-daemon to shut down..."
+    touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
+}
+trap cleanup_docker EXIT
+
 # Ensure Rust environment is always properly set up
 echo "🔧 Setting up Rust environment..."
 
