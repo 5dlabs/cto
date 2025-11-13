@@ -732,6 +732,9 @@ derive_bot_identity() {
 GITHUB_APP="{{github_app}}"
 derive_bot_identity "$GITHUB_APP"
 
+# Extract agent name for display (e.g., "5DLabs-Rex" → "Rex", "5DLabs-Cipher" → "Cipher")
+AGENT_NAME=$(echo "$GITHUB_APP" | sed -E 's/.*-([^-]+)$/\1/')
+
 git config --global user.name "$GIT_AUTHOR_NAME"
 git config --global user.email "$GIT_AUTHOR_EMAIL"
 
@@ -2191,7 +2194,7 @@ Reason: $COMPLETION_REASON"
     git push origin HEAD 2>/dev/null || echo "⚠️ Could not push handoff document"
   fi
   
-  # Check if Rex made any commits before deciding to handoff vs fail
+  # Check if agent made any commits before deciding to handoff vs fail
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   REMOTE_BASE="origin/${BASE_BRANCH:-main}"
   COMMITS_MADE=0
@@ -2201,14 +2204,14 @@ Reason: $COMPLETION_REASON"
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
     if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
       COMMITS_MADE=1
-      echo "✅ Rex made $AHEAD_COUNT commit(s) - will handoff to Cleo"
+      echo "✅ $AGENT_NAME made $AHEAD_COUNT commit(s) - will handoff to next stage"
     else
-      echo "⚠️ Rex made NO commits - cannot handoff without progress"
+      echo "⚠️ $AGENT_NAME made NO commits - cannot handoff without progress"
     fi
   fi
   
   if [ "$COMMITS_MADE" -eq 1 ]; then
-    # Rex made progress - handoff to Cleo
+    # Agent made progress - handoff to next stage
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
@@ -2216,14 +2219,14 @@ Reason: $COMPLETION_REASON"
     echo ""
     echo "🔄 NEXT STEPS:"
     echo "   - Handoff document created at task/rex-handoff.md"
-    echo "   - Workflow will continue to Cleo for completion"
-    echo "   - Cleo will review PR and finish remaining work"
+    echo "   - Workflow will continue to next stage for completion"
+    echo "   - Next agent will review PR and finish remaining work"
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     
     EXIT_CODE=0  # Exit successfully to allow Cleo to continue
   else
-    # Rex made NO progress - this is a failure, should retry
+    # Agent made NO progress - this is a failure, should retry
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     echo "║          TASK COMPLETION STATUS: FAILED - NO PROGRESS         ║"
