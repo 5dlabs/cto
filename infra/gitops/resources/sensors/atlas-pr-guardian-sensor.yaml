@@ -19,13 +19,9 @@ spec:
             type: string
             value:
               - "5dlabs/cto"
-          # CRITICAL: Only process webhooks from 5DLabs-Atlas GitHub App
-          # Prevents webhook amplification from other apps (Rex, Cleo, Tess, Morgan, etc.)
-          # Without this filter, EVERY app's webhook triggers Atlas workflows
-          - path: body.installation.app_slug
-            type: string
-            value:
-              - "5dlabs-atlas"
+          # NOTE: app_slug filter removed to allow Atlas to monitor ALL PR activity
+          # (from humans, bots, other apps). Deduplication workflow + rate limiting
+          # prevents duplicate Atlas instances per PR.
           # Accept both pull_request and issue_comment events
           - path: body.X-GitHub-Event
             type: string
