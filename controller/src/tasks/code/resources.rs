@@ -809,7 +809,7 @@ impl<'a> CodeResourceManager<'a> {
                     },
                     {
                         "name": "workspace",
-                        "mountPath": "/data"
+                        "mountPath": "/workspace"
                     }
                 ],
                 "lifecycle": {
