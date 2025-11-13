@@ -1152,7 +1152,28 @@ else
     ls -la "$CLAUDE_WORK_DIR/" || echo "Working directory not accessible"
 
     # Check if prompt.md exists and use it as main prompt
-    if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
+    # Skip for Task ID 0 (non-TaskMaster workflows like Atlas PR Guardian)
+    if [ "{{task_id}}" = "0" ]; then
+        echo "ℹ️ Task ID 0 detected - launching Claude without task prompt"
+        echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+        echo "  Claude will use its system prompt and environment variables"
+
+        # Launch Claude directly without prompt
+        echo "🚀 Launching Claude Code (Task ID 0 mode)..."
+        $CLAUDE_CMD &
+        CLAUDE_PID=$!
+
+        # Wait for Claude to complete
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
+        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+          echo "✅ Claude process completed normally"
+        else
+          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+          sleep 2
+          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+        fi
+    elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
         echo "✓ Using task-specific prompt from docs service: task/prompt.md"
 
         echo "startingTask:{{task_id}}"
