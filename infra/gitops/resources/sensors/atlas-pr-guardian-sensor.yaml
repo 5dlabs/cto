@@ -138,7 +138,7 @@ spec:
                           overwriteMemory: false
                           cliConfig:
                             cliType: "claude"
-                            model: "claude-sonnet-4-20250514"
+                            model: "claude-sonnet-4-5-20250929"
                             maxTokens: 8192
                             temperature: 0.3
                           env:
