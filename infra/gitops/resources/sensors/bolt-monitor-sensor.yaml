@@ -39,7 +39,7 @@ spec:
               spec:
                 githubApp: "5DLabs-Bolt"
                 cli: "Claude"
-                model: "claude-sonnet-4-20250514"
+                model: "claude-sonnet-4-5-20250929"
                 maxTokens: 4096
                 temperature: 0.3
                 repositoryUrl: "https://github.com/5dlabs/cto.git"

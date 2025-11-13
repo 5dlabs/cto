@@ -83,7 +83,7 @@ spec:
               spec:
                 githubApp: "5DLabs-Rex"
                 cli: "Claude"
-                model: "claude-sonnet-4-20250514"
+                model: "claude-sonnet-4-5-20250929"
                 maxTokens: 16384
                 temperature: 0.2  # Lower temperature for focused fixes
                 repositoryUrl: "https://github.com/5dlabs/cto"
