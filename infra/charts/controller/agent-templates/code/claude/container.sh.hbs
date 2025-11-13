@@ -1201,20 +1201,11 @@ else
         $CLAUDE_CMD < "$FIFO_PATH" &
         CLAUDE_PID=$!
         
-        # Send a simple initial message to unblock Claude
-        # Use sidecar HTTP endpoint if available, otherwise direct FIFO write
+        # Send initial message via FIFO to unblock Claude
         INITIAL_MSG='{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Begin execution."}]}}'
-        if printf '{"text":%s}\n' "$(printf '%s' "Begin execution." | jq -Rs .)" | \
-             curl -fsS -X POST http://127.0.0.1:8080/input \
-               -H 'Content-Type: application/json' \
-               --data-binary @- >/dev/null 2>&1; then
-          echo "✓ Initial message sent via sidecar /input"
-        else
-          echo "⚠️ Sidecar /input failed, using direct FIFO write"
-          exec 9>"$FIFO_PATH"
-          printf '%s\n' "$INITIAL_MSG" >&9
-          exec 9>&-  # Close writer immediately after sending initial message
-        fi
+        exec 9>"$FIFO_PATH"
+        printf '%s\n' "$INITIAL_MSG" >&9
+        exec 9>&-  # Close writer immediately after sending initial message
         
         echo "🚀 Launching Claude Code (Task ID 0 mode)..."
 
@@ -1280,18 +1271,9 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         # Compose initial user turn
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
 
-        # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
-        if printf '{"text":%s}\n' "$USER_COMBINED" | \
-             curl -fsS -X POST http://127.0.0.1:8080/input \
-               -H 'Content-Type: application/json' \
-               --data-binary @- >/dev/null 2>&1; then
-          echo "✓ Initial prompt sent via sidecar /input"
-        else
-          echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-          # Fallback: open FIFO writer and keep it open until Claude exits
-          exec 9>"$FIFO_PATH"
-          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-        fi
+        # Send initial prompt via FIFO
+        exec 9>"$FIFO_PATH"
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
 
         # Optional debug: dump FIFO holders if requested
         if [ "${DEBUG_FIFO:-false}" = "true" ]; then
