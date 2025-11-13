@@ -115,7 +115,36 @@ spec:
                           exit 0
                         fi
 
-                        # Check for existing CodeRun for this PR
+                        # Use ConfigMap as distributed lock to prevent race conditions
+                        # Multiple concurrent workflows will try to create this - only one succeeds
+                        LOCK_NAME="atlas-pr-lock-$PR_NUMBER"
+                        echo "🔒 Attempting to acquire lock: $LOCK_NAME"
+
+                        if kubectl create configmap "$LOCK_NAME" \
+                          --from-literal=pr-number="$PR_NUMBER" \
+                          --from-literal=created-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+                          --from-literal=workflow="{{workflow.name}}" \
+                          -n agent-platform \
+                          -o yaml --dry-run=client | kubectl create -f - 2>/dev/null; then
+                          echo "✅ Lock acquired - this workflow will create CodeRun"
+                          trap "kubectl delete configmap $LOCK_NAME -n agent-platform --ignore-not-found=true 2>/dev/null || true" EXIT
+                        else
+                          echo "🔒 Lock already held by another workflow - skipping to prevent duplicate"
+                          # Check if CodeRun was created by lock holder
+                          sleep 2
+                          EXISTING=$(kubectl get coderuns -n agent-platform \
+                            -l agent=atlas,pr-number="$PR_NUMBER" \
+                            -o json 2>/dev/null || echo '{"items":[]}')
+                          COUNT=$(echo "$EXISTING" | jq '.items | length')
+                          if [ "$COUNT" -gt 0 ]; then
+                            echo "✅ CodeRun created by lock holder"
+                          else
+                            echo "⚠️ No CodeRun yet, lock holder may still be processing"
+                          fi
+                          exit 0
+                        fi
+
+                        # Check for existing CodeRun for this PR (belt-and-suspenders with lock)
                         EXISTING=$(kubectl get coderuns -n agent-platform \
                           -l agent=atlas,pr-number="$PR_NUMBER" \
                           -o json 2>/dev/null || echo '{"items":[]}')
