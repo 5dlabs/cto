@@ -880,10 +880,17 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
         rm -rf "$TEMP_TASK_DIR"
         echo "✓ Cleaned up temporary preservation directory"
     else
-        echo "❌ CRITICAL: No preserved Task Master files found at: $TEMP_TASK_DIR"
-        echo "🔍 DEBUG: This indicates the Task Master preservation step failed earlier"
-        echo "❌ Task {{task_id}} files are not available for this job"
-        exit 1
+        # Special case: taskId 0 is used for non-TaskMaster workflows (e.g., Atlas PR Guardian)
+        if [ "{{task_id}}" = "0" ]; then
+            echo "ℹ️ TaskId 0 detected - no TaskMaster files needed"
+            echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+            echo "  Proceeding without preserved TaskMaster files..."
+        else
+            echo "❌ CRITICAL: No preserved Task Master files found at: $TEMP_TASK_DIR"
+            echo "🔍 DEBUG: This indicates the Task Master preservation step failed earlier"
+            echo "❌ Task {{task_id}} files are not available for this job"
+            exit 1
+        fi
     fi
 
     # DEBUG: Verify files were copied successfully
