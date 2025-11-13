@@ -359,10 +359,10 @@ spec:
         parameters:
           - name: pr-url
             valueFrom:
-              parameter: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+              parameter: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-url}}`}}"
           - name: pr-number
             valueFrom:
-              parameter: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+              parameter: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
       steps:
         # Step 0: Determine resume point from ConfigMap
         - - name: check-resume-point
@@ -373,6 +373,15 @@ spec:
                   value: "{{`{{workflow.parameters.task-id}}`}}"
                 - name: repository
                   value: "{{`{{workflow.parameters.repository}}`}}"
+        - - name: get-pr-info-from-github
+            template: get-pr-info-from-github
+            arguments:
+              parameters:
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+            when: "'{{`{{steps.check-resume-point.outputs.parameters.resume-stage}}`}}' != 'implementation'"
 
         # Step 1: Check if implementation stage should run
         - - name: should-run-implementation
@@ -418,6 +427,24 @@ spec:
                   value: "{{`{{steps.determine-agent.outputs.parameters.task-language}}`}}"
                 - name: task-framework
                   value: "{{`{{steps.determine-agent.outputs.parameters.task-framework}}`}}"
+        - - name: resolve-pr-info
+            template: resolve-pr-info
+            arguments:
+              parameters:
+                - name: resume-stage
+                  value: "{{`{{steps.check-resume-point.outputs.parameters.resume-stage}}`}}"
+                - name: pr-url-from-configmap
+                  value: ""
+                - name: pr-number-from-configmap
+                  value: ""
+                - name: pr-url-from-github
+                  value: "{{`{{steps.get-pr-info-from-github.outputs.parameters.pr-url}}`}}"
+                - name: pr-number-from-github
+                  value: "{{`{{steps.get-pr-info-from-github.outputs.parameters.pr-number}}`}}"
+                - name: pr-url-from-implementation
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+                - name: pr-number-from-implementation
+                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
         # Note: No longer suspending for PR created event - implementation-cycle already
         # verified PR exists via check-or-wait-for-pr polling. Webhook-based resume was
         # creating race conditions where PR webhook fired before suspend point was reached.
@@ -449,7 +476,7 @@ spec:
                 - name: repository
                   value: "{{`{{workflow.parameters.repository}}`}}"
                 - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: stage-name
                   value: "quality"
         - - name: quality-work
@@ -474,9 +501,9 @@ spec:
                 - name: tools-config
                   value: "{{`{{workflow.parameters.quality-tools}}`}}"
                 - name: pr-url
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.quality-max-retries}}`}}"
         # Proceed to Cipher security scanning after Cleo quality checks
@@ -510,7 +537,7 @@ spec:
                 - name: repository
                   value: "{{`{{workflow.parameters.repository}}`}}"
                 - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: stage-name
                   value: "security"
             when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
@@ -535,9 +562,9 @@ spec:
                 - name: tools-config
                   value: "{{`{{workflow.parameters.security-tools}}`}}"
                 - name: pr-url
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.security-max-retries}}`}}"
             when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true' && '{{`{{steps.check-security-completion.outputs.parameters.skip-stage}}`}}' != 'true'"
@@ -572,7 +599,7 @@ spec:
                 - name: repository
                   value: "{{`{{workflow.parameters.repository}}`}}"
                 - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: stage-name
                   value: "testing"
         - - name: update-to-testing
@@ -606,9 +633,9 @@ spec:
                 - name: tools-config
                   value: "{{`{{workflow.parameters.testing-tools}}`}}"
                 - name: pr-url
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-url}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-url}}`}}"
                 - name: pr-number
-                  value: "{{`{{steps.implementation.outputs.parameters.pr-number}}`}}"
+                  value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: max-retries
                   value: "{{`{{workflow.parameters.testing-max-retries}}`}}"
                 - name: qa-ready
@@ -2165,9 +2192,10 @@ spec:
               echo "✅ Resuming at: Waiting for Merge"
               ;;
             "completed")
-              # Task already completed - still allow restart for idempotency
-              RESUME_STAGE="completed"
-              echo "✅ Task already completed (allowing restart)"
+              # FIX: For idempotent restart of completed tasks, restart from implementation
+              # This allows re-running completed tasks without skipping all stages
+              RESUME_STAGE="implementation"
+              echo "✅ Task already completed - restarting from implementation for idempotency"
               ;;
             *)
               echo "⚠️  Unknown stage: $STORED_STAGE, starting from beginning"
@@ -2232,6 +2260,185 @@ spec:
           else
             echo "▶️  Running $CURRENT_STAGE"
             echo "true" > /tmp/should-run.txt
+          fi
+
+    # Template to get PR info from GitHub when resuming from later stages
+    - name: get-pr-info-from-github
+      inputs:
+        parameters:
+          - name: repository
+          - name: task-id
+      outputs:
+        parameters:
+          - name: pr-url
+            valueFrom:
+              path: /tmp/pr-url-github.txt
+            default: ""
+          - name: pr-number
+            valueFrom:
+              path: /tmp/pr-number-github.txt
+            default: ""
+      script:
+        image: alpine:3.20
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: app-id
+          - name: GITHUB_APP_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-app-5dlabs-morgan
+                key: private-key
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          REPO="{{`{{inputs.parameters.repository}}`}}"
+          TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
+          TASK_LABEL="task-${TASK_ID}"
+          RUN_LABEL="run-{{`{{workflow.name}}`}}"
+          
+          echo "" > /tmp/pr-url-github.txt
+          echo "" > /tmp/pr-number-github.txt
+          
+          apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
+          
+          OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          
+          # GitHub App authentication
+          AUTH_HEADER=""
+          if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
+            TEMP_KEY="/tmp/github-app-key.pem"
+            printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
+            chmod 600 "$TEMP_KEY"
+            
+            NOW=$(date +%s)
+            EXP=$((NOW + 600))
+            HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
+            HDR=$(echo -n "$HDR" | tr '+/' '-_' | tr -d '=')
+            PAY=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64 -w 0 2>/dev/null || printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$GITHUB_APP_ID" | base64)
+            PAY=$(echo -n "$PAY" | tr '+/' '-_' | tr -d '=')
+            SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
+            SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
+            JWT="$HDR.$PAY.$SIG"
+            
+            INSTALLATION_ID=$(curl -s -L \
+              -H "Authorization: Bearer $JWT" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
+            
+            if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
+              INSTALLATION_ID=$(curl -s -L \
+                -H "Authorization: Bearer $JWT" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
+            fi
+            
+            if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
+              TOKEN=$(curl -s -X POST \
+                -H "Authorization: Bearer $JWT" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+              if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
+                AUTH_HEADER="Authorization: Bearer $TOKEN"
+              fi
+            fi
+            
+            rm -f "$TEMP_KEY"
+          fi
+          
+          if [ -z "$AUTH_HEADER" ]; then
+            echo "⚠️ No GitHub authentication - cannot fetch PR info"
+            exit 0
+          fi
+          
+          # Search for PR by labels
+          q_labels=$(printf "%s" "$TASK_LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
+          url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
+          resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
+          
+          pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
+          pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
+          
+          if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
+            echo "$pr_url" > /tmp/pr-url-github.txt
+            echo "$pr_number" > /tmp/pr-number-github.txt
+            echo "✅ Found PR #$pr_number from GitHub"
+          else
+            echo "ℹ️ No PR found for task $TASK_ID"
+          fi
+
+    # Template to resolve PR info from multiple sources (ConfigMap, GitHub, or implementation step)
+    - name: resolve-pr-info
+      inputs:
+        parameters:
+          - name: resume-stage
+          - name: pr-url-from-configmap
+            default: ""
+          - name: pr-number-from-configmap
+            default: ""
+          - name: pr-url-from-github
+            default: ""
+          - name: pr-number-from-github
+            default: ""
+          - name: pr-url-from-implementation
+            default: ""
+          - name: pr-number-from-implementation
+            default: ""
+      outputs:
+        parameters:
+          - name: pr-url
+            valueFrom:
+              path: /tmp/pr-url-final.txt
+            default: ""
+          - name: pr-number
+            valueFrom:
+              path: /tmp/pr-number-final.txt
+            default: ""
+      script:
+        image: alpine:3.20
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+          
+          RESUME_STAGE="{{`{{inputs.parameters.resume-stage}}`}}"
+          PR_URL_CONFIGMAP="{{`{{inputs.parameters.pr-url-from-configmap}}`}}"
+          PR_NUMBER_CONFIGMAP="{{`{{inputs.parameters.pr-number-from-configmap}}`}}"
+          PR_URL_GITHUB="{{`{{inputs.parameters.pr-url-from-github}}`}}"
+          PR_NUMBER_GITHUB="{{`{{inputs.parameters.pr-number-from-github}}`}}"
+          PR_URL_IMPL="{{`{{inputs.parameters.pr-url-from-implementation}}`}}"
+          PR_NUMBER_IMPL="{{`{{inputs.parameters.pr-number-from-implementation}}`}}"
+          
+          # Priority: implementation output > GitHub > ConfigMap
+          PR_URL=""
+          PR_NUMBER=""
+          
+          if [ -n "$PR_URL_IMPL" ] && [ "$PR_URL_IMPL" != "" ] && [ "$PR_NUMBER_IMPL" != "" ]; then
+            PR_URL="$PR_URL_IMPL"
+            PR_NUMBER="$PR_NUMBER_IMPL"
+            echo "✅ Using PR info from implementation step"
+          elif [ -n "$PR_URL_GITHUB" ] && [ "$PR_URL_GITHUB" != "" ] && [ "$PR_NUMBER_GITHUB" != "" ]; then
+            PR_URL="$PR_URL_GITHUB"
+            PR_NUMBER="$PR_NUMBER_GITHUB"
+            echo "✅ Using PR info from GitHub API"
+          elif [ -n "$PR_URL_CONFIGMAP" ] && [ "$PR_URL_CONFIGMAP" != "" ] && [ "$PR_NUMBER_CONFIGMAP" != "" ]; then
+            PR_URL="$PR_URL_CONFIGMAP"
+            PR_NUMBER="$PR_NUMBER_CONFIGMAP"
+            echo "✅ Using PR info from ConfigMap"
+          else
+            echo "ℹ️ No PR info available from any source"
+          fi
+          
+          echo "$PR_URL" > /tmp/pr-url-final.txt
+          echo "$PR_NUMBER" > /tmp/pr-number-final.txt
+          
+          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "" ]; then
+            echo "   PR #$PR_NUMBER: $PR_URL"
           fi
 
     # Cleanup handler for workflow completion/failure
