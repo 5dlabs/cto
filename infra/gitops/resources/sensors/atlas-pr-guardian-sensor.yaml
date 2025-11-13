@@ -39,16 +39,9 @@ spec:
               - ready_for_review
               - created
               - submitted
-        exprs:
-          # CRITICAL: Only process issue_comment events that are on pull requests
-          # Regular GitHub issues also use issue_comment events, but we only want PR comments
-          # This prevents the workflow from treating issue numbers as PR numbers
-          - expr: 'body.X-GitHub-Event != "issue_comment" || has(body.issue.pull_request)'
-            fields:
-              - name: body.X-GitHub-Event
-                path: body.X-GitHub-Event
-              - name: body.issue.pull_request
-                path: body.issue.pull_request
+        # NOTE: Removed broken exprs filter - issue comment PR validation moved to workflow
+        # The dedup workflow validates issue_comment events are on PRs (lines 98-106)
+        # This is more reliable than Argo Events exprs which fail with field access errors
 
   triggers:
     - template:
