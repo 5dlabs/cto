@@ -366,20 +366,39 @@ create_task_issues() {
     TASK_TITLE=$(echo "$task" | jq -r '.title')
     TASK_STATUS=$(echo "$task" | jq -r '.status // "pending"')
     TASK_PRIORITY=$(echo "$task" | jq -r '.priority // "medium"')
-    
-    log "📌 Creating issue for Task $TASK_ID: $TASK_TITLE"
-    
+
+    # Check if issue already exists for this task (prevent duplicates on resume)
+    log "🔍 Checking for existing issue for task-$TASK_ID..."
+    EXISTING_ISSUE=$(gh issue list \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --state open \
+      --label "task-$TASK_ID" \
+      --json number,title \
+      --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+    if [[ -n "$EXISTING_ISSUE" ]]; then
+      log "✅ Issue already exists: #$EXISTING_ISSUE (task-$TASK_ID)"
+      ISSUE_NUMBER="$EXISTING_ISSUE"
+      # Store in map and skip creation
+      echo "$TASKS" | jq --arg tid "$TASK_ID" --arg inum "$ISSUE_NUMBER" \
+        'map(select(.id == ($tid | tonumber)) | .issue_number = ($inum | tonumber))' \
+        > "$TASK_ISSUE_MAP.tmp" 2>/dev/null || true
+      continue
+    fi
+
+    log "📌 Creating new issue for Task $TASK_ID: $TASK_TITLE"
+
     # Generate issue body from task details
     ISSUE_BODY=$(generate_issue_body "$task" "$TASKS_JSON_PATH")
-    
+
     # Debug: Check if body was generated
     if [[ -z "$ISSUE_BODY" ]]; then
       log "⚠️  Failed to generate issue body for task $TASK_ID"
       continue
     fi
-    
+
     log "🔍 DEBUG: Issue body length: ${#ISSUE_BODY} characters"
-    
+
     # Create GitHub issue with workflow-specific labels
     # First, create issue without labels (labels might not exist)
     ISSUE_CREATE_OUTPUT=$(gh issue create \
