@@ -54,6 +54,23 @@ spec:
           requestsPerUnit: 10
         argoWorkflow:
           operation: submit
+          parameters:
+            - src:
+                dependencyName: pr-events
+                dataKey: body.X-GitHub-Event
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: pr-events
+                dataTemplate: "{{ .Input.body.pull_request.number | default .Input.body.issue.number | default \"\" }}"
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: pr-events
+                dataKey: body.action
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: pr-events
+                dataKey: body.repository.clone_url
+              dest: spec.arguments.parameters.3.value
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -64,8 +81,24 @@ spec:
               spec:
                 entrypoint: deduplicate-and-create
                 serviceAccountName: argo-workflow
+                arguments:
+                  parameters:
+                    - name: event-type
+                      value: ""
+                    - name: pr-number
+                      value: ""
+                    - name: action
+                      value: ""
+                    - name: repo-url
+                      value: ""
                 templates:
                   - name: deduplicate-and-create
+                    inputs:
+                      parameters:
+                        - name: event-type
+                        - name: pr-number
+                        - name: action
+                        - name: repo-url
                     script:
                       image: alpine/k8s:1.31.0
                       command: [bash]
@@ -81,26 +114,11 @@ spec:
                         fi
 
                         echo "=== Atlas PR Guardian Deduplication ==="
-                        echo "Event: {{ .Input.body.X-GitHub-Event }}"
-                        echo "Action: {{ .Input.body.action }}"
+                        echo "Event: {{inputs.parameters.event-type}}"
+                        echo "Action: {{inputs.parameters.action}}"
+                        echo "PR Number: {{inputs.parameters.pr-number}}"
 
-                        # Extract PR number based on event type
-                        EVENT_TYPE="{{ .Input.body.X-GitHub-Event }}"
-
-                        if [ "$EVENT_TYPE" = "issue_comment" ]; then
-                          # For issue_comment: verify it's on a PR, not a regular issue
-                          IS_PR="{{ .Input.body.issue.pull_request }}"
-                          if [ -z "$IS_PR" ] || [ "$IS_PR" = "null" ]; then
-                            echo "ℹ️ Issue comment on regular issue (not PR) - skipping"
-                            exit 0
-                          fi
-                          PR_NUMBER="{{ .Input.body.issue.number }}"
-                        else
-                          # For pull_request/pull_request_review events
-                          PR_NUMBER="{{ .Input.body.pull_request.number }}"
-                        fi
-
-                        echo "PR Number: $PR_NUMBER"
+                        PR_NUMBER="{{inputs.parameters.pr-number}}"
 
                         # Validate PR_NUMBER is not empty (prevents edge cases in GitHub webhooks)
                         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
@@ -165,6 +183,7 @@ spec:
                         fi
 
                         # Create new CodeRun
+                        REPO_URL="{{inputs.parameters.repo-url}}"
                         cat <<EOF | kubectl create -f - 2>&1 | tee /tmp/create-output.txt
                         apiVersion: agents.platform/v1
                         kind: CodeRun
@@ -181,8 +200,8 @@ spec:
                           service: "atlas-pr-guardian"
                           githubApp: "5DLabs-Atlas"
                           model: "claude-sonnet-4-5-20250929"
-                          repositoryUrl: "{{ .Input.body.repository.clone_url }}"
-                          docsRepositoryUrl: "{{ .Input.body.repository.clone_url }}"
+                          repositoryUrl: "$REPO_URL"
+                          docsRepositoryUrl: "$REPO_URL"
                           docsProjectDirectory: "docs"
                           workingDirectory: "."
                           continueSession: true
@@ -194,8 +213,8 @@ spec:
                             temperature: 0.3
                           env:
                             PR_NUMBER: "$PR_NUMBER"
-                            PR_URL: "{{ .Input.body.pull_request.html_url | default .Input.body.issue.html_url }}"
-                            REPOSITORY_FULL_NAME: "{{ .Input.body.repository.full_name }}"
+                            PR_URL: "https://github.com/5dlabs/cto/pull/$PR_NUMBER"
+                            REPOSITORY_FULL_NAME: "5dlabs/cto"
                             GUARDIAN_MODE: "active"
                             TARGET_REPOSITORY: "5dlabs/cto"
                             MERGE_STRATEGY: "squash"
