@@ -540,7 +540,7 @@ spec:
                   value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: stage-name
                   value: "security"
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true'"
         - - name: security-work
             template: agent-coderun
             continueOn:
