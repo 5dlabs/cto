@@ -83,6 +83,12 @@ spec:
 
                         PR_NUMBER="{{ .Input.body.pull_request.number | default .Input.body.issue.number }}"
 
+                        # Validate PR_NUMBER is not empty (prevents edge cases in GitHub webhooks)
+                        if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+                          echo "❌ No PR number found in webhook event - skipping"
+                          exit 0
+                        fi
+
                         # Check for existing CodeRun for this PR
                         EXISTING=$(kubectl get coderuns -n agent-platform \
                           -l agent=atlas,pr-number="$PR_NUMBER" \
@@ -92,22 +98,22 @@ spec:
                         echo "Found $COUNT existing CodeRun(s) for PR #$PR_NUMBER"
 
                         if [ "$COUNT" -gt 0 ]; then
-                          # Check status of existing CodeRuns
-                          RUNNING=$(echo "$EXISTING" | jq -r '.items[] | select(.status.phase == "Running") | .metadata.name' | head -1)
+                          # Check status of existing CodeRuns (both Running AND Pending to prevent race conditions)
+                          ACTIVE=$(echo "$EXISTING" | jq -r '.items[] | select(.status.phase == "Running" or .status.phase == "Pending") | .metadata.name' | head -1)
 
-                          if [ -n "$RUNNING" ]; then
-                            echo "✅ CodeRun already running: $RUNNING"
+                          if [ -n "$ACTIVE" ]; then
+                            echo "✅ CodeRun already active: $ACTIVE"
                             echo "   Session continuity will handle this event"
                             exit 0
                           fi
 
-                          echo "⚠️  Existing CodeRun(s) are not Running (likely Completed/Failed)"
+                          echo "⚠️  Existing CodeRun(s) are not active (likely Completed/Failed)"
                           echo "   Creating new CodeRun for PR #$PR_NUMBER"
                         fi
 
                         # Create new CodeRun
                         cat <<EOF | kubectl create -f - 2>&1 | tee /tmp/create-output.txt
-                        apiVersion: agents.platform.5dlabs.ai/v1alpha1
+                        apiVersion: agents.platform/v1
                         kind: CodeRun
                         metadata:
                           generateName: coderun-atlas-pr-
