@@ -43,6 +43,16 @@ spec:
               - ready_for_review
               - created
               - submitted
+        exprs:
+          # CRITICAL: Only process issue_comment events that are on pull requests
+          # Regular GitHub issues also use issue_comment events, but we only want PR comments
+          # This prevents the workflow from treating issue numbers as PR numbers
+          - expr: 'body.X-GitHub-Event != "issue_comment" || has(body.issue.pull_request)'
+            fields:
+              - name: body.X-GitHub-Event
+                path: body.X-GitHub-Event
+              - name: body.issue.pull_request
+                path: body.issue.pull_request
 
   triggers:
     - template:
