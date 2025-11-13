@@ -530,7 +530,6 @@ spec:
                   value: "true"
             when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true'"
         - - name: check-security-completion
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true'"
             template: check-pr-merge-status
             arguments:
               parameters:
@@ -540,7 +539,7 @@ spec:
                   value: "{{`{{steps.resolve-pr-info.outputs.parameters.pr-number}}`}}"
                 - name: stage-name
                   value: "security"
-            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != ''"
+            when: "'{{`{{workflow.parameters.security-agent}}`}}' != '' && '{{`{{workflow.parameters.security-cli}}`}}' != '' && '{{`{{workflow.parameters.security-model}}`}}' != '' && '{{`{{steps.should-run-security.outputs.parameters.should-run}}`}}' == 'true'"
         - - name: security-work
             template: agent-coderun
             continueOn:
