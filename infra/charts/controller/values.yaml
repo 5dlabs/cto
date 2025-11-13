@@ -562,6 +562,7 @@ agents:
 
       **CORE RESPONSIBILITIES**:
       1. **Bugbot Resolution**: Monitor and resolve Cursor Bugbot comments (https://github.com/apps/cursor)
+         - After pushing fixes, ALWAYS re-initialize Bugbot by commenting: "@bugbot run"
       2. **CI Recovery**: Fix failing checks (clippy, tests, lints) to get CI green
       3. **Conflict Resolution**: Rebase and resolve merge conflicts with main
       4. **Auto-Merge**: Squash-merge PRs when all criteria met (no Bugbot comments, CI green, no conflicts)
@@ -576,12 +577,44 @@ agents:
       - ✅ No merge conflicts
       - ✅ PR mergeable state
 
+      **HOW TO MERGE A PR**:
+      When ALL merge criteria are satisfied, execute the merge with these exact steps:
+      
+      1. **Verify Merge Readiness**:
+         ```bash
+         # Check PR status
+         gh pr view $PR_NUMBER --json mergeable,mergeStateStatus,statusCheckRollup
+         ```
+      
+      2. **Execute Squash Merge**:
+         ```bash
+         # Merge the PR with squash strategy (immediate merge)
+         gh pr merge $PR_NUMBER --squash
+         ```
+      
+      3. **Post Success Comment**:
+         ```bash
+         gh pr comment $PR_NUMBER --body "## ✅ Atlas: PR Merged
+         
+         Successfully merged PR #$PR_NUMBER using squash merge.
+         
+         **Merge Criteria Met**:
+         - ✅ No Bugbot comments
+         - ✅ All CI checks passing
+         - ✅ No merge conflicts
+         - ✅ PR was mergeable
+         
+         ---
+         *Merged by Atlas PR Guardian at $(date -u)*"
+         ```
+
       **BEST PRACTICES**:
       - Apply minimal fixes only
       - Use conventional commits
       - Post clear PR comments
-      - Squash merge always
+      - ALWAYS use squash merge strategy
       - Suspend when blocked (3 attempts)
+      - Check merge criteria BEFORE attempting merge
 
       **ENVIRONMENT**:
       - PR_NUMBER: Current PR number

@@ -721,7 +721,7 @@ spec:
                   "Failed"|"Error")
                     echo "❌ Workflow $workflow_name failed"
                     any_failed=true
-                    all_done=false
+                    # Don't set all_done=false here - failed workflows are "done", just with failure status
                     ;;
                   "Running"|"Pending")
                     all_done=false
@@ -732,12 +732,13 @@ spec:
                 esac
               done
 
-              if [ "$any_failed" = "true" ]; then
-                echo "❌ One or more tasks in level $level_index failed"
-                exit 1
-              fi
-
+              # Only check for failures after all workflows have completed
               if [ "$all_done" = "true" ]; then
+                if [ "$any_failed" = "true" ]; then
+                  echo "❌ One or more tasks in level $level_index failed"
+                  exit 1
+                fi
+                
                 echo "✅ All tasks in level $level_index completed successfully"
 
               # Optional: Create integration PR that merges all task branches in this level

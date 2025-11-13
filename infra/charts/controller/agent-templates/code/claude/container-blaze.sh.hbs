@@ -899,6 +899,35 @@ if git show-ref --verify --quiet refs/heads/$FEATURE_BRANCH; then
     BRANCH_EXISTS="true"
     echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
     git checkout $FEATURE_BRANCH
+    
+    # Check if upstream branch is gone (deleted after previous PR was closed)
+    UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+    if [ -n "$UPSTREAM_BRANCH" ]; then
+        if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
+            echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
+            echo "🔍 Checking for closed PRs from previous runs..."
+            
+            # Check if there's a CLOSED PR for this branch
+            CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+            
+            if [ -n "$CLOSED_PR" ]; then
+                echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
+                echo "🔄 Deleting stale branch and recreating fresh from origin/main"
+                
+                # Switch off the branch before deleting it
+                git checkout origin/main 2>/dev/null || git checkout -b temp-cleanup-branch origin/main
+                git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+                
+                # Recreate fresh branch
+                git checkout -b "$FEATURE_BRANCH" origin/main
+                echo "✅ Created fresh branch $FEATURE_BRANCH from origin/main"
+                echo "ℹ️ Previous PR was closed - starting with clean slate"
+            else
+                echo "ℹ️ No closed PRs found - will unset upstream and continue"
+                git branch --unset-upstream 2>/dev/null || true
+            fi
+        fi
+    fi
 
     echo "📥 Merging latest main into $FEATURE_BRANCH..."
     if git merge origin/main --no-edit; then
@@ -2392,12 +2421,37 @@ echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/
 echo "🛑 Explicitly stopping Docker sidecar..."
 stop_docker_sidecar || true
 
-# Always exit with success to allow workflow to continue to Cleo
+# Check if Rex made any commits before deciding to handoff vs fail
+if [ $SUCCESS -ne 1 ]; then
+  CURRENT_BRANCH=$(git -C "$TASK_REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  REMOTE_BASE="origin/${BASE_BRANCH:-main}"
+  COMMITS_MADE=0
+  
+  if [ -n "$CURRENT_BRANCH" ]; then
+    git -C "$TASK_REPO_DIR" fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    AHEAD_COUNT=$(git -C "$TASK_REPO_DIR" rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
+    if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
+      COMMITS_MADE=1
+      echo "✅ Rex made $AHEAD_COUNT commit(s) - will handoff to Cleo"
+    else
+      echo "⚠️ Rex made NO commits - cannot handoff without progress"
+    fi
+  fi
+  
+  if [ "$COMMITS_MADE" -eq 0 ]; then
+    echo "❌ Rex failed to make any commits after $FINAL_ATTEMPTS attempts"
+    echo "   CodeRun will retry this task"
+    echo "🔚 Terminating container with failure status to trigger retry..."
+    exit 1
+  fi
+fi
+
+# Exit with success if task completed OR if partial progress made (handoff to Cleo)
 if [ $SUCCESS -eq 1 ]; then
   echo "🔚 Terminating container with success status..."
   exit 0
 else
   echo "🔚 Terminating container with success status (handoff to Cleo)..."
   echo "📝 Implementation incomplete after $FINAL_ATTEMPTS attempt(s) - Cleo will continue"
-  exit 0  # Changed from exit 1 to allow Cleo to continue
+  exit 0  # Exit successfully because commits were made (validated above)
 fi
