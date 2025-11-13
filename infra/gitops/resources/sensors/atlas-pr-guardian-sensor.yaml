@@ -36,12 +36,6 @@ spec:
               - ready_for_review
               - created
               - submitted
-        # Use exprs to ensure issue_comment events are only on PRs
-        exprs:
-          # For pull_request/pull_request_review: always pass (PRs by definition)
-          # For issue_comment: use has() to safely check if it's on a PR
-          # This prevents "Unable to access unexported field" errors on non-issue events
-          - expr: 'body.X-GitHub-Event == "pull_request" || body.X-GitHub-Event == "pull_request_review" || (body.X-GitHub-Event == "issue_comment" && has(body.issue.pull_request))'
 
   triggers:
     - template:
