@@ -73,7 +73,7 @@ spec:
               dest: spec.templates.0.script.env.3.value
             - src:
                 dependencyName: pr-events
-                dataTemplate: "{{ if .Input.body.issue.pull_request }}true{{ else }}false{{ end }}"
+                dataTemplate: "{{ if or .Input.body.pull_request .Input.body.issue.pull_request }}true{{ else }}false{{ end }}"
               dest: spec.templates.0.script.env.4.value
           source:
             resource:
@@ -117,6 +117,12 @@ spec:
                         echo "Action: $ACTION"
                         echo "PR Number: $PR_NUMBER"
                         echo "Is PR: $IS_PR"
+
+                        # Validate this is a PR-related event (not a regular issue)
+                        if [ "$EVENT_TYPE" = "issue_comment" ] && [ "$IS_PR" != "true" ]; then
+                          echo "ℹ️ Issue comment on regular issue (not PR) - skipping"
+                          exit 0
+                        fi
 
                         # Validate PR_NUMBER is not empty (prevents edge cases in GitHub webhooks)
                         if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
