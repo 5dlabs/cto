@@ -56,7 +56,7 @@ HEADER_EOF
   
   # Compute checksum
   local checksum_tmp=$(mktemp)
-  trap 'rm -f "$checksum_tmp"' EXIT
+  trap 'rm -f "$checksum_tmp"' RETURN
   
   while IFS= read -r f; do
     [ -z "$f" ] && continue
@@ -100,6 +100,7 @@ HEADER_EOF
     return 1
   fi
   
+  rm -f "$checksum_tmp"
   return 0
 }
 
