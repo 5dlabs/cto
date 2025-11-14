@@ -177,6 +177,52 @@ log() {
   echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $*" | tee -a "$SYNC_LOG" >&2
 }
 
+persist_project_config() {
+  local project_id="$1"
+  local project_title="${2:-${PROJECT_TITLE:-"$SERVICE_NAME - TaskMaster Workflow"}}"
+  local workflow="${3:-$WORKFLOW_NAME}"
+  local repository="${4:-$REPO_OWNER/$REPO_NAME}"
+
+  if [[ -z "$project_id" ]] || [[ "$project_id" == "null" ]]; then
+    log "❌ Cannot persist project config - project_id is empty"
+    return 1
+  fi
+
+  mkdir -p "$SHARED_DIR"
+
+  cat > "$PROJECT_CONFIG" <<EOF
+{
+  "project_id": "$project_id",
+  "project_title": "$project_title",
+  "workflow_name": "$workflow",
+  "repository": "$repository",
+  "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+
+  log "💾 Persisted project configuration to $PROJECT_CONFIG"
+}
+
+ensure_project_config_loaded() {
+  if [[ -f "$PROJECT_CONFIG" ]]; then
+    local stored_project_id=$(jq -r '.project_id // empty' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+    if [[ -n "$stored_project_id" ]] && [[ "$stored_project_id" != "null" ]]; then
+      PROJECT_ID="$stored_project_id"
+      return 0
+    fi
+    log "⚠️  project-config.json exists but is invalid - attempting to repair"
+  fi
+
+  if [[ -n "${PROJECT_ID:-}" ]] && [[ "$PROJECT_ID" != "null" ]]; then
+    log "⚠️  project-config.json missing - recreating from in-memory state"
+    persist_project_config "$PROJECT_ID" "$PROJECT_TITLE" "$WORKFLOW_NAME" "$REPO_OWNER/$REPO_NAME"
+    return 0
+  fi
+
+  log "❌ Project configuration missing project_id"
+  return 1
+}
+
 # State tracking helpers to prevent duplicate comments
 init_state_cache() {
   if [[ ! -f "$TASK_STATE_CACHE" ]]; then
@@ -323,15 +369,7 @@ initialize_project() {
   setup_custom_fields "$PROJECT_ID"
   
   # Store project configuration
-  cat > "$PROJECT_CONFIG" <<EOF
-{
-  "project_id": "$PROJECT_ID",
-  "project_title": "$PROJECT_TITLE",
-  "workflow_name": "$WORKFLOW_NAME",
-  "repository": "$REPO_OWNER/$REPO_NAME",
-  "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
-EOF
+  persist_project_config "$PROJECT_ID" "$PROJECT_TITLE" "$WORKFLOW_NAME" "$REPO_OWNER/$REPO_NAME"
   
   log "✅ Project initialization complete"
 }
@@ -496,6 +534,11 @@ create_task_issues() {
       --json id --jq '.id')
     
     # Add issue to project with retry logic
+    ensure_project_config_loaded || {
+      log "❌ Cannot link issues without project configuration"
+      exit 1
+    }
+    PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
     ITEM_ID=""
     
     # Retry adding issue to project (handles transient failures)
@@ -559,6 +602,10 @@ monitor_and_sync() {
   log "👀 Phase 3: Event-Driven Monitoring & Synchronization"
   log "🔄 Starting real-time workflow watch..."
   
+  ensure_project_config_loaded || {
+    log "❌ Cannot start monitoring without project configuration"
+    exit 1
+  }
   PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
   
   # Initialize state cache for deduplication
@@ -675,8 +722,12 @@ watch_parent_workflow() {
       log "✅ Parent workflow completed with status: $WORKFLOW_STATUS"
       
       # Trigger final sync
-      PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
-      sync_all_tasks "$PROJECT_ID" false  # false = not initial, check for changes
+      if ensure_project_config_loaded; then
+        PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
+        sync_all_tasks "$PROJECT_ID" false  # false = not initial, check for changes
+      else
+        log "⚠️  Skipping final sync - project configuration unavailable"
+      fi
       
       # Kill main watch process
       pkill -P $$ kubectl || true
@@ -1690,7 +1741,13 @@ generate_ai_summary() {
   
   # Gather project statistics
   local total_tasks=$(jq 'length' "$TASK_ISSUE_MAP")
-  local project_title=$(jq -r '.project_title' "$PROJECT_CONFIG")
+  local project_title=""
+  if ensure_project_config_loaded; then
+    project_title=$(jq -r '.project_title // empty' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+  fi
+  if [[ -z "$project_title" ]]; then
+    project_title="${PROJECT_TITLE:-"$SERVICE_NAME - TaskMaster Workflow"}"
+  fi
   
   # Get task statuses
   local tasks_status=$(kubectl get workflows -n "$NAMESPACE" \
