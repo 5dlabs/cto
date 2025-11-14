@@ -329,14 +329,37 @@ initialize_project() {
   # Read tasks data
   TASKS_DATA=$(cat "$TASKS_JSON_PATH")
   
-  # Check if we have an existing project configuration
-  if [[ -f "$PROJECT_CONFIG" ]]; then
-    PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG" 2>/dev/null || echo "")
-    if [[ -n "$PROJECT_ID" ]] && [[ "$PROJECT_ID" != "null" ]]; then
-      log "♻️  Reusing existing project ID: $PROJECT_ID"
-    else
-      log "⚠️  Existing project config is invalid, will create new project"
-      PROJECT_ID=""
+  # Initialize PROJECT_ID (will be set from config or created new)
+  PROJECT_ID=""
+  
+  # Check if FORCE_NEW_PROJECT is set to skip reusing old projects
+  if [[ "${FORCE_NEW_PROJECT:-false}" == "true" ]]; then
+    log "🔄 FORCE_NEW_PROJECT=true, will create fresh project"
+    if [[ -f "$PROJECT_CONFIG" ]]; then
+      log "🗑️  Removing old project config: $PROJECT_CONFIG"
+      rm -f "$PROJECT_CONFIG"
+    fi
+  else
+    # Check if we have an existing project configuration
+    if [[ -f "$PROJECT_CONFIG" ]]; then
+      PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+      if [[ -n "$PROJECT_ID" ]] && [[ "$PROJECT_ID" != "null" ]]; then
+        log "♻️  Found existing project ID: $PROJECT_ID"
+        
+        # Validate the project is still accessible
+        log "🔍 Validating existing project is accessible..."
+        if gh api graphql -f query="query { node(id: \"$PROJECT_ID\") { id } }" > /dev/null 2>&1; then
+          log "✅ Project is accessible, reusing it"
+        else
+          log "⚠️  Existing project is not accessible (may be deleted/closed)"
+          log "🔄 Will create a new project instead"
+          PROJECT_ID=""
+          rm -f "$PROJECT_CONFIG"
+        fi
+      else
+        log "⚠️  Existing project config is invalid, will create new project"
+        PROJECT_ID=""
+      fi
     fi
   fi
   
