@@ -47,6 +47,12 @@ spec:
               spec:
                 entrypoint: resume-workflow
                 serviceAccountName: argo-workflow
+                # Auto-cleanup after completion
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 templates:
                   - name: resume-workflow
                     script:

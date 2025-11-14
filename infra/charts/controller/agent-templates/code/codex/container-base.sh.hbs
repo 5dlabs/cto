@@ -1534,9 +1534,9 @@ ${NEXT_ITERATION_GUIDANCE}"
   CODEX_CMD+=("$PROMPT_PAYLOAD")
 
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" 2>&1 | tee "$RUN_LOG"
   else
-    "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+    "${CODEX_CMD[@]}" 2>&1 | tee "$RUN_LOG"
   fi
   CODEX_EXIT=${PIPESTATUS[0]}
   set +o pipefail
@@ -1603,7 +1603,12 @@ Try instead:
 
   NEW_SESSION_ID=""
   if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+    # Ensure file is fully written (flush buffers)
+    sync || true
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
+    echo "[codex-debug] Session extraction from $RUN_LOG: ${NEW_SESSION_ID:-<empty>}"
+  else
+    echo "[codex-debug] RUN_LOG not found or empty: RUN_LOG=${RUN_LOG:-<unset>}"
   fi
   if [ -n "$NEW_SESSION_ID" ]; then
     if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
@@ -1611,6 +1616,8 @@ Try instead:
       CURRENT_SESSION_ID="$NEW_SESSION_ID"
       persist_session_id "$CURRENT_SESSION_ID"
     fi
+  else
+    echo "[codex-debug] Failed to extract session ID from log (attempt $ATTEMPT)"
   fi
 
   if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then

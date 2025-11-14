@@ -85,6 +85,10 @@ spec:
               spec:
                 entrypoint: deduplicate-and-create
                 serviceAccountName: argo-workflow
+                # Auto-cleanup after completion (5 minutes for success, 1 hour for failure)
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterFailure: 3600    # 1 hour
                 templates:
                   - name: deduplicate-and-create
                     script:
