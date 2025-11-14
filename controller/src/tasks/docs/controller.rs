@@ -108,7 +108,12 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
         match status.phase.as_str() {
             "Succeeded" => {
                 info!("Already succeeded, ensuring work_completed is set");
-                let finished_at = Utc::now();
+                // Preserve existing finishedAt to avoid resetting TTL on every reconciliation
+                let finished_at = status
+                    .finished_at
+                    .as_ref()
+                    .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                    .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
                 let cleanup_deadline =
                     compute_docs_cleanup_deadline(&docs_run, ctx, "Succeeded", finished_at);
 

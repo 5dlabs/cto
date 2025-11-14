@@ -113,7 +113,12 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         match status.phase.as_str() {
             "Succeeded" => {
                 debug!("Already succeeded, ensuring work_completed is set");
-                let finished_at = Utc::now();
+                // Preserve existing finishedAt to avoid resetting TTL on every reconciliation
+                let finished_at = status
+                    .finished_at
+                    .as_ref()
+                    .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                    .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
                 let cleanup_deadline =
                     compute_cleanup_deadline(&code_run, ctx, "Succeeded", finished_at);
 
@@ -190,7 +195,13 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 // Ensure work_completed flag is set if phase is Succeeded
                 if current_phase == "Succeeded" && !work_completed {
                     debug!("Backfilling work_completed=true for succeeded CodeRun");
-                    let finished_at = Utc::now();
+                    // Preserve existing finishedAt to avoid resetting TTL on every reconciliation
+                    let finished_at = code_run
+                        .status
+                        .as_ref()
+                        .and_then(|s| s.finished_at.as_ref())
+                        .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                        .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
                     let cleanup_deadline =
                         compute_cleanup_deadline(&code_run, ctx, "Succeeded", finished_at);
 
