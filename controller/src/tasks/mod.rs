@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, instrument, Instrument};
 
 pub mod cancel;
+pub mod cleanup;
 pub mod code;
 pub mod config;
 pub mod docs;

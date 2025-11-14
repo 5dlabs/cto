@@ -75,6 +75,10 @@ argo:
 cleanup:
   # Whether to enable automatic cleanup of completed jobs
   enabled: true
+  # Seconds to keep successful runs before controller cleanup
+  successTTLSeconds: 60
+  # Seconds to keep failed runs before controller cleanup
+  failureTTLSeconds: 300
   # Minutes to wait before cleaning up successful jobs (default: 5 minutes)
   completedJobDelayMinutes: 5
   # Minutes to wait before cleaning up failed jobs (default: 60 minutes)

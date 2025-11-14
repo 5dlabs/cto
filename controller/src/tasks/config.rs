@@ -277,6 +277,14 @@ pub struct CleanupConfig {
     #[serde(default = "default_cleanup_enabled")]
     pub enabled: bool,
 
+    /// Seconds to wait before cleaning up successful runs
+    #[serde(rename = "successTTLSeconds", default = "default_success_ttl_seconds")]
+    pub success_ttl_seconds: u64,
+
+    /// Seconds to wait before cleaning up failed runs
+    #[serde(rename = "failureTTLSeconds", default = "default_failure_ttl_seconds")]
+    pub failure_ttl_seconds: u64,
+
     /// Minutes to wait before cleaning up completed (successful) jobs
     #[serde(
         rename = "completedJobDelayMinutes",
@@ -295,6 +303,14 @@ pub struct CleanupConfig {
 
 fn default_cleanup_enabled() -> bool {
     true
+}
+
+fn default_success_ttl_seconds() -> u64 {
+    60
+}
+
+fn default_failure_ttl_seconds() -> u64 {
+    300
 }
 
 fn default_completed_delay() -> u64 {
@@ -403,6 +419,8 @@ impl Default for CleanupConfig {
     fn default() -> Self {
         CleanupConfig {
             enabled: default_cleanup_enabled(),
+            success_ttl_seconds: default_success_ttl_seconds(),
+            failure_ttl_seconds: default_failure_ttl_seconds(),
             completed_job_delay_minutes: default_completed_delay(),
             failed_job_delay_minutes: default_failed_delay(),
             delete_configmap: default_delete_configmap(),
@@ -607,6 +625,8 @@ impl Default for ControllerConfig {
             },
             cleanup: CleanupConfig {
                 enabled: true,
+                success_ttl_seconds: 60,
+                failure_ttl_seconds: 300,
                 completed_job_delay_minutes: 5,
                 failed_job_delay_minutes: 60,
                 delete_configmap: true,

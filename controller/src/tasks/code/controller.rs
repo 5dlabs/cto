@@ -1,7 +1,9 @@
 use super::naming::ResourceNaming;
 use super::resources::CodeResourceManager;
 use crate::crds::CodeRun;
+use crate::tasks::cleanup;
 use crate::tasks::types::{Context, Result, CODE_FINALIZER_NAME};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use k8s_openapi::api::{
     batch::v1::Job,
     core::v1::{ConfigMap, PersistentVolumeClaim},
@@ -14,6 +16,12 @@ use serde_json::json;
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
+enum ExpireAtUpdate {
+    Unchanged,
+    Set(DateTime<Utc>),
+    Clear,
+}
+
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
 pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Result<Action> {
     debug!("Starting reconcile for CodeRun: {}", code_run.name_any());
@@ -23,6 +31,11 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
     let name = code_run.name_any();
 
     debug!("Reconciling CodeRun: {}", name);
+
+    if let Some(action) = try_cleanup_after_ttl(&code_run, &ctx).await? {
+        debug!("TTL cleanup handling for {} returned {:?}", name, action);
+        return Ok(action);
+    }
 
     // Create APIs
     debug!("Creating Kubernetes API clients...");
@@ -107,6 +120,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Code implementation completed successfully",
                     true,
                     None,
+                    None,
+                    ExpireAtUpdate::Unchanged,
                 )
                 .await?;
 
@@ -176,6 +191,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                         "Code implementation completed successfully",
                         true,
                         None,
+                        None,
+                        ExpireAtUpdate::Unchanged,
                     )
                     .await?;
                 }
@@ -203,6 +220,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Code implementation started",
                 false,
                 None,
+                None,
+                ExpireAtUpdate::Clear,
             )
             .await?;
 
@@ -222,6 +241,8 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Code task in progress",
                 false,
                 None,
+                None,
+                ExpireAtUpdate::Clear,
             )
             .await?;
 
@@ -275,6 +296,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     latest_code_run.name_any()
                 );
 
+                let finished_at = Utc::now();
+                let cleanup_deadline =
+                    compute_cleanup_deadline(&latest_code_run, ctx, "Failed", finished_at);
+
                 update_code_status_with_completion(
                     &latest_code_run,
                     ctx,
@@ -282,6 +307,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     &failure_message,
                     false,
                     None,
+                    Some(finished_at),
+                    cleanup_deadline
+                        .map(ExpireAtUpdate::Set)
+                        .unwrap_or(ExpireAtUpdate::Unchanged),
                 )
                 .await?;
 
@@ -381,6 +410,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     reason
                 );
 
+                let finished_at = Utc::now();
+                let cleanup_deadline =
+                    compute_cleanup_deadline(&latest_code_run, ctx, "Failed", finished_at);
+
                 update_code_status_with_completion(
                     &latest_code_run,
                     ctx,
@@ -388,6 +421,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     &format!("Retry limit reached without completion: {reason}"),
                     false,
                     None,
+                    Some(finished_at),
+                    cleanup_deadline
+                        .map(ExpireAtUpdate::Set)
+                        .unwrap_or(ExpireAtUpdate::Unchanged),
                 )
                 .await?;
 
@@ -456,6 +493,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     code_run_name
                 );
 
+                let finished_at = Utc::now();
+                let cleanup_deadline =
+                    compute_cleanup_deadline(&latest_code_run, ctx, "Failed", finished_at);
+
                 update_code_status_with_completion(
                     &latest_code_run,
                     ctx,
@@ -463,6 +504,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Implementation agent must create a pull request (PR URL not found in status)",
                     false,
                     None,
+                    Some(finished_at),
+                    cleanup_deadline
+                        .map(ExpireAtUpdate::Set)
+                        .unwrap_or(ExpireAtUpdate::Unchanged),
                 )
                 .await?;
 
@@ -505,6 +550,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
 
             debug!("Validation passed - marking work as completed");
 
+            let finished_at = Utc::now();
+            let cleanup_deadline =
+                compute_cleanup_deadline(&latest_code_run, ctx, "Succeeded", finished_at);
+
             update_code_status_with_completion(
                 &latest_code_run,
                 ctx,
@@ -512,6 +561,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Code implementation completed successfully",
                 true,
                 None,
+                Some(finished_at),
+                cleanup_deadline
+                    .map(ExpireAtUpdate::Set)
+                    .unwrap_or(ExpireAtUpdate::Unchanged),
             )
             .await?;
 
@@ -603,6 +656,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 current_retry_count
             );
 
+            let finished_at = Utc::now();
+            let cleanup_deadline =
+                compute_cleanup_deadline(&latest_code_run, ctx, "Failed", finished_at);
+
             update_code_status_with_completion(
                 &latest_code_run,
                 ctx,
@@ -610,6 +667,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 "Code implementation failed",
                 false,
                 None,
+                Some(finished_at),
+                cleanup_deadline
+                    .map(ExpireAtUpdate::Set)
+                    .unwrap_or(ExpireAtUpdate::Unchanged),
             )
             .await?;
 
@@ -726,6 +787,8 @@ async fn update_code_status_with_completion(
     new_message: &str,
     work_completed: bool,
     retry_count_override: Option<u32>,
+    finished_at: Option<DateTime<Utc>>,
+    expire_update: ExpireAtUpdate,
 ) -> Result<()> {
     // Only update if status actually changed or work_completed changed
     let current_phase = code_run
@@ -762,7 +825,7 @@ async fn update_code_status_with_completion(
             .unwrap_or(0)
     });
 
-    let status_patch = json!({
+    let mut status_patch = json!({
         "status": {
             "phase": new_phase,
             "message": new_message,
@@ -771,6 +834,20 @@ async fn update_code_status_with_completion(
             "retryCount": retry_count,
         }
     });
+
+    if let Some(done_at) = finished_at {
+        status_patch["status"]["finishedAt"] = json!(done_at.to_rfc3339());
+    }
+
+    match expire_update {
+        ExpireAtUpdate::Set(deadline) => {
+            status_patch["status"]["expireAt"] = json!(deadline.to_rfc3339());
+        }
+        ExpireAtUpdate::Clear => {
+            status_patch["status"]["expireAt"] = serde_json::Value::Null;
+        }
+        ExpireAtUpdate::Unchanged => {}
+    }
 
     // Use status subresource to avoid triggering spec reconciliation
     coderuns
@@ -1160,6 +1237,8 @@ async fn schedule_retry(
         &format!("Retry attempt {next_attempt} scheduled (max {allowed_display}): {reason}"),
         false,
         Some(next_attempt), // Pass the incremented retry count
+        None,
+        ExpireAtUpdate::Clear,
     )
     .await?;
 
@@ -1209,4 +1288,125 @@ async fn clear_work_completed_status(code_run: &CodeRun, ctx: &Context) -> Resul
         code_run.name_any()
     );
     Ok(())
+}
+
+async fn try_cleanup_after_ttl(
+    code_run: &Arc<CodeRun>,
+    ctx: &Arc<Context>,
+) -> Result<Option<Action>> {
+    if !ctx.config.cleanup.enabled {
+        return Ok(None);
+    }
+
+    if cleanup::is_preserved(&code_run.metadata) {
+        return Ok(None);
+    }
+
+    let status = match &code_run.status {
+        Some(status) => status,
+        None => return Ok(None),
+    };
+
+    if status.cleanup_completed_at.is_some() {
+        return Ok(None);
+    }
+
+    if !matches!(status.phase.as_str(), "Succeeded" | "Failed") {
+        return Ok(None);
+    }
+
+    let expire_at = status
+        .expire_at
+        .as_deref()
+        .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
+        .map(|dt| dt.with_timezone(&Utc));
+
+    let Some(expire_at) = expire_at else {
+        return Ok(None);
+    };
+
+    let now = Utc::now();
+    if expire_at > now {
+        let delay = (expire_at - now)
+            .to_std()
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0));
+        return Ok(Some(Action::requeue(delay)));
+    }
+
+    info!(
+        code_run = %code_run.name_any(),
+        "TTL expired - cleaning up remaining resources"
+    );
+    perform_ttl_cleanup(code_run, ctx).await?;
+    mark_cleanup_complete(code_run, ctx).await?;
+    Ok(Some(Action::await_change()))
+}
+
+async fn perform_ttl_cleanup(code_run: &Arc<CodeRun>, ctx: &Arc<Context>) -> Result<()> {
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let configmaps: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let resource_manager = CodeResourceManager::new(&jobs, &configmaps, &pvcs, &ctx.config, ctx);
+    let _ = resource_manager.cleanup_resources(code_run).await?;
+    Ok(())
+}
+
+async fn mark_cleanup_complete(code_run: &CodeRun, ctx: &Context) -> Result<()> {
+    let coderuns: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
+    let patch = json!({
+        "status": {
+            "cleanupCompletedAt": Utc::now().to_rfc3339(),
+            "expireAt": serde_json::Value::Null
+        }
+    });
+    coderuns
+        .patch_status(
+            &code_run.name_any(),
+            &PatchParams::default(),
+            &Patch::Merge(&patch),
+        )
+        .await?;
+    Ok(())
+}
+
+fn compute_cleanup_deadline(
+    code_run: &CodeRun,
+    ctx: &Context,
+    phase: &str,
+    finished_at: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
+    if !ctx.config.cleanup.enabled {
+        return None;
+    }
+
+    if !matches!(phase, "Succeeded" | "Failed") {
+        return None;
+    }
+
+    if cleanup::is_preserved(&code_run.metadata) {
+        return None;
+    }
+
+    if code_run
+        .status
+        .as_ref()
+        .and_then(|status| status.expire_at.as_ref())
+        .is_some()
+    {
+        return None;
+    }
+
+    let ttl_seconds = cleanup::ttl_override_seconds(&code_run.metadata).or_else(|| {
+        if phase == "Succeeded" {
+            Some(ctx.config.cleanup.success_ttl_seconds)
+        } else {
+            Some(ctx.config.cleanup.failure_ttl_seconds)
+        }
+    })?;
+
+    if ttl_seconds == 0 {
+        return None;
+    }
+
+    Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }

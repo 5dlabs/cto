@@ -111,6 +111,15 @@ spec:
               configmapName:
                 type: string
                 description: "Name of the ConfigMap containing the prompt and context"
+              finishedAt:
+                type: string
+                description: "Timestamp when the DocsRun finished"
+              expireAt:
+                type: string
+                description: "Timestamp when controller should clean up DocsRun resources"
+              cleanupCompletedAt:
+                type: string
+                description: "Timestamp when controller cleanup completed"
               workCompleted:
                 type: boolean
                 description: "Tracks whether the documentation work has been completed successfully for idempotent reconciliation and TTL safety"

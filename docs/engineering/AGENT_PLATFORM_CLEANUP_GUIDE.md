@@ -109,6 +109,14 @@ cleanup:
 
 This handles CodeRun/DocsRun resource cleanup after completion.
 
+### Controller-Managed TTL Sweep (New)
+
+- Every CodeRun and DocsRun resource now carries explicit cleanup labels (`cleanup.cto.dev/scope=run`, `cleanup.cto.dev/run=<name>`) so the controller can safely target only workflow-scoped artifacts.
+- When a run reaches a terminal phase, the controller records `finishedAt`, computes an `expireAt` deadline (default: 60s for success, 300s for failure—configurable via `cleanup.successTTLSeconds` and `cleanup.failureTTLSeconds`), and schedules a follow-up reconciliation.
+- After `expireAt` passes, the controller requeues automatically, deletes remaining Jobs/Pods/ConfigMaps via the resource manager, then stamps `cleanupCompletedAt` to avoid double work.
+- Operators can opt out per run by setting the annotation `cleanup.cto.dev/preserve: "true"` or override the TTL with `cleanup.cto.dev/ttl-seconds: "<seconds>"`.
+- Observability: `finishedAt`, `expireAt`, and `cleanupCompletedAt` now surface in the `status` block of each run for quick audits and troubleshooting.
+
 ## Preventing Resource Accumulation
 
 ### 1. Enable Workflow Archiving (Optional)

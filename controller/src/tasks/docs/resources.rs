@@ -1,4 +1,7 @@
 use crate::crds::DocsRun;
+use crate::tasks::cleanup::{
+    LABEL_CLEANUP_KIND, LABEL_CLEANUP_RUN, LABEL_CLEANUP_SCOPE, SCOPE_RUN,
+};
 use crate::tasks::config::ControllerConfig;
 use crate::tasks::types::{github_app_secret_name, ssh_secret_name, Context, Result};
 use k8s_openapi::api::{batch::v1::Job, core::v1::ConfigMap};
@@ -677,6 +680,15 @@ impl<'a> DocsResourceManager<'a> {
         // Update legacy orchestrator label to controller
         labels.insert("app".to_string(), "controller".to_string());
         labels.insert("component".to_string(), "docs-generator".to_string());
+
+        labels.insert(LABEL_CLEANUP_SCOPE.to_string(), SCOPE_RUN.to_string());
+        labels.insert(LABEL_CLEANUP_KIND.to_string(), "docrun".to_string());
+        if let Some(name) = docs_run.metadata.name.as_deref() {
+            labels.insert(
+                LABEL_CLEANUP_RUN.to_string(),
+                self.sanitize_label_value(name),
+            );
+        }
 
         // Project identification labels
         labels.insert("job-type".to_string(), "docs".to_string());
