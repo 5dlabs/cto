@@ -52,7 +52,7 @@
       "implementationMaxRetries": 10,
       "frontendMaxRetries": 10,
       "qualityMaxRetries": 5,
-      "securityMaxRetries": 5,
+      "securityMaxRetries": 2,
       "testingMaxRetries": 5,
       "autoMerge": true,
       "parallelExecution": false
