@@ -566,7 +566,7 @@ setup_custom_fields() {
   # This causes board columns to AUTO-CREATE without manual configuration!
   # Pattern from 5dlabs/tasks - Status field triggers automatic column creation
   create_single_select_field "$project_id" "Status" \
-    "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Complete ✅"
+    "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
   
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true
