@@ -50,10 +50,12 @@
       "workingDirectory": "cli-agnostic-platform",
       "maxRetries": 10,
       "implementationMaxRetries": 10,
+      "frontendMaxRetries": 10,
       "qualityMaxRetries": 5,
-      "securityMaxRetries": 5,
+      "securityMaxRetries": 2,
       "testingMaxRetries": 5,
-      "autoMerge": true
+      "autoMerge": true,
+      "parallelExecution": false
     },
     "docs_ingest": {
       "model": "claude-sonnet-4-20250514",

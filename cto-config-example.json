@@ -47,6 +47,12 @@
       "docsRepository": "5dlabs/cto-play-test",
       "docsProjectDirectory": "docs",
       "workingDirectory": "/Users/jonathonfritz/cto-play-test",
+      "maxRetries": 10,
+      "implementationMaxRetries": 10,
+      "frontendMaxRetries": 10,
+      "qualityMaxRetries": 5,
+      "securityMaxRetries": 2,
+      "testingMaxRetries": 5,
       "autoMerge": false,
       "parallelExecution": false
     },
