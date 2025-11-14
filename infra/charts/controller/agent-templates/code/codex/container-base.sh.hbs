@@ -1746,11 +1746,23 @@ Your response:"
 
   echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
 
+  # Look for explicit yes/no, OR common completion phrases
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  
+  # Fallback: detect implicit completion signals if no explicit yes/no
+  if [ -z "$COMPLETION_RESPONSE" ]; then
+    if printf '%s\n' "$COMPLETION_OUTPUT" | grep -Eiq '(task.*(complete|finished|done)|work.*(complete|finished)|security work complete)'; then
+      echo "[codex-debug] Detected implicit completion signal in probe output"
+      COMPLETION_RESPONSE="yes"
+    fi
+  fi
   fi
   
   set +o pipefail
   set -e
+  
+  echo "[codex-debug] Final completion response: ${COMPLETION_RESPONSE:-<none>}"
+  
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
     CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')

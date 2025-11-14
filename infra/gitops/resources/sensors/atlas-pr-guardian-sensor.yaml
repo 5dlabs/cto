@@ -29,6 +29,7 @@ spec:
               - pull_request
               - issue_comment
               - pull_request_review
+              - workflow_run
           # Filter PR actions to relevant ones only
           - path: body.action
             type: string
@@ -39,6 +40,8 @@ spec:
               - ready_for_review
               - created
               - submitted
+              - completed
+              - requested
         # NOTE: Removed broken exprs filter - issue comment PR validation moved to workflow
         # The dedup workflow validates issue_comment events are on PRs (lines 98-106)
         # This is more reliable than Argo Events exprs which fail with field access errors
@@ -61,7 +64,16 @@ spec:
               dest: spec.templates.0.script.env.0.value
             - src:
                 dependencyName: pr-events
-                dataTemplate: "{{ .Input.body.pull_request.number | default .Input.body.issue.number | default \"\" }}"
+                dataTemplate: |
+                  {{- if .Input.body.pull_request -}}
+                    {{ .Input.body.pull_request.number }}
+                  {{- else if and .Input.body.issue .Input.body.issue.pull_request -}}
+                    {{ .Input.body.issue.number }}
+                  {{- else if and .Input.body.workflow_run (gt (len .Input.body.workflow_run.pull_requests) 0) -}}
+                    {{ (index .Input.body.workflow_run.pull_requests 0).number }}
+                  {{- else -}}
+                  {{""}}
+                  {{- end -}}
               dest: spec.templates.0.script.env.1.value
             - src:
                 dependencyName: pr-events
@@ -73,8 +85,37 @@ spec:
               dest: spec.templates.0.script.env.3.value
             - src:
                 dependencyName: pr-events
-                dataTemplate: "{{ if or .Input.body.pull_request .Input.body.issue.pull_request }}true{{ else }}false{{ end }}"
+                dataTemplate: |
+                  {{- if .Input.body.pull_request -}}
+                    true
+                  {{- else if and .Input.body.issue .Input.body.issue.pull_request -}}
+                    true
+                  {{- else if and .Input.body.workflow_run (gt (len .Input.body.workflow_run.pull_requests) 0) -}}
+                    true
+                  {{- else -}}
+                    false
+                  {{- end -}}
               dest: spec.templates.0.script.env.4.value
+            - src:
+                dependencyName: pr-events
+                dataTemplate: "{{ .Input.body.workflow_run.id | default \"\" }}"
+              dest: spec.templates.0.script.env.5.value
+            - src:
+                dependencyName: pr-events
+                dataTemplate: "{{ .Input.body.workflow_run.conclusion | default \"\" }}"
+              dest: spec.templates.0.script.env.6.value
+            - src:
+                dependencyName: pr-events
+                dataTemplate: "{{ .Input.body.workflow_run.name | default \"\" }}"
+              dest: spec.templates.0.script.env.7.value
+            - src:
+                dependencyName: pr-events
+                dataTemplate: "{{ .Input.body.workflow_run.run_attempt | default \"\" }}"
+              dest: spec.templates.0.script.env.8.value
+            - src:
+                dependencyName: pr-events
+                dataTemplate: "{{ .Input.body.workflow_run.html_url | default \"\" }}"
+              dest: spec.templates.0.script.env.9.value
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -105,6 +146,16 @@ spec:
                           value: ""
                         - name: IS_PR
                           value: ""
+                        - name: WORKFLOW_RUN_ID
+                          value: ""
+                        - name: WORKFLOW_RUN_CONCLUSION
+                          value: ""
+                        - name: WORKFLOW_RUN_NAME
+                          value: ""
+                        - name: WORKFLOW_RUN_ATTEMPT
+                          value: ""
+                        - name: WORKFLOW_RUN_URL
+                          value: ""
                       source: |
                         #!/bin/bash
                         set -e
@@ -120,6 +171,12 @@ spec:
                         echo "Event: $EVENT_TYPE"
                         echo "Action: $ACTION"
                         echo "PR Number: $PR_NUMBER"
+                        if [ -n "$WORKFLOW_RUN_ID" ]; then
+                          echo "Workflow Run ID: $WORKFLOW_RUN_ID"
+                          echo "Workflow Name: ${WORKFLOW_RUN_NAME:-unknown}"
+                          echo "Workflow Conclusion: ${WORKFLOW_RUN_CONCLUSION:-pending}"
+                          echo "Workflow Attempt: ${WORKFLOW_RUN_ATTEMPT:-1}"
+                        fi
                         echo "Is PR: $IS_PR"
 
                         # Validate this is a PR-related event (not a regular issue)
@@ -214,11 +271,6 @@ spec:
                           workingDirectory: "."
                           continueSession: true
                           overwriteMemory: false
-                          cliConfig:
-                            cliType: "claude"
-                            model: "claude-sonnet-4-5-20250929"
-                            maxTokens: 8192
-                            temperature: 0.3
                           env:
                             PR_NUMBER: "$PR_NUMBER"
                             PR_URL: "https://github.com/5dlabs/cto/pull/$PR_NUMBER"
@@ -226,6 +278,13 @@ spec:
                             GUARDIAN_MODE: "active"
                             TARGET_REPOSITORY: "5dlabs/cto"
                             MERGE_STRATEGY: "squash"
+                            TRIGGER_EVENT: "$EVENT_TYPE"
+                            TRIGGER_ACTION: "$ACTION"
+                            WORKFLOW_RUN_ID: "$WORKFLOW_RUN_ID"
+                            WORKFLOW_RUN_CONCLUSION: "$WORKFLOW_RUN_CONCLUSION"
+                            WORKFLOW_RUN_NAME: "$WORKFLOW_RUN_NAME"
+                            WORKFLOW_RUN_ATTEMPT: "$WORKFLOW_RUN_ATTEMPT"
+                            WORKFLOW_RUN_URL: "$WORKFLOW_RUN_URL"
                         EOF
 
                         if grep -q "created" /tmp/create-output.txt; then
