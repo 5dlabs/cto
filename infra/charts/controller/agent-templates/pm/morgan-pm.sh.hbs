@@ -421,6 +421,33 @@ create_task_issues() {
   
   cd "$TEMP_CLONE/$DOCS_DIR"
   
+  # Clean up old issues from previous workflow runs
+  log "🧹 Checking for old issues from previous workflow runs..."
+  OLD_ISSUES=$(gh issue list \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --state open \
+    --label "taskmaster-task" \
+    --json number,labels \
+    --jq --arg current_workflow "workflow-$WORKFLOW_NAME" \
+      '[.[] | select(.labels | map(.name) | any(. == "taskmaster-task")) | 
+       select(.labels | map(.name) | any(startswith("workflow-")) and . != $current_workflow) | .number] | .[]' \
+    2>/dev/null || echo "")
+  
+  if [[ -n "$OLD_ISSUES" ]]; then
+    OLD_COUNT=$(echo "$OLD_ISSUES" | wc -w)
+    log "🗑️  Found $OLD_COUNT old issue(s) from previous runs - closing them..."
+    for issue_num in $OLD_ISSUES; do
+      log "  Closing issue #$issue_num"
+      gh issue close "$issue_num" \
+        --repo "$REPO_OWNER/$REPO_NAME" \
+        --comment "🔄 Closing this issue as a new workflow run has been initiated. New issues will be created for the latest run." \
+        2>/dev/null || log "⚠️  Failed to close issue #$issue_num"
+    done
+    log "✅ Closed $OLD_COUNT old issue(s)"
+  else
+    log "✅ No old issues found to clean up"
+  fi
+  
   # Initialize task-issue mapping
   echo "{}" > "$TASK_ISSUE_MAP"
   
