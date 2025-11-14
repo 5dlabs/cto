@@ -1204,6 +1204,9 @@ impl<'a> CodeResourceManager<'a> {
             .as_deref()
             .or(code_run.spec.github_user.as_deref())
             .unwrap_or("unknown");
+
+        // IMPORTANT: Only cleanup ConfigMaps with BOTH github-user AND service labels
+        // This prevents accidentally matching ConfigMaps from other stages in multi-agent workflows
         let list_params = ListParams::default().labels(&format!(
             "app=controller,component=code-runner,github-user={},service={}",
             self.sanitize_label_value(github_identifier),
@@ -1245,17 +1248,31 @@ impl<'a> CodeResourceManager<'a> {
                         .labels(&format!("batch.kubernetes.io/job-name={job_name}"));
                     match pods.list(&pod_list_params).await {
                         Ok(pod_list) => {
-                            let has_running_pods = pod_list.items.iter().any(|pod| {
+                            // Check for ANY pods that are Running, Pending, or Init (mounting volumes)
+                            let has_active_pods = pod_list.items.iter().any(|pod| {
                                 pod.status
                                     .as_ref()
                                     .and_then(|s| s.phase.as_deref())
-                                    .map(|phase| phase == "Running" || phase == "Pending")
+                                    .map(|phase| {
+                                        // Protect ConfigMaps for pods that might be starting
+                                        phase == "Running" || phase == "Pending"
+                                    })
+                                    .unwrap_or(false) ||
+                                // Also check for Init containers (still mounting volumes)
+                                pod.status
+                                    .as_ref()
+                                    .and_then(|s| s.init_container_statuses.as_ref())
+                                    .map(|containers| containers.iter().any(|c| {
+                                        c.state.as_ref().map(|state| {
+                                            state.running.is_some() || state.waiting.is_some()
+                                        }).unwrap_or(false)
+                                    }))
                                     .unwrap_or(false)
                             });
 
-                            if has_running_pods {
+                            if has_active_pods {
                                 info!(
-                                    "Skipping cleanup of ConfigMap {} - job {} still has running pods",
+                                    "Skipping cleanup of ConfigMap {} - job {} still has active pods",
                                     cm_name, job_name
                                 );
                                 continue;

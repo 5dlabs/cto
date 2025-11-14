@@ -1534,9 +1534,9 @@ ${NEXT_ITERATION_GUIDANCE}"
   CODEX_CMD+=("$PROMPT_PAYLOAD")
 
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" 2>&1 | tee "$RUN_LOG"
   else
-    "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+    "${CODEX_CMD[@]}" 2>&1 | tee "$RUN_LOG"
   fi
   CODEX_EXIT=${PIPESTATUS[0]}
   set +o pipefail
@@ -1603,7 +1603,12 @@ Try instead:
 
   NEW_SESSION_ID=""
   if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+    # Ensure file is fully written (flush buffers)
+    sync || true
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
+    echo "[codex-debug] Session extraction from $RUN_LOG: ${NEW_SESSION_ID:-<empty>}"
+  else
+    echo "[codex-debug] RUN_LOG not found or empty: RUN_LOG=${RUN_LOG:-<unset>}"
   fi
   if [ -n "$NEW_SESSION_ID" ]; then
     if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
@@ -1611,6 +1616,8 @@ Try instead:
       CURRENT_SESSION_ID="$NEW_SESSION_ID"
       persist_session_id "$CURRENT_SESSION_ID"
     fi
+  else
+    echo "[codex-debug] Failed to extract session ID from log (attempt $ATTEMPT)"
   fi
 
   if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then
@@ -1739,11 +1746,23 @@ Your response:"
 
   echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
 
+  # Look for explicit yes/no, OR common completion phrases
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  
+  # Fallback: detect implicit completion signals if no explicit yes/no
+  if [ -z "$COMPLETION_RESPONSE" ]; then
+    if printf '%s\n' "$COMPLETION_OUTPUT" | grep -Eiq '(task.*(complete|finished|done)|work.*(complete|finished)|security work complete)'; then
+      echo "[codex-debug] Detected implicit completion signal in probe output"
+      COMPLETION_RESPONSE="yes"
+    fi
+  fi
   fi
   
   set +o pipefail
   set -e
+  
+  echo "[codex-debug] Final completion response: ${COMPLETION_RESPONSE:-<none>}"
+  
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
     CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
@@ -1927,11 +1946,11 @@ fi
 if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
-elif [[ "{{github_app}}" =~ [Rr]ex ]] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
-  echo "🔍 Rex implementation agent - creating PR even though completion unconfirmed"
+elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+  echo "🔍 Implementation agent ($AGENT_NAME) made commits - ensuring PR exists"
   ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
 else
-  echo "⚠️ Skipping auto PR enforcement due to Codex completion status"
+  echo "⚠️ Skipping auto PR enforcement (no commits or non-implementation stage)"
 fi
 
 # Map CodeRun stage values to workflow stage labels expected by container logic
