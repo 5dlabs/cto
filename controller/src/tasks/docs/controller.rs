@@ -108,14 +108,20 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
         match status.phase.as_str() {
             "Succeeded" => {
                 info!("Already succeeded, ensuring work_completed is set");
+                let finished_at = Utc::now();
+                let cleanup_deadline =
+                    compute_docs_cleanup_deadline(&docs_run, ctx, "Succeeded", finished_at);
+
                 update_docs_status_with_completion(
                     &docs_run,
                     ctx,
                     "Succeeded",
                     "Documentation generation completed successfully",
                     true,
-                    None,
-                    DocsExpireUpdate::Unchanged,
+                    Some(finished_at),
+                    cleanup_deadline
+                        .map(DocsExpireUpdate::Set)
+                        .unwrap_or(DocsExpireUpdate::Unchanged),
                 )
                 .await?;
                 return Ok(Action::await_change());

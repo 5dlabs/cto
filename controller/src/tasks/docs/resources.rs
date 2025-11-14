@@ -682,7 +682,7 @@ impl<'a> DocsResourceManager<'a> {
         labels.insert("component".to_string(), "docs-generator".to_string());
 
         labels.insert(LABEL_CLEANUP_SCOPE.to_string(), SCOPE_RUN.to_string());
-        labels.insert(LABEL_CLEANUP_KIND.to_string(), "docrun".to_string());
+        labels.insert(LABEL_CLEANUP_KIND.to_string(), "docsrun".to_string());
         if let Some(name) = docs_run.metadata.name.as_deref() {
             labels.insert(
                 LABEL_CLEANUP_RUN.to_string(),

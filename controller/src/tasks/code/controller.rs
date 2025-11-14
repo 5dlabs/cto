@@ -113,6 +113,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         match status.phase.as_str() {
             "Succeeded" => {
                 debug!("Already succeeded, ensuring work_completed is set");
+                let finished_at = Utc::now();
+                let cleanup_deadline =
+                    compute_cleanup_deadline(&code_run, ctx, "Succeeded", finished_at);
+
                 update_code_status_with_completion(
                     &code_run,
                     ctx,
@@ -120,8 +124,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     "Code implementation completed successfully",
                     true,
                     None,
-                    None,
-                    ExpireAtUpdate::Unchanged,
+                    Some(finished_at),
+                    cleanup_deadline
+                        .map(ExpireAtUpdate::Set)
+                        .unwrap_or(ExpireAtUpdate::Unchanged),
                 )
                 .await?;
 
@@ -184,6 +190,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 // Ensure work_completed flag is set if phase is Succeeded
                 if current_phase == "Succeeded" && !work_completed {
                     debug!("Backfilling work_completed=true for succeeded CodeRun");
+                    let finished_at = Utc::now();
+                    let cleanup_deadline =
+                        compute_cleanup_deadline(&code_run, ctx, "Succeeded", finished_at);
+
                     update_code_status_with_completion(
                         &code_run,
                         ctx,
@@ -191,8 +201,10 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                         "Code implementation completed successfully",
                         true,
                         None,
-                        None,
-                        ExpireAtUpdate::Unchanged,
+                        Some(finished_at),
+                        cleanup_deadline
+                            .map(ExpireAtUpdate::Set)
+                            .unwrap_or(ExpireAtUpdate::Unchanged),
                     )
                     .await?;
                 }
@@ -780,6 +792,7 @@ fn determine_code_job_state(status: &k8s_openapi::api::batch::v1::JobStatus) -> 
     CodeJobState::Running
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_code_status_with_completion(
     code_run: &CodeRun,
     ctx: &Context,
