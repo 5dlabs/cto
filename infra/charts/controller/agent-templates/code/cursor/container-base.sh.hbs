@@ -2009,11 +2009,11 @@ fi
 if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
-elif [[ "{{github_app}}" =~ [Rr]ex ]] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
-  echo "🔍 Rex implementation agent - creating PR even though completion unconfirmed"
+elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+  echo "🔍 Implementation agent ($AGENT_NAME) made commits - ensuring PR exists"
   ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
 else
-  echo "⚠️ Skipping auto PR enforcement due to Cursor completion status"
+  echo "⚠️ Skipping auto PR enforcement (no commits or non-implementation stage)"
 fi
 
 RESOLVED_PR_URL="$(resolve_pr_url)"
