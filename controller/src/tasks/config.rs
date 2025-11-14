@@ -306,11 +306,11 @@ fn default_cleanup_enabled() -> bool {
 }
 
 fn default_success_ttl_seconds() -> u64 {
-    60
+    3600 // 1 hour - allow time for multi-stage workflows
 }
 
 fn default_failure_ttl_seconds() -> u64 {
-    300
+    7200 // 2 hours - keep failures longer for debugging
 }
 
 fn default_completed_delay() -> u64 {
