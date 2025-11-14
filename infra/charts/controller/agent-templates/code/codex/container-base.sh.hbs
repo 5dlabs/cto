@@ -708,6 +708,11 @@ else
   cd "$REPO_NAME"
 fi
 
+# Ensure credential helper is configured in the repository's local config
+# This ensures Codex subshells can access credentials even if GIT_CONFIG_GLOBAL isn't honored
+git config credential.helper "store --file=$CREDENTIALS_FILE"
+echo "✓ Git credential helper configured for repository"
+
 git config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 # Remove stale automation-managed files that block branch checkout when rerunning
