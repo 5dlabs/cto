@@ -45,6 +45,7 @@ spec:
                 namespace: agent-platform
                 labels:
                   agent: atlas
+                  stage: integration
                   trigger: batch-integration
               spec:
                 githubApp: "5DLabs-Atlas"

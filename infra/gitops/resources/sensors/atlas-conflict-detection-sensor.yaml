@@ -51,6 +51,7 @@ spec:
                 namespace: agent-platform
                 labels:
                   agent: atlas
+                  stage: integration
                   task-id: "" # Extracted from PR labels
               spec:
                 githubApp: 5DLabs-Atlas
