@@ -329,6 +329,9 @@ initialize_project() {
   # Read tasks data
   TASKS_DATA=$(cat "$TASKS_JSON_PATH")
   
+  # Initialize PROJECT_ID (will be set from config or created new)
+  PROJECT_ID=""
+  
   # Check if we have an existing project configuration
   if [[ -f "$PROJECT_CONFIG" ]]; then
     PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG" 2>/dev/null || echo "")
