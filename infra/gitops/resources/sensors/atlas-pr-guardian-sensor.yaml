@@ -196,6 +196,7 @@ spec:
                           labels:
                             agent: atlas
                             role: pr-guardian
+                            stage: guardian
                             pr-number: "$PR_NUMBER"
                             repository: "cto"
                         spec:
