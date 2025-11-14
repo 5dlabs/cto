@@ -41,6 +41,7 @@ use controller::tasks::{
     types::Context as TaskContext,
 };
 use serde_json::{json, Value};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
@@ -174,15 +175,21 @@ async fn metrics() -> Json<Value> {
 }
 
 fn load_controller_config() -> ControllerConfig {
-    match ControllerConfig::from_mounted_file("/config/config.yaml") {
+    let override_path = std::env::var("CONTROLLER_CONFIG_PATH").ok();
+    let config_path = override_path
+        .as_deref()
+        .filter(|path| Path::new(path).exists())
+        .unwrap_or("/config/config.yaml");
+
+    match ControllerConfig::from_mounted_file(config_path) {
         Ok(cfg) => {
-            info!("Loaded controller configuration from mounted file");
+            info!("Loaded controller configuration from {}", config_path);
             cfg
         }
         Err(err) => {
             warn!(
-                "Failed to load configuration from file: {}. Using defaults.",
-                err
+                "Failed to load configuration from {}: {}. Using defaults.",
+                config_path, err
             );
             ControllerConfig::default()
         }
