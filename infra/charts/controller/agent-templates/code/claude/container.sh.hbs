@@ -54,7 +54,37 @@ echo '════════════════════════�
 # Ensure workspace directories exist (TASK_WORKSPACE already defined above)
 mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
+export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
+mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+gh_hosts_file() {
+    if [ -n "${GH_CONFIG_DIR:-}" ] && [ -f "${GH_CONFIG_DIR}/hosts.yml" ]; then
+        printf '%s\n' "${GH_CONFIG_DIR}/hosts.yml"
+        return
+    fi
+    if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+        printf '%s\n' "$HOME/.config/gh/hosts.yml"
+        return
+    fi
+    printf ''
+}
+
+sync_gh_hosts_to_path() {
+    target="$1"
+    if [ -z "$target" ]; then
+        return
+    fi
+    source_file=$(gh_hosts_file)
+    if [ -z "$source_file" ] || [ ! -f "$source_file" ]; then
+        return
+    fi
+    dest_dir="$target/.config/gh"
+    mkdir -p "$dest_dir"
+    if cp "$source_file" "$dest_dir/hosts.yml" >/dev/null 2>&1; then
+        chmod 600 "$dest_dir/hosts.yml" 2>/dev/null || true
+    fi
+}
 
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
@@ -168,6 +198,8 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
 
     # Also authenticate gh CLI with the token
     echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+    sync_gh_hosts_to_path "$TASK_WORKSPACE"
 
     echo "✓ GitHub App authenticated successfully"
 
@@ -420,6 +452,7 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
     mkdir -p "$TEMP_TASK_DIR"
 
     cd "/workspace/$TARGET_REPO_DIR"
+    sync_gh_hosts_to_path "/workspace/$TARGET_REPO_DIR"
     echo "🔍 DEBUG: TaskMaster file preservation"
     echo "  docs_project_directory: '{{docs_project_directory}}'"
     echo "  task_id: '{{task_id}}'"
@@ -703,6 +736,7 @@ else
   CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
 fi
 mkdir -p "$CLAUDE_WORK_DIR" && cd "$CLAUDE_WORK_DIR"
+sync_gh_hosts_to_path "$CLAUDE_WORK_DIR"
 echo "✓ Set working directory: $CLAUDE_WORK_DIR"
 echo "🔑 CRITICAL: Claude will be launched from this directory"
 
