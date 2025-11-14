@@ -54,9 +54,12 @@
       "workingDirectory": "/path/to/your/test/workspace",
       "maxRetries": 10,
       "implementationMaxRetries": 10,
+      "frontendMaxRetries": 10,
       "qualityMaxRetries": 5,
+      "securityMaxRetries": 5,
       "testingMaxRetries": 5,
-      "autoMerge": false
+      "autoMerge": false,
+      "parallelExecution": false
     },
     "_comment_docs_ingest": "Default values for docs ingest workflows",
     "docs_ingest": {
@@ -281,10 +284,18 @@
     "defaults.play.implementationAgent": "Default GitHub App for implementation in play workflows",
     "defaults.play.frontendAgent": "Default GitHub App for frontend tasks in play workflows",
     "defaults.play.qualityAgent": "Default GitHub App for quality checks in play workflows",
+    "defaults.play.securityAgent": "Default GitHub App for security scanning in play workflows",
     "defaults.play.testingAgent": "Default GitHub App for testing in play workflows",
     "defaults.play.repository": "Default repository for play workspace",
     "defaults.play.service": "Default service name for play workspace isolation",
+    "defaults.play.maxRetries": "Default maximum retry attempts for all agents (can be overridden per agent)",
+    "defaults.play.implementationMaxRetries": "Maximum retry attempts for implementation agent (Rex/Blaze)",
+    "defaults.play.frontendMaxRetries": "Maximum retry attempts for frontend agent (Blaze)",
+    "defaults.play.qualityMaxRetries": "Maximum retry attempts for quality agent (Cleo)",
+    "defaults.play.securityMaxRetries": "Maximum retry attempts for security agent (Cipher)",
+    "defaults.play.testingMaxRetries": "Maximum retry attempts for testing agent (Tess)",
     "defaults.play.autoMerge": "Whether Tess should automatically merge PRs after approval (true/false)",
+    "defaults.play.parallelExecution": "Whether to run independent tasks in parallel (true/false)",
     "defaults.docs_ingest.model": "Model for docs ingestion workflows",
     "defaults.docs_ingest.docServerUrl": "URL of the documentation server for docs ingest",
     "agents": "Agent configurations with tool profiles - each agent has githubApp, cli, model, and tools configuration including remote tools and local server access"
