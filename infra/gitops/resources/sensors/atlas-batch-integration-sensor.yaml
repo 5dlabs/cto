@@ -45,11 +45,12 @@ spec:
                 namespace: agent-platform
                 labels:
                   agent: atlas
+                  stage: integration
                   trigger: batch-integration
               spec:
                 githubApp: "5DLabs-Atlas"
                 cli: "Claude"
-                model: "claude-sonnet-4-20250514"
+                model: "claude-sonnet-4-5-20250929"
                 maxTokens: 4096
                 temperature: 0.4
                 repositoryUrl: ""

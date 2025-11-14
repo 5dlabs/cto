@@ -1,5 +1,17 @@
 #!/bin/sh
 
+# Task-specific workspace for parallel execution isolation
+# Define BEFORE cleanup function so cleanup uses correct path
+TASK_WORKSPACE="/workspace/task-{{task_id}}"
+
+# Signal docker-daemon to shut down on ANY exit (success or failure)
+# This prevents docker-daemon from running indefinitely when Claude crashes
+cleanup_docker() {
+    echo "🧹 Cleanup: Signaling docker-daemon to shut down..."
+    touch "$TASK_WORKSPACE/.agent_done" 2>/dev/null || true
+}
+trap cleanup_docker EXIT
+
 # Ensure Rust environment is always properly set up
 echo "🔧 Setting up Rust environment..."
 
@@ -39,11 +51,40 @@ printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
 echo '║  IMPLEMENTATION TASK STARTING                                ║'
 echo '════════════════════════════════════════════════════════════════'
 
-# Task-specific workspace for parallel execution isolation
-TASK_WORKSPACE="/workspace/task-{{task_id}}"
+# Ensure workspace directories exist (TASK_WORKSPACE already defined above)
 mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
+export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
+mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
+
+gh_hosts_file() {
+    if [ -n "${GH_CONFIG_DIR:-}" ] && [ -f "${GH_CONFIG_DIR}/hosts.yml" ]; then
+        printf '%s\n' "${GH_CONFIG_DIR}/hosts.yml"
+        return
+    fi
+    if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+        printf '%s\n' "$HOME/.config/gh/hosts.yml"
+        return
+    fi
+    printf ''
+}
+
+sync_gh_hosts_to_path() {
+    target="$1"
+    if [ -z "$target" ]; then
+        return
+    fi
+    source_file=$(gh_hosts_file)
+    if [ -z "$source_file" ] || [ ! -f "$source_file" ]; then
+        return
+    fi
+    dest_dir="$target/.config/gh"
+    mkdir -p "$dest_dir"
+    if cp "$source_file" "$dest_dir/hosts.yml" >/dev/null 2>&1; then
+        chmod 600 "$dest_dir/hosts.yml" 2>/dev/null || true
+    fi
+}
 
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
@@ -157,6 +198,8 @@ if [ -n "$GITHUB_APP_PRIVATE_KEY" ] && [ -n "$GITHUB_APP_ID" ]; then
 
     # Also authenticate gh CLI with the token
     echo "$GITHUB_TOKEN" | gh auth login --with-token
+
+    sync_gh_hosts_to_path "$TASK_WORKSPACE"
 
     echo "✓ GitHub App authenticated successfully"
 
@@ -409,6 +452,7 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
     mkdir -p "$TEMP_TASK_DIR"
 
     cd "/workspace/$TARGET_REPO_DIR"
+    sync_gh_hosts_to_path "/workspace/$TARGET_REPO_DIR"
     echo "🔍 DEBUG: TaskMaster file preservation"
     echo "  docs_project_directory: '{{docs_project_directory}}'"
     echo "  task_id: '{{task_id}}'"
@@ -457,15 +501,22 @@ if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
         echo "🔍 DEBUG: Preserved files:"
         ls -la "$TEMP_TASK_DIR/" || echo "No files in temp directory"
     else
-        echo "❌ Task Master directory not found at: $PRESERVE_FROM"
-        echo "❌ CRITICAL: TaskMaster files must exist at the specified location"
-        echo "❌ Expected location: $PRESERVE_FROM"
-        echo "❌ This job cannot continue without the specified TaskMaster files"
-        echo "❌ Verify that:"
-        echo "   1. The docs-project-directory parameter is correct"
-        echo "   2. The task-id exists in the TaskMaster directory"
-        echo "   3. The docs-branch contains the TaskMaster files"
-        exit 1
+        # Special case: taskId 0 is used for non-TaskMaster workflows (e.g., Atlas PR Guardian)
+        if [ "{{task_id}}" = "0" ]; then
+            echo "ℹ️ TaskId 0 detected - skipping TaskMaster file requirements"
+            echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+            echo "  Proceeding without TaskMaster files..."
+        else
+            echo "❌ Task Master directory not found at: $PRESERVE_FROM"
+            echo "❌ CRITICAL: TaskMaster files must exist at the specified location"
+            echo "❌ Expected location: $PRESERVE_FROM"
+            echo "❌ This job cannot continue without the specified TaskMaster files"
+            echo "❌ Verify that:"
+            echo "   1. The docs-project-directory parameter is correct"
+            echo "   2. The task-id exists in the TaskMaster directory"
+            echo "   3. The docs-branch contains the TaskMaster files"
+            exit 1
+        fi
     fi
     cd "$TASK_WORKSPACE"
 
@@ -582,9 +633,16 @@ else
 
         echo "✓ Task {{task_id}} files copied from $TASK_DIR"
     else
-        echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
-        echo "🔍 DEBUG: Available directories in docs:"
-        find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+        # Special case: taskId 0 is used for non-TaskMaster workflows (e.g., Atlas PR Guardian)
+        if [ "{{task_id}}" = "0" ]; then
+            echo "ℹ️ TaskId 0 detected - skipping TaskMaster file requirements"
+            echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+            echo "  Proceeding without TaskMaster files..."
+        else
+            echo "❌ CRITICAL: Task {{task_id}} directory not found at: $TASK_DIR"
+            echo "🔍 DEBUG: Available directories in docs:"
+            find /tmp/docs-repo -name "task-*" -type d || echo "No task directories found"
+        fi
     fi
 
     # Copy architecture.md from docs root
@@ -678,6 +736,7 @@ else
   CLAUDE_WORK_DIR="/workspace/$WORKSPACE_DIR/$WORK_DIR"
 fi
 mkdir -p "$CLAUDE_WORK_DIR" && cd "$CLAUDE_WORK_DIR"
+sync_gh_hosts_to_path "$CLAUDE_WORK_DIR"
 echo "✓ Set working directory: $CLAUDE_WORK_DIR"
 echo "🔑 CRITICAL: Claude will be launched from this directory"
 
@@ -827,49 +886,56 @@ echo "✓ Created task directory at: $CLAUDE_WORK_DIR/task"
 
 # Task documentation should already be available in the task/ directory
 if [ "$WORKFLOW_TYPE" = "single-repo" ]; then
-    echo "✓ Restoring task documentation from preserved temporary location"
+    # Special case: taskId 0 is used for non-TaskMaster workflows (e.g., Atlas PR Guardian)
+    if [ "{{task_id}}" = "0" ]; then
+        echo "ℹ️ TaskId 0 detected - skipping TaskMaster file restoration"
+        echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+        echo "  Proceeding without TaskMaster files..."
+    else
+        echo "✓ Restoring task documentation from preserved temporary location"
 
-    # Use the preserved Task Master files from temporary location
-    TEMP_TASK_DIR="/tmp/taskmaster-preserve"
-    echo "🔍 DEBUG: Restoring task files from: $TEMP_TASK_DIR"
+        # Use the preserved Task Master files from temporary location
+        TEMP_TASK_DIR="/tmp/taskmaster-preserve"
+        echo "🔍 DEBUG: Restoring task files from: $TEMP_TASK_DIR"
 
-    if [ -d "$TEMP_TASK_DIR" ] && [ "$(ls -A $TEMP_TASK_DIR 2>/dev/null)" ]; then
-        echo "✓ Preserved Task Master files found"
-        echo "🔍 DEBUG: Preserved task files:"
-        ls -la "$TEMP_TASK_DIR/"
+        if [ -d "$TEMP_TASK_DIR" ] && [ "$(ls -A $TEMP_TASK_DIR 2>/dev/null)" ]; then
+            echo "✓ Preserved Task Master files found"
+            echo "🔍 DEBUG: Preserved task files:"
+            ls -la "$TEMP_TASK_DIR/"
 
-        echo "✅ Copying all preserved files to task directory..."
+            echo "✅ Copying all preserved files to task directory..."
 
-        # Copy all files from preserved directory to task directory
-        if cp -r "$TEMP_TASK_DIR"/* "$CLAUDE_WORK_DIR/task/" 2>/dev/null; then
-            echo "✓ All task files copied from preserved temporary location"
+            # Copy all files from preserved directory to task directory
+            if cp -r "$TEMP_TASK_DIR"/* "$CLAUDE_WORK_DIR/task/" 2>/dev/null; then
+                echo "✓ All task files copied from preserved temporary location"
+            else
+                echo "❌ Failed to copy task files from preserved location"
+                exit 1
+            fi
+
+            # Copy task.txt as task.md if it exists (specific rename needed)
+            if [ -f "$CLAUDE_WORK_DIR/task/task.txt" ]; then
+                cp "$CLAUDE_WORK_DIR/task/task.txt" "$CLAUDE_WORK_DIR/task/task.md" && echo "✓ task.txt copied as task.md" || echo "❌ task.txt copy failed"
+            fi
+
+            # Move client-config.json to Claude working directory (not in task/ subdirectory)
+            if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
+                mv "$CLAUDE_WORK_DIR/task/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Claude working directory" || echo "❌ client-config.json move failed"
+            else
+                echo "⚠️ client-config.json not found - MCP client may not be configured"
+            fi
+
+            echo "✓ Task {{task_id}} files copied from preserved temporary location"
+
+            # Clean up temporary directory
+            rm -rf "$TEMP_TASK_DIR"
+            echo "✓ Cleaned up temporary preservation directory"
         else
-            echo "❌ Failed to copy task files from preserved location"
+            echo "❌ CRITICAL: No preserved Task Master files found at: $TEMP_TASK_DIR"
+            echo "🔍 DEBUG: This indicates the Task Master preservation step failed earlier"
+            echo "❌ Task {{task_id}} files are not available for this job"
             exit 1
         fi
-
-        # Copy task.txt as task.md if it exists (specific rename needed)
-        if [ -f "$CLAUDE_WORK_DIR/task/task.txt" ]; then
-            cp "$CLAUDE_WORK_DIR/task/task.txt" "$CLAUDE_WORK_DIR/task/task.md" && echo "✓ task.txt copied as task.md" || echo "❌ task.txt copy failed"
-        fi
-
-        # Move client-config.json to Claude working directory (not in task/ subdirectory)
-        if [ -f "$CLAUDE_WORK_DIR/task/client-config.json" ]; then
-            mv "$CLAUDE_WORK_DIR/task/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json moved to Claude working directory" || echo "❌ client-config.json move failed"
-        else
-            echo "⚠️ client-config.json not found - MCP client may not be configured"
-        fi
-
-        echo "✓ Task {{task_id}} files copied from preserved temporary location"
-
-        # Clean up temporary directory
-        rm -rf "$TEMP_TASK_DIR"
-        echo "✓ Cleaned up temporary preservation directory"
-    else
-        echo "❌ CRITICAL: No preserved Task Master files found at: $TEMP_TASK_DIR"
-        echo "🔍 DEBUG: This indicates the Task Master preservation step failed earlier"
-        echo "❌ Task {{task_id}} files are not available for this job"
-        exit 1
     fi
 
     # DEBUG: Verify files were copied successfully
@@ -1152,7 +1218,42 @@ else
     ls -la "$CLAUDE_WORK_DIR/" || echo "Working directory not accessible"
 
     # Check if prompt.md exists and use it as main prompt
-    if [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
+    # Skip for Task ID 0 (non-TaskMaster workflows like Atlas PR Guardian)
+    if [ "{{task_id}}" = "0" ]; then
+        echo "ℹ️ Task ID 0 detected - launching Claude without task prompt"
+        echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
+        echo "  Claude will use its system prompt and environment variables"
+
+        # For task ID 0, provide FIFO with initial message to avoid hanging
+        # Claude expects stream-json input, so we must provide it via FIFO
+        FIFO_PATH="/workspace/agent-input.jsonl"
+        rm -f "$FIFO_PATH" 2>/dev/null || true
+        mkfifo "$FIFO_PATH"
+        chmod 666 "$FIFO_PATH" || true
+        
+        # Start Claude (reader) in background
+        $CLAUDE_CMD < "$FIFO_PATH" &
+        CLAUDE_PID=$!
+        
+        # Send initial message via FIFO to unblock Claude
+        INITIAL_MSG='{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Begin execution."}]}}'
+        exec 9>"$FIFO_PATH"
+        printf '%s\n' "$INITIAL_MSG" >&9
+        exec 9>&-  # Close writer immediately after sending initial message
+        
+        echo "🚀 Launching Claude Code (Task ID 0 mode)..."
+
+        # Wait for Claude to complete
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
+        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+          echo "✅ Claude process completed normally"
+        else
+          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+          sleep 2
+          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+        fi
+    elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
         echo "✓ Using task-specific prompt from docs service: task/prompt.md"
 
         echo "startingTask:{{task_id}}"
@@ -1204,18 +1305,9 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         # Compose initial user turn
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
 
-        # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
-        if printf '{"text":%s}\n' "$USER_COMBINED" | \
-             curl -fsS -X POST http://127.0.0.1:8080/input \
-               -H 'Content-Type: application/json' \
-               --data-binary @- >/dev/null 2>&1; then
-          echo "✓ Initial prompt sent via sidecar /input"
-        else
-          echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-          # Fallback: open FIFO writer and keep it open until Claude exits
-          exec 9>"$FIFO_PATH"
-          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-        fi
+        # Send initial prompt via FIFO
+        exec 9>"$FIFO_PATH"
+        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
 
         # Optional debug: dump FIFO holders if requested
         if [ "${DEBUG_FIFO:-false}" = "true" ]; then

@@ -67,6 +67,7 @@ GitHub Webhook → Argo Events Sensor → CodeRun Creation → Atlas Activation
 - `pull_request` (opened, reopened, synchronize, ready_for_review)
 - `issue_comment` (created) - for Bugbot feedback
 - `status` / `check_run` / `check_suite` - for CI updates
+- `workflow_run` (completed/requested) - to react on GitHub Actions finishing for PR commits
 
 ### Session Continuity
 
@@ -117,6 +118,8 @@ atlas:
     watchBugbot: true
     watchCI: true
     watchConflicts: true
+
+**CLI Selection:** Atlas now uses the same controller-driven CLI configuration as other agents. Set `.Values.agents.atlas.cli` (and related model/maxTokens/temperature) to switch between Claude, Cursor, Codex, Factory, or OpenCode without touching the sensor. The sensor no longer hard-codes `cliConfig`, so whatever you configure in Helm values is what the controller injects into the CodeRun.
 ```
 
 ### Sensor Configuration

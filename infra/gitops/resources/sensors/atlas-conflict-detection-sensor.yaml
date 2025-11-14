@@ -51,11 +51,12 @@ spec:
                 namespace: agent-platform
                 labels:
                   agent: atlas
+                  stage: integration
                   task-id: "" # Extracted from PR labels
               spec:
                 githubApp: 5DLabs-Atlas
                 cli: Claude
-                model: claude-sonnet-4-20250514
+                model: claude-sonnet-4-5-20250929
                 repositoryUrl: "" # Extracted from webhook
                 workingDirectory: "."
                 continueSession: false

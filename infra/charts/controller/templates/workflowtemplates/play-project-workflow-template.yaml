@@ -150,19 +150,24 @@ spec:
     - name: orchestrate-project
       dag:
         tasks:
+        # Check play state first to determine where to resume
+        - name: check-play-state
+          template: play-state-checker
+
         # Morgan PM runs as daemon throughout workflow (no dependencies, starts immediately)
         - name: launch-morgan-pm
           template: morgan-project-manager
-        
-        # Discover all tasks (no dependencies, can start immediately)
+
+        # Discover all tasks (depends on state check to get correct start-from value)
         - name: discover-tasks
+          dependencies: [check-play-state]
           template: task-discovery
           arguments:
             parameters:
             - name: docs-directory
               value: "{{`{{workflow.parameters.docs-project-directory}}`}}"
             - name: start-from
-              value: "{{`{{workflow.parameters.start-from-task}}`}}"
+              value: "{{`{{tasks.check-play-state.outputs.parameters.next-task-id}}`}}"
             - name: max-tasks
               value: "{{`{{workflow.parameters.max-tasks}}`}}"
 
@@ -199,6 +204,88 @@ spec:
             - name: task-count
               value: "{{`{{tasks.discover-tasks.outputs.parameters.task-count}}`}}"
           when: "!{{`{{workflow.parameters.parallel-execution}}`}}"
+
+    # Play state checker - reads persisted state to determine next task
+    - name: play-state-checker
+      outputs:
+        parameters:
+        - name: next-task-id
+          valueFrom:
+            path: /tmp/next-task-id.txt
+      script:
+        image: alpine/k8s:1.31.0
+        command: [sh]
+        source: |
+          #!/bin/sh
+          set -e
+
+          echo "🔍 Checking play state for resume..."
+
+          apk add --no-cache jq
+
+          # State config map name is based on repository
+          REPO_SLUG="{{`{{workflow.parameters.repository}}`}}"
+          REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
+          STATE_CM_NAME="play-state-${REPO_SLUG}"
+
+          echo "📋 Looking for state config map: $STATE_CM_NAME"
+
+          # Try to get existing state
+          if kubectl get configmap "$STATE_CM_NAME" -n {{ .Release.Namespace }} >/dev/null 2>&1; then
+            echo "✅ Found existing play state"
+
+            # Extract last completed task
+            LAST_COMPLETED=$(kubectl get configmap "$STATE_CM_NAME" \
+              -n {{ .Release.Namespace }} \
+              -o jsonpath='{.data.last-completed-task}' 2>/dev/null || echo "0")
+
+            # Extract last completed level (for parallel execution)
+            LAST_LEVEL=$(kubectl get configmap "$STATE_CM_NAME" \
+              -n {{ .Release.Namespace }} \
+              -o jsonpath='{.data.last-completed-level}' 2>/dev/null || echo "-1")
+
+            echo "   Last completed task: $LAST_COMPLETED"
+            echo "   Last completed level: $LAST_LEVEL"
+
+            # Next task is last completed + 1
+            NEXT_TASK=$((LAST_COMPLETED + 1))
+
+            echo "🎯 Resuming from task: $NEXT_TASK"
+            echo "$NEXT_TASK" > /tmp/next-task-id.txt
+          else
+            echo "ℹ️ No existing play state found - starting fresh"
+
+            # Use the workflow parameter default or 1
+            START_FROM="{{`{{workflow.parameters.start-from-task}}`}}"
+            echo "🎯 Starting from task: $START_FROM"
+            echo "$START_FROM" > /tmp/next-task-id.txt
+
+            # Create initial state config map
+            cat > /tmp/state.json <<EOF
+          {
+            "repository": "{{`{{workflow.parameters.repository}}`}}",
+            "service": "{{`{{workflow.parameters.service}}`}}",
+            "last-completed-task": "0",
+            "last-completed-level": "-1",
+            "workflow-name": "{{`{{workflow.name}}`}}",
+            "started-at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "updated-at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF
+
+            kubectl create configmap "$STATE_CM_NAME" \
+              --from-literal=last-completed-task=0 \
+              --from-literal=last-completed-level=-1 \
+              --from-literal=repository="{{`{{workflow.parameters.repository}}`}}" \
+              --from-literal=service="{{`{{workflow.parameters.service}}`}}" \
+              --from-literal=workflow-name="{{`{{workflow.name}}`}}" \
+              --from-literal=started-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+              --from-literal=updated-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+              -n {{ .Release.Namespace }} \
+              -o yaml --dry-run=client | kubectl apply -n {{ .Release.Namespace }} -f -
+
+            echo "✅ Created initial play state config map"
+          fi
 
     # Task discovery template
     - name: task-discovery
@@ -740,6 +827,31 @@ spec:
                 fi
                 
                 echo "✅ All tasks in level $level_index completed successfully"
+
+              # Update play state - save highest completed task in this level
+              REPO_SLUG="{{`{{workflow.parameters.repository}}`}}"
+              REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
+              STATE_CM_NAME="play-state-${REPO_SLUG}"
+
+              # Get highest task number from current level
+              HIGHEST_TASK=0
+              for task_id in $task_array; do
+                if [ "$task_id" -gt "$HIGHEST_TASK" ]; then
+                  HIGHEST_TASK=$task_id
+                fi
+              done
+
+              echo "💾 Saving play state: level $level_index complete, highest task $HIGHEST_TASK"
+              kubectl create configmap "$STATE_CM_NAME" \
+                --from-literal=last-completed-task="$HIGHEST_TASK" \
+                --from-literal=last-completed-level="$level_index" \
+                --from-literal=repository="{{`{{workflow.parameters.repository}}`}}" \
+                --from-literal=service="{{`{{workflow.parameters.service}}`}}" \
+                --from-literal=workflow-name="{{`{{workflow.name}}`}}" \
+                --from-literal=updated-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+                -n {{ .Release.Namespace }} \
+                -o yaml --dry-run=client | kubectl apply -n {{ .Release.Namespace }} -f -
+              echo "✅ Play state saved"
 
               # Optional: Create integration PR that merges all task branches in this level
               if [ "{{`{{workflow.parameters.integration-pr-enabled}}`}}" = "true" ]; then
@@ -1301,6 +1413,24 @@ spec:
               case "$status" in
                 "Succeeded")
                   echo "✅ Task $task_id completed successfully"
+
+                  # Update play state after successful task completion
+                  REPO_SLUG="{{`{{workflow.parameters.repository}}`}}"
+                  REPO_SLUG=$(echo "$REPO_SLUG" | tr '/' '-')
+                  STATE_CM_NAME="play-state-${REPO_SLUG}"
+
+                  echo "💾 Saving play state: task $task_id complete"
+                  kubectl create configmap "$STATE_CM_NAME" \
+                    --from-literal=last-completed-task="$task_id" \
+                    --from-literal=last-completed-level="-1" \
+                    --from-literal=repository="{{`{{workflow.parameters.repository}}`}}" \
+                    --from-literal=service="{{`{{workflow.parameters.service}}`}}" \
+                    --from-literal=workflow-name="{{`{{workflow.name}}`}}" \
+                    --from-literal=updated-at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+                    -n {{ .Release.Namespace }} \
+                    -o yaml --dry-run=client | kubectl apply -n {{ .Release.Namespace }} -f -
+                  echo "✅ Play state saved"
+
                   break
                   ;;
                 "Failed"|"Error")

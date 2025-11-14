@@ -2290,7 +2290,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
             "5DLabs-Tess" => "integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
+            "5DLabs-Atlas" => "claude/container.sh.hbs",
             "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
                 // Default to the generic container template for unknown agents
@@ -2329,7 +2329,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Atlas" => "code/codex/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
         };
@@ -2377,7 +2377,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Atlas" => "code/opencode/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
         };
@@ -2427,7 +2427,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Atlas" => "code/cursor/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
         };
@@ -2475,7 +2475,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Atlas" => "code/factory/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };
@@ -2701,7 +2701,7 @@ mod tests {
     fn test_atlas_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Atlas".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/integration/container-atlas.sh.hbs");
+        assert_eq!(template_path, "code/claude/container.sh.hbs");
     }
 
     #[test]

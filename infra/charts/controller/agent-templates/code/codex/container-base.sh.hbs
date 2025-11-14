@@ -124,6 +124,8 @@ export GH_HOST="github.com"
 TASK_WORKSPACE="/workspace/task-{{task_id}}"
 mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
+export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
+mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
 export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
@@ -137,6 +139,35 @@ write_git_credentials() {
   fi
   printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$CREDENTIALS_FILE"
   chmod 600 "$CREDENTIALS_FILE" 2>/dev/null || true
+}
+
+gh_hosts_file() {
+  if [ -n "${GH_CONFIG_DIR:-}" ] && [ -f "${GH_CONFIG_DIR}/hosts.yml" ]; then
+    printf '%s\n' "${GH_CONFIG_DIR}/hosts.yml"
+    return
+  fi
+  if [ -f "$HOME/.config/gh/hosts.yml" ]; then
+    printf '%s\n' "$HOME/.config/gh/hosts.yml"
+    return
+  fi
+  printf ''
+}
+
+sync_gh_hosts_to_path() {
+  local target="$1"
+  if [ -z "$target" ]; then
+    return
+  fi
+  local source
+  source=$(gh_hosts_file)
+  if [ -z "$source" ] || [ ! -f "$source" ]; then
+    return
+  fi
+  local dest_dir="$target/.config/gh"
+  mkdir -p "$dest_dir"
+  if cp "$source" "$dest_dir/hosts.yml" >/dev/null 2>&1; then
+    chmod 600 "$dest_dir/hosts.yml" 2>/dev/null || true
+  fi
 }
 
 write_git_credentials
@@ -361,6 +392,8 @@ ensure_gh_authenticated() {
 }
 
 ensure_gh_authenticated
+
+sync_gh_hosts_to_path "$TASK_WORKSPACE"
 
 ensure_pr_created() {
   if [ "${SKIP_AUTO_PR:-0}" = "1" ]; then
@@ -606,7 +639,29 @@ EOF
 
   if gh pr create "${LABEL_ARGS[@]}"; then
     echo "✅ Auto-created pull request for $CURRENT_BRANCH"
-    echo "ℹ️  Morgan PM will link this PR to the GitHub Project during workflow execution"
+
+    # Add PR to GitHub Project (works for all CLIs: Claude, Codex, Cursor, Factory, OpenCode, Blaze, Rex)
+    echo "=== Linking PR to GitHub Project ==="
+
+    # Get PR number for this branch
+    PR_NUMBER=$(gh pr list --head "$CURRENT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+    if [ -n "$PR_NUMBER" ]; then
+      # Use organization project number 1 (Task Master / CTO Project)
+      # This works across all repos and agents
+      PROJECT_NUMBER="1"
+
+      echo "🔗 Adding PR #$PR_NUMBER to Project #$PROJECT_NUMBER..."
+
+      # Use gh project item-add command (simpler than GraphQL)
+      if gh project item-add "$PROJECT_NUMBER" --owner 5dlabs --url "https://github.com/$REPO_SLUG/pull/$PR_NUMBER" 2>&1 | grep -q "Added\|already"; then
+        echo "✅ PR linked to GitHub Project #$PROJECT_NUMBER"
+      else
+        echo "⚠️ Could not link PR to project (may already be linked or permissions issue)"
+      fi
+    else
+      echo "⚠️ Could not get PR number for project linking"
+    fi
   else
     echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
   fi
@@ -651,6 +706,9 @@ derive_bot_identity() {
 GITHUB_APP="{{github_app}}"
 derive_bot_identity "$GITHUB_APP"
 
+# Extract agent name for display (e.g., "5DLabs-Rex" → "Rex", "5DLabs-Cipher" → "Cipher")
+AGENT_NAME=$(echo "$GITHUB_APP" | sed -E 's/.*-([^-]+)$/\1/')
+
 git config --global user.name "$GIT_AUTHOR_NAME"
 git config --global user.email "$GIT_AUTHOR_EMAIL"
 export GIT_AUTHOR_NAME
@@ -683,8 +741,14 @@ else
   cd "$REPO_NAME"
 fi
 
+# Ensure credential helper is configured in the repository's local config
+# This ensures Codex subshells can access credentials even if GIT_CONFIG_GLOBAL isn't honored
+git config credential.helper "store --file=$CREDENTIALS_FILE"
+echo "✓ Git credential helper configured for repository"
+
 git config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
+sync_gh_hosts_to_path "$REPO_ROOT"
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
@@ -756,6 +820,37 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
     git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
   fi
   git checkout "$FEATURE_BRANCH"
+  
+  # Check if upstream branch is gone (deleted after previous PR was closed)
+  UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
+  if [ -n "$UPSTREAM_BRANCH" ]; then
+    if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
+      echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
+      echo "🔍 Checking for closed PRs from previous runs..."
+      
+      # Check if there's a CLOSED PR for this branch
+      refresh_token_if_needed || true
+      CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
+      
+      if [ -n "$CLOSED_PR" ]; then
+        echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
+        echo "🔄 Deleting stale branch and recreating fresh from $REMOTE_BASE"
+        
+        # Switch off the branch before deleting it
+        git checkout "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-cleanup-branch "$REMOTE_BASE"
+        git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
+        
+        # Recreate fresh branch
+        git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
+        echo "✅ Created fresh branch $FEATURE_BRANCH from $REMOTE_BASE"
+        echo "ℹ️ Previous PR was closed - starting with clean slate"
+      else
+        echo "ℹ️ No closed PRs found - will unset upstream and continue"
+        git branch --unset-upstream 2>/dev/null || true
+      fi
+    fi
+  fi
+  
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
     if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
@@ -832,6 +927,7 @@ else
 fi
 
 cd "$CODEX_WORK_DIR"
+sync_gh_hosts_to_path "$CODEX_WORK_DIR"
 echo "✓ Working directory: $CODEX_WORK_DIR"
 
 echo "📦 git status"
@@ -1253,18 +1349,10 @@ fi
 extract_session_id() {
   local log_file="$1"
   [ -f "$log_file" ] || return 1
-  awk '
-    {
-      gsub(/\033\[[0-9;]*[mK]/, "");
-      if ($0 ~ /codex session[[:space:]]+[0-9a-fA-F-]{4,}/) {
-        match($0, /codex session[[:space:]]+([0-9a-fA-F-]+)/, a);
-        if (a[1] != "") last=a[1];
-      }
-    }
-    END {
-      if (last != "") print last;
-    }
-  ' "$log_file" 2>/dev/null
+  # Match both "codex session <id>" and "session id: <id>" formats
+  grep -Eoi '(codex session|session id:)[[:space:]]+[0-9a-fA-F-]{8,}' "$log_file" 2>/dev/null | \
+    sed -E 's/(codex session|session id:)[[:space:]]+//i' | \
+    tail -n1
 }
 
 persist_session_id() {
@@ -1435,6 +1523,7 @@ ${NEXT_ITERATION_GUIDANCE}"
     "--skip-git-repo-check"
     "--output-last-message" "$LAST_MESSAGE_FILE"
     "--cd" "$CODEX_WORK_DIR"
+    "-c" "shell_environment_policy.inherit=all"
   )
   if [ -n "$CURRENT_MODEL" ]; then
     CODEX_CMD+=("--model" "$CURRENT_MODEL")
@@ -1445,9 +1534,9 @@ ${NEXT_ITERATION_GUIDANCE}"
   CODEX_CMD+=("$PROMPT_PAYLOAD")
 
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+    timeout "$CODEX_TIMEOUT" "${CODEX_CMD[@]}" 2>&1 | tee "$RUN_LOG"
   else
-    "${CODEX_CMD[@]}" | tee "$RUN_LOG"
+    "${CODEX_CMD[@]}" 2>&1 | tee "$RUN_LOG"
   fi
   CODEX_EXIT=${PIPESTATUS[0]}
   set +o pipefail
@@ -1514,7 +1603,12 @@ Try instead:
 
   NEW_SESSION_ID=""
   if [ -n "$RUN_LOG" ] && [ -f "$RUN_LOG" ]; then
+    # Ensure file is fully written (flush buffers)
+    sync || true
     NEW_SESSION_ID=$(extract_session_id "$RUN_LOG" || true)
+    echo "[codex-debug] Session extraction from $RUN_LOG: ${NEW_SESSION_ID:-<empty>}"
+  else
+    echo "[codex-debug] RUN_LOG not found or empty: RUN_LOG=${RUN_LOG:-<unset>}"
   fi
   if [ -n "$NEW_SESSION_ID" ]; then
     if [ "$CURRENT_SESSION_ID" != "$NEW_SESSION_ID" ]; then
@@ -1522,6 +1616,8 @@ Try instead:
       CURRENT_SESSION_ID="$NEW_SESSION_ID"
       persist_session_id "$CURRENT_SESSION_ID"
     fi
+  else
+    echo "[codex-debug] Failed to extract session ID from log (attempt $ATTEMPT)"
   fi
 
   if [ "$CONTINUE_SESSION" = "1" ] && [ -n "$CURRENT_SESSION_ID" ]; then
@@ -1650,11 +1746,23 @@ Your response:"
 
   echo "[codex-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
 
+  # Look for explicit yes/no, OR common completion phrases
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '\\b(yes|no)\\b' | head -n1 | tr '[:upper:]' '[:lower:]')
+  
+  # Fallback: detect implicit completion signals if no explicit yes/no
+  if [ -z "$COMPLETION_RESPONSE" ]; then
+    if printf '%s\n' "$COMPLETION_OUTPUT" | grep -Eiq '(task.*(complete|finished|done)|work.*(complete|finished)|security work complete)'; then
+      echo "[codex-debug] Detected implicit completion signal in probe output"
+      COMPLETION_RESPONSE="yes"
+    fi
+  fi
   fi
   
   set +o pipefail
   set -e
+  
+  echo "[codex-debug] Final completion response: ${COMPLETION_RESPONSE:-<none>}"
+  
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
     CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
@@ -1770,7 +1878,7 @@ Handoff document created for Cleo to continue work." 2>/dev/null || echo "⚠️
     git push origin HEAD 2>/dev/null || echo "⚠️ Could not push handoff document"
   fi
   
-  # Check if Rex made any commits before deciding to handoff vs fail
+  # Check if agent made any commits before deciding to handoff vs fail
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   REMOTE_BASE="origin/${BASE_BRANCH:-main}"
   COMMITS_MADE=0
@@ -1780,14 +1888,14 @@ Handoff document created for Cleo to continue work." 2>/dev/null || echo "⚠️
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
     if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
       COMMITS_MADE=1
-      echo "✅ Rex made $AHEAD_COUNT commit(s) - will handoff to Cleo"
+      echo "✅ $AGENT_NAME made $AHEAD_COUNT commit(s) - will handoff to next stage"
     else
-      echo "⚠️ Rex made NO commits - cannot handoff without progress"
+      echo "⚠️ $AGENT_NAME made NO commits - cannot handoff without progress"
     fi
   fi
-  
+
   if [ "$COMMITS_MADE" -eq 1 ]; then
-    # Rex made progress - handoff to Cleo
+    # Agent made progress - handoff to next stage
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
@@ -1795,14 +1903,14 @@ Handoff document created for Cleo to continue work." 2>/dev/null || echo "⚠️
     echo ""
     echo "🔄 NEXT STEPS:"
     echo "   - Handoff document created at task/rex-handoff.md"
-    echo "   - Workflow will continue to Cleo for completion"
-    echo "   - Cleo will review PR and finish remaining work"
+    echo "   - Workflow will continue to next stage for completion"
+    echo "   - Next agent will review PR and continue work"
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     
     EXIT_CODE=0  # Exit successfully to allow Cleo to continue
   else
-    # Rex made NO progress - this is a failure, should retry
+    # Agent made NO progress - this is a failure, should retry
     echo ""
     echo "════════════════════════════════════════════════════════════════"
     echo "║          TASK COMPLETION STATUS: FAILED - NO PROGRESS         ║"
@@ -1838,11 +1946,11 @@ fi
 if [ $SUCCESS -eq 1 ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
-elif [[ "{{github_app}}" =~ [Rr]ex ]] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
-  echo "🔍 Rex implementation agent - creating PR even though completion unconfirmed"
+elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
+  echo "🔍 Implementation agent ($AGENT_NAME) made commits - ensuring PR exists"
   ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
 else
-  echo "⚠️ Skipping auto PR enforcement due to Codex completion status"
+  echo "⚠️ Skipping auto PR enforcement (no commits or non-implementation stage)"
 fi
 
 # Map CodeRun stage values to workflow stage labels expected by container logic

@@ -177,6 +177,52 @@ log() {
   echo "[$(date -u +"%Y-%m-%d %H:%M:%S UTC")] $*" | tee -a "$SYNC_LOG" >&2
 }
 
+persist_project_config() {
+  local project_id="$1"
+  local project_title="${2:-${PROJECT_TITLE:-"$SERVICE_NAME - TaskMaster Workflow"}}"
+  local workflow="${3:-$WORKFLOW_NAME}"
+  local repository="${4:-$REPO_OWNER/$REPO_NAME}"
+
+  if [[ -z "$project_id" ]] || [[ "$project_id" == "null" ]]; then
+    log "❌ Cannot persist project config - project_id is empty"
+    return 1
+  fi
+
+  mkdir -p "$SHARED_DIR"
+
+  cat > "$PROJECT_CONFIG" <<EOF
+{
+  "project_id": "$project_id",
+  "project_title": "$project_title",
+  "workflow_name": "$workflow",
+  "repository": "$repository",
+  "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+
+  log "💾 Persisted project configuration to $PROJECT_CONFIG"
+}
+
+ensure_project_config_loaded() {
+  if [[ -f "$PROJECT_CONFIG" ]]; then
+    local stored_project_id=$(jq -r '.project_id // empty' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+    if [[ -n "$stored_project_id" ]] && [[ "$stored_project_id" != "null" ]]; then
+      PROJECT_ID="$stored_project_id"
+      return 0
+    fi
+    log "⚠️  project-config.json exists but is invalid - attempting to repair"
+  fi
+
+  if [[ -n "${PROJECT_ID:-}" ]] && [[ "$PROJECT_ID" != "null" ]]; then
+    log "⚠️  project-config.json missing - recreating from in-memory state"
+    persist_project_config "$PROJECT_ID" "$PROJECT_TITLE" "$WORKFLOW_NAME" "$REPO_OWNER/$REPO_NAME"
+    return 0
+  fi
+
+  log "❌ Project configuration missing project_id"
+  return 1
+}
+
 # State tracking helpers to prevent duplicate comments
 init_state_cache() {
   if [[ ! -f "$TASK_STATE_CACHE" ]]; then
@@ -283,23 +329,59 @@ initialize_project() {
   # Read tasks data
   TASKS_DATA=$(cat "$TASKS_JSON_PATH")
   
-  # Get or create GitHub Project
-  log "🏗️  Setting up GitHub Project..."
-  log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, REPO_NAME=$REPO_NAME, SERVICE_NAME=$SERVICE_NAME"
+  # Initialize PROJECT_ID (will be set from config or created new)
+  PROJECT_ID=""
   
-  PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
-  log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
+  # Check if FORCE_NEW_PROJECT is set to skip reusing old projects
+  if [[ "${FORCE_NEW_PROJECT:-false}" == "true" ]]; then
+    log "🔄 FORCE_NEW_PROJECT=true, will create fresh project"
+    if [[ -f "$PROJECT_CONFIG" ]]; then
+      log "🗑️  Removing old project config: $PROJECT_CONFIG"
+      rm -f "$PROJECT_CONFIG"
+    fi
+  else
+    # Check if we have an existing project configuration
+    if [[ -f "$PROJECT_CONFIG" ]]; then
+      PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+      if [[ -n "$PROJECT_ID" ]] && [[ "$PROJECT_ID" != "null" ]]; then
+        log "♻️  Found existing project ID: $PROJECT_ID"
+        
+        # Validate the project is still accessible
+        log "🔍 Validating existing project is accessible..."
+        if gh api graphql -f query="query { node(id: \"$PROJECT_ID\") { id } }" > /dev/null 2>&1; then
+          log "✅ Project is accessible, reusing it"
+        else
+          log "⚠️  Existing project is not accessible (may be deleted/closed)"
+          log "🔄 Will create a new project instead"
+          PROJECT_ID=""
+          rm -f "$PROJECT_CONFIG"
+        fi
+      else
+        log "⚠️  Existing project config is invalid, will create new project"
+        PROJECT_ID=""
+      fi
+    fi
+  fi
   
-  # Try to create project with smart fallback
-  # Prefers org-level for better visibility, falls back to repo-level if issues
-  # Set PREFER_REPO_LEVEL_PROJECTS=true env var to change behavior
-  local prefer_repo="${PREFER_REPO_LEVEL_PROJECTS:-false}"
-  PROJECT_ID=$(get_or_create_project_smart "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE" "$prefer_repo")
-  
+  # Get or create GitHub Project if we don't have one
   if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
-    log "❌ Failed to create or find project"
-    log "🔍 DEBUG: PROJECT_ID returned: '$PROJECT_ID'"
-    exit 1
+    log "🏗️  Setting up GitHub Project..."
+    log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, REPO_NAME=$REPO_NAME, SERVICE_NAME=$SERVICE_NAME"
+    
+    PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
+    log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
+    
+    # Try to create project with smart fallback
+    # Prefers org-level for better visibility, falls back to repo-level if issues
+    # Set PREFER_REPO_LEVEL_PROJECTS=true env var to change behavior
+    local prefer_repo="${PREFER_REPO_LEVEL_PROJECTS:-false}"
+    PROJECT_ID=$(get_or_create_project_smart "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE" "$prefer_repo")
+    
+    if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
+      log "❌ Failed to create or find project"
+      log "🔍 DEBUG: PROJECT_ID returned: '$PROJECT_ID'"
+      exit 1
+    fi
   fi
   
   log "✅ Project ID: $PROJECT_ID"
@@ -317,15 +399,7 @@ initialize_project() {
   setup_custom_fields "$PROJECT_ID"
   
   # Store project configuration
-  cat > "$PROJECT_CONFIG" <<EOF
-{
-  "project_id": "$PROJECT_ID",
-  "project_title": "$PROJECT_TITLE",
-  "workflow_name": "$WORKFLOW_NAME",
-  "repository": "$REPO_OWNER/$REPO_NAME",
-  "created_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-}
-EOF
+  persist_project_config "$PROJECT_ID" "$PROJECT_TITLE" "$WORKFLOW_NAME" "$REPO_OWNER/$REPO_NAME"
   
   log "✅ Project initialization complete"
 }
@@ -347,6 +421,33 @@ create_task_issues() {
   
   cd "$TEMP_CLONE/$DOCS_DIR"
   
+  # Clean up old issues from previous workflow runs
+  log "🧹 Checking for old issues from previous workflow runs..."
+  OLD_ISSUES=$(gh issue list \
+    --repo "$REPO_OWNER/$REPO_NAME" \
+    --state open \
+    --label "taskmaster-task" \
+    --json number,labels \
+    --jq --arg current_workflow "workflow-$WORKFLOW_NAME" \
+      '[.[] | select(.labels | map(.name) | any(. == "taskmaster-task")) | 
+       select(.labels | map(.name) | any(startswith("workflow-")) and . != $current_workflow) | .number] | .[]' \
+    2>/dev/null || echo "")
+  
+  if [[ -n "$OLD_ISSUES" ]]; then
+    OLD_COUNT=$(echo "$OLD_ISSUES" | wc -w)
+    log "🗑️  Found $OLD_COUNT old issue(s) from previous runs - closing them..."
+    for issue_num in $OLD_ISSUES; do
+      log "  Closing issue #$issue_num"
+      gh issue close "$issue_num" \
+        --repo "$REPO_OWNER/$REPO_NAME" \
+        --comment "🔄 Closing this issue as a new workflow run has been initiated. New issues will be created for the latest run." \
+        2>/dev/null || log "⚠️  Failed to close issue #$issue_num"
+    done
+    log "✅ Closed $OLD_COUNT old issue(s)"
+  else
+    log "✅ No old issues found to clean up"
+  fi
+  
   # Initialize task-issue mapping
   echo "{}" > "$TASK_ISSUE_MAP"
   
@@ -366,20 +467,83 @@ create_task_issues() {
     TASK_TITLE=$(echo "$task" | jq -r '.title')
     TASK_STATUS=$(echo "$task" | jq -r '.status // "pending"')
     TASK_PRIORITY=$(echo "$task" | jq -r '.priority // "medium"')
-    
-    log "📌 Creating issue for Task $TASK_ID: $TASK_TITLE"
-    
+
+    # Check if issue already exists for this task (prevent duplicates on resume)
+    log "🔍 Checking for existing issue for task-$TASK_ID..."
+    EXISTING_ISSUE=$(gh issue list \
+      --repo "$REPO_OWNER/$REPO_NAME" \
+      --state open \
+      --label "task-$TASK_ID" \
+      --json number,title \
+      --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+    if [[ -n "$EXISTING_ISSUE" ]]; then
+      log "✅ Issue already exists: #$EXISTING_ISSUE (task-$TASK_ID)"
+      ISSUE_NUMBER="$EXISTING_ISSUE"
+      
+      local ISSUE_DATA=$(gh issue view "$ISSUE_NUMBER" \
+        --repo "$REPO_OWNER/$REPO_NAME" \
+        --json id,projectItems 2>/dev/null || echo "")
+      
+      ISSUE_NODE_ID=$(echo "$ISSUE_DATA" | jq -r '.id // empty')
+      ITEM_ID=$(echo "$ISSUE_DATA" | jq -r --arg pid "$PROJECT_ID" \
+        '(.projectItems // []) | map(select(.project.id == $pid)) | .[0].id // ""')
+      
+      if [[ -z "$ITEM_ID" ]]; then
+        log "⚠️  Existing issue #$ISSUE_NUMBER not linked to project - linking now"
+        
+        if [[ -z "$ISSUE_NODE_ID" ]]; then
+          ISSUE_NODE_ID=$(gh issue view "$ISSUE_NUMBER" \
+            --repo "$REPO_OWNER/$REPO_NAME" \
+            --json id --jq '.id' 2>/dev/null || echo "")
+        fi
+        
+        if [[ -z "$ISSUE_NODE_ID" ]]; then
+          log "❌ Could not determine node ID for issue #$ISSUE_NUMBER"
+          continue
+        fi
+        
+        if ! ITEM_ID=$(retry_with_backoff 3 "Link existing issue #$ISSUE_NUMBER to project" \
+          add_issue_to_project "$PROJECT_ID" "$ISSUE_NODE_ID" "$ISSUE_NUMBER"); then
+          log "❌ Failed to link issue #$ISSUE_NUMBER to project"
+          continue
+        fi
+      fi
+      
+      GITHUB_STAGE=$(map_taskmaster_status_to_stage "$TASK_STATUS")
+      retry_with_backoff 3 "Set stage for task $TASK_ID" \
+        set_project_item_stage "$PROJECT_ID" "$ITEM_ID" "$GITHUB_STAGE"
+      
+      retry_with_backoff 3 "Set priority for task $TASK_ID" \
+        set_project_item_priority "$PROJECT_ID" "$ITEM_ID" "$TASK_PRIORITY"
+      
+      TEMP_MAP=$(mktemp)
+      jq --arg task_id "$TASK_ID" \
+         --arg issue_num "$ISSUE_NUMBER" \
+         --arg item_id "$ITEM_ID" \
+         --arg node_id "${ISSUE_NODE_ID:-}" \
+         '.[$task_id] = {
+           "issue_number": ($issue_num | tonumber),
+           "item_id": $item_id,
+           "node_id": $node_id
+         }' "$TASK_ISSUE_MAP" > "$TEMP_MAP"
+      mv "$TEMP_MAP" "$TASK_ISSUE_MAP"
+      continue
+    fi
+
+    log "📌 Creating new issue for Task $TASK_ID: $TASK_TITLE"
+
     # Generate issue body from task details
     ISSUE_BODY=$(generate_issue_body "$task" "$TASKS_JSON_PATH")
-    
+
     # Debug: Check if body was generated
     if [[ -z "$ISSUE_BODY" ]]; then
       log "⚠️  Failed to generate issue body for task $TASK_ID"
       continue
     fi
-    
+
     log "🔍 DEBUG: Issue body length: ${#ISSUE_BODY} characters"
-    
+
     # Create GitHub issue with workflow-specific labels
     # First, create issue without labels (labels might not exist)
     ISSUE_CREATE_OUTPUT=$(gh issue create \
@@ -427,6 +591,10 @@ create_task_issues() {
       --json id --jq '.id')
     
     # Add issue to project with retry logic
+    ensure_project_config_loaded || {
+      log "❌ Cannot link issues without project configuration"
+      exit 1
+    }
     PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
     ITEM_ID=""
     
@@ -491,6 +659,10 @@ monitor_and_sync() {
   log "👀 Phase 3: Event-Driven Monitoring & Synchronization"
   log "🔄 Starting real-time workflow watch..."
   
+  ensure_project_config_loaded || {
+    log "❌ Cannot start monitoring without project configuration"
+    exit 1
+  }
   PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
   
   # Initialize state cache for deduplication
@@ -607,8 +779,12 @@ watch_parent_workflow() {
       log "✅ Parent workflow completed with status: $WORKFLOW_STATUS"
       
       # Trigger final sync
-      PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
-      sync_all_tasks "$PROJECT_ID" false  # false = not initial, check for changes
+      if ensure_project_config_loaded; then
+        PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
+        sync_all_tasks "$PROJECT_ID" false  # false = not initial, check for changes
+      else
+        log "⚠️  Skipping final sync - project configuration unavailable"
+      fi
       
       # Kill main watch process
       pkill -P $$ kubectl || true
@@ -1622,7 +1798,13 @@ generate_ai_summary() {
   
   # Gather project statistics
   local total_tasks=$(jq 'length' "$TASK_ISSUE_MAP")
-  local project_title=$(jq -r '.project_title' "$PROJECT_CONFIG")
+  local project_title=""
+  if ensure_project_config_loaded; then
+    project_title=$(jq -r '.project_title // empty' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+  fi
+  if [[ -z "$project_title" ]]; then
+    project_title="${PROJECT_TITLE:-"$SERVICE_NAME - TaskMaster Workflow"}"
+  fi
   
   # Get task statuses
   local tasks_status=$(kubectl get workflows -n "$NAMESPACE" \

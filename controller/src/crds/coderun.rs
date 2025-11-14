@@ -207,6 +207,18 @@ pub struct CodeRunStatus {
     /// Session ID for tracking
     pub session_id: Option<String>,
 
+    /// Timestamp when the run finished (Succeeded/Failed)
+    #[serde(rename = "finishedAt", skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+
+    /// Time when controller should attempt TTL cleanup
+    #[serde(rename = "expireAt", skip_serializing_if = "Option::is_none")]
+    pub expire_at: Option<String>,
+
+    /// Timestamp when cleanup completed
+    #[serde(rename = "cleanupCompletedAt", skip_serializing_if = "Option::is_none")]
+    pub cleanup_completed_at: Option<String>,
+
     /// Tracks whether the code implementation work has been completed successfully
     /// This field is used for idempotent reconciliation and TTL safety
     pub work_completed: Option<bool>,

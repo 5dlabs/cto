@@ -221,3 +221,15 @@ spec:
               sessionId:
                 type: string
                 description: "Session ID for tracking"
+              finishedAt:
+                type: string
+                description: "Timestamp when the run finished"
+              expireAt:
+                type: string
+                description: "Timestamp when controller should clean up run resources"
+              cleanupCompletedAt:
+                type: string
+                description: "Timestamp when controller cleanup completed"
+              workCompleted:
+                type: boolean
+                description: "Tracks whether the code implementation work has been completed successfully (used for TTL safety)"

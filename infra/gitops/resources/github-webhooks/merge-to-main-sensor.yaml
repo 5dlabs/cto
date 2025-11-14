@@ -55,6 +55,12 @@ spec:
                 entrypoint: handle-task-completion
                 serviceAccountName: argo-workflow
                 activeDeadlineSeconds: 7200  # 2 hour timeout for finding suspend node
+                # Auto-cleanup after completion
+                ttlStrategy:
+                  secondsAfterCompletion: 300  # 5 minutes
+                  secondsAfterFailure: 3600    # 1 hour
+                podGC:
+                  strategy: OnPodCompletion
                 arguments:
                   parameters:
                     - name: pr-title

@@ -254,4 +254,15 @@ spec:
             --ignore-not-found=true
           echo "Cleanup complete"
 
+  # TTL strategy for workflow cleanup
+  ttlStrategy:
+    secondsAfterCompletion: 86400    # Keep completed workflows for 24 hours
+    secondsAfterFailure: 259200      # Keep failed workflows for 3 days
+    secondsAfterSuccess: 86400       # Keep successful workflows for 24 hours
+
+  # Pod garbage collection
+  podGC:
+    strategy: OnPodCompletion
+    deleteDelayDuration: 60s
+
 {{- end }}

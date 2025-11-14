@@ -46,6 +46,12 @@ pub struct DocsRunStatus {
     pub pull_request_url: Option<String>,
     pub conditions: Option<Vec<DocsRunCondition>>,
     pub configmap_name: Option<String>,
+    #[serde(rename = "finishedAt", skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+    #[serde(rename = "expireAt", skip_serializing_if = "Option::is_none")]
+    pub expire_at: Option<String>,
+    #[serde(rename = "cleanupCompletedAt", skip_serializing_if = "Option::is_none")]
+    pub cleanup_completed_at: Option<String>,
     /// Tracks whether the documentation work has been completed successfully
     /// This field is used for idempotent reconciliation and TTL safety
     pub work_completed: Option<bool>,
