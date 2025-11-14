@@ -313,12 +313,6 @@ initialize_project() {
   
   cd "$TEMP_CLONE/$DOCS_DIR"
   
-  PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG")
-  if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
-    log "❌ Project configuration missing project_id"
-    exit 1
-  fi
-  
   # Find tasks.json
   TASKS_JSON_PATH=""
   if [[ -f ".taskmaster/tasks/tasks.json" ]]; then
@@ -335,23 +329,36 @@ initialize_project() {
   # Read tasks data
   TASKS_DATA=$(cat "$TASKS_JSON_PATH")
   
-  # Get or create GitHub Project
-  log "🏗️  Setting up GitHub Project..."
-  log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, REPO_NAME=$REPO_NAME, SERVICE_NAME=$SERVICE_NAME"
+  # Check if we have an existing project configuration
+  if [[ -f "$PROJECT_CONFIG" ]]; then
+    PROJECT_ID=$(jq -r '.project_id' "$PROJECT_CONFIG" 2>/dev/null || echo "")
+    if [[ -n "$PROJECT_ID" ]] && [[ "$PROJECT_ID" != "null" ]]; then
+      log "♻️  Reusing existing project ID: $PROJECT_ID"
+    else
+      log "⚠️  Existing project config is invalid, will create new project"
+      PROJECT_ID=""
+    fi
+  fi
   
-  PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
-  log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
-  
-  # Try to create project with smart fallback
-  # Prefers org-level for better visibility, falls back to repo-level if issues
-  # Set PREFER_REPO_LEVEL_PROJECTS=true env var to change behavior
-  local prefer_repo="${PREFER_REPO_LEVEL_PROJECTS:-false}"
-  PROJECT_ID=$(get_or_create_project_smart "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE" "$prefer_repo")
-  
+  # Get or create GitHub Project if we don't have one
   if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
-    log "❌ Failed to create or find project"
-    log "🔍 DEBUG: PROJECT_ID returned: '$PROJECT_ID'"
-    exit 1
+    log "🏗️  Setting up GitHub Project..."
+    log "🔍 DEBUG: REPO_OWNER=$REPO_OWNER, REPO_NAME=$REPO_NAME, SERVICE_NAME=$SERVICE_NAME"
+    
+    PROJECT_TITLE="$SERVICE_NAME - TaskMaster Workflow"
+    log "🔍 DEBUG: PROJECT_TITLE=$PROJECT_TITLE"
+    
+    # Try to create project with smart fallback
+    # Prefers org-level for better visibility, falls back to repo-level if issues
+    # Set PREFER_REPO_LEVEL_PROJECTS=true env var to change behavior
+    local prefer_repo="${PREFER_REPO_LEVEL_PROJECTS:-false}"
+    PROJECT_ID=$(get_or_create_project_smart "$REPO_OWNER" "$REPO_NAME" "$PROJECT_TITLE" "$prefer_repo")
+    
+    if [[ -z "$PROJECT_ID" ]] || [[ "$PROJECT_ID" == "null" ]]; then
+      log "❌ Failed to create or find project"
+      log "🔍 DEBUG: PROJECT_ID returned: '$PROJECT_ID'"
+      exit 1
+    fi
   fi
   
   log "✅ Project ID: $PROJECT_ID"
