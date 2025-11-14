@@ -1349,18 +1349,10 @@ fi
 extract_session_id() {
   local log_file="$1"
   [ -f "$log_file" ] || return 1
-  awk '
-    {
-      gsub(/\033\[[0-9;]*[mK]/, "");
-      if ($0 ~ /codex session[[:space:]]+[0-9a-fA-F-]{4,}/) {
-        match($0, /codex session[[:space:]]+([0-9a-fA-F-]+)/, a);
-        if (a[1] != "") last=a[1];
-      }
-    }
-    END {
-      if (last != "") print last;
-    }
-  ' "$log_file" 2>/dev/null
+  # Match both "codex session <id>" and "session id: <id>" formats
+  grep -Eoi '(codex session|session id:)[[:space:]]+[0-9a-fA-F-]{8,}' "$log_file" 2>/dev/null | \
+    sed -E 's/(codex session|session id:)[[:space:]]+//i' | \
+    tail -n1
 }
 
 persist_session_id() {
