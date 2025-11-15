@@ -1243,7 +1243,33 @@ impl<'a> CodeResourceManager<'a> {
                 });
 
                 if let Some(job_name) = job_owner_name {
-                    // Check if any pods from this job are still running
+                    // First check if the Job itself is still active (not completed/failed)
+                    // This prevents race conditions where pods might be created after cleanup runs
+                    match self.jobs.get(&job_name).await {
+                        Ok(job) => {
+                            let is_job_active = job.status.as_ref().map_or(true, |status| {
+                                // Job is active if it hasn't completed or failed
+                                status.completion_time.is_none() && status.failed.unwrap_or(0) == 0
+                            });
+
+                            if is_job_active {
+                                info!(
+                                    "Skipping cleanup of ConfigMap {} - job {} is still active",
+                                    cm_name, job_name
+                                );
+                                continue;
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to get job {}: {} - skipping ConfigMap deletion for safety",
+                                job_name, e
+                            );
+                            continue;
+                        }
+                    }
+
+                    // Also check if any pods from this job are still running/pending
                     let pod_list_params = ListParams::default()
                         .labels(&format!("batch.kubernetes.io/job-name={job_name}"));
                     match pods.list(&pod_list_params).await {
