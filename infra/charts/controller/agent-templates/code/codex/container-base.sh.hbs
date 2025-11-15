@@ -131,7 +131,50 @@ echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
 CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 
-git config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
+# Safe git config wrapper with retry logic and lock file cleanup
+safe_git_config() {
+  local max_attempts=5
+  local attempt=1
+  local sleep_time=1
+  
+  while [ $attempt -le $max_attempts ]; do
+    # Clean up stale lock files before attempting
+    if [ -f "${GIT_CONFIG_GLOBAL}.lock" ]; then
+      # Check if lock file is stale (older than 10 seconds)
+      # Use find with -mmin for portability (works on Linux and macOS)
+      if find "${GIT_CONFIG_GLOBAL}.lock" -mmin +0.17 2>/dev/null | grep -q .; then
+        echo "⚠️  Removing stale git config lock file"
+        rm -f "${GIT_CONFIG_GLOBAL}.lock" 2>/dev/null || true
+      fi
+    fi
+    
+    # Attempt the git config operation
+    if git config "$@" 2>/dev/null; then
+      return 0
+    fi
+    
+    # Operation failed, retry with exponential backoff
+    local exit_code=$?
+    if [ $exit_code -ne 0 ] && [ $attempt -lt $max_attempts ]; then
+      echo "⚠️  Git config attempt $attempt/$max_attempts failed (exit $exit_code), retrying in ${sleep_time}s..."
+      rm -f "${GIT_CONFIG_GLOBAL}.lock" 2>/dev/null || true
+      sleep "$sleep_time"
+      attempt=$((attempt + 1))
+      sleep_time=$((sleep_time * 2))  # Exponential backoff
+    else
+      break
+    fi
+  done
+  
+  if [ $attempt -gt $max_attempts ]; then
+    echo "❌ Git config failed after $max_attempts attempts: git config $*"
+    return 1
+  fi
+  
+  return 0
+}
+
+safe_git_config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 
 write_git_credentials() {
   if [ -z "${GITHUB_TOKEN:-}" ]; then
@@ -691,7 +734,7 @@ EOF
   fi
 }
 
-git config --global --add safe.directory "$TASK_WORKSPACE"
+safe_git_config --global --add safe.directory "$TASK_WORKSPACE"
 
 derive_bot_identity() {
   local app_name="$1"
@@ -733,8 +776,8 @@ derive_bot_identity "$GITHUB_APP"
 # Extract agent name for display (e.g., "5DLabs-Rex" → "Rex", "5DLabs-Cipher" → "Cipher")
 AGENT_NAME=$(echo "$GITHUB_APP" | sed -E 's/.*-([^-]+)$/\1/')
 
-git config --global user.name "$GIT_AUTHOR_NAME"
-git config --global user.email "$GIT_AUTHOR_EMAIL"
+safe_git_config --global user.name "$GIT_AUTHOR_NAME"
+safe_git_config --global user.email "$GIT_AUTHOR_EMAIL"
 export GIT_AUTHOR_NAME
 export GIT_AUTHOR_EMAIL
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
@@ -751,7 +794,7 @@ WORK_DIR="{{working_directory}}"
 cd "$TASK_WORKSPACE"
 
 REPO_ROOT="$TASK_WORKSPACE/$REPO_NAME"
-git config --global --add safe.directory "$REPO_ROOT"
+safe_git_config --global --add safe.directory "$REPO_ROOT"
 
 if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
@@ -767,10 +810,10 @@ fi
 
 # Ensure credential helper is configured in the repository's local config
 # This ensures Codex subshells can access credentials even if GIT_CONFIG_GLOBAL isn't honored
-git config credential.helper "store --file=$CREDENTIALS_FILE"
+safe_git_config credential.helper "store --file=$CREDENTIALS_FILE"
 echo "✓ Git credential helper configured for repository"
 
-git config --global --add safe.directory "$REPO_ROOT"
+safe_git_config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 sync_gh_hosts_to_path "$REPO_ROOT"
 # Remove stale automation-managed files that block branch checkout when rerunning
@@ -936,9 +979,9 @@ else
   fi
 fi
 
-git config --local user.name "$GIT_AUTHOR_NAME"
-git config --local user.email "$GIT_AUTHOR_EMAIL"
-git config --local push.autoSetupRemote true
+safe_git_config --local user.name "$GIT_AUTHOR_NAME"
+safe_git_config --local user.email "$GIT_AUTHOR_EMAIL"
+safe_git_config --local push.autoSetupRemote true
 export IMPLEMENTATION_BRANCH="$FEATURE_BRANCH"
 echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
 
