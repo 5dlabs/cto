@@ -1252,7 +1252,8 @@ impl<'a> CodeResourceManager<'a> {
                                 .status
                                 .as_ref()
                                 .map(|status| {
-                                    status.completion_time.is_none() && status.failed.unwrap_or(0) == 0
+                                    status.completion_time.is_none()
+                                        && status.failed.unwrap_or(0) == 0
                                 })
                                 .unwrap_or(true);
 
