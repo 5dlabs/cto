@@ -1247,10 +1247,14 @@ impl<'a> CodeResourceManager<'a> {
                     // This prevents race conditions where pods might be created after cleanup runs
                     match self.jobs.get(&job_name).await {
                         Ok(job) => {
-                            let is_job_active = job.status.as_ref().map_or(true, |status| {
-                                // Job is active if it hasn't completed or failed
-                                status.completion_time.is_none() && status.failed.unwrap_or(0) == 0
-                            });
+                            // Job is active if status is None or if it hasn't completed/failed
+                            let is_job_active = job
+                                .status
+                                .as_ref()
+                                .map(|status| {
+                                    status.completion_time.is_none() && status.failed.unwrap_or(0) == 0
+                                })
+                                .unwrap_or(true);
 
                             if is_job_active {
                                 info!(
