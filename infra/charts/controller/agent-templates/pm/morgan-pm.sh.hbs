@@ -469,17 +469,27 @@ create_task_issues() {
     TASK_PRIORITY=$(echo "$task" | jq -r '.priority // "medium"')
 
     # Check if issue already exists for this task (prevent duplicates on resume)
+    # Check both open and closed issues to handle cases where issues were closed
     log "🔍 Checking for existing issue for task-$TASK_ID..."
     EXISTING_ISSUE=$(gh issue list \
       --repo "$REPO_OWNER/$REPO_NAME" \
-      --state open \
+      --state all \
       --label "task-$TASK_ID" \
-      --json number,title \
-      --jq '.[0].number // empty' 2>/dev/null || echo "")
+      --json number,title,state \
+      --jq '.[0] | if . then {number: .number, state: .state} else empty end' 2>/dev/null || echo "")
+    
+    EXISTING_ISSUE_NUMBER=$(echo "$EXISTING_ISSUE" | jq -r '.number // empty' 2>/dev/null || echo "")
+    EXISTING_ISSUE_STATE=$(echo "$EXISTING_ISSUE" | jq -r '.state // empty' 2>/dev/null || echo "")
 
-    if [[ -n "$EXISTING_ISSUE" ]]; then
-      log "✅ Issue already exists: #$EXISTING_ISSUE (task-$TASK_ID)"
-      ISSUE_NUMBER="$EXISTING_ISSUE"
+    if [[ -n "$EXISTING_ISSUE_NUMBER" ]]; then
+      if [[ "$EXISTING_ISSUE_STATE" == "CLOSED" ]]; then
+        log "🔄 Found closed issue #$EXISTING_ISSUE_NUMBER for task-$TASK_ID - reopening it"
+        gh issue reopen "$EXISTING_ISSUE_NUMBER" \
+          --repo "$REPO_OWNER/$REPO_NAME" \
+          2>/dev/null || log "⚠️  Could not reopen issue #$EXISTING_ISSUE_NUMBER"
+      fi
+      log "✅ Issue already exists: #$EXISTING_ISSUE_NUMBER (task-$TASK_ID, state: ${EXISTING_ISSUE_STATE:-open})"
+      ISSUE_NUMBER="$EXISTING_ISSUE_NUMBER"
       
       local ISSUE_DATA=$(gh issue view "$ISSUE_NUMBER" \
         --repo "$REPO_OWNER/$REPO_NAME" \
