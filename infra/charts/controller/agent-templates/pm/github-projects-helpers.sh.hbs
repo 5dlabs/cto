@@ -453,10 +453,7 @@ ensure_project_linked_to_repository() {
 create_default_board_view() {
   local project_id="$1"
   
-  echo "Setting up agent-based board view as default..." >&2
-  
-  # Using built-in Status field - board columns auto-create!
-  echo "✅ Board will use Status field for automatic column creation" >&2
+  echo "Setting up clean table view with essential columns..." >&2
   
   # First, get existing views (GitHub auto-creates a default table view)
   local views_query='
@@ -483,16 +480,22 @@ create_default_board_view() {
     return 1
   }
   
-  # Find the default table view to delete
+  # Check if default table view already exists
   local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null | head -1)
   
-  # Create board view with Stage field grouping
+  if [[ -n "$default_view_id" ]] && [[ "$default_view_id" != "null" ]]; then
+    echo "✅ Using existing table view as default (ID: $default_view_id)" >&2
+    echo "📋 Table shows: Title | Priority | Status | Linked Pull Requests" >&2
+    return 0
+  fi
+  
+  # If no table view exists, create one
   local view_mutation='
     mutation($projectId: ID!) {
       createProjectV2View(input: {
         projectId: $projectId
-        name: "Agent Workflow Board"
-        layout: BOARD_LAYOUT
+        name: "Task Overview"
+        layout: TABLE_LAYOUT
       }) {
         projectV2View {
           id
@@ -506,7 +509,7 @@ create_default_board_view() {
   view_result=$(gh api graphql \
     -f query="$view_mutation" \
     -f projectId="$project_id" 2>/dev/null) || {
-    echo "⚠️  Could not create board view" >&2
+    echo "⚠️  Could not create table view" >&2
     return 1
   }
   
@@ -514,44 +517,11 @@ create_default_board_view() {
   local view_number=$(echo "$view_result" | jq -r '.data.createProjectV2View.projectV2View.number // ""' 2>/dev/null)
   
   if [[ -n "$view_id" ]] && [[ "$view_id" != "null" ]]; then
-    echo "✅ Created agent workflow board view (ID: $view_id, Number: $view_number)" >&2
-    
-    # Note: GitHub Projects V2 API doesn't support setting groupByFieldId during creation via GraphQL
-    # The board will use default grouping (by Status typically)
-    # Users can manually configure grouping by "Stage" field in the UI
-    # The Stage field contains agent names: Pending, Rex (Implementation), Cleo (Quality), etc.
-    
-    echo "💡 To group by agents in the UI:" >&2
-    echo "   1. Open the project board" >&2
-    echo "   2. Click 'Group by' → Select 'Stage'" >&2
-    echo "   3. Columns will show: Pending | Rex | Cleo | Cipher | Tess | Atlas | Bolt | Complete ✅" >&2
-    
-    # Delete the default table view if it exists (makes board the default)
-    if [[ -n "$default_view_id" ]] && [[ "$default_view_id" != "null" ]]; then
-      echo "Removing default table view to make board the default..." >&2
-      
-      local delete_mutation='
-        mutation($viewId: ID!) {
-          deleteProjectV2View(input: {
-            viewId: $viewId
-          }) {
-            projectV2View {
-              id
-            }
-          }
-        }
-      '
-      
-      if gh api graphql \
-        -f query="$delete_mutation" \
-        -f viewId="$default_view_id" >/dev/null 2>&1; then
-        echo "✅ Deleted default table view - agent board is now the default!" >&2
-      else
-        echo "⚠️  Could not delete table view (board view still available)" >&2
-      fi
-    fi
+    echo "✅ Created clean table view (ID: $view_id, Number: $view_number)" >&2
+    echo "📋 Table displays: Title | Priority | Status | Linked Pull Requests" >&2
+    echo "💡 The table view shows all essential task information in a clean, scannable format" >&2
   else
-    echo "⚠️  Could not create board view (project still works)" >&2
+    echo "⚠️  Could not create table view (project still works)" >&2
   fi
 }
 
@@ -563,19 +533,18 @@ setup_custom_fields() {
   local project_id="$1"
   
   # CRITICAL: Use GitHub's BUILT-IN "Status" field with agent names and roles
-  # This causes board columns to AUTO-CREATE without manual configuration!
-  # Pattern from 5dlabs/tasks - Status field triggers automatic column creation
+  # This enables clear task tracking in table view
+  # Pattern from 5dlabs/tasks - Status field shows which agent is working on each task
   create_single_select_field "$project_id" "Status" \
     "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
   
-  # Create "Task ID" field (text)
-  create_text_field "$project_id" "Task ID" || true
-  
-  # Create "Priority" field for filtering
+  # Create "Priority" field for filtering and visibility
+  # Table view columns: Title | Priority | Status | Linked Pull Requests
   create_single_select_field "$project_id" "Priority" \
     "High" "Medium" "Low" || true
   
-  echo "✅ Custom fields setup completed" >&2
+  echo "✅ Custom fields setup completed - Table view ready" >&2
+  echo "📋 Visible columns: Title | Priority | Status | Linked Pull Requests" >&2
 }
 
 create_single_select_field() {
