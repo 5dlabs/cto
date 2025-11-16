@@ -134,7 +134,7 @@ pub enum FeedbackStatus {
 /// Information about currently active agent run
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveRun {
-    /// Type of run (CodeRun or DocsRun)
+    /// Type of run (`CodeRun` or `DocsRun`)
     pub run_type: RunType,
 
     /// Name of the Kubernetes resource
@@ -162,14 +162,14 @@ pub struct RemediationStateManager {
 
 impl RemediationStateManager {
     /// Create a new state manager
-    pub fn new(context: &Context) -> Self {
+    #[must_use] pub fn new(context: &Context) -> Self {
         Self {
             configmaps: Api::namespaced(context.client.clone(), &context.namespace),
             namespace: context.namespace.clone(),
         }
     }
 
-    /// Generate ConfigMap name for a remediation workflow
+    /// Generate `ConfigMap` name for a remediation workflow
     fn configmap_name(pr_number: u32, task_id: &str) -> String {
         format!("remediation-state-pr-{pr_number}-task-{task_id}")
     }
@@ -252,7 +252,7 @@ impl RemediationStateManager {
         }
     }
 
-    /// Save remediation state to ConfigMap
+    /// Save remediation state to `ConfigMap`
     pub async fn save_state(&self, state: &RemediationState) -> Result<()> {
         let cm_name = Self::configmap_name(state.pr_number, &state.task_id);
 
@@ -520,7 +520,7 @@ impl RemediationStateManager {
 
     /// Clean up old remediation states (for maintenance)
     pub async fn cleanup_old_states(&self, max_age_days: u32) -> Result<usize> {
-        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let cutoff = Utc::now() - chrono::Duration::days(i64::from(max_age_days));
         let mut cleaned_count = 0;
 
         // List all remediation state ConfigMaps
@@ -612,15 +612,15 @@ pub struct RemediationStatistics {
 }
 
 impl RemediationStatistics {
-    pub fn average_iterations(&self) -> f64 {
+    #[must_use] pub fn average_iterations(&self) -> f64 {
         if self.total_workflows == 0 {
             0.0
         } else {
-            self.total_iterations as f64 / self.total_workflows as f64
+            f64::from(self.total_iterations) / self.total_workflows as f64
         }
     }
 
-    pub fn success_rate(&self) -> f64 {
+    #[must_use] pub fn success_rate(&self) -> f64 {
         let total_completed = self.completed + self.failed + self.terminated;
         if total_completed == 0 {
             0.0

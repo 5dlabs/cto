@@ -63,7 +63,7 @@ pub struct StateAwareCancellation {
 
 impl StateAwareCancellation {
     /// Create a new state-aware cancellation manager
-    pub fn new(client: Client, namespace: &str, state_manager: RemediationStateManager) -> Self {
+    #[must_use] pub fn new(client: Client, namespace: &str, state_manager: RemediationStateManager) -> Self {
         let lock_manager = DistributedLock::new(
             client.clone(),
             namespace,
@@ -82,6 +82,18 @@ impl StateAwareCancellation {
     }
 
     /// Cancel agents with state awareness and distributed locking
+    ///
+    /// # Errors
+    ///
+    /// Returns `CancellationError` if the distributed lock cannot be obtained,
+    /// remediation state queries fail, or Kubernetes API calls fail.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `SystemTime::now()` returns a value earlier than `UNIX_EPOCH`
+    /// while generating the correlation identifier. This is not expected in
+    /// normal environments.
+    #[allow(clippy::too_many_lines)]
     pub async fn cancel_agents_with_state_check(
         &self,
         task_id: &str,
@@ -146,10 +158,11 @@ impl StateAwareCancellation {
         let _lease_guard = lease;
 
         // Check current remediation state
-        let state_result = self
-            .state_manager
-            .load_state(pr_number as u32, task_id)
-            .await;
+        let pr_number_u32 = u32::try_from(pr_number).map_err(|_| CancellationError::StateError(
+            "PR number must be non-negative to track remediation state".to_string(),
+        ))?;
+
+        let state_result = self.state_manager.load_state(pr_number_u32, task_id).await;
 
         match state_result {
             Ok(Some(state)) => {
@@ -330,7 +343,7 @@ impl StateAwareCancellation {
 
             if should_cancel {
                 match self.cancel_single_coderun(coderun.clone()).await {
-                    Ok(_) => {
+                    Ok(()) => {
                         cancelled_agents.push(AgentInfo {
                             name: coderun_name.clone(),
                             agent_type: agent_type.to_string(),
@@ -384,7 +397,7 @@ impl StateAwareCancellation {
         })
     }
 
-    /// Cancel a single CodeRun with proper error handling
+    /// Cancel a single `CodeRun` with proper error handling
     async fn cancel_single_coderun(&self, coderun: CodeRun) -> Result<(), CancellationError> {
         let coderun_name =
             coderun

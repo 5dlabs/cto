@@ -22,7 +22,7 @@ pub struct DocsResourceManager<'a> {
 }
 
 impl<'a> DocsResourceManager<'a> {
-    pub fn new(
+    #[must_use] pub fn new(
         jobs: &'a Api<Job>,
         configmaps: &'a Api<ConfigMap>,
         config: &'a Arc<ControllerConfig>,
@@ -199,8 +199,7 @@ impl<'a> DocsResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
         let context_version = 1; // Docs don't have context versions, always 1
 
         // Use deterministic naming based on DocsRun UID for stable references
@@ -417,7 +416,7 @@ impl<'a> DocsResourceManager<'a> {
             docs_run.name_any(),
             job_name
         );
-        let job = self.build_job_spec(docs_run, &job_name, cm_name).await?;
+        let job = self.build_job_spec(docs_run, &job_name, cm_name)?;
         info!(
             "✅ DocsRun {}: Job spec built for {}",
             docs_run.name_any(),
@@ -479,15 +478,14 @@ impl<'a> DocsResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
 
         format!("docs-{namespace}-{name}-{uid_suffix}")
             .replace(['_', '.'], "-")
             .to_lowercase()
     }
 
-    async fn build_job_spec(
+    fn build_job_spec(
         &self,
         docs_run: &DocsRun,
         job_name: &str,
@@ -837,12 +835,11 @@ impl<'a> DocsResourceManager<'a> {
                     .metadata
                     .owner_references
                     .as_ref()
-                    .map(|owners| {
+                    .is_some_and(|owners| {
                         owners.iter().any(|owner| {
                             owner.kind == "Job" && owner.api_version.starts_with("batch/")
                         })
-                    })
-                    .unwrap_or(false);
+                    });
 
                 if has_active_job {
                     // If ConfigMap is owned by a Job, let Kubernetes handle cleanup when Job completes

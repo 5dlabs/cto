@@ -76,7 +76,7 @@ impl CliAdapter for FactoryAdapter {
         let model = first_string(&cli_config, &["model"])
             .or_else(|| first_string(&settings, &["model"]))
             .filter(|value| !value.trim().is_empty())
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .unwrap_or_else(|| agent_config.model.clone());
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "modelMaxOutputTokens"])
@@ -86,7 +86,7 @@ impl CliAdapter for FactoryAdapter {
 
         let temperature = first_f64(&cli_config, &["temperature"])
             .or_else(|| first_f64(&settings, &["temperature"]))
-            .or_else(|| agent_config.temperature.map(|value| value as f64));
+            .or_else(|| agent_config.temperature.map(|value| f64::from(value)));
 
         let approval_policy = first_string(&settings, &["approvalPolicy"]).unwrap_or("never");
 
@@ -98,13 +98,13 @@ impl CliAdapter for FactoryAdapter {
         let reasoning_effort =
             first_string(&settings, &["reasoningEffort", "modelReasoningEffort"])
                 .or_else(|| first_string(&cli_config, &["reasoningEffort"]))
-                .map(|value| value.to_string());
+                .map(std::string::ToString::to_string);
 
         let auto_level = settings
             .get("autoLevel")
             .and_then(Value::as_str)
             .or_else(|| cli_config.get("autoLevel").and_then(Value::as_str))
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| reasoning_effort.clone());
 
         let output_format = settings
@@ -112,10 +112,10 @@ impl CliAdapter for FactoryAdapter {
             .or_else(|| settings.get("output_format"))
             .or_else(|| cli_config.get("outputFormat"))
             .and_then(Value::as_str)
-            .map(|value| value.to_string());
+            .map(std::string::ToString::to_string);
 
         let raw_additional_json = first_string(&settings, &["rawJson", "raw_json"]) // legacy & snake_case
-            .map(|value| value.to_string());
+            .map(std::string::ToString::to_string);
 
         let toolman_url = env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
             "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
@@ -210,8 +210,7 @@ impl CliAdapter for FactoryAdapter {
                             if event
                                 .get("role")
                                 .and_then(Value::as_str)
-                                .map(|role| role.eq_ignore_ascii_case("assistant"))
-                                .unwrap_or(true)
+                                .map_or(true, |role| role.eq_ignore_ascii_case("assistant"))
                             {
                                 if let Some(text) = event.get("text").and_then(Value::as_str) {
                                     aggregated_messages.push(text.to_string());
@@ -228,7 +227,7 @@ impl CliAdapter for FactoryAdapter {
                                 .get("id")
                                 .and_then(Value::as_str)
                                 .or_else(|| event.get("callId").and_then(Value::as_str))
-                                .map(|value| value.to_string());
+                                .map(std::string::ToString::to_string);
                             tool_calls.push(ToolCall {
                                 name: name.to_string(),
                                 arguments,
@@ -338,11 +337,11 @@ impl CliAdapter for FactoryAdapter {
         })
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "AGENTS.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "droid"
     }
 

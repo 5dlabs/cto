@@ -112,7 +112,7 @@ impl PatternExtractor {
     }
 
     /// Extract expected and actual behavior from comment body
-    pub fn extract_expected_actual(body: &str) -> (Option<String>, Option<String>) {
+    #[must_use] pub fn extract_expected_actual(body: &str) -> (Option<String>, Option<String>) {
         let expected = Self::extract_expected_behavior(body);
         let actual = Self::extract_actual_behavior(body);
 
@@ -249,8 +249,7 @@ impl PatternExtractor {
                 // Remove leading number and dot/space
                 let step = trimmed
                     .split_once('.')
-                    .map(|(_, rest)| rest.trim())
-                    .unwrap_or(trimmed);
+                    .map_or(trimmed, |(_, rest)| rest.trim());
 
                 Some(step.to_string())
             })
@@ -264,27 +263,27 @@ impl PatternExtractor {
     }
 
     /// Check if comment contains actionable feedback marker
-    pub fn is_actionable_feedback(body: &str) -> bool {
+    #[must_use] pub fn is_actionable_feedback(body: &str) -> bool {
         body.contains("🔴 Required Changes")
     }
 
     /// Extract optional description (returns None if not found)
-    pub fn extract_description_optional(body: &str) -> Option<String> {
+    #[must_use] pub fn extract_description_optional(body: &str) -> Option<String> {
         Self::extract_description(body).ok()
     }
 
     /// Extract optional reproduction steps (returns None if not found)
-    pub fn extract_reproduction_steps_optional(body: &str) -> Option<Vec<String>> {
+    #[must_use] pub fn extract_reproduction_steps_optional(body: &str) -> Option<Vec<String>> {
         Self::extract_reproduction_steps(body).ok()
     }
 
     /// Extract optional issue type (returns None if not found)
-    pub fn extract_issue_type_optional(body: &str) -> Option<IssueType> {
+    #[must_use] pub fn extract_issue_type_optional(body: &str) -> Option<IssueType> {
         Self::extract_issue_type(body).ok()
     }
 
     /// Extract optional severity (returns None if not found)
-    pub fn extract_severity_optional(body: &str) -> Option<Severity> {
+    #[must_use] pub fn extract_severity_optional(body: &str) -> Option<Severity> {
         Self::extract_severity(body).ok()
     }
 }

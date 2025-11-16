@@ -53,18 +53,15 @@ pub async fn check_github_for_pr_by_branch(
             let pr_url = pr
                 .html_url
                 .as_ref()
-                .map(|url| url.to_string())
+                .map(std::string::ToString::to_string)
                 .unwrap_or_else(|| format!("https://github.com/{owner}/{repo}/pull/{}", pr.number));
             info!("Found PR via GitHub API for task {}: {}", task_id, pr_url);
             return Ok(Some(pr_url));
         }
 
-        match next_page(&octocrab, &page).await? {
-            Some(next) => page = next,
-            None => {
-                info!("No PR found for task branch patterns: task-{}", task_id);
-                return Ok(None);
-            }
+        if let Some(next) = next_page(&octocrab, &page).await? { page = next } else {
+            info!("No PR found for task branch patterns: task-{}", task_id);
+            return Ok(None);
         }
     }
 }
@@ -97,7 +94,7 @@ fn pr_origin_matches(
     pr.head
         .repo
         .as_ref()
-        .map(|repo| {
+        .is_some_and(|repo| {
             repo_identity_matches(
                 repo.owner.as_ref().map(|owner| owner.login.as_str()),
                 repo.name.as_str(),
@@ -107,7 +104,6 @@ fn pr_origin_matches(
                 expected_full_name,
             )
         })
-        .unwrap_or(false)
 }
 
 fn repo_identity_matches(
@@ -119,8 +115,7 @@ fn repo_identity_matches(
     expected_full_name: &str,
 ) -> bool {
     let owner_matches = owner_login
-        .map(|login| login.eq_ignore_ascii_case(expected_owner))
-        .unwrap_or(false);
+        .is_some_and(|login| login.eq_ignore_ascii_case(expected_owner));
 
     if !owner_matches {
         return false;
@@ -135,7 +130,7 @@ fn repo_identity_matches(
 
 /// Parse repository URL to extract owner and repo name
 /// Supports formats like:
-/// - https://github.com/owner/repo
+/// - <https://github.com/owner/repo>
 /// - git@github.com:owner/repo.git
 /// - owner/repo
 fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
@@ -153,7 +148,7 @@ fn parse_repository_url(repo_url: &str) -> Result<(String, String)> {
     }
 }
 
-/// Update CodeRun status with found PR URL
+/// Update `CodeRun` status with found PR URL
 pub async fn update_code_run_pr_url(
     client: &kube::Client,
     namespace: &str,

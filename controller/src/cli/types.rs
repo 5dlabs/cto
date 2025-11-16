@@ -10,15 +10,15 @@ use std::collections::HashMap;
 pub enum CLIType {
     /// Anthropic Claude Code CLI
     Claude,
-    /// OpenAI Codex CLI
+    /// `OpenAI` Codex CLI
     Codex,
-    /// OpenCode AI CLI
+    /// `OpenCode` AI CLI
     OpenCode,
     /// Cursor Agent
     Cursor,
     /// Factory Droid CLI
     Factory,
-    /// OpenHands
+    /// `OpenHands`
     OpenHands,
     /// Grok CLI
     Grok,
@@ -46,7 +46,7 @@ impl std::fmt::Display for CLIType {
 
 impl CLIType {
     /// Parse a CLI type from a string, ignoring case and accepting legacy aliases.
-    pub fn from_str_ci(value: &str) -> Option<Self> {
+    #[must_use] pub fn from_str_ci(value: &str) -> Option<Self> {
         let normalized = value.trim().to_lowercase();
 
         match normalized.as_str() {

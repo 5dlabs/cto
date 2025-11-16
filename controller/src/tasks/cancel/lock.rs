@@ -50,7 +50,7 @@ pub struct DistributedLock {
 
 impl DistributedLock {
     /// Create a new distributed lock
-    pub fn new(client: Client, namespace: &str, lock_name: &str, holder_name: &str) -> Self {
+    #[must_use] pub fn new(client: Client, namespace: &str, lock_name: &str, holder_name: &str) -> Self {
         Self {
             client,
             namespace: namespace.to_string(),
@@ -62,13 +62,13 @@ impl DistributedLock {
     }
 
     /// Set the lease duration (default: 30 seconds)
-    pub fn with_lease_duration(mut self, duration: Duration) -> Self {
+    #[must_use] pub fn with_lease_duration(mut self, duration: Duration) -> Self {
         self.lease_duration = duration;
         self
     }
 
     /// Set the renewal interval (default: 10 seconds)
-    pub fn with_renewal_interval(mut self, interval: Duration) -> Self {
+    #[must_use] pub fn with_renewal_interval(mut self, interval: Duration) -> Self {
         self.renewal_interval = interval;
         self
     }
@@ -169,8 +169,7 @@ impl DistributedLock {
                 .spec
                 .as_ref()
                 .and_then(|spec| spec.holder_identity.as_ref())
-                .map(|s| s.as_str())
-                .unwrap_or("unknown");
+                .map_or("unknown", std::string::String::as_str);
 
             debug!(
                 lock_name = %self.lock_name,
@@ -198,7 +197,7 @@ impl DistributedLock {
             return true;
         };
 
-        let expiration_time = renew_time.0 + chrono::Duration::seconds(duration_seconds as i64);
+        let expiration_time = renew_time.0 + chrono::Duration::seconds(i64::from(duration_seconds));
         let now = chrono::Utc::now();
 
         expiration_time < now
@@ -360,22 +359,21 @@ impl ActiveLease {
     }
 
     /// Get the lease name
-    pub fn name(&self) -> &str {
+    #[must_use] pub fn name(&self) -> &str {
         self.lease.metadata.name.as_deref().unwrap_or("")
     }
 
     /// Get the holder identity
-    pub fn holder(&self) -> &str {
+    #[must_use] pub fn holder(&self) -> &str {
         self.lease
             .spec
             .as_ref()
             .and_then(|spec| spec.holder_identity.as_ref())
-            .map(|s| s.as_str())
-            .unwrap_or("")
+            .map_or("", std::string::String::as_str)
     }
 
     /// Check if the lease is still valid
-    pub fn is_valid(&self) -> bool {
+    #[must_use] pub fn is_valid(&self) -> bool {
         let Some(spec) = &self.lease.spec else {
             return false;
         };
@@ -388,7 +386,7 @@ impl ActiveLease {
             return false;
         };
 
-        let expiration_time = renew_time.0 + chrono::Duration::seconds(duration_seconds as i64);
+        let expiration_time = renew_time.0 + chrono::Duration::seconds(i64::from(duration_seconds));
         let now = chrono::Utc::now();
 
         expiration_time > now

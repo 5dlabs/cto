@@ -56,12 +56,10 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
     )
     .await
     .map_err(|e| match e {
-        kube::runtime::finalizer::Error::ApplyFailed(err) => err,
-        kube::runtime::finalizer::Error::CleanupFailed(err) => err,
-        kube::runtime::finalizer::Error::AddFinalizer(e) => {
-            crate::tasks::types::Error::KubeError(e)
-        }
-        kube::runtime::finalizer::Error::RemoveFinalizer(e) => {
+        kube::runtime::finalizer::Error::ApplyFailed(err)
+        | kube::runtime::finalizer::Error::CleanupFailed(err) => err,
+        kube::runtime::finalizer::Error::AddFinalizer(e)
+        | kube::runtime::finalizer::Error::RemoveFinalizer(e) => {
             crate::tasks::types::Error::KubeError(e)
         }
         kube::runtime::finalizer::Error::UnnamedObject => {
@@ -91,15 +89,14 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         if status.work_completed == Some(true) {
             // Double-check with GitHub to ensure status hasn't changed
             if let Some(pr_url) = &status.pull_request_url {
-                if let Ok(is_still_complete) = verify_github_completion_status(pr_url).await {
-                    if !is_still_complete {
-                        warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
-                        clear_work_completed_status(&code_run, ctx).await?;
-                        // Continue with reconciliation
-                    } else {
+                if let Ok(is_still_complete) = verify_github_completion_status(pr_url) {
+                    if is_still_complete {
                         debug!("Work already completed (verified with GitHub), no further action needed");
                         return Ok(Action::await_change());
                     }
+                    warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
+                    clear_work_completed_status(&code_run, ctx).await?;
+                    // Continue with reconciliation
                 } else {
                     warn!("Could not verify GitHub status, proceeding with caution");
                 }
@@ -131,8 +128,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     None,
                     Some(finished_at),
                     cleanup_deadline
-                        .map(ExpireAtUpdate::Set)
-                        .unwrap_or(ExpireAtUpdate::Unchanged),
+                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -181,8 +177,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             let current_phase = code_run
                 .status
                 .as_ref()
-                .map(|s| s.phase.as_str())
-                .unwrap_or("");
+                .map_or("", |s| s.phase.as_str());
 
             if work_completed || current_phase == "Succeeded" {
                 debug!(
@@ -214,8 +209,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                         None,
                         Some(finished_at),
                         cleanup_deadline
-                            .map(ExpireAtUpdate::Set)
-                            .unwrap_or(ExpireAtUpdate::Unchanged),
+                            .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                     )
                     .await?;
                 }
@@ -332,8 +326,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     None,
                     Some(finished_at),
                     cleanup_deadline
-                        .map(ExpireAtUpdate::Set)
-                        .unwrap_or(ExpireAtUpdate::Unchanged),
+                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -446,8 +439,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     None,
                     Some(finished_at),
                     cleanup_deadline
-                        .map(ExpireAtUpdate::Set)
-                        .unwrap_or(ExpireAtUpdate::Unchanged),
+                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -495,7 +487,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .labels
                 .as_ref()
                 .and_then(|labels| labels.get("stage"))
-                .map(|s| s.as_str());
+                .map(std::string::String::as_str);
 
             let is_implementation_stage = matches!(
                 stage,
@@ -529,8 +521,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     None,
                     Some(finished_at),
                     cleanup_deadline
-                        .map(ExpireAtUpdate::Set)
-                        .unwrap_or(ExpireAtUpdate::Unchanged),
+                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -586,8 +577,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 None,
                 Some(finished_at),
                 cleanup_deadline
-                    .map(ExpireAtUpdate::Set)
-                    .unwrap_or(ExpireAtUpdate::Unchanged),
+                    .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
             )
             .await?;
 
@@ -692,8 +682,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 None,
                 Some(finished_at),
                 cleanup_deadline
-                    .map(ExpireAtUpdate::Set)
-                    .unwrap_or(ExpireAtUpdate::Unchanged),
+                    .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
             )
             .await?;
 
@@ -743,7 +732,7 @@ pub enum CodeJobState {
     Failed,
 }
 
-/// Get job name for CodeRun - prefer stored name, fallback to generation
+/// Get job name for `CodeRun` - prefer stored name, fallback to generation
 /// This fixes the job name mismatch that was causing status update failures
 fn get_job_name(code_run: &CodeRun) -> String {
     // First try to get the job name from CodeRun status (set during creation)
@@ -818,8 +807,7 @@ async fn update_code_status_with_completion(
     let current_phase = code_run
         .status
         .as_ref()
-        .map(|s| s.phase.as_str())
-        .unwrap_or("");
+        .map_or("", |s| s.phase.as_str());
     let current_work_completed = code_run
         .status
         .as_ref()
@@ -889,7 +877,7 @@ async fn update_code_status_with_completion(
     Ok(())
 }
 
-/// Handle workflow resumption when CodeRun completes successfully
+/// Handle workflow resumption when `CodeRun` completes successfully
 async fn handle_workflow_resumption_on_completion(code_run: &CodeRun, ctx: &Context) -> Result<()> {
     use crate::tasks::workflow::{
         extract_pr_number, extract_workflow_name, resume_workflow_for_pr,
@@ -948,7 +936,7 @@ async fn handle_workflow_resumption_on_completion(code_run: &CodeRun, ctx: &Cont
     handle_no_pr_timeout(&workflow_name, code_run, ctx).await
 }
 
-/// Handle workflow resumption when CodeRun fails
+/// Handle workflow resumption when `CodeRun` fails
 async fn handle_workflow_resumption_on_failure(code_run: &CodeRun, ctx: &Context) -> Result<()> {
     use crate::tasks::workflow::{extract_workflow_name, resume_workflow_for_failure};
 
@@ -1092,8 +1080,7 @@ async fn handle_no_pr_timeout(
     let coderun_status = updated_code_run
         .status
         .as_ref()
-        .map(|s| s.phase.as_str())
-        .unwrap_or("Succeeded");
+        .map_or("Succeeded", |s| s.phase.as_str());
 
     if let Err(e) =
         resume_workflow_for_no_pr(&ctx.client, &ctx.namespace, workflow_name, coderun_status).await
@@ -1136,7 +1123,7 @@ fn extract_max_retries(code_run: &CodeRun) -> u32 {
         "OPENCODE_MAX_RETRIES",
     ];
 
-    for key in RETRY_KEYS.iter() {
+    for key in &RETRY_KEYS {
         if let Some(value) = code_run.spec.env.get(*key) {
             if let Ok(parsed) = value.trim().parse::<u32>() {
                 return parsed;
@@ -1162,11 +1149,10 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
             let has_pr = status
                 .pull_request_url
                 .as_ref()
-                .map(|url| {
+                .is_some_and(|url| {
                     let trimmed = url.trim();
                     !trimmed.is_empty() && trimmed != "no-pr"
-                })
-                .unwrap_or(false);
+                });
 
             if !has_pr {
                 return Some("Implementation attempt did not produce a pull request".to_string());
@@ -1270,7 +1256,7 @@ async fn schedule_retry(
 }
 
 /// Verify completion status with GitHub to prevent stale local state
-async fn verify_github_completion_status(_pr_url: &str) -> Result<bool> {
+fn verify_github_completion_status(_pr_url: &str) -> Result<bool> {
     // Extract PR number from GitHub URL
     // Format: https://github.com/owner/repo/pull/number
     // let pr_number = extract_pr_number_from_url(pr_url)?;
@@ -1288,7 +1274,7 @@ async fn verify_github_completion_status(_pr_url: &str) -> Result<bool> {
     Ok(true) // Placeholder - assume complete for now
 }
 
-/// Clear stale work_completed status
+/// Clear stale `work_completed` status
 async fn clear_work_completed_status(code_run: &CodeRun, ctx: &Context) -> Result<()> {
     let code_runs: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
 

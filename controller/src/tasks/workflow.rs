@@ -7,7 +7,7 @@ use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
 
-/// Extract workflow name from CodeRun labels
+/// Extract workflow name from `CodeRun` labels
 pub fn extract_workflow_name(code_run: &CodeRun) -> Result<String> {
     // Try to get workflow name from label if labels exist
     if let Some(labels) = code_run.metadata.labels.as_ref() {
@@ -63,7 +63,7 @@ pub async fn resume_workflow_for_pr(
     .await
 }
 
-/// Resume workflow when CodeRun failed
+/// Resume workflow when `CodeRun` failed
 pub async fn resume_workflow_for_failure(
     client: &Client,
     namespace: &str,

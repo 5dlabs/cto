@@ -204,6 +204,10 @@ git secrets --scan
 gitleaks detect --source . --verbose
 ```
 
+> **Note:** The Codex security runner now falls back to the GitHub REST API if `gh pr create` cannot authenticate (for example when no personal token is available). Supplying a `GH_TOKEN`/`GITHUB_TOKEN` with sufficient scopes is still recommended so that `gh` can link PRs to projects, but the workflow will no longer fail just because the CLI login step is blocked.
+
+> **New:** During repository preparation the Codex security runner now drops a `.gitleaks.toml` allowlist into the workspace and exports `GITLEAKS_CONFIG` so every `gitleaks` invocation automatically consumes it. This suppresses the deterministic false positives from the GitHub CLI host cache (`.config/gh/hosts.yml`) and the sample JWT strings that live in the `cto-parallel-test` documentation while leaving genuine leaks untouched.
+
 ### 2. Workflow Template Updates
 
 **File:** `infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml`

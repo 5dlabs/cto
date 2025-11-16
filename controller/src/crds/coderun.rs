@@ -143,7 +143,7 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "envFromSecrets")]
     pub env_from_secrets: Vec<SecretEnvVar>,
 
-    /// Whether to enable Docker-in-Docker support for this CodeRun (defaults to true)
+    /// Whether to enable Docker-in-Docker support for this `CodeRun` (defaults to true)
     #[serde(default = "default_enable_docker", rename = "enableDocker")]
     pub enable_docker: Option<bool>,
 
@@ -151,7 +151,7 @@ pub struct CodeRunSpec {
     #[serde(default, rename = "taskRequirements")]
     pub task_requirements: Option<String>,
 
-    /// Kubernetes ServiceAccount name for the Job pods created to execute this CodeRun
+    /// Kubernetes `ServiceAccount` name for the Job pods created to execute this `CodeRun`
     #[serde(default, rename = "serviceAccountName")]
     pub service_account_name: Option<String>,
 
@@ -182,7 +182,7 @@ pub struct CodeRunStatus {
     #[serde(rename = "remediationStatus", skip_serializing_if = "Option::is_none")]
     pub remediation_status: Option<String>,
 
-    /// QA decision captured from Tess (approved, changes_requested, pending)
+    /// QA decision captured from Tess (approved, `changes_requested`, pending)
     #[serde(rename = "qaStatus", skip_serializing_if = "Option::is_none")]
     pub qa_status: Option<String>,
 

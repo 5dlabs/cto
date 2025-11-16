@@ -75,11 +75,11 @@ impl CliAdapter for CursorAdapter {
         Err(Self::unsupported("response parsing").into())
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "AGENTS.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "cursor-agent"
     }
 

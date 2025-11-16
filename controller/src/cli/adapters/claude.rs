@@ -112,7 +112,7 @@ impl CliAdapter for ClaudeAdapter {
         let context = HashMap::from([("model".to_string(), model.to_string())]);
         self.base.log_operation("validate_model", &context);
 
-        let is_valid = self.model_validator.validate(model).await?;
+        let is_valid = self.model_validator.validate(model)?;
 
         info!(model = %model, is_valid = is_valid, "Model validation completed");
         Ok(is_valid)
@@ -188,7 +188,7 @@ impl CliAdapter for ClaudeAdapter {
         self.base.log_operation("parse_response", &context);
 
         // Parse tool calls from Claude response
-        let tool_calls = self.extract_tool_calls(response).await?;
+        let tool_calls = self.extract_tool_calls(response)?;
 
         // Determine finish reason
         let finish_reason = if tool_calls.is_empty() {
@@ -198,7 +198,7 @@ impl CliAdapter for ClaudeAdapter {
         };
 
         // Extract metadata if available
-        let metadata = self.extract_response_metadata(response).await;
+        let metadata = self.extract_response_metadata(response);
 
         let parsed_response = ParsedResponse {
             content: response.to_string(),
@@ -217,11 +217,11 @@ impl CliAdapter for ClaudeAdapter {
         Ok(parsed_response)
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "CLAUDE.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "claude"
     }
 
@@ -362,7 +362,7 @@ impl CliAdapter for ClaudeAdapter {
 
 impl ClaudeAdapter {
     /// Extract tool calls from Claude response
-    async fn extract_tool_calls(&self, response: &str) -> AdapterResult<Vec<ToolCall>> {
+    fn extract_tool_calls(&self, response: &str) -> AdapterResult<Vec<ToolCall>> {
         // Claude tool calls are typically in the format:
         // <function_calls>
         // <invoke name="tool_name">
@@ -418,7 +418,7 @@ impl ClaudeAdapter {
     }
 
     /// Extract response metadata from Claude response
-    async fn extract_response_metadata(&self, _response: &str) -> ResponseMetadata {
+    fn extract_response_metadata(&self, _response: &str) -> ResponseMetadata {
         // Claude Code CLI doesn't typically provide detailed metadata in responses
         // This is a placeholder for future enhancement
         ResponseMetadata {
@@ -439,7 +439,7 @@ pub struct ClaudeModelValidator {
 }
 
 impl ClaudeModelValidator {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         let valid_patterns = vec![
             // Claude 3.5 models
             Regex::new(r"^claude-3-5-sonnet.*").unwrap(),
@@ -459,7 +459,7 @@ impl ClaudeModelValidator {
         Self { valid_patterns }
     }
 
-    pub async fn validate(&self, model: &str) -> AdapterResult<bool> {
+    pub fn validate(&self, model: &str) -> AdapterResult<bool> {
         if model.trim().is_empty() {
             return Ok(false);
         }
@@ -474,7 +474,7 @@ impl ClaudeModelValidator {
     }
 
     /// Get suggestions for invalid models
-    pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
+    #[must_use] pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
         vec![
             "claude-3-5-sonnet-20241022".to_string(),
             "claude-3-opus-20240229".to_string(),
@@ -639,13 +639,13 @@ The file has been read successfully."#;
         let validator = ClaudeModelValidator::new();
 
         // Test valid models
-        assert!(tokio_test::block_on(validator.validate("claude-3-5-sonnet-20241022")).unwrap());
-        assert!(tokio_test::block_on(validator.validate("claude-3-opus-20240229")).unwrap());
-        assert!(tokio_test::block_on(validator.validate("opus")).unwrap());
+        assert!(validator.validate("claude-3-5-sonnet-20241022").unwrap());
+        assert!(validator.validate("claude-3-opus-20240229").unwrap());
+        assert!(validator.validate("opus").unwrap());
 
         // Test invalid models
-        assert!(!tokio_test::block_on(validator.validate("gpt-4")).unwrap());
-        assert!(!tokio_test::block_on(validator.validate("")).unwrap());
+        assert!(!validator.validate("gpt-4").unwrap());
+        assert!(!validator.validate("").unwrap());
     }
 
     #[tokio::test]
@@ -673,7 +673,6 @@ Done!
 
         let tool_calls = adapter
             .extract_tool_calls(response_with_tools)
-            .await
             .unwrap();
         // In our basic implementation, tool calls are parsed as best effort
         // The test may find 0, 1, or 2 tool calls depending on parsing logic

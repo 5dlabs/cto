@@ -5,7 +5,7 @@
 
 use crate::cli::bridge::ConfigurationBridge;
 use crate::cli::discovery::DiscoveryService;
-use crate::cli::types::*;
+use crate::cli::types::{CLIType, UniversalConfig, CLIExecutionContext, CLIProfile, SessionType};
 use std::collections::HashMap;
 
 /// CLI selection preferences
@@ -41,7 +41,7 @@ impl Default for CLIRouter {
 
 impl CLIRouter {
     /// Create a new CLI router
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             discovery: DiscoveryService::new(),
             bridge: ConfigurationBridge::new(),
@@ -222,7 +222,7 @@ impl CLIRouter {
     }
 
     /// Get CLI profile information
-    pub fn get_cli_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
+    #[must_use] pub fn get_cli_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
         self.discovery.get_profile(cli_type)
     }
 
@@ -232,7 +232,7 @@ impl CLIRouter {
     }
 
     /// Get all supported CLI types
-    pub fn supported_clis(&self) -> Vec<CLIType> {
+    #[must_use] pub fn supported_clis(&self) -> Vec<CLIType> {
         self.bridge.supported_clis()
     }
 

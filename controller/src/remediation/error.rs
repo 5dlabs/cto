@@ -96,12 +96,12 @@ pub enum ParseError {
     ResourceExhausted { resource: String, details: String },
 }
 
-/// Type alias for ParseResult
+/// Type alias for `ParseResult`
 pub type ParseResult<T> = Result<T, ParseError>;
 
 impl ParseError {
     /// Check if error is recoverable (can be retried)
-    pub fn is_recoverable(&self) -> bool {
+    #[must_use] pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
             ParseError::ExternalServiceError { .. }
@@ -111,7 +111,7 @@ impl ParseError {
     }
 
     /// Check if error indicates authorization failure
-    pub fn is_authorization_error(&self) -> bool {
+    #[must_use] pub fn is_authorization_error(&self) -> bool {
         matches!(
             self,
             ParseError::UnauthorizedAuthor { .. } | ParseError::AuthorValidationError { .. }
@@ -119,7 +119,7 @@ impl ParseError {
     }
 
     /// Check if error indicates malformed input
-    pub fn is_malformed_input(&self) -> bool {
+    #[must_use] pub fn is_malformed_input(&self) -> bool {
         matches!(
             self,
             ParseError::MalformedComment { .. }
@@ -130,7 +130,7 @@ impl ParseError {
     }
 
     /// Check if error indicates missing required data
-    pub fn is_missing_data(&self) -> bool {
+    #[must_use] pub fn is_missing_data(&self) -> bool {
         matches!(
             self,
             ParseError::MissingRequiredField { .. }
@@ -142,7 +142,7 @@ impl ParseError {
     }
 
     /// Get error category as string
-    pub fn category(&self) -> &'static str {
+    #[must_use] pub fn category(&self) -> &'static str {
         match self {
             ParseError::NotActionableFeedback => "not_actionable",
             ParseError::UnauthorizedAuthor { .. } => "authorization",
@@ -170,7 +170,7 @@ impl ParseError {
     }
 
     /// Convert error to user-friendly message
-    pub fn user_message(&self) -> String {
+    #[must_use] pub fn user_message(&self) -> String {
         match self {
             ParseError::NotActionableFeedback => {
                 "This comment doesn't contain actionable feedback. Make sure it includes '🔴 Required Changes'.".to_string()
@@ -242,7 +242,7 @@ impl ParseError {
     }
 
     /// Get suggested remediation action
-    pub fn suggested_action(&self) -> &'static str {
+    #[must_use] pub fn suggested_action(&self) -> &'static str {
         match self {
             ParseError::NotActionableFeedback => {
                 "Add '🔴 Required Changes' marker to make this actionable feedback"
@@ -310,7 +310,7 @@ impl ErrorContext {
     }
 
     /// Add comment context
-    pub fn with_comment(mut self, comment_id: u64, pr_number: u32, author: String) -> Self {
+    #[must_use] pub fn with_comment(mut self, comment_id: u64, pr_number: u32, author: String) -> Self {
         self.comment_id = Some(comment_id);
         self.pr_number = Some(pr_number);
         self.author = Some(author);
@@ -318,13 +318,13 @@ impl ErrorContext {
     }
 
     /// Add additional context information
-    pub fn with_info(mut self, key: &str, value: String) -> Self {
+    #[must_use] pub fn with_info(mut self, key: &str, value: String) -> Self {
         self.additional_info.insert(key.to_string(), value);
         self
     }
 
     /// Get user-friendly error message with context
-    pub fn user_message(&self) -> String {
+    #[must_use] pub fn user_message(&self) -> String {
         let mut message = self.error.user_message();
 
         if let Some(pr_number) = self.pr_number {
@@ -407,30 +407,30 @@ mod tests {
         );
         assert_eq!(
             ParseError::UnauthorizedAuthor {
-                author: "".to_string()
+                author: String::new()
             }
             .category(),
             "authorization"
         );
         assert_eq!(
             ParseError::MissingRequiredField {
-                field: "".to_string()
+                field: String::new()
             }
             .category(),
             "missing_data"
         );
         assert_eq!(
             ParseError::InvalidFieldValue {
-                field: "".to_string(),
-                value: "".to_string(),
-                expected: "".to_string()
+                field: String::new(),
+                value: String::new(),
+                expected: String::new()
             }
             .category(),
             "invalid_data"
         );
         assert_eq!(
             ParseError::MalformedComment {
-                reason: "".to_string()
+                reason: String::new()
             }
             .category(),
             "malformed_input"
@@ -443,60 +443,60 @@ mod tests {
     fn test_error_classification() {
         // Recoverable errors
         assert!(ParseError::ExternalServiceError {
-            service: "".to_string(),
-            details: "".to_string()
+            service: String::new(),
+            details: String::new()
         }
         .is_recoverable());
         assert!(ParseError::TimeoutError {
-            operation: "".to_string()
+            operation: String::new()
         }
         .is_recoverable());
         assert!(ParseError::CacheError {
-            details: "".to_string()
+            details: String::new()
         }
         .is_recoverable());
 
         // Non-recoverable errors
         assert!(!ParseError::NotActionableFeedback.is_recoverable());
         assert!(!ParseError::MalformedComment {
-            reason: "".to_string()
+            reason: String::new()
         }
         .is_recoverable());
 
         // Authorization errors
         assert!(ParseError::UnauthorizedAuthor {
-            author: "".to_string()
+            author: String::new()
         }
         .is_authorization_error());
         assert!(ParseError::AuthorValidationError {
-            details: "".to_string()
+            details: String::new()
         }
         .is_authorization_error());
 
         // Malformed input errors
         assert!(ParseError::MalformedComment {
-            reason: "".to_string()
+            reason: String::new()
         }
         .is_malformed_input());
         assert!(ParseError::InvalidFieldValue {
-            field: "".to_string(),
-            value: "".to_string(),
-            expected: "".to_string()
+            field: String::new(),
+            value: String::new(),
+            expected: String::new()
         }
         .is_malformed_input());
         assert!(ParseError::RegexError {
-            details: "".to_string()
+            details: String::new()
         }
         .is_malformed_input());
 
         // Missing data errors
         assert!(ParseError::MissingRequiredField {
-            field: "".to_string()
+            field: String::new()
         }
         .is_missing_data());
         assert!(ParseError::NoCriteriaFound.is_missing_data());
         assert!(ParseError::IssueTypeError {
-            details: "".to_string()
+            details: String::new()
         }
         .is_missing_data());
     }
@@ -525,7 +525,7 @@ mod tests {
         assert!(error.suggested_action().contains("🔴 Required Changes"));
 
         let error = ParseError::UnauthorizedAuthor {
-            author: "".to_string(),
+            author: String::new(),
         };
         assert!(error.suggested_action().contains("administrator"));
 

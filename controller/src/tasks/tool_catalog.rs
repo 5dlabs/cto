@@ -1,14 +1,12 @@
-use lazy_static::lazy_static;
 use serde_json::Value;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
+use std::sync::LazyLock;
 use tracing::{debug, warn};
 
 const TOOLMAN_CATALOG_PATH: &str = "/toolman-catalog/tool-catalog.json";
 
-lazy_static! {
-    static ref TOOL_CATALOG: ToolCatalog = ToolCatalog::load();
-}
+static TOOL_CATALOG: LazyLock<ToolCatalog> = LazyLock::new(ToolCatalog::load);
 
 /// Resolve a requested remote tool name to the canonical identifier advertised by Toolman.
 /// Returns `None` when the name is invalid (not present in the catalog) and cannot be

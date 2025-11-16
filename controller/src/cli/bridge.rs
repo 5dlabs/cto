@@ -3,7 +3,7 @@
 //! Translates between universal configuration and CLI-specific formats.
 //! This is the core component that enables CLI-agnostic operation.
 
-use crate::cli::types::*;
+use crate::cli::types::{CLIType, ConfigFile, TranslationResult, UniversalConfig};
 use async_trait::async_trait;
 use serde_json::json;
 use std::collections::HashSet;
@@ -197,7 +197,7 @@ impl CLIAdapter for TomlCLIAdapter {
     }
 }
 
-/// JSON format CLI adapter (OpenCode)
+/// JSON format CLI adapter (`OpenCode`)
 pub struct JsonCLIAdapter;
 
 #[async_trait]
@@ -478,7 +478,7 @@ pub struct ConfigurationBridge {
 
 impl ConfigurationBridge {
     /// Create a new configuration bridge with all supported adapters
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         let mut adapters = std::collections::HashMap::new();
 
         adapters.insert(
@@ -545,12 +545,12 @@ impl ConfigurationBridge {
     }
 
     /// Get all supported CLI types
-    pub fn supported_clis(&self) -> Vec<CLIType> {
-        self.adapters.keys().cloned().collect()
+    #[must_use] pub fn supported_clis(&self) -> Vec<CLIType> {
+        self.adapters.keys().copied().collect()
     }
 
     /// Check if a CLI type is supported
-    pub fn supports_cli(&self, cli_type: CLIType) -> bool {
+    #[must_use] pub fn supports_cli(&self, cli_type: CLIType) -> bool {
         self.adapters.contains_key(&cli_type)
     }
 }
@@ -585,6 +585,14 @@ pub type Result<T> = std::result::Result<T, BridgeError>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::types::{
+        AgentConfig,
+        ContextConfig,
+        MCPServer,
+        SettingsConfig,
+        ToolDefinition,
+        UniversalMCPConfig,
+    };
     use serde_json::Value;
     use std::collections::HashMap;
 
@@ -628,7 +636,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test Project".to_string(),
                 project_description: "A test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],
@@ -671,7 +679,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test Project".to_string(),
                 project_description: "A test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],

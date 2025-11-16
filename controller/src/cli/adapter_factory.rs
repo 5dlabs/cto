@@ -162,7 +162,7 @@ impl AdapterFactory {
 
         // Start health monitoring if enabled
         if factory.config.enable_health_monitoring {
-            factory.start_health_monitoring().await;
+            factory.start_health_monitoring();
         }
 
         info!(
@@ -214,7 +214,7 @@ impl AdapterFactory {
 
         // Initialize health monitoring for this adapter
         if self.config.enable_health_monitoring {
-            self.health_monitor.initialize_monitoring(cli_type).await;
+            self.health_monitor.initialize_monitoring(cli_type);
         }
 
         info!(cli_type = %cli_type, "CLI adapter registered successfully");
@@ -267,12 +267,12 @@ impl AdapterFactory {
     }
 
     /// Get all supported CLI types
-    pub fn get_supported_clis(&self) -> Vec<CLIType> {
+    #[must_use] pub fn get_supported_clis(&self) -> Vec<CLIType> {
         self.adapters.iter().map(|entry| *entry.key()).collect()
     }
 
     /// Check if a CLI type is supported
-    pub fn supports_cli(&self, cli_type: CLIType) -> bool {
+    #[must_use] pub fn supports_cli(&self, cli_type: CLIType) -> bool {
         self.adapters.contains_key(&cli_type)
     }
 
@@ -305,7 +305,8 @@ impl AdapterFactory {
     }
 
     /// Get configuration registry (for configuration management)
-    pub async fn get_config_registry(&self) -> Arc<RwLock<ConfigRegistry>> {
+    #[must_use]
+    pub fn get_config_registry(&self) -> Arc<RwLock<ConfigRegistry>> {
         self.config_registry.clone()
     }
 
@@ -380,7 +381,7 @@ impl AdapterFactory {
     }
 
     /// Start background health monitoring
-    async fn start_health_monitoring(&self) {
+    fn start_health_monitoring(&self) {
         let adapters = self.adapters.clone();
         let health_monitor = self.health_monitor.clone();
         let interval = self.config.health_check_interval;
@@ -406,7 +407,7 @@ impl AdapterFactory {
                                     check_duration: start_time.elapsed(),
                                     error: None,
                                 };
-                                monitor.record_health_check(cli_type, record).await;
+                                monitor.record_health_check(cli_type, record);
                             }
                             Err(e) => {
                                 let record = HealthCheckRecord {
@@ -415,7 +416,7 @@ impl AdapterFactory {
                                     check_duration: start_time.elapsed(),
                                     error: Some(e.to_string()),
                                 };
-                                monitor.record_health_check(cli_type, record).await;
+                                monitor.record_health_check(cli_type, record);
                             }
                         }
                     });
@@ -441,7 +442,7 @@ pub struct FactoryStats {
 
 impl HealthMonitor {
     /// Create a new health monitor
-    pub fn new(config: HealthMonitorConfig) -> Self {
+    #[must_use] pub fn new(config: HealthMonitorConfig) -> Self {
         Self {
             health_history: Arc::new(DashMap::new()),
             config,
@@ -449,13 +450,13 @@ impl HealthMonitor {
     }
 
     /// Initialize monitoring for a CLI type
-    pub async fn initialize_monitoring(&self, cli_type: CLIType) {
+    pub fn initialize_monitoring(&self, cli_type: CLIType) {
         self.health_history.insert(cli_type, Vec::new());
         debug!(cli_type = %cli_type, "Initialized health monitoring");
     }
 
     /// Record a health check result
-    pub async fn record_health_check(&self, cli_type: CLIType, record: HealthCheckRecord) {
+    pub fn record_health_check(&self, cli_type: CLIType, record: HealthCheckRecord) {
         if let Some(mut history) = self.health_history.get_mut(&cli_type) {
             // Add new record
             history.push(record.clone());
@@ -476,7 +477,7 @@ impl HealthMonitor {
     }
 
     /// Get health history for a CLI type
-    pub async fn get_health_history(&self, cli_type: CLIType) -> Vec<HealthCheckRecord> {
+    pub fn get_health_history(&self, cli_type: CLIType) -> Vec<HealthCheckRecord> {
         self.health_history
             .get(&cli_type)
             .map(|history| history.clone())
@@ -484,7 +485,7 @@ impl HealthMonitor {
     }
 
     /// Check if an adapter is consistently unhealthy
-    pub async fn is_consistently_unhealthy(&self, cli_type: CLIType) -> bool {
+    pub fn is_consistently_unhealthy(&self, cli_type: CLIType) -> bool {
         if let Some(history) = self.health_history.get(&cli_type) {
             if history.len() < self.config.failure_threshold {
                 return false;
@@ -718,7 +719,7 @@ mod tests {
     async fn test_health_monitor() {
         let monitor = HealthMonitor::new(HealthMonitorConfig::default());
 
-        monitor.initialize_monitoring(CLIType::Claude).await;
+        monitor.initialize_monitoring(CLIType::Claude);
 
         let record = HealthCheckRecord {
             timestamp: chrono::Utc::now(),
@@ -727,9 +728,9 @@ mod tests {
             error: None,
         };
 
-        monitor.record_health_check(CLIType::Claude, record).await;
+        monitor.record_health_check(CLIType::Claude, record);
 
-        let history = monitor.get_health_history(CLIType::Claude).await;
+        let history = monitor.get_health_history(CLIType::Claude);
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].status, HealthState::Healthy);
     }

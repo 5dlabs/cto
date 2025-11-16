@@ -73,7 +73,7 @@ pub struct AgentConfig {
     #[serde(default, rename = "imagePullSecrets")]
     pub image_pull_secrets: Vec<String>,
 
-    /// Optional default ServiceAccount name to use for CodeRun jobs
+    /// Optional default `ServiceAccount` name to use for `CodeRun` jobs
     #[serde(default, rename = "serviceAccountName")]
     pub service_account_name: Option<String>,
 }
@@ -90,7 +90,7 @@ pub struct ImageConfig {
 
 impl ImageConfig {
     /// Returns `true` when both repository and tag are populated with real values.
-    pub fn is_configured(&self) -> bool {
+    #[must_use] pub fn is_configured(&self) -> bool {
         let repo = self.repository.trim();
         let tag = self.tag.trim();
 
@@ -168,7 +168,7 @@ pub struct ResolvedSecretBinding {
 
 impl SecretsConfig {
     /// Resolve the secret binding (env var + secret key/name) for a given CLI
-    pub fn resolve_cli_binding(
+    #[must_use] pub fn resolve_cli_binding(
         &self,
         cli_type: &CLIType,
         provider: Option<&str>,
@@ -191,7 +191,7 @@ impl SecretsConfig {
             };
         }
 
-        if let Some(provider_key) = provider.map(|p| p.to_lowercase()) {
+        if let Some(provider_key) = provider.map(str::to_lowercase) {
             if let Some(provider_cfg) = self.provider_api_keys.get(&provider_key) {
                 let env_var = provider_cfg
                     .env_var
@@ -296,7 +296,7 @@ pub struct CleanupConfig {
     #[serde(rename = "failedJobDelayMinutes", default = "default_failed_delay")]
     pub failed_job_delay_minutes: u64,
 
-    /// Whether to delete the ConfigMap when cleaning up the job
+    /// Whether to delete the `ConfigMap` when cleaning up the job
     #[serde(rename = "deleteConfigMap", default = "default_delete_configmap")]
     pub delete_configmap: bool,
 }
@@ -523,7 +523,7 @@ impl ControllerConfig {
         Ok(())
     }
 
-    /// Load configuration from mounted ConfigMap file
+    /// Load configuration from mounted `ConfigMap` file
     pub fn from_mounted_file(config_path: &str) -> Result<Self, anyhow::Error> {
         let config_str = std::fs::read_to_string(config_path)
             .map_err(|e| anyhow::anyhow!("Failed to read config file {config_path}: {e}"))?;

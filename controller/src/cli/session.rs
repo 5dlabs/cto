@@ -3,7 +3,7 @@
 //! Manages session state and persistence across different CLI types.
 //! Handles state transitions and maintains context between CLI executions.
 
-use crate::cli::types::*;
+use crate::cli::types::{CLIType, UniversalConfig};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -101,7 +101,7 @@ impl Default for MemorySessionPersistence {
 }
 
 impl MemorySessionPersistence {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -159,7 +159,7 @@ impl Default for SessionManager {
 
 impl SessionManager {
     /// Create a new session manager with memory persistence
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             persistence: Box::new(MemorySessionPersistence::new()),
             active_sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -371,6 +371,7 @@ impl From<serde_json::Error> for SessionError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::types::{AgentConfig, ContextConfig, SettingsConfig};
 
     #[tokio::test]
     async fn test_session_creation() {
@@ -380,7 +381,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test".to_string(),
                 project_description: "Test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],
@@ -417,7 +418,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test".to_string(),
                 project_description: "Test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],
@@ -458,7 +459,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test".to_string(),
                 project_description: "Test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],

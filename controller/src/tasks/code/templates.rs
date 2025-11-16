@@ -67,8 +67,7 @@ impl CodeTemplateGenerator {
             .spec
             .cli_config
             .as_ref()
-            .map(|cfg| cfg.cli_type)
-            .unwrap_or(CLIType::Claude)
+            .map_or(CLIType::Claude, |cfg| cfg.cli_type)
     }
 
     fn generate_claude_templates(
@@ -1006,6 +1005,13 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
+        let cli_model = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .map(|cfg| cfg.model.clone())
+            .unwrap_or_else(|| code_run.spec.model.clone());
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -1024,12 +1030,7 @@ impl CodeTemplateGenerator {
             "workflow_name": workflow_name,
             "cli": {
                 "type": Self::determine_cli_type(code_run).to_string(),
-                "model": code_run
-                    .spec
-                    .cli_config
-                    .as_ref()
-                    .map(|cfg| cfg.model.as_str())
-                    .unwrap_or(&code_run.spec.model),
+                "model": cli_model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
             },
@@ -1115,7 +1116,7 @@ impl CodeTemplateGenerator {
         })
     }
 
-    /// Enrich cli_config with agent-level configuration from ControllerConfig
+    /// Enrich `cli_config` with agent-level configuration from `ControllerConfig`
     /// This allows agent-level settings (like modelRotation) to be used as defaults
     fn enrich_cli_config_from_agent(
         cli_config: Value,
@@ -1203,13 +1204,13 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_str)
             .or_else(|| settings.get("reasoningEffort").and_then(Value::as_str))
             .or_else(|| settings.get("modelReasoningEffort").and_then(Value::as_str))
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let auto_level = settings
             .get("autoLevel")
             .and_then(Value::as_str)
             .or_else(|| cli_config.get("autoLevel").and_then(Value::as_str))
-            .map(|value| value.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| reasoning_effort.clone());
 
         let output_format = settings
@@ -1217,7 +1218,7 @@ impl CodeTemplateGenerator {
             .or_else(|| settings.get("output_format"))
             .or_else(|| cli_config.get("outputFormat"))
             .and_then(Value::as_str)
-            .map(|value| value.to_string());
+            .map(std::string::ToString::to_string);
 
         let editor_vim_mode = settings
             .get("editor")
@@ -1228,7 +1229,7 @@ impl CodeTemplateGenerator {
         let mut toolman_url = settings
             .get("toolmanUrl")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .unwrap_or_else(|| {
                 std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
                     "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
@@ -1272,23 +1273,23 @@ impl CodeTemplateGenerator {
         let raw_additional_toml = settings
             .get("rawToml")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 settings
                     .get("raw_config")
                     .and_then(Value::as_str)
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             });
 
         let raw_additional_json = settings
             .get("rawJson")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 settings
                     .get("raw_json")
                     .and_then(Value::as_str)
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             });
         let model_rotation = settings
             .get("modelRotation")
@@ -1301,7 +1302,7 @@ impl CodeTemplateGenerator {
                     Value::Array(arr) => Some(
                         arr.iter()
                             .filter_map(Value::as_str)
-                            .map(|s| s.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>(),
                     ),
                     Value::String(s) => {
@@ -1358,7 +1359,7 @@ impl CodeTemplateGenerator {
             .and_then(Value::as_array)
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                    .filter_map(|item| item.as_str().map(std::string::ToString::to_string))
                     .collect()
             })
             .unwrap_or_default()
@@ -1503,7 +1504,7 @@ impl CodeTemplateGenerator {
             match v {
                 Value::Object(map) => {
                     let mut out = serde_json::Map::new();
-                    for (k, val) in map.iter() {
+                    for (k, val) in map {
                         if let Value::Object(obj) = val {
                             out.insert(k.clone(), Value::Object(obj.clone()));
                         }
@@ -1584,7 +1585,7 @@ impl CodeTemplateGenerator {
             v.as_array()
                 .map(|arr| {
                     arr.iter()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .filter_map(|x| x.as_str().map(std::string::ToString::to_string))
                         .collect::<Vec<String>>()
                 })
                 .unwrap_or_default()
@@ -1639,7 +1640,7 @@ impl CodeTemplateGenerator {
                             out.insert("tools".to_string(), json!(union));
                         }
                         // Overlay scalar/object fields from overlay
-                        for (ok, ov) in om.iter() {
+                        for (ok, ov) in om {
                             if ok == "tools" {
                                 continue;
                             }
@@ -2022,17 +2023,17 @@ impl CodeTemplateGenerator {
             .get("base_url")
             .or_else(|| provider_obj.get("baseUrl"))
             .and_then(Value::as_str)
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let instructions_plain = cli_config
             .get("instructions")
             .and_then(Value::as_str)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| {
                 cli_config
                     .get("memory")
                     .and_then(Value::as_str)
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             });
 
         let local_servers_value = client_config
@@ -2041,8 +2042,7 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
         let local_servers_serialized = if local_servers_value
             .as_object()
-            .map(|map| map.is_empty())
-            .unwrap_or(true)
+            .map_or(true, serde_json::Map::is_empty)
         {
             None
         } else {
@@ -2146,9 +2146,7 @@ impl CodeTemplateGenerator {
         let cli_key = code_run
             .spec
             .cli_config
-            .as_ref()
-            .map(|cfg| cfg.cli_type.to_string())
-            .unwrap_or_else(|| CLIType::Claude.to_string());
+            .as_ref().map_or_else(|| CLIType::Claude.to_string(), |cfg| cfg.cli_type.to_string());
 
         let hook_prefixes = vec![
             format!("code_{}_hooks_", cli_key),
@@ -2169,7 +2167,10 @@ impl CodeTemplateGenerator {
                     let path = entry.path();
                     if path.is_file() {
                         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                            if filename.ends_with(".hbs") {
+                            if std::path::Path::new(filename)
+                                .extension()
+                                .is_some_and(|ext| ext.eq_ignore_ascii_case("hbs"))
+                            {
                                 if let Some(prefix) = hook_prefixes
                                     .iter()
                                     .find(|prefix| filename.starts_with(prefix.as_str()))
@@ -2264,7 +2265,7 @@ impl CodeTemplateGenerator {
         retry_count > 0 || code_run.spec.continue_session
     }
 
-    /// Select the appropriate container template based on the github_app field
+    /// Select the appropriate container template based on the `github_app` field
     fn get_agent_container_template(code_run: &CodeRun) -> String {
         let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
 
@@ -2557,7 +2558,7 @@ impl CodeTemplateGenerator {
         })
     }
 
-    /// Load a template file from the mounted ConfigMap
+    /// Load a template file from the mounted `ConfigMap`
     fn load_template(relative_path: &str) -> Result<String> {
         // Convert path separators to underscores for ConfigMap key lookup
         let configmap_key = relative_path.replace('/', "_");

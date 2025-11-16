@@ -1,7 +1,7 @@
 //! # GitHub Label API Client
 //!
 //! This module provides a comprehensive GitHub API client for label operations,
-//! including rate limiting, retry logic, and atomic operations using ETags.
+//! including rate limiting, retry logic, and atomic operations using `ETags`.
 
 use crate::tasks::label::schema::{LabelOperation, LabelOperationType};
 use k8s_openapi::api::core::v1::Secret;
@@ -120,7 +120,7 @@ impl GitHubLabelClient {
     }
 
     /// Create a client with a direct token (for testing)
-    pub fn with_token(token: String, owner: String, repo: String) -> Self {
+    #[must_use] pub fn with_token(token: String, owner: String, repo: String) -> Self {
         let http_client = HttpClient::builder()
             .user_agent("cto-agent-remediation-loop/1.0")
             .timeout(Duration::from_secs(30))
@@ -362,7 +362,7 @@ impl GitHubLabelClient {
         }
     }
 
-    /// Get labels with ETag for conditional requests
+    /// Get labels with `ETag` for conditional requests
     async fn get_labels_with_etag(
         &mut self,
         pr_number: i32,
@@ -445,7 +445,7 @@ impl GitHubLabelClient {
         body: Option<serde_json::Value>,
     ) -> Result<Response, GitHubLabelError> {
         // Check rate limit
-        self.check_rate_limit().await?;
+        self.check_rate_limit()?;
 
         let mut request = self
             .http_client
@@ -473,7 +473,7 @@ impl GitHubLabelClient {
     }
 
     /// Check if we're within rate limits
-    async fn check_rate_limit(&mut self) -> Result<(), GitHubLabelError> {
+    fn check_rate_limit(&mut self) -> Result<(), GitHubLabelError> {
         if let Some(reset_time) = self.rate_limit_reset {
             if Instant::now() < reset_time {
                 let remaining = reset_time - Instant::now();

@@ -26,7 +26,7 @@ impl Default for CancellationCoordinator {
 }
 
 impl CancellationCoordinator {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         // Placeholder implementation
         Self {}
     }
@@ -37,7 +37,7 @@ impl CancellationCoordinator {
         Ok(())
     }
 
-    pub fn get_status(&self, _task_id: &str) -> Option<CancellationStatus> {
+    #[must_use] pub fn get_status(&self, _task_id: &str) -> Option<CancellationStatus> {
         // Placeholder implementation
         None
     }

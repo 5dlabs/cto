@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
-/// Task from TaskMaster tasks.json
+/// Task from `TaskMaster` tasks.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: u32,
@@ -20,7 +20,7 @@ pub struct Task {
     pub subtasks: Option<Vec<SubTask>>,
 }
 
-/// Subtask from TaskMaster tasks.json
+/// Subtask from `TaskMaster` tasks.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubTask {
     pub id: u32,
@@ -30,7 +30,7 @@ pub struct SubTask {
     pub details: Option<String>,
 }
 
-/// TaskMaster file structure
+/// `TaskMaster` file structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct TasksFile {
     tasks: Vec<Task>,
@@ -203,8 +203,7 @@ pub fn find_blocked_tasks(repo_path: &Path) -> Result<Vec<u32>> {
             let has_incomplete_deps = deps.iter().any(|dep_id| {
                 task_map
                     .get(dep_id)
-                    .map(|dep| dep.status != "done" && dep.status != "completed")
-                    .unwrap_or(true)
+                    .map_or(true, |dep| dep.status != "done" && dep.status != "completed")
             });
 
             if has_incomplete_deps {

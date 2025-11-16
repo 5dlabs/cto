@@ -1,6 +1,6 @@
-//! OpenCode CLI Adapter Implementation
+//! `OpenCode` CLI Adapter Implementation
 //!
-//! Provides a concrete implementation of the `CliAdapter` trait for the OpenCode CLI.
+//! Provides a concrete implementation of the `CliAdapter` trait for the `OpenCode` CLI.
 //! The adapter mirrors the structure used by other adapters (Codex/Factory) so the
 //! controller can generate CLI-specific configuration, render memory files, and
 //! translate responses into the shared `ParsedResponse` format.
@@ -122,9 +122,7 @@ impl OpenCodeAdapter {
     fn build_config_context(&self, agent_config: &AgentConfig) -> Value {
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
-        let model = first_string(&cli_config, &["model", "defaultModel"])
-            .map(str::to_string)
-            .unwrap_or_else(|| agent_config.model.clone());
+        let model = first_string(&cli_config, &["model", "defaultModel"]).map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "max_output_tokens"])
             .map(|value| value as u32)
@@ -291,11 +289,11 @@ impl CliAdapter for OpenCodeAdapter {
         })
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "OPENCODE.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "opencode"
     }
 

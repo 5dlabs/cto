@@ -172,9 +172,7 @@ impl CliAdapter for CodexAdapter {
 
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
-        let model = first_string(&cli_config, &["model"])
-            .map(str::to_string)
-            .unwrap_or_else(|| agent_config.model.clone());
+        let model = first_string(&cli_config, &["model"]).map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "modelMaxOutputTokens"])
             .map(|value| value as u32)
@@ -322,11 +320,11 @@ impl CliAdapter for CodexAdapter {
         })
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "AGENTS.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "codex"
     }
 

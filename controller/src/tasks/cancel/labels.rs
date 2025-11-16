@@ -26,7 +26,7 @@ pub struct AtomicLabelManager {
 }
 
 impl AtomicLabelManager {
-    pub fn new(_token: &str, _owner: &str, _repo: &str) -> Self {
+    #[must_use] pub fn new(_token: &str, _owner: &str, _repo: &str) -> Self {
         // Placeholder implementation
         Self {}
     }

@@ -16,10 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Controller Service - Kubernetes Controller for CodeRun and DocsRun CRDs
+//! Controller Service - Kubernetes Controller for `CodeRun` and `DocsRun` CRDs
 //!
 //! This service manages the lifecycle of AI agent jobs by:
-//! - Watching for CodeRun and DocsRun custom resources
+//! - Watching for `CodeRun` and `DocsRun` custom resources
 //! - Creating and managing Kubernetes Jobs for agent execution
 //! - Handling resource cleanup and status updates
 //! - Providing health and metrics endpoints
@@ -233,7 +233,7 @@ async fn webhook_handler(
     let pr_number = payload
         .get("pull_request")
         .and_then(|pr| pr.get("number"))
-        .and_then(|num| num.as_i64())
+        .and_then(serde_json::Value::as_i64)
         .ok_or(StatusCode::BAD_REQUEST)?;
 
     let repo_owner = payload
@@ -289,18 +289,15 @@ async fn webhook_handler(
 
     let task_id = task_label.to_string();
 
-    let token = match std::env::var("GITHUB_TOKEN") {
-        Ok(value) => value,
-        Err(_) => {
-            warn!(
-                "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
-                label_name
-            );
-            return Ok(Json(json!({
-                "status": "skipped",
-                "reason": "missing_token"
-            })));
-        }
+    let token = if let Ok(value) = std::env::var("GITHUB_TOKEN") { value } else {
+        warn!(
+            "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
+            label_name
+        );
+        return Ok(Json(json!({
+            "status": "skipped",
+            "reason": "missing_token"
+        })));
     };
 
     let label_client =
@@ -378,10 +375,10 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
+        () = ctrl_c => {
             info!("Received Ctrl+C, shutting down gracefully");
         },
-        _ = terminate => {
+        () = terminate => {
             info!("Received SIGTERM, shutting down gracefully");
         },
     }

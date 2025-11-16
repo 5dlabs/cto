@@ -29,7 +29,7 @@ pub struct CodeResourceManager<'a> {
 }
 
 impl<'a> CodeResourceManager<'a> {
-    pub fn new(
+    #[must_use] pub fn new(
         jobs: &'a Api<Job>,
         configmaps: &'a Api<ConfigMap>,
         pvcs: &'a Api<PersistentVolumeClaim>,
@@ -50,7 +50,7 @@ impl<'a> CodeResourceManager<'a> {
         info!("🚀 Creating/updating code resources for: {}", name);
 
         // STEP: Auto-populate CLI config based on agent (if not already specified)
-        let code_run = self.populate_cli_config_if_needed(code_run).await?;
+        let code_run = self.populate_cli_config_if_needed(code_run)?;
         let code_run_ref = &*code_run;
 
         // Determine PVC name based on agent classification
@@ -269,8 +269,7 @@ impl<'a> CodeResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
         let task_id = code_run.spec.task_id;
         let service_name = code_run.spec.service.replace('_', "-");
         let context_version = code_run.spec.context_version;
@@ -337,15 +336,15 @@ impl<'a> CodeResourceManager<'a> {
                     .list(&ListParams::default().labels(&format!("job-name={job_name}")))
                     .await?;
 
-                if !pod_list.items.is_empty() {
+                if pod_list.items.is_empty() {
                     info!(
-                        "Found {} existing pod(s) for job {}, using existing job",
-                        pod_list.items.len(),
+                        "Job {} exists but has no pods, will let Job controller handle it",
                         job_name
                     );
                 } else {
                     info!(
-                        "Job {} exists but has no pods, will let Job controller handle it",
+                        "Found {} existing pod(s) for job {}, using existing job",
+                        pod_list.items.len(),
                         job_name
                     );
                 }
@@ -585,7 +584,7 @@ impl<'a> CodeResourceManager<'a> {
             .agent
             .cli_providers
             .get(&cli_type.to_string().to_lowercase())
-            .map(|value| value.as_str());
+            .map(std::string::String::as_str);
 
         let api_key_binding = self.config.secrets.resolve_cli_binding(&cli_type, provider);
         let ResolvedSecretBinding {
@@ -961,8 +960,7 @@ impl<'a> CodeResourceManager<'a> {
             .spec
             .task_requirements
             .as_ref()
-            .map(|r| !r.trim().is_empty())
-            .unwrap_or(false);
+            .is_some_and(|r| !r.trim().is_empty());
 
         if has_valid_requirements {
             let requirements_b64 = code_run.spec.task_requirements.as_ref().unwrap();
@@ -1251,11 +1249,10 @@ impl<'a> CodeResourceManager<'a> {
                             let is_job_active = job
                                 .status
                                 .as_ref()
-                                .map(|status| {
+                                .map_or(true, |status| {
                                     status.completion_time.is_none()
                                         && status.failed.unwrap_or(0) == 0
-                                })
-                                .unwrap_or(true);
+                                });
 
                             if is_job_active {
                                 info!(
@@ -1284,21 +1281,19 @@ impl<'a> CodeResourceManager<'a> {
                                 pod.status
                                     .as_ref()
                                     .and_then(|s| s.phase.as_deref())
-                                    .map(|phase| {
+                                    .is_some_and(|phase| {
                                         // Protect ConfigMaps for pods that might be starting
                                         phase == "Running" || phase == "Pending"
-                                    })
-                                    .unwrap_or(false) ||
+                                    }) ||
                                 // Also check for Init containers (still mounting volumes)
                                 pod.status
                                     .as_ref()
                                     .and_then(|s| s.init_container_statuses.as_ref())
-                                    .map(|containers| containers.iter().any(|c| {
-                                        c.state.as_ref().map(|state| {
+                                    .is_some_and(|containers| containers.iter().any(|c| {
+                                        c.state.as_ref().is_some_and(|state| {
                                             state.running.is_some() || state.waiting.is_some()
-                                        }).unwrap_or(false)
+                                        })
                                     }))
-                                    .unwrap_or(false)
                             });
 
                             if has_active_pods {
@@ -1417,13 +1412,12 @@ impl<'a> CodeResourceManager<'a> {
             .spec
             .cli_config
             .as_ref()
-            .map(|cfg| cfg.cli_type)
-            .unwrap_or(CLIType::Claude)
+            .map_or(CLIType::Claude, |cfg| cfg.cli_type)
     }
 
-    /// Select the appropriate Docker image based on the CLI type specified in the CodeRun
+    /// Select the appropriate Docker image based on the CLI type specified in the `CodeRun`
     /// Auto-populate CLI config based on agent GitHub app (if not already specified)
-    async fn populate_cli_config_if_needed(&self, code_run: &Arc<CodeRun>) -> Result<Arc<CodeRun>> {
+    fn populate_cli_config_if_needed(&self, code_run: &Arc<CodeRun>) -> Result<Arc<CodeRun>> {
         // If we have no GitHub app context, we cannot enrich the CLI config
         let Some(github_app) = &code_run.spec.github_app else {
             if code_run.spec.cli_config.is_none() {
@@ -1448,20 +1442,17 @@ impl<'a> CodeResourceManager<'a> {
 
         let mut new_code_run = (**code_run).clone();
 
-        match new_code_run.spec.cli_config.as_mut() {
-            Some(existing) => {
-                Self::merge_cli_config(existing, agent_cli_config);
+        if let Some(existing) = new_code_run.spec.cli_config.as_mut() {
+            Self::merge_cli_config(existing, agent_cli_config);
+            self.apply_cli_provider(existing);
+        } else {
+            info!(
+                "🔧 Auto-populating CLI config for agent {}: {} ({})",
+                github_app, agent_cli_config.cli_type, agent_cli_config.model
+            );
+            new_code_run.spec.cli_config = Some(agent_cli_config.clone());
+            if let Some(existing) = new_code_run.spec.cli_config.as_mut() {
                 self.apply_cli_provider(existing);
-            }
-            None => {
-                info!(
-                    "🔧 Auto-populating CLI config for agent {}: {} ({})",
-                    github_app, agent_cli_config.cli_type, agent_cli_config.model
-                );
-                new_code_run.spec.cli_config = Some(agent_cli_config.clone());
-                if let Some(existing) = new_code_run.spec.cli_config.as_mut() {
-                    self.apply_cli_provider(existing);
-                }
             }
         }
 
@@ -1568,7 +1559,7 @@ mod tests {
     fn cli_config_with_settings(settings: HashMap<String, serde_json::Value>) -> CLIConfig {
         CLIConfig {
             cli_type: CLIType::Codex,
-            model: "".to_string(),
+            model: String::new(),
             settings,
             max_tokens: None,
             temperature: None,

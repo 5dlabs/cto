@@ -40,16 +40,16 @@ pub(crate) const DOCS_FINALIZER_NAME: &str = "docsruns.orchestrator.io/finalizer
 pub(crate) const CODE_FINALIZER_NAME: &str = "coderuns.orchestrator.io/finalizer";
 
 // Helper functions for SSH and GitHub token secret names
-pub fn ssh_secret_name(github_user: &str) -> String {
+#[must_use] pub fn ssh_secret_name(github_user: &str) -> String {
     format!("github-ssh-{github_user}")
 }
 
-pub fn github_token_secret_name(github_user: &str) -> String {
+#[must_use] pub fn github_token_secret_name(github_user: &str) -> String {
     format!("github-token-{github_user}")
 }
 
 // Helper function for GitHub App secret names
-pub fn github_app_secret_name(github_app: &str) -> String {
+#[must_use] pub fn github_app_secret_name(github_app: &str) -> String {
     // Convert GitHub App name to secret name (e.g., "5DLabs-Morgan" -> "github-app-5dlabs-morgan")
     let normalized = github_app.to_lowercase().replace(['_', ' '], "-");
     format!("github-app-{normalized}")

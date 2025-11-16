@@ -5,7 +5,7 @@ use std::fmt;
 /// Main structured feedback container representing parsed QA feedback
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuredFeedback {
-    /// The type of issue identified (Bug, MissingFeature, etc.)
+    /// The type of issue identified (Bug, `MissingFeature`, etc.)
     pub issue_type: IssueType,
     /// The severity level of the issue
     pub severity: Severity,
@@ -108,7 +108,7 @@ pub struct CriteriaStatus {
 
 impl CriteriaStatus {
     /// Create a new uncompleted criterion
-    pub fn new(description: String) -> Self {
+    #[must_use] pub fn new(description: String) -> Self {
         Self {
             description,
             completed: false,
@@ -117,7 +117,7 @@ impl CriteriaStatus {
     }
 
     /// Create a new criterion with specified completion status
-    pub fn with_status(description: String, completed: bool) -> Self {
+    #[must_use] pub fn with_status(description: String, completed: bool) -> Self {
         Self {
             description,
             completed,
@@ -126,7 +126,7 @@ impl CriteriaStatus {
     }
 
     /// Set the line number for this criterion
-    pub fn with_line_number(mut self, line_number: usize) -> Self {
+    #[must_use] pub fn with_line_number(mut self, line_number: usize) -> Self {
         self.line_number = Some(line_number);
         self
     }
@@ -149,7 +149,7 @@ pub struct FeedbackMetadata {
 
 impl FeedbackMetadata {
     /// Create new metadata with current timestamp
-    pub fn new(author: String, comment_id: u64, pr_number: u32, task_id: String) -> Self {
+    #[must_use] pub fn new(author: String, comment_id: u64, pr_number: u32, task_id: String) -> Self {
         Self {
             author,
             timestamp: Utc::now(),
@@ -160,7 +160,7 @@ impl FeedbackMetadata {
     }
 
     /// Create metadata with specific timestamp (useful for testing)
-    pub fn with_timestamp(
+    #[must_use] pub fn with_timestamp(
         author: String,
         timestamp: DateTime<Utc>,
         comment_id: u64,

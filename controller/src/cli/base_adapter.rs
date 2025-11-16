@@ -34,7 +34,7 @@ pub struct OperationContext {
     pub start_time: Instant,
 }
 
-/// Configuration for BaseAdapter
+/// Configuration for `BaseAdapter`
 #[derive(Debug, Clone)]
 pub struct AdapterConfig {
     /// CLI type this adapter handles
@@ -55,23 +55,20 @@ pub struct AdapterConfig {
 
 impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
-        let default_template_root = match std::env::var("CLI_TEMPLATES_ROOT") {
-            Ok(path) => PathBuf::from(path),
-            Err(_) => {
-                let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
-                let repo_relative = manifest_dir
-                    .map(PathBuf::from)
-                    .map(|dir| {
-                        dir.join("..")
-                            .join("infra/charts/controller/agent-templates")
-                    })
-                    .filter(|path| path.exists());
+        let default_template_root = if let Ok(path) = std::env::var("CLI_TEMPLATES_ROOT") { PathBuf::from(path) } else {
+            let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
+            let repo_relative = manifest_dir
+                .map(PathBuf::from)
+                .map(|dir| {
+                    dir.join("..")
+                        .join("infra/charts/controller/agent-templates")
+                })
+                .filter(|path| path.exists());
 
-                if let Some(path) = repo_relative {
-                    path
-                } else {
-                    PathBuf::from("/agent-templates")
-                }
+            if let Some(path) = repo_relative {
+                path
+            } else {
+                PathBuf::from("/agent-templates")
             }
         };
         Self {
@@ -85,7 +82,7 @@ impl AdapterConfig {
         }
     }
 
-    pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
+    #[must_use] pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
         self.correlation_id = correlation_id;
         self
     }
@@ -95,7 +92,7 @@ impl AdapterConfig {
         self
     }
 
-    pub fn with_verbose_logging(mut self, verbose: bool) -> Self {
+    #[must_use] pub fn with_verbose_logging(mut self, verbose: bool) -> Self {
         self.verbose_logging = verbose;
         self
     }
@@ -531,7 +528,7 @@ impl BaseAdapter {
     }
 
     /// Get adapter configuration summary for diagnostics
-    pub fn get_config_summary(&self) -> HashMap<String, serde_json::Value> {
+    #[must_use] pub fn get_config_summary(&self) -> HashMap<String, serde_json::Value> {
         let mut summary = HashMap::new();
 
         summary.insert("cli_type".to_string(), json!(self.cli_type.to_string()));
@@ -682,7 +679,7 @@ mod tests {
         let invalid_config = AgentConfig {
             github_app: "test-app".to_string(),
             cli: "claude".to_string(),
-            model: "".to_string(),
+            model: String::new(),
             max_tokens: Some(4096),
             temperature: Some(0.7),
             tools: None,
@@ -759,7 +756,7 @@ mod tests {
         // Invalid container context - empty name
         let invalid_container = ContainerContext {
             pod: None,
-            container_name: "".to_string(),
+            container_name: String::new(),
             working_dir: "/workspace".to_string(),
             env_vars: HashMap::new(),
             namespace: "default".to_string(),

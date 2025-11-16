@@ -3,7 +3,7 @@
 //! Responsible for discovering and profiling CLI tools to understand
 //! their capabilities, configuration requirements, and compatibility.
 
-use crate::cli::types::*;
+use crate::cli::types::{CLIType, CLIProfile, CLIAvailability, CLIConfiguration, ConfigFormat, CLICapabilities, SessionType, CostModel};
 use std::collections::HashMap;
 use tokio::process::Command;
 use tracing::info;
@@ -22,7 +22,7 @@ impl Default for DiscoveryService {
 
 impl DiscoveryService {
     /// Create a new discovery service
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             discovered_profiles: HashMap::new(),
         }
@@ -36,13 +36,13 @@ impl DiscoveryService {
         let _availability = self.check_availability(cli_type).await?;
 
         // Phase 2: Configuration format discovery
-        let configuration = self.discover_configuration(cli_type).await?;
+        let configuration = self.discover_configuration(cli_type)?;
 
         // Phase 3: Capability assessment
-        let capabilities = self.assess_capabilities(cli_type).await?;
+        let capabilities = self.assess_capabilities(cli_type)?;
 
         // Phase 4: Performance profiling
-        let cost_model = self.profile_performance(cli_type).await?;
+        let cost_model = self.profile_performance(cli_type)?;
 
         let profile = CLIProfile {
             name: cli_type.to_string(),
@@ -86,7 +86,7 @@ impl DiscoveryService {
     }
 
     /// Discover configuration format and requirements
-    async fn discover_configuration(&self, cli_type: CLIType) -> Result<CLIConfiguration> {
+    fn discover_configuration(&self, cli_type: CLIType) -> Result<CLIConfiguration> {
         match cli_type {
             CLIType::Claude => Ok(CLIConfiguration {
                 config_format: ConfigFormat::Markdown,
@@ -134,7 +134,7 @@ impl DiscoveryService {
     }
 
     /// Assess CLI capabilities
-    async fn assess_capabilities(&self, cli_type: CLIType) -> Result<CLICapabilities> {
+    fn assess_capabilities(&self, cli_type: CLIType) -> Result<CLICapabilities> {
         // For now, return known capabilities based on our research
         match cli_type {
             CLIType::Claude => Ok(CLICapabilities {
@@ -195,7 +195,7 @@ impl DiscoveryService {
     }
 
     /// Profile performance characteristics
-    async fn profile_performance(&self, cli_type: CLIType) -> Result<CostModel> {
+    fn profile_performance(&self, cli_type: CLIType) -> Result<CostModel> {
         // Return estimated cost models based on our research
         match cli_type {
             CLIType::Claude => Ok(CostModel {
@@ -250,7 +250,7 @@ impl DiscoveryService {
     }
 
     /// Get a cached profile if available
-    pub fn get_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
+    #[must_use] pub fn get_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
         self.discovered_profiles.get(&cli_type)
     }
 

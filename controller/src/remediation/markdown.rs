@@ -131,7 +131,7 @@ impl MarkdownParser {
     }
 
     /// Check if all criteria are completed
-    pub fn are_all_criteria_met(body: &str) -> bool {
+    #[must_use] pub fn are_all_criteria_met(body: &str) -> bool {
         Self::extract_unmet_criteria(body).is_err() // Returns error if all are met
     }
 
@@ -146,7 +146,7 @@ impl MarkdownParser {
     }
 
     /// Handle various markdown checkbox formats
-    pub fn normalize_checkbox_syntax(line: &str) -> Option<(bool, String)> {
+    #[must_use] pub fn normalize_checkbox_syntax(line: &str) -> Option<(bool, String)> {
         let line = line.trim();
 
         // Handle different checkbox formats

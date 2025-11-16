@@ -117,7 +117,11 @@ if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 export GITHUB_TOKEN
-export GH_TOKEN="$GITHUB_TOKEN"
+if [ -z "${GH_TOKEN:-}" ]; then
+  export GH_TOKEN="$GITHUB_TOKEN"
+else
+  echo "ℹ️ Preserving preconfigured GH_TOKEN from environment"
+fi
 export GH_HOST="github.com"
 
 # Task-specific workspace for parallel execution isolation
@@ -176,12 +180,118 @@ safe_git_config() {
 
 safe_git_config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 
+write_gitleaks_allowlist() {
+  local config_path="$REPO_ROOT/.gitleaks.toml"
+  cat > "$config_path" <<'EOF'
+title = "Codex managed gitleaks configuration"
+
+[allowlist]
+description = "Ignore gh CLI host cache generated during Codex runs"
+paths = [
+  '''\.config/gh/hosts\.yml'''
+]
+EOF
+
+  if [ "${SERVICE_NAME:-}" = "cto-parallel-test" ]; then
+    cat >> "$config_path" <<'EOF'
+
+[[allowlist.files]]
+description = "Sample JWT strings documented for task instructions"
+file = '''IMPLEMENTATION_COMPLETE.md'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+
+[[allowlist.files]]
+description = "Sample JWT strings in acceptance criteria handoff"
+file = '''task/task.md'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+
+[[allowlist.files]]
+description = "Sample JWT strings in docs/.taskmaster/docs/task-3/task.md"
+file = '''docs/.taskmaster/docs/task-3/task.md'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+
+[[allowlist.files]]
+description = "Sample JWT strings in src/auth/models.rs fixtures"
+file = '''src/auth/models.rs'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+EOF
+  fi
+
+  echo "✓ Wrote gitleaks allowlist to $config_path"
+}
+
+cleanup_locked_refs_from_log() {
+  local log_file="$1"
+  local cleaned=0
+
+  if [ ! -f "$log_file" ]; then
+    return 1
+  fi
+
+  while IFS= read -r ref; do
+    if [ -z "$ref" ]; then
+      continue
+    fi
+    local ref_path=".git/$ref"
+    echo "⚠️ Removing stale remote ref $ref_path"
+    rm -f "$ref_path" "${ref_path}.lock"
+    cleaned=1
+  done < <(grep -o "refs/remotes/[^']*" "$log_file" 2>/dev/null | sort -u || true)
+
+  if [ $cleaned -eq 1 ]; then
+    git remote prune origin >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  return 1
+}
+
+safe_git_fetch() {
+  local log_file
+  log_file=$(mktemp)
+
+  if git fetch "$@" >"$log_file" 2>&1; then
+    rm -f "$log_file"
+    return 0
+  fi
+
+  if cleanup_locked_refs_from_log "$log_file"; then
+    echo "🔧 Cleaned stale remote refs; retrying git fetch $*"
+    if git fetch "$@" >>"$log_file" 2>&1; then
+      rm -f "$log_file"
+      return 0
+    fi
+  fi
+
+  cat "$log_file"
+  rm -f "$log_file"
+  return 1
+}
+
 write_git_credentials() {
   if [ -z "${GITHUB_TOKEN:-}" ]; then
     return
   fi
   printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$CREDENTIALS_FILE"
   chmod 600 "$CREDENTIALS_FILE" 2>/dev/null || true
+}
+
+write_gh_hosts_config() {
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    return
+  fi
+
+  local hosts_dir="${GH_CONFIG_DIR:-$HOME/.config/gh}"
+  mkdir -p "$hosts_dir"
+
+  cat >"$hosts_dir/hosts.yml" <<EOF
+github.com:
+    user: x-access-token
+    oauth_token: ${GITHUB_TOKEN}
+    git_protocol: https
+EOF
+
+  chmod 600 "$hosts_dir/hosts.yml" 2>/dev/null || true
 }
 
 gh_hosts_file() {
@@ -213,7 +323,32 @@ sync_gh_hosts_to_path() {
   fi
 }
 
+cleanup_git_state() {
+  if [ ! -d ".git" ]; then
+    return
+  fi
+
+  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^AU\|^UA\|^DU\|^UD"; then
+    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
+    git merge --abort 2>/dev/null || true
+    echo "✓ Merge conflicts aborted"
+  fi
+
+  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
+    echo "⚠️ Detecting incomplete git operation, resetting..."
+    git rebase --abort 2>/dev/null || true
+    git cherry-pick --abort 2>/dev/null || true
+    git merge --abort 2>/dev/null || true
+    if ! git diff-index --quiet HEAD 2>/dev/null; then
+      git reset --hard HEAD 2>/dev/null || true
+    fi
+    echo "✓ Git operations reset"
+  fi
+}
+
 write_git_credentials
+
+write_gh_hosts_config
 
 TOKEN_GENERATED_AT=$(date +%s)
 
@@ -257,6 +392,7 @@ refresh_github_token() {
     export GH_TOKEN="$NEW_TOKEN"
     TOKEN_GENERATED_AT=$(date +%s)
     write_git_credentials
+    write_gh_hosts_config
 
     # Update bashrc with refreshed token for Codex login shells
     if [ -f "$HOME/.bashrc" ]; then
@@ -269,7 +405,7 @@ refresh_github_token() {
     fi
 
     if command -v gh >/dev/null 2>&1; then
-      printf '%s\n' "$NEW_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1 || true
+      printf '%s\n' "$NEW_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" --git-protocol https >/dev/null 2>&1 || true
       gh auth setup-git >/dev/null 2>&1 || true
     fi
 
@@ -429,7 +565,8 @@ ensure_gh_authenticated() {
   if ! gh auth status -h "$GH_HOST" >/dev/null 2>&1; then
     echo "🔐 Logging in to GitHub CLI for host $GH_HOST"
     refresh_github_token || true
-    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" >/dev/null 2>&1; then
+    write_gh_hosts_config
+    if ! printf '%s\n' "$GITHUB_TOKEN" | timeout 10 gh auth login --with-token --hostname "$GH_HOST" --git-protocol https >/dev/null 2>&1; then
       echo "⚠️ gh auth login returned non-zero or timed out; continuing with GH_TOKEN env"
     fi
   fi
@@ -541,7 +678,7 @@ ensure_pr_created() {
 
   refresh_token_if_needed || true
   if [ -n "$BASE_BRANCH" ]; then
-    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    safe_git_fetch origin "$BASE_BRANCH" || true
   fi
 
   if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
@@ -577,7 +714,7 @@ ensure_pr_created() {
     return
   fi
 
-  git fetch origin "$CURRENT_BRANCH" >/dev/null 2>&1 || true
+  safe_git_fetch origin "$CURRENT_BRANCH" || true
   if [ -n "$REMOTE_BASE" ]; then
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
   else
@@ -688,6 +825,91 @@ EOF
 
   LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
 
+  github_api_request() {
+    local method="$1"
+    shift
+    if [ -z "${GITHUB_TOKEN:-}" ]; then
+      return 1
+    fi
+    curl -sS -X "$method" \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "$@"
+  }
+
+  fetch_existing_pr_number() {
+    local response
+    response=$(github_api_request GET "https://api.github.com/repos/$REPO_SLUG/pulls?head=${REPO_OWNER}:${CURRENT_BRANCH}&state=all" 2>/dev/null || true)
+    if [ -z "$response" ]; then
+      return
+    fi
+    printf '%s' "$response" | jq -r '.[0].number // empty' 2>/dev/null || true
+  }
+
+  apply_labels_via_api() {
+    local pr_number="$1"
+    shift
+    local labels_to_add=()
+    for label in "$@"; do
+      if [ -z "$label" ]; then
+        continue
+      fi
+      if github_api_request GET "https://api.github.com/repos/$REPO_SLUG/labels/$label" >/dev/null 2>&1; then
+        labels_to_add+=("$label")
+      else
+        echo "⚠️ Label '$label' not found via API fallback; skipping"
+      fi
+    done
+    if [ "${#labels_to_add[@]}" -eq 0 ]; then
+      return 0
+    fi
+    local labels_json
+    labels_json=$(printf '%s\n' "${labels_to_add[@]}" | jq -R . | jq -s .)
+    github_api_request POST "https://api.github.com/repos/$REPO_SLUG/issues/$pr_number/labels" \
+      --data "{\"labels\": $labels_json}" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to apply labels via API fallback"
+  }
+
+  create_pr_via_api() {
+    if [ -z "${GITHUB_TOKEN:-}" ]; then
+      echo "⚠️ No GitHub token available for REST fallback"
+      return 1
+    fi
+
+    local payload
+    payload=$(jq -n \
+      --arg title "$PR_TITLE" \
+      --arg body "$PR_BODY" \
+      --arg base "$BASE_BRANCH" \
+      --arg head "$CURRENT_BRANCH" \
+      '{title:$title, body:$body, base:$base, head:$head, maintainer_can_modify:true}')
+
+    local response pr_number
+    response=$(github_api_request POST "https://api.github.com/repos/$REPO_SLUG/pulls" --data "$payload")
+    pr_number=$(printf '%s' "$response" | jq -r '.number // empty')
+
+    if [ -z "$pr_number" ]; then
+      local errors_message
+      errors_message=$(printf '%s' "$response" | jq -r '.errors[0].message // empty')
+      if printf '%s' "$errors_message" | grep -qi "already exists"; then
+        pr_number=$(fetch_existing_pr_number)
+      fi
+    fi
+
+    if [ -z "$pr_number" ]; then
+      local api_message
+      api_message=$(printf '%s' "$response" | jq -r '.message // "unknown error"')
+      echo "⚠️ REST fallback failed to create PR: $api_message"
+      return 1
+    fi
+
+    PR_NUMBER="$pr_number"
+    PR_URL="https://github.com/$REPO_SLUG/pull/$PR_NUMBER"
+    echo "✅ Created pull request via GitHub REST API fallback (#$PR_NUMBER)"
+    apply_labels_via_api "$PR_NUMBER" "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"
+    return 0
+  }
+
   maybe_add_label() {
     local label="$1"
     if [ -z "$label" ]; then
@@ -730,7 +952,12 @@ EOF
       echo "⚠️ Could not get PR number for project linking"
     fi
   else
-    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+    echo "⚠️ gh pr create failed (it may already exist or authentication failed); attempting REST fallback"
+    if create_pr_via_api; then
+      echo "ℹ️ Skipping GitHub Project linking for REST fallback"
+    else
+      echo "⚠️ Failed to create pull request automatically (gh CLI and REST fallback both failed)"
+    fi
   fi
 }
 
@@ -800,7 +1027,7 @@ if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
   cd "$REPO_NAME"
   refresh_token_if_needed
-  git fetch --all --prune
+  safe_git_fetch --all --prune
 else
   echo "⬇️  Cloning repository"
   refresh_token_if_needed
@@ -816,6 +1043,9 @@ echo "✓ Git credential helper configured for repository"
 safe_git_config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 sync_gh_hosts_to_path "$REPO_ROOT"
+write_gitleaks_allowlist
+export GITLEAKS_CONFIG="$REPO_ROOT/.gitleaks.toml"
+# gitleaks CLI reads $GITLEAKS_CONFIG automatically, so agents don't need to pass --config
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
@@ -874,12 +1104,13 @@ if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
 fi
 
 if [ -n "$BASE_BRANCH" ]; then
-  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  safe_git_fetch origin "$BASE_BRANCH" || true
 fi
 
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  cleanup_git_state
   # Stash any local changes from previous runs to avoid checkout conflicts
   # Exclude task/ directory to preserve task files that were just copied
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
@@ -945,25 +1176,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   fi
 else
   echo "Creating new feature branch '$FEATURE_BRANCH'"
-  
-  # Check for and abort any in-progress merge conflicts before checkout
-  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^DD\|^AU\|^UA\|^DU\|^UD"; then
-    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
-    git merge --abort 2>/dev/null || true
-    echo "✓ Merge conflicts aborted"
-  fi
-  
-  # Check for and reset any incomplete merge (rebase, cherry-pick, etc.)
-  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
-    echo "⚠️ Detecting incomplete git operation, resetting..."
-    git rebase --abort 2>/dev/null || true
-    git cherry-pick --abort 2>/dev/null || true  
-    git merge --abort 2>/dev/null || true
-    if ! git diff-index --quiet HEAD; then
-      git reset --hard HEAD 2>/dev/null || true
-    fi
-    echo "✓ Git operations reset"
-  fi
+  cleanup_git_state
   
   # Stash any local changes from previous runs to avoid checkout conflicts
   # Exclude task/ directory to preserve task files that were just copied
@@ -1951,7 +2164,7 @@ Handoff document created for Cleo to continue work." 2>/dev/null || echo "⚠️
   COMMITS_MADE=0
   
   if [ -n "$CURRENT_BRANCH" ]; then
-    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    safe_git_fetch origin "$BASE_BRANCH" || true
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
     if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
       COMMITS_MADE=1

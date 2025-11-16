@@ -997,7 +997,7 @@ async fn test_error_handling() {
 
     // ✅ Test invalid configuration handling
     let invalid_config = AgentConfig {
-        github_app: "".to_string(), // Invalid empty GitHub app
+        github_app: String::new(), // Invalid empty GitHub app
         cli: "claude".to_string(),
         model: "claude-3-opus".to_string(),
         max_tokens: Some(4096),

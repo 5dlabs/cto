@@ -23,7 +23,7 @@ pub struct FeedbackParser {
 
 impl FeedbackParser {
     /// Create a new feedback parser with default settings
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             author_validator: AuthorValidator::new(),
             detailed_logging: true,
@@ -32,7 +32,7 @@ impl FeedbackParser {
     }
 
     /// Create parser with custom author validator
-    pub fn with_validator(validator: AuthorValidator) -> Self {
+    #[must_use] pub fn with_validator(validator: AuthorValidator) -> Self {
         Self {
             author_validator: validator,
             detailed_logging: true,
@@ -41,7 +41,7 @@ impl FeedbackParser {
     }
 
     /// Create parser with custom settings
-    pub fn with_config(
+    #[must_use] pub fn with_config(
         validator: AuthorValidator,
         detailed_logging: bool,
         max_comment_size: usize,
@@ -336,7 +336,7 @@ impl FeedbackParser {
     }
 
     /// Get author validator for configuration
-    pub fn author_validator(&self) -> &AuthorValidator {
+    #[must_use] pub fn author_validator(&self) -> &AuthorValidator {
         &self.author_validator
     }
 
@@ -356,7 +356,7 @@ impl FeedbackParser {
     }
 
     /// Get current configuration
-    pub fn config(&self) -> ParserConfig {
+    #[must_use] pub fn config(&self) -> ParserConfig {
         ParserConfig {
             detailed_logging: self.detailed_logging,
             max_comment_size: self.max_comment_size,
@@ -379,7 +379,7 @@ impl Default for FeedbackParser {
     }
 }
 
-/// Convenience function for parsing feedback (equivalent to parse_feedback_comment from mod.rs)
+/// Convenience function for parsing feedback (equivalent to `parse_feedback_comment` from mod.rs)
 pub fn parse_feedback_comment(
     comment_body: &str,
     author: &str,
