@@ -61,7 +61,8 @@ impl ResourceNaming {
             // Use deterministic hash for long names
             let hash = Self::hash_string(job_name);
             let task_id = Self::extract_task_id_from_job_name(job_name);
-            format!("bridge-t{task_id}-{hash}")
+            let hashed_name = format!("{CODERUN_JOB_PREFIX}bridge-t{task_id}-{hash}");
+            Self::ensure_k8s_name_length(&hashed_name, MAX_DNS_LABEL_LENGTH)
         }
     }
 
@@ -225,5 +226,15 @@ mod tests {
             ResourceNaming::extract_task_id_from_job_name(&job_name),
             "42"
         );
+    }
+
+    #[test]
+    fn service_name_retains_prefix_when_hashed() {
+        let mut long_job_name = String::from(CODERUN_JOB_PREFIX);
+        long_job_name.push_str(&"x".repeat(80));
+
+        let service_name = ResourceNaming::headless_service_name(&long_job_name);
+        assert!(service_name.starts_with(CODERUN_JOB_PREFIX));
+        assert!(service_name.len() <= MAX_DNS_LABEL_LENGTH);
     }
 }
