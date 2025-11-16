@@ -1326,7 +1326,7 @@ impl<'a> CodeResourceManager<'a> {
                         self.sanitize_label_value(github_identifier),
                         self.sanitize_label_value(&code_run.spec.service)
                     ));
-                    
+
                     let all_jobs = match self.jobs.list(&job_list_params).await {
                         Ok(jobs) => jobs,
                         Err(e) => {
@@ -1371,7 +1371,7 @@ impl<'a> CodeResourceManager<'a> {
                         self.sanitize_label_value(github_identifier),
                         self.sanitize_label_value(&code_run.spec.service)
                     ));
-                    
+
                     match pods.list(&pod_list_params).await {
                         Ok(pod_list) => {
                             let is_used_by_pod = pod_list.items.iter().any(|pod| {
