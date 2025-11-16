@@ -180,6 +180,46 @@ safe_git_config() {
 
 safe_git_config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 
+write_gitleaks_allowlist() {
+  local config_path="$REPO_ROOT/.gitleaks.toml"
+  cat > "$config_path" <<'EOF'
+title = "Codex managed gitleaks configuration"
+
+[allowlist]
+description = "Ignore gh CLI host cache generated during Codex runs"
+paths = [
+  '''\.config/gh/hosts\.yml'''
+]
+EOF
+
+  if [ "${SERVICE_NAME:-}" = "cto-parallel-test" ]; then
+    cat >> "$config_path" <<'EOF'
+
+[[allowlist.files]]
+description = "Sample JWT strings documented for task instructions"
+file = '''IMPLEMENTATION_COMPLETE.md'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+
+[[allowlist.files]]
+description = "Sample JWT strings in acceptance criteria handoff"
+file = '''task/task.md'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+
+[[allowlist.files]]
+description = "Sample JWT strings in docs/.taskmaster/docs/task-3/task.md"
+file = '''docs/.taskmaster/docs/task-3/task.md'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+
+[[allowlist.files]]
+description = "Sample JWT strings in src/auth/models.rs fixtures"
+file = '''src/auth/models.rs'''
+regex = '''eyJ[a-zA-Z0-9_-]{20,}'''
+EOF
+  fi
+
+  echo "✓ Wrote gitleaks allowlist to $config_path"
+}
+
 cleanup_locked_refs_from_log() {
   local log_file="$1"
   local cleaned=0
@@ -981,6 +1021,7 @@ echo "✓ Git credential helper configured for repository"
 safe_git_config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 sync_gh_hosts_to_path "$REPO_ROOT"
+write_gitleaks_allowlist
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
