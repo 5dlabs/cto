@@ -213,6 +213,29 @@ sync_gh_hosts_to_path() {
   fi
 }
 
+cleanup_git_state() {
+  if [ ! -d ".git" ]; then
+    return
+  fi
+
+  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^AU\|^UA\|^DU\|^UD"; then
+    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
+    git merge --abort 2>/dev/null || true
+    echo "✓ Merge conflicts aborted"
+  fi
+
+  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
+    echo "⚠️ Detecting incomplete git operation, resetting..."
+    git rebase --abort 2>/dev/null || true
+    git cherry-pick --abort 2>/dev/null || true
+    git merge --abort 2>/dev/null || true
+    if ! git diff-index --quiet HEAD 2>/dev/null; then
+      git reset --hard HEAD 2>/dev/null || true
+    fi
+    echo "✓ Git operations reset"
+  fi
+}
+
 write_git_credentials
 
 TOKEN_GENERATED_AT=$(date +%s)
@@ -880,6 +903,7 @@ fi
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
 if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   echo "Feature branch '$FEATURE_BRANCH' exists, checking out..."
+  cleanup_git_state
   # Stash any local changes from previous runs to avoid checkout conflicts
   # Exclude task/ directory to preserve task files that were just copied
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
@@ -945,25 +969,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
   fi
 else
   echo "Creating new feature branch '$FEATURE_BRANCH'"
-  
-  # Check for and abort any in-progress merge conflicts before checkout
-  if git status --porcelain 2>/dev/null | grep -q "^UU\|^AA\|^DD\|^..U\|^U..\|^DD\|^AU\|^UA\|^DU\|^UD"; then
-    echo "⚠️ Detecting unresolved merge conflicts, aborting merge..."
-    git merge --abort 2>/dev/null || true
-    echo "✓ Merge conflicts aborted"
-  fi
-  
-  # Check for and reset any incomplete merge (rebase, cherry-pick, etc.)
-  if [ -f ".git/REBASE_HEAD" ] || [ -f ".git/CHERRY_PICK_HEAD" ] || [ -f ".git/MERGE_HEAD" ]; then
-    echo "⚠️ Detecting incomplete git operation, resetting..."
-    git rebase --abort 2>/dev/null || true
-    git cherry-pick --abort 2>/dev/null || true  
-    git merge --abort 2>/dev/null || true
-    if ! git diff-index --quiet HEAD; then
-      git reset --hard HEAD 2>/dev/null || true
-    fi
-    echo "✓ Git operations reset"
-  fi
+  cleanup_git_state
   
   # Stash any local changes from previous runs to avoid checkout conflicts
   # Exclude task/ directory to preserve task files that were just copied
