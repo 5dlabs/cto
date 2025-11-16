@@ -1218,8 +1218,34 @@ git status --short || true
 source /agent-templates/shared_task-setup-functions.sh || {
     echo "⚠️ Warning: Resilient task functions not available, using basic operations"
     # Define minimal fallback functions
-    safe_copy_file() { cp "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
-    safe_copy_directory() { cp -r "$1" "$2" && echo "✓ $3 copied" || echo "❌ $3 copy failed"; }
+    safe_copy_file() { 
+      if [ ! -f "$1" ]; then
+        echo "❌ Source file not found: $1"
+        return 1
+      fi
+      if cp "$1" "$2" 2>/dev/null; then
+        echo "✓ $3 copied"
+        return 0
+      else
+        echo "❌ $3 copy failed"
+        return 1
+      fi
+    }
+    safe_copy_directory() { 
+      if [ ! -d "$1" ]; then
+        echo "❌ Source directory not found: $1"
+        return 1
+      fi
+      mkdir -p "$2" 2>/dev/null || true
+      if cp -r "$1"/* "$2/" 2>/dev/null; then
+        local file_count=$(find "$2" -type f 2>/dev/null | wc -l | tr -d ' ')
+        echo "✓ $3 copied ($file_count files)"
+        return 0
+      else
+        echo "❌ $3 copy failed"
+        return 1
+      fi
+    }
     safe_ensure_directory() { mkdir -p "$1"; }
     verify_task_files() { 
         if [ -f "$1/prompt.md" ]; then
@@ -1312,9 +1338,16 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
       refresh_token_if_needed
       if safe_copy_directory "$TASK_DIR" "$CODEX_WORK_DIR/task" "docs task files"; then
           echo "✅ Task files copied successfully from docs repository"
+          # Verify critical files exist after copy
+          if [ ! -f "$CODEX_WORK_DIR/task/prompt.md" ]; then
+            echo "❌ CRITICAL: prompt.md missing after copy"
+            create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "prompt.md missing after copy"
+            exit 1
+          fi
       else
           echo "❌ CRITICAL: Failed to copy task files from docs repository"
           create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
+          exit 1
       fi
     else
       echo "❌ CRITICAL: Task directory not found. Checked:"
@@ -1322,6 +1355,7 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
       echo "   - $DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
       echo "   - $DOCS_BASE_PATH/tasks/task-{{task_id}}"
       create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
+      exit 1
     fi
 
     if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
