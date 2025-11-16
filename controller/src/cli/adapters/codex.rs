@@ -5,11 +5,11 @@
 //! and health checks.
 
 use crate::cli::adapter::{
-    AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
-    ConfigFormat, ContainerContext, FinishReason, HealthStatus, MemoryStrategy, ParsedResponse,
-    ResponseMetadata, ToolCall,
+    AdapterError, AdapterResult, AgentConfig, CliAdapter, CliCapabilities, ContainerContext,
+    FinishReason, HealthStatus, ParsedResponse, ResponseMetadata, ToolCall,
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
+use crate::cli::capabilities::cli_capabilities;
 use crate::cli::types::CLIType;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -331,16 +331,7 @@ impl CliAdapter for CodexAdapter {
     }
 
     fn get_capabilities(&self) -> CliCapabilities {
-        CliCapabilities {
-            supports_streaming: false,
-            supports_multimodal: false,
-            supports_function_calling: true,
-            supports_system_prompts: true,
-            max_context_tokens: 128_000,
-            memory_strategy: MemoryStrategy::MarkdownFile("AGENTS.md".to_string()),
-            config_format: ConfigFormat::Toml,
-            authentication_methods: vec![AuthMethod::ApiKey],
-        }
+        cli_capabilities(CLIType::Codex)
     }
 
     async fn initialize(&self, container: &ContainerContext) -> Result<()> {

@@ -1,4 +1,5 @@
 use crate::cli::types::CLIType;
+use crate::cli::{cli_capabilities, CliCapabilities};
 use crate::crds::CodeRun;
 use crate::tasks::code::agent::AgentClassifier;
 use crate::tasks::config::ControllerConfig;
@@ -46,6 +47,7 @@ struct CliRenderSettings {
     raw_additional_json: Option<String>,
     model_rotation: Vec<String>,
     list_tools_on_start: bool,
+    capabilities: CliCapabilities,
 }
 
 pub struct CodeTemplateGenerator;
@@ -396,6 +398,7 @@ impl CodeTemplateGenerator {
                 "model": model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -478,6 +481,7 @@ impl CodeTemplateGenerator {
                 "model": model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
             "toolman": {
                 "tools": remote_tools,
@@ -685,6 +689,7 @@ impl CodeTemplateGenerator {
                 "model": render_settings.model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -764,6 +769,7 @@ impl CodeTemplateGenerator {
                 "model": render_settings.model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
             "toolman": {
                 "tools": remote_tools,
@@ -906,6 +912,8 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
         // Register shared agent system prompt partials
         Self::register_agent_partials(&mut handlebars)?;
 
@@ -1018,6 +1026,7 @@ impl CodeTemplateGenerator {
                 "model": cli_model, // Use cli_model instead of code_run.spec.model
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
             "toolman": {
                 "tools": remote_tools,
@@ -1098,6 +1107,7 @@ impl CodeTemplateGenerator {
             .get("settings")
             .cloned()
             .unwrap_or_else(|| json!({}));
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
@@ -1128,6 +1138,7 @@ impl CodeTemplateGenerator {
                     .unwrap_or(&code_run.spec.model),
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -1168,12 +1179,10 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
         // Extract model from cli_config like other templates do
-        let model = cli_config
-            .get("model")
-            .and_then(Value::as_str)
-            .unwrap_or(&code_run.spec.model)
-            .to_string();
+        let model = render_settings.model.clone();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
         let context = json!({
@@ -1198,6 +1207,7 @@ impl CodeTemplateGenerator {
                 "model": model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
             "toolman": {
                 "tools": remote_tools,
@@ -1245,6 +1255,7 @@ impl CodeTemplateGenerator {
     }
 
     fn build_cli_render_settings(code_run: &CodeRun, cli_config: &Value) -> CliRenderSettings {
+        let cli_type = Self::determine_cli_type(code_run);
         let settings = cli_config
             .get("settings")
             .cloned()
@@ -1445,6 +1456,7 @@ impl CodeTemplateGenerator {
             raw_additional_json,
             model_rotation,
             list_tools_on_start,
+            capabilities: cli_capabilities(cli_type),
         }
     }
 
@@ -1997,6 +2009,7 @@ impl CodeTemplateGenerator {
                 "model": render_settings.model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -2038,13 +2051,10 @@ impl CodeTemplateGenerator {
             .get("settings")
             .cloned()
             .unwrap_or_else(|| json!({}));
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
         // Extract model from cli_config like other templates do
-        let model = cli_config
-            .get("model")
-            .and_then(Value::as_str)
-            .unwrap_or(&code_run.spec.model)
-            .to_string();
+        let model = render_settings.model.clone();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
         let context = json!({
@@ -2067,6 +2077,7 @@ impl CodeTemplateGenerator {
                 "model": model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -2251,6 +2262,7 @@ impl CodeTemplateGenerator {
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
                 "include_directories": include_directories,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -2291,12 +2303,9 @@ impl CodeTemplateGenerator {
             .get("settings")
             .cloned()
             .unwrap_or_else(|| json!({}));
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
 
-        let model = cli_config
-            .get("model")
-            .and_then(Value::as_str)
-            .unwrap_or(&code_run.spec.model)
-            .to_string();
+        let model = render_settings.model.clone();
         let cli_type = Self::determine_cli_type(code_run).to_string();
 
         let context = json!({
@@ -2319,6 +2328,7 @@ impl CodeTemplateGenerator {
                 "model": model,
                 "settings": cli_settings,
                 "remote_tools": remote_tools,
+                "capabilities": render_settings.capabilities.clone(),
             },
         });
 
@@ -2967,9 +2977,13 @@ impl CodeTemplateGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::crds::{CodeRun, CodeRunSpec};
+    use crate::cli::types::CLIType;
+    use crate::crds::{CLIConfig, CodeRun, CodeRunSpec};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-    use std::collections::{BTreeMap, HashMap};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        path::PathBuf,
+    };
 
     fn create_test_code_run(github_app: Option<String>) -> CodeRun {
         CodeRun {
@@ -3001,6 +3015,33 @@ mod tests {
             },
             status: None,
         }
+    }
+
+    fn code_run_with_cli(cli_type: CLIType, github_app: &str) -> CodeRun {
+        let mut code_run = create_test_code_run(Some(github_app.to_string()));
+        code_run.spec.cli_config = Some(CLIConfig {
+            cli_type,
+            model: format!("{cli_type}-test-model"),
+            settings: HashMap::new(),
+            max_tokens: None,
+            temperature: None,
+            model_rotation: None,
+        });
+        code_run
+    }
+
+    fn agent_templates_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../infra/charts/controller/agent-templates")
+    }
+
+    fn assert_template_exists(root: &PathBuf, relative_path: &str) {
+        let path = root.join(relative_path);
+        assert!(
+            path.exists(),
+            "Template {} missing at {}",
+            relative_path,
+            path.display()
+        );
     }
 
     #[test]
@@ -3080,6 +3121,63 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("No GitHub app specified"));
+    }
+
+    #[test]
+    fn test_cli_agent_validation_matrix() {
+        let templates_root = agent_templates_root();
+        let cli_types = [
+            CLIType::Claude,
+            CLIType::Codex,
+            CLIType::OpenCode,
+            CLIType::Cursor,
+            CLIType::Factory,
+            CLIType::Gemini,
+        ];
+        let github_apps = [
+            "5DLabs-Rex",
+            "5DLabs-Cleo",
+            "5DLabs-Tess",
+            "5DLabs-Blaze",
+            "5DLabs-Cipher",
+            "5DLabs-Atlas",
+            "5DLabs-Bolt",
+        ];
+
+        for cli in cli_types {
+            for app in github_apps {
+                let code_run = code_run_with_cli(cli, app);
+                let (container_template, memory_template) = match cli {
+                    CLIType::Claude => (
+                        CodeTemplateGenerator::get_agent_container_template(&code_run),
+                        CODE_CLAUDE_MEMORY_TEMPLATE.to_string(),
+                    ),
+                    CLIType::Codex => (
+                        CodeTemplateGenerator::get_codex_container_template(&code_run),
+                        CodeTemplateGenerator::get_codex_memory_template(&code_run),
+                    ),
+                    CLIType::OpenCode => (
+                        CodeTemplateGenerator::get_opencode_container_template(&code_run),
+                        CodeTemplateGenerator::get_opencode_memory_template(&code_run),
+                    ),
+                    CLIType::Cursor => (
+                        CodeTemplateGenerator::get_cursor_container_template(&code_run),
+                        CodeTemplateGenerator::get_cursor_memory_template(&code_run),
+                    ),
+                    CLIType::Factory => (
+                        CodeTemplateGenerator::get_factory_container_template(&code_run),
+                        CodeTemplateGenerator::get_factory_memory_template(&code_run),
+                    ),
+                    CLIType::Gemini => (
+                        CodeTemplateGenerator::get_gemini_container_template(&code_run),
+                        CodeTemplateGenerator::get_gemini_memory_template(&code_run),
+                    ),
+                };
+
+                assert_template_exists(&templates_root, &container_template);
+                assert_template_exists(&templates_root, &memory_template);
+            }
+        }
     }
 
     #[test]

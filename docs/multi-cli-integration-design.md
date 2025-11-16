@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The 5D Labs Agent Platform now ships six first-class CLIs (Claude, Codex, Factory, OpenCode, Cursor, and Gemini). We built a CLI-agnostic adapter stack so every agent follows identical business rules (branch creation, PR requirements, tooling) regardless of the CLI it is paired with. Fresh snapshots of every upstream CLI doc set now live under `docs/claude-code`, `docs/cursor-cli`, `docs/codex-cli`, `docs/factory-cli`, `docs/opencode-cli`, and `docs/gemini-cli`, so configuration diffs stay reviewable inside this repo. The remaining work is operational—keeping the template ConfigMaps in sync, deduplicating shared shell snippets (`code/shared/prompt-scaffold.sh.hbs`), and exercising the multi-CLI smoke tests that prove cross-CLI parity before dispatching a full workflow.
+The 5D Labs Agent Platform now ships six first-class CLIs (Claude, Codex, Factory, OpenCode, Cursor, and Gemini). We built a CLI-agnostic adapter stack so every agent follows identical business rules (branch creation, PR requirements, tooling) regardless of the CLI it is paired with. Fresh snapshots of every upstream CLI doc set now live under `docs/claude-code`, `docs/cursor-cli`, `docs/codex-cli`, `docs/factory-cli`, `docs/opencode-cli`, and `docs/gemini-cli`, so configuration diffs stay reviewable inside this repo. We also centralized the capability matrix in `cli_capabilities(CLIType)` and pipe those flags directly into every template context, so container scripts/AGENTS.md files can branch on each CLI’s actual feature set without bespoke plumbing. The remaining work is operational—keeping the template ConfigMaps in sync, deduplicating shared shell snippets (`code/shared/prompt-scaffold.sh.hbs`), and exercising the multi-CLI smoke tests that prove cross-CLI parity before dispatching a full workflow.
 
 ## Table of Contents
 
@@ -606,6 +606,8 @@ impl AgentResolver {
 ## Backward Compatibility Test Matrix
 
 ### Required Test Scenarios
+
+We now codify the CLI/agent cross-product as a unit test so template regressions fail instantly via `cargo test -p controller`. `test_cli_agent_validation_matrix` iterates every CLI type across Rex/Cleo/Tess/Blaze/Cipher/Atlas/Bolt and asserts both the container and memory templates exist under `infra/charts/controller/agent-templates`, giving us a fast safety net before any end-to-end run.【3170:3179:controller/src/tasks/code/templates.rs】
 
 #### Scenario 1: Existing Claude-Only Agent (MUST PASS)
 ```json

@@ -6,11 +6,11 @@
 //! understands stream-json output, and surfaces detailed health diagnostics.
 
 use crate::cli::adapter::{
-    AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
-    ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
-    ParsedResponse, ResponseMetadata, ToolCall,
+    AdapterError, AdapterResult, AgentConfig, CliAdapter, CliCapabilities, ContainerContext,
+    FinishReason, HealthState, HealthStatus, ParsedResponse, ResponseMetadata, ToolCall,
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
+use crate::cli::capabilities::cli_capabilities;
 use crate::cli::types::CLIType;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -353,16 +353,7 @@ impl CliAdapter for CursorAdapter {
     }
 
     fn get_capabilities(&self) -> CliCapabilities {
-        CliCapabilities {
-            supports_streaming: true,
-            supports_multimodal: false,
-            supports_function_calling: true,
-            supports_system_prompts: true,
-            max_context_tokens: 128_000,
-            memory_strategy: MemoryStrategy::MarkdownFile("AGENTS.md".to_string()),
-            config_format: ConfigFormat::Json,
-            authentication_methods: vec![AuthMethod::ApiKey],
-        }
+        cli_capabilities(CLIType::Cursor)
     }
 
     async fn initialize(&self, container: &ContainerContext) -> Result<()> {

@@ -12,6 +12,7 @@ pub mod adapter_factory;
 pub mod adapters;
 pub mod base_adapter;
 pub mod bridge;
+pub mod capabilities;
 pub mod discovery;
 pub mod router;
 pub mod session;
@@ -28,6 +29,7 @@ pub use adapters::{
     ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
 };
 pub use base_adapter::{AdapterConfig, AdapterMetrics, BaseAdapter};
+pub use capabilities::cli_capabilities;
 
 // Re-export legacy components for backward compatibility
 pub use adapter::{CLIExecutionAdapter, CommandBuilder, ResultProcessor};

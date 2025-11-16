@@ -155,6 +155,12 @@ That partial now renders inside both container scripts:
 {{> code_shared_prompt-scaffold prompt_scaffold}}
 ```
 
+### Capability registry feeds templates
+A new `cli_capabilities(CLIType)` registry keeps the streaming/function-call flags and context windows for every CLI in one place. Each adapter now defers to that helper instead of duplicating values, and the template generator injects the serialized capability map into the `cli` context so AGENTS.md/container scripts can branch on what the selected CLI actually supports.【1:33:controller/src/cli/capabilities.rs】【360:402:controller/src/tasks/code/templates.rs】
+
+### Automated CLI/agent validation matrix
+`cargo test -p controller` now runs `test_cli_agent_validation_matrix`, which iterates every CLI type against every GitHub app (Rex/Cleo/Tess/Blaze/Cipher/Atlas/Bolt) and asserts their container + memory templates exist under `infra/charts/controller/agent-templates`. Missing ConfigMap entries now fail in seconds during unit tests instead of during multi-hour workflows.【3170:3179:controller/src/tasks/code/templates.rs】
+
 ### Shared business logic per agent
 All adapters inherit the same validation, telemetry, and template rendering guarantees through `BaseAdapter`, so instructions such as “always create a PR” or “run clippy pedantic” live in the rendered agent markdown rather than the CLI implementation.
 

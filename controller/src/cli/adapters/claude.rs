@@ -4,11 +4,12 @@
 //! Maintains 100% backward compatibility with existing Claude functionality.
 
 use crate::cli::adapter::{
-    AdapterError, AdapterResult, AgentConfig, AuthMethod, CliAdapter, CliCapabilities,
-    ConfigFormat, ContainerContext, FinishReason, HealthState, HealthStatus, MemoryStrategy,
-    ParsedResponse, ResponseMetadata, ToolCall, ToolConfiguration,
+    AdapterError, AdapterResult, AgentConfig, CliAdapter, CliCapabilities, ContainerContext,
+    FinishReason, HealthState, HealthStatus, ParsedResponse, ResponseMetadata, ToolCall,
+    ToolConfiguration,
 };
 use crate::cli::base_adapter::{AdapterConfig, BaseAdapter};
+use crate::cli::capabilities::cli_capabilities;
 use crate::cli::types::CLIType;
 use crate::tasks::template_paths::CODE_CLAUDE_CONFIG_TEMPLATE;
 use anyhow::Result;
@@ -226,22 +227,7 @@ impl CliAdapter for ClaudeAdapter {
     }
 
     fn get_capabilities(&self) -> CliCapabilities {
-        // Get context window size from environment variable (configurable, not hardcoded)
-        let max_context_tokens = std::env::var("CLAUDE_MAX_CONTEXT_TOKENS")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(200_000); // Claude 3.5 Sonnet default context window
-
-        CliCapabilities {
-            supports_streaming: true,
-            supports_multimodal: false, // Claude Code CLI doesn't support multimodal yet
-            supports_function_calling: true,
-            supports_system_prompts: true,
-            max_context_tokens,
-            memory_strategy: MemoryStrategy::MarkdownFile("CLAUDE.md".to_string()),
-            config_format: ConfigFormat::Json,
-            authentication_methods: vec![AuthMethod::SessionToken],
-        }
+        cli_capabilities(CLIType::Claude)
     }
 
     #[instrument(skip(self, container))]
@@ -497,6 +483,7 @@ impl Default for ClaudeModelValidator {
 mod tests {
     use super::*;
     use crate::cli::adapter::LocalServerConfig;
+    use crate::cli::{AuthMethod, ConfigFormat};
     use std::collections::HashMap;
 
     #[tokio::test]
