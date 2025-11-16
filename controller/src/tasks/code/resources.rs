@@ -1320,7 +1320,14 @@ impl<'a> CodeResourceManager<'a> {
                 } else {
                     // ConfigMap has no owner reference - check if any jobs are using it
                     // This protects ConfigMaps that were just created but don't have owner ref yet
-                    let all_jobs = match self.jobs.list(&ListParams::default()).await {
+                    // Use same label filters as ConfigMap listing to scope the search
+                    let job_list_params = ListParams::default().labels(&format!(
+                        "app=controller,component=code-runner,github-user={},service={}",
+                        self.sanitize_label_value(github_identifier),
+                        self.sanitize_label_value(&code_run.spec.service)
+                    ));
+                    
+                    let all_jobs = match self.jobs.list(&job_list_params).await {
                         Ok(jobs) => jobs,
                         Err(e) => {
                             warn!(
@@ -1358,7 +1365,13 @@ impl<'a> CodeResourceManager<'a> {
                     }
 
                     // Also check if any pods are using this ConfigMap (in case job was deleted but pods remain)
-                    let pod_list_params = ListParams::default();
+                    // Use same label filters to scope the search
+                    let pod_list_params = ListParams::default().labels(&format!(
+                        "app=controller,component=code-runner,github-user={},service={}",
+                        self.sanitize_label_value(github_identifier),
+                        self.sanitize_label_value(&code_run.spec.service)
+                    ));
+                    
                     match pods.list(&pod_list_params).await {
                         Ok(pod_list) => {
                             let is_used_by_pod = pod_list.items.iter().any(|pod| {
