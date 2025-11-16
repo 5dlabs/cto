@@ -1070,7 +1070,7 @@ spec:
           apiVersion: agents.platform/v1
           kind: CodeRun
           metadata:
-            generateName: "{{`{{workflow.parameters.service}}`}}-t{{`{{inputs.parameters.task-id}}`}}-{{`{{inputs.parameters.stage}}`}}-"
+            generateName: "coderun-{{`{{workflow.parameters.service}}`}}-t{{`{{inputs.parameters.task-id}}`}}-{{`{{inputs.parameters.stage}}`}}-"
             namespace: {{.Release.Namespace}}
             labels:
               task-id: "{{`{{inputs.parameters.task-id}}`}}"

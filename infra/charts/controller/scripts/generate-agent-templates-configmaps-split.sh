@@ -60,6 +60,13 @@ HEADER_EOF
       files_list+=$'\n'
       files_list+="$agent_partials"
     fi
+
+    # Include shared code templates (e.g., hooks prefixed with code_shared_)
+    code_shared=$(find "agent-templates" -maxdepth 1 -type f -name "code_shared_*" \( -name "*.hbs" -o -name "*.sh" -o -name "*.md" \) 2>/dev/null | LC_ALL=C sort || true)
+    if [ -n "$code_shared" ]; then
+      files_list+=$'\n'
+      files_list+="$code_shared"
+    fi
   fi
   
   # Remove duplicates and empty lines
