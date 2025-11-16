@@ -59,7 +59,8 @@ pub struct PlayProgress {
 
 impl PlayProgress {
     /// Create a new progress entry
-    #[must_use] pub fn new(repository: String, branch: String, task_id: u32, workflow_name: String) -> Self {
+    #[must_use]
+    pub fn new(repository: String, branch: String, task_id: u32, workflow_name: String) -> Self {
         let now = Utc::now();
         Self {
             repository,
@@ -132,11 +133,13 @@ impl PlayProgress {
 
         let started_at = data
             .get("started-at")
-            .and_then(|s| DateTime::parse_from_rfc3339(s).ok()).map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
         let last_updated = data
             .get("last-updated")
-            .and_then(|s| DateTime::parse_from_rfc3339(s).ok()).map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
         Ok(Self {
             repository,

@@ -63,7 +63,8 @@ pub struct StateAwareCancellation {
 
 impl StateAwareCancellation {
     /// Create a new state-aware cancellation manager
-    #[must_use] pub fn new(client: Client, namespace: &str, state_manager: RemediationStateManager) -> Self {
+    #[must_use]
+    pub fn new(client: Client, namespace: &str, state_manager: RemediationStateManager) -> Self {
         let lock_manager = DistributedLock::new(
             client.clone(),
             namespace,
@@ -158,9 +159,11 @@ impl StateAwareCancellation {
         let _lease_guard = lease;
 
         // Check current remediation state
-        let pr_number_u32 = u32::try_from(pr_number).map_err(|_| CancellationError::StateError(
-            "PR number must be non-negative to track remediation state".to_string(),
-        ))?;
+        let pr_number_u32 = u32::try_from(pr_number).map_err(|_| {
+            CancellationError::StateError(
+                "PR number must be non-negative to track remediation state".to_string(),
+            )
+        })?;
 
         let state_result = self.state_manager.load_state(pr_number_u32, task_id).await;
 

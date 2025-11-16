@@ -120,7 +120,8 @@ impl GitHubLabelClient {
     }
 
     /// Create a client with a direct token (for testing)
-    #[must_use] pub fn with_token(token: String, owner: String, repo: String) -> Self {
+    #[must_use]
+    pub fn with_token(token: String, owner: String, repo: String) -> Self {
         let http_client = HttpClient::builder()
             .user_agent("cto-agent-remediation-loop/1.0")
             .timeout(Duration::from_secs(30))

@@ -380,7 +380,8 @@ impl Default for LabelSchema {
 
 impl LabelSchema {
     /// Validate that a label matches the expected pattern for its type
-    #[must_use] pub fn validate_label(&self, label: &str, label_type: &LabelType) -> bool {
+    #[must_use]
+    pub fn validate_label(&self, label: &str, label_type: &LabelType) -> bool {
         if let Some(schema) = self.type_schemas.get(label_type) {
             let regex_pattern = format!("^{}$", schema.pattern);
             regex::Regex::new(&regex_pattern)
@@ -392,7 +393,8 @@ impl LabelSchema {
     }
 
     /// Determine the type of a label based on its pattern
-    #[must_use] pub fn classify_label(&self, label: &str) -> Option<LabelType> {
+    #[must_use]
+    pub fn classify_label(&self, label: &str) -> Option<LabelType> {
         for label_type in self.type_schemas.keys() {
             if self.validate_label(label, label_type) {
                 return Some(label_type.clone());
@@ -413,7 +415,8 @@ impl LabelSchema {
     }
 
     /// Get the current workflow state from a set of labels
-    #[must_use] pub fn determine_workflow_state(&self, labels: &[String]) -> WorkflowState {
+    #[must_use]
+    pub fn determine_workflow_state(&self, labels: &[String]) -> WorkflowState {
         if labels.contains(&"approved".to_string()) {
             WorkflowState::Approved
         } else if labels.contains(&"failed-remediation".to_string()) {
@@ -432,7 +435,8 @@ impl LabelSchema {
     }
 
     /// Check if a state transition is valid
-    #[must_use] pub fn is_valid_transition(
+    #[must_use]
+    pub fn is_valid_transition(
         &self,
         from: &WorkflowState,
         to: &WorkflowState,
@@ -444,7 +448,8 @@ impl LabelSchema {
     }
 
     /// Get the transition definition for a specific transition
-    #[must_use] pub fn get_transition(
+    #[must_use]
+    pub fn get_transition(
         &self,
         from: &WorkflowState,
         to: &WorkflowState,
@@ -456,7 +461,8 @@ impl LabelSchema {
     }
 
     /// Check if a workflow state is terminal (end state)
-    #[must_use] pub fn is_terminal_state(&self, state: &WorkflowState) -> bool {
+    #[must_use]
+    pub fn is_terminal_state(&self, state: &WorkflowState) -> bool {
         matches!(state, WorkflowState::Approved | WorkflowState::Failed)
     }
 }

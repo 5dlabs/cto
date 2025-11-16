@@ -29,7 +29,8 @@ pub struct CodeResourceManager<'a> {
 }
 
 impl<'a> CodeResourceManager<'a> {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         jobs: &'a Api<Job>,
         configmaps: &'a Api<ConfigMap>,
         pvcs: &'a Api<PersistentVolumeClaim>,
@@ -1246,13 +1247,9 @@ impl<'a> CodeResourceManager<'a> {
                     match self.jobs.get(&job_name).await {
                         Ok(job) => {
                             // Job is active if status is None or if it hasn't completed/failed
-                            let is_job_active = job
-                                .status
-                                .as_ref()
-                                .map_or(true, |status| {
-                                    status.completion_time.is_none()
-                                        && status.failed.unwrap_or(0) == 0
-                                });
+                            let is_job_active = job.status.as_ref().is_none_or(|status| {
+                                status.completion_time.is_none() && status.failed.unwrap_or(0) == 0
+                            });
 
                             if is_job_active {
                                 info!(

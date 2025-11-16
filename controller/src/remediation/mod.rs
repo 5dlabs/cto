@@ -153,14 +153,16 @@ pub use state::{
 ///
 /// This is a convenience function for creating a parser with standard settings.
 /// For custom configuration, use `FeedbackParser::with_config()` directly.
-#[must_use] pub fn new_parser() -> FeedbackParser {
+#[must_use]
+pub fn new_parser() -> FeedbackParser {
     FeedbackParser::new()
 }
 
 /// Create a parser with custom author validator
 ///
 /// Useful when you need specific authorization rules or additional approved authors.
-#[must_use] pub fn parser_with_validator(validator: AuthorValidator) -> FeedbackParser {
+#[must_use]
+pub fn parser_with_validator(validator: AuthorValidator) -> FeedbackParser {
     FeedbackParser::with_validator(validator)
 }
 

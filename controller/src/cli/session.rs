@@ -101,7 +101,8 @@ impl Default for MemorySessionPersistence {
 }
 
 impl MemorySessionPersistence {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -159,7 +160,8 @@ impl Default for SessionManager {
 
 impl SessionManager {
     /// Create a new session manager with memory persistence
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             persistence: Box::new(MemorySessionPersistence::new()),
             active_sessions: Arc::new(RwLock::new(HashMap::new())),

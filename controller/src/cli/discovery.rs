@@ -3,7 +3,10 @@
 //! Responsible for discovering and profiling CLI tools to understand
 //! their capabilities, configuration requirements, and compatibility.
 
-use crate::cli::types::{CLIType, CLIProfile, CLIAvailability, CLIConfiguration, ConfigFormat, CLICapabilities, SessionType, CostModel};
+use crate::cli::types::{
+    CLIAvailability, CLICapabilities, CLIConfiguration, CLIProfile, CLIType, ConfigFormat,
+    CostModel, SessionType,
+};
 use std::collections::HashMap;
 use tokio::process::Command;
 use tracing::info;
@@ -22,7 +25,8 @@ impl Default for DiscoveryService {
 
 impl DiscoveryService {
     /// Create a new discovery service
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             discovered_profiles: HashMap::new(),
         }
@@ -250,7 +254,8 @@ impl DiscoveryService {
     }
 
     /// Get a cached profile if available
-    #[must_use] pub fn get_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
+    #[must_use]
+    pub fn get_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
         self.discovered_profiles.get(&cli_type)
     }
 

@@ -51,7 +51,8 @@ impl From<OverrideError> for OrchestratorError {
 
 impl LabelOrchestrator {
     /// Create a new label orchestrator
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         label_client: GitHubLabelClient,
         state_manager: Arc<RemediationStateManager>,
         override_detector: OverrideDetector,
@@ -285,7 +286,7 @@ impl LabelOrchestrator {
         }
 
         // Log the transition
-            self.log_transition(pr_number, task_id, &transition, iteration_update, context);
+        self.log_transition(pr_number, task_id, &transition, iteration_update, context);
 
         Ok(())
     }

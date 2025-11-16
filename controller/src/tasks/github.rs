@@ -59,7 +59,9 @@ pub async fn check_github_for_pr_by_branch(
             return Ok(Some(pr_url));
         }
 
-        if let Some(next) = next_page(&octocrab, &page).await? { page = next } else {
+        if let Some(next) = next_page(&octocrab, &page).await? {
+            page = next
+        } else {
             info!("No PR found for task branch patterns: task-{}", task_id);
             return Ok(None);
         }
@@ -91,19 +93,16 @@ fn pr_origin_matches(
     expected_repo: &str,
     expected_full_name: &str,
 ) -> bool {
-    pr.head
-        .repo
-        .as_ref()
-        .is_some_and(|repo| {
-            repo_identity_matches(
-                repo.owner.as_ref().map(|owner| owner.login.as_str()),
-                repo.name.as_str(),
-                repo.full_name.as_deref(),
-                expected_owner,
-                expected_repo,
-                expected_full_name,
-            )
-        })
+    pr.head.repo.as_ref().is_some_and(|repo| {
+        repo_identity_matches(
+            repo.owner.as_ref().map(|owner| owner.login.as_str()),
+            repo.name.as_str(),
+            repo.full_name.as_deref(),
+            expected_owner,
+            expected_repo,
+            expected_full_name,
+        )
+    })
 }
 
 fn repo_identity_matches(
@@ -114,8 +113,7 @@ fn repo_identity_matches(
     expected_repo: &str,
     expected_full_name: &str,
 ) -> bool {
-    let owner_matches = owner_login
-        .is_some_and(|login| login.eq_ignore_ascii_case(expected_owner));
+    let owner_matches = owner_login.is_some_and(|login| login.eq_ignore_ascii_case(expected_owner));
 
     if !owner_matches {
         return false;

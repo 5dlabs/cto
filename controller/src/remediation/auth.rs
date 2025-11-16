@@ -19,7 +19,8 @@ pub struct AuthorValidator {
 
 impl AuthorValidator {
     /// Create a new validator with default settings
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         let mut allowed_authors = HashSet::new();
 
         // Core QA bot
@@ -39,7 +40,8 @@ impl AuthorValidator {
     }
 
     /// Create validator with custom settings
-    #[must_use] pub fn with_config(
+    #[must_use]
+    pub fn with_config(
         allowed_authors: HashSet<String>,
         cache_ttl_seconds: u64,
         team_prefixes: Vec<String>,
@@ -167,12 +169,14 @@ impl AuthorValidator {
     }
 
     /// Get list of approved authors
-    #[must_use] pub fn get_approved_authors(&self) -> Vec<String> {
+    #[must_use]
+    pub fn get_approved_authors(&self) -> Vec<String> {
         self.allowed_authors.iter().cloned().collect()
     }
 
     /// Get list of team prefixes
-    #[must_use] pub fn get_team_prefixes(&self) -> Vec<String> {
+    #[must_use]
+    pub fn get_team_prefixes(&self) -> Vec<String> {
         self.allowed_team_prefixes.clone()
     }
 
@@ -184,7 +188,8 @@ impl AuthorValidator {
     }
 
     /// Get cache statistics
-    #[must_use] pub fn get_cache_stats(&self) -> (usize, usize, usize) {
+    #[must_use]
+    pub fn get_cache_stats(&self) -> (usize, usize, usize) {
         let total_entries = self.auth_cache.len();
         let valid_entries = self
             .auth_cache
@@ -197,12 +202,14 @@ impl AuthorValidator {
     }
 
     /// Check if an author would be authorized without caching
-    #[must_use] pub fn check_author_without_cache(&self, author: &str) -> bool {
+    #[must_use]
+    pub fn check_author_without_cache(&self, author: &str) -> bool {
         self.is_author_explicitly_allowed(author) || self.is_team_member(author)
     }
 
     /// Get cache TTL in seconds
-    #[must_use] pub fn get_cache_ttl_seconds(&self) -> u64 {
+    #[must_use]
+    pub fn get_cache_ttl_seconds(&self) -> u64 {
         self.cache_ttl.as_secs()
     }
 
@@ -239,7 +246,8 @@ pub struct SharedAuthorValidator {
 
 impl SharedAuthorValidator {
     /// Create a new shared validator
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             inner: std::sync::Arc::new(std::sync::RwLock::new(AuthorValidator::new())),
         }

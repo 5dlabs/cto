@@ -46,7 +46,8 @@ impl std::fmt::Display for CLIType {
 
 impl CLIType {
     /// Parse a CLI type from a string, ignoring case and accepting legacy aliases.
-    #[must_use] pub fn from_str_ci(value: &str) -> Option<Self> {
+    #[must_use]
+    pub fn from_str_ci(value: &str) -> Option<Self> {
         let normalized = value.trim().to_lowercase();
 
         match normalized.as_str() {

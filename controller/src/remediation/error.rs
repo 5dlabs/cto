@@ -101,7 +101,8 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 impl ParseError {
     /// Check if error is recoverable (can be retried)
-    #[must_use] pub fn is_recoverable(&self) -> bool {
+    #[must_use]
+    pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
             ParseError::ExternalServiceError { .. }
@@ -111,7 +112,8 @@ impl ParseError {
     }
 
     /// Check if error indicates authorization failure
-    #[must_use] pub fn is_authorization_error(&self) -> bool {
+    #[must_use]
+    pub fn is_authorization_error(&self) -> bool {
         matches!(
             self,
             ParseError::UnauthorizedAuthor { .. } | ParseError::AuthorValidationError { .. }
@@ -119,7 +121,8 @@ impl ParseError {
     }
 
     /// Check if error indicates malformed input
-    #[must_use] pub fn is_malformed_input(&self) -> bool {
+    #[must_use]
+    pub fn is_malformed_input(&self) -> bool {
         matches!(
             self,
             ParseError::MalformedComment { .. }
@@ -130,7 +133,8 @@ impl ParseError {
     }
 
     /// Check if error indicates missing required data
-    #[must_use] pub fn is_missing_data(&self) -> bool {
+    #[must_use]
+    pub fn is_missing_data(&self) -> bool {
         matches!(
             self,
             ParseError::MissingRequiredField { .. }
@@ -142,7 +146,8 @@ impl ParseError {
     }
 
     /// Get error category as string
-    #[must_use] pub fn category(&self) -> &'static str {
+    #[must_use]
+    pub fn category(&self) -> &'static str {
         match self {
             ParseError::NotActionableFeedback => "not_actionable",
             ParseError::UnauthorizedAuthor { .. } => "authorization",
@@ -170,7 +175,8 @@ impl ParseError {
     }
 
     /// Convert error to user-friendly message
-    #[must_use] pub fn user_message(&self) -> String {
+    #[must_use]
+    pub fn user_message(&self) -> String {
         match self {
             ParseError::NotActionableFeedback => {
                 "This comment doesn't contain actionable feedback. Make sure it includes '🔴 Required Changes'.".to_string()
@@ -242,7 +248,8 @@ impl ParseError {
     }
 
     /// Get suggested remediation action
-    #[must_use] pub fn suggested_action(&self) -> &'static str {
+    #[must_use]
+    pub fn suggested_action(&self) -> &'static str {
         match self {
             ParseError::NotActionableFeedback => {
                 "Add '🔴 Required Changes' marker to make this actionable feedback"
@@ -310,7 +317,8 @@ impl ErrorContext {
     }
 
     /// Add comment context
-    #[must_use] pub fn with_comment(mut self, comment_id: u64, pr_number: u32, author: String) -> Self {
+    #[must_use]
+    pub fn with_comment(mut self, comment_id: u64, pr_number: u32, author: String) -> Self {
         self.comment_id = Some(comment_id);
         self.pr_number = Some(pr_number);
         self.author = Some(author);
@@ -318,13 +326,15 @@ impl ErrorContext {
     }
 
     /// Add additional context information
-    #[must_use] pub fn with_info(mut self, key: &str, value: String) -> Self {
+    #[must_use]
+    pub fn with_info(mut self, key: &str, value: String) -> Self {
         self.additional_info.insert(key.to_string(), value);
         self
     }
 
     /// Get user-friendly error message with context
-    #[must_use] pub fn user_message(&self) -> String {
+    #[must_use]
+    pub fn user_message(&self) -> String {
         let mut message = self.error.user_message();
 
         if let Some(pr_number) = self.pr_number {

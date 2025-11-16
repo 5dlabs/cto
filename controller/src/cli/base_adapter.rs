@@ -55,7 +55,9 @@ pub struct AdapterConfig {
 
 impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
-        let default_template_root = if let Ok(path) = std::env::var("CLI_TEMPLATES_ROOT") { PathBuf::from(path) } else {
+        let default_template_root = if let Ok(path) = std::env::var("CLI_TEMPLATES_ROOT") {
+            PathBuf::from(path)
+        } else {
             let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
             let repo_relative = manifest_dir
                 .map(PathBuf::from)
@@ -82,7 +84,8 @@ impl AdapterConfig {
         }
     }
 
-    #[must_use] pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
+    #[must_use]
+    pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
         self.correlation_id = correlation_id;
         self
     }
@@ -92,7 +95,8 @@ impl AdapterConfig {
         self
     }
 
-    #[must_use] pub fn with_verbose_logging(mut self, verbose: bool) -> Self {
+    #[must_use]
+    pub fn with_verbose_logging(mut self, verbose: bool) -> Self {
         self.verbose_logging = verbose;
         self
     }
@@ -528,7 +532,8 @@ impl BaseAdapter {
     }
 
     /// Get adapter configuration summary for diagnostics
-    #[must_use] pub fn get_config_summary(&self) -> HashMap<String, serde_json::Value> {
+    #[must_use]
+    pub fn get_config_summary(&self) -> HashMap<String, serde_json::Value> {
         let mut summary = HashMap::new();
 
         summary.insert("cli_type".to_string(), json!(self.cli_type.to_string()));

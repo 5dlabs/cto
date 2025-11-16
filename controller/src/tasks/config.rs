@@ -90,7 +90,8 @@ pub struct ImageConfig {
 
 impl ImageConfig {
     /// Returns `true` when both repository and tag are populated with real values.
-    #[must_use] pub fn is_configured(&self) -> bool {
+    #[must_use]
+    pub fn is_configured(&self) -> bool {
         let repo = self.repository.trim();
         let tag = self.tag.trim();
 
@@ -168,7 +169,8 @@ pub struct ResolvedSecretBinding {
 
 impl SecretsConfig {
     /// Resolve the secret binding (env var + secret key/name) for a given CLI
-    #[must_use] pub fn resolve_cli_binding(
+    #[must_use]
+    pub fn resolve_cli_binding(
         &self,
         cli_type: &CLIType,
         provider: Option<&str>,

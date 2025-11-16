@@ -267,12 +267,14 @@ impl AdapterFactory {
     }
 
     /// Get all supported CLI types
-    #[must_use] pub fn get_supported_clis(&self) -> Vec<CLIType> {
+    #[must_use]
+    pub fn get_supported_clis(&self) -> Vec<CLIType> {
         self.adapters.iter().map(|entry| *entry.key()).collect()
     }
 
     /// Check if a CLI type is supported
-    #[must_use] pub fn supports_cli(&self, cli_type: CLIType) -> bool {
+    #[must_use]
+    pub fn supports_cli(&self, cli_type: CLIType) -> bool {
         self.adapters.contains_key(&cli_type)
     }
 
@@ -442,7 +444,8 @@ pub struct FactoryStats {
 
 impl HealthMonitor {
     /// Create a new health monitor
-    #[must_use] pub fn new(config: HealthMonitorConfig) -> Self {
+    #[must_use]
+    pub fn new(config: HealthMonitorConfig) -> Self {
         Self {
             health_history: Arc::new(DashMap::new()),
             config,

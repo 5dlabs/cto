@@ -22,7 +22,8 @@ pub struct DocsResourceManager<'a> {
 }
 
 impl<'a> DocsResourceManager<'a> {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         jobs: &'a Api<Job>,
         configmaps: &'a Api<ConfigMap>,
         config: &'a Arc<ControllerConfig>,
@@ -485,12 +486,7 @@ impl<'a> DocsResourceManager<'a> {
             .to_lowercase()
     }
 
-    fn build_job_spec(
-        &self,
-        docs_run: &DocsRun,
-        job_name: &str,
-        cm_name: &str,
-    ) -> Result<Job> {
+    fn build_job_spec(&self, docs_run: &DocsRun, job_name: &str, cm_name: &str) -> Result<Job> {
         let labels = self.create_task_labels(docs_run);
 
         // Create owner reference to DocsRun for proper event handling
@@ -831,15 +827,11 @@ impl<'a> DocsResourceManager<'a> {
                 }
 
                 // Check if ConfigMap has an owner reference to a Job that's still running
-                let has_active_job = cm
-                    .metadata
-                    .owner_references
-                    .as_ref()
-                    .is_some_and(|owners| {
-                        owners.iter().any(|owner| {
-                            owner.kind == "Job" && owner.api_version.starts_with("batch/")
-                        })
-                    });
+                let has_active_job = cm.metadata.owner_references.as_ref().is_some_and(|owners| {
+                    owners
+                        .iter()
+                        .any(|owner| owner.kind == "Job" && owner.api_version.starts_with("batch/"))
+                });
 
                 if has_active_job {
                     // If ConfigMap is owned by a Job, let Kubernetes handle cleanup when Job completes

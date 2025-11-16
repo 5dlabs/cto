@@ -12,7 +12,8 @@ impl ResourceNaming {
     /// Generate job name with guaranteed length compliance
     /// Format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
     /// This is the single source of truth for job names
-    #[must_use] pub fn job_name(code_run: &CodeRun) -> String {
+    #[must_use]
+    pub fn job_name(code_run: &CodeRun) -> String {
         let namespace = code_run.namespace().unwrap_or("default".to_string());
         let name = code_run.name_any();
         let uid_suffix = code_run
@@ -46,7 +47,8 @@ impl ResourceNaming {
 
     /// Generate service name with length compliance
     /// Fixes the DNS label length violation that was causing reconciliation failures
-    #[must_use] pub fn headless_service_name(job_name: &str) -> String {
+    #[must_use]
+    pub fn headless_service_name(job_name: &str) -> String {
         const BRIDGE_SUFFIX: &str = "-bridge";
         const MAX_BASE_LENGTH: usize = MAX_DNS_LABEL_LENGTH - BRIDGE_SUFFIX.len();
 
@@ -150,6 +152,7 @@ impl ResourceNaming {
         job_name
             .split('-')
             .nth(1) // Task ID is now at position 1 after "task-"
-            .filter(|part| part.chars().all(|c| c.is_ascii_digit())).map_or_else(|| "unknown".to_string(), String::from)
+            .filter(|part| part.chars().all(|c| c.is_ascii_digit()))
+            .map_or_else(|| "unknown".to_string(), String::from)
     }
 }

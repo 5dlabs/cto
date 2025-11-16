@@ -86,7 +86,7 @@ impl CliAdapter for FactoryAdapter {
 
         let temperature = first_f64(&cli_config, &["temperature"])
             .or_else(|| first_f64(&settings, &["temperature"]))
-            .or_else(|| agent_config.temperature.map(|value| f64::from(value)));
+            .or_else(|| agent_config.temperature.map(f64::from));
 
         let approval_policy = first_string(&settings, &["approvalPolicy"]).unwrap_or("never");
 
@@ -210,7 +210,7 @@ impl CliAdapter for FactoryAdapter {
                             if event
                                 .get("role")
                                 .and_then(Value::as_str)
-                                .map_or(true, |role| role.eq_ignore_ascii_case("assistant"))
+                                .is_none_or(|role| role.eq_ignore_ascii_case("assistant"))
                             {
                                 if let Some(text) = event.get("text").and_then(Value::as_str) {
                                     aggregated_messages.push(text.to_string());

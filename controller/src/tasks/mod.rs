@@ -99,7 +99,8 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
                         .unwrap_or_else(|| "(none)".to_string());
                     let phase = cr
                         .status
-                        .as_ref().map_or_else(String::new, |s| s.phase.clone());
+                        .as_ref()
+                        .map_or_else(String::new, |s| s.phase.clone());
                     info!(
                         "Existing CodeRun: name={}, githubApp={}, phase='{}'",
                         name, app, phase

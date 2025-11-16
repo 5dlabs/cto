@@ -2042,7 +2042,7 @@ impl CodeTemplateGenerator {
             .unwrap_or_else(|| json!({}));
         let local_servers_serialized = if local_servers_value
             .as_object()
-            .map_or(true, serde_json::Map::is_empty)
+            .is_none_or(serde_json::Map::is_empty)
         {
             None
         } else {
@@ -2143,10 +2143,10 @@ impl CodeTemplateGenerator {
 
     fn generate_hook_scripts(code_run: &CodeRun) -> Result<BTreeMap<String, String>> {
         let mut hook_scripts = BTreeMap::new();
-        let cli_key = code_run
-            .spec
-            .cli_config
-            .as_ref().map_or_else(|| CLIType::Claude.to_string(), |cfg| cfg.cli_type.to_string());
+        let cli_key = code_run.spec.cli_config.as_ref().map_or_else(
+            || CLIType::Claude.to_string(),
+            |cfg| cfg.cli_type.to_string(),
+        );
 
         let hook_prefixes = vec![
             format!("code_{}_hooks_", cli_key),

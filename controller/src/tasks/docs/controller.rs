@@ -121,8 +121,7 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                     "Documentation generation completed successfully",
                     true,
                     Some(finished_at),
-                    cleanup_deadline
-                        .map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
+                    cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
                 )
                 .await?;
                 return Ok(Action::await_change());
@@ -225,8 +224,7 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                 "Documentation generation completed successfully",
                 true,
                 Some(finished_at),
-                cleanup_deadline
-                    .map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
+                cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
             )
             .await?;
 
@@ -248,8 +246,7 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                 "Documentation generation failed",
                 false,
                 Some(finished_at),
-                cleanup_deadline
-                    .map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
+                cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
             )
             .await?;
 
@@ -350,10 +347,7 @@ async fn update_docs_status_with_completion(
     expire_update: DocsExpireUpdate,
 ) -> Result<()> {
     // Only update if status actually changed
-    let current_phase = docs_run
-        .status
-        .as_ref()
-        .map_or("", |s| s.phase.as_str());
+    let current_phase = docs_run.status.as_ref().map_or("", |s| s.phase.as_str());
     let current_work_completed = docs_run
         .status
         .as_ref()

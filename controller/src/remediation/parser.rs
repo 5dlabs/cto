@@ -23,7 +23,8 @@ pub struct FeedbackParser {
 
 impl FeedbackParser {
     /// Create a new feedback parser with default settings
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             author_validator: AuthorValidator::new(),
             detailed_logging: true,
@@ -32,7 +33,8 @@ impl FeedbackParser {
     }
 
     /// Create parser with custom author validator
-    #[must_use] pub fn with_validator(validator: AuthorValidator) -> Self {
+    #[must_use]
+    pub fn with_validator(validator: AuthorValidator) -> Self {
         Self {
             author_validator: validator,
             detailed_logging: true,
@@ -41,7 +43,8 @@ impl FeedbackParser {
     }
 
     /// Create parser with custom settings
-    #[must_use] pub fn with_config(
+    #[must_use]
+    pub fn with_config(
         validator: AuthorValidator,
         detailed_logging: bool,
         max_comment_size: usize,
@@ -336,7 +339,8 @@ impl FeedbackParser {
     }
 
     /// Get author validator for configuration
-    #[must_use] pub fn author_validator(&self) -> &AuthorValidator {
+    #[must_use]
+    pub fn author_validator(&self) -> &AuthorValidator {
         &self.author_validator
     }
 
@@ -356,7 +360,8 @@ impl FeedbackParser {
     }
 
     /// Get current configuration
-    #[must_use] pub fn config(&self) -> ParserConfig {
+    #[must_use]
+    pub fn config(&self) -> ParserConfig {
         ParserConfig {
             detailed_logging: self.detailed_logging,
             max_comment_size: self.max_comment_size,

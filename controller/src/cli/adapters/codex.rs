@@ -172,7 +172,8 @@ impl CliAdapter for CodexAdapter {
 
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
-        let model = first_string(&cli_config, &["model"]).map_or_else(|| agent_config.model.clone(), str::to_string);
+        let model = first_string(&cli_config, &["model"])
+            .map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "modelMaxOutputTokens"])
             .map(|value| value as u32)

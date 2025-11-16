@@ -439,7 +439,8 @@ pub struct ClaudeModelValidator {
 }
 
 impl ClaudeModelValidator {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         let valid_patterns = vec![
             // Claude 3.5 models
             Regex::new(r"^claude-3-5-sonnet.*").unwrap(),
@@ -474,7 +475,8 @@ impl ClaudeModelValidator {
     }
 
     /// Get suggestions for invalid models
-    #[must_use] pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
+    #[must_use]
+    pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
         vec![
             "claude-3-5-sonnet-20241022".to_string(),
             "claude-3-opus-20240229".to_string(),
@@ -671,9 +673,7 @@ I'll help you with that task.
 Done!
 "#;
 
-        let tool_calls = adapter
-            .extract_tool_calls(response_with_tools)
-            .unwrap();
+        let tool_calls = adapter.extract_tool_calls(response_with_tools).unwrap();
         // In our basic implementation, tool calls are parsed as best effort
         // The test may find 0, 1, or 2 tool calls depending on parsing logic
         // Basic sanity check - tool_calls should be a valid Vec

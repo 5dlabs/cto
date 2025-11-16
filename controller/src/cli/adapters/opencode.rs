@@ -122,7 +122,8 @@ impl OpenCodeAdapter {
     fn build_config_context(&self, agent_config: &AgentConfig) -> Value {
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
-        let model = first_string(&cli_config, &["model", "defaultModel"]).map_or_else(|| agent_config.model.clone(), str::to_string);
+        let model = first_string(&cli_config, &["model", "defaultModel"])
+            .map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "max_output_tokens"])
             .map(|value| value as u32)

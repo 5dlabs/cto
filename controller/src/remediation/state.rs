@@ -162,7 +162,8 @@ pub struct RemediationStateManager {
 
 impl RemediationStateManager {
     /// Create a new state manager
-    #[must_use] pub fn new(context: &Context) -> Self {
+    #[must_use]
+    pub fn new(context: &Context) -> Self {
         Self {
             configmaps: Api::namespaced(context.client.clone(), &context.namespace),
             namespace: context.namespace.clone(),
@@ -612,7 +613,8 @@ pub struct RemediationStatistics {
 }
 
 impl RemediationStatistics {
-    #[must_use] pub fn average_iterations(&self) -> f64 {
+    #[must_use]
+    pub fn average_iterations(&self) -> f64 {
         if self.total_workflows == 0 {
             0.0
         } else {
@@ -620,7 +622,8 @@ impl RemediationStatistics {
         }
     }
 
-    #[must_use] pub fn success_rate(&self) -> f64 {
+    #[must_use]
+    pub fn success_rate(&self) -> f64 {
         let total_completed = self.completed + self.failed + self.terminated;
         if total_completed == 0 {
             0.0

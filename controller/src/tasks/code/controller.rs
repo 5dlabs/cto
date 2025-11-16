@@ -127,8 +127,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     true,
                     None,
                     Some(finished_at),
-                    cleanup_deadline
-                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                    cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -174,10 +173,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 .and_then(|s| s.work_completed)
                 .unwrap_or(false);
 
-            let current_phase = code_run
-                .status
-                .as_ref()
-                .map_or("", |s| s.phase.as_str());
+            let current_phase = code_run.status.as_ref().map_or("", |s| s.phase.as_str());
 
             if work_completed || current_phase == "Succeeded" {
                 debug!(
@@ -208,8 +204,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                         true,
                         None,
                         Some(finished_at),
-                        cleanup_deadline
-                            .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                        cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                     )
                     .await?;
                 }
@@ -325,8 +320,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     false,
                     None,
                     Some(finished_at),
-                    cleanup_deadline
-                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                    cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -438,8 +432,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     false,
                     None,
                     Some(finished_at),
-                    cleanup_deadline
-                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                    cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -520,8 +513,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                     false,
                     None,
                     Some(finished_at),
-                    cleanup_deadline
-                        .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                    cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
                 )
                 .await?;
 
@@ -576,8 +568,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 true,
                 None,
                 Some(finished_at),
-                cleanup_deadline
-                    .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
             )
             .await?;
 
@@ -681,8 +672,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 false,
                 None,
                 Some(finished_at),
-                cleanup_deadline
-                    .map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
+                cleanup_deadline.map_or(ExpireAtUpdate::Unchanged, ExpireAtUpdate::Set),
             )
             .await?;
 
@@ -804,10 +794,7 @@ async fn update_code_status_with_completion(
     expire_update: ExpireAtUpdate,
 ) -> Result<()> {
     // Only update if status actually changed or work_completed changed
-    let current_phase = code_run
-        .status
-        .as_ref()
-        .map_or("", |s| s.phase.as_str());
+    let current_phase = code_run.status.as_ref().map_or("", |s| s.phase.as_str());
     let current_work_completed = code_run
         .status
         .as_ref()
@@ -1146,13 +1133,10 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
                 return Some("Implementation agent requested fixes".to_string());
             }
 
-            let has_pr = status
-                .pull_request_url
-                .as_ref()
-                .is_some_and(|url| {
-                    let trimmed = url.trim();
-                    !trimmed.is_empty() && trimmed != "no-pr"
-                });
+            let has_pr = status.pull_request_url.as_ref().is_some_and(|url| {
+                let trimmed = url.trim();
+                !trimmed.is_empty() && trimmed != "no-pr"
+            });
 
             if !has_pr {
                 return Some("Implementation attempt did not produce a pull request".to_string());

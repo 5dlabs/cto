@@ -50,7 +50,8 @@ pub struct DistributedLock {
 
 impl DistributedLock {
     /// Create a new distributed lock
-    #[must_use] pub fn new(client: Client, namespace: &str, lock_name: &str, holder_name: &str) -> Self {
+    #[must_use]
+    pub fn new(client: Client, namespace: &str, lock_name: &str, holder_name: &str) -> Self {
         Self {
             client,
             namespace: namespace.to_string(),
@@ -62,13 +63,15 @@ impl DistributedLock {
     }
 
     /// Set the lease duration (default: 30 seconds)
-    #[must_use] pub fn with_lease_duration(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub fn with_lease_duration(mut self, duration: Duration) -> Self {
         self.lease_duration = duration;
         self
     }
 
     /// Set the renewal interval (default: 10 seconds)
-    #[must_use] pub fn with_renewal_interval(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub fn with_renewal_interval(mut self, interval: Duration) -> Self {
         self.renewal_interval = interval;
         self
     }
@@ -359,12 +362,14 @@ impl ActiveLease {
     }
 
     /// Get the lease name
-    #[must_use] pub fn name(&self) -> &str {
+    #[must_use]
+    pub fn name(&self) -> &str {
         self.lease.metadata.name.as_deref().unwrap_or("")
     }
 
     /// Get the holder identity
-    #[must_use] pub fn holder(&self) -> &str {
+    #[must_use]
+    pub fn holder(&self) -> &str {
         self.lease
             .spec
             .as_ref()
@@ -373,7 +378,8 @@ impl ActiveLease {
     }
 
     /// Check if the lease is still valid
-    #[must_use] pub fn is_valid(&self) -> bool {
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
         let Some(spec) = &self.lease.spec else {
             return false;
         };

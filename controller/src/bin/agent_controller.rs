@@ -289,7 +289,9 @@ async fn webhook_handler(
 
     let task_id = task_label.to_string();
 
-    let token = if let Ok(value) = std::env::var("GITHUB_TOKEN") { value } else {
+    let token = if let Ok(value) = std::env::var("GITHUB_TOKEN") {
+        value
+    } else {
         warn!(
             "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
             label_name

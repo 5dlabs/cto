@@ -478,7 +478,8 @@ pub struct ConfigurationBridge {
 
 impl ConfigurationBridge {
     /// Create a new configuration bridge with all supported adapters
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         let mut adapters = std::collections::HashMap::new();
 
         adapters.insert(
@@ -545,12 +546,14 @@ impl ConfigurationBridge {
     }
 
     /// Get all supported CLI types
-    #[must_use] pub fn supported_clis(&self) -> Vec<CLIType> {
+    #[must_use]
+    pub fn supported_clis(&self) -> Vec<CLIType> {
         self.adapters.keys().copied().collect()
     }
 
     /// Check if a CLI type is supported
-    #[must_use] pub fn supports_cli(&self, cli_type: CLIType) -> bool {
+    #[must_use]
+    pub fn supports_cli(&self, cli_type: CLIType) -> bool {
         self.adapters.contains_key(&cli_type)
     }
 }
@@ -586,12 +589,7 @@ pub type Result<T> = std::result::Result<T, BridgeError>;
 mod tests {
     use super::*;
     use crate::cli::types::{
-        AgentConfig,
-        ContextConfig,
-        MCPServer,
-        SettingsConfig,
-        ToolDefinition,
-        UniversalMCPConfig,
+        AgentConfig, ContextConfig, MCPServer, SettingsConfig, ToolDefinition, UniversalMCPConfig,
     };
     use serde_json::Value;
     use std::collections::HashMap;

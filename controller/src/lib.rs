@@ -16,7 +16,11 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc, clippy::doc_markdown)]
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::doc_markdown
+)]
 
 //! Orchestrator core library
 //!
