@@ -1317,6 +1317,95 @@ impl<'a> CodeResourceManager<'a> {
                             continue;
                         }
                     }
+                } else {
+                    // ConfigMap has no owner reference - check if any jobs are using it
+                    // This protects ConfigMaps that were just created but don't have owner ref yet
+                    // Use same label filters as ConfigMap listing to scope the search
+                    let job_list_params = ListParams::default().labels(&format!(
+                        "app=controller,component=code-runner,github-user={},service={}",
+                        self.sanitize_label_value(github_identifier),
+                        self.sanitize_label_value(&code_run.spec.service)
+                    ));
+                    
+                    let all_jobs = match self.jobs.list(&job_list_params).await {
+                        Ok(jobs) => jobs,
+                        Err(e) => {
+                            warn!(
+                                "Failed to list jobs to check ConfigMap usage: {} - skipping deletion for safety",
+                                e
+                            );
+                            continue;
+                        }
+                    };
+
+                    // Check if any job references this ConfigMap in its volumes
+                    let is_used_by_job = all_jobs.items.iter().any(|job| {
+                        job.spec
+                            .as_ref()
+                            .and_then(|spec| spec.template.spec.as_ref())
+                            .and_then(|pod_spec| pod_spec.volumes.as_ref())
+                            .map(|volumes| {
+                                volumes.iter().any(|vol| {
+                                    vol.config_map
+                                        .as_ref()
+                                        .and_then(|cm| cm.name.as_ref())
+                                        .map(|name| name == &cm_name)
+                                        .unwrap_or(false)
+                                })
+                            })
+                            .unwrap_or(false)
+                    });
+
+                    if is_used_by_job {
+                        info!(
+                            "Skipping cleanup of ConfigMap {} - it's referenced by an active job",
+                            cm_name
+                        );
+                        continue;
+                    }
+
+                    // Also check if any pods are using this ConfigMap (in case job was deleted but pods remain)
+                    // Use same label filters to scope the search
+                    let pod_list_params = ListParams::default().labels(&format!(
+                        "app=controller,component=code-runner,github-user={},service={}",
+                        self.sanitize_label_value(github_identifier),
+                        self.sanitize_label_value(&code_run.spec.service)
+                    ));
+                    
+                    match pods.list(&pod_list_params).await {
+                        Ok(pod_list) => {
+                            let is_used_by_pod = pod_list.items.iter().any(|pod| {
+                                pod.spec
+                                    .as_ref()
+                                    .and_then(|spec| spec.volumes.as_ref())
+                                    .map(|volumes| {
+                                        volumes.iter().any(|vol| {
+                                            vol.config_map
+                                                .as_ref()
+                                                .and_then(|cm| cm.name.as_ref())
+                                                .map(|name| name == &cm_name)
+                                                .unwrap_or(false)
+                                        })
+                                    })
+                                    .unwrap_or(false)
+                            });
+
+                            if is_used_by_pod {
+                                info!(
+                                    "Skipping cleanup of ConfigMap {} - it's referenced by an active pod",
+                                    cm_name
+                                );
+                                continue;
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to list pods to check ConfigMap usage: {} - skipping deletion for safety",
+                                e
+                            );
+                            continue;
+                        }
+                    }
                 }
 
                 info!("Deleting old code ConfigMap: {}", cm_name);
