@@ -117,7 +117,11 @@ if [ "$GITHUB_TOKEN" = "null" ] || [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 export GITHUB_TOKEN
-export GH_TOKEN="$GITHUB_TOKEN"
+if [ -z "${GH_TOKEN:-}" ]; then
+  export GH_TOKEN="$GITHUB_TOKEN"
+else
+  echo "ℹ️ Preserving preconfigured GH_TOKEN from environment"
+fi
 export GH_HOST="github.com"
 
 # Task-specific workspace for parallel execution isolation
@@ -711,6 +715,91 @@ EOF
 
   LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
 
+  github_api_request() {
+    local method="$1"
+    shift
+    if [ -z "${GITHUB_TOKEN:-}" ]; then
+      return 1
+    fi
+    curl -sS -X "$method" \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Accept: application/vnd.github+json" \
+      "$@"
+  }
+
+  fetch_existing_pr_number() {
+    local response
+    response=$(github_api_request GET "https://api.github.com/repos/$REPO_SLUG/pulls?head=${REPO_OWNER}:${CURRENT_BRANCH}&state=all" 2>/dev/null || true)
+    if [ -z "$response" ]; then
+      return
+    fi
+    printf '%s' "$response" | jq -r '.[0].number // empty' 2>/dev/null || true
+  }
+
+  apply_labels_via_api() {
+    local pr_number="$1"
+    shift
+    local labels_to_add=()
+    for label in "$@"; do
+      if [ -z "$label" ]; then
+        continue
+      fi
+      if github_api_request GET "https://api.github.com/repos/$REPO_SLUG/labels/$label" >/dev/null 2>&1; then
+        labels_to_add+=("$label")
+      else
+        echo "⚠️ Label '$label' not found via API fallback; skipping"
+      fi
+    done
+    if [ "${#labels_to_add[@]}" -eq 0 ]; then
+      return 0
+    fi
+    local labels_json
+    labels_json=$(printf '%s\n' "${labels_to_add[@]}" | jq -R . | jq -s .)
+    github_api_request POST "https://api.github.com/repos/$REPO_SLUG/issues/$pr_number/labels" \
+      --data "{\"labels\": $labels_json}" >/dev/null 2>&1 || \
+      echo "⚠️ Failed to apply labels via API fallback"
+  }
+
+  create_pr_via_api() {
+    if [ -z "${GITHUB_TOKEN:-}" ]; then
+      echo "⚠️ No GitHub token available for REST fallback"
+      return 1
+    fi
+
+    local payload
+    payload=$(jq -n \
+      --arg title "$PR_TITLE" \
+      --arg body "$PR_BODY" \
+      --arg base "$BASE_BRANCH" \
+      --arg head "$CURRENT_BRANCH" \
+      '{title:$title, body:$body, base:$base, head:$head, maintainer_can_modify:true}')
+
+    local response pr_number
+    response=$(github_api_request POST "https://api.github.com/repos/$REPO_SLUG/pulls" --data "$payload")
+    pr_number=$(printf '%s' "$response" | jq -r '.number // empty')
+
+    if [ -z "$pr_number" ]; then
+      local errors_message
+      errors_message=$(printf '%s' "$response" | jq -r '.errors[0].message // empty')
+      if printf '%s' "$errors_message" | grep -qi "already exists"; then
+        pr_number=$(fetch_existing_pr_number)
+      fi
+    fi
+
+    if [ -z "$pr_number" ]; then
+      local api_message
+      api_message=$(printf '%s' "$response" | jq -r '.message // "unknown error"')
+      echo "⚠️ REST fallback failed to create PR: $api_message"
+      return 1
+    fi
+
+    PR_NUMBER="$pr_number"
+    PR_URL="https://github.com/$REPO_SLUG/pull/$PR_NUMBER"
+    echo "✅ Created pull request via GitHub REST API fallback (#$PR_NUMBER)"
+    apply_labels_via_api "$PR_NUMBER" "$TASK_LABEL" "$SERVICE_LABEL" "$RUN_LABEL"
+    return 0
+  }
+
   maybe_add_label() {
     local label="$1"
     if [ -z "$label" ]; then
@@ -753,7 +842,12 @@ EOF
       echo "⚠️ Could not get PR number for project linking"
     fi
   else
-    echo "⚠️ Failed to create pull request automatically (it may already exist or authentication failed)"
+    echo "⚠️ gh pr create failed (it may already exist or authentication failed); attempting REST fallback"
+    if create_pr_via_api; then
+      echo "ℹ️ Skipping GitHub Project linking for REST fallback"
+    else
+      echo "⚠️ Failed to create pull request automatically (gh CLI and REST fallback both failed)"
+    fi
   fi
 }
 

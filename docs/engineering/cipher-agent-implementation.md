@@ -204,6 +204,8 @@ git secrets --scan
 gitleaks detect --source . --verbose
 ```
 
+> **Note:** The Codex security runner now falls back to the GitHub REST API if `gh pr create` cannot authenticate (for example when no personal token is available). Supplying a `GH_TOKEN`/`GITHUB_TOKEN` with sufficient scopes is still recommended so that `gh` can link PRs to projects, but the workflow will no longer fail just because the CLI login step is blocked.
+
 ### 2. Workflow Template Updates
 
 **File:** `infra/charts/controller/templates/workflowtemplates/play-workflow-template.yaml`
