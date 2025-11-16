@@ -42,7 +42,7 @@ agent:
     codex: openai
     cursor: anthropic
     factory: openai
-    opencode: xai  # Primary provider for OpenCode (Grok)
+    opencode: xai  # Primary provider for OpenCode
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
@@ -151,7 +151,7 @@ agents:
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
     tools:
-      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
+      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query"]
 
   cleo:
     name: "Cleo"
@@ -184,7 +184,7 @@ agents:
 
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
     tools:
-      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
+      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query"]
 
   tess:
     name: "Tess"
@@ -228,7 +228,7 @@ agents:
 
       **IMPORTANT: After submitting your PR review, your work is complete. Exit immediately.**
     tools:
-      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query", "kubernetes_helmInstall", "kubernetes_helmRollback", "kubernetes_getPodMetrics", "kubernetes_getPodsLogs", "kubernetes_describeResource", "kubernetes_listResources", "kubernetes_getEvents", "kubernetes_getNodeMetrics", "kubernetes_helmList", "kubernetes_helmGet", "kubernetes_helmUpgrade", "kubernetes_helmRepoAdd", "kubernetes_helmRepoList", "kubernetes_getResource", "kubernetes_helmUninstall", "kubernetes_createResource"]
+      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "kubernetes_helmInstall", "kubernetes_helmRollback", "kubernetes_getPodMetrics", "kubernetes_getPodsLogs", "kubernetes_describeResource", "kubernetes_listResources", "kubernetes_getEvents", "kubernetes_getNodeMetrics", "kubernetes_helmList", "kubernetes_helmGet", "kubernetes_helmUpgrade", "kubernetes_helmRepoAdd", "kubernetes_helmRepoList", "kubernetes_getResource", "kubernetes_helmUninstall", "kubernetes_createResource"]
 
   blaze:
     name: "Blaze"
@@ -919,7 +919,7 @@ secrets:
     factory:
       secretKey: "FACTORY_API_KEY"
     opencode:
-      secretKey: "XAI_API_KEY"  # OpenCode uses xAI (Grok) as primary provider
+      secretKey: "XAI_API_KEY"  # OpenCode uses xAI as primary provider
   providerApiKeys:
     anthropic:
       secretKey: "ANTHROPIC_API_KEY"

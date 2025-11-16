@@ -239,13 +239,7 @@ impl DiscoveryService {
             CLIType::OpenCode => ("opencode", vec!["--version"]),
             CLIType::Cursor => ("cursor-agent", vec!["--version"]),
             CLIType::Factory => ("droid", vec!["--version"]),
-            CLIType::OpenHands => (
-                "python3",
-                vec!["-c", "import openhands; print(openhands.__version__)"],
-            ),
-            CLIType::Grok => ("grok-cli", vec!["--version"]),
             CLIType::Gemini => ("gemini-cli", vec!["--version"]),
-            CLIType::Qwen => ("qwen-cli", vec!["--version"]),
         }
     }
 

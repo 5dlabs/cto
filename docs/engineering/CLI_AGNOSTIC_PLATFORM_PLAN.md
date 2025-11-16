@@ -15,10 +15,10 @@ Transform the Multi-Agent Software Development Orchestration Platform from Claud
 
 ### Available CLI Images (Untested)
 - Cursor CLI
-- Windsurf CLI
-- Aider CLI
-- Continue CLI
-- OpenHands CLI
+- Factory CLI
+- Opencode CLI
+- Gemini CLI
+- Codex CLI
 
 ## Discovery Project Specification
 

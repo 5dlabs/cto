@@ -24,7 +24,9 @@ pub use adapter::{
     ParsedResponse, ResponseMetadata, StreamingDelta, ToolCall,
 };
 pub use adapter_factory::{AdapterFactory, FactoryConfig, FactoryStats};
-pub use adapters::{ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, OpenCodeAdapter};
+pub use adapters::{
+    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
+};
 pub use base_adapter::{AdapterConfig, AdapterMetrics, BaseAdapter};
 
 // Re-export legacy components for backward compatibility

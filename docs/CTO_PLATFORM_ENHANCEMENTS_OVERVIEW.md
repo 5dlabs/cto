@@ -47,7 +47,7 @@ docs/
 **Status:** Documentation Complete
 
 #### Objective
-Transform the platform from Claude-specific to support multiple AI CLI tools (Claude, Cursor, OpenHands, Grok, Gemini, Qwen, Codex).
+Transform the platform from Claude-specific to support multiple AI CLI tools (Claude, Cursor, Codex, Factory, OpenCode, Gemini).
 
 #### Key Components
 - Discovery Service for understanding each CLI's capabilities

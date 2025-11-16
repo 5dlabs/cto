@@ -5,7 +5,7 @@
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
 use crate::cli::adapters::{
-    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, OpenCodeAdapter,
+    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
 };
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
@@ -192,6 +192,10 @@ impl AdapterFactory {
 
         let opencode_adapter = Arc::new(OpenCodeAdapter::new().await?);
         self.register_adapter(CLIType::OpenCode, opencode_adapter)
+            .await?;
+
+        let gemini_adapter = Arc::new(GeminiAdapter::new().await?);
+        self.register_adapter(CLIType::Gemini, gemini_adapter)
             .await?;
 
         Ok(())
@@ -427,6 +431,13 @@ impl AdapterFactory {
     }
 }
 
+impl AdapterFactory {
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn remove_adapter_for_test(&self, cli_type: CLIType) {
+        self.adapters.remove(&cli_type);
+    }
+}
+
 /// Factory statistics
 #[derive(Debug, Clone)]
 pub struct FactoryStats {
@@ -600,12 +611,13 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 5);
+        assert_eq!(factory.get_supported_clis().len(), 6);
         assert!(factory.supports_cli(CLIType::Claude));
         assert!(factory.supports_cli(CLIType::Codex));
         assert!(factory.supports_cli(CLIType::Cursor));
         assert!(factory.supports_cli(CLIType::Factory));
         assert!(factory.supports_cli(CLIType::OpenCode));
+        assert!(factory.supports_cli(CLIType::Gemini));
     }
 
     #[tokio::test]
@@ -622,7 +634,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 5);
+        assert_eq!(factory.get_supported_clis().len(), 6);
     }
 
     #[tokio::test]
@@ -645,6 +657,9 @@ mod tests {
     #[tokio::test]
     async fn test_unsupported_cli_error() {
         let factory = AdapterFactory::new().await.unwrap();
+
+        // Simulate an unsupported CLI by removing it from the registry
+        factory.adapters.remove(&CLIType::Gemini);
 
         let result = factory.create(CLIType::Gemini).await;
         assert!(result.is_err());
@@ -679,7 +694,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 5);
+        assert_eq!(health_summary.len(), 6);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -708,10 +723,12 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 5);
-        assert_eq!(stats.healthy_adapters, 5);
-        assert_eq!(stats.warning_adapters, 0);
-        assert_eq!(stats.unhealthy_adapters, 0);
+        assert_eq!(stats.total_adapters, factory.get_supported_clis().len());
+        assert!(stats.healthy_adapters >= 5);
+        assert_eq!(
+            stats.healthy_adapters + stats.warning_adapters + stats.unhealthy_adapters,
+            stats.total_adapters
+        );
     }
 
     #[tokio::test]

@@ -36,6 +36,13 @@ pub const CODE_OPENCODE_CONTAINER_BASE_TEMPLATE: &str = "code/opencode/container
 pub const CODE_OPENCODE_MEMORY_TEMPLATE: &str = "code/opencode/memory.md.hbs";
 pub const CODE_OPENCODE_CONFIG_TEMPLATE: &str = "code/opencode/config.json.hbs";
 
+// Gemini code templates
+pub const CODE_GEMINI_CONTAINER_BASE_TEMPLATE: &str = "code/gemini/container-base.sh.hbs";
+pub const CODE_GEMINI_CONTAINER_TEMPLATE: &str = "code/gemini/container.sh.hbs";
+pub const CODE_GEMINI_MEMORY_TEMPLATE: &str = "code/gemini/GEMINI.md.hbs";
+pub const CODE_GEMINI_USER_SETTINGS_TEMPLATE: &str = "code/gemini/settings.user.json.hbs";
+pub const CODE_GEMINI_WORKSPACE_SETTINGS_TEMPLATE: &str = "code/gemini/settings.workspace.json.hbs";
+
 // Claude docs templates
 pub const DOCS_CLAUDE_CONTAINER_TEMPLATE: &str = "docs/claude/container.sh.hbs";
 pub const DOCS_CLAUDE_MEMORY_TEMPLATE: &str = "docs/claude/memory.md.hbs";

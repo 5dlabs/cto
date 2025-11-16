@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+  "general": {
+    "vimMode": {{#if render.editor_vim_mode}}true{{else}}false{{/if}},
+    "disableAutoUpdate": true,
+    "disableUpdateNag": true,
+    "checkpointing": {
+      "enabled": true
+    }
+  },
+  "model": {
+    "name": "{{render.model}}"{{#if render.temperature}},
+    "temperature": {{render.temperature}}{{/if}}{{#if render.max_output_tokens}},
+    "maxOutputTokens": {{render.max_output_tokens}}{{/if}}
+  },
+  "sandbox": "{{render.sandbox_mode}}",
+  "automation": {
+    "approvalMode": "{{render.approval_policy}}",
+    "autoApproveTrustedTools": true
+  },
+  "tools": {
+    "enableMessageBusIntegration": true,
+    "useWriteTodos": true
+  },
+  "privacy": {
+    "usageStatisticsEnabled": false
+  },
+  "telemetry": {
+    "enabled": false
+  }{{#if toolman.url}},
+  "mcpServers": {
+    "toolman": {
+      "command": "toolman",
+      "args": ["--url", "{{toolman.url}}", "--working-dir", "/workspace"],
+      "env": {
+        "TOOLMAN_SERVER_URL": "{{toolman.url}}"
+      },
+      "availableTools": [{{#each toolman.tools}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+    }
+  }{{/if}}
+}

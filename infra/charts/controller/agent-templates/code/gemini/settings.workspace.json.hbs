@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+  "general": {
+    "checkpointing": {
+      "enabled": true
+    },
+    "sessionRetention": {
+      "enabled": true,
+      "maxAge": "7d"
+    }
+  },
+  "includeDirectories": [
+    "{{workspace.working_directory}}/task",
+    "{{workspace.working_directory}}",
+    "{{workspace.docs_directory}}"
+  ],
+  "context": {
+    "customFiles": [
+      "GEMINI.md",
+      "task/acceptance-criteria.md",
+      "task/rex-handoff.md"
+    ],
+    "discovery": {
+      "maxDirs": 400,
+      "exclude": [
+        ".git",
+        "node_modules",
+        "target"
+      ]
+    }
+  },
+  "paths": {
+    "trustedFolders": [
+      "{{workspace.working_directory}}",
+      "{{workspace.docs_directory}}"
+    ]
+  },
+  "git": {
+    "autoCommit": false
+  }
+}

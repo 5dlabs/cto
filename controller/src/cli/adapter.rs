@@ -156,9 +156,9 @@ pub struct CliCapabilities {
 pub enum MemoryStrategy {
     /// Single markdown file (Claude: CLAUDE.md, Codex: AGENTS.md)
     MarkdownFile(String),
-    /// Subdirectory with multiple files (Grok: .grok/GROK.md)
+    /// Subdirectory with multiple files (for CLIs that maintain their own guidance dirs)
     Subdirectory(String),
-    /// Session-based memory (Cursor, `OpenHands`)
+    /// Session-based memory (Cursor or other session-based CLIs)
     SessionBased,
     /// Configuration-based persistence
     ConfigurationBased,

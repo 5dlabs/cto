@@ -8,7 +8,7 @@ set -euo pipefail
 {{#if agent_banner}}
 echo "{{agent_banner}}"
 {{else}}
-echo "🔧 Initialising OpenCode environment"
+echo "🔧 Initialising Gemini environment"
 {{/if}}
 
 if [ -f "$HOME/.cargo/env" ]; then
@@ -33,7 +33,7 @@ echo "PATH: $PATH"
 # =========================================================================
 # RETRY CONFIGURATION
 # =========================================================================
-MAX_RETRIES_CONFIG=${OPENCODE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+MAX_RETRIES_CONFIG=${GEMINI_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 echo "║                    RETRY CONFIGURATION                        ║"
@@ -45,8 +45,8 @@ if [ "$MAX_RETRIES_CONFIG" = "0" ]; then
 else
   echo "🔄 Maximum Iterations: $MAX_RETRIES_CONFIG"
 fi
-if [ -n "${OPENCODE_MAX_RETRIES:-}" ]; then
-  echo "📍 Source: OPENCODE_MAX_RETRIES environment variable"
+if [ -n "${GEMINI_MAX_RETRIES:-}" ]; then
+  echo "📍 Source: GEMINI_MAX_RETRIES environment variable"
 elif [ -n "${EXECUTION_MAX_RETRIES:-}" ]; then
   echo "📍 Source: EXECUTION_MAX_RETRIES environment variable"
 else
@@ -651,7 +651,7 @@ ensure_pr_created() {
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
   read -r -d '' PR_BODY <<EOF || true
 ## Summary
-- Auto-generated fallback PR because the OpenCode agent finished without opening one
+- Auto-generated fallback PR because the Gemini agent finished without opening one
 - Task {{task_id}} for service {{service}} is ready for review
 
 ## Metadata
@@ -662,7 +662,7 @@ ${ISSUE_LINK:+
 ## Links
 $ISSUE_LINK
 }
-_This PR was created automatically by the OpenCode container._
+_This PR was created automatically by the Gemini container._
 EOF
 
   LABEL_ARGS=("--title" "$PR_TITLE" "--body" "$PR_BODY" "--base" "$BASE_BRANCH" "--head" "$CURRENT_BRANCH")
@@ -697,7 +697,7 @@ EOF
       fi
     done
 
-    # Add PR to GitHub Project (works for all CLIs: Claude, Codex, Cursor, Factory, OpenCode, Blaze, Rex)
+    # Add PR to GitHub Project (works for all CLIs: Claude, Codex, Cursor, Factory, Gemini, Blaze, Rex)
     echo "=== Linking PR to GitHub Project ==="
 
     # Get PR number for this branch
@@ -805,7 +805,7 @@ sync_gh_hosts_to_path "$REPO_ROOT"
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
-  "AGENTS.md"
+  "GEMINI.md"
   "client-config.json"
   "coding-guidelines.md"
   "github-guidelines.md"
@@ -1082,15 +1082,15 @@ echo "✓ Using feature branch: $FEATURE_BRANCH (base: ${BASE_BRANCH:-unknown})"
 
 # Set working directory: use repo root if working_directory is "." or empty
 if [ "$WORK_DIR" = "." ] || [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "null" ]; then
-  OPENCODE_WORK_DIR="$REPO_ROOT"
+  GEMINI_WORK_DIR="$REPO_ROOT"
 else
-  OPENCODE_WORK_DIR="$REPO_ROOT/$WORK_DIR"
-  mkdir -p "$OPENCODE_WORK_DIR"
+  GEMINI_WORK_DIR="$REPO_ROOT/$WORK_DIR"
+  mkdir -p "$GEMINI_WORK_DIR"
 fi
 
-cd "$OPENCODE_WORK_DIR"
-sync_gh_hosts_to_path "$OPENCODE_WORK_DIR"
-echo "✓ Working directory: $OPENCODE_WORK_DIR"
+cd "$GEMINI_WORK_DIR"
+sync_gh_hosts_to_path "$GEMINI_WORK_DIR"
+echo "✓ Working directory: $GEMINI_WORK_DIR"
 
 echo "📦 git status"
 refresh_token_if_needed
@@ -1122,15 +1122,15 @@ source /agent-templates/shared_task-setup-functions.sh || {
 
 echo "🧱 Syncing task assets (RESILIENT MODE)"
 # Use safe directory creation to avoid overwriting files
-if ! safe_ensure_directory "$OPENCODE_WORK_DIR/task" "OpenCode task directory"; then
-    echo "❌ CRITICAL: Cannot create OpenCode task directory"
+if ! safe_ensure_directory "$GEMINI_WORK_DIR/task" "Gemini task directory"; then
+    echo "❌ CRITICAL: Cannot create Gemini task directory"
     exit 1
 fi
 
 # Safely copy task files from ConfigMap
 if [ -d "/task-files/task" ]; then
     echo "📂 Copying task files from ConfigMap..."
-    if ! safe_copy_directory "/task-files/task" "$OPENCODE_WORK_DIR/task" "ConfigMap task files"; then
+    if ! safe_copy_directory "/task-files/task" "$GEMINI_WORK_DIR/task" "ConfigMap task files"; then
         echo "⚠️ Warning: Could not copy all task files from ConfigMap"
     fi
 else
@@ -1181,69 +1181,69 @@ if [ -n "$DOCS_REPO_URL" ] && [ "$DOCS_REPO_URL" != "null" ]; then
     if [ -n "$TASK_DIR" ] && [ -d "$TASK_DIR" ]; then
       echo "✓ Copying task definition from $TASK_DIR (RESILIENT MODE)"
       refresh_token_if_needed
-      if safe_copy_directory "$TASK_DIR" "$OPENCODE_WORK_DIR/task" "docs task files"; then
+      if safe_copy_directory "$TASK_DIR" "$GEMINI_WORK_DIR/task" "docs task files"; then
           echo "✅ Task files copied successfully from docs repository"
       else
           echo "❌ CRITICAL: Failed to copy task files from docs repository"
-          create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
+          create_error_report "$GEMINI_WORK_DIR/task" "{{task_id}}" "Failed to copy from docs repository"
       fi
     else
       echo "❌ CRITICAL: Task directory not found. Checked:"
       echo "   - $DOCS_BASE_PATH/docs/task-{{task_id}}"
       echo "   - $DOCS_BASE_PATH/docs/.completed/task-{{task_id}}"
       echo "   - $DOCS_BASE_PATH/tasks/task-{{task_id}}"
-      create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
+      create_error_report "$GEMINI_WORK_DIR/task" "{{task_id}}" "Task directory not found in docs repository"
     fi
 
     if [ -f "$DOCS_BASE_PATH/tasks.json" ]; then
       refresh_token_if_needed
-      safe_copy_file "$DOCS_BASE_PATH/tasks.json" "$OPENCODE_WORK_DIR/task/tasks.json" "tasks.json"
+      safe_copy_file "$DOCS_BASE_PATH/tasks.json" "$GEMINI_WORK_DIR/task/tasks.json" "tasks.json"
     fi
   fi
 fi
 if [ -f /task-files/coding-guidelines.md ]; then
-  cp /task-files/coding-guidelines.md "$OPENCODE_WORK_DIR/"
+  cp /task-files/coding-guidelines.md "$GEMINI_WORK_DIR/"
   echo "✓ Copied coding-guidelines.md to working directory"
 fi
 
 if [ -f /task-files/github-guidelines.md ]; then
-  cp /task-files/github-guidelines.md "$OPENCODE_WORK_DIR/"
+  cp /task-files/github-guidelines.md "$GEMINI_WORK_DIR/"
   echo "✓ Copied github-guidelines.md to working directory"
 fi
 
-# AGENTS.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
+# GEMINI.md Memory Persistence Logic (controlled by overwriteMemory CRD field)
 OVERWRITE_MEMORY="{{overwrite_memory}}"
 
-# Handle AGENTS.md based on overwriteMemory setting
+# Handle GEMINI.md based on overwriteMemory setting
 if [ "$OVERWRITE_MEMORY" = "true" ]; then
-  # Overwrite mode: Always replace AGENTS.md with fresh template
-  if [ -f /task-files/AGENTS.md ]; then
-    cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
-    echo "✓ Overwrote AGENTS.md memory file (fresh start requested)"
+  # Overwrite mode: Always replace GEMINI.md with fresh template
+  if [ -f /task-files/GEMINI.md ]; then
+    cp /task-files/GEMINI.md "$GEMINI_WORK_DIR/GEMINI.md"
+    echo "✓ Overwrote GEMINI.md memory file (fresh start requested)"
   fi
 else
   # Preserve mode (default): Only copy if doesn't exist
-  if [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
+  if [ ! -f "$GEMINI_WORK_DIR/GEMINI.md" ]; then
     # Initial creation - copy from ConfigMap
-    if [ -f /task-files/AGENTS.md ]; then
-      cp /task-files/AGENTS.md "$OPENCODE_WORK_DIR/AGENTS.md"
-      echo "✓ Created initial AGENTS.md memory file"
+    if [ -f /task-files/GEMINI.md ]; then
+      cp /task-files/GEMINI.md "$GEMINI_WORK_DIR/GEMINI.md"
+      echo "✓ Created initial GEMINI.md memory file"
     fi
   else
-    echo "✓ Preserved existing AGENTS.md memory file (maintaining accumulated context)"
+    echo "✓ Preserved existing GEMINI.md memory file (maintaining accumulated context)"
   fi
 fi
 
 if [ -f /task-files/client-config.json ]; then
-  cp /task-files/client-config.json "$OPENCODE_WORK_DIR/"
+  cp /task-files/client-config.json "$GEMINI_WORK_DIR/"
   echo "✓ Copied client-config.json to working directory"
 fi
 
 if [ -f /task-files/mcp.json ]; then
-  cp /task-files/mcp.json "$OPENCODE_WORK_DIR/.mcp.json"
+  cp /task-files/mcp.json "$GEMINI_WORK_DIR/.mcp.json"
 fi
 
-export OPENCODE_PERMISSION='{"bash":{"*":"allow"},"edit":"allow","webfetch":"allow"}'
+export GEMINI_PERMISSION='{"bash":{"*":"allow"},"edit":"allow","webfetch":"allow"}'
 
 # Guard against destructive workspace cleanup
 guard_rm() {
@@ -1277,7 +1277,7 @@ guard_rm() {
         esac
         local resolved
         resolved=$(realpath -m "$expanded" 2>/dev/null || printf '%s' "$expanded")
-        if [ "$resolved" = "$OPENCODE_WORK_DIR" ] || [ "$resolved" = "$TASK_WORKSPACE" ] ||
+        if [ "$resolved" = "$GEMINI_WORK_DIR" ] || [ "$resolved" = "$TASK_WORKSPACE" ] ||
            [ "$resolved" = "$HOME" ] || [[ "$resolved" == "$HOME/.rustup"* ]]; then
           echo "❌ Guard: destructive rm blocked (target=$target)" >&2
           return 1
@@ -1299,13 +1299,13 @@ rm() {
 
 export -f guard_rm rm
 
-if [ ! -f "$OPENCODE_WORK_DIR/client-config.json" ]; then
+if [ ! -f "$GEMINI_WORK_DIR/client-config.json" ]; then
   echo "❌ client-config.json missing from workspace; required for MCP/toolman"
   exit 1
 fi
 
 echo "=== MCP CLIENT CONFIG ==="
-WORKSPACE_CFG="$OPENCODE_WORK_DIR/client-config.json"
+WORKSPACE_CFG="$GEMINI_WORK_DIR/client-config.json"
 SOURCE_CFG="/task-files/client-config.json"
 TARGET_CFG="${MCP_CLIENT_CONFIG:-$TASK_WORKSPACE/client-config.json}"
 
@@ -1357,13 +1357,21 @@ else
 fi
 echo "=========================="
 
-# Configure OpenCode config directory
-mkdir -p "$HOME/.opencode"
-if [ -f /task-files/opencode-config.json ]; then
-  cp /task-files/opencode-config.json "$HOME/.opencode/config.json"
-  echo "✓ Installed opencode-config.json"
+# Configure Gemini config directory
+mkdir -p "$HOME/.gemini"
+if [ -f /task-files/gemini-user-settings.json ]; then
+  cp /task-files/gemini-user-settings.json "$HOME/.gemini/settings.json"
+  echo "✓ Installed gemini-user-settings.json"
 else
-  echo "⚠️ opencode-config.json not provided; falling back to defaults"
+  echo "⚠️ gemini-user-settings.json not provided; falling back to defaults"
+fi
+
+mkdir -p "$GEMINI_WORK_DIR/.gemini"
+if [ -f /task-files/gemini-workspace-settings.json ]; then
+  cp /task-files/gemini-workspace-settings.json "$GEMINI_WORK_DIR/.gemini/settings.json"
+  echo "✓ Installed gemini-workspace-settings.json"
+else
+  echo "ℹ️ gemini-workspace-settings.json not provided; workspace will inherit user settings"
 fi
 
 echo "=== MCP PRECHECKS ==="
@@ -1401,38 +1409,38 @@ if [ "$TOOLMAN_SUCCESS" != "true" ]; then
   cat /tmp/toolman-ping.log >&2 || true
   rm -f /tmp/toolman-ping.log
   echo "⚠️ This may be an intermittent DNS/network issue. Proceeding anyway, but MCP tools may not work."
-  echo "⚠️ If OpenCode execution fails, check Toolman service health and DNS resolution."
-  # Don't exit - allow OpenCode to proceed in case Toolman comes back online
+  echo "⚠️ If Gemini execution fails, check Toolman service health and DNS resolution."
+  # Don't exit - allow Gemini to proceed in case Toolman comes back online
   # The MCP client will handle connection failures gracefully
 fi
 echo "✓ Toolman endpoint check completed"
 
-# Verify OpenCode provider API key is set based on config
-OPENCODE_CONFIG_PATH="$HOME/.opencode/config.json"
-if [ -f "$OPENCODE_CONFIG_PATH" ]; then
-  PROVIDER_ENV_KEY=$(jq -r '.provider.envKey // "OPENAI_API_KEY"' "$OPENCODE_CONFIG_PATH")
+# Verify Gemini provider API key is set based on config
+GEMINI_CONFIG_PATH="$HOME/.gemini/settings.json"
+if [ -f "$GEMINI_CONFIG_PATH" ]; then
+  PROVIDER_ENV_KEY=$(jq -r '.provider.envKey // "OPENAI_API_KEY"' "$GEMINI_CONFIG_PATH")
 else
   PROVIDER_ENV_KEY="OPENAI_API_KEY"
 fi
 
 if [ -z "${!PROVIDER_ENV_KEY:-}" ]; then
-  echo "❌ $PROVIDER_ENV_KEY is not set; OpenCode cannot authenticate with its provider"
+  echo "❌ $PROVIDER_ENV_KEY is not set; Gemini cannot authenticate with its provider"
   exit 1
 fi
 
-echo "🔑 Configuring OpenCode authentication (provider key: $PROVIDER_ENV_KEY)"
+echo "🔑 Configuring Gemini authentication (provider key: $PROVIDER_ENV_KEY)"
 
-if [ ! -f "$OPENCODE_WORK_DIR/AGENTS.md" ]; then
-  echo "⚠️ No AGENTS.md guidance file detected; creating placeholder"
-  cat <<'PLACEHOLDER' > "$OPENCODE_WORK_DIR/AGENTS.md"
+if [ ! -f "$GEMINI_WORK_DIR/GEMINI.md" ]; then
+  echo "⚠️ No GEMINI.md guidance file detected; creating placeholder"
+  cat <<'PLACEHOLDER' > "$GEMINI_WORK_DIR/GEMINI.md"
 # Project Guidance
 
-This OpenCode run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give OpenCode richer instructions.
+This Gemini run was triggered without GEMINI.md content. Provide project context in GEMINI.md to give Gemini richer instructions.
 PLACEHOLDER
 fi
 
 # =========================================================================
-# Prompt assembly and OpenCode execution
+# Prompt assembly and Gemini execution
 # =========================================================================
 
 PROMPT_PREFIX=""
@@ -1442,14 +1450,14 @@ PROMPT_PREFIX="${PROMPT_PREFIX}## Task Context\n\n"
 PROMPT_PREFIX="${PROMPT_PREFIX}You're working on **Task {{task_id}}** for service **{{service}}**.\n\n"
 PROMPT_PREFIX="${PROMPT_PREFIX}**Required Reading:**\n"
 PROMPT_PREFIX="${PROMPT_PREFIX}- @task/acceptance-criteria.md — Your success criteria (complete ALL of these)\n"
-PROMPT_PREFIX="${PROMPT_PREFIX}- @AGENTS.md — Repository guidelines and workflow\n"
-if [ -f "$OPENCODE_WORK_DIR/task/toolman-guide.md" ]; then
+PROMPT_PREFIX="${PROMPT_PREFIX}- @GEMINI.md — Repository guidelines and workflow\n"
+if [ -f "$GEMINI_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}- @task/toolman-guide.md — Tool usage reference\n"
 fi
-if [ -f "$OPENCODE_WORK_DIR/coding-guidelines.md" ]; then
+if [ -f "$GEMINI_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md — Coding standards\n"
 fi
-if [ -f "$OPENCODE_WORK_DIR/github-guidelines.md" ]; then
+if [ -f "$GEMINI_WORK_DIR/github-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md — Git workflow\n"
 fi
 
@@ -1463,15 +1471,15 @@ PROMPT_PREFIX="${PROMPT_PREFIX}- GitHub auth is pre-configured (GH_TOKEN is set)
 PROMPT_PREFIX="${PROMPT_PREFIX}---\n\n"
 
 # Resilient verification of task files
-echo "🔍 RESILIENT VERIFICATION: Checking task files at: $OPENCODE_WORK_DIR/task/"
-if verify_task_files "$OPENCODE_WORK_DIR/task" "{{task_id}}"; then
+echo "🔍 RESILIENT VERIFICATION: Checking task files at: $GEMINI_WORK_DIR/task/"
+if verify_task_files "$GEMINI_WORK_DIR/task" "{{task_id}}"; then
     echo "✅ Task files verification: PASSED"
 else
     echo "❌ CRITICAL: Task files verification: FAILED"
-    create_error_report "$OPENCODE_WORK_DIR/task" "{{task_id}}" "Task files missing before agent execution"
+    create_error_report "$GEMINI_WORK_DIR/task" "{{task_id}}" "Task files missing before agent execution"
     
     # Attempt recovery
-    if attempt_task_recovery "/tmp/docs-repo" "$OPENCODE_WORK_DIR/task" "{{task_id}}"; then
+    if attempt_task_recovery "/tmp/docs-repo" "$GEMINI_WORK_DIR/task" "{{task_id}}"; then
         echo "✅ Recovery successful - continuing with execution"
     else
         echo "❌ Recovery failed - cannot proceed without prompt.md"
@@ -1479,7 +1487,7 @@ else
     fi
 fi
 
-PROMPT_FILE="$OPENCODE_WORK_DIR/task/prompt.md"
+PROMPT_FILE="$GEMINI_WORK_DIR/task/prompt.md"
 echo "📄 Using prompt file: $PROMPT_FILE"
 
 echo "startingTask:{{task_id}}"
@@ -1488,7 +1496,7 @@ echo ""
 PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
 
 # Print prompt preview (similar to Factory/Claude CLIs)
-echo "📤 Sending prompt to OpenCode (truncated to 2000 chars for log safety):"
+echo "📤 Sending prompt to Gemini (truncated to 2000 chars for log safety):"
 echo "=================================================================================="
 PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
 printf '%s\n' "$PROMPT_PREVIEW"
@@ -1501,18 +1509,20 @@ echo ""
 ORIGINAL_PROMPT="$PROMPT_CONTENT"
 PREVIOUS_MESSAGE_FILE=""
 
+GEMINI_INCLUDE_DIRECTORIES="{{cli.include_directories}}"
+
 # Default xAI context window is 256k tokens - MAX IT OUT
-TOKEN_LIMIT=${OPENCODE_TOKEN_LIMIT:-256000}
+TOKEN_LIMIT=${GEMINI_TOKEN_LIMIT:-256000}
 
-# Allow generous runtime since OpenCode rides on xAI latency
-OPENCODE_TIMEOUT=${OPENCODE_EXEC_TIMEOUT:-2400}  # 40 minutes (was 30)
+# Allow generous runtime since Gemini rides on xAI latency
+GEMINI_TIMEOUT=${GEMINI_EXEC_TIMEOUT:-2400}  # 40 minutes (was 30)
 
-RESET_SESSION_ON_RETRY=${OPENCODE_RESET_SESSION_ON_RETRY:-1}
-CONTINUE_SESSION=${OPENCODE_CONTINUE_SESSION:-1}
+RESET_SESSION_ON_RETRY=${GEMINI_RESET_SESSION_ON_RETRY:-1}
+CONTINUE_SESSION=${GEMINI_CONTINUE_SESSION:-0}
 
-# Reasonable retries for OpenCode - not too many to waste tokens
+# Reasonable retries for Gemini - not too many to waste tokens
 # Special case: 0 means unlimited (keep going until acceptance criteria met)
-MAX_RETRIES=${OPENCODE_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
+MAX_RETRIES=${GEMINI_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-10}}
 if [ "$MAX_RETRIES" = "0" ]; then
   echo "🔄 Unlimited retries enabled - will continue until acceptance criteria met"
   UNLIMITED_RETRIES=1
@@ -1520,38 +1530,30 @@ else
   UNLIMITED_RETRIES=0
 fi
 
-# Output format: json (structured, parseable) or markdown (human-readable)
-# JSON is better for automated parsing (session IDs, circuit breaker, token tracking)
-# MARKDOWN is better for human observation during development/debugging
-# Set OPENCODE_VERBOSE=1 to use markdown format for readability
-if [ "${OPENCODE_VERBOSE:-0}" = "1" ]; then
-  OPENCODE_FORMAT="markdown"
-  # Only set log level if not explicitly provided by user
-  if [ -z "${OPENCODE_LOG_LEVEL:-}" ]; then
-    OPENCODE_LOG_LEVEL="INFO"
-  fi
-  echo "📢 Verbose mode enabled - using markdown format with ${OPENCODE_LOG_LEVEL} log level for readability"
-  if [ "${OPENCODE_LOG_LEVEL}" != "DEBUG" ]; then
-    echo "   To see even more detail, set OPENCODE_LOG_LEVEL=DEBUG"
-  fi
+# Gemini CLI supports text, json, and stream-json. We default to streaming so we can
+# parse tool events and statuses in real time. Set GEMINI_VERBOSE=1 to switch to markdown.
+if [ "${GEMINI_VERBOSE:-0}" = "1" ]; then
+  GEMINI_OUTPUT_FORMAT="markdown"
+  GEMINI_DEBUG=${GEMINI_DEBUG:-1}
+  echo "📢 Verbose mode enabled - using markdown output for readability"
 else
-  OPENCODE_FORMAT=${OPENCODE_FORMAT:-json}
-  # Only set log level if not explicitly provided by user
-  if [ -z "${OPENCODE_LOG_LEVEL:-}" ]; then
-    OPENCODE_LOG_LEVEL="DEBUG"
-  fi
+  GEMINI_OUTPUT_FORMAT=${GEMINI_OUTPUT_FORMAT:-stream-json}
+  GEMINI_DEBUG=${GEMINI_DEBUG:-0}
 fi
+
+GEMINI_APPROVAL_MODE=${GEMINI_APPROVAL_MODE:-auto_edit}
+GEMINI_AUTO_APPROVE=${GEMINI_AUTO_APPROVE:-1}
 
 ATTEMPT=1
 SUCCESS=0
-OPENCODE_EXIT=1
+GEMINI_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
 COMPLETION_REASON=""
 LAST_COMPLETION_REASON=""
 NEXT_ITERATION_GUIDANCE=""
 
-SESSION_DIR="$HOME/.opencode/sessions"
+SESSION_DIR="$HOME/.gemini/sessions"
 LATEST_SESSION_ID=""
 
 # Circuit breaker: track repeated command failures
@@ -1602,8 +1604,8 @@ extract_session_id() {
         if ($0 ~ /sessionID"[[:space:]]*:[[:space:]]*"[0-9a-fA-F-]{4,}/) {
           match($0, /sessionID"[[:space:]]*:[[:space:]]*"([0-9a-fA-F-]+)/, a);
           if (a[1] != "") last=a[1];
-        } else if ($0 ~ /opencode session[[:space:]]+[0-9a-fA-F-]{4,}/) {
-          match($0, /opencode session[[:space:]]+([0-9a-fA-F-]+)/, a);
+        } else if ($0 ~ /gemini session[[:space:]]+[0-9a-fA-F-]{4,}/) {
+          match($0, /gemini session[[:space:]]+([0-9a-fA-F-]+)/, a);
           if (a[1] != "") last=a[1];
         }
       }
@@ -1650,7 +1652,7 @@ print_attempt_banner() {
 
 if [ "$CONTINUE_SESSION" = "1" ]; then
   if ! has_existing_sessions "$SESSION_DIR"; then
-    echo "ℹ️ No existing OpenCode sessions detected; starting new session"
+    echo "ℹ️ No existing Gemini sessions detected; starting new session"
     CONTINUE_SESSION=0
   fi
 fi
@@ -1681,7 +1683,7 @@ write_last_message() {
 }
 
 if [ "$CONTINUE_SESSION" = "1" ]; then
-  echo "ℹ️ OpenCode will attempt to continue the most recent session when available."
+  echo "ℹ️ Gemini will attempt to continue the most recent session when available."
 else
   if [ -d "$SESSION_DIR" ]; then
     find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
@@ -1748,10 +1750,10 @@ while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   if [ -n "$CURRENT_MODEL" ]; then
     echo "🎯 Attempt $ATTEMPT will use model: $CURRENT_MODEL"
     
-    # Update opencode config with current model (format: provider/model)
-    if [ -f "$HOME/.opencode/config.json" ]; then
-      jq --arg model "$CURRENT_MODEL" '.model = $model' "$HOME/.opencode/config.json" > /tmp/opencode-config-rotated.json && \
-      mv /tmp/opencode-config-rotated.json "$HOME/.opencode/config.json"
+    # Update gemini config with current model (format: provider/model)
+    if [ -f "$HOME/.gemini/settings.json" ]; then
+      jq --arg model "$CURRENT_MODEL" '.model = $model' "$HOME/.gemini/settings.json" > /tmp/gemini-config-rotated.json && \
+      mv /tmp/gemini-config-rotated.json "$HOME/.gemini/settings.json"
     fi
   fi
 
@@ -1759,8 +1761,8 @@ while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   refresh_github_token || true
 
   CURRENT_ATTEMPT=$ATTEMPT
-  LAST_MESSAGE_FILE="/tmp/opencode-last-message-${ATTEMPT}.txt"
-  RUN_LOG="/tmp/opencode-run-${ATTEMPT}.jsonl"
+  LAST_MESSAGE_FILE="/tmp/gemini-last-message-${ATTEMPT}.txt"
+  RUN_LOG="/tmp/gemini-run-${ATTEMPT}.jsonl"
 
   if [ "$RESET_SESSION_ON_RETRY" = "1" ] && [ "$CONTINUE_SESSION" != "1" ] && [ $ATTEMPT -gt 1 ] && [ -d "$SESSION_DIR" ]; then
     find "$SESSION_DIR" -maxdepth 1 -type f -name '*.json' -delete 2>/dev/null || true
@@ -1817,38 +1819,42 @@ Remaining work:
 
 ${NEXT_ITERATION_GUIDANCE}"
       fi
-      RUN_LOG="/tmp/opencode-run-${ATTEMPT}-cont${CONTINUATION_ATTEMPT}.jsonl"
+      RUN_LOG="/tmp/gemini-run-${ATTEMPT}-cont${CONTINUATION_ATTEMPT}.jsonl"
     fi
     
     set +e
     set -o pipefail
     # Write prompt to temp file to avoid "Argument list too long" error
-    PROMPT_FILE="/tmp/opencode-prompt-${ATTEMPT}-${CONTINUATION_ATTEMPT}.txt"
+    PROMPT_FILE="/tmp/gemini-prompt-${ATTEMPT}-${CONTINUATION_ATTEMPT}.txt"
     printf '%s' "$PROMPT_PAYLOAD" > "$PROMPT_FILE"
     
-    OPENCODE_CMD=(
-      "opencode"
-      "run"
-      "--format"
-      "$OPENCODE_FORMAT"
-      "--log-level"
-      "$OPENCODE_LOG_LEVEL"
+    GEMINI_CMD=(
+      "gemini"
+      "--output-format"
+      "$GEMINI_OUTPUT_FORMAT"
+      "--approval-mode"
+      "$GEMINI_APPROVAL_MODE"
     )
-    if [ "$CONTINUE_SESSION" = "1" ]; then
-      if [ -n "$LATEST_SESSION_ID" ]; then
-        OPENCODE_CMD+=("--session" "$LATEST_SESSION_ID")
-      else
-        OPENCODE_CMD+=("--continue")
-      fi
+    if [ -n "$CURRENT_MODEL" ]; then
+      GEMINI_CMD+=("--model" "$CURRENT_MODEL")
+    fi
+    if [ "${GEMINI_AUTO_APPROVE:-1}" = "1" ]; then
+      GEMINI_CMD+=("--yolo")
+    fi
+    if [ "${GEMINI_DEBUG:-0}" = "1" ]; then
+      GEMINI_CMD+=("--debug")
+    fi
+    if [ -n "${GEMINI_INCLUDE_DIRECTORIES:-}" ]; then
+      GEMINI_CMD+=("--include-directories" "$GEMINI_INCLUDE_DIRECTORIES")
     fi
     
     # Pass prompt via stdin to handle large prompts
     if command -v timeout >/dev/null 2>&1; then
-      timeout "$OPENCODE_TIMEOUT" "${OPENCODE_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
+      timeout "$GEMINI_TIMEOUT" "${GEMINI_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
     else
-      "${OPENCODE_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
+      "${GEMINI_CMD[@]}" < "$PROMPT_FILE" | tee "$RUN_LOG"
     fi
-    OPENCODE_EXIT=${PIPESTATUS[0]}
+    GEMINI_EXIT=${PIPESTATUS[0]}
     set +o pipefail
     set -e
     
@@ -1870,19 +1876,19 @@ ${NEXT_ITERATION_GUIDANCE}"
     CONTINUATION_ATTEMPT=$((CONTINUATION_ATTEMPT + 1))
   done
 
-  if [ $OPENCODE_EXIT -eq 124 ]; then
-    echo "⏱️ OpenCode command exceeded ${OPENCODE_TIMEOUT}s timeout; terminating session"
-    pkill -f "opencode" 2>/dev/null || true
+  if [ $GEMINI_EXIT -eq 124 ]; then
+    echo "⏱️ Gemini command exceeded ${GEMINI_TIMEOUT}s timeout; terminating session"
+    pkill -f "gemini" 2>/dev/null || true
     PREVIOUS_MESSAGE_FILE="$LAST_MESSAGE_FILE"
     COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
     ATTEMPT=$((ATTEMPT + 1))
     continue
   fi
 
-  echo "[opencode-debug] Attempt $ATTEMPT finished with exit code $OPENCODE_EXIT"
+  echo "[gemini-debug] Attempt $ATTEMPT finished with exit code $GEMINI_EXIT"
 
-  if [ $OPENCODE_EXIT -ne 0 ]; then
-    echo "⚠️ OpenCode exited with status $OPENCODE_EXIT on attempt $ATTEMPT"
+  if [ $GEMINI_EXIT -ne 0 ]; then
+    echo "⚠️ Gemini exited with status $GEMINI_EXIT on attempt $ATTEMPT"
   fi
 
   # Circuit breaker: detect repeated failing bash commands
@@ -1925,10 +1931,10 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
   write_last_message "$RUN_LOG" "$LAST_MESSAGE_FILE" || true
 
   if [ -s "$LAST_MESSAGE_FILE" ]; then
-    echo "📝 OpenCode summary (attempt $ATTEMPT):"
+    echo "📝 Gemini summary (attempt $ATTEMPT):"
     sed 's/^/    /' "$LAST_MESSAGE_FILE"
   else
-    echo "ℹ️ No textual summary captured from OpenCode on attempt $ATTEMPT"
+    echo "ℹ️ No textual summary captured from Gemini on attempt $ATTEMPT"
   fi
 
   NEW_SESSION_ID=""
@@ -1937,7 +1943,7 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
   fi
   if [ -n "$NEW_SESSION_ID" ]; then
     if [ "$LATEST_SESSION_ID" != "$NEW_SESSION_ID" ]; then
-      echo "ℹ️  Captured OpenCode session ID: $NEW_SESSION_ID"
+      echo "ℹ️  Captured Gemini session ID: $NEW_SESSION_ID"
       LATEST_SESSION_ID="$NEW_SESSION_ID"
     fi
     CONTINUE_SESSION=1
@@ -1948,7 +1954,7 @@ Continuing Task {{task_id}} - focus on solving the underlying issue, not repeati
   if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ -f "$RUN_LOG" ]; then
     LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" 2>/dev/null | tail -n1 | awk '{print $3}' | tr -d ',' | tr -d '\n' || true)
     if [[ "$LAST_TOKENS" =~ ^[0-9]+$ ]]; then
-      echo "📊 OpenCode tokens used this attempt: $LAST_TOKENS"
+      echo "📊 Gemini tokens used this attempt: $LAST_TOKENS"
       if [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ]; then
         echo "⚠️ Token usage $LAST_TOKENS exceeds limit $TOKEN_LIMIT; forcing clean session before retry"
         if [ -d "$SESSION_DIR" ]; then
@@ -2044,29 +2050,35 @@ REASON: Acceptance criteria 2 and 4 incomplete. API endpoint /users created but 
 
 Your response:"
   fi
-  COMPLETION_LAST_MESSAGE="/tmp/opencode-completion-${ATTEMPT}.txt"
-  COMPLETION_LOG="/tmp/opencode-completion-${ATTEMPT}.jsonl"
+  COMPLETION_LAST_MESSAGE="/tmp/gemini-completion-${ATTEMPT}.txt"
+  COMPLETION_LOG="/tmp/gemini-completion-${ATTEMPT}.jsonl"
 
   COMPLETION_RESPONSE=""
   if [ "$CONTINUE_SESSION" = "1" ]; then
     # Write completion prompt to file (same pattern as main prompt)
-    COMPLETION_PROMPT_FILE="/tmp/opencode-completion-prompt-${ATTEMPT}.txt"
+    COMPLETION_PROMPT_FILE="/tmp/gemini-completion-prompt-${ATTEMPT}.txt"
     printf '%s' "$COMPLETION_PROMPT" > "$COMPLETION_PROMPT_FILE"
     
     set +e
     set -o pipefail
     COMPLETION_CMD=(
-      "opencode"
-      "run"
-      "--format"
-      "$OPENCODE_FORMAT"
-      "--log-level"
-      "$OPENCODE_LOG_LEVEL"
+      "gemini"
+      "--output-format"
+      "$GEMINI_OUTPUT_FORMAT"
+      "--approval-mode"
+      "$GEMINI_APPROVAL_MODE"
     )
-    if [ -n "$LATEST_SESSION_ID" ]; then
-      COMPLETION_CMD+=("--session" "$LATEST_SESSION_ID")
-    else
-      COMPLETION_CMD+=("--continue")
+    if [ -n "$CURRENT_MODEL" ]; then
+      COMPLETION_CMD+=("--model" "$CURRENT_MODEL")
+    fi
+    if [ "${GEMINI_AUTO_APPROVE:-1}" = "1" ]; then
+      COMPLETION_CMD+=("--yolo")
+    fi
+    if [ "${GEMINI_DEBUG:-0}" = "1" ]; then
+      COMPLETION_CMD+=("--debug")
+    fi
+    if [ -n "${GEMINI_INCLUDE_DIRECTORIES:-}" ]; then
+      COMPLETION_CMD+=("--include-directories" "$GEMINI_INCLUDE_DIRECTORIES")
     fi
     
     # Pass completion prompt via stdin
@@ -2084,7 +2096,7 @@ Your response:"
 
     write_last_message "$COMPLETION_LOG" "$COMPLETION_LAST_MESSAGE" || true
 
-    echo "[opencode-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
+    echo "[gemini-debug] Completion probe for attempt $ATTEMPT exited $COMPLETION_EXIT"
 
     if [ -s "$COMPLETION_LAST_MESSAGE" ]; then
       COMPLETION_RESPONSE_RAW=$(tr -d '\r' < "$COMPLETION_LAST_MESSAGE")
@@ -2121,12 +2133,12 @@ Your response:"
     break
   fi
 
-  echo "[opencode-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
+  echo "[gemini-debug] Completion response on attempt $ATTEMPT: $COMPLETION_RESPONSE"
 
   if [ -n "$COMPLETION_REASON" ]; then
-    echo "⚠️ OpenCode reported task incomplete; retrying with new guidance..."
+    echo "⚠️ Gemini reported task incomplete; retrying with new guidance..."
   else
-    echo "⚠️ OpenCode reported task incomplete; retrying..."
+    echo "⚠️ Gemini reported task incomplete; retrying..."
   fi
   COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
   ATTEMPT=$((ATTEMPT + 1))
@@ -2146,9 +2158,9 @@ fi
 
 if [ $SUCCESS -ne 1 ]; then
   if [ "$UNLIMITED_RETRIES" = "1" ]; then
-    echo "⚠️ OpenCode did not confirm task completion after $FINAL_ATTEMPTS attempts (unlimited mode)"
+    echo "⚠️ Gemini did not confirm task completion after $FINAL_ATTEMPTS attempts (unlimited mode)"
   else
-    echo "⚠️ OpenCode did not confirm task completion after $MAX_RETRIES attempts"
+    echo "⚠️ Gemini did not confirm task completion after $MAX_RETRIES attempts"
   fi
   
   # Display the last recorded reason for incompletion
@@ -2161,8 +2173,8 @@ if [ $SUCCESS -ne 1 ]; then
   # Document remaining work for downstream agents (Cleo/Tess)
   echo ""
   echo "📝 Creating handoff document for Cleo..."
-  HANDOFF_FILE="$OPENCODE_WORK_DIR/task/rex-handoff.md"
-  mkdir -p "$OPENCODE_WORK_DIR/task"
+  HANDOFF_FILE="$GEMINI_WORK_DIR/task/rex-handoff.md"
+  mkdir -p "$GEMINI_WORK_DIR/task"
   
   # Prepare handoff content with proper variable expansion
   HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -2201,13 +2213,13 @@ Compare current implementation against acceptance criteria in task/acceptance-cr
 See \`task/acceptance-criteria.md\` for complete requirements.
 
 ---
-*Generated by Rex (OpenCode) after $FINAL_ATTEMPTS implementation attempts*
+*Generated by Rex (Gemini) after $FINAL_ATTEMPTS implementation attempts*
 EOF
 
   echo "✅ Handoff document created at task/rex-handoff.md"
   
   # Commit and push the handoff document
-  cd "$OPENCODE_WORK_DIR"
+  cd "$GEMINI_WORK_DIR"
   git add task/rex-handoff.md 2>/dev/null || true
   
   # Build commit message with proper variable expansion
@@ -2273,12 +2285,12 @@ Reason: $COMPLETION_REASON"
       echo "📋 LAST COMPLETION REASON:"
       echo "$COMPLETION_REASON"
     else
-      echo "⚠️ OpenCode did not provide a reason for incompletion"
-      echo "   This may indicate an error occurred before OpenCode could respond"
+      echo "⚠️ Gemini did not provide a reason for incompletion"
+      echo "   This may indicate an error occurred before Gemini could respond"
     fi
     echo ""
     echo "🔄 NEXT STEPS:"
-    echo "   - Check OpenCode logs above for errors"
+    echo "   - Check Gemini logs above for errors"
     echo "   - CodeRun will retry this task"
     echo "   - If retries exhausted, workflow will fail"
     echo ""
@@ -2287,9 +2299,9 @@ Reason: $COMPLETION_REASON"
     EXIT_CODE=1  # Exit with failure to trigger retry
   fi
 else
-  echo "✅ OpenCode confirmed task completion"
-  if [ ${OPENCODE_EXIT:-0} -ne 0 ]; then
-    echo "⚠️ OpenCode returned non-zero exit code ${OPENCODE_EXIT}, but completion probe passed"
+  echo "✅ Gemini confirmed task completion"
+  if [ ${GEMINI_EXIT:-0} -ne 0 ]; then
+    echo "⚠️ Gemini returned non-zero exit code ${GEMINI_EXIT}, but completion probe passed"
   fi
   EXIT_CODE=0
 fi
@@ -2562,7 +2574,7 @@ if [ $SUCCESS -ne 1 ]; then
   {{#if agent_completion_message}}
 echo "{{agent_completion_message}}"
   {{else}}
-echo "⚠️ OpenCode execution incomplete"
+echo "⚠️ Gemini execution incomplete"
   {{/if}}
   # Force exit to ensure container stops
   kill -TERM $$ 2>/dev/null || true
@@ -2573,7 +2585,7 @@ fi
 {{#if agent_completion_message}}
 echo "{{agent_completion_message}}"
 {{else}}
-echo "✅ OpenCode execution complete"
+echo "✅ Gemini execution complete"
 {{/if}}
 
 # Ensure container exits by terminating the shell process

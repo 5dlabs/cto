@@ -5,7 +5,7 @@
 
 use crate::cli::types::*;
 use async_trait::async_trait;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::env;
 
@@ -245,36 +245,258 @@ impl CLIAdapter for JsonCLIAdapter {
     }
 }
 
-/// Cursor CLI adapter (skeleton)
+/// Gemini CLI adapter
+pub struct GeminiCLIAdapter;
+
+impl GeminiCLIAdapter {
+    fn build_mcp_servers(universal: &UniversalConfig) -> serde_json::Map<String, Value> {
+        let mut servers = serde_json::Map::new();
+        if let Some(mcp_config) = &universal.mcp_config {
+            for server in &mcp_config.servers {
+                servers.insert(
+                    server.name.clone(),
+                    json!({
+                        "command": server.command,
+                        "args": server.args,
+                        "env": server.env,
+                    }),
+                );
+            }
+        }
+        servers
+    }
+
+    fn build_user_settings(universal: &UniversalConfig) -> Value {
+        let max_tokens = if universal.settings.max_tokens > 0 {
+            Some(universal.settings.max_tokens)
+        } else {
+            None
+        };
+
+        json!({
+            "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+            "general": {
+                "vimMode": false,
+                "disableAutoUpdate": true,
+                "disableUpdateNag": true
+            },
+            "model": {
+                "name": universal.settings.model,
+                "temperature": universal.settings.temperature,
+                "maxOutputTokens": max_tokens
+            },
+            "sandbox": universal.settings.sandbox_mode,
+            "automation": {
+                "approvalMode": "auto_edit",
+                "autoApproveTrustedTools": true
+            },
+            "tools": {
+                "enableMessageBusIntegration": true
+            },
+            "mcpServers": Value::Object(Self::build_mcp_servers(universal))
+        })
+    }
+
+    fn build_workspace_settings(_universal: &UniversalConfig) -> Value {
+        json!({
+            "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+            "general": {
+                "checkpointing": {
+                    "enabled": true
+                }
+            },
+            "includeDirectories": [
+                "/workspace/task",
+                "/workspace/docs"
+            ],
+            "context": {
+                "customFiles": [
+                    "GEMINI.md",
+                    "task/acceptance-criteria.md"
+                ]
+            },
+            "paths": {
+                "trustedFolders": [
+                    "/workspace"
+                ]
+            }
+        })
+    }
+}
+
+#[async_trait]
+impl CLIAdapter for GeminiCLIAdapter {
+    async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
+        let user_settings = Self::build_user_settings(universal);
+        let workspace_settings = Self::build_workspace_settings(universal);
+
+        let user_settings_str = serde_json::to_string_pretty(&user_settings)
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
+        let workspace_settings_str = serde_json::to_string_pretty(&workspace_settings)
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
+
+        let config_files = vec![
+            ConfigFile {
+                path: "/home/node/.gemini/settings.json".to_string(),
+                content: user_settings_str.clone(),
+                permissions: Some("0644".to_string()),
+            },
+            ConfigFile {
+                path: "/workspace/.gemini/settings.json".to_string(),
+                content: workspace_settings_str,
+                permissions: Some("0644".to_string()),
+            },
+            ConfigFile {
+                path: "/workspace/GEMINI.md".to_string(),
+                content: universal.agent.instructions.clone(),
+                permissions: Some("0644".to_string()),
+            },
+        ];
+
+        Ok(TranslationResult {
+            content: user_settings_str,
+            config_files,
+            env_vars: vec!["GEMINI_API_KEY".to_string()],
+        })
+    }
+
+    async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
+        Ok(vec![
+            "gemini".to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
+            "--prompt".to_string(),
+            task.to_string(),
+        ])
+    }
+
+    fn required_env_vars(&self) -> Vec<String> {
+        vec!["GEMINI_API_KEY".to_string()]
+    }
+
+    fn cli_type(&self) -> CLIType {
+        CLIType::Gemini
+    }
+}
+
+/// Cursor CLI adapter
 pub struct CursorCLIAdapter;
+
+impl CursorCLIAdapter {
+    fn resolve_toolman_url(universal: &UniversalConfig) -> String {
+        if let Some(mcp_config) = &universal.mcp_config {
+            for server in &mcp_config.servers {
+                if server.name.eq_ignore_ascii_case("toolman") {
+                    if let Some(env_url) = server.env.get("TOOLMAN_SERVER_URL") {
+                        return env_url.trim_end_matches('/').to_string();
+                    }
+                    if let Some(idx) = server.args.iter().position(|arg| arg == "--url") {
+                        if let Some(arg_url) = server.args.get(idx + 1) {
+                            return arg_url.trim_end_matches('/').to_string();
+                        }
+                    }
+                }
+            }
+        }
+
+        env::var("TOOLMAN_SERVER_URL")
+            .unwrap_or_else(|_| "http://toolman.agent-platform.svc.cluster.local:3000/mcp".into())
+            .trim_end_matches('/')
+            .to_string()
+    }
+
+    fn available_tools(universal: &UniversalConfig) -> Vec<String> {
+        let mut names: Vec<String> = universal
+            .tools
+            .iter()
+            .map(|tool| tool.name.clone())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    fn project_permissions() -> Value {
+        json!({
+            "permissions": {
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)"],
+                "deny": []
+            }
+        })
+    }
+}
 
 #[async_trait]
 impl CLIAdapter for CursorCLIAdapter {
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
-        let cursor_config = serde_json::json!({
+        let toolman_url = Self::resolve_toolman_url(universal);
+        let tools = Self::available_tools(universal);
+
+        let mut model_section = json!({
+            "default": universal.settings.model,
+            "maxOutputTokens": universal.settings.max_tokens,
+        });
+        if universal.settings.temperature != 0.0 {
+            model_section
+                .as_object_mut()
+                .expect("model section is object")
+                .insert(
+                    "temperature".to_string(),
+                    json!(universal.settings.temperature),
+                );
+        }
+
+        let cursor_config = json!({
             "version": 1,
+            "hasChangedDefaultModel": true,
+            "model": model_section,
             "editor": { "vimMode": false },
             "permissions": {
-                "allow": [],
+                "allow": ["Shell(*)", "Read(**/*)", "Write(**/*)"],
                 "deny": [],
             },
-            "notes": "TODO(cursor): populate CLI configuration",
+            "automation": {
+                "approvalPolicy": "never",
+                "sandboxMode": universal.settings.sandbox_mode,
+                "projectDocMaxBytes": 32_768,
+            },
+            "mcp": {
+                "servers": {
+                    "toolman": {
+                        "command": "toolman",
+                        "args": ["--url", toolman_url],
+                        "env": {
+                            "TOOLMAN_SERVER_URL": toolman_url,
+                        },
+                        "availableTools": tools,
+                    }
+                }
+            }
         });
 
         let config_content = serde_json::to_string_pretty(&cursor_config)
             .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
 
-        let mut config_files = vec![ConfigFile {
-            path: "/workspace/.cursor/cli.json".to_string(),
-            content: config_content.clone(),
-            permissions: Some("0644".to_string()),
-        }];
+        let project_permissions = serde_json::to_string_pretty(&Self::project_permissions())
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
 
-        config_files.push(ConfigFile {
-            path: "/workspace/AGENTS.md".to_string(),
-            content: universal.agent.instructions.clone(),
-            permissions: Some("0644".to_string()),
-        });
+        let config_files = vec![
+            ConfigFile {
+                path: "/home/node/.cursor/cli-config.json".to_string(),
+                content: config_content.clone(),
+                permissions: Some("0644".to_string()),
+            },
+            ConfigFile {
+                path: "/workspace/.cursor/cli.json".to_string(),
+                content: project_permissions,
+                permissions: Some("0644".to_string()),
+            },
+            ConfigFile {
+                path: "/workspace/AGENTS.md".to_string(),
+                content: universal.agent.instructions.clone(),
+                permissions: Some("0644".to_string()),
+            },
+        ];
 
         Ok(TranslationResult {
             content: config_content,
@@ -287,6 +509,8 @@ impl CLIAdapter for CursorCLIAdapter {
         Ok(vec![
             "cursor-agent".to_string(),
             "--print".to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
             "--force".to_string(),
             task.to_string(),
         ])
@@ -501,6 +725,10 @@ impl ConfigurationBridge {
             CLIType::Factory,
             Box::new(FactoryCLIAdapter) as Box<dyn CLIAdapter>,
         );
+        adapters.insert(
+            CLIType::Gemini,
+            Box::new(GeminiCLIAdapter) as Box<dyn CLIAdapter>,
+        );
 
         Self { adapters }
     }
@@ -713,7 +941,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cursor_adapter_placeholder() {
+    async fn test_cursor_adapter_generates_config() {
         let adapter = CursorCLIAdapter;
         let universal = UniversalConfig {
             context: ContextConfig {
@@ -742,7 +970,12 @@ mod tests {
         assert!(result
             .config_files
             .iter()
-            .any(|f| f.path.ends_with(".cursor/cli.json")));
+            .any(|f| f.path == "/home/node/.cursor/cli-config.json"));
+        assert!(result
+            .config_files
+            .iter()
+            .any(|f| f.path == "/workspace/.cursor/cli.json"));
+        assert!(result.content.contains("hasChangedDefaultModel"));
         assert!(result.env_vars.contains(&"CURSOR_API_KEY".to_string()));
 
         let command = adapter
@@ -751,6 +984,7 @@ mod tests {
             .unwrap();
         assert_eq!(command[0], "cursor-agent");
         assert!(command.contains(&"--print".to_string()));
+        assert!(command.contains(&"stream-json".to_string()));
     }
 
     #[tokio::test]
@@ -840,6 +1074,54 @@ mod tests {
         assert_eq!(command[0], "droid");
         assert!(command.contains(&"--auto".to_string()));
         assert!(command.contains(&"medium".to_string()));
+        assert!(command.contains(&"implement feature".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_gemini_adapter_generates_config() {
+        let adapter = GeminiCLIAdapter;
+        let universal = UniversalConfig {
+            context: ContextConfig {
+                project_name: "Gemini Project".to_string(),
+                project_description: "Testing gemini adapter".to_string(),
+                architecture_notes: String::new(),
+                constraints: vec![],
+            },
+            tools: vec![ToolDefinition {
+                name: "memory_create_entities".to_string(),
+                description: "Create memory entities".to_string(),
+                parameters: json!({}),
+                implementations: HashMap::new(),
+            }],
+            settings: SettingsConfig {
+                model: "gemini-2.5-pro".to_string(),
+                temperature: 0.25,
+                max_tokens: 128_000,
+                timeout: 300,
+                sandbox_mode: "workspace-write".to_string(),
+            },
+            agent: AgentConfig {
+                role: "developer".to_string(),
+                capabilities: vec![],
+                instructions: "Gemini instructions".to_string(),
+            },
+            mcp_config: None,
+        };
+
+        let result = adapter.to_cli_config(&universal).await.unwrap();
+        assert!(result
+            .config_files
+            .iter()
+            .any(|f| f.path == "/home/node/.gemini/settings.json"));
+        assert!(result.env_vars.contains(&"GEMINI_API_KEY".to_string()));
+
+        let command = adapter
+            .generate_command("implement feature", &universal)
+            .await
+            .unwrap();
+        assert_eq!(command[0], "gemini");
+        assert!(command.contains(&"--output-format".to_string()));
+        assert!(command.contains(&"stream-json".to_string()));
         assert!(command.contains(&"implement feature".to_string()));
     }
 }

@@ -535,33 +535,6 @@ spec:
                 }
               },
               {
-                "name": "openhands_query",
-                "docType": "openhands",
-                "title": "OpenHands CLI Documentation Query",
-                "description": "Search OpenHands CLI documentation for AI-assisted software development and automation tools.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "python", "yaml"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "automation", "development", "python-cli", "integration"],
-                  "supported_topics": ["installation", "configuration", "usage", "api", "troubleshooting"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "pip", "python", "virtualenv"],
-                    "configuration": ["config", "settings", "yaml", "env", "options"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "troubleshooting": ["error", "debug", "fix", "issue", "problem"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "automation": ["automate", "script", "workflow", "task", "process"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "python-cli": ["python", "pip", "cli", "command", "script"],
-                    "integration": ["integrate", "connect", "api", "webhook", "plugin"]
-                  }
-                }
-              },
-              {
                 "name": "gemini_query",
                 "docType": "gemini",
                 "title": "Google Gemini CLI Documentation Query",
@@ -585,60 +558,6 @@ spec:
                     "cli": ["cli", "command", "terminal", "console", "shell"],
                     "development": ["dev", "develop", "build", "create", "program"],
                     "google-ai": ["google", "gemini", "ai", "model", "llm"]
-                  }
-                }
-              },
-              {
-                "name": "qwen_query",
-                "docType": "qwen",
-                "title": "Qwen Code CLI Documentation Query",
-                "description": "Search Qwen Code CLI documentation for AI-powered coding assistance and development tools.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "typescript", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "qwen-ai"],
-                  "supported_topics": ["installation", "configuration", "usage", "api", "models"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "npm", "node"],
-                    "configuration": ["config", "settings", "json", "env", "options"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "models": ["model", "llm", "ai", "qwen", "version"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "qwen-ai": ["qwen", "alibaba", "ai", "model", "llm"]
-                  }
-                }
-              },
-              {
-                "name": "grok_query",
-                "docType": "grok",
-                "title": "Grok CLI Documentation Query",
-                "description": "Search Grok CLI documentation for AI-powered development assistance with X.AI integration.",
-                "enabled": true,
-                "metadataHints": {
-                  "supported_formats": ["markdown", "typescript", "json"],
-                  "supported_complexity_levels": ["beginner", "intermediate", "advanced"],
-                  "supported_categories": ["ai-assistance", "code-generation", "cli", "development", "xai-integration"],
-                  "supported_topics": ["installation", "authentication", "usage", "api", "mcp-tools"],
-                  "topic_keywords": {
-                    "installation": ["install", "setup", "configure", "bun", "npm"],
-                    "authentication": ["auth", "authenticate", "login", "key", "token"],
-                    "usage": ["use", "command", "cli", "terminal", "shell"],
-                    "api": ["api", "endpoint", "interface", "protocol", "rest"],
-                    "mcp-tools": ["mcp", "tool", "protocol", "model", "context"]
-                  },
-                  "category_keywords": {
-                    "ai-assistance": ["ai", "assistant", "help", "suggest", "complete"],
-                    "code-generation": ["generate", "code", "create", "write", "produce"],
-                    "cli": ["cli", "command", "terminal", "console", "shell"],
-                    "development": ["dev", "develop", "build", "create", "program"],
-                    "xai-integration": ["xai", "grok", "x", "ai", "integration"]
                   }
                 }
               },

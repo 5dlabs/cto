@@ -220,7 +220,7 @@ const features = [
   {
     icon: CodeIcon,
     title: "CLI-Agnostic Platform",
-    description: "Support for multiple AI CLI tools including Claude, Cursor, OpenHands, Grok, and more.",
+    description: "Support for multiple AI CLI tools including Claude, Cursor, Codex, Factory, OpenCode, and Gemini.",
     details: "Abstract away CLI differences with standardized interfaces and configuration bridges."
   },
   {
@@ -332,7 +332,7 @@ export const FeaturesSection: React.FC = () => {
               <div className="mt-6 p-4 bg-white rounded-lg">
                 <h4 className="font-semibold text-gray-900 mb-2">Supported CLIs:</h4>
                 <div className="flex flex-wrap gap-2">
-                  {['Claude', 'Cursor', 'OpenHands', 'Grok', 'Gemini', 'Qwen', 'Codex'].map((cli) => (
+                  {['Claude', 'Cursor', 'Codex', 'Factory', 'OpenCode', 'Gemini'].map((cli) => (
                     <span key={cli} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
                       {cli}
                     </span>

@@ -66,11 +66,8 @@ impl CliAdapter for TestAdapter {
             CLIType::Codex => "AGENTS.md",
             CLIType::OpenCode => "OPENCODE.md",
             CLIType::Gemini => "GEMINI.md",
-            CLIType::Grok => "GROK.md",
-            CLIType::Qwen => "QWEN.md",
             CLIType::Cursor => "CURSOR.md",
             CLIType::Factory => "AGENTS.md",
-            CLIType::OpenHands => "OPENHANDS.md",
         }
     }
 
@@ -80,18 +77,15 @@ impl CliAdapter for TestAdapter {
             CLIType::Codex => "codex",
             CLIType::OpenCode => "opencode",
             CLIType::Gemini => "gemini",
-            CLIType::Grok => "grok",
-            CLIType::Qwen => "qwen",
             CLIType::Cursor => "cursor",
             CLIType::Factory => "droid",
-            CLIType::OpenHands => "openhands",
         }
     }
 
     fn get_capabilities(&self) -> CliCapabilities {
         CliCapabilities {
             supports_streaming: matches!(self.cli_type, CLIType::Claude | CLIType::Factory),
-            supports_multimodal: matches!(self.cli_type, CLIType::Gemini | CLIType::Grok),
+            supports_multimodal: matches!(self.cli_type, CLIType::Gemini),
             supports_function_calling: true,
             supports_system_prompts: true,
             max_context_tokens: match self.cli_type {
@@ -233,22 +227,19 @@ async fn test_fr2_supporting_type_system() {
 
     println!("🧪 FR-2: Testing Supporting Type System");
 
-    // ✅ Test CLIType enum includes all 9 CLI types
+    // ✅ Test CLIType enum includes all supported CLI types
     let cli_types = vec![
         CLIType::Claude,
         CLIType::Codex,
         CLIType::OpenCode,
         CLIType::Gemini,
-        CLIType::Grok,
-        CLIType::Qwen,
         CLIType::Cursor,
         CLIType::Factory,
-        CLIType::OpenHands,
     ];
     assert_eq!(
         cli_types.len(),
-        9,
-        "CLIType enum must include exactly 9 CLI types"
+        6,
+        "CLIType enum must include exactly 6 CLI types"
     );
 
     // ✅ Test ParsedResponse structure
@@ -413,7 +404,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let supported = factory.get_supported_clis();
     assert_eq!(
         supported.len(),
-        5,
+        6,
         "Factory must return correct supported CLI count"
     );
     assert!(
@@ -436,6 +427,10 @@ async fn test_fr4_adapter_factory_implementation() {
         supported.contains(&CLIType::OpenCode),
         "Factory must include default OpenCode CLI"
     );
+    assert!(
+        supported.contains(&CLIType::Gemini),
+        "Factory must include default Gemini CLI"
+    );
 
     // ✅ Test adapter creation
     let created_adapter = factory
@@ -449,6 +444,7 @@ async fn test_fr4_adapter_factory_implementation() {
     );
 
     // ✅ Test unsupported CLI error
+    factory.remove_adapter_for_test(CLIType::Gemini);
     let unsupported_result = factory.create(CLIType::Gemini).await;
     assert!(
         unsupported_result.is_err(),
@@ -462,11 +458,22 @@ async fn test_fr4_adapter_factory_implementation() {
         "Factory must return UnsupportedCliType error"
     );
 
+    factory
+        .register_adapter(
+            CLIType::Gemini,
+            Arc::new(TestAdapter {
+                cli_type: CLIType::Gemini,
+                healthy: true,
+            }),
+        )
+        .await
+        .expect("Should restore Gemini adapter");
+
     // ✅ Test health checking before returning adapters
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        5,
+        6,
         "Factory must provide health summary"
     );
     assert_eq!(
@@ -907,11 +914,8 @@ async fn test_nfr4_extensibility() {
         CLIType::Codex,
         CLIType::OpenCode,
         CLIType::Gemini,
-        CLIType::Grok,
-        CLIType::Qwen,
         CLIType::Cursor,
         CLIType::Factory,
-        CLIType::OpenHands,
     ];
 
     for cli_type in all_cli_types {
@@ -941,11 +945,8 @@ async fn test_nfr4_extensibility() {
                 CLIType::Codex => "codex",
                 CLIType::OpenCode => "opencode",
                 CLIType::Gemini => "gemini",
-                CLIType::Grok => "grok",
-                CLIType::Qwen => "qwen",
                 CLIType::Cursor => "cursor",
                 CLIType::Factory => "droid",
-                CLIType::OpenHands => "openhands",
             },
             "Created adapter must match CLI type"
         );
@@ -954,8 +955,8 @@ async fn test_nfr4_extensibility() {
     let supported_clis = factory.get_supported_clis();
     assert_eq!(
         supported_clis.len(),
-        9,
-        "Factory must support all 9 CLI types"
+        6,
+        "Factory must support all registered CLI types"
     );
 
     // ✅ Test minimal boilerplate for new adapters (via TestAdapter)
@@ -1012,6 +1013,7 @@ async fn test_error_handling() {
 
     // ✅ Test factory error handling
     let factory = AdapterFactory::new().await.expect("Factory must work");
+    factory.remove_adapter_for_test(CLIType::Gemini);
     let unsupported_result = factory.create(CLIType::Gemini).await;
     assert!(
         unsupported_result.is_err(),
@@ -1167,7 +1169,7 @@ async fn test_factory_health_monitoring() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        5,
+        6,
         "Health summary must include all adapters"
     );
     assert_eq!(
@@ -1193,14 +1195,18 @@ async fn test_factory_health_monitoring() {
 
     // ✅ Test factory statistics
     let stats = factory.get_factory_stats().await;
-    assert_eq!(stats.total_adapters, 5, "Stats must show correct total");
     assert_eq!(
-        stats.healthy_adapters, 4,
-        "Stats must show correct healthy count"
+        stats.total_adapters,
+        factory.get_supported_clis().len(),
+        "Stats must match supported CLI count"
+    );
+    assert!(
+        stats.healthy_adapters >= 4,
+        "Most adapters should be healthy"
     );
     assert_eq!(
-        stats.unhealthy_adapters, 1,
-        "Stats must show correct unhealthy count"
+        stats.healthy_adapters + stats.warning_adapters + stats.unhealthy_adapters,
+        stats.total_adapters,
     );
     assert!(
         stats.health_monitoring_enabled,

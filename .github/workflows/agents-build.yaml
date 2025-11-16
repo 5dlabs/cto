@@ -1,7 +1,7 @@
 ---
 name: Agent Images
 
-# Automatically build latest agent images (Claude Code, Grok, etc.)
+# Automatically build latest agent images (Claude, Codex, Factory, Cursor, etc.)
 # Runs daily to ensure we always have the latest versions
 # Can also be triggered manually or on agent-related changes
 

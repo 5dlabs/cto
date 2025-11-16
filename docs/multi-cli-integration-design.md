@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The 5D Labs Agent Platform currently operates exclusively with Claude Code CLI. To expand capabilities and support diverse development workflows, we need to implement CLI-agnostic support, starting with OpenAI's Codex CLI, followed by Opencode and Cursor. This requires a standardized abstraction layer that handles the nuances of each CLI while maintaining consistent agent behavior.
+The 5D Labs Agent Platform now ships six first-class CLIs (Claude, Codex, Factory, OpenCode, Cursor, and Gemini). We built a CLI-agnostic adapter stack so every agent follows identical business rules (branch creation, PR requirements, tooling) regardless of the CLI it is paired with. A clean clone of the upstream Gemini CLI lives in `docs/gemini-cli` to track the latest schema changes ahead of the Gemini 3 release [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli). The remaining work is operational—keeping the template ConfigMaps in sync and exercising the multi-CLI smoke tests that prove cross-CLI parity.
 
 ## Table of Contents
 
@@ -24,9 +24,9 @@ The 5D Labs Agent Platform currently operates exclusively with Claude Code CLI. 
 
 ## Critical Implementation Prerequisites & Open Questions
 
-### 🚨 MAJOR SCOPE DISCOVERY: 8 CLI Architecture Analysis
+### 🚨 MAJOR SCOPE DISCOVERY: 6 CLI Architecture Analysis
 
-**Comprehensive analysis reveals 8 different CLI footprints in `/infra/images/`:**
+**Comprehensive analysis reveals 6 different CLI footprints in `/infra/images/`:**
 
 | CLI | Install Source (repo path) | Runtime Footprint | Primary Config Artifacts | Guidance / Memory Mechanism | MCP Integration Notes |
 |-----|----------------------------|-------------------|--------------------------|-----------------------------|-----------------------|
@@ -34,51 +34,32 @@ The 5D Labs Agent Platform currently operates exclusively with Claude Code CLI. 
 | **Codex** | `infra/images/codex/Dockerfile` (installs `@openai/codex`) | Rust binary distributed via npm | `~/.codex/config.toml` (TOML) | `AGENTS.md` layered files (`docs/codex/docs/getting-started.md:62`) | STDIO-only MCP clients (`docs/codex/docs/config.md:341`) |
 | **Opencode** | `infra/images/opencode/Dockerfile` (installs OpenCode bootstrap) | TypeScript/Node | Project + global `opencode.json` / `opencode.jsonc` | `AGENTS.md` + instruction files (`docs/opencode/packages/web/src/content/docs/docs/rules.mdx`) | Ships `@modelcontextprotocol` client libraries; supports both local and remote MCP servers |
 | **Gemini** | `infra/images/gemini/Dockerfile` (installs `@google/gemini-cli`) | TypeScript/Node | TBD – need upstream config review | Guidance mechanism TBD (no `GEMINI.md` reference in repo yet) | MCP support advertised upstream; implementation specifics still to be confirmed |
-| **Grok** | `infra/images/grok/Dockerfile` (installs `@vibe-kit/grok-cli`) | TypeScript/Node | CLI-driven flags/env (scripts/grok-entrypoint.sh) | TBD – no persisted rules observed yet | MCP usage not documented in repo – requires investigation |
 | **Cursor** | `infra/images/cursor/Dockerfile` (installs `cursor-agent`) | Python CLI + Node deps | Environment variables + CLI arguments | TBD – depends on Cursor agent capabilities | MCP integration unclear; likely via Cursor cloud APIs |
-| **OpenHands** | `infra/images/openhands/Dockerfile` (installs `openhands-ai` via pip) | Python/Poetry | Virtualenv configuration, project YAML/TOML | Internal stateful sessions (OpenHands runtime) | MCP support undocumented; treat as non-MCP initially |
-| **Qwen** | `infra/images/qwen/Dockerfile` (installs `@qwen-code/qwen-code`) | TypeScript/Node | CLI defaults (npm package) | Guidance mechanism TBD – confirm upstream behavior | MCP story unknown; may mirror other Node CLIs but needs validation |
+| **Factory** | `infra/images/factory/Dockerfile` (installs Factory Droid CLI) | Rust/Go binary with Node utilities | `~/.factory/settings.json` + persisted cache | `AGENTS.md` rendered into `/workspace/AGENTS.md` | STDIO-driven CLI that shells out to MCP via Toolman adapters |
 
 **CRITICAL FINDINGS:**
-- **npm-based distribution**: Six of the eight CLIs (Claude, Codex, Opencode, Gemini, Grok, Qwen) are delivered via npm packages on top of our runtime image, implying shared dependency management and cache strategy.
-- **Mixed guidance formats**: Claude and Codex use documented instruction files (`CLAUDE.md`, `AGENTS.md`), Opencode also leans on `AGENTS.md`; the remaining CLIs require discovery before we assume memory compatibility.
-- **Configuration diversity**: We must support TOML (`codex`), JSON/JSONC (`opencode`), and CLI/ENV driven modes (Grok, Cursor, OpenHands, Qwen) without forcing a single schema.
-- **MCP readiness varies**: Only Claude/Codex have confirmed MCP stories in this repo. Gemini/Grok/Qwen likely provide SDK integrations, while Cursor/OpenHands may require wrappers or alternative tooling.
-- **Container baselines**: Python-focused CLIs (Cursor, OpenHands) impose different dependency sets compared to Node-first CLIs, reinforcing the need for CLI-specific entrypoints.
+- **npm-based distribution**: Four of the six CLIs (Claude, Codex, Opencode, Gemini) are delivered via npm packages on top of our runtime image, implying shared dependency management and cache strategy. Factory ships its own installer, and Cursor bundles Python dependencies.
+- **Mixed guidance formats**: Claude and Codex use documented instruction files (`CLAUDE.md`, `AGENTS.md`), Opencode and Factory also lean on `AGENTS.md`, while Cursor and Gemini require discovery before we assume memory compatibility.
+- **Configuration diversity**: We must support TOML (`codex`), JSON/JSONC (`opencode`), CLI/ENV driven modes (Cursor), and custom binary settings (`factory`) without forcing a single schema.
+- **MCP readiness varies**: Claude/Codex have confirmed MCP stories in this repo. Gemini advertises MCP support, Cursor likely routes through Toolman, and Factory shells out to Toolman adapters.
+- **Container baselines**: Python-focused CLIs (Cursor) impose different dependency sets compared to Node-first CLIs, reinforcing the need for CLI-specific entrypoints.
 
-**REVISED SCOPE - Phase 1 Focus: "Big 4" CLIs**
-- **Claude** (current reference)
-- **Codex** (Rust binary + TOML config)
-- **Opencode** (TypeScript multi-package + JSON/JSONC config)
-- **Gemini** (TypeScript CLI – upstream config still under review)
-
-**Future Phases:**
-- **Phase 2**: Grok, Qwen (TypeScript variants)
-- **Phase 3**: Cursor, Openhands (Python frameworks)
+**Revised Scope**
+- **Phase 1 (Complete)**: Claude, Codex, Opencode, Factory.
+- **Phase 2 (Complete)**: Cursor stream-json adapter + Toolman bridge hardening.
+- **Phase 3 (Complete)**: Gemini adapter/templates aligned with upstream repo (`docs/gemini-cli`, sourced from [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)).
+- **Next Focus**: Operational hygiene (template ConfigMap rotation, multi-CLI smoke tests, and upcoming Gemini 3 schema diffs).
 
 ### 🚨 Immediate Blockers Identified
 
-#### 1. Model Validation Blocker (CRITICAL)
-**Status**: ❌ **BLOCKING**
+#### 1. Model Validation Blocker (RESOLVED)
+**Status**: ✅ **DONE**
 **Location**: `/mcp/src/main.rs:validate_model_name()`
-**Issue**: Current validation strictly enforces Claude models:
-```rust
-fn validate_model_name(model: &str) -> Result<()> {
-    if !model.starts_with("claude-") && !["opus", "sonnet", "haiku"].contains(&model) {
-        return Err(anyhow!(
-            "Invalid model '{}'. Must be a valid Claude model name (claude-* format) or CLAUDE code model (opus, sonnet, haiku)",
-            model
-        ));
-    }
-    Ok(())
-}
-```
-**Impact**: Codex models like `gpt-5-codex`, `o3` are immediately rejected
-**Required Action**: Update validation to support CLI-specific model patterns
+**Resolution**: Validation now accepts any non-empty model string and defers enforcement to the selected CLI, so Codex/Factory/Gemini identifiers no longer get rejected early.
 
-#### 2. MCP Streaming Compatibility (UNKNOWN)
-**Status**: ❓ **NEEDS AUDIT**
-**Issue**: Unknown whether Codex CLI supports HTTP streaming for MCP responses
+#### 2. MCP Streaming Compatibility (VERIFIED)
+**Status**: ✅ **STREAMING IN PROD**
+**Issue**: Cursor and Gemini both consume `--output-format stream-json`. The adapters buffer/parse those events and map tool calls + usage metadata back into the shared `ParsedResponse` struct, so no fallback transport is required today. Keep the buffered relay design in the appendix should we hit a future CLI that lacks streaming support.
 **Impact**: May require buffered relay implementation
 **Required Action**: Test Codex MCP streaming capabilities immediately
 
@@ -149,25 +130,13 @@ If performance is acceptable without buffering, we can skip the relay implementa
 
 #### Additional Follow-ups for Associate Agent - ANSWERED
 
-**Q1: Upstream documentation for Gemini, Grok, and Qwen CLI configuration**
+**Q1: Upstream documentation for Gemini CLI configuration**
 
 **Gemini CLI** (`/tmp/gemini-cli/`):
 - **Config**: Uses `GEMINI.md` files (confirmed in `/tmp/gemini-cli/packages/cli/src/commands/extensions/examples/context/GEMINI.md`)
 - **Pattern**: Similar to Claude's `CLAUDE.md` approach
 - **Official Google CLI**: `@google/gemini-cli` npm package
 - **Documentation**: Full docs available in cloned repo at `/tmp/gemini-cli/GEMINI.md`
-
-**Grok CLI** (`/tmp/grok-cli/`):
-- **Config**: Uses `.grok/GROK.md` pattern (subdirectory approach)
-- **Package**: `@vibe-kit/grok-cli` or similar TypeScript CLI
-- **Memory**: Project-specific guidance files in `.grok/` subdirectory
-- **Status**: Repository structure confirms `.grok/GROK.md` semantics exist
-
-**Qwen CLI** (`/tmp/qwen-code/`):
-- **Config**: Gemini fork - uses `GEMINI.md` variant (confirmed in package.json: Gemini CLI fork)
-- **Package**: `@qwen-code/qwen-code` npm package
-- **Memory**: Same pattern as Gemini but adapted for Qwen models
-- **Documentation**: Available in cloned repo at `/tmp/qwen-code/`
 
 **Q2: Version pinning strategy for npm packages**
 
@@ -180,8 +149,6 @@ agent:
     claude: "0.8.5"
     codex: "0.7.2"
     gemini: "0.7.0-nightly.20250918.2722473a"  # From /tmp/gemini-cli/package.json
-    qwen: "0.0.12"  # From /tmp/qwen-code/package.json
-    grok: "latest"  # TBD - needs version discovery
     opencode: "latest"  # TBD - needs version discovery
 ```
 
@@ -193,27 +160,19 @@ agent:
 - **Memory pattern**: `GEMINI.md` with Ink library screen reader guidance
 - **MCP Integration**: Native MCP support with standardized tooling
 
-**Qwen CLI Specifics** (from `/tmp/qwen-code/`):
-- **Architecture**: Direct fork of Gemini CLI adapted for Qwen models
-- **Build command**: `npm run preflight` (inherited from Gemini)
-- **Container**: Uses same TypeScript/Node.js foundation as Gemini
-- **Binary name**: `qwen` (vs `gemini` for original)
-
 #### Additional Implementation Guidance from CLI Analysis
 
 **CLI Architecture Patterns Discovered:**
-- **npm-delivered CLIs (Claude, Codex, Opencode, Gemini, Grok, Qwen)**: Share the Node-based runtime we already ship. Integration hinges on per-CLI config formats rather than disparate language stacks.
+- **npm-delivered CLIs (Claude, Codex, Opencode, Gemini)**: Share the Node-based runtime we already ship. Integration hinges on per-CLI config formats rather than disparate language stacks.
 - **Rust CLI (Codex)**: External MCP client via `toolman` – existing STDIO wrapper continues to apply.
-- **Python CLIs (Cursor, OpenHands)**: Bring their own virtualenv / framework assumptions – staged for a later phase once Node-first CLIs land.
+- **Python CLIs (Cursor)**: Bring their own virtualenv / framework assumptions – staged for a later phase once Node-first CLIs land.
 
 **Memory / Guidance Mechanisms - CONFIRMED:**
 - **Claude**: `CLAUDE.md` (current baseline)
 - **Codex**: `AGENTS.md` (layered project guidance)
 - **Opencode**: `AGENTS.md` (confirmed in documentation)
 - **Gemini**: `GEMINI.md` (confirmed in upstream repo at `/tmp/gemini-cli/`)
-- **Grok**: `.grok/GROK.md` (subdirectory pattern confirmed in `/tmp/grok-cli/`)
-- **Qwen**: `GEMINI.md` variant (Gemini fork confirmed in `/tmp/qwen-code/package.json`)
-- **Cursor/OpenHands**: Session-based (no persistent guidance files - Python frameworks)
+- **Cursor**: Session-based (no persistent guidance files - Python frameworks)
 
 **Recommended Phase 1 Focus Validation:**
 The "Big 4" approach (Claude, Codex, Opencode, Gemini) covers all major architectural patterns:

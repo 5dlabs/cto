@@ -116,13 +116,7 @@ The 5D Labs Platform is evolving to become the premier AI-driven development pla
 **Support for diverse AI development tools**
 
 
-- **Grok CLI** - X.AI's development assistant integration
-
-
 - **Gemini CLI** - Google's Gemini model integration
-
-
-- **All Hands CLI** - OpenHands development agent support
 
 
 - Unified interface across different AI providers

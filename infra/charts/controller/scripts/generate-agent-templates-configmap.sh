@@ -112,6 +112,7 @@ create_configmap "claude" "code/claude/"
 create_configmap "cursor" "code/cursor/"
 create_configmap "codex" "code/codex/"
 create_configmap "factory" "code/factory/"
+create_configmap "gemini" "code/gemini/"
 create_configmap "opencode" "code/opencode/"
 create_configmap "code-shared" "code/[^/]+\.(hbs|md|sh)$"  # Files directly in code/
 create_configmap "docs" "docs/"

@@ -8,8 +8,11 @@ use crate::tasks::template_paths::{
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
-    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
-    CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
+    CODE_GEMINI_CONTAINER_TEMPLATE, CODE_GEMINI_MEMORY_TEMPLATE,
+    CODE_GEMINI_USER_SETTINGS_TEMPLATE, CODE_GEMINI_WORKSPACE_SETTINGS_TEMPLATE,
+    CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE,
+    CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -58,6 +61,7 @@ impl CodeTemplateGenerator {
             CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
             CLIType::Factory => Self::generate_factory_templates(code_run, config),
             CLIType::OpenCode => Self::generate_opencode_templates(code_run, config),
+            CLIType::Gemini => Self::generate_gemini_templates(code_run, config),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -242,6 +246,70 @@ impl CodeTemplateGenerator {
                 &client_config_value,
                 &remote_tools,
             )?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    fn generate_gemini_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_gemini_container_script(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
+            "GEMINI.md".to_string(),
+            Self::generate_gemini_memory(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
+            "gemini-user-settings.json".to_string(),
+            Self::generate_gemini_user_settings(code_run, &enriched_cli_config, &remote_tools)?,
+        );
+
+        templates.insert(
+            "gemini-workspace-settings.json".to_string(),
+            Self::generate_gemini_workspace_settings(code_run)?,
         );
 
         templates.insert(
@@ -2084,6 +2152,235 @@ impl CodeTemplateGenerator {
         })
     }
 
+    fn generate_gemini_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let base_template = Self::load_template(CODE_GEMINI_CONTAINER_BASE_TEMPLATE)?;
+        handlebars
+            .register_partial("gemini_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_gemini_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("gemini_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini container template {template_path}: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let working_directory = Self::get_working_directory(code_run);
+        let task_dir = format!("{working_directory}/task");
+        let docs_dir = code_run
+            .spec
+            .docs_project_directory
+            .as_deref()
+            .map(|dir| format!("{working_directory}/{dir}"))
+            .unwrap_or_else(|| format!("{working_directory}/docs"));
+        let include_directories = format!("{task_dir},{docs_dir}");
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": working_directory,
+            "continue_session": Self::get_continue_session(code_run),
+            "overwrite_memory": code_run.spec.overwrite_memory,
+            "docs_project_directory": code_run
+                .spec
+                .docs_project_directory
+                .as_deref()
+                .unwrap_or(""),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "model": render_settings.model,
+            "cli": {
+                "type": Self::determine_cli_type(code_run).to_string(),
+                "model": render_settings.model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+                "include_directories": include_directories,
+            },
+        });
+
+        handlebars
+            .render("gemini_container", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Gemini container template: {e}"
+                ))
+            })
+    }
+
+    fn generate_gemini_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        Self::register_agent_partials(&mut handlebars)?;
+
+        let template_path = Self::get_gemini_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
+
+        handlebars
+            .register_template_string("gemini_memory", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register GEMINI.md template {template_path}: {e}"
+                ))
+            })?;
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
+        let context = json!({
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "model": model,
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "workflow_name": workflow_name,
+            "toolman": {
+                "tools": remote_tools,
+            },
+            "cli_config": cli_config,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+        });
+
+        handlebars.render("gemini_memory", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render GEMINI.md template: {e}"
+            ))
+        })
+    }
+
+    fn generate_gemini_user_settings(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_GEMINI_USER_SETTINGS_TEMPLATE)?;
+        handlebars
+            .register_template_string("gemini_user_settings", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini user settings template: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let context = json!({
+            "render": {
+                "model": render_settings.model,
+                "temperature": render_settings.temperature,
+                "max_output_tokens": render_settings.max_output_tokens,
+                "sandbox_mode": render_settings.sandbox_mode,
+                "approval_policy": render_settings.approval_policy,
+                "editor_vim_mode": render_settings.editor_vim_mode,
+            },
+            "toolman": {
+                "url": render_settings.toolman_url,
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars
+            .render("gemini_user_settings", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Gemini user settings template: {e}"
+                ))
+            })
+    }
+
+    fn generate_gemini_workspace_settings(code_run: &CodeRun) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_GEMINI_WORKSPACE_SETTINGS_TEMPLATE)?;
+        handlebars
+            .register_template_string("gemini_workspace_settings", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini workspace settings template: {e}"
+                ))
+            })?;
+
+        let working_directory = Self::get_working_directory(code_run);
+        let docs_directory = code_run
+            .spec
+            .docs_project_directory
+            .as_deref()
+            .map(|dir| format!("{working_directory}/{dir}"))
+            .unwrap_or_else(|| format!("{working_directory}/docs"));
+
+        let context = json!({
+            "workspace": {
+                "working_directory": working_directory,
+                "docs_directory": docs_directory,
+            },
+        });
+
+        handlebars
+            .render("gemini_workspace_settings", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Gemini workspace settings template: {e}"
+                ))
+            })
+    }
+
     fn generate_coding_guidelines(code_run: &CodeRun) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -2497,6 +2794,14 @@ impl CodeTemplateGenerator {
         };
 
         template_name.to_string()
+    }
+
+    fn get_gemini_container_template(_code_run: &CodeRun) -> String {
+        CODE_GEMINI_CONTAINER_TEMPLATE.to_string()
+    }
+
+    fn get_gemini_memory_template(_code_run: &CodeRun) -> String {
+        CODE_GEMINI_MEMORY_TEMPLATE.to_string()
     }
 
     /// Extract agent name from GitHub app identifier
