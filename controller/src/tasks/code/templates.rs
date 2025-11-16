@@ -1229,46 +1229,50 @@ impl CodeTemplateGenerator {
         let mut toolman_url = settings
             .get("toolmanUrl")
             .and_then(Value::as_str)
-            .map(std::string::ToString::to_string)
-            .unwrap_or_else(|| {
-                std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
-                    "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
-                })
-            });
+            .map_or_else(
+                || {
+                    std::env::var("TOOLMAN_SERVER_URL").unwrap_or_else(|_| {
+                        "http://toolman.agent-platform.svc.cluster.local:3000/mcp".to_string()
+                    })
+                },
+                std::string::ToString::to_string,
+            );
         toolman_url = toolman_url.trim_end_matches('/').to_string();
 
         let model_provider = settings
             .get("modelProvider")
             .and_then(Value::as_object)
-            .map(|provider| {
-                let get = |key: &str| provider.get(key).and_then(Value::as_str);
-                json!({
-                    "name": get("name").unwrap_or("OpenAI"),
-                    "base_url": get("base_url")
-                        .or_else(|| get("baseUrl"))
-                        .unwrap_or("https://api.openai.com/v1"),
-                    "env_key": get("env_key")
-                        .or_else(|| get("envKey"))
-                        .unwrap_or("OPENAI_API_KEY"),
-                    "wire_api": get("wire_api")
-                        .or_else(|| get("wireApi"))
-                        .unwrap_or("chat"),
-                    "request_max_retries": provider
-                        .get("request_max_retries")
-                        .and_then(Value::as_u64),
-                    "stream_max_retries": provider
-                        .get("stream_max_retries")
-                        .and_then(Value::as_u64),
-                })
-            })
-            .unwrap_or_else(|| {
-                json!({
-                    "name": "OpenAI",
-                    "base_url": "https://api.openai.com/v1",
-                    "env_key": "OPENAI_API_KEY",
-                    "wire_api": "chat"
-                })
-            });
+            .map_or_else(
+                || {
+                    json!({
+                        "name": "OpenAI",
+                        "base_url": "https://api.openai.com/v1",
+                        "env_key": "OPENAI_API_KEY",
+                        "wire_api": "chat"
+                    })
+                },
+                |provider| {
+                    let get = |key: &str| provider.get(key).and_then(Value::as_str);
+                    json!({
+                        "name": get("name").unwrap_or("OpenAI"),
+                        "base_url": get("base_url")
+                            .or_else(|| get("baseUrl"))
+                            .unwrap_or("https://api.openai.com/v1"),
+                        "env_key": get("env_key")
+                            .or_else(|| get("envKey"))
+                            .unwrap_or("OPENAI_API_KEY"),
+                        "wire_api": get("wire_api")
+                            .or_else(|| get("wireApi"))
+                            .unwrap_or("chat"),
+                        "request_max_retries": provider
+                            .get("request_max_retries")
+                            .and_then(Value::as_u64),
+                        "stream_max_retries": provider
+                            .get("stream_max_retries")
+                            .and_then(Value::as_u64),
+                    })
+                },
+            );
 
         let raw_additional_toml = settings
             .get("rawToml")
@@ -2662,7 +2666,7 @@ mod tests {
                 docs_branch: "main".to_string(),
                 env: HashMap::new(),
                 env_from_secrets: Vec::new(),
-                enable_docker: None,
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
             },

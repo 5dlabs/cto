@@ -151,21 +151,18 @@ impl ParseError {
         match self {
             ParseError::NotActionableFeedback => "not_actionable",
             ParseError::UnauthorizedAuthor { .. } => "authorization",
-            ParseError::MissingRequiredField { .. } => "missing_data",
+            ParseError::MissingRequiredField { .. } | ParseError::NoCriteriaFound => "missing_data",
             ParseError::InvalidFieldValue { .. } => "invalid_data",
             ParseError::MalformedComment { .. } => "malformed_input",
-            ParseError::NoCriteriaFound => "missing_data",
             ParseError::AllCriteriaMet => "no_action_needed",
-            ParseError::IssueTypeError { .. } => "extraction_failure",
-            ParseError::SeverityError { .. } => "extraction_failure",
-            ParseError::DescriptionError { .. } => "extraction_failure",
-            ParseError::ReproductionStepsError { .. } => "extraction_failure",
-            ParseError::ExpectedActualError { .. } => "extraction_failure",
-            ParseError::MarkdownParseError { .. } => "parsing_failure",
-            ParseError::RegexError { .. } => "parsing_failure",
+            ParseError::IssueTypeError { .. }
+            | ParseError::SeverityError { .. }
+            | ParseError::DescriptionError { .. }
+            | ParseError::ReproductionStepsError { .. }
+            | ParseError::ExpectedActualError { .. } => "extraction_failure",
+            ParseError::MarkdownParseError { .. } | ParseError::RegexError { .. } => "parsing_failure",
             ParseError::AuthorValidationError { .. } => "authorization",
-            ParseError::CacheError { .. } => "system_error",
-            ParseError::SerializationError { .. } => "system_error",
+            ParseError::CacheError { .. } | ParseError::SerializationError { .. } => "system_error",
             ParseError::Generic { .. } => "generic_error",
             ParseError::ExternalServiceError { .. } => "external_error",
             ParseError::ConfigurationError { .. } => "configuration_error",

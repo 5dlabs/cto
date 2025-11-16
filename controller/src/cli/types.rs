@@ -4,6 +4,18 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+const CLI_TYPE_VARIANTS: &[&str] = &[
+    "claude",
+    "codex",
+    "opencode",
+    "cursor",
+    "factory",
+    "openhands",
+    "grok",
+    "gemini",
+    "qwen",
+];
+
 /// Supported CLI types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -72,20 +84,8 @@ impl<'de> Deserialize<'de> for CLIType {
     {
         let value = String::deserialize(deserializer)?;
 
-        const VARIANTS: &[&str] = &[
-            "claude",
-            "codex",
-            "opencode",
-            "cursor",
-            "factory",
-            "openhands",
-            "grok",
-            "gemini",
-            "qwen",
-        ];
-
         CLIType::from_str_ci(&value)
-            .ok_or_else(|| serde::de::Error::unknown_variant(&value, VARIANTS))
+            .ok_or_else(|| serde::de::Error::unknown_variant(&value, CLI_TYPE_VARIANTS))
     }
 }
 
@@ -151,6 +151,7 @@ pub enum SessionType {
 }
 
 /// CLI capability profile
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CLICapabilities {
     /// Maximum context window size

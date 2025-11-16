@@ -105,12 +105,12 @@ impl AuthorValidator {
     }
 
     /// Add an author to the approved list
-    pub fn add_approved_author(&mut self, author: String) -> Result<()> {
+    pub fn add_approved_author(&mut self, author: &str) -> Result<()> {
         if author.trim().is_empty() {
             return Err(anyhow::anyhow!("Author name cannot be empty"));
         }
 
-        if self.allowed_authors.insert(author.clone()) {
+        if self.allowed_authors.insert(author.to_string()) {
             info!("Added '{}' to approved authors list", author);
             // Clear cache to force re-validation
             self.clear_cache();
@@ -137,18 +137,22 @@ impl AuthorValidator {
     }
 
     /// Add a team prefix pattern
-    pub fn add_team_prefix(&mut self, prefix: String) -> Result<()> {
+    pub fn add_team_prefix(&mut self, prefix: &str) -> Result<()> {
         if prefix.trim().is_empty() {
             return Err(anyhow::anyhow!("Team prefix cannot be empty"));
         }
 
-        if self.allowed_team_prefixes.contains(&prefix) {
+        if self
+            .allowed_team_prefixes
+            .iter()
+            .any(|existing| existing == prefix)
+        {
             return Err(anyhow::anyhow!(
                 "Team prefix '{prefix}' is already configured"
             ));
         }
 
-        self.allowed_team_prefixes.push(prefix.clone());
+        self.allowed_team_prefixes.push(prefix.to_string());
         info!("Added team prefix '{}' to allowed patterns", prefix);
         // Clear cache to force re-validation
         self.clear_cache();

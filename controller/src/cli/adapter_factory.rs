@@ -542,7 +542,7 @@ mod tests {
             Ok(crate::cli::adapter::ParsedResponse {
                 content: response.to_string(),
                 tool_calls: vec![],
-                metadata: Default::default(),
+                metadata: ResponseMetadata::default(),
                 finish_reason: crate::cli::adapter::FinishReason::Stop,
                 streaming_delta: None,
             })

@@ -135,7 +135,8 @@ impl SessionPersistence for MemorySessionPersistence {
 
     async fn cleanup_sessions(&self, max_age_hours: u64) -> Result<usize> {
         let mut sessions = self.sessions.write().await;
-        let cutoff = chrono::Utc::now() - chrono::Duration::hours(max_age_hours as i64);
+        let cutoff = chrono::Utc::now()
+            - chrono::Duration::hours(i64::try_from(max_age_hours).unwrap_or(i64::MAX));
         let initial_count = sessions.len();
 
         sessions.retain(|_, session| session.last_active > cutoff);
@@ -332,7 +333,8 @@ impl SessionManager {
 
         // Clean up cache
         let mut active = self.active_sessions.write().await;
-        let cutoff = chrono::Utc::now() - chrono::Duration::hours(max_age_hours as i64);
+        let cutoff = chrono::Utc::now()
+            - chrono::Duration::hours(i64::try_from(max_age_hours).unwrap_or(i64::MAX));
         active.retain(|_, session| session.last_active > cutoff);
 
         Ok(cleaned)

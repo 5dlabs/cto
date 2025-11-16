@@ -39,8 +39,8 @@ fn default_overwrite_memory() -> bool {
     false
 }
 
-fn default_enable_docker() -> Option<bool> {
-    Some(true)
+fn default_enable_docker() -> bool {
+    true
 }
 
 /// CLI-specific configuration
@@ -145,7 +145,7 @@ pub struct CodeRunSpec {
 
     /// Whether to enable Docker-in-Docker support for this `CodeRun` (defaults to true)
     #[serde(default = "default_enable_docker", rename = "enableDocker")]
-    pub enable_docker: Option<bool>,
+    pub enable_docker: bool,
 
     /// Base64-encoded YAML containing task requirements (secrets and environment variables)
     #[serde(default, rename = "taskRequirements")]

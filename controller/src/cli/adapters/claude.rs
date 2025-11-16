@@ -46,7 +46,7 @@ impl ClaudeAdapter {
     pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing Claude adapter");
 
-        let base = Arc::new(BaseAdapter::new(config).await?);
+        let base = Arc::new(BaseAdapter::new(config)?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
 
         let adapter = Self {

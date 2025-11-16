@@ -542,7 +542,7 @@ impl<'a> CodeResourceManager<'a> {
         }));
 
         // Docker-in-Docker volumes (enabled by default, can be disabled via enableDocker: false)
-        let enable_docker = code_run.spec.enable_docker.unwrap_or(true);
+        let enable_docker = code_run.spec.enable_docker;
         if enable_docker {
             volumes.push(json!({
                 "name": "docker-sock-dir",

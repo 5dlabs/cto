@@ -119,7 +119,7 @@ pub struct BaseAdapter {
 
 impl BaseAdapter {
     /// Create new base adapter
-    pub async fn new(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn new(config: AdapterConfig) -> AdapterResult<Self> {
         let metrics = Arc::new(AdapterMetrics::new(&config.metrics_prefix)?);
         let mut templates = Handlebars::new();
 
