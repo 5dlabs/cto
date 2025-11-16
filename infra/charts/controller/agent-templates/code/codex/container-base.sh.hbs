@@ -1022,6 +1022,8 @@ safe_git_config --global --add safe.directory "$REPO_ROOT"
 cd "$REPO_ROOT"
 sync_gh_hosts_to_path "$REPO_ROOT"
 write_gitleaks_allowlist
+export GITLEAKS_CONFIG="$REPO_ROOT/.gitleaks.toml"
+# gitleaks CLI reads $GITLEAKS_CONFIG automatically, so agents don't need to pass --config
 # Remove stale automation-managed files that block branch checkout when rerunning
 MANAGED_PATHS=(
   ".mcp.json"
