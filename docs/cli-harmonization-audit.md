@@ -221,20 +221,20 @@ Instead of waiting for end-to-end workflow flakes, we can exercise each CLI/agen
 
 | CLI | Agents exercised | Automated checks | Manual spot-check |
 | --- | --- | --- | --- |
-| Claude | Rex, Cleo, Tess, Cipher | `cargo test -p controller` already covers Claude adapter parsing + template selection; add nightly `cursor-agent`-style smoke script that renders Rex container and runs `claude --version` | Run `docs/claude-code` quickstart in the seeded PVC |
-| Codex | Rex, Cleo, Tess, Cipher | Existing adapter tests + `test_templates` binary; add `scripts/validate-cli codex` to invoke `codex --version --config generated` | Manual: `docker run codex-agent` with generated config |
-| Cursor | Rex, Cleo, Tess, Blaze | Unit tests validate stream-json parsing; add `make validate-cursor` that executes `cursor-agent --print --output-format stream-json --force "noop"` inside the container image | Validate headless auth by replaying `docs/cursor-cli/headless.html` instructions |
-| Factory | Rex, Blaze | Keep current `factory --version` smoke step and assert `factory-cli-config.json` from ConfigMap matches schema extracted from `docs/factory-cli/README.md` | Run `factory droid plan` locally with generated config |
-| OpenCode | Rex | New prompt scaffold ensures deterministic prompt preview; add `scripts/validate-cli opencode` to run `opencode --version` and parse `--dry-run` output | Launch `opencode run --dry-run` using `docs/opencode-cli` reference |
-| Gemini | Rex | Adapter tests + prompt scaffold; add `scripts/validate-cli gemini` to call `gemini --version` and `gemini run prompt.md --dry-run` with generated settings | Follow `docs/gemini-cli/README.md` quickstart inside container |
+| Claude | Rex, Cleo, Tess, Cipher | `cargo test -p controller` already covers Claude adapter parsing + template selection; `./scripts/validate-cli.sh claude` ensures the GHCR image can answer `claude --version` | Run `docs/claude-code` quickstart in the seeded PVC |
+| Codex | Rex, Cleo, Tess, Cipher | Existing adapter tests + `test_templates` binary; `./scripts/validate-cli.sh codex` invokes `codex --version` inside `ghcr.io/5dlabs/codex` | Manual: `docker run ghcr.io/5dlabs/codex codex --version --config generated` |
+| Cursor | Rex, Cleo, Tess, Blaze | Unit tests validate stream-json parsing; `./scripts/validate-cli.sh cursor -- --print --output-format stream-json --force noop` dry-runs the containerized CLI | Validate headless auth by replaying `docs/cursor-cli/headless.html` instructions |
+| Factory | Rex, Blaze | Keep current `factory --version` smoke step; `./scripts/validate-cli.sh factory` executes `droid --version` in the Factory image | Run `factory droid plan` locally with generated config |
+| OpenCode | Rex | Prompt scaffold ensures deterministic preview; `./scripts/validate-cli.sh opencode` runs `opencode --version` (pass `-- --help` for extra coverage) | Launch `opencode run --dry-run` using `docs/opencode-cli` reference |
+| Gemini | Rex | Adapter tests + prompt scaffold; `./scripts/validate-cli.sh gemini` runs `gemini --version` (add `-- run prompt.md --dry-run` once API keys are wired) | Follow `docs/gemini-cli/README.md` quickstart inside container |
 
 Per agent gating:
 
-- **Rex** – requires PR automation + task file presence. Validation uses `code/shared/prompt-scaffold` plus `scripts/validate-cli <cli> --agent rex`.
+- **Rex** – requires PR automation + task file presence. Validation stacks `code/shared/prompt-scaffold` rendering with `./scripts/validate-cli.sh <cli>` to ensure the container image is healthy before invoking `./scripts/test-play-project.sh`.
 - **Cleo/Tess** – there is no separate CLI; they inherit Rex containers but different AGENTS.md. Validation ensures `agents/<name>-system-prompt` renders and `task/acceptance-criteria.md` is referenced.
 - **Cipher** – same as Cleo/Tess but ensures `github-guidelines.md` includes security hooks; tests already read that file.
 
-Once `scripts/validate-cli` exists (tracked in TODO-5/6), we can hook it into CI to give us a deterministic “ready” bit before dispatching expensive workflows.
+Now that `./scripts/validate-cli.sh` exists, we can hook it into CI to give us a deterministic “ready” bit before dispatching expensive workflows.
 
 ## CLI Readiness Matrix
 

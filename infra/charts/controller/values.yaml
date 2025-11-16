@@ -37,12 +37,16 @@ agent:
     factory:
       repository: ghcr.io/5dlabs/factory
       tag: "latest"
+    gemini:
+      repository: ghcr.io/5dlabs/gemini
+      tag: "latest"
   cliProviders:
     claude: anthropic
     codex: openai
     cursor: anthropic
     factory: openai
     opencode: xai  # Primary provider for OpenCode
+    gemini: google
   # Optional: default ServiceAccount name for CodeRun jobs (overrides clusterAdmin SA)
   serviceAccountName: ""
 
@@ -920,6 +924,8 @@ secrets:
       secretKey: "FACTORY_API_KEY"
     opencode:
       secretKey: "XAI_API_KEY"  # OpenCode uses xAI as primary provider
+    gemini:
+      secretKey: "GEMINI_API_KEY"
   providerApiKeys:
     anthropic:
       secretKey: "ANTHROPIC_API_KEY"

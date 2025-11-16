@@ -607,6 +607,8 @@ impl AgentResolver {
 
 ### Required Test Scenarios
 
+We now ship `./scripts/validate-cli.sh`, which issues a quick `--version` (or any custom arguments after `--`) inside each GHCR CLI image. Use it as the first gate in this matrix so we fail fast before kicking off longer-running workflow tests.
+
 We now codify the CLI/agent cross-product as a unit test so template regressions fail instantly via `cargo test -p controller`. `test_cli_agent_validation_matrix` iterates every CLI type across Rex/Cleo/Tess/Blaze/Cipher/Atlas/Bolt and asserts both the container and memory templates exist under `infra/charts/controller/agent-templates`, giving us a fast safety net before any end-to-end run.【3170:3179:controller/src/tasks/code/templates.rs】
 
 #### Scenario 1: Existing Claude-Only Agent (MUST PASS)
