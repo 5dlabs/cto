@@ -1,0 +1,570 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "willow",
+  "name": "Factory Documentation",
+  "colors": {
+    "primary": "#020202",
+    "light": "#f8f8f8",
+    "dark": "#020202"
+  },
+  "styling": {
+    "fonts": {
+      "body": {
+        "family": "Inter"
+      },
+      "heading": {
+        "family": "Inter"
+      },
+      "mono": {
+        "family": "Geist Mono"
+      }
+    }
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "icon": "github",
+          "href": "https://github.com/factory-ai/factory"
+        },
+        {
+          "anchor": "Discord",
+          "icon": "discord",
+          "href": "https://discord.gg/zuudFXxg69"
+        }
+      ]
+    },
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Welcome",
+            "pages": ["welcome/index", "pricing"]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+                  "cli/getting-started/overview",
+                  "cli/getting-started/quickstart",
+                  {
+                    "group": "Resources",
+                    "pages": [
+                      "cli/getting-started/video-walkthrough",
+                      "cli/getting-started/how-to-talk-to-a-droid",
+                      "cli/getting-started/common-use-cases"
+                    ]
+                  },
+                  {
+                    "group": "User Guides",
+                    "pages": [
+                      "cli/user-guides/become-a-power-user",
+                      "cli/user-guides/specification-mode",
+                      "cli/user-guides/auto-run",
+                      "cli/user-guides/choosing-your-model",
+                      "cli/user-guides/implementing-large-features"
+                    ]
+                  },
+                  {
+                    "group": "Configuration",
+                    "pages": [
+                      "cli/configuration/custom-slash-commands",
+                      "cli/configuration/ide-integrations",
+                      "cli/configuration/custom-droids",
+                      "cli/configuration/agents-md",
+                      "cli/configuration/settings",
+                      "cli/configuration/mixed-models",
+                      "cli/configuration/mcp",
+                      {
+                        "group": "Hooks",
+                        "pages": [
+                          "cli/configuration/hooks-guide",
+                          {
+                            "group": "Cookbook",
+                            "pages": [
+                              "cli/configuration/hooks/auto-formatting",
+                              "cli/configuration/hooks/code-validation",
+                              "cli/configuration/hooks/documentation-sync",
+                              "cli/configuration/hooks/git-workflows",
+                              "cli/configuration/hooks/logging-analytics",
+                              "cli/configuration/hooks/notifications",
+                              "cli/configuration/hooks/session-automation",
+                              "cli/configuration/hooks/testing-automation"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "group": "Bring Your Own Key",
+                        "pages": [
+                          "cli/byok/overview",
+                          "cli/byok/baseten",
+                          "cli/byok/deepinfra",
+                          "cli/byok/fireworks",
+                          "cli/byok/google-gemini",
+                          "cli/byok/groq",
+                          "cli/byok/huggingface",
+                          "cli/byok/ollama",
+                          "cli/byok/openai-anthropic",
+                          "cli/byok/openrouter"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "group": "Droid Exec (Headless)",
+                    "pages": [
+                      "cli/droid-exec/overview",
+                      {
+                        "group": "Cookbook",
+                        "pages": [
+                          "cli/droid-exec/cookbook/code-review",
+                          "cli/droid-exec/cookbook/refactor-imports",
+                          "cli/droid-exec/cookbook/refactor-error-messages",
+                          "cli/droid-exec/cookbook/refactor-fix-lint"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "group": "Account",
+                    "pages": [
+                      "cli/account/security",
+                      "cli/account/droid-shield"
+                    ]
+                  }
+                ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/cli-reference",
+              "reference/hooks-reference"
+            ]
+          },
+          {
+            "group": "Web Platform",
+            "pages": [
+              "web/getting-started/overview",
+              "web/getting-started/quickstart",
+              {
+                "group": "Machine Connection",
+                "pages": [
+                  {
+                    "group": "Factory Bridge",
+                    "pages": [
+                      "web/machine-connection/factory-bridge/installation-and-usage",
+                      "web/machine-connection/factory-bridge/cli-tools-reference",
+                      "web/machine-connection/factory-bridge/model-context-protocol",
+                      "web/machine-connection/factory-bridge/best-practices",
+                      "web/machine-connection/factory-bridge/troubleshooting"
+                    ]
+                  },
+                  {
+                    "group": "Remote Workspaces",
+                    "pages": [
+                      "web/machine-connection/remote-workspaces/index",
+                      "web/machine-connection/remote-workspaces/installation-and-usage",
+                      "web/machine-connection/remote-workspaces/setup-script",
+                      "web/machine-connection/remote-workspaces/best-practices",
+                      "web/machine-connection/remote-workspaces/troubleshooting"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Enterprise",
+            "pages": [
+              "enterprise/index",
+              {
+                "group": "Architecture & Deployment",
+                "pages": [
+                  "enterprise/network-and-deployment",
+                  "enterprise/models-llm-gateways-and-integrations"
+                ]
+              },
+              {
+                "group": "Security & Governance",
+                "pages": [
+                  "enterprise/identity-and-access",
+                  "enterprise/identity-sso-and-scim",
+                  "enterprise/privacy-and-data-flows",
+                  "enterprise/llm-safety-and-agent-controls",
+                  "enterprise/hierarchical-settings-and-org-control",
+                  "enterprise/compliance-audit-and-monitoring"
+                ]
+              },
+              {
+                "group": "Analytics & Operations",
+                "pages": [
+                  "enterprise/usage-cost-and-analytics"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Building",
+            "pages": [
+              "guides/building/droid-exec-tutorial",
+              "guides/building/droid-vps-setup"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": ["changelog/1-10", "changelog/1-9", "changelog/1-8", "changelog/cli-updates"]
+          }
+        ]
+      }
+    ]
+  },
+  "_hiddenTabs": {},
+  "logo": {
+    "light": "/logo/light.png",
+    "dark": "/logo/dark.svg"
+  },
+  "topbarLinks": [
+    {
+      "name": "Guides",
+      "url": "/guides/building/droid-exec-tutorial"
+    },
+    {
+      "name": "Changelog",
+      "url": "/changelog/1-9"
+    }
+  ],
+  "navbar": {
+    "links": []
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/factory-ai/factory",
+      "discord": "https://discord.gg/zuudFXxg69",
+      "twitter": "https://twitter.com/factoryAI",
+      "linkedin": "https://www.linkedin.com/company/factory-hq/"
+    }
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude"]
+  },
+  "integrations": {
+    "mixpanel": {
+      "projectToken": "f2846cc5dfc8931eb2d1e98383a748e5"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/release-notes/jun-11-factory-1-1",
+      "destination": "/changelog/1-1"
+    },
+    {
+      "source": "/release-notes/jun-24-factory-1-2",
+      "destination": "/changelog/1-2"
+    },
+    {
+      "source": "/droids/review_droid/guidelines",
+      "destination": "/onboarding/configuring-your-review-droid/review-droid-guidelines"
+    },
+    {
+      "source": "/factory-cli/getting-started/overview",
+      "destination": "/cli/getting-started/overview"
+    },
+    {
+      "source": "/factory-cli/getting-started/quickstart",
+      "destination": "/cli/getting-started/quickstart"
+    },
+    {
+      "source": "/factory-cli/getting-started/how-to-talk-to-a-droid",
+      "destination": "/cli/getting-started/how-to-talk-to-a-droid"
+    },
+    {
+      "source": "/factory-cli/getting-started/common-use-cases",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/factory-cli/user-guides/specification-mode",
+      "destination": "/cli/user-guides/specification-mode"
+    },
+    {
+      "source": "/factory-cli/user-guides/auto-run",
+      "destination": "/cli/user-guides/auto-run"
+    },
+    {
+      "source": "/factory-cli/user-guides/implementing-large-features",
+      "destination": "/cli/user-guides/implementing-large-features"
+    },
+    {
+      "source": "/factory-cli/configuration/ide-integrations",
+      "destination": "/cli/configuration/ide-integrations"
+    },
+    {
+      "source": "/factory-cli/configuration/agents-md",
+      "destination": "/cli/configuration/agents-md"
+    },
+    {
+      "source": "/factory-cli/configuration/settings",
+      "destination": "/cli/configuration/settings"
+    },
+    {
+      "source": "/factory-cli/configuration/byok",
+      "destination": "/cli/byok/overview"
+    },
+    {
+      "source": "/cli/configuration/byok",
+      "destination": "/cli/byok/overview"
+    },
+    {
+      "source": "/factory-cli/configuration/mcp",
+      "destination": "/cli/configuration/mcp"
+    },
+    {
+      "source": "/factory-cli/account/security",
+      "destination": "/cli/account/security"
+    },
+    {
+      "source": "/cli/configuration/spec-mode-model",
+      "destination": "/cli/configuration/mixed-models"
+    },
+    {
+      "source": "/cli/configuration/cli-reference",
+      "destination": "/reference/cli-reference"
+    },
+    {
+      "source": "/cli/configuration/hooks-reference",
+      "destination": "/reference/hooks-reference"
+    },
+    {
+      "source": "/cli/reference/cli-reference",
+      "destination": "/reference/cli-reference"
+    },
+    {
+      "source": "/cli/reference/hooks-reference",
+      "destination": "/reference/hooks-reference"
+    },
+    {
+      "source": "/user-guides/build-with-factory/engineer-system-integrations",
+      "destination": "/onboarding/creating-your-factory/basic-integrations"
+    },
+    {
+      "source": "/user-guides/build-with-factory/security-compliance",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/build-with-factory/using-images",
+      "destination": "/web/getting-started/overview"
+    },
+    {
+      "source": "/user-guides/droids/creating-custom-droids",
+      "destination": "/cli/configuration/custom-droids"
+    },
+    {
+      "source": "/user-guides/droids/understanding-droids",
+      "destination": "/cli/getting-started/how-to-talk-to-a-droid"
+    },
+    {
+      "source": "/user-guides/factory-bridge/best-practices",
+      "destination": "/web/machine-connection/factory-bridge/best-practices"
+    },
+    {
+      "source": "/user-guides/factory-bridge/cli-tools-reference",
+      "destination": "/web/machine-connection/factory-bridge/cli-tools-reference"
+    },
+    {
+      "source": "/user-guides/factory-bridge/installation-and-usage",
+      "destination": "/web/machine-connection/factory-bridge/installation-and-usage"
+    },
+    {
+      "source": "/user-guides/factory-bridge/model-context-protocol",
+      "destination": "/web/machine-connection/factory-bridge/model-context-protocol"
+    },
+    {
+      "source": "/user-guides/factory-bridge/troubleshooting",
+      "destination": "/web/machine-connection/factory-bridge/troubleshooting"
+    },
+    {
+      "source": "/user-guides/get-started/core-concepts",
+      "destination": "/cli/getting-started/how-to-talk-to-a-droid"
+    },
+    {
+      "source": "/user-guides/get-started/overview",
+      "destination": "/cli/getting-started/video-walkthrough"
+    },
+    {
+      "source": "/user-guides/get-started/quickstart",
+      "destination": "/cli/getting-started/quickstart"
+    },
+    {
+      "source": "/user-guides/managing-context/context-retrieval",
+      "destination": "/cli/user-guides/become-a-power-user"
+    },
+    {
+      "source": "/user-guides/managing-context/context-types",
+      "destination": "/cli/user-guides/become-a-power-user"
+    },
+    {
+      "source": "/user-guides/managing-context/understanding-context",
+      "destination": "/cli/user-guides/become-a-power-user"
+    },
+    {
+      "source": "/user-guides/memory/understanding-memory",
+      "destination": "/cli/user-guides/become-a-power-user"
+    },
+    {
+      "source": "/user-guides/remote-workspaces",
+      "destination": "/web/machine-connection/remote-workspaces"
+    },
+    {
+      "source": "/user-guides/remote-workspaces/best-practices",
+      "destination": "/web/machine-connection/remote-workspaces/best-practices"
+    },
+    {
+      "source": "/user-guides/remote-workspaces/custom-commands",
+      "destination": "/web/machine-connection/remote-workspaces/setup-script"
+    },
+    {
+      "source": "/user-guides/remote-workspaces/installation-and-usage",
+      "destination": "/web/machine-connection/remote-workspaces/installation-and-usage"
+    },
+    {
+      "source": "/user-guides/remote-workspaces/troubleshooting",
+      "destination": "/web/machine-connection/remote-workspaces/troubleshooting"
+    },
+    {
+      "source": "/user-guides/sessions-in-factory/chat-interface",
+      "destination": "/cli/getting-started/overview"
+    },
+    {
+      "source": "/user-guides/sessions-in-factory/how-to-use-fragments",
+      "destination": "/cli/user-guides/specification-mode"
+    },
+    {
+      "source": "/user-guides/sessions-in-factory/sessions",
+      "destination": "/cli/getting-started/overview"
+    },
+    {
+      "source": "/user-guides/sessions-in-factory/use-cases",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/threads/Working%20with%20Threads",
+      "destination": "/welcome"
+    },
+    {
+      "source": "/user-guides/troubleshooting/repository-issues",
+      "destination": "/web/machine-connection/factory-bridge/troubleshooting"
+    },
+    {
+      "source": "/user-guides/usage-and-pricing/understanding-usage",
+      "destination": "/enterprise/usage-cost-and-analytics"
+    },
+    {
+      "source": "/user-guides/use-cases/building-internal-tools",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/code-diagrams",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/core-development",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/creating-prds",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/data-science",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/design-to-component",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/documentation",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/migrations",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/user-guides/use-cases/unit-testing",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/core-concepts/context/dynamic-retrieval",
+      "destination": "/cli/getting-started/how-to-talk-to-a-droid"
+    },
+    {
+      "source": "/web/core-concepts/context/external-integrations",
+      "destination": "/web/machine-connection/factory-bridge/installation-and-usage"
+    },
+    {
+      "source": "/web/core-concepts/context/memory-as-context",
+      "destination": "/web/machine-connection/factory-bridge/model-context-protocol"
+    },
+    {
+      "source": "/web/core-concepts/context/understanding-context",
+      "destination": "/web/machine-connection/factory-bridge/model-context-protocol"
+    },
+    {
+      "source": "/web/core-concepts/droids/understanding-droids",
+      "destination": "/cli/getting-started/how-to-talk-to-a-droid"
+    },
+    {
+      "source": "/web/core-concepts/droids/using-specialized-droids",
+      "destination": "/cli/getting-started/how-to-talk-to-a-droid"
+    },
+    {
+      "source": "/web/use-cases/building-internal-tools",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/code-diagrams",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/core-development",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/data-science",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/design-to-component",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/documentation",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/migrations",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/overview",
+      "destination": "/cli/getting-started/common-use-cases"
+    },
+    {
+      "source": "/web/use-cases/unit-testing",
+      "destination": "/cli/getting-started/common-use-cases"
+    }
+  ]
+}

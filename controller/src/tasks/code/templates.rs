@@ -373,7 +373,7 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
-        let context = json!({
+        let mut context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -398,6 +398,20 @@ impl CodeTemplateGenerator {
                 "remote_tools": remote_tools,
             },
         });
+
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "prompt_scaffold".to_string(),
+                json!({
+                    "work_dir": "$OPENCODE_WORK_DIR",
+                    "guidance_filename": "AGENTS.md",
+                    "guidance_placeholder": "# Project Guidance\n\nThis OpenCode run was triggered without AGENTS.md content. Provide project context in AGENTS.md to give OpenCode richer instructions.",
+                    "memory_reference": "@AGENTS.md — Repository guidelines and workflow",
+                    "docs_source": "/tmp/docs-repo",
+                    "cli_display_name": "OpenCode"
+                }),
+            );
+        }
 
         handlebars
             .render("cursor_container", &context)
@@ -645,7 +659,7 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
-        let context = json!({
+        let mut context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
@@ -673,6 +687,20 @@ impl CodeTemplateGenerator {
                 "remote_tools": remote_tools,
             },
         });
+
+        if let Some(obj) = context.as_object_mut() {
+            obj.insert(
+                "prompt_scaffold".to_string(),
+                json!({
+                    "work_dir": "$GEMINI_WORK_DIR",
+                    "guidance_filename": "GEMINI.md",
+                    "guidance_placeholder": "# Project Guidance\n\nThis Gemini run was triggered without GEMINI.md content. Provide project context in GEMINI.md to give Gemini richer instructions.",
+                    "memory_reference": "@GEMINI.md — Repository guidelines and workflow",
+                    "docs_source": "/tmp/docs-repo",
+                    "cli_display_name": "Gemini"
+                }),
+            );
+        }
 
         handlebars
             .render("factory_container", &context)
@@ -2885,19 +2913,20 @@ impl CodeTemplateGenerator {
     fn register_agent_partials(handlebars: &mut Handlebars) -> Result<()> {
         // List of shared agent system prompt partials that need to be registered
         let agent_partials = vec![
-            "agents/cipher-system-prompt",
-            "agents/cleo-system-prompt",
-            "agents/rex-system-prompt",
-            "agents/tess-system-prompt",
-            "agents/system-prompt",
+            ("agents/cipher-system-prompt", "md.hbs"),
+            ("agents/cleo-system-prompt", "md.hbs"),
+            ("agents/rex-system-prompt", "md.hbs"),
+            ("agents/tess-system-prompt", "md.hbs"),
+            ("agents/system-prompt", "md.hbs"),
+            ("code_shared_prompt-scaffold", "sh.hbs"),
         ];
 
         let mut failed_partials = Vec::new();
 
-        for partial_name in agent_partials {
+        for (partial_name, extension) in agent_partials {
             // Load the partial template from ConfigMap
             // The ConfigMap key uses underscores instead of slashes (e.g., agents_cipher-system-prompt.md.hbs)
-            let template_path = format!("{partial_name}.md.hbs");
+            let template_path = format!("{partial_name}.{extension}");
             match Self::load_template(&template_path) {
                 Ok(content) => {
                     handlebars

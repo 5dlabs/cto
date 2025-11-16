@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The 5D Labs Agent Platform now ships six first-class CLIs (Claude, Codex, Factory, OpenCode, Cursor, and Gemini). We built a CLI-agnostic adapter stack so every agent follows identical business rules (branch creation, PR requirements, tooling) regardless of the CLI it is paired with. A clean clone of the upstream Gemini CLI lives in `docs/gemini-cli` to track the latest schema changes ahead of the Gemini 3 release [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli). The remaining work is operational—keeping the template ConfigMaps in sync and exercising the multi-CLI smoke tests that prove cross-CLI parity.
+The 5D Labs Agent Platform now ships six first-class CLIs (Claude, Codex, Factory, OpenCode, Cursor, and Gemini). We built a CLI-agnostic adapter stack so every agent follows identical business rules (branch creation, PR requirements, tooling) regardless of the CLI it is paired with. Fresh snapshots of every upstream CLI doc set now live under `docs/claude-code`, `docs/cursor-cli`, `docs/codex-cli`, `docs/factory-cli`, `docs/opencode-cli`, and `docs/gemini-cli`, so configuration diffs stay reviewable inside this repo. The remaining work is operational—keeping the template ConfigMaps in sync, deduplicating shared shell snippets (`code/shared/prompt-scaffold.sh.hbs`), and exercising the multi-CLI smoke tests that prove cross-CLI parity before dispatching a full workflow.
 
 ## Table of Contents
 
@@ -47,8 +47,9 @@ The 5D Labs Agent Platform now ships six first-class CLIs (Claude, Codex, Factor
 **Revised Scope**
 - **Phase 1 (Complete)**: Claude, Codex, Opencode, Factory.
 - **Phase 2 (Complete)**: Cursor stream-json adapter + Toolman bridge hardening.
-- **Phase 3 (Complete)**: Gemini adapter/templates aligned with upstream repo (`docs/gemini-cli`, sourced from [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)).
-- **Next Focus**: Operational hygiene (template ConfigMap rotation, multi-CLI smoke tests, and upcoming Gemini 3 schema diffs).
+- **Phase 3 (Complete)**: Gemini adapter/templates aligned with upstream repo (doc snapshot stored under `docs/gemini-cli`, sourced from [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)).
+- **Phase 4 (In Flight)**: DRY shared shell snippets (prompt scaffold, hook scripts) and seed local doc mirrors for every CLI so updates are reviewable.
+- **Next Focus**: Operational hygiene (template ConfigMap rotation, CLI capability matrix, deterministic smoke tests for every CLI/agent pairing, and upcoming Gemini 3 schema diffs).
 
 ### 🚨 Immediate Blockers Identified
 

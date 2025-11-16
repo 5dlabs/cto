@@ -119,6 +119,42 @@ create_configmap "code-shared" "code/[^/]+\\.(hbs|md|sh)$"
 create_configmap "docs" "docs/"
 ```
 
+### Shared prompt scaffolds
+Gemini and OpenCode used to carry identical prompt preambles inline; those blocks now live in a single shared partial so we only edit the guidance once per policy change.
+
+```1:68:infra/charts/controller/agent-templates/code/shared/prompt-scaffold.sh.hbs
+if [ ! -f "{{work_dir}}/{{guidance_filename}}" ]; then
+  echo "⚠️ No {{guidance_filename}} guidance file detected; creating placeholder"
+  ...
+PROMPT_PREFIX="${PROMPT_PREFIX}- {{memory_reference}}\n"
+...
+if attempt_task_recovery "{{#if docs_source}}{{docs_source}}{{else}}/tmp/docs-repo{{/if}}" "{{work_dir}}/task" "{{task_id}}"; then
+...
+```
+
+```2179:2213:controller/src/tasks/code/templates.rs
+obj.insert(
+    "prompt_scaffold".to_string(),
+    json!({
+        "work_dir": "$GEMINI_WORK_DIR",
+        "guidance_filename": "GEMINI.md",
+        "memory_reference": "@GEMINI.md — Repository guidelines and workflow",
+        "docs_source": "/tmp/docs-repo",
+        "cli_display_name": "Gemini"
+    }),
+);
+```
+
+That partial now renders inside both container scripts:
+
+```1418:1424:infra/charts/controller/agent-templates/code/gemini/container-base.sh.hbs
+# =========================================================================
+# Prompt assembly and Gemini execution
+# =========================================================================
+
+{{> code_shared_prompt-scaffold prompt_scaffold}}
+```
+
 ### Shared business logic per agent
 All adapters inherit the same validation, telemetry, and template rendering guarantees through `BaseAdapter`, so instructions such as “always create a PR” or “run clippy pedantic” live in the rendered agent markdown rather than the CLI implementation.
 
@@ -161,6 +197,38 @@ fn validate_model_name(model: &str) -> Result<()> {
     Ok(())
 }
 ```
+
+## Local CLI documentation snapshots
+To keep pace with rapidly changing CLI switches, we vend the upstream docs inside this repo. Each directory contains the exact files pulled on 2025-11-16 so reviewers can diff future updates:
+
+- `docs/claude-code/` – [Anthropic Claude Code docs](https://code.claude.com/docs/)
+- `docs/cursor-cli/` – [Cursor headless CLI](https://cursor.com/docs/cli/headless) (HTML snapshot)
+- `docs/codex-cli/` – [OpenAI Codex docs](https://github.com/openai/codex/tree/main/docs)
+- `docs/factory-cli/` – [Factory CLI docs](https://github.com/Factory-AI/factory/tree/main/docs)
+- `docs/opencode-cli/` – [OpenCode CLI docs](https://opencode.ai/docs)
+- `docs/gemini-cli/` – [Gemini CLI docs](https://github.com/google-gemini/gemini-cli/tree/main/docs)
+
+These folders are intentionally vendor-specific so we can link to concrete examples while keeping the controller templates DRY.
+
+## CLI + agent validation plan
+Instead of waiting for end-to-end workflow flakes, we can exercise each CLI/agent pair deterministically:
+
+| CLI | Agents exercised | Automated checks | Manual spot-check |
+| --- | --- | --- | --- |
+| Claude | Rex, Cleo, Tess, Cipher | `cargo test -p controller` already covers Claude adapter parsing + template selection; add nightly `cursor-agent`-style smoke script that renders Rex container and runs `claude --version` | Run `docs/claude-code` quickstart in the seeded PVC |
+| Codex | Rex, Cleo, Tess, Cipher | Existing adapter tests + `test_templates` binary; add `scripts/validate-cli codex` to invoke `codex --version --config generated` | Manual: `docker run codex-agent` with generated config |
+| Cursor | Rex, Cleo, Tess, Blaze | Unit tests validate stream-json parsing; add `make validate-cursor` that executes `cursor-agent --print --output-format stream-json --force "noop"` inside the container image | Validate headless auth by replaying `docs/cursor-cli/headless.html` instructions |
+| Factory | Rex, Blaze | Keep current `factory --version` smoke step and assert `factory-cli-config.json` from ConfigMap matches schema extracted from `docs/factory-cli/README.md` | Run `factory droid plan` locally with generated config |
+| OpenCode | Rex | New prompt scaffold ensures deterministic prompt preview; add `scripts/validate-cli opencode` to run `opencode --version` and parse `--dry-run` output | Launch `opencode run --dry-run` using `docs/opencode-cli` reference |
+| Gemini | Rex | Adapter tests + prompt scaffold; add `scripts/validate-cli gemini` to call `gemini --version` and `gemini run prompt.md --dry-run` with generated settings | Follow `docs/gemini-cli/README.md` quickstart inside container |
+
+Per agent gating:
+
+- **Rex** – requires PR automation + task file presence. Validation uses `code/shared/prompt-scaffold` plus `scripts/validate-cli <cli> --agent rex`.
+- **Cleo/Tess** – there is no separate CLI; they inherit Rex containers but different AGENTS.md. Validation ensures `agents/<name>-system-prompt` renders and `task/acceptance-criteria.md` is referenced.
+- **Cipher** – same as Cleo/Tess but ensures `github-guidelines.md` includes security hooks; tests already read that file.
+
+Once `scripts/validate-cli` exists (tracked in TODO-5/6), we can hook it into CI to give us a deterministic “ready” bit before dispatching expensive workflows.
 
 ## CLI Readiness Matrix
 

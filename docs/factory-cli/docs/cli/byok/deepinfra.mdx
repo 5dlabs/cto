@@ -1,0 +1,63 @@
+---
+title: DeepInfra
+description: Cost-effective inference for a wide variety of open-source models
+---
+
+Access cost-effective inference for a wide variety of open-source models with DeepInfra's optimized infrastructure.
+
+## Configuration
+
+Configuration examples for `~/.factory/config.json`:
+
+```json
+{
+  "custom_models": [
+    {
+      "model_display_name": "GLM-4.6 [DeepInfra]",
+      "model": "zai-org/GLM-4.6",
+      "base_url": "https://api.deepinfra.com/v1/openai",
+      "api_key": "YOUR_DEEPINFRA_TOKEN",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 16384
+    },
+    {
+      "model_display_name": "DeepSeek V3.1 Terminus [DeepInfra]",
+      "model": "deepseek-ai/DeepSeek-V3.1-Terminus",
+      "base_url": "https://api.deepinfra.com/v1/openai",
+      "api_key": "YOUR_DEEPINFRA_TOKEN",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 16384
+    },
+    {
+      "model_display_name": "Kimi K2 Instruct [DeepInfra]",
+      "model": "moonshotai/Kimi-K2-Instruct-0905",
+      "base_url": "https://api.deepinfra.com/v1/openai",
+      "api_key": "YOUR_DEEPINFRA_TOKEN",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 32768
+    },
+    {
+      "model_display_name": "Qwen3 Coder 480B [DeepInfra]",
+      "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo",
+      "base_url": "https://api.deepinfra.com/v1/openai",
+      "api_key": "YOUR_DEEPINFRA_TOKEN",
+      "provider": "generic-chat-completion-api",
+      "max_tokens": 32768
+    }
+  ]
+}
+```
+
+## Getting Started
+
+1. Sign up at [deepinfra.com](https://deepinfra.com)
+2. Get your API token from the dashboard
+3. View available models at their [model list](https://deepinfra.com/models)
+4. Add desired models to your configuration
+
+## Notes
+
+- Base URL format: `https://api.deepinfra.com/v1/openai`
+- Model names match Hugging Face repository format
+- Supports OpenAI-compatible API
+- Automatic model updates when new versions are released

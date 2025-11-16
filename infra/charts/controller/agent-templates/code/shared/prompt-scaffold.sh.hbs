@@ -1,0 +1,76 @@
+{{!-- Shared prompt scaffold for CLI containers --}}
+{{#if guidance_placeholder}}
+if [ ! -f "{{work_dir}}/{{guidance_filename}}" ]; then
+  echo "⚠️ No {{guidance_filename}} guidance file detected; creating placeholder"
+  cat <<'PLACEHOLDER' > "{{work_dir}}/{{guidance_filename}}"
+{{guidance_placeholder}}
+PLACEHOLDER
+fi
+{{/if}}
+
+PROMPT_PREFIX=""
+
+# Simple, focused context - let @ references do the heavy lifting
+PROMPT_PREFIX="${PROMPT_PREFIX}## Task Context\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}You're working on **Task {{task_id}}** for service **{{service}}**.\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}**Required Reading:**\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- @task/acceptance-criteria.md — Your success criteria (complete ALL of these)\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- {{memory_reference}}\n"
+if [ -f "{{work_dir}}/task/toolman-guide.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}- @task/toolman-guide.md — Tool usage reference\n"
+fi
+if [ -f "{{work_dir}}/coding-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}- @coding-guidelines.md — Coding standards\n"
+fi
+if [ -f "{{work_dir}}/github-guidelines.md" ]; then
+  PROMPT_PREFIX="${PROMPT_PREFIX}- @github-guidelines.md — Git workflow\n"
+fi
+
+PROMPT_PREFIX="${PROMPT_PREFIX}\n**Key Requirements:**\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- Implement ALL acceptance criteria before completing\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- Write production code (no TODOs or placeholders)\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- Commit frequently and create a PR when done\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- Run quality gates (cargo fmt, clippy, test) before finishing\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- You're on branch \`feature/task-{{task_id}}-implementation\`\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}- GitHub auth is pre-configured (GH_TOKEN is set)\n\n"
+PROMPT_PREFIX="${PROMPT_PREFIX}---\n\n"
+
+# Resilient verification of task files
+echo "🔍 RESILIENT VERIFICATION: Checking task files at: {{work_dir}}/task/"
+if verify_task_files "{{work_dir}}/task" "{{task_id}}"; then
+    echo "✅ Task files verification: PASSED"
+else
+    echo "❌ CRITICAL: Task files verification: FAILED"
+    create_error_report "{{work_dir}}/task" "{{task_id}}" "Task files missing before agent execution"
+    
+    # Attempt recovery
+    if attempt_task_recovery "{{#if docs_source}}{{docs_source}}{{else}}/tmp/docs-repo{{/if}}" "{{work_dir}}/task" "{{task_id}}"; then
+        echo "✅ Recovery successful - continuing with execution"
+    else
+        echo "❌ Recovery failed - cannot proceed without prompt.md"
+        exit 1
+    fi
+fi
+
+PROMPT_FILE="{{work_dir}}/task/prompt.md"
+echo "📄 Using prompt file: $PROMPT_FILE"
+
+echo "startingTask:{{task_id}}"
+echo ""
+
+PROMPT_CONTENT="${PROMPT_PREFIX}$(cat "$PROMPT_FILE")"
+
+# Print prompt preview
+echo "📤 Sending prompt to {{cli_display_name}} (truncated to 2000 chars for log safety):"
+echo "=================================================================================="
+PROMPT_PREVIEW=$(printf '%s' "$PROMPT_CONTENT" | head -c 2000)
+printf '%s\n' "$PROMPT_PREVIEW"
+echo "..."
+echo "=================================================================================="
+PROMPT_BYTES=$(printf '%s' "$PROMPT_CONTENT" | wc -c | tr -d '[:space:]')
+echo "📏 Total prompt size: $PROMPT_BYTES bytes"
+echo ""
+
+ORIGINAL_PROMPT="$PROMPT_CONTENT"
+PREVIOUS_MESSAGE_FILE=""
+

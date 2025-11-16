@@ -114,7 +114,7 @@ create_configmap "codex" "code/codex/"
 create_configmap "factory" "code/factory/"
 create_configmap "gemini" "code/gemini/"
 create_configmap "opencode" "code/opencode/"
-create_configmap "code-shared" "code/[^/]+\.(hbs|md|sh)$"  # Files directly in code/
+create_configmap "code-shared" "code/(shared/)?[^/]+\.(hbs|md|sh)$"  # Files in code/ root or code/shared/
 create_configmap "docs" "docs/"
 create_configmap "intake" "intake/"
 

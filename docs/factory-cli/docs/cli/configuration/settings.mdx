@@ -1,0 +1,142 @@
+---
+title: Settings
+description: Configure how droid behaves and integrates with your workflow.
+---
+
+## Accessing settings
+
+To configure droid settings:
+
+1. Run `droid`
+2. Enter `/settings`
+3. Adjust your preferences interactively
+
+Changes take effect immediately and are saved to your settings file.
+
+## Where settings live
+
+| OS        | Location                               |
+| --------- | -------------------------------------- |
+| macOS / Linux | `~/.factory/settings.json` |
+| Windows   | `%USERPROFILE%\.factory\settings.json` |
+
+If the file doesn't exist, it's created with defaults the first time you run **droid**.
+
+## Available settings
+
+| Setting | Options | Default | Description |
+| ------- | ------- | ------- | ----------- |
+| `model` | `sonnet`, `opus`, `GPT-5`, `gpt-5-codex`, `haiku`, `droid-core`, `custom-model` | `sonnet` | The default AI model used by droid |
+| `reasoningEffort` | `off`, `none`, `low`, `medium`, `high` (availability depends on the model) | Model-dependent default | Controls how much structured thinking the model performs. |
+| `autonomyLevel` | `normal`, `spec`, `auto-low`, `auto-medium`, `auto-high` | `normal` | Sets the default autonomy mode when starting droid. |
+| `cloudSessionSync` | `true`, `false` | `true` | Mirror CLI sessions to Factory web. |
+| `diffMode` | `github`, `unified` | `github` | Choose between split GitHub-style diffs and a single-column view. |
+| `completionSound` | `off`, `bell` | `off` | Audio cue when a response finishes. |
+| `commandAllowlist` | Array of commands | Safe defaults provided | Commands that run without extra confirmation. |
+| `commandDenylist` | Array of commands | Restrictive defaults provided | Commands that always require confirmation. |
+| `includeCoAuthoredByDroid` | `true`, `false` | `true` | Automatically append the Droid co-author trailer to commits. |
+| `enableDroidShield` | `true`, `false` | `true` | Enable secret scanning and git guardrails. |
+| `specSaveEnabled` | `true`, `false` | `false` | Persist spec outputs to disk. |
+| `specSaveDir` | File path | `.factory/docs` | Directory used when `specSaveEnabled` is `true`. |
+| `enableCustomDroids` | `true`, `false` | `false` | Toggle the experimental Custom Droids feature. |
+
+### Model
+
+Choose the default AI model that powers your droid:
+
+- **`sonnet`** - Claude Sonnet 4.5 (recommended, current default)
+- **`opus`** - Claude Opus 4.1 for complex tasks
+- **`GPT-5`** - Latest OpenAI model
+- **`gpt-5-codex`** - Advanced coding-focused model
+- **`haiku`** - Claude Haiku 4.5, fast and cost-effective
+- **`droid-core`** - GLM-4.6 open-source model
+- **`custom-model`** - Your own configured model via BYOK
+
+[You can also add custom models and BYOK.](/cli/configuration/byok)
+
+### Reasoning effort
+
+`reasoningEffort` adjusts how much structured thinking the model performs before replying. Available values depend on the model, but typically include:
+
+- **`off` / `none`** – disable structured reasoning (fastest).
+- **`low`**, **`medium`**, **`high`** – progressively increase deliberation time for more complex reasoning.
+
+Anthropic models default to `off`, while GPT-5 starts on `medium`.
+
+### Autonomy level
+
+`autonomyLevel` controls how proactively droid executes commands when sessions begin. Start at `normal`, or select an `auto-*` preset to pre-authorize additional actions.
+
+### Diff mode
+
+Control how droid displays code changes:
+
+- **`github`** – Side-by-side, higher fidelity render (recommended).
+- **`unified`** – Traditional single-column diff format.
+
+### Cloud session sync
+
+When this switch is on, every CLI session is mirrored to Factory web so you can revisit conversations in the browser:
+
+- **`true`** – Sync sessions to the web app.
+- **`false`** – Keep sessions local only.
+
+### Sound notifications
+
+Configure audio feedback when droid completes a response:
+
+- **`bell`** – Use the system terminal bell
+- **`off`** – No sound notifications
+
+<Note>
+  Access sound settings via `/settings` or `Shift+Tab` → **Settings** in the TUI.
+</Note>
+
+## Command allowlist & denylist
+
+Use these settings to control which commands droid can execute automatically and which it must never run:
+
+- **`commandAllowlist`** – Commands in this array are treated as safe and run without additional confirmation, regardless of autonomy prompts. Include only low-risk utilities you rely on frequently (for example `ls`, `pwd`, `dir`).
+- **`commandDenylist`** – Commands in this array always require confirmation and are typically blocked because they are destructive or unsafe (for example recursive `rm`, `mkfs`, or privileged system operations).
+
+Commands that appear in both lists default to the denylist behavior. Any command that is in neither list falls back to the autonomy level you selected for the session.
+
+### Example allow/deny configuration
+
+```json
+{
+  "commandAllowlist": [
+    "ls",
+    "pwd",
+    "dir"
+  ],
+  "commandDenylist": [
+    "rm -rf /",
+    "mkfs",
+    "shutdown"
+  ]
+}
+```
+
+Review and update these arrays periodically to match your workflow and security posture, especially when sharing configurations across teams.
+
+## Example configuration
+
+```json
+{
+  "model": "sonnet",
+  "reasoningEffort": "low",
+  "diffMode": "github",
+  "cloudSessionSync": true,
+  "completionSound": "bell"
+}
+```
+
+---
+
+### Need more?
+
+- [CLI Overview](/cli/getting-started/overview) – see the main TUI workflow
+- [CLI Reference](/reference/cli-reference) – command flags & options
+- [IDE Integrations](/cli/configuration/ide-integrations) – editor-specific setup
+- [Custom models & BYOK](/cli/configuration/byok) - add custom models and API keys
