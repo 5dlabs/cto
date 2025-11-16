@@ -483,10 +483,7 @@ create_default_board_view() {
     return 1
   }
   
-  # Find the default table view to delete
-  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null | head -1)
-  
-  # Create board view with Stage field grouping
+  # Create board view with agent-based columns
   local view_mutation='
     mutation($projectId: ID!) {
       createProjectV2View(input: {
