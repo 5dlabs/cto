@@ -180,6 +180,54 @@ safe_git_config() {
 
 safe_git_config --global --replace-all credential.helper "store --file=$CREDENTIALS_FILE"
 
+cleanup_locked_refs_from_log() {
+  local log_file="$1"
+  local cleaned=0
+
+  if [ ! -f "$log_file" ]; then
+    return 1
+  fi
+
+  while IFS= read -r ref; do
+    if [ -z "$ref" ]; then
+      continue
+    fi
+    local ref_path=".git/$ref"
+    echo "⚠️ Removing stale remote ref $ref_path"
+    rm -f "$ref_path" "${ref_path}.lock"
+    cleaned=1
+  done < <(grep -o "refs/remotes/[^']*" "$log_file" 2>/dev/null | sort -u || true)
+
+  if [ $cleaned -eq 1 ]; then
+    git remote prune origin >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  return 1
+}
+
+safe_git_fetch() {
+  local log_file
+  log_file=$(mktemp)
+
+  if git fetch "$@" >"$log_file" 2>&1; then
+    rm -f "$log_file"
+    return 0
+  fi
+
+  if cleanup_locked_refs_from_log "$log_file"; then
+    echo "🔧 Cleaned stale remote refs; retrying git fetch $*"
+    if git fetch "$@" >>"$log_file" 2>&1; then
+      rm -f "$log_file"
+      return 0
+    fi
+  fi
+
+  cat "$log_file"
+  rm -f "$log_file"
+  return 1
+}
+
 write_git_credentials() {
   if [ -z "${GITHUB_TOKEN:-}" ]; then
     return
@@ -568,7 +616,7 @@ ensure_pr_created() {
 
   refresh_token_if_needed || true
   if [ -n "$BASE_BRANCH" ]; then
-    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    safe_git_fetch origin "$BASE_BRANCH" || true
   fi
 
   if [ "$CURRENT_BRANCH" = "HEAD" ] || [ "$CURRENT_BRANCH" = "$BASE_BRANCH" ]; then
@@ -604,7 +652,7 @@ ensure_pr_created() {
     return
   fi
 
-  git fetch origin "$CURRENT_BRANCH" >/dev/null 2>&1 || true
+  safe_git_fetch origin "$CURRENT_BRANCH" || true
   if [ -n "$REMOTE_BASE" ]; then
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
   else
@@ -917,7 +965,7 @@ if [ -d "$REPO_NAME/.git" ]; then
   echo "🔁 Repository already cloned, fetching latest"
   cd "$REPO_NAME"
   refresh_token_if_needed
-  git fetch --all --prune
+  safe_git_fetch --all --prune
 else
   echo "⬇️  Cloning repository"
   refresh_token_if_needed
@@ -991,7 +1039,7 @@ if ! git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
 fi
 
 if [ -n "$BASE_BRANCH" ]; then
-  git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+  safe_git_fetch origin "$BASE_BRANCH" || true
 fi
 
 FEATURE_BRANCH="feature/task-{{task_id}}-implementation"
@@ -2051,7 +2099,7 @@ Handoff document created for Cleo to continue work." 2>/dev/null || echo "⚠️
   COMMITS_MADE=0
   
   if [ -n "$CURRENT_BRANCH" ]; then
-    git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
+    safe_git_fetch origin "$BASE_BRANCH" || true
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
     if [ "${AHEAD_COUNT:-0}" -gt 0 ]; then
       COMMITS_MADE=1
