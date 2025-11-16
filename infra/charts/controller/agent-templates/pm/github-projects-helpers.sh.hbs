@@ -483,10 +483,7 @@ create_default_board_view() {
     return 1
   }
   
-  # Find the default table view to delete
-  local default_view_id=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null | head -1)
-  
-  # Create board view with Stage field grouping
+  # Create board view with agent-based columns
   local view_mutation='
     mutation($projectId: ID!) {
       createProjectV2View(input: {
@@ -526,29 +523,43 @@ create_default_board_view() {
     echo "   2. Click 'Group by' → Select 'Stage'" >&2
     echo "   3. Columns will show: Pending | Rex | Cleo | Cipher | Tess | Atlas | Bolt | Complete ✅" >&2
     
-    # Delete the default table view if it exists (makes board the default)
-    if [[ -n "$default_view_id" ]] && [[ "$default_view_id" != "null" ]]; then
-      echo "Removing default table view to make board the default..." >&2
+    # Delete ALL table views - GitHub Projects V2 API doesn't support configuring field visibility
+    # Table views will show default columns (Assignees, Sub-issues progress) which we don't want
+    # Users can manually create a table view and configure columns if needed
+    # For now, we only use the board view which shows agent-based columns correctly
+    local all_table_views=$(echo "$views_result" | jq -r '.data.node.views.nodes[]? | select(.layout == "TABLE_LAYOUT") | .id' 2>/dev/null)
+    
+    if [[ -n "$all_table_views" ]]; then
+      echo "Removing all table views (board view will be the default)..." >&2
       
-      local delete_mutation='
-        mutation($viewId: ID!) {
-          deleteProjectV2View(input: {
-            viewId: $viewId
-          }) {
-            projectV2View {
-              id
+      while IFS= read -r table_view_id; do
+        if [[ -n "$table_view_id" ]] && [[ "$table_view_id" != "null" ]]; then
+          local delete_mutation='
+            mutation($viewId: ID!) {
+              deleteProjectV2View(input: {
+                viewId: $viewId
+              }) {
+                projectV2View {
+                  id
+                }
+              }
             }
-          }
-        }
-      '
+          '
+          
+          if gh api graphql \
+            -f query="$delete_mutation" \
+            -f viewId="$table_view_id" >/dev/null 2>&1; then
+            echo "✅ Deleted table view (ID: $table_view_id)" >&2
+          else
+            echo "⚠️  Could not delete table view (ID: $table_view_id)" >&2
+          fi
+        fi
+      done <<< "$all_table_views"
       
-      if gh api graphql \
-        -f query="$delete_mutation" \
-        -f viewId="$default_view_id" >/dev/null 2>&1; then
-        echo "✅ Deleted default table view - agent board is now the default!" >&2
-      else
-        echo "⚠️  Could not delete table view (board view still available)" >&2
-      fi
+      echo "✅ All table views removed - board view is now the default!" >&2
+      echo "💡 If you need a table view, create it manually and hide 'Assignees' and 'Sub-issues progress' columns" >&2
+    else
+      echo "✅ No table views found - board view will be the default" >&2
     fi
   else
     echo "⚠️  Could not create board view (project still works)" >&2
