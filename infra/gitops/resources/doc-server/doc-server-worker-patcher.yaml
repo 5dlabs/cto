@@ -58,7 +58,7 @@ spec:
             emptyDir: {}
           containers:
           - name: patcher
-            image: bitnami/kubectl:1.31.4
+            image: bitnami/kubectl:latest
             env:
             - name: HOME
               value: /tmp/patcher
