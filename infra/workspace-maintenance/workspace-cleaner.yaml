@@ -77,7 +77,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: cleaner
-              image: bitnami/kubectl:1.31.4
+              image: bitnami/kubectl:latest
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
