@@ -1560,8 +1560,18 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   # =========================================================================
   # FAST-PATH: Skip work if PR already approved
   # =========================================================================
-  # Only applies to quality and testing agents (Cleo/Tess), not implementation (Rex)
-  if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ] && [ "${WORKFLOW_STAGE:-}" != "implementation" ]; then
+  # Only applies to Cleo/Tess (quality + testing). Security must always rerun.
+  FAST_PATH_ALLOWED=0
+  case "${WORKFLOW_STAGE:-}" in
+    "quality"|"quality-in-progress"|"testing"|"testing-in-progress")
+      FAST_PATH_ALLOWED=1
+      ;;
+    *)
+      FAST_PATH_ALLOWED=0
+      ;;
+  esac
+
+  if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ] && [ "$FAST_PATH_ALLOWED" -eq 1 ]; then
     echo ""
     echo "🔍 Checking if PR #${PR_NUMBER} already has approval..."
     
