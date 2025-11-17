@@ -11,6 +11,10 @@ detect_billing_failure() {
   local pr_number="$3"
   local repo="$4"
   local agent_name="$5"
+  local task_id="${6:-${TASK_ID:-unknown}}"
+  local workflow_stage="${7:-${WORKFLOW_STAGE:-unknown}}"
+  local workflow_name="${8:-${WORKFLOW_NAME:-unknown}}"
+  local max_chars="${BILLING_FAILURE_LOG_MAX_CHARS:-4000}"
   
   # Skip if command succeeded
   [[ "$exit_code" == "0" ]] && return 0
@@ -40,47 +44,58 @@ detect_billing_failure() {
     fi
   done
   
-  # If billing error detected, post alert comment
+  # If billing error detected, post alert comment in remediation format
   if [[ "$is_billing_error" == "true" ]]; then
     echo "🚨 BILLING FAILURE DETECTED: ${matched_pattern}"
-    echo "   Posting alert comment to PR #${pr_number}..."
     
-    # Use tilde fences instead of backticks to avoid conflicts with CLI output
-    # This completely sidesteps the issue of backticks in the output breaking the fence
-    local comment_body="## 🚨 Billing/Quota Failure Alert
+    local trimmed_output="$cli_output"
+    local cli_len=${#trimmed_output}
+    if [[ "$cli_len" -gt "$max_chars" ]]; then
+      trimmed_output="$(printf '%s' "$trimmed_output" | tail -c "$max_chars")"
+      trimmed_output="(truncated last ${max_chars} characters)\n${trimmed_output}"
+    fi
+    
+    local comment_body="🔴 Required Changes
+**Issue Type**: [Regression]
+**Severity**: [Critical]
 
-**Agent**: ${agent_name}  
-**Error Type**: Billing/quota issue detected
+### Description
+${agent_name} could not proceed during the **${workflow_stage:-unknown}** stage for task ${task_id} (workflow ${workflow_name}) because the CLI reported a billing/quota failure that matched \`${matched_pattern}\`. This blocks the automation from completing.
+
+### Acceptance Criteria Not Met
+- [ ] Restore the provider's billing/quota so ${agent_name} can run end-to-end
+- [ ] Re-run the multi-agent workflow for task ${task_id} after quota is restored
+- [ ] Confirm ${agent_name} completes without provider billing errors
+
+### Steps to Reproduce
+1. Re-run the workflow for task ${task_id}
+2. Observe the ${agent_name} stage exit with the billing/quota error shown below
 
 ### Error Details
 ~~~
-${cli_output}
+${trimmed_output}
 ~~~
 
-### Action Required
-This agent failed due to billing or quota issues. Please:
-1. Check billing account status for the CLI provider
-2. Verify API quota limits
-3. Ensure sufficient credits/balance
-4. Restart workflow after resolving billing issues
-
-### Detected Pattern
-Matched: \`${matched_pattern}\`
-
 ---
-*This is an automated alert from the agent platform.*"
+*Automatically posted by the agent platform to trigger remediation*"
     
-    # Post comment using gh CLI
-    if command -v gh >/dev/null 2>&1 && [[ -n "$GITHUB_TOKEN" ]]; then
-      if echo "$comment_body" | gh pr comment "$pr_number" \
-        --repo "$repo" \
-        --body-file - 2>/dev/null; then
-        echo "✅ Alert comment posted to PR #${pr_number}"
+    if [[ -n "$pr_number" && -n "$repo" ]]; then
+      if command -v gh >/dev/null 2>&1 && [[ -n "$GITHUB_TOKEN" ]]; then
+        if echo "$comment_body" | gh pr comment "$pr_number" \
+          --repo "$repo" \
+          --body-file - 2>/dev/null; then
+          echo "✅ Alert comment posted to PR #${pr_number}"
+        else
+          echo "⚠️  Failed to post billing alert comment"
+          return 2
+        fi
       else
-        echo "⚠️  Failed to post comment (continuing anyway)"
+        echo "⚠️  GitHub CLI not available or GH token missing; cannot post billing alert"
+        echo "$comment_body"
       fi
     else
-      echo "⚠️  GitHub CLI not available or no token, cannot post comment"
+      echo "⚠️  PR number or repository not set; printing billing alert locally"
+      echo "$comment_body"
     fi
     
     return 1
