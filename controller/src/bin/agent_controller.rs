@@ -16,10 +16,10 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Controller Service - Kubernetes Controller for CodeRun and DocsRun CRDs
+//! Controller Service - Kubernetes Controller for `CodeRun` and `DocsRun` CRDs
 //!
 //! This service manages the lifecycle of AI agent jobs by:
-//! - Watching for CodeRun and DocsRun custom resources
+//! - Watching for `CodeRun` and `DocsRun` custom resources
 //! - Creating and managing Kubernetes Jobs for agent execution
 //! - Handling resource cleanup and status updates
 //! - Providing health and metrics endpoints
@@ -196,11 +196,19 @@ fn load_controller_config() -> ControllerConfig {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn webhook_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
+    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
+    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
+    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
+    const LABEL_NEEDS_TESS: &str = "needs-tess";
+    const LABEL_APPROVED: &str = "approved";
+    const LABEL_FAILED: &str = "failed-remediation";
+
     let event = headers
         .get("X-GitHub-Event")
         .and_then(|value| value.to_str().ok())
@@ -233,7 +241,7 @@ async fn webhook_handler(
     let pr_number = payload
         .get("pull_request")
         .and_then(|pr| pr.get("number"))
-        .and_then(|num| num.as_i64())
+        .and_then(serde_json::Value::as_i64)
         .ok_or(StatusCode::BAD_REQUEST)?;
 
     let repo_owner = payload
@@ -248,13 +256,6 @@ async fn webhook_handler(
         .and_then(|repo| repo.get("name"))
         .and_then(|name| name.as_str())
         .ok_or(StatusCode::BAD_REQUEST)?;
-
-    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
-    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
-    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
-    const LABEL_NEEDS_TESS: &str = "needs-tess";
-    const LABEL_APPROVED: &str = "approved";
-    const LABEL_FAILED: &str = "failed-remediation";
 
     let target_state = match label_name {
         LABEL_NEEDS_FIXES => Some(WorkflowState::NeedsFixes),
@@ -289,18 +290,15 @@ async fn webhook_handler(
 
     let task_id = task_label.to_string();
 
-    let token = match std::env::var("GITHUB_TOKEN") {
-        Ok(value) => value,
-        Err(_) => {
-            warn!(
-                "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
-                label_name
-            );
-            return Ok(Json(json!({
-                "status": "skipped",
-                "reason": "missing_token"
-            })));
-        }
+    let Ok(token) = std::env::var("GITHUB_TOKEN") else {
+        warn!(
+            "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
+            label_name
+        );
+        return Ok(Json(json!({
+            "status": "skipped",
+            "reason": "missing_token"
+        })));
     };
 
     let label_client =
@@ -316,13 +314,13 @@ async fn webhook_handler(
 
     match state
         .remediation_state_manager
-        .load_state(pr_number as u32, &task_id)
+        .load_state(u32::try_from(pr_number).unwrap_or(0), &task_id)
         .await
     {
         Ok(None) => {
             if let Err(err) = state
                 .remediation_state_manager
-                .initialize_state(pr_number as u32, task_id.clone(), None)
+                .initialize_state(u32::try_from(pr_number).unwrap_or(0), task_id.clone(), None)
                 .await
             {
                 warn!(
@@ -341,7 +339,7 @@ async fn webhook_handler(
     }
 
     if let Err(err) = orchestrator
-        .force_state(pr_number as i32, &task_id, target_state.unwrap())
+        .force_state(i32::try_from(pr_number).unwrap_or(0), &task_id, target_state.unwrap())
         .await
     {
         error!(
@@ -378,10 +376,10 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
+        () = ctrl_c => {
             info!("Received Ctrl+C, shutting down gracefully");
         },
-        _ = terminate => {
+        () = terminate => {
             info!("Received SIGTERM, shutting down gracefully");
         },
     }

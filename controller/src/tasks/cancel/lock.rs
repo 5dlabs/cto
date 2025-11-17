@@ -50,6 +50,7 @@ pub struct DistributedLock {
 
 impl DistributedLock {
     /// Create a new distributed lock
+    #[must_use]
     pub fn new(client: Client, namespace: &str, lock_name: &str, holder_name: &str) -> Self {
         Self {
             client,
@@ -62,12 +63,14 @@ impl DistributedLock {
     }
 
     /// Set the lease duration (default: 30 seconds)
+    #[must_use]
     pub fn with_lease_duration(mut self, duration: Duration) -> Self {
         self.lease_duration = duration;
         self
     }
 
     /// Set the renewal interval (default: 10 seconds)
+    #[must_use]
     pub fn with_renewal_interval(mut self, interval: Duration) -> Self {
         self.renewal_interval = interval;
         self
@@ -83,7 +86,7 @@ impl DistributedLock {
 
         let lease_api: Api<K8sLease> = Api::namespaced(self.client.clone(), &self.namespace);
 
-        let lease = self.create_lease_object()?;
+        let lease = self.create_lease_object();
 
         // Try to create the lease (succeeds if it doesn't exist)
         match lease_api.create(&PostParams::default(), &lease).await {
@@ -124,7 +127,7 @@ impl DistributedLock {
         let existing_lease = lease_api.get(&self.lock_name).await?;
 
         // Check if the lease is expired
-        if self.is_lease_expired(&existing_lease) {
+        if Self::is_lease_expired(&existing_lease) {
             debug!(
                 lock_name = %self.lock_name,
                 holder = %self.holder_name,
@@ -133,7 +136,7 @@ impl DistributedLock {
 
             // Try to update the expired lease
             let mut updated_lease = existing_lease.clone();
-            updated_lease.spec = Some(self.create_lease_spec()?);
+            updated_lease.spec = Some(self.create_lease_spec());
             updated_lease.metadata.annotations = Some(self.create_annotations());
 
             match lease_api
@@ -169,8 +172,7 @@ impl DistributedLock {
                 .spec
                 .as_ref()
                 .and_then(|spec| spec.holder_identity.as_ref())
-                .map(|s| s.as_str())
-                .unwrap_or("unknown");
+                .map_or("unknown", std::string::String::as_str);
 
             debug!(
                 lock_name = %self.lock_name,
@@ -185,7 +187,7 @@ impl DistributedLock {
     }
 
     /// Check if a lease is expired
-    fn is_lease_expired(&self, lease: &K8sLease) -> bool {
+    fn is_lease_expired(lease: &K8sLease) -> bool {
         let Some(spec) = &lease.spec else {
             return true;
         };
@@ -198,36 +200,37 @@ impl DistributedLock {
             return true;
         };
 
-        let expiration_time = renew_time.0 + chrono::Duration::seconds(duration_seconds as i64);
+        let expiration_time = renew_time.0 + chrono::Duration::seconds(i64::from(duration_seconds));
         let now = chrono::Utc::now();
 
         expiration_time < now
     }
 
     /// Create a lease object for initial creation
-    fn create_lease_object(&self) -> Result<K8sLease, LeaseError> {
-        Ok(K8sLease {
+    fn create_lease_object(&self) -> K8sLease {
+        K8sLease {
             metadata: ObjectMeta {
                 name: Some(self.lock_name.clone()),
                 namespace: Some(self.namespace.clone()),
                 annotations: Some(self.create_annotations()),
                 ..Default::default()
             },
-            spec: Some(self.create_lease_spec()?),
-        })
+            spec: Some(self.create_lease_spec()),
+        }
     }
 
     /// Create lease spec
-    fn create_lease_spec(&self) -> Result<LeaseSpec, LeaseError> {
+    fn create_lease_spec(&self) -> LeaseSpec {
         let now = chrono::Utc::now();
+        let duration = i32::try_from(self.lease_duration.as_secs()).unwrap_or(i32::MAX);
 
-        Ok(LeaseSpec {
+        LeaseSpec {
             holder_identity: Some(self.holder_name.clone()),
-            lease_duration_seconds: Some(self.lease_duration.as_secs() as i32),
+            lease_duration_seconds: Some(duration),
             acquire_time: Some(MicroTime(now)),
             renew_time: Some(MicroTime(now)),
             lease_transitions: None,
-        })
+        }
     }
 
     /// Create lease annotations
@@ -360,21 +363,23 @@ impl ActiveLease {
     }
 
     /// Get the lease name
+    #[must_use]
     pub fn name(&self) -> &str {
         self.lease.metadata.name.as_deref().unwrap_or("")
     }
 
     /// Get the holder identity
+    #[must_use]
     pub fn holder(&self) -> &str {
         self.lease
             .spec
             .as_ref()
             .and_then(|spec| spec.holder_identity.as_ref())
-            .map(|s| s.as_str())
-            .unwrap_or("")
+            .map_or("", std::string::String::as_str)
     }
 
     /// Check if the lease is still valid
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         let Some(spec) = &self.lease.spec else {
             return false;
@@ -388,7 +393,7 @@ impl ActiveLease {
             return false;
         };
 
-        let expiration_time = renew_time.0 + chrono::Duration::seconds(duration_seconds as i64);
+        let expiration_time = renew_time.0 + chrono::Duration::seconds(i64::from(duration_seconds));
         let now = chrono::Utc::now();
 
         expiration_time > now

@@ -35,18 +35,18 @@ impl ClaudeAdapter {
     ///
     /// # Errors
     /// Returns an [`AdapterError`] if the adapter fails to initialize.
-    pub async fn new() -> AdapterResult<Self> {
-        Self::with_config(AdapterConfig::new(CLIType::Claude)).await
+    pub fn new() -> AdapterResult<Self> {
+        Self::with_config(AdapterConfig::new(CLIType::Claude))
     }
 
     /// Create a new Claude adapter with custom configuration.
     ///
     /// # Errors
     /// Returns an [`AdapterError`] if the adapter fails to initialize with the provided config.
-    pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing Claude adapter");
 
-        let base = Arc::new(BaseAdapter::new(config).await?);
+        let base = Arc::new(BaseAdapter::new(config)?);
         let model_validator = Arc::new(ClaudeModelValidator::new());
 
         let adapter = Self {
@@ -112,7 +112,7 @@ impl CliAdapter for ClaudeAdapter {
         let context = HashMap::from([("model".to_string(), model.to_string())]);
         self.base.log_operation("validate_model", &context);
 
-        let is_valid = self.model_validator.validate(model).await?;
+        let is_valid = self.model_validator.validate(model)?;
 
         info!(model = %model, is_valid = is_valid, "Model validation completed");
         Ok(is_valid)
@@ -188,7 +188,7 @@ impl CliAdapter for ClaudeAdapter {
         self.base.log_operation("parse_response", &context);
 
         // Parse tool calls from Claude response
-        let tool_calls = self.extract_tool_calls(response).await?;
+        let tool_calls = Self::extract_tool_calls(response)?;
 
         // Determine finish reason
         let finish_reason = if tool_calls.is_empty() {
@@ -198,7 +198,7 @@ impl CliAdapter for ClaudeAdapter {
         };
 
         // Extract metadata if available
-        let metadata = self.extract_response_metadata(response).await;
+        let metadata = Self::extract_response_metadata(response);
 
         let parsed_response = ParsedResponse {
             content: response.to_string(),
@@ -217,11 +217,11 @@ impl CliAdapter for ClaudeAdapter {
         Ok(parsed_response)
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "CLAUDE.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "claude"
     }
 
@@ -362,7 +362,7 @@ impl CliAdapter for ClaudeAdapter {
 
 impl ClaudeAdapter {
     /// Extract tool calls from Claude response
-    async fn extract_tool_calls(&self, response: &str) -> AdapterResult<Vec<ToolCall>> {
+    fn extract_tool_calls(response: &str) -> AdapterResult<Vec<ToolCall>> {
         // Claude tool calls are typically in the format:
         // <function_calls>
         // <invoke name="tool_name">
@@ -418,7 +418,7 @@ impl ClaudeAdapter {
     }
 
     /// Extract response metadata from Claude response
-    async fn extract_response_metadata(&self, _response: &str) -> ResponseMetadata {
+    fn extract_response_metadata(_response: &str) -> ResponseMetadata {
         // Claude Code CLI doesn't typically provide detailed metadata in responses
         // This is a placeholder for future enhancement
         ResponseMetadata {
@@ -439,6 +439,7 @@ pub struct ClaudeModelValidator {
 }
 
 impl ClaudeModelValidator {
+    #[must_use]
     pub fn new() -> Self {
         let valid_patterns = vec![
             // Claude 3.5 models
@@ -459,7 +460,7 @@ impl ClaudeModelValidator {
         Self { valid_patterns }
     }
 
-    pub async fn validate(&self, model: &str) -> AdapterResult<bool> {
+    pub fn validate(&self, model: &str) -> AdapterResult<bool> {
         if model.trim().is_empty() {
             return Ok(false);
         }
@@ -474,6 +475,7 @@ impl ClaudeModelValidator {
     }
 
     /// Get suggestions for invalid models
+    #[must_use]
     pub fn get_model_suggestions(&self, _invalid_model: &str) -> Vec<String> {
         vec![
             "claude-3-5-sonnet-20241022".to_string(),
@@ -501,7 +503,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_claude_adapter_creation() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
 
         assert_eq!(adapter.get_executable_name(), "claude");
         assert_eq!(adapter.get_memory_filename(), "CLAUDE.md");
@@ -509,7 +511,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_claude_capabilities() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
         let capabilities = adapter.get_capabilities();
 
         assert!(capabilities.supports_streaming);
@@ -525,7 +527,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_model_validation() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
 
         // Valid models
         assert!(adapter
@@ -547,7 +549,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_generation() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
 
         let agent_config = AgentConfig {
             github_app: "test-app".to_string(),
@@ -577,7 +579,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_prompt_formatting() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
         let formatted = adapter.format_prompt("Hello, world!");
 
         assert_eq!(formatted, "Human: Hello, world!\n\nAssistant: ");
@@ -585,7 +587,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_response_parsing() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
 
         // Simple response without tool calls
         let simple_response = "Hello! How can I help you today?";
@@ -621,7 +623,7 @@ The file has been read successfully."#;
 
     #[tokio::test]
     async fn test_health_check() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
+        let adapter = ClaudeAdapter::new().unwrap();
         let health = adapter.health_check().await.unwrap();
 
         // Health check should pass for basic functionality
@@ -639,19 +641,17 @@ The file has been read successfully."#;
         let validator = ClaudeModelValidator::new();
 
         // Test valid models
-        assert!(tokio_test::block_on(validator.validate("claude-3-5-sonnet-20241022")).unwrap());
-        assert!(tokio_test::block_on(validator.validate("claude-3-opus-20240229")).unwrap());
-        assert!(tokio_test::block_on(validator.validate("opus")).unwrap());
+        assert!(validator.validate("claude-3-5-sonnet-20241022").unwrap());
+        assert!(validator.validate("claude-3-opus-20240229").unwrap());
+        assert!(validator.validate("opus").unwrap());
 
         // Test invalid models
-        assert!(!tokio_test::block_on(validator.validate("gpt-4")).unwrap());
-        assert!(!tokio_test::block_on(validator.validate("")).unwrap());
+        assert!(!validator.validate("gpt-4").unwrap());
+        assert!(!validator.validate("").unwrap());
     }
 
     #[tokio::test]
     async fn test_tool_call_extraction() {
-        let adapter = ClaudeAdapter::new().await.unwrap();
-
         let response_with_tools = r#"
 I'll help you with that task.
 
@@ -671,10 +671,7 @@ I'll help you with that task.
 Done!
 "#;
 
-        let tool_calls = adapter
-            .extract_tool_calls(response_with_tools)
-            .await
-            .unwrap();
+        let tool_calls = ClaudeAdapter::extract_tool_calls(response_with_tools).unwrap();
         // In our basic implementation, tool calls are parsed as best effort
         // The test may find 0, 1, or 2 tool calls depending on parsing logic
         // Basic sanity check - tool_calls should be a valid Vec

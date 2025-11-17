@@ -47,7 +47,7 @@
 //! ```rust,ignore
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut validator = controller::remediation::AuthorValidator::new();
-//! validator.add_approved_author("custom-reviewer".to_string())
+//! validator.add_approved_author("custom-reviewer")
 //!     .expect("Failed to add author");
 //!
 //! let parser = controller::remediation::FeedbackParser::with_validator(validator);
@@ -118,7 +118,7 @@
 //!
 //! - XSS prevention: HTML/script tags are not executed
 //! - Command injection prevention: Shell metacharacters are safe
-//! - ReDoS prevention: Regex patterns have complexity bounds
+//! - `ReDoS` prevention: Regex patterns have complexity bounds
 //! - Authorization bypass prevention: Cache poisoning is prevented
 //! - Memory exhaustion prevention: Large inputs don't cause OOM
 
@@ -153,6 +153,7 @@ pub use state::{
 ///
 /// This is a convenience function for creating a parser with standard settings.
 /// For custom configuration, use `FeedbackParser::with_config()` directly.
+#[must_use]
 pub fn new_parser() -> FeedbackParser {
     FeedbackParser::new()
 }
@@ -160,6 +161,7 @@ pub fn new_parser() -> FeedbackParser {
 /// Create a parser with custom author validator
 ///
 /// Useful when you need specific authorization rules or additional approved authors.
+#[must_use]
 pub fn parser_with_validator(validator: AuthorValidator) -> FeedbackParser {
     FeedbackParser::with_validator(validator)
 }
@@ -206,7 +208,7 @@ Test feedback for parsing functionality.
     fn test_parser_with_custom_validator() {
         let mut validator = AuthorValidator::new();
         validator
-            .add_approved_author("custom-user".to_string())
+            .add_approved_author("custom-user")
             .expect("Failed to add author");
 
         let parser = parser_with_validator(validator);
@@ -219,8 +221,11 @@ Test feedback for parsing functionality.
     #[test]
     fn test_module_exports() {
         // Test that all expected types are exported
-        let _issue_type: IssueType = IssueType::Bug;
-        let _severity: Severity = Severity::High;
+        #[allow(clippy::no_effect_underscore_binding)]
+        {
+            let _issue_type: IssueType = IssueType::Bug;
+            let _severity: Severity = Severity::High;
+        }
         let _parser = FeedbackParser::new();
         let _validator = AuthorValidator::new();
     }

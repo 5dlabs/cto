@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt;
 
 /// Main structured feedback container representing parsed QA feedback
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructuredFeedback {
-    /// The type of issue identified (Bug, MissingFeature, etc.)
+    /// The type of issue identified (Bug, `MissingFeature`, etc.)
     pub issue_type: IssueType,
     /// The severity level of the issue
     pub severity: Severity,
@@ -67,19 +68,18 @@ impl PartialOrd for Severity {
 }
 
 impl Ord for Severity {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Custom ordering: Critical > High > Medium > Low
-        match (self, other) {
-            (Severity::Critical, Severity::Critical) => std::cmp::Ordering::Equal,
-            (Severity::Critical, _) => std::cmp::Ordering::Greater,
-            (_, Severity::Critical) => std::cmp::Ordering::Less,
-            (Severity::High, Severity::High) => std::cmp::Ordering::Equal,
-            (Severity::High, _) => std::cmp::Ordering::Greater,
-            (_, Severity::High) => std::cmp::Ordering::Less,
-            (Severity::Medium, Severity::Medium) => std::cmp::Ordering::Equal,
-            (Severity::Medium, _) => std::cmp::Ordering::Greater,
-            (_, Severity::Medium) => std::cmp::Ordering::Less,
-            (Severity::Low, Severity::Low) => std::cmp::Ordering::Equal,
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.rank().cmp(&other.rank())
+    }
+}
+
+impl Severity {
+    const fn rank(&self) -> u8 {
+        match self {
+            Severity::Critical => 3,
+            Severity::High => 2,
+            Severity::Medium => 1,
+            Severity::Low => 0,
         }
     }
 }
@@ -108,6 +108,7 @@ pub struct CriteriaStatus {
 
 impl CriteriaStatus {
     /// Create a new uncompleted criterion
+    #[must_use]
     pub fn new(description: String) -> Self {
         Self {
             description,
@@ -117,6 +118,7 @@ impl CriteriaStatus {
     }
 
     /// Create a new criterion with specified completion status
+    #[must_use]
     pub fn with_status(description: String, completed: bool) -> Self {
         Self {
             description,
@@ -126,6 +128,7 @@ impl CriteriaStatus {
     }
 
     /// Set the line number for this criterion
+    #[must_use]
     pub fn with_line_number(mut self, line_number: usize) -> Self {
         self.line_number = Some(line_number);
         self
@@ -149,6 +152,7 @@ pub struct FeedbackMetadata {
 
 impl FeedbackMetadata {
     /// Create new metadata with current timestamp
+    #[must_use]
     pub fn new(author: String, comment_id: u64, pr_number: u32, task_id: String) -> Self {
         Self {
             author,
@@ -160,6 +164,7 @@ impl FeedbackMetadata {
     }
 
     /// Create metadata with specific timestamp (useful for testing)
+    #[must_use]
     pub fn with_timestamp(
         author: String,
         timestamp: DateTime<Utc>,

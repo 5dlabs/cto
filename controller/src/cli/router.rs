@@ -5,7 +5,7 @@
 
 use crate::cli::bridge::ConfigurationBridge;
 use crate::cli::discovery::DiscoveryService;
-use crate::cli::types::*;
+use crate::cli::types::{CLIExecutionContext, CLIProfile, CLIType, SessionType, UniversalConfig};
 use std::collections::HashMap;
 
 /// CLI selection preferences
@@ -41,6 +41,7 @@ impl Default for CLIRouter {
 
 impl CLIRouter {
     /// Create a new CLI router
+    #[must_use]
     pub fn new() -> Self {
         Self {
             discovery: DiscoveryService::new(),
@@ -81,7 +82,7 @@ impl CLIRouter {
         let context = CLIExecutionContext {
             cli_type: selected_cli,
             working_dir: "/workspace".to_string(),
-            env_vars: self.prepare_environment(selected_cli, &translation.env_vars),
+            env_vars: Self::prepare_environment(selected_cli, &translation.env_vars),
             config_files: translation.config_files,
             command,
         };
@@ -144,14 +145,13 @@ impl CLIRouter {
             return false; // Can't discover = not available
         }
 
-        let profile = match self.discovery.get_profile(cli_type) {
-            Some(p) => p,
-            None => return false,
+        let Some(profile) = self.discovery.get_profile(cli_type) else {
+            return false;
         };
 
         // Check required capabilities
         for capability in &criteria.required_capabilities {
-            if !self.cli_has_capability(profile, capability) {
+            if !Self::cli_has_capability(profile, capability) {
                 return false;
             }
         }
@@ -165,7 +165,7 @@ impl CLIRouter {
     }
 
     /// Check if CLI has a specific capability
-    fn cli_has_capability(&self, profile: &CLIProfile, capability: &str) -> bool {
+    fn cli_has_capability(profile: &CLIProfile, capability: &str) -> bool {
         match capability {
             "tools" => profile.capabilities.supports_tools,
             "vision" => profile.capabilities.supports_vision,
@@ -181,11 +181,7 @@ impl CLIRouter {
     }
 
     /// Prepare environment variables for CLI execution
-    fn prepare_environment(
-        &self,
-        cli_type: CLIType,
-        required_vars: &[String],
-    ) -> HashMap<String, String> {
+    fn prepare_environment(cli_type: CLIType, required_vars: &[String]) -> HashMap<String, String> {
         let mut env = HashMap::new();
 
         // Add CLI-specific environment setup
@@ -193,18 +189,9 @@ impl CLIRouter {
             CLIType::Claude => {
                 // Claude doesn't need special env vars
             }
-            CLIType::Codex => {
+            CLIType::Codex | CLIType::Cursor | CLIType::Factory | CLIType::OpenCode => {
                 env.insert("HOME".to_string(), "/home/node".to_string());
-                // OPENAI_API_KEY will be added from required_vars
-            }
-            CLIType::Cursor => {
-                env.insert("HOME".to_string(), "/home/node".to_string());
-            }
-            CLIType::Factory => {
-                env.insert("HOME".to_string(), "/home/node".to_string());
-            }
-            CLIType::OpenCode => {
-                env.insert("HOME".to_string(), "/home/node".to_string());
+                // Provider-specific keys are added from required_vars
             }
             _ => {
                 env.insert("HOME".to_string(), "/workspace".to_string());
@@ -222,6 +209,7 @@ impl CLIRouter {
     }
 
     /// Get CLI profile information
+    #[must_use]
     pub fn get_cli_profile(&self, cli_type: CLIType) -> Option<&CLIProfile> {
         self.discovery.get_profile(cli_type)
     }
@@ -232,6 +220,7 @@ impl CLIRouter {
     }
 
     /// Get all supported CLI types
+    #[must_use]
     pub fn supported_clis(&self) -> Vec<CLIType> {
         self.bridge.supported_clis()
     }
@@ -322,18 +311,17 @@ mod tests {
 
     #[test]
     fn test_environment_preparation() {
-        let router = CLIRouter::new();
-        let env = router.prepare_environment(CLIType::Codex, &["OPENAI_API_KEY".to_string()]);
+        let env = CLIRouter::prepare_environment(CLIType::Codex, &["OPENAI_API_KEY".to_string()]);
 
         assert_eq!(env.get("HOME").unwrap(), "/home/node");
         // OPENAI_API_KEY would be added if available in actual environment
 
         let cursor_env =
-            router.prepare_environment(CLIType::Cursor, &["CURSOR_API_KEY".to_string()]);
+            CLIRouter::prepare_environment(CLIType::Cursor, &["CURSOR_API_KEY".to_string()]);
         assert_eq!(cursor_env.get("HOME").unwrap(), "/home/node");
 
         let factory_env =
-            router.prepare_environment(CLIType::Factory, &["FACTORY_API_KEY".to_string()]);
+            CLIRouter::prepare_environment(CLIType::Factory, &["FACTORY_API_KEY".to_string()]);
         assert_eq!(factory_env.get("HOME").unwrap(), "/home/node");
     }
 }

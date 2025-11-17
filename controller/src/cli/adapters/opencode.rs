@@ -1,6 +1,6 @@
-//! OpenCode CLI Adapter Implementation
+//! `OpenCode` CLI Adapter Implementation
 //!
-//! Provides a concrete implementation of the `CliAdapter` trait for the OpenCode CLI.
+//! Provides a concrete implementation of the `CliAdapter` trait for the `OpenCode` CLI.
 //! The adapter mirrors the structure used by other adapters (Codex/Factory) so the
 //! controller can generate CLI-specific configuration, render memory files, and
 //! translate responses into the shared `ParsedResponse` format.
@@ -38,6 +38,17 @@ fn first_f64(value: &Value, keys: &[&str]) -> Option<f64> {
         .find_map(|key| value.get(*key).and_then(Value::as_f64))
 }
 
+fn safe_f32(value: f64) -> Option<f32> {
+    if value.is_finite() && value >= f64::from(f32::MIN) && value <= f64::from(f32::MAX) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        {
+            Some(value as f32)
+        }
+    } else {
+        None
+    }
+}
+
 #[derive(Debug)]
 pub struct OpenCodeAdapter {
     base: Arc<BaseAdapter>,
@@ -46,13 +57,13 @@ pub struct OpenCodeAdapter {
 }
 
 impl OpenCodeAdapter {
-    pub async fn new() -> AdapterResult<Self> {
-        Self::with_config(AdapterConfig::new(CLIType::OpenCode)).await
+    pub fn new() -> AdapterResult<Self> {
+        Self::with_config(AdapterConfig::new(CLIType::OpenCode))
     }
 
-    pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing OpenCode adapter");
-        let base = Arc::new(BaseAdapter::new(config).await?);
+        let base = Arc::new(BaseAdapter::new(config)?);
 
         Ok(Self {
             base,
@@ -123,15 +134,14 @@ impl OpenCodeAdapter {
         let cli_config = agent_config.cli_config.clone().unwrap_or_else(|| json!({}));
 
         let model = first_string(&cli_config, &["model", "defaultModel"])
-            .map(str::to_string)
-            .unwrap_or_else(|| agent_config.model.clone());
+            .map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "max_output_tokens"])
-            .map(|value| value as u32)
+            .and_then(|value| u32::try_from(value).ok())
             .or(agent_config.max_tokens);
 
         let temperature = first_f64(&cli_config, &["temperature", "temp"])
-            .map(|value| value as f32)
+            .and_then(safe_f32)
             .or(agent_config.temperature);
 
         let instructions = cli_config
@@ -201,10 +211,10 @@ impl OpenCodeAdapter {
 
         if let Some(usage) = line.get("usage") {
             if let Some(input) = usage.get("input_tokens").and_then(Value::as_u64) {
-                metadata.input_tokens = Some(input as u32);
+                metadata.input_tokens = u32::try_from(input).ok();
             }
             if let Some(output) = usage.get("output_tokens").and_then(Value::as_u64) {
-                metadata.output_tokens = Some(output as u32);
+                metadata.output_tokens = u32::try_from(output).ok();
             }
         }
 
@@ -291,11 +301,11 @@ impl CliAdapter for OpenCodeAdapter {
         })
     }
 
-    fn get_memory_filename(&self) -> &str {
+    fn get_memory_filename(&self) -> &'static str {
         "OPENCODE.md"
     }
 
-    fn get_executable_name(&self) -> &str {
+    fn get_executable_name(&self) -> &'static str {
         "opencode"
     }
 
@@ -412,7 +422,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_config_overrides_defaults() {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        let adapter = OpenCodeAdapter::new().await.unwrap();
+        let adapter = OpenCodeAdapter::new().unwrap();
         let agent = sample_agent_config();
 
         let rendered = adapter.generate_config(&agent).await.unwrap();
@@ -436,7 +446,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_response_extracts_tool_calls() {
-        let adapter = OpenCodeAdapter::new().await.unwrap();
+        let adapter = OpenCodeAdapter::new().unwrap();
         let payload = r#"
         {"message":"Started run","model":"opencode-sonnet"}
         {"commands":[{"command":"shell","args":{"cmd":"ls"}}],"usage":{"input_tokens":120,"output_tokens":32}}

@@ -59,6 +59,7 @@ pub struct PlayProgress {
 
 impl PlayProgress {
     /// Create a new progress entry
+    #[must_use]
     pub fn new(repository: String, branch: String, task_id: u32, workflow_name: String) -> Self {
         let now = Utc::now();
         Self {
@@ -73,7 +74,7 @@ impl PlayProgress {
         }
     }
 
-    /// Convert to ConfigMap data format
+    /// Convert to `ConfigMap` data format
     fn to_config_map_data(&self) -> BTreeMap<String, String> {
         let mut data = BTreeMap::new();
         data.insert("repository".to_string(), self.repository.clone());
@@ -99,7 +100,7 @@ impl PlayProgress {
         data
     }
 
-    /// Parse from ConfigMap data
+    /// Parse from `ConfigMap` data
     fn from_config_map_data(data: &BTreeMap<String, String>) -> Result<Self> {
         let repository = data
             .get("repository")
@@ -133,14 +134,12 @@ impl PlayProgress {
         let started_at = data
             .get("started-at")
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(Utc::now);
+            .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
         let last_updated = data
             .get("last-updated")
             .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&Utc))
-            .unwrap_or_else(Utc::now);
+            .map_or_else(Utc::now, |dt| dt.with_timezone(&Utc));
 
         Ok(Self {
             repository,
@@ -155,13 +154,13 @@ impl PlayProgress {
     }
 }
 
-/// Generate ConfigMap name from repository
+/// Generate `ConfigMap` name from repository
 /// e.g., "5dlabs/cto" -> "play-progress-5dlabs-cto"
 fn configmap_name(repo: &str) -> String {
     format!("play-progress-{}", repo.replace('/', "-"))
 }
 
-/// Read progress from ConfigMap
+/// Read progress from `ConfigMap`
 pub async fn read_progress(client: &Client, repo: &str) -> Result<Option<PlayProgress>> {
     let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), NAMESPACE);
     let name = configmap_name(repo);
@@ -180,7 +179,7 @@ pub async fn read_progress(client: &Client, repo: &str) -> Result<Option<PlayPro
     }
 }
 
-/// Write or update progress to ConfigMap
+/// Write or update progress to `ConfigMap`
 pub async fn write_progress(client: &Client, progress: &PlayProgress) -> Result<()> {
     let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), NAMESPACE);
     let name = configmap_name(&progress.repository);

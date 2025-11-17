@@ -133,6 +133,7 @@ fn test_docs_templates(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)]
 fn test_code_templates(
     handlebars: &mut Handlebars,
     template_dir: &Path,

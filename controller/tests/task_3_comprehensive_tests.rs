@@ -25,9 +25,26 @@ use controller::cli::base_adapter::AdapterConfig;
 use controller::cli::types::CLIType;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::time::{Duration, Instant};
 use tokio;
+use tracing::info;
+
+#[allow(dead_code)]
+fn init_tracing() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let _ = tracing_subscriber::fmt::try_init();
+    });
+}
+
+#[allow(unused_macros)]
+macro_rules! log_step {
+    ($($arg:tt)*) => {{
+        init_tracing();
+        info!($($arg)*);
+    }};
+}
 
 /// Mock adapter for testing trait completeness and factory functionality
 #[derive(Debug)]
@@ -63,13 +80,12 @@ impl CliAdapter for TestAdapter {
     fn get_memory_filename(&self) -> &str {
         match self.cli_type {
             CLIType::Claude => "CLAUDE.md",
-            CLIType::Codex => "AGENTS.md",
+            CLIType::Codex | CLIType::Factory => "AGENTS.md",
             CLIType::OpenCode => "OPENCODE.md",
             CLIType::Gemini => "GEMINI.md",
             CLIType::Grok => "GROK.md",
             CLIType::Qwen => "QWEN.md",
             CLIType::Cursor => "CURSOR.md",
-            CLIType::Factory => "AGENTS.md",
             CLIType::OpenHands => "OPENHANDS.md",
         }
     }
@@ -338,9 +354,7 @@ async fn test_fr3_base_adapter_functionality() {
     println!("🧪 FR-3: Testing BaseAdapter Shared Functionality");
 
     // This test verifies the base functionality through the ClaudeAdapter
-    let adapter = ClaudeAdapter::new()
-        .await
-        .expect("BaseAdapter must be creatable");
+    let adapter = ClaudeAdapter::new().expect("BaseAdapter must be creatable");
 
     // ✅ Test basic functionality exists (covered by existing tests)
     // Note: BaseAdapter functionality is tested via the ClaudeAdapter implementation
@@ -376,6 +390,7 @@ async fn test_fr3_base_adapter_functionality() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_fr4_adapter_factory_implementation() {
     /// FR-4: AdapterFactory Implementation
     /// REQUIREMENT: Factory pattern for adapter management
@@ -517,15 +532,14 @@ async fn test_fr4_adapter_factory_implementation() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_fr5_claude_adapter_reference_implementation() {
     /// FR-5: ClaudeAdapter Reference Implementation
     /// REQUIREMENT: Complete Claude adapter as reference
 
     println!("🧪 FR-5: Testing ClaudeAdapter Reference Implementation");
 
-    let adapter = ClaudeAdapter::new()
-        .await
-        .expect("ClaudeAdapter must be creatable");
+    let adapter = ClaudeAdapter::new().expect("ClaudeAdapter must be creatable");
 
     // ✅ Test all CliAdapter trait methods implemented
     assert_eq!(
@@ -721,9 +735,7 @@ async fn test_nfr1_performance_requirements() {
 
     // ✅ Test adapter creation time (<200ms for CI compatibility)
     let start = Instant::now();
-    let adapter = ClaudeAdapter::new()
-        .await
-        .expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new().expect("Adapter creation must work");
     let creation_time = start.elapsed();
     assert!(
         creation_time < Duration::from_millis(200),
@@ -839,6 +851,7 @@ async fn test_nfr2_thread_safety() {
     }
 
     // ✅ Test Send + Sync trait bounds (compile-time check)
+    #[allow(clippy::items_after_statements)]
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<ClaudeAdapter>();
     assert_send_sync::<AdapterFactory>();
@@ -853,9 +866,7 @@ async fn test_nfr3_observability() {
 
     println!("🧪 NFR-3: Testing Observability");
 
-    let adapter = ClaudeAdapter::new()
-        .await
-        .expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new().expect("Adapter creation must work");
 
     // ✅ Test health check functionality
     let health = adapter
@@ -975,9 +986,7 @@ async fn test_error_handling() {
 
     println!("🧪 Testing Error Handling Scenarios");
 
-    let adapter = ClaudeAdapter::new()
-        .await
-        .expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new().expect("Adapter creation must work");
 
     // ✅ Test invalid model handling
     assert!(
@@ -997,7 +1006,7 @@ async fn test_error_handling() {
 
     // ✅ Test invalid configuration handling
     let invalid_config = AgentConfig {
-        github_app: "".to_string(), // Invalid empty GitHub app
+        github_app: String::new(), // Invalid empty GitHub app
         cli: "claude".to_string(),
         model: "claude-3-opus".to_string(),
         max_tokens: Some(4096),
@@ -1075,9 +1084,7 @@ async fn test_adapter_lifecycle() {
 
     println!("🧪 Testing Adapter Lifecycle");
 
-    let adapter = ClaudeAdapter::new()
-        .await
-        .expect("Adapter creation must work");
+    let adapter = ClaudeAdapter::new().expect("Adapter creation must work");
 
     let container = ContainerContext {
         pod: None,
@@ -1257,7 +1264,7 @@ async fn test_task_3_definition_of_done() {
     println!("🧪 FINAL VALIDATION: Task 3 Definition of Done");
 
     // ✅ All functional requirements implemented and tested
-    let claude_adapter = ClaudeAdapter::new().await.expect("ClaudeAdapter must work");
+    let claude_adapter = ClaudeAdapter::new().expect("ClaudeAdapter must work");
     let factory = AdapterFactory::new()
         .await
         .expect("AdapterFactory must work");

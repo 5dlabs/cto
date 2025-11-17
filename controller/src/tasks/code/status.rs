@@ -11,7 +11,7 @@ pub struct CodeStatusManager;
 
 #[allow(dead_code)]
 impl CodeStatusManager {
-    /// Monitor Job status and update CodeRun CRD accordingly
+    /// Monitor Job status and update `CodeRun` CRD accordingly
     pub async fn monitor_job_status(
         code_run: &Arc<CodeRun>,
         jobs: &Api<Job>,
@@ -172,7 +172,7 @@ impl CodeStatusManager {
         Ok(())
     }
 
-    /// Update the CodeRun CRD status
+    /// Update the `CodeRun` CRD status
     async fn update_status(
         code_run: &Arc<CodeRun>,
         ctx: &Arc<Context>,
@@ -292,7 +292,7 @@ impl CodeStatusManager {
         )
     }
 
-    /// Build CodeRun conditions
+    /// Build `CodeRun` conditions
     fn build_conditions(phase: &str, message: &str, timestamp: &str) -> Vec<CodeRunCondition> {
         vec![CodeRunCondition {
             condition_type: phase.to_string(),

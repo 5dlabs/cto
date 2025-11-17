@@ -22,6 +22,7 @@ pub struct DocsResourceManager<'a> {
 }
 
 impl<'a> DocsResourceManager<'a> {
+    #[must_use]
     pub fn new(
         jobs: &'a Api<Job>,
         configmaps: &'a Api<ConfigMap>,
@@ -74,7 +75,7 @@ impl<'a> DocsResourceManager<'a> {
         info!("🔄 RESOURCE_MANAGER: Using idempotent resource creation (no aggressive cleanup)");
 
         // Create ConfigMap FIRST (without owner reference) so Job can mount it
-        let cm_name = self.generate_configmap_name(docs_run);
+        let cm_name = Self::generate_configmap_name(docs_run);
         info!("📝 RESOURCE_MANAGER: Generated ConfigMap name: {}", cm_name);
 
         info!("🏗️ RESOURCE_MANAGER: Creating ConfigMap object");
@@ -191,7 +192,7 @@ impl<'a> DocsResourceManager<'a> {
         Ok(Action::await_change())
     }
 
-    fn generate_configmap_name(&self, docs_run: &DocsRun) -> String {
+    fn generate_configmap_name(docs_run: &DocsRun) -> String {
         // Generate unique ConfigMap name per DocsRun to prevent conflicts between sequential jobs
         let namespace = docs_run.metadata.namespace.as_deref().unwrap_or("default");
         let name = docs_run.metadata.name.as_deref().unwrap_or("unknown");
@@ -199,8 +200,7 @@ impl<'a> DocsResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
         let context_version = 1; // Docs don't have context versions, always 1
 
         // Use deterministic naming based on DocsRun UID for stable references
@@ -255,7 +255,7 @@ impl<'a> DocsResourceManager<'a> {
             "🏷️ RESOURCE_MANAGER: Creating labels for ConfigMap: {}",
             name
         );
-        let labels = self.create_task_labels(docs_run);
+        let labels = Self::create_task_labels(docs_run);
         error!("✅ RESOURCE_MANAGER: Created {} labels", labels.len());
 
         error!("📝 RESOURCE_MANAGER: Building ConfigMap metadata");
@@ -290,7 +290,7 @@ impl<'a> DocsResourceManager<'a> {
         docs_run: &DocsRun,
         cm_name: &str,
     ) -> Result<Option<OwnerReference>> {
-        let job_name = self.generate_job_name(docs_run);
+        let job_name = Self::generate_job_name(docs_run);
 
         // FIRST: Check if the job already exists
         match self.jobs.get(&job_name).await {
@@ -397,7 +397,7 @@ impl<'a> DocsResourceManager<'a> {
         docs_run: &DocsRun,
         cm_name: &str,
     ) -> Result<Option<OwnerReference>> {
-        let job_name = self.generate_job_name(docs_run);
+        let job_name = Self::generate_job_name(docs_run);
 
         // Ensure PVC exists before creating job
         info!(
@@ -417,7 +417,7 @@ impl<'a> DocsResourceManager<'a> {
             docs_run.name_any(),
             job_name
         );
-        let job = self.build_job_spec(docs_run, &job_name, cm_name).await?;
+        let job = self.build_job_spec(docs_run, &job_name, cm_name)?;
         info!(
             "✅ DocsRun {}: Job spec built for {}",
             docs_run.name_any(),
@@ -470,7 +470,7 @@ impl<'a> DocsResourceManager<'a> {
         }
     }
 
-    fn generate_job_name(&self, docs_run: &DocsRun) -> String {
+    fn generate_job_name(docs_run: &DocsRun) -> String {
         // Use deterministic naming based on the DocsRun's actual name and UID
         // This ensures the same DocsRun always generates the same Job name
         let namespace = docs_run.metadata.namespace.as_deref().unwrap_or("default");
@@ -479,21 +479,16 @@ impl<'a> DocsResourceManager<'a> {
             .metadata
             .uid
             .as_deref()
-            .map(|uid| &uid[..8]) // Use first 8 chars of UID for uniqueness
-            .unwrap_or("nouid");
+            .map_or("nouid", |uid| &uid[..8]);
 
         format!("docs-{namespace}-{name}-{uid_suffix}")
             .replace(['_', '.'], "-")
             .to_lowercase()
     }
 
-    async fn build_job_spec(
-        &self,
-        docs_run: &DocsRun,
-        job_name: &str,
-        cm_name: &str,
-    ) -> Result<Job> {
-        let labels = self.create_task_labels(docs_run);
+    #[allow(clippy::too_many_lines)]
+    fn build_job_spec(&self, docs_run: &DocsRun, job_name: &str, cm_name: &str) -> Result<Job> {
+        let labels = Self::create_task_labels(docs_run);
 
         // Create owner reference to DocsRun for proper event handling
         let owner_ref = OwnerReference {
@@ -590,7 +585,7 @@ impl<'a> DocsResourceManager<'a> {
         }));
 
         // SSH volumes
-        let ssh_volumes = self.generate_ssh_volumes(docs_run);
+        let ssh_volumes = Self::generate_ssh_volumes(docs_run);
         volumes.extend(ssh_volumes.volumes);
         volume_mounts.extend(ssh_volumes.volume_mounts);
 
@@ -674,7 +669,7 @@ impl<'a> DocsResourceManager<'a> {
         Ok(serde_json::from_value(job_spec)?)
     }
 
-    fn create_task_labels(&self, docs_run: &DocsRun) -> BTreeMap<String, String> {
+    fn create_task_labels(docs_run: &DocsRun) -> BTreeMap<String, String> {
         let mut labels = BTreeMap::new();
 
         // Update legacy orchestrator label to controller
@@ -686,7 +681,7 @@ impl<'a> DocsResourceManager<'a> {
         if let Some(name) = docs_run.metadata.name.as_deref() {
             labels.insert(
                 LABEL_CLEANUP_RUN.to_string(),
-                self.sanitize_label_value(name),
+                Self::sanitize_label_value(name),
             );
         }
 
@@ -696,7 +691,7 @@ impl<'a> DocsResourceManager<'a> {
         // Use working_directory as project name (it's the most meaningful identifier)
         labels.insert(
             "project-name".to_string(),
-            self.sanitize_label_value(&docs_run.spec.working_directory),
+            Self::sanitize_label_value(&docs_run.spec.working_directory),
         );
 
         // Use github_app if available, fallback to github_user for backward compatibility
@@ -708,7 +703,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or("");
         labels.insert(
             "github-identity".to_string(),
-            self.sanitize_label_value(github_identity),
+            Self::sanitize_label_value(github_identity),
         );
         labels.insert("context-version".to_string(), "1".to_string()); // Docs always version 1
 
@@ -716,13 +711,13 @@ impl<'a> DocsResourceManager<'a> {
         labels.insert("task-type".to_string(), "docs".to_string());
         labels.insert(
             "repository".to_string(),
-            self.sanitize_label_value(&docs_run.spec.repository_url),
+            Self::sanitize_label_value(&docs_run.spec.repository_url),
         );
 
         labels
     }
 
-    fn generate_ssh_volumes(&self, docs_run: &DocsRun) -> SshVolumes {
+    fn generate_ssh_volumes(docs_run: &DocsRun) -> SshVolumes {
         // Only mount SSH keys when using github_user authentication (not GitHub Apps)
         if docs_run.spec.github_app.is_some() || docs_run.spec.github_user.is_none() {
             // GitHub App authentication doesn't need SSH keys
@@ -792,7 +787,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or("");
         let list_params = ListParams::default().labels(&format!(
             "app=orchestrator,component=docs-generator,github-identity={}",
-            self.sanitize_label_value(github_identity)
+            Self::sanitize_label_value(github_identity)
         ));
 
         let jobs = self.jobs.list(&list_params).await?;
@@ -809,7 +804,7 @@ impl<'a> DocsResourceManager<'a> {
 
     async fn cleanup_old_configmaps(&self, docs_run: &DocsRun) -> Result<()> {
         // Generate current ConfigMap name to avoid deleting it
-        let current_cm_name = self.generate_configmap_name(docs_run);
+        let current_cm_name = Self::generate_configmap_name(docs_run);
 
         let github_identity = docs_run
             .spec
@@ -819,7 +814,7 @@ impl<'a> DocsResourceManager<'a> {
             .unwrap_or("");
         let list_params = ListParams::default().labels(&format!(
             "app=orchestrator,component=docs-generator,github-identity={}",
-            self.sanitize_label_value(github_identity)
+            Self::sanitize_label_value(github_identity)
         ));
 
         let configmaps = self.configmaps.list(&list_params).await?;
@@ -833,16 +828,11 @@ impl<'a> DocsResourceManager<'a> {
                 }
 
                 // Check if ConfigMap has an owner reference to a Job that's still running
-                let has_active_job = cm
-                    .metadata
-                    .owner_references
-                    .as_ref()
-                    .map(|owners| {
-                        owners.iter().any(|owner| {
-                            owner.kind == "Job" && owner.api_version.starts_with("batch/")
-                        })
-                    })
-                    .unwrap_or(false);
+                let has_active_job = cm.metadata.owner_references.as_ref().is_some_and(|owners| {
+                    owners
+                        .iter()
+                        .any(|owner| owner.kind == "Job" && owner.api_version.starts_with("batch/"))
+                });
 
                 if has_active_job {
                     // If ConfigMap is owned by a Job, let Kubernetes handle cleanup when Job completes
@@ -864,7 +854,7 @@ impl<'a> DocsResourceManager<'a> {
         Ok(())
     }
 
-    fn sanitize_label_value(&self, input: &str) -> String {
+    fn sanitize_label_value(input: &str) -> String {
         if input.is_empty() {
             return String::new();
         }
@@ -899,6 +889,7 @@ impl<'a> DocsResourceManager<'a> {
         sanitized
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn ensure_workspace_pvc(&self, docs_run: &DocsRun) -> Result<()> {
         // Create a project-specific PVC name to avoid cross-project data contamination
         let repo_slug = docs_run
@@ -971,7 +962,7 @@ impl<'a> DocsResourceManager<'a> {
                     labels.insert("component".to_string(), "docs-workspace".to_string());
                     labels.insert(
                         "working-directory".to_string(),
-                        self.sanitize_label_value(&docs_run.spec.working_directory),
+                        Self::sanitize_label_value(&docs_run.spec.working_directory),
                     );
                     labels
                 }),

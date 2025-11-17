@@ -7,7 +7,7 @@ use tracing::{info, warn};
 
 use crate::crds::coderun::CodeRun;
 
-/// Extract workflow name from CodeRun labels
+/// Extract workflow name from `CodeRun` labels
 pub fn extract_workflow_name(code_run: &CodeRun) -> Result<String> {
     // Try to get workflow name from label if labels exist
     if let Some(labels) = code_run.metadata.labels.as_ref() {
@@ -63,7 +63,7 @@ pub async fn resume_workflow_for_pr(
     .await
 }
 
-/// Resume workflow when CodeRun failed
+/// Resume workflow when `CodeRun` failed
 pub async fn resume_workflow_for_failure(
     client: &Client,
     namespace: &str,
@@ -112,6 +112,7 @@ pub async fn resume_workflow_for_no_pr(
 
 /// Resume workflow by forcing re-evaluation of stuck resource nodes
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
 async fn resume_workflow_via_http(
     _client: &Client,
     namespace: &str,
@@ -351,7 +352,7 @@ mod tests {
                 overwrite_memory: false,
                 env: std::collections::HashMap::new(),
                 env_from_secrets: vec![],
-                enable_docker: None,
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
                 docs_project_directory: None,
@@ -387,7 +388,7 @@ mod tests {
                 overwrite_memory: false,
                 env: std::collections::HashMap::new(),
                 env_from_secrets: vec![],
-                enable_docker: None,
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
                 docs_project_directory: None,

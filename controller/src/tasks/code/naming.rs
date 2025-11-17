@@ -13,6 +13,7 @@ impl ResourceNaming {
     /// Generate job name with guaranteed length compliance
     /// Format: task-{task_id}-{agent}-{cli}-{namespace}-{name}-{uid}-v{version}
     /// This is the single source of truth for job names
+    #[must_use]
     pub fn job_name(code_run: &CodeRun) -> String {
         let namespace = code_run.namespace().unwrap_or("default".to_string());
         let name = code_run.name_any();
@@ -20,8 +21,7 @@ impl ResourceNaming {
             .metadata
             .uid
             .as_ref()
-            .map(|uid| &uid[..8])
-            .unwrap_or("unknown");
+            .map_or("unknown", |uid| &uid[..8]);
         let task_id = code_run.spec.task_id;
         let context_version = code_run.spec.context_version;
 
@@ -51,6 +51,7 @@ impl ResourceNaming {
 
     /// Generate service name with length compliance
     /// Fixes the DNS label length violation that was causing reconciliation failures
+    #[must_use]
     pub fn headless_service_name(job_name: &str) -> String {
         const BRIDGE_SUFFIX: &str = "-bridge";
         const MAX_BASE_LENGTH: usize = MAX_DNS_LABEL_LENGTH - BRIDGE_SUFFIX.len();
@@ -71,7 +72,7 @@ impl ResourceNaming {
         github_app
             .split('-')
             .next_back()
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .ok_or_else(|| {
                 crate::tasks::types::Error::ConfigError(format!(
                     "Invalid GitHub app format: {github_app}"
@@ -200,7 +201,7 @@ mod tests {
                 overwrite_memory: false,
                 env: HashMap::new(),
                 env_from_secrets: vec![],
-                enable_docker: Some(true),
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
             },

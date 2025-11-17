@@ -23,7 +23,7 @@ pub struct DocsRunSpec {
     pub github_user: Option<String>,
     #[serde(rename = "githubApp", default)]
     pub github_app: Option<String>,
-    /// Optional: CLI type to use (e.g., "Claude", "Cursor", "Codex", "OpenCode")
+    /// Optional: CLI type to use (e.g., "Claude", "Cursor", "Codex", "`OpenCode`")
     #[serde(default)]
     pub cli: Option<String>,
     #[serde(rename = "includeCodebase", default)]

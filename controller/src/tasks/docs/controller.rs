@@ -51,12 +51,10 @@ pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Re
     )
     .await
     .map_err(|e| match e {
-        kube::runtime::finalizer::Error::ApplyFailed(err) => err,
-        kube::runtime::finalizer::Error::CleanupFailed(err) => err,
-        kube::runtime::finalizer::Error::AddFinalizer(e) => {
-            crate::tasks::types::Error::KubeError(e)
-        }
-        kube::runtime::finalizer::Error::RemoveFinalizer(e) => {
+        kube::runtime::finalizer::Error::ApplyFailed(err)
+        | kube::runtime::finalizer::Error::CleanupFailed(err) => err,
+        kube::runtime::finalizer::Error::AddFinalizer(e)
+        | kube::runtime::finalizer::Error::RemoveFinalizer(e) => {
             crate::tasks::types::Error::KubeError(e)
         }
         kube::runtime::finalizer::Error::UnnamedObject => {
@@ -73,6 +71,7 @@ pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Re
 }
 
 #[instrument(skip(ctx), fields(docs_run_name = %docs_run.name_any(), namespace = %ctx.namespace))]
+#[allow(clippy::too_many_lines)]
 async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) -> Result<Action> {
     let docs_run_name = docs_run.name_any();
     info!(
@@ -86,15 +85,14 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
         if status.work_completed == Some(true) {
             // Double-check with GitHub to ensure status hasn't changed
             if let Some(pr_url) = &status.pull_request_url {
-                if let Ok(is_still_complete) = verify_github_completion_status(pr_url).await {
-                    if !is_still_complete {
-                        warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
-                        clear_work_completed_status(&docs_run, ctx).await?;
-                        // Continue with reconciliation
-                    } else {
+                if let Ok(is_still_complete) = verify_github_completion_status(pr_url) {
+                    if is_still_complete {
                         info!("Work already completed (verified with GitHub), no further action needed");
                         return Ok(Action::await_change());
                     }
+                    warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
+                    clear_work_completed_status(&docs_run, ctx).await?;
+                    // Continue with reconciliation
                 } else {
                     warn!("Could not verify GitHub status, proceeding with caution");
                 }
@@ -124,9 +122,7 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                     "Documentation generation completed successfully",
                     true,
                     Some(finished_at),
-                    cleanup_deadline
-                        .map(DocsExpireUpdate::Set)
-                        .unwrap_or(DocsExpireUpdate::Unchanged),
+                    cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
                 )
                 .await?;
                 return Ok(Action::await_change());
@@ -229,9 +225,7 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                 "Documentation generation completed successfully",
                 true,
                 Some(finished_at),
-                cleanup_deadline
-                    .map(DocsExpireUpdate::Set)
-                    .unwrap_or(DocsExpireUpdate::Unchanged),
+                cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
             )
             .await?;
 
@@ -253,9 +247,7 @@ async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) 
                 "Documentation generation failed",
                 false,
                 Some(finished_at),
-                cleanup_deadline
-                    .map(DocsExpireUpdate::Set)
-                    .unwrap_or(DocsExpireUpdate::Unchanged),
+                cleanup_deadline.map_or(DocsExpireUpdate::Unchanged, DocsExpireUpdate::Set),
             )
             .await?;
 
@@ -296,8 +288,7 @@ fn generate_job_name(docs_run: &DocsRun) -> String {
         .metadata
         .uid
         .as_deref()
-        .map(|uid| &uid[..8])
-        .unwrap_or("nouid");
+        .map_or("nouid", |uid| &uid[..8]);
 
     format!("docs-{namespace}-{name}-{uid_suffix}")
         .replace(['_', '.'], "-")
@@ -357,11 +348,7 @@ async fn update_docs_status_with_completion(
     expire_update: DocsExpireUpdate,
 ) -> Result<()> {
     // Only update if status actually changed
-    let current_phase = docs_run
-        .status
-        .as_ref()
-        .map(|s| s.phase.as_str())
-        .unwrap_or("");
+    let current_phase = docs_run.status.as_ref().map_or("", |s| s.phase.as_str());
     let current_work_completed = docs_run
         .status
         .as_ref()
@@ -423,7 +410,7 @@ async fn update_docs_status_with_completion(
 }
 
 /// Verify completion status with GitHub to prevent stale local state
-async fn verify_github_completion_status(pr_url: &str) -> Result<bool> {
+fn verify_github_completion_status(pr_url: &str) -> Result<bool> {
     // Extract PR number from GitHub URL
     // Format: https://github.com/owner/repo/pull/number
     let _pr_number = extract_pr_number_from_url(pr_url)?;
@@ -456,7 +443,7 @@ fn extract_pr_number_from_url(url: &str) -> Result<u32> {
     )))
 }
 
-/// Clear stale work_completed status
+/// Clear stale `work_completed` status
 async fn clear_work_completed_status(docs_run: &crate::crds::DocsRun, ctx: &Context) -> Result<()> {
     let docs_runs: Api<crate::crds::DocsRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
 
@@ -494,9 +481,8 @@ async fn try_docs_cleanup_after_ttl(
         return Ok(None);
     }
 
-    let status = match &docs_run.status {
-        Some(status) => status,
-        None => return Ok(None),
+    let Some(status) = &docs_run.status else {
+        return Ok(None);
     };
 
     if status.cleanup_completed_at.is_some() {
@@ -599,5 +585,6 @@ fn compute_docs_cleanup_deadline(
         return None;
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }

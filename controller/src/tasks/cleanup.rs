@@ -20,15 +20,16 @@ pub const ANNOTATION_PRESERVE: &str = "cleanup.cto.dev/preserve";
 pub const ANNOTATION_TTL_SECONDS: &str = "cleanup.cto.dev/ttl-seconds";
 
 /// Returns true if cleanup should be skipped because the resource is marked as preserved.
+#[must_use]
 pub fn is_preserved(meta: &ObjectMeta) -> bool {
     meta.annotations
         .as_ref()
         .and_then(|annotations| annotations.get(ANNOTATION_PRESERVE))
-        .map(|value| value.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
+        .is_some_and(|value| value.eq_ignore_ascii_case("true"))
 }
 
 /// Extracts a TTL override from the object's annotations (in seconds).
+#[must_use]
 pub fn ttl_override_seconds(meta: &ObjectMeta) -> Option<u64> {
     meta.annotations
         .as_ref()

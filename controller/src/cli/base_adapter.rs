@@ -34,7 +34,7 @@ pub struct OperationContext {
     pub start_time: Instant,
 }
 
-/// Configuration for BaseAdapter
+/// Configuration for `BaseAdapter`
 #[derive(Debug, Clone)]
 pub struct AdapterConfig {
     /// CLI type this adapter handles
@@ -55,23 +55,22 @@ pub struct AdapterConfig {
 
 impl AdapterConfig {
     pub fn new(cli_type: CLIType) -> Self {
-        let default_template_root = match std::env::var("CLI_TEMPLATES_ROOT") {
-            Ok(path) => PathBuf::from(path),
-            Err(_) => {
-                let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
-                let repo_relative = manifest_dir
-                    .map(PathBuf::from)
-                    .map(|dir| {
-                        dir.join("..")
-                            .join("infra/charts/controller/agent-templates")
-                    })
-                    .filter(|path| path.exists());
+        let default_template_root = if let Ok(path) = std::env::var("CLI_TEMPLATES_ROOT") {
+            PathBuf::from(path)
+        } else {
+            let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
+            let repo_relative = manifest_dir
+                .map(PathBuf::from)
+                .map(|dir| {
+                    dir.join("..")
+                        .join("infra/charts/controller/agent-templates")
+                })
+                .filter(|path| path.exists());
 
-                if let Some(path) = repo_relative {
-                    path
-                } else {
-                    PathBuf::from("/agent-templates")
-                }
+            if let Some(path) = repo_relative {
+                path
+            } else {
+                PathBuf::from("/agent-templates")
             }
         };
         Self {
@@ -85,16 +84,19 @@ impl AdapterConfig {
         }
     }
 
+    #[must_use]
     pub fn with_correlation_id(mut self, correlation_id: String) -> Self {
         self.correlation_id = correlation_id;
         self
     }
 
+    #[must_use]
     pub fn with_template_root<P: Into<PathBuf>>(mut self, template_root: P) -> Self {
         self.template_root = template_root.into();
         self
     }
 
+    #[must_use]
     pub fn with_verbose_logging(mut self, verbose: bool) -> Self {
         self.verbose_logging = verbose;
         self
@@ -118,7 +120,7 @@ pub struct BaseAdapter {
 
 impl BaseAdapter {
     /// Create new base adapter
-    pub async fn new(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn new(config: AdapterConfig) -> AdapterResult<Self> {
         let metrics = Arc::new(AdapterMetrics::new(&config.metrics_prefix)?);
         let mut templates = Handlebars::new();
 
@@ -176,7 +178,7 @@ impl BaseAdapter {
         // Record operation duration
         self.metrics
             .operation_duration
-            .record(duration.as_millis() as f64, &labels);
+            .record(duration.as_secs_f64() * 1_000.0, &labels);
 
         // Record failures
         if !success {
@@ -367,14 +369,12 @@ impl BaseAdapter {
 
         // Helper for conditional CLI features
         handlebars_helper!(if_cli_supports: |cli_type: str, feature: str, then_val: Value, else_val: Value| {
-            let supports = match (cli_type, feature) {
-                ("claude", "streaming") => true,
-                ("claude", "multimodal") => false,
-                ("codex", "streaming") => false,
-                ("codex", "toml_config") => true,
-                ("gemini", "multimodal") => true,
-                _ => false,
-            };
+            let supports = matches!(
+                (cli_type, feature),
+                ("claude", "streaming")
+                    | ("codex", "toml_config")
+                    | ("gemini", "multimodal")
+            );
 
             if supports { then_val } else { else_val }
         });
@@ -531,6 +531,7 @@ impl BaseAdapter {
     }
 
     /// Get adapter configuration summary for diagnostics
+    #[must_use]
     pub fn get_config_summary(&self) -> HashMap<String, serde_json::Value> {
         let mut summary = HashMap::new();
 
@@ -614,7 +615,7 @@ impl AdapterMetrics {
 
         self.operations_total.add(1, &labels);
         self.operation_duration
-            .record(duration.as_millis() as f64, &labels);
+            .record(duration.as_secs_f64() * 1_000.0, &labels);
 
         if !success {
             self.operation_failures.add(1, &labels);
@@ -630,7 +631,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_adapter_creation() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         assert_eq!(adapter.cli_type, CLIType::Claude);
         assert!(!adapter.config.correlation_id.is_empty());
@@ -650,7 +651,7 @@ mod tests {
     #[tokio::test]
     async fn test_template_rendering() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         let template = "Hello {{name}}, CLI: {{cli_type}}";
         let context = json!({"name": "World"});
@@ -663,7 +664,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_validation() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         // Valid config
         let valid_config = AgentConfig {
@@ -682,7 +683,7 @@ mod tests {
         let invalid_config = AgentConfig {
             github_app: "test-app".to_string(),
             cli: "claude".to_string(),
-            model: "".to_string(),
+            model: String::new(),
             max_tokens: Some(4096),
             temperature: Some(0.7),
             tools: None,
@@ -695,7 +696,7 @@ mod tests {
     #[tokio::test]
     async fn test_health_check() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         let container = ContainerContext {
             pod: None,
@@ -732,7 +733,7 @@ mod tests {
         let config =
             AdapterConfig::new(CLIType::Gemini).with_correlation_id("test-456".to_string());
 
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
         let summary = adapter.get_config_summary();
 
         assert_eq!(summary["cli_type"], json!("gemini"));
@@ -743,7 +744,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_initialization_validation() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         // Valid container context
         let valid_container = ContainerContext {
@@ -759,7 +760,7 @@ mod tests {
         // Invalid container context - empty name
         let invalid_container = ContainerContext {
             pod: None,
-            container_name: "".to_string(),
+            container_name: String::new(),
             working_dir: "/workspace".to_string(),
             env_vars: HashMap::new(),
             namespace: "default".to_string(),

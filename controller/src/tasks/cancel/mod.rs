@@ -8,11 +8,11 @@
 //!
 //! The cancellation system consists of several key components:
 //!
-//! - **DistributedLock**: Kubernetes lease-based concurrency control
-//! - **StateAwareCancellation**: Integration with remediation state management
-//! - **AtomicLabelManager**: GitHub API optimistic concurrency control
-//! - **CancellationCoordinator**: Queue-based concurrent operation management
-//! - **RecoveryManager**: Automated failure detection and repair
+//! - **`DistributedLock`**: Kubernetes lease-based concurrency control
+//! - **`StateAwareCancellation`**: Integration with remediation state management
+//! - **`AtomicLabelManager`**: GitHub API optimistic concurrency control
+//! - **`CancellationCoordinator`**: Queue-based concurrent operation management
+//! - **`RecoveryManager`**: Automated failure detection and repair
 //!
 //! ## Usage
 //!

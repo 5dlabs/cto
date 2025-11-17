@@ -100,8 +100,7 @@ pub async fn run_task_controller(client: Client, namespace: String) -> Result<()
                     let phase = cr
                         .status
                         .as_ref()
-                        .map(|s| s.phase.clone())
-                        .unwrap_or_else(String::new);
+                        .map_or_else(String::new, |s| s.phase.clone());
                     info!(
                         "Existing CodeRun: name={}, githubApp={}, phase='{}'",
                         name, app, phase
@@ -248,6 +247,7 @@ async fn run_code_controller(
 
 /// Error policy for DocsRun controller - limit to single retry
 #[instrument(skip(_ctx), fields(docs_run_name = %_docs_run.name_any(), namespace = %_ctx.namespace))]
+#[allow(clippy::used_underscore_binding)]
 fn error_policy_docs(_docs_run: Arc<DocsRun>, err: &Error, _ctx: Arc<Context>) -> Action {
     error!(
         error = ?err,
@@ -260,6 +260,7 @@ fn error_policy_docs(_docs_run: Arc<DocsRun>, err: &Error, _ctx: Arc<Context>) -
 
 /// Error policy for CodeRun controller - limit to single retry
 #[instrument(skip(_ctx), fields(code_run_name = %_code_run.name_any(), namespace = %_ctx.namespace))]
+#[allow(clippy::used_underscore_binding)]
 fn error_policy_code(_code_run: Arc<CodeRun>, err: &Error, _ctx: Arc<Context>) -> Action {
     error!(
         error = ?err,

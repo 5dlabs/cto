@@ -3,11 +3,12 @@
 //! Translates between universal configuration and CLI-specific formats.
 //! This is the core component that enables CLI-agnostic operation.
 
-use crate::cli::types::*;
+use crate::cli::types::{CLIType, ConfigFile, TranslationResult, UniversalConfig};
 use async_trait::async_trait;
 use serde_json::json;
 use std::collections::HashSet;
 use std::env;
+use std::fmt::Write;
 
 /// Trait for CLI-specific configuration translators
 #[async_trait]
@@ -30,29 +31,32 @@ pub struct MarkdownCLIAdapter;
 
 #[async_trait]
 impl CLIAdapter for MarkdownCLIAdapter {
+    #[allow(clippy::too_many_lines)]
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
         // Generate CLAUDE.md content
         let mut claude_md = String::new();
 
         // Project context
         claude_md.push_str("# Project Context\n\n");
-        claude_md.push_str(&format!("Project: {}\n", universal.context.project_name));
-        claude_md.push_str(&format!(
-            "Description: {}\n\n",
+        let _ = writeln!(claude_md, "Project: {}", universal.context.project_name);
+        let _ = writeln!(
+            claude_md,
+            "Description: {}\n",
             universal.context.project_description
-        ));
+        );
 
         // Architecture notes
         if !universal.context.architecture_notes.is_empty() {
             claude_md.push_str("# Architecture\n\n");
-            claude_md.push_str(&format!("{}\n\n", universal.context.architecture_notes));
+            claude_md.push_str(&universal.context.architecture_notes);
+            claude_md.push_str("\n\n");
         }
 
         // Constraints
         if !universal.context.constraints.is_empty() {
             claude_md.push_str("# Constraints\n\n");
             for constraint in &universal.context.constraints {
-                claude_md.push_str(&format!("- {constraint}\n"));
+                let _ = writeln!(claude_md, "- {constraint}");
             }
             claude_md.push('\n');
         }
@@ -95,18 +99,20 @@ impl CLIAdapter for TomlCLIAdapter {
         let mut toml_config = String::new();
 
         // Basic settings
-        toml_config.push_str(&format!("model = \"{}\"\n", universal.settings.model));
-        toml_config.push_str(&format!(
-            "sandbox_mode = \"{}\"\n",
+        let _ = writeln!(toml_config, "model = \"{}\"", universal.settings.model);
+        let _ = writeln!(
+            toml_config,
+            "sandbox_mode = \"{}\"",
             universal.settings.sandbox_mode
-        ));
+        );
 
         // Model constraints
         if universal.settings.max_tokens > 0 {
-            toml_config.push_str(&format!(
-                "model_max_output_tokens = {}\n",
+            let _ = writeln!(
+                toml_config,
+                "model_max_output_tokens = {}",
                 universal.settings.max_tokens
-            ));
+            );
         }
 
         // Approval policy based on sandbox mode
@@ -114,7 +120,7 @@ impl CLIAdapter for TomlCLIAdapter {
 
         // Agent instructions as project doc
         if !universal.agent.instructions.is_empty() {
-            toml_config.push_str(&format!("project_doc_max_bytes = {}\n", 32768));
+            let _ = writeln!(toml_config, "project_doc_max_bytes = {}", 32_768);
             // 32KB
         }
 
@@ -124,11 +130,11 @@ impl CLIAdapter for TomlCLIAdapter {
             toml_config.push_str("# MCP Server Configuration\n");
 
             for server in &mcp_config.servers {
-                toml_config.push_str(&format!("[mcp_servers.{}]\n", server.name));
-                toml_config.push_str(&format!("command = \"{}\"\n", server.command));
+                let _ = writeln!(toml_config, "[mcp_servers.{}]", server.name);
+                let _ = writeln!(toml_config, "command = \"{}\"", server.command);
 
                 if !server.args.is_empty() {
-                    toml_config.push_str(&format!("args = {:?}\n", server.args));
+                    let _ = writeln!(toml_config, "args = {:?}", server.args);
                 }
 
                 if !server.env.is_empty() {
@@ -138,7 +144,7 @@ impl CLIAdapter for TomlCLIAdapter {
                         .iter()
                         .map(|(k, v)| format!("\"{k}\" = \"{v}\""))
                         .collect();
-                    toml_config.push_str(&format!("env = {{{}}}\n", env_pairs.join(", ")));
+                    let _ = writeln!(toml_config, "env = {{{}}}", env_pairs.join(", "));
                 }
 
                 toml_config.push('\n');
@@ -197,7 +203,7 @@ impl CLIAdapter for TomlCLIAdapter {
     }
 }
 
-/// JSON format CLI adapter (OpenCode)
+/// JSON format CLI adapter (`OpenCode`)
 pub struct JsonCLIAdapter;
 
 #[async_trait]
@@ -306,8 +312,9 @@ pub struct FactoryCLIAdapter;
 
 #[async_trait]
 impl CLIAdapter for FactoryCLIAdapter {
+    #[allow(clippy::too_many_lines)]
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
-        let sandbox_mode = universal.settings.sandbox_mode.to_string();
+        let sandbox_mode = universal.settings.sandbox_mode.clone();
         let auto_level = match sandbox_mode.as_str() {
             "danger-full-access" => "high",
             "workspace-write" => "medium",
@@ -478,6 +485,7 @@ pub struct ConfigurationBridge {
 
 impl ConfigurationBridge {
     /// Create a new configuration bridge with all supported adapters
+    #[must_use]
     pub fn new() -> Self {
         let mut adapters = std::collections::HashMap::new();
 
@@ -545,11 +553,13 @@ impl ConfigurationBridge {
     }
 
     /// Get all supported CLI types
+    #[must_use]
     pub fn supported_clis(&self) -> Vec<CLIType> {
-        self.adapters.keys().cloned().collect()
+        self.adapters.keys().copied().collect()
     }
 
     /// Check if a CLI type is supported
+    #[must_use]
     pub fn supports_cli(&self, cli_type: CLIType) -> bool {
         self.adapters.contains_key(&cli_type)
     }
@@ -585,6 +595,9 @@ pub type Result<T> = std::result::Result<T, BridgeError>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::types::{
+        AgentConfig, ContextConfig, MCPServer, SettingsConfig, ToolDefinition, UniversalMCPConfig,
+    };
     use serde_json::Value;
     use std::collections::HashMap;
 
@@ -628,7 +641,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test Project".to_string(),
                 project_description: "A test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],
@@ -671,7 +684,7 @@ mod tests {
             context: ContextConfig {
                 project_name: "Test Project".to_string(),
                 project_description: "A test project".to_string(),
-                architecture_notes: "".to_string(),
+                architecture_notes: String::new(),
                 constraints: vec![],
             },
             tools: vec![],

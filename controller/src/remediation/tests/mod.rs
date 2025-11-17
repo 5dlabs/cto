@@ -411,7 +411,7 @@ mod author_validation_tests {
     #[test]
     fn test_team_prefix_validation() {
         let mut validator = AuthorValidator::new();
-        validator.add_team_prefix("MyTeam-".to_string()).unwrap();
+        validator.add_team_prefix("MyTeam-").unwrap();
 
         assert!(validator.validate_author("MyTeam-Dev").is_ok());
         assert!(validator.validate_author("MyTeam-QA").is_ok());
@@ -423,7 +423,7 @@ mod author_validation_tests {
         let mut validator = AuthorValidator::new();
 
         // Add author
-        validator.add_approved_author("new-reviewer".to_string()).unwrap();
+        validator.add_approved_author("new-reviewer").unwrap();
         assert!(validator.validate_author("new-reviewer").is_ok());
 
         // Remove author
@@ -559,7 +559,7 @@ mod concurrency_tests {
 
                 // Test adding author
                 let author_name = format!("test-author-{}", i);
-                let add_result = validator_clone.add_approved_author(author_name.clone());
+                let add_result = validator_clone.add_approved_author(&author_name);
                 assert!(add_result.is_ok());
 
                 // Test getting authors
