@@ -314,7 +314,7 @@ pub struct FactoryCLIAdapter;
 impl CLIAdapter for FactoryCLIAdapter {
     #[allow(clippy::too_many_lines)]
     async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
-        let sandbox_mode = universal.settings.sandbox_mode.to_string();
+        let sandbox_mode = universal.settings.sandbox_mode.clone();
         let auto_level = match sandbox_mode.as_str() {
             "danger-full-access" => "high",
             "workspace-write" => "medium",
