@@ -2397,8 +2397,8 @@ RESOLVED_PR_URL="$(resolve_pr_url)"
 if [ $SUCCESS -eq 1 ]; then
   patch_coderun_status \
     "Running" \
-    "Implementation completed - ready for quality review" \
-    "ready-for-qa" \
+    "Implementation completed - ready for security review" \
+    "ready-for-security" \
     "" \
     "$RESOLVED_PR_URL" \
     "false"
@@ -2481,8 +2481,8 @@ EOF
         # Add security-approved label (create if missing)
         LABEL_NAME="security-approved"
         echo "🏷️  Ensuring '$LABEL_NAME' label exists"
-        if ! gh label view "$LABEL_NAME" >/dev/null 2>&1; then
-          gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
+        if ! gh label view "$LABEL_NAME" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1; then
+          gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
         fi
         echo "🏷️  Adding '$LABEL_NAME' label"
         timeout 30 gh pr edit "$PR_NUM" --add-label "$LABEL_NAME" 2>&1 || echo "⚠️ Failed to add $LABEL_NAME label"

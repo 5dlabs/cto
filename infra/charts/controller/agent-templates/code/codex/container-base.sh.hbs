@@ -151,12 +151,12 @@ safe_git_config() {
         rm -f "${GIT_CONFIG_GLOBAL}.lock" 2>/dev/null || true
       fi
     fi
-    
+
     # Attempt the git config operation
     if git config "$@" 2>/dev/null; then
       return 0
     fi
-    
+
     # Operation failed, retry with exponential backoff
     local exit_code=$?
     if [ $exit_code -ne 0 ] && [ $attempt -lt $max_attempts ]; then
@@ -763,23 +763,23 @@ ensure_pr_created() {
 
   # VALIDATION: Check for problematic commits before creating PR
   echo "🔍 Validating changes before PR creation..."
-  
+
   # Check total diff size
   TOTAL_ADDITIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$1} END {print sum+0}')
   TOTAL_DELETIONS=$(git diff --numstat "$BASE_BRANCH"..."$CURRENT_BRANCH" | awk '{sum+=$2} END {print sum+0}')
   TOTAL_CHANGES=$((TOTAL_ADDITIONS + TOTAL_DELETIONS))
-  
+
   echo "   📊 Total changes: +$TOTAL_ADDITIONS -$TOTAL_DELETIONS (total: $TOTAL_CHANGES lines)"
-  
+
   # Warn if commit is suspiciously large
   if [[ $TOTAL_CHANGES -gt 100000 ]]; then
     echo "   ⚠️  WARNING: Very large commit detected ($TOTAL_CHANGES lines)!"
     echo "   This may include unwanted files like node_modules or build artifacts"
   fi
-  
+
   # Check for commonly ignored files that shouldn't be committed
   PROBLEMATIC_FILES=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | grep -E "(node_modules/|\.next/|dist/|build/|target/debug/|\.pyc$|__pycache__/)" || echo "")
-  
+
   if [[ -n "$PROBLEMATIC_FILES" ]]; then
     echo "   ❌ ERROR: Detected files that should be gitignored!"
     echo "$PROBLEMATIC_FILES" | head -10 | sed 's/^/      /'
@@ -797,16 +797,16 @@ ensure_pr_created() {
     echo "      __pycache__/"
     return 1
   fi
-  
+
   # Check file count
   FILE_COUNT=$(git diff --name-only "$BASE_BRANCH"..."$CURRENT_BRANCH" | wc -l)
   echo "   📁 Files changed: $FILE_COUNT"
-  
+
   if [[ $FILE_COUNT -gt 100 ]]; then
     echo "   ⚠️  WARNING: Large number of files changed ($FILE_COUNT)"
     echo "   Verify this is intentional and not due to dependency/build commits"
   fi
-  
+
   echo "   ✅ Validation passed"
 
   PR_TITLE="feat({{service}}): complete task {{task_id}}"
@@ -1118,26 +1118,26 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
     git stash push --include-untracked -m "Auto-stash before checkout ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
   fi
   git checkout "$FEATURE_BRANCH"
-  
+
   # Check if upstream branch is gone (deleted after previous PR was closed)
   UPSTREAM_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "")
   if [ -n "$UPSTREAM_BRANCH" ]; then
     if ! git show-ref --verify --quiet "refs/remotes/$UPSTREAM_BRANCH"; then
       echo "⚠️ Upstream branch $UPSTREAM_BRANCH is gone (deleted from remote)"
       echo "🔍 Checking for closed PRs from previous runs..."
-      
+
       # Check if there's a CLOSED PR for this branch
       refresh_token_if_needed || true
       CLOSED_PR=$(gh pr list --state closed --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
-      
+
       if [ -n "$CLOSED_PR" ]; then
         echo "✅ Found CLOSED PR #$CLOSED_PR from previous run"
         echo "🔄 Deleting stale branch and recreating fresh from $REMOTE_BASE"
-        
+
         # Switch off the branch before deleting it
         git checkout "$REMOTE_BASE" 2>/dev/null || git checkout -b temp-cleanup-branch "$REMOTE_BASE"
         git branch -D "$FEATURE_BRANCH" 2>/dev/null || true
-        
+
         # Recreate fresh branch
         git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
         echo "✅ Created fresh branch $FEATURE_BRANCH from $REMOTE_BASE"
@@ -1148,7 +1148,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
       fi
     fi
   fi
-  
+
   if [ -n "$REMOTE_BASE" ]; then
     echo "📥 Fast-forwarding $FEATURE_BRANCH with $REMOTE_BASE"
     if ! git merge "$REMOTE_BASE" --ff-only >/dev/null 2>&1; then
@@ -1156,7 +1156,7 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
       echo "⚠️ Unable to fast-forward $FEATURE_BRANCH; checking for existing PR"
       refresh_token_if_needed || true
       EXISTING_PR=$(gh pr list --state open --head "$FEATURE_BRANCH" --json number --limit 1 2>/dev/null | jq -r '.[0].number // empty')
-      
+
       if [ -n "$EXISTING_PR" ]; then
         echo "✅ Found existing PR #$EXISTING_PR for branch $FEATURE_BRANCH"
         echo "ℹ️ Continuing with this branch despite merge conflict (will be resolved in PR)"
@@ -1177,14 +1177,14 @@ if git show-ref --verify --quiet "refs/heads/$FEATURE_BRANCH"; then
 else
   echo "Creating new feature branch '$FEATURE_BRANCH'"
   cleanup_git_state
-  
+
   # Stash any local changes from previous runs to avoid checkout conflicts
   # Exclude task/ directory to preserve task files that were just copied
   if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     echo "🔄 Stashing local changes and untracked files (excluding task/) before creating new branch"
     git stash push --include-untracked -m "Auto-stash before new branch creation ($(date -u +%Y%m%d-%H%M%S))" -- . ':!task' || true
   fi
-  
+
   if [ -n "$REMOTE_BASE" ] && git show-ref --verify --quiet "refs/remotes/$REMOTE_BASE"; then
     git checkout -b "$FEATURE_BRANCH" "$REMOTE_BASE"
   else
@@ -1218,7 +1218,7 @@ git status --short || true
 source /agent-templates/shared_task-setup-functions.sh || {
     echo "⚠️ Warning: Resilient task functions not available, using basic operations"
     # Define minimal fallback functions
-    safe_copy_file() { 
+    safe_copy_file() {
       if [ ! -f "$1" ]; then
         echo "❌ Source file not found: $1"
         return 1
@@ -1231,7 +1231,7 @@ source /agent-templates/shared_task-setup-functions.sh || {
         return 1
       fi
     }
-    safe_copy_directory() { 
+    safe_copy_directory() {
       if [ ! -d "$1" ]; then
         echo "❌ Source directory not found: $1"
         return 1
@@ -1247,7 +1247,7 @@ source /agent-templates/shared_task-setup-functions.sh || {
       fi
     }
     safe_ensure_directory() { mkdir -p "$1"; }
-    verify_task_files() { 
+    verify_task_files() {
         if [ -f "$1/prompt.md" ]; then
             echo "✅ Task files verified"
             return 0
@@ -1621,7 +1621,7 @@ if verify_task_files "$CODEX_WORK_DIR/task" "{{task_id}}"; then
 else
     echo "❌ CRITICAL: Task files verification: FAILED"
     create_error_report "$CODEX_WORK_DIR/task" "{{task_id}}" "Task files missing before agent execution"
-    
+
     # Attempt recovery
     if attempt_task_recovery "/tmp/docs-repo" "$CODEX_WORK_DIR/task" "{{task_id}}"; then
         echo "✅ Recovery successful - continuing with execution"
@@ -1765,7 +1765,7 @@ fi
 # =========================================================================
 if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
   echo "🛡️  QA Review Mode: Installing PR creation safeguard"
-  
+
   # Create a wrapper function that blocks 'gh pr create' in QA mode
   gh() {
     if [[ "$1" == "pr" && "$2" == "create" ]]; then
@@ -1778,7 +1778,7 @@ if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
     command gh "$@"
   }
   export -f gh
-  
+
   echo "✅ Safeguard installed: 'gh pr create' is now blocked"
   echo "✅ You can only review PR #${PR_NUMBER}"
 fi
@@ -1880,13 +1880,13 @@ ${NEXT_ITERATION_GUIDANCE}"
 
   if [ $CODEX_EXIT -ne 0 ]; then
     echo "⚠️ Codex exited with status $CODEX_EXIT on attempt $ATTEMPT"
-    
+
     if command -v detect_billing_failure >/dev/null 2>&1; then
       CLI_OUTPUT_SNIPPET=""
       if [ -f "$RUN_LOG" ]; then
         CLI_OUTPUT_SNIPPET=$(tail -n 400 "$RUN_LOG" 2>/dev/null || cat "$RUN_LOG" 2>/dev/null || true)
       fi
-      
+
       if [ -n "$CLI_OUTPUT_SNIPPET" ]; then
         if ! detect_billing_failure "$CLI_OUTPUT_SNIPPET" "$CODEX_EXIT" "${PR_NUMBER:-}" "${REPOSITORY:-}" "$AGENT_NAME" "{{task_id}}" "${WORKFLOW_STAGE:-}" "{{workflow_name}}"; then
           BILLING_DETECT_EXIT=$?
@@ -1910,23 +1910,23 @@ ${NEXT_ITERATION_GUIDANCE}"
     # Codex format: look for bash tool failures in JSON log
     # Note: Codex may output text, so this only works if JSON logging is enabled
     FAILED_CMD=$(jq -r 'select(.type=="bash" and (.exit_code // 0) != 0) | .command' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100)
-    
+
     # Fallback: grep for common error patterns in plain text logs
     if [ -z "$FAILED_CMD" ] && [ -f "$RUN_LOG" ]; then
       # Try to extract from text output (less reliable but better than nothing)
       FAILED_CMD=$(grep -oP '(?<=\$ ).*?(?= \(exit)' "$RUN_LOG" 2>/dev/null | tail -n1 | head -c 100 || true)
     fi
-    
+
     if [ -n "$FAILED_CMD" ]; then
       # Track how many times this command has failed
       FAILED_COMMANDS["$FAILED_CMD"]=$((${FAILED_COMMANDS["$FAILED_CMD"]:-0} + 1))
       FAIL_COUNT=${FAILED_COMMANDS["$FAILED_CMD"]}
-      
+
       if [ $FAIL_COUNT -ge $MAX_SAME_COMMAND_FAILURES ]; then
         echo "🔴 CIRCUIT BREAKER TRIGGERED: Command has failed $FAIL_COUNT times in a row:"
         echo "   Command: $FAILED_CMD"
         echo "   This indicates the agent is stuck in a loop."
-        
+
         # Inject intervention prompt for next attempt
         PROMPT_CONTENT="${PROMPT_CONTENT}
 
@@ -1942,7 +1942,7 @@ Try instead:
 2. List files: \`ls -la\`
 3. Use a completely different approach
 4. Create files/directories step-by-step"
-        
+
         # Reset counter
         FAILED_COMMANDS["$FAILED_CMD"]=0
       fi
@@ -1980,28 +1980,28 @@ Try instead:
   if [ -f "$RUN_LOG" ]; then
     # Try multiple extraction methods for robustness
     LAST_TOKENS=$(grep -Eo 'tokens used: [0-9,]+' "$RUN_LOG" 2>/dev/null | tail -n1 | awk '{print $3}' | tr -d ',' | tr -d '\n' || true)
-    
+
     # Also try JSON format if available
     if [ -z "$LAST_TOKENS" ] && command -v jq >/dev/null 2>&1; then
       TOKENS_IN=$(jq -r 'select(.tokens.input != null) | .tokens.input' "$RUN_LOG" 2>/dev/null | tail -n1)
       TOKENS_OUT=$(jq -r 'select(.tokens.output != null) | .tokens.output' "$RUN_LOG" 2>/dev/null | tail -n1)
-      
+
       if [[ "$TOKENS_IN" =~ ^[0-9]+$ ]] && [[ "$TOKENS_OUT" =~ ^[0-9]+$ ]]; then
         LAST_TOKENS=$((TOKENS_IN + TOKENS_OUT))
         echo "📊 Codex tokens this attempt: input=$TOKENS_IN, output=$TOKENS_OUT, total=$LAST_TOKENS"
-        
+
         # Store detailed metrics for cost analysis
         echo "{\"attempt\":$ATTEMPT,\"task_id\":\"{{task_id}}\",\"service\":\"{{service}}\",\"cli\":\"codex\",\"tokens_in\":$TOKENS_IN,\"tokens_out\":$TOKENS_OUT,\"tokens_total\":$LAST_TOKENS}" >> /tmp/codex-metrics.jsonl
       fi
     fi
-    
+
     if [[ "$LAST_TOKENS" =~ ^[0-9]+$ ]]; then
       if [ -z "$TOKENS_IN" ]; then
         # Only total available from text format
         echo "📊 Codex tokens used this attempt: $LAST_TOKENS"
         echo "{\"attempt\":$ATTEMPT,\"task_id\":\"{{task_id}}\",\"service\":\"{{service}}\",\"cli\":\"codex\",\"tokens_total\":$LAST_TOKENS}" >> /tmp/codex-metrics.jsonl
       fi
-      
+
       # Check token limit if configured
       if [ "${TOKEN_LIMIT:-0}" -gt 0 ] && [ "$LAST_TOKENS" -gt "$TOKEN_LIMIT" ]; then
         echo "⚠️ Token usage $LAST_TOKENS exceeds limit $TOKEN_LIMIT; forcing clean session before retry"
@@ -2065,7 +2065,7 @@ Your response:"
 
   set +e
   set -o pipefail
-  
+
   # Skip completion probe if no session exists
   if [ -z "$CURRENT_SESSION_ID" ]; then
     echo "⚠️ No Codex session found - skipping completion probe for attempt $ATTEMPT"
@@ -2098,7 +2098,7 @@ Your response:"
   # Extract yes/no from lines starting with ** (markdown bold) or standalone lines
   # This avoids false matches from phrases like "no warnings" or "no errors"
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
-  
+
   # Fallback: detect implicit completion signals if no explicit yes/no
   if [ -z "$COMPLETION_RESPONSE" ]; then
     if printf '%s\n' "$COMPLETION_OUTPUT" | grep -Eiq '(task.*(complete|finished|done)|work.*(complete|finished)|security work complete)'; then
@@ -2107,12 +2107,12 @@ Your response:"
     fi
   fi
   fi
-  
+
   set +o pipefail
   set -e
-  
+
   echo "[codex-debug] Final completion response: ${COMPLETION_RESPONSE:-<none>}"
-  
+
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
     CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
@@ -2188,15 +2188,15 @@ fi
 
 if [ $SUCCESS -ne 1 ]; then
   echo "⚠️ Codex did not confirm task completion after $MAX_RETRIES attempts"
-  
+
   # Document remaining work for downstream agents (stage-aware)
   echo ""
-  
+
   # Determine handoff target and agent name based on workflow stage
   HANDOFF_TARGET="Cleo"
   HANDOFF_AGENT="Rex"
   HANDOFF_FILE="$CODEX_WORK_DIR/task/rex-handoff.md"
-  
+
   case "${WORKFLOW_STAGE:-implementation}" in
     "implementation")
       HANDOFF_TARGET="Cleo"
@@ -2224,10 +2224,10 @@ if [ $SUCCESS -ne 1 ]; then
       HANDOFF_FILE="$CODEX_WORK_DIR/task/agent-handoff.md"
       ;;
   esac
-  
+
   echo "📝 Creating handoff document for $HANDOFF_TARGET..."
   mkdir -p "$CODEX_WORK_DIR/task"
-  
+
   # Prepare handoff content with proper variable expansion
   HANDOFF_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
   if [ -n "$LAST_COMPLETION_REASON" ]; then
@@ -2236,7 +2236,7 @@ if [ $SUCCESS -ne 1 ]; then
     REMAINING_WORK_SECTION=$'Review the completion probe responses in the logs above for details on what remains to be done.
 Compare current implementation against acceptance criteria in task/acceptance-criteria.md.'
   fi
-  
+
   cat > "$HANDOFF_FILE" << EOF
 # $HANDOFF_AGENT Handoff to $HANDOFF_TARGET
 
@@ -2269,7 +2269,7 @@ See \`task/acceptance-criteria.md\` for complete requirements.
 EOF
 
   echo "✅ Handoff document created at $(basename "$HANDOFF_FILE")"
-  
+
   # Commit and push the handoff document
   cd "$CODEX_WORK_DIR"
   git add "task/$(basename "$HANDOFF_FILE")" 2>/dev/null || true
@@ -2277,17 +2277,17 @@ EOF
 
 $HANDOFF_AGENT completed $FINAL_ATTEMPTS iterations with incomplete status (max: $MAX_RETRIES).
 Handoff document created for $HANDOFF_TARGET to continue work." 2>/dev/null || echo "⚠️ Could not commit handoff document"
-  
+
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "main" ] && [ "$CURRENT_BRANCH" != "master" ]; then
     git push origin HEAD 2>/dev/null || echo "⚠️ Could not push handoff document"
   fi
-  
+
   # Check if agent made any commits before deciding to handoff vs fail
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   REMOTE_BASE="origin/${BASE_BRANCH:-main}"
   COMMITS_MADE=0
-  
+
   if [ -n "$CURRENT_BRANCH" ]; then
     safe_git_fetch origin "$BASE_BRANCH" || true
     AHEAD_COUNT=$(git rev-list --left-right "$REMOTE_BASE...$CURRENT_BRANCH" 2>/dev/null | awk '/^>/{c++} END{print c+0}')
@@ -2312,7 +2312,7 @@ Handoff document created for $HANDOFF_TARGET to continue work." 2>/dev/null || e
     echo "   - Next agent will review PR and continue work"
     echo ""
     echo "════════════════════════════════════════════════════════════════"
-    
+
     EXIT_CODE=0  # Exit successfully to allow Cleo to continue
   else
     # Agent made NO progress - this is a failure, should retry
@@ -2383,8 +2383,8 @@ FINAL_MESSAGE=""
 
 if [ "$WORKFLOW_STAGE" != "quality-in-progress" ] && [ "$WORKFLOW_STAGE" != "security-in-progress" ] && [ "$WORKFLOW_STAGE" != "testing-in-progress" ]; then
   if [ $SUCCESS -eq 1 ]; then
-    FINAL_REMEDIATION_STATUS="ready-for-qa"
-    FINAL_MESSAGE="Implementation completed - ready for quality review"
+    FINAL_REMEDIATION_STATUS="ready-for-security"
+    FINAL_MESSAGE="Implementation completed - ready for security review"
   else
     FINAL_REMEDIATION_STATUS="needs-fixes"
     FINAL_MESSAGE="Implementation requires follow-up"
@@ -2409,10 +2409,10 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
   if [ -n "$PR_NUM" ]; then
     # Run actual quality gate checks instead of relying on $SUCCESS
     QUALITY_GATES_PASSED=1
-    
+
     if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
       echo "🔍 Running quality gate checks..."
-      
+
       # Check 1: Code formatting
       echo "  ➤ Checking code formatting (cargo fmt)..."
       if ! cargo fmt --all -- --check >/tmp/fmt-check.log 2>&1; then
@@ -2421,7 +2421,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       else
         echo "    ✅ Formatting check passed"
       fi
-      
+
       # Check 2: Linting with pedantic Clippy
       echo "  ➤ Checking lints (cargo clippy)..."
       if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic >/tmp/clippy-check.log 2>&1; then
@@ -2430,7 +2430,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       else
         echo "    ✅ Clippy check passed"
       fi
-      
+
       # Check 3: Unit tests
       echo "  ➤ Running unit tests (cargo test)..."
       if ! cargo test --workspace --all-features >/tmp/test-check.log 2>&1; then
@@ -2441,7 +2441,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       fi
     elif [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
       echo "🔍 Running security checks..."
-      
+
       # Security checks can assume code passed quality gates
       # Focus on security-specific validations
       echo "  ➤ Security scan completed by Cipher"
@@ -2453,7 +2453,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       fi
     elif [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
       echo "🔍 Running integration and E2E tests..."
-      
+
       # Run the same quality gates as quality stage, plus acceptance criteria validation
       echo "  ➤ Checking code formatting (cargo fmt)..."
       if ! cargo fmt --all -- --check >/tmp/fmt-check.log 2>&1; then
@@ -2462,7 +2462,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       else
         echo "    ✅ Formatting check passed"
       fi
-      
+
       echo "  ➤ Checking lints (cargo clippy)..."
       if ! cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic >/tmp/clippy-check.log 2>&1; then
         echo "    ❌ Clippy check failed"
@@ -2470,7 +2470,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       else
         echo "    ✅ Clippy check passed"
       fi
-      
+
       echo "  ➤ Running tests (cargo test)..."
       if ! cargo test --workspace --all-features >/tmp/test-check.log 2>&1; then
         echo "    ❌ Tests failed"
@@ -2478,7 +2478,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
       else
         echo "    ✅ Tests passed"
       fi
-      
+
       # Validate acceptance criteria completion
       if [ $SUCCESS -ne 1 ]; then
         echo "    ❌ Codex did not confirm acceptance criteria completion"
@@ -2496,7 +2496,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
 - Unit tests successful
 - Quality standards met"
       NEXT_STAGE="end-to-end testing by Tess"
-      
+
       if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
         # Cipher security review
         STAGE_NAME="Security"
@@ -2506,7 +2506,7 @@ if [ "$WORKFLOW_STAGE" = "quality-in-progress" ] || [ "$WORKFLOW_STAGE" = "secur
 - Secret scanning completed
 - Security best practices verified"
         NEXT_STAGE="QA testing by Tess"
-        
+
         echo "✅ $STAGE_NAME checks passed - handing off to Tess"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
@@ -2515,7 +2515,7 @@ All security checks have passed:
 $CHECKS_PASSED
 
 **Status:** Ready for $NEXT_STAGE
-**Next Step:** Tess will now perform comprehensive QA validation
+**Next Step:** Cipher will now perform comprehensive security validation
 
 ---
 *Security review by Cipher*
@@ -2523,12 +2523,12 @@ EOF
         refresh_token_if_needed || true
         timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
         rm -f "$REVIEW_BODY_FILE"
-        
+
         # Add security-approved label (create if missing)
         LABEL_NAME="security-approved"
         echo "🏷️  Ensuring '$LABEL_NAME' label exists"
-        if ! gh label view "$LABEL_NAME" >/dev/null 2>&1; then
-          gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
+        if ! gh label view "$LABEL_NAME" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1; then
+          gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
         fi
         echo "🏷️  Adding '$LABEL_NAME' label"
         timeout 30 gh pr edit "$PR_NUM" --add-label "$LABEL_NAME" 2>&1 || echo "⚠️ Failed to add $LABEL_NAME label"
@@ -2541,27 +2541,27 @@ EOF
 - Acceptance criteria validated
 - Production readiness confirmed"
         NEXT_STAGE="human review and merge"
-        
+
         # Check if this is the final task requiring deployment verification
         DEPLOYMENT_STATUS=""
         if [ "${FINAL_TASK:-false}" = "true" ]; then
           echo "🎯 Final task detected - verifying Kubernetes deployment"
-          
+
           # Extract service name from repository or use default
           SERVICE_NAME="${SERVICE_NAME:-$(basename "$REPOSITORY" .git)}"
           NAMESPACE="${NAMESPACE:-agent-platform}"
-          
+
           # Check for deployment
           if kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" &>/dev/null; then
             READY_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
             DESIRED_REPLICAS=$(kubectl get deployment "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-            
+
             if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" != "0" ]; then
               echo "✅ Deployment verified: $READY_REPLICAS/$DESIRED_REPLICAS replicas ready"
-              
+
               # Get ingress URLs
               INGRESS_URLS=$(kubectl get ingress -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.rules[*].host}{"\n"}{end}' 2>/dev/null | grep -v "^$" || echo "")
-              
+
               if [ -n "$INGRESS_URLS" ]; then
                 DEPLOYMENT_STATUS="
 
@@ -2601,7 +2601,7 @@ $(echo "$INGRESS_URLS" | sed 's/^/  - https:\/\//')"
 - **Action Required**: Ensure deployment manifests are applied"
           fi
         fi
-        
+
         echo "✅ $STAGE_NAME complete - posting APPROVE review (Tess final approval)"
         REVIEW_BODY=$(cat <<EOF
 ### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
@@ -2614,7 +2614,7 @@ EOF
 )
         refresh_token_if_needed || true
         timeout 30 gh pr review "$PR_NUM" --approve --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR review command failed"
-        
+
         # Auto-merge if enabled (Tess only)
         if [ "${AUTO_MERGE:-false}" = "true" ]; then
           echo "🔀 AUTO_MERGE enabled - merging PR automatically"
@@ -2641,16 +2641,16 @@ EOF
 )
         refresh_token_if_needed || true
         timeout 30 gh pr comment "$PR_NUM" --body "$REVIEW_BODY" 2>&1 || echo "⚠️ PR comment command failed"
-        
-        # Add ready-for-qa label to signal Tess
-        echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
-        timeout 30 gh pr edit "$PR_NUM" --add-label "ready-for-qa" 2>&1 || echo "⚠️ Failed to add ready-for-qa label"
+
+        # Add ready-for-security label to signal Cipher
+        echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "ready-for-security" 2>&1 || echo "⚠️ Failed to add ready-for-security label"
       fi
 
       if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
-        FINAL_REMEDIATION_STATUS="ready-for-qa"
+        FINAL_REMEDIATION_STATUS="ready-for-security"
         FINAL_QA_STATUS="quality-passed"
-        FINAL_MESSAGE="Quality review passed - ready for QA testing"
+        FINAL_MESSAGE="Quality review passed - ready for security testing"
       elif [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
         FINAL_REMEDIATION_STATUS="security-approved"
         FINAL_QA_STATUS="security-passed"
@@ -2668,7 +2668,7 @@ EOF
 - Ensure unit tests pass
 - Meet quality standards"
       FAILURE_LOGS=""
-      
+
       if [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
         # Collect failure details from logs
         if [ -f /tmp/fmt-check.log ]; then
