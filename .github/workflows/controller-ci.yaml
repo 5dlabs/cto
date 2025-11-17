@@ -46,7 +46,7 @@ jobs:
       format-needed: ${{ steps.format-check.outputs.format-needed }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
           components: rustfmt, clippy
@@ -91,7 +91,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
           components: rustfmt
@@ -255,7 +255,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
@@ -415,7 +415,7 @@ jobs:
     continue-on-error: true  # Non-blocking
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
           components: llvm-tools-preview
@@ -480,7 +480,7 @@ jobs:
 
       - name: Setup Rust toolchain
         if: matrix.language == 'rust'
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
           components: rustfmt, clippy
@@ -493,9 +493,8 @@ jobs:
 
       - name: Build Rust workspace
         if: matrix.language == 'rust'
-        working-directory: ./controller
         run: |
-          echo "🔨 Building Rust workspace for CodeQL..."
+          echo "🔨 Building Rust workspace for CodeQL extraction..."
           cargo fetch
           cargo build --workspace --all-features
 

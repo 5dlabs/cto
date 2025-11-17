@@ -1,0 +1,135 @@
+---
+# ServiceAccount for workspace PVC cleanup
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workspace-cleaner
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: workspace-cleaner
+    app.kubernetes.io/part-of: platform
+---
+# Minimal RBAC for deleting stale workspace PVCs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workspace-cleaner
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: workspace-cleaner
+    app.kubernetes.io/part-of: platform
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workspace-cleaner
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: workspace-cleaner
+    app.kubernetes.io/part-of: platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workspace-cleaner
+subjects:
+  - kind: ServiceAccount
+    name: workspace-cleaner
+    namespace: agent-platform
+---
+# CronJob that removes stale workspace PVCs that are no longer mounted
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: workspace-pvc-cleaner
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: workspace-pvc-cleaner
+    app.kubernetes.io/part-of: platform
+spec:
+  # Run once per hour
+  schedule: "15 * * * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: workspace-pvc-cleaner
+        spec:
+          serviceAccountName: workspace-cleaner
+          restartPolicy: OnFailure
+          containers:
+            - name: cleaner
+              image: bitnami/kubectl:1.31.4
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: RETENTION_HOURS
+                  value: "12"
+                - name: MAX_DELETIONS
+                  value: "15"
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  RETENTION_HOURS="${RETENTION_HOURS:-12}"
+                  MAX_DELETIONS="${MAX_DELETIONS:-15}"
+                  RETENTION_SECONDS=$((RETENTION_HOURS * 3600))
+                  NOW=$(date -u +%s)
+
+                  echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Looking for workspace PVCs older than ${RETENTION_HOURS}h..."
+
+                  ACTIVE_CLAIMS="$(kubectl get pods -n agent-platform \
+                    --field-selector=status.phase!=Succeeded,status.phase!=Failed \
+                    -o json | jq -r '.items[]? | .spec.volumes[]? | select(.persistentVolumeClaim != null) | .persistentVolumeClaim.claimName' | sort -u)"
+
+                  DELETE_COUNT=0
+
+                  while read -r PVC_NAME PVC_TIMESTAMP SKIP_FLAG; do
+                    if [ -z "${PVC_NAME:-}" ]; then
+                      continue
+                    fi
+
+                    CREATED_TS=$(date -u -d "$PVC_TIMESTAMP" +%s)
+                    AGE=$((NOW - CREATED_TS))
+
+                    if [ "${SKIP_FLAG:-false}" = "true" ]; then
+                      echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Skipping PVC $PVC_NAME (opt-out label set)"
+                      continue
+                    fi
+
+                    if [ "$AGE" -lt "$RETENTION_SECONDS" ]; then
+                      continue
+                    fi
+
+                    if printf '%s\n' "$ACTIVE_CLAIMS" | grep -qx "$PVC_NAME"; then
+                      echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Skipping active workspace PVC $PVC_NAME"
+                      continue
+                    fi
+
+                    if [ "$DELETE_COUNT" -ge "$MAX_DELETIONS" ]; then
+                      echo "Reached MAX_DELETIONS=$MAX_DELETIONS limit; exiting early."
+                      break
+                    fi
+
+                    AGE_HOURS=$((AGE / 3600))
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Deleting stale workspace PVC $PVC_NAME (age=${AGE_HOURS}h)"
+                    if kubectl delete pvc "$PVC_NAME" -n agent-platform --ignore-not-found --wait=false; then
+                      DELETE_COUNT=$((DELETE_COUNT + 1))
+                    fi
+                  done < <(kubectl get pvc -n agent-platform -l workspace-type=shared -o json \
+                    | jq -r '.items[] | "\(.metadata.name) \(.metadata.creationTimestamp) \(.metadata.labels["workspace.cleanup/skip"] // "false")"')
+
+                  echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Workspace PVC cleanup finished (deleted ${DELETE_COUNT})"
+
