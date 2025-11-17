@@ -47,6 +47,9 @@ spec:
           authModes:
             - server
           secure: false
+          env:
+            - name: ARGO_SERVER_SECURE
+              value: "false"
           extraArgs:
             - --secure=false
           service:
