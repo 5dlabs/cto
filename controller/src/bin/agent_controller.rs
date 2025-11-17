@@ -339,7 +339,11 @@ async fn webhook_handler(
     }
 
     if let Err(err) = orchestrator
-        .force_state(i32::try_from(pr_number).unwrap_or(0), &task_id, target_state.unwrap())
+        .force_state(
+            i32::try_from(pr_number).unwrap_or(0),
+            &task_id,
+            target_state.unwrap(),
+        )
         .await
     {
         error!(
