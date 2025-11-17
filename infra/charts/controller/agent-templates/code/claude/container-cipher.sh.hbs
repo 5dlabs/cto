@@ -682,7 +682,7 @@ if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
     DOCS_HTTP_URL=$(echo "$DOCS_REPO_URL" | sed "s|https://github.com/|https://x-access-token:$GITHUB_TOKEN@github.com/|")
     
     echo "📥 Docs Repository: $DOCS_REPO_URL"
-    
+
     # Step 1: Verify repository access (fail fast if inaccessible)
     echo ""
     echo "🔍 Step 1/4: Verifying repository access..."
@@ -702,16 +702,16 @@ fi
 if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
     echo ""
     echo "📥 Step 2/4: Cloning docs repository..."
-    
+
     # Clean up any existing docs clone
     rm -rf /tmp/docs-repo /tmp/docs_clone_error.log 2>/dev/null || true
-    
+
     MAX_ATTEMPTS=3
     CLONE_SUCCEEDED=false
-    
+
     for attempt in $(seq 1 $MAX_ATTEMPTS); do
         echo "   Clone attempt $attempt/$MAX_ATTEMPTS..."
-        
+
         # Attempt clone with explicit error capture
         if git clone --quiet --depth 1 "$DOCS_HTTP_URL" /tmp/docs-repo 2>/tmp/docs_clone_error.log; then
             # Verify clone actually succeeded
@@ -733,14 +733,14 @@ if [ "$DOCS_AUTH_VERIFIED" = "true" ]; then
             CLONE_ERROR=$(cat /tmp/docs_clone_error.log 2>/dev/null | head -3)
             echo "❌ Clone failed: ${CLONE_ERROR:-Unknown error}"
         fi
-        
+
         # Retry logic
         if [ $attempt -lt $MAX_ATTEMPTS ]; then
             echo "   Waiting 5 seconds before retry..."
             sleep 5
         fi
     done
-    
+
     if [ "$CLONE_SUCCEEDED" != "true" ]; then
         echo "❌ FAILED to clone after $MAX_ATTEMPTS attempts"
         echo "   Last error: $(cat /tmp/docs_clone_error.log 2>/dev/null || echo 'No error log available')"
@@ -755,7 +755,7 @@ fi
 if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
     echo ""
     echo "📂 Step 3/4: Validating documentation paths..."
-    
+
     # Simplified path determination - single clear logic path
     {{#if docs_project_directory}}
     # docs_project_directory is specified
@@ -773,7 +773,7 @@ if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
     DOCS_BASE_PATH="/tmp/docs-repo"
     echo "   Using repository root (no docs_project_directory specified)"
     {{/if}}
-    
+
     # Validate base path exists
     if [ ! -d "$DOCS_BASE_PATH" ]; then
         echo "❌ Base path does not exist: $DOCS_BASE_PATH"
@@ -785,11 +785,11 @@ if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
         # Build and validate remaining paths
         DOCS_PATH="$DOCS_BASE_PATH/.taskmaster"
         TASK_DIR="$DOCS_PATH/docs/task-{{task_id}}"
-        
+
         echo "✅ Base path exists: $DOCS_BASE_PATH"
         echo "   Taskmaster directory: $DOCS_PATH"
         echo "   Task directory: $TASK_DIR"
-        
+
         # Validate .taskmaster directory - create if missing for resilient setup
         if [ ! -d "$DOCS_PATH" ]; then
             echo "⚠️  .taskmaster directory not found at: $DOCS_PATH"
@@ -807,7 +807,7 @@ if [ "$DOCS_CLONE_SUCCESS" = "true" ]; then
             echo "✅ .taskmaster directory found"
             DOCS_PATH_VALID=true
         fi
-        
+
         # Check task directory (informational only, not blocking)
         if [ ! -d "$TASK_DIR" ]; then
             echo "⚠️  Task-specific directory not found: $TASK_DIR"
@@ -828,34 +828,34 @@ fi
 if [ "$DOCS_PATH_VALID" = "true" ]; then
     echo ""
     echo "📋 Step 4/4: Copying documentation files..."
-    
+
     # Enhanced file copy helper with better error handling
     safe_copy_file() {
         local src="$1"
         local dest="$2"
         local filename="$3"
-        
+
         # Validate source exists
         if [ ! -f "$src" ]; then
             echo "  ⊘ $filename - source not found"
             FAILED_FILES="$FAILED_FILES $filename"
             return 1
         fi
-        
+
         # Check if source is readable and has content
         if [ ! -r "$src" ]; then
             echo "  ❌ $filename - source not readable"
             FAILED_FILES="$FAILED_FILES $filename"
             return 1
         fi
-        
+
         local src_size=$(wc -c < "$src" 2>/dev/null || echo "0")
         if [ "$src_size" = "0" ]; then
             echo "  ⚠️  $filename - source is empty (0 bytes)"
             FAILED_FILES="$FAILED_FILES $filename"
             return 1
         fi
-        
+
         # Check if destination already exists with content
         if [ -f "$dest" ] && [ -s "$dest" ]; then
             local dest_size=$(wc -c < "$dest")
@@ -863,7 +863,7 @@ if [ "$DOCS_PATH_VALID" = "true" ]; then
             EXISTING_FILES="$EXISTING_FILES $filename"
             return 0
         fi
-        
+
         # Attempt copy with explicit error handling
         if cp "$src" "$dest" 2>/tmp/copy_error_${filename}.log; then
             # Verify copy succeeded and has content
@@ -893,17 +893,17 @@ if [ "$DOCS_PATH_VALID" = "true" ]; then
             return 1
         fi
     }
-    
+
     # Copy task-specific files (task.md is critical, others are optional)
     CRITICAL_FILES_COPIED=0
     if [ -d "$TASK_DIR" ]; then
         echo "  📁 Processing task-specific files from: $TASK_DIR"
-        
+
         # Critical file: task.md
         if safe_copy_file "$TASK_DIR/task.md" "$CLAUDE_WORK_DIR/task/task.md" "task.md"; then
             CRITICAL_FILES_COPIED=$((CRITICAL_FILES_COPIED + 1))
         fi
-        
+
         # Optional files
         safe_copy_file "$TASK_DIR/acceptance-criteria.md" "$CLAUDE_WORK_DIR/task/acceptance-criteria.md" "acceptance-criteria.md" || true
         safe_copy_file "$TASK_DIR/prompt.md" "$CLAUDE_WORK_DIR/task/prompt.md" "prompt.md" || true
@@ -912,10 +912,10 @@ if [ "$DOCS_PATH_VALID" = "true" ]; then
         echo "  Skipping task-specific files (task.md, acceptance-criteria.md, prompt.md)"
         FAILED_FILES="$FAILED_FILES task.md acceptance-criteria.md prompt.md"
     fi
-    
+
     # Copy architecture documentation (optional)
     safe_copy_file "$DOCS_PATH/docs/architecture.md" "$CLAUDE_WORK_DIR/task/architecture.md" "architecture.md" || true
-    
+
     # Determine overall success
     # Success if at least one critical file was copied/exists OR any files were copied/exist
     AVAILABLE_FILE_COUNT=$(ls -1 "$CLAUDE_WORK_DIR/task/" 2>/dev/null | wc -l)
@@ -999,7 +999,7 @@ else
     ls /tmp/copy_error_*.log 2>/dev/null | while read -r log; do
         echo "   ✓ $log"
     done || true
-    
+
     # Provide specific troubleshooting guidance
     echo ""
     echo "Troubleshooting Steps:"
@@ -1374,7 +1374,7 @@ fi
 - ✅ Changes documented and pushed
 
 ## Remember
-Security is not optional. Every vulnerability you fix protects users, data, and the company. 
+Security is not optional. Every vulnerability you fix protects users, data, and the company.
 Never suppress security warnings - fix the root cause. When in doubt, fail securely.
 EOF
 
@@ -1493,14 +1493,14 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ] && [ "$FAST_PATH_ALLOWED" -eq 1 ]; then
     echo ""
     echo "🔍 Checking if PR #${PR_NUMBER} already has approval..."
-    
+
     APPROVAL_COUNT=$(gh pr view "$PR_NUMBER" --json reviews --jq '[.reviews[] | select(.state == "APPROVED")] | length' 2>/dev/null || echo "0")
-    
+
     if [ "${APPROVAL_COUNT:-0}" -gt 0 ]; then
       STAGE_LABEL="${WORKFLOW_STAGE:-stage}"
       echo "✅ PR #${PR_NUMBER} already has ${APPROVAL_COUNT} approval(s)"
       echo "🚀 FAST-PATH: Skipping ${STAGE_LABEL} checks since PR is already approved"
-      
+
       gh pr comment "$PR_NUMBER" --body "✅ **Cipher Security Scan - Fast-Path**
 
 PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant ${STAGE_LABEL} checks.
@@ -1526,19 +1526,19 @@ _${STAGE_LABEL^} agent will still run full checks if approval is revoked._" 2>/d
   # =========================================================================
   AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
   mkdir -p "$AGENT_STATE_DIR"
-  
+
   PREVIOUS_CONTEXT=""
   if [ $ATTEMPT -gt 1 ]; then
     PREV_ATTEMPT=$((ATTEMPT - 1))
     PREV_STATE_FILE="$AGENT_STATE_DIR/security-iteration-${PREV_ATTEMPT}.json"
-    
+
     if [ -f "$PREV_STATE_FILE" ]; then
       echo "📚 Loading context from previous iteration $PREV_ATTEMPT"
-      
+
       if command -v jq >/dev/null 2>&1; then
         PREV_FINDINGS=$(jq -r '.findings // "No findings recorded"' "$PREV_STATE_FILE" 2>/dev/null || echo "")
         PREV_STATUS=$(jq -r '.status // "unknown"' "$PREV_STATE_FILE" 2>/dev/null || echo "unknown")
-        
+
         if [ -n "$PREV_FINDINGS" ] && [ "$PREV_FINDINGS" != "No findings recorded" ]; then
           PREVIOUS_CONTEXT="
 
@@ -1562,7 +1562,7 @@ $PREV_FINDINGS
       echo "ℹ️ No previous iteration state found (first attempt or state cleared)"
     fi
   fi
-  
+
   if [ -n "$PREVIOUS_CONTEXT" ]; then
     PROMPT_CONTENT="${PROMPT_CONTENT}${PREVIOUS_CONTEXT}"
     echo "📝 Enhanced prompt with previous iteration context"
@@ -1780,7 +1780,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
              toolchain: stable
              components: rustfmt, clippy
          # 🚀 CRITICAL: Use Swatinem/rust-cache for intelligent dependency caching
-         - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+         - uses: Swatinem/rust-cache@v2
            with:
              workspaces: . -> target
              shared-key: "rust-cache-ci"
@@ -1796,7 +1796,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
          - uses: actions-rust-lang/setup-rust-toolchain@v1
            with:
              toolchain: stable
-         - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
+         - uses: Swatinem/rust-cache@v2
            with:
              workspaces: . -> target
              shared-key: "rust-cache-ci"
@@ -1825,7 +1825,7 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
          packages: write
        steps:
          - uses: actions/checkout@v4
-         
+
          # 🚀 Build with ULTRA-FAST caching mechanisms
          - name: Build binary
            env:
@@ -1842,30 +1842,30 @@ You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
              sccache --start-server || true
              echo "📊 Initial sccache stats:"
              sccache --show-stats
-             
+
              # Build with persistent cache directory
              mkdir -p \$HOME/cache/target
              cargo build --release --bin <binary-name>
-             
+
              # Show cache hit rates
              echo "📊 Final sccache stats:"
              sccache --show-stats
-             
+
              # Copy from cache dir to workspace
              cp \$HOME/cache/target/release/<binary-name> ./<binary-name>
-         
-         - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+         - uses: docker/setup-buildx-action@v3
            with:
              driver: docker
              install: true
-         
-         - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+
+         - uses: docker/login-action@v3
            with:
              registry: ghcr.io
              username: ${{ github.actor }}
              password: ${{ secrets.GITHUB_TOKEN }}
-         
-         - uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+
+         - uses: docker/build-push-action@v5
            with:
              context: .
              file: ./Dockerfile
@@ -2133,7 +2133,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
 
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
     echo "✅ Cipher security checks passed - handing off to Tess for E2E testing"
-    
+
     # Post COMMENT (NOT APPROVE) - Tess has final approval authority
     timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED
 
@@ -2148,23 +2148,17 @@ All security checks have passed:
 
 ---
 *Security review by Cipher*" || echo "⚠️ PR comment command failed"
-    
+
     # Add security-approved label (create if missing)
     LABEL_NAME="security-approved"
-    LABEL_COLOR="0E8A16"
-    LABEL_DESC="Cipher security gate approval"
-    if [ -n "$REPO_SLUG" ]; then
-      echo "🏷️  Ensuring '$LABEL_NAME' label exists on $REPO_SLUG"
-      if ! gh label view "$LABEL_NAME" -R "$REPO_SLUG" >/dev/null 2>&1; then
-        gh label create "$LABEL_NAME" -R "$REPO_SLUG" --color "$LABEL_COLOR" --description "$LABEL_DESC" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
-      fi
-      echo "🏷️  Adding '$LABEL_NAME' label"
-      timeout 30 gh pr edit "$PR_NUMBER" -R "$REPO_SLUG" --add-label "$LABEL_NAME" || echo "⚠️ Failed to add $LABEL_NAME label"
-    else
-      echo "⚠️ Repository information missing; cannot manage '$LABEL_NAME' label"
+    echo "🏷️  Ensuring '$LABEL_NAME' label exists"
+    if ! gh label view "$LABEL_NAME" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1; then
+      gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
     fi
-    
-    update_coderun_status "ready-for-qa" "quality-passed" "$PR_URL"
+    echo "🏷️  Adding '$LABEL_NAME' label"
+    timeout 30 gh pr edit "$PR_NUMBER" --add-label "$LABEL_NAME" || echo "⚠️ Failed to add $LABEL_NAME label"
+
+    update_coderun_status "ready-for-qa" "security-passed" "$PR_URL"
   else
     echo "❌ Security issues detected - posting REQUEST CHANGES review"
     timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Security Changes
@@ -2179,11 +2173,11 @@ Rex will address these issues and resubmit for review.
 
 ---
 *Security review by Cipher*" || echo "⚠️ PR review command failed"
-    
+
     # Add needs-fixes label so evaluate-remediation can detect it
     echo "🏷️  Adding 'needs-fixes' label to trigger remediation"
     timeout 30 gh pr edit "$PR_NUMBER" --add-label "needs-fixes" || echo "⚠️ Failed to add needs-fixes label"
-    
+
     update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   fi
 else
@@ -2212,7 +2206,7 @@ fi
 }
 EOF
     echo "💾 Saved successful completion state to $STATE_FILE"
-    
+
     echo "✅ Attempt $ATTEMPT: Security checks passed"
     SUCCESS=1
     break
@@ -2229,9 +2223,9 @@ EOF
 }
 EOF
     echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
-    
+
     echo "⚠️ Attempt $ATTEMPT: Security checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
-    
+
     if [ $ATTEMPT -lt $MAX_RETRIES ]; then
       echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
       ATTEMPT=$((ATTEMPT + 1))
