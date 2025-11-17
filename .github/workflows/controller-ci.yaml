@@ -50,7 +50,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
           workspaces: controller -> target
           shared-key: "rust-cache-ci"
@@ -258,7 +258,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
           workspaces: controller -> target
           shared-key: "rust-cache-ci"
@@ -287,7 +287,7 @@ jobs:
           key: kubectl-ci-${{ runner.os }}-1.30.0
 
       - name: Create Kind cluster
-        uses: helm/kind-action@v1.8.0
+        uses: helm/kind-action@dda0770415bac9fc20092cacbc54aa298604d140 # v1.8.0
         with:
           cluster_name: platform-test
           kubectl_version: v1.30.0
@@ -377,7 +377,7 @@ jobs:
             trivy-db-${{ runner.os }}-
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -419,7 +419,7 @@ jobs:
         with:
           toolchain: stable
           components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@7939da402645ba29a2df566723491a2c856e8f8a # v2
         with:
           workspaces: controller -> target
           shared-key: "rust-cache-ci"
