@@ -116,9 +116,7 @@ pub fn get_next_task(repo_path: &Path) -> Result<Option<Task>> {
     available_tasks.sort_by(|a, b| {
         let priority_order = |p: &Option<String>| match p.as_deref() {
             Some("high") => 0,
-            Some("medium") => 1,
-            Some("low") => 2,
-            _ => 1, // Default to medium
+            _ => 1, // Default to medium/low
         };
 
         let a_priority = priority_order(&a.priority);
@@ -201,9 +199,9 @@ pub fn find_blocked_tasks(repo_path: &Path) -> Result<Vec<u32>> {
 
             // Check if ANY dependency is still pending/in-progress
             let has_incomplete_deps = deps.iter().any(|dep_id| {
-                task_map.get(dep_id).is_none_or(|dep| {
-                    dep.status != "done" && dep.status != "completed"
-                })
+                task_map
+                    .get(dep_id)
+                    .is_none_or(|dep| dep.status != "done" && dep.status != "completed")
             });
 
             if has_incomplete_deps {

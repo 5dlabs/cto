@@ -50,17 +50,16 @@ pub async fn check_github_for_pr_by_branch(
             branch_matches(task_id, &pr.head.ref_field)
                 && pr_origin_matches(pr, &owner, &repo, &expected_full_name)
         }) {
-            let pr_url = pr
-                .html_url
-                .as_ref()
-                .map(std::string::ToString::to_string)
-                .unwrap_or_else(|| format!("https://github.com/{owner}/{repo}/pull/{}", pr.number));
+            let pr_url = pr.html_url.as_ref().map_or_else(
+                || format!("https://github.com/{owner}/{repo}/pull/{}", pr.number),
+                std::string::ToString::to_string,
+            );
             info!("Found PR via GitHub API for task {}: {}", task_id, pr_url);
             return Ok(Some(pr_url));
         }
 
         if let Some(next) = next_page(&octocrab, &page).await? {
-            page = next
+            page = next;
         } else {
             info!("No PR found for task branch patterns: task-{}", task_id);
             return Ok(None);

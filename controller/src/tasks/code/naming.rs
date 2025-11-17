@@ -201,7 +201,7 @@ mod tests {
                 overwrite_memory: false,
                 env: HashMap::new(),
                 env_from_secrets: vec![],
-                enable_docker: Some(true),
+                enable_docker: true,
                 task_requirements: None,
                 service_account_name: None,
             },

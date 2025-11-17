@@ -51,7 +51,7 @@ impl<'a> CodeResourceManager<'a> {
         info!("🚀 Creating/updating code resources for: {}", name);
 
         // STEP: Auto-populate CLI config based on agent (if not already specified)
-        let code_run = self.populate_cli_config_if_needed(code_run)?;
+        let code_run = self.populate_cli_config_if_needed(code_run);
         let code_run_ref = &*code_run;
 
         // Determine PVC name based on agent classification
@@ -105,7 +105,7 @@ impl<'a> CodeResourceManager<'a> {
         info!("🔄 Using idempotent resource creation (no aggressive cleanup)");
 
         // Create ConfigMap FIRST (without owner reference) so Job can mount it
-        let cm_name = self.generate_configmap_name(code_run_ref);
+        let cm_name = Self::generate_configmap_name(code_run_ref);
         info!("📄 Generated ConfigMap name: {}", cm_name);
 
         info!("🔧 Creating ConfigMap template data...");
@@ -262,7 +262,7 @@ impl<'a> CodeResourceManager<'a> {
         serde_json::from_value(pvc_spec).expect("Failed to build PVC spec")
     }
 
-    fn generate_configmap_name(&self, code_run: &CodeRun) -> String {
+    fn generate_configmap_name(code_run: &CodeRun) -> String {
         // Generate unique ConfigMap name per CodeRun to prevent conflicts between sequential jobs
         let namespace = code_run.metadata.namespace.as_deref().unwrap_or("default");
         let name = code_run.metadata.name.as_deref().unwrap_or("unknown");
@@ -295,7 +295,7 @@ impl<'a> CodeResourceManager<'a> {
             data.insert(filename, content);
         }
 
-        let labels = self.create_task_labels(code_run);
+        let labels = Self::create_task_labels(code_run);
         let mut metadata = ObjectMeta {
             name: Some(name.to_string()),
             labels: Some(labels),
@@ -319,52 +319,49 @@ impl<'a> CodeResourceManager<'a> {
         code_run: &CodeRun,
         cm_name: &str,
     ) -> Result<Option<OwnerReference>> {
-        let job_name = self.generate_job_name(code_run);
+        let job_name = Self::generate_job_name(code_run);
 
         // Try to get existing job first (idempotent check)
-        match self.jobs.get(&job_name).await {
-            Ok(existing_job) => {
-                info!("Found existing job: {}, checking for active pods", job_name);
+        if let Ok(existing_job) = self.jobs.get(&job_name).await {
+            info!("Found existing job: {}, checking for active pods", job_name);
 
-                // Check if there are any pods for this job (regardless of controller UID)
-                // This prevents duplicate pods when controller restarts
-                let pods: Api<k8s_openapi::api::core::v1::Pod> = Api::namespaced(
-                    self.ctx.client.clone(),
-                    code_run.metadata.namespace.as_deref().unwrap_or("default"),
+            // Check if there are any pods for this job (regardless of controller UID)
+            // This prevents duplicate pods when controller restarts
+            let pods: Api<k8s_openapi::api::core::v1::Pod> = Api::namespaced(
+                self.ctx.client.clone(),
+                code_run.metadata.namespace.as_deref().unwrap_or("default"),
+            );
+
+            let pod_list = pods
+                .list(&ListParams::default().labels(&format!("job-name={job_name}")))
+                .await?;
+
+            if pod_list.items.is_empty() {
+                info!(
+                    "Job {} exists but has no pods, will let Job controller handle it",
+                    job_name
                 );
-
-                let pod_list = pods
-                    .list(&ListParams::default().labels(&format!("job-name={job_name}")))
-                    .await?;
-
-                if pod_list.items.is_empty() {
-                    info!(
-                        "Job {} exists but has no pods, will let Job controller handle it",
-                        job_name
-                    );
-                } else {
-                    info!(
-                        "Found {} existing pod(s) for job {}, using existing job",
-                        pod_list.items.len(),
-                        job_name
-                    );
-                }
-
-                // Return the existing job's owner reference
-                Ok(Some(OwnerReference {
-                    api_version: "batch/v1".to_string(),
-                    kind: "Job".to_string(),
-                    name: job_name,
-                    uid: existing_job.metadata.uid.unwrap_or_default(),
-                    controller: Some(false),
-                    block_owner_deletion: Some(true),
-                }))
+            } else {
+                info!(
+                    "Found {} existing pod(s) for job {}, using existing job",
+                    pod_list.items.len(),
+                    job_name
+                );
             }
-            Err(_) => {
-                // Job doesn't exist, create it
-                info!("Job {} doesn't exist, creating it", job_name);
-                self.create_job(code_run, cm_name).await
-            }
+
+            // Return the existing job's owner reference
+            Ok(Some(OwnerReference {
+                api_version: "batch/v1".to_string(),
+                kind: "Job".to_string(),
+                name: job_name,
+                uid: existing_job.metadata.uid.unwrap_or_default(),
+                controller: Some(false),
+                block_owner_deletion: Some(true),
+            }))
+        } else {
+            // Job doesn't exist, create it
+            info!("Job {} doesn't exist, creating it", job_name);
+            self.create_job(code_run, cm_name).await
         }
     }
 
@@ -373,7 +370,7 @@ impl<'a> CodeResourceManager<'a> {
         code_run: &CodeRun,
         cm_name: &str,
     ) -> Result<Option<OwnerReference>> {
-        let job_name = self.generate_job_name(code_run);
+        let job_name = Self::generate_job_name(code_run);
         let job = self.build_job_spec(code_run, &job_name, cm_name)?;
 
         match self.jobs.create(&PostParams::default(), &job).await {
@@ -431,13 +428,14 @@ impl<'a> CodeResourceManager<'a> {
         }
     }
 
-    fn generate_job_name(&self, code_run: &CodeRun) -> String {
+    fn generate_job_name(code_run: &CodeRun) -> String {
         // Use unified naming system to ensure consistency with controller lookups
         ResourceNaming::job_name(code_run)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn build_job_spec(&self, code_run: &CodeRun, job_name: &str, cm_name: &str) -> Result<Job> {
-        let labels = self.create_task_labels(code_run);
+        let labels = Self::create_task_labels(code_run);
 
         // Create owner reference to CodeRun for proper event handling
         let owner_ref = OwnerReference {
@@ -577,7 +575,7 @@ impl<'a> CodeResourceManager<'a> {
         let image = self.select_image_for_cli(code_run)?;
         let cli_type_str = cli_type.to_string();
         let cli_model = code_run.spec.model.clone();
-        let container_name = Self::container_name_for_cli(&cli_type, &cli_model);
+        let container_name = Self::container_name_for_cli(cli_type, &cli_model);
 
         // Resolve CLI-specific API key binding (env var + secret reference)
         let provider = self
@@ -628,7 +626,7 @@ impl<'a> CodeResourceManager<'a> {
         ];
 
         // Process task requirements if present
-        let (mut final_env_vars, env_from) = self.process_task_requirements(code_run, env_vars)?;
+        let (mut final_env_vars, env_from) = Self::process_task_requirements(code_run, env_vars)?;
 
         // Critical system variables that must not be overridden
         // Add these AFTER requirements processing to ensure they take precedence
@@ -935,8 +933,8 @@ impl<'a> CodeResourceManager<'a> {
         Ok(serde_json::from_value(job_spec)?)
     }
 
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
     fn process_task_requirements(
-        &self,
         code_run: &CodeRun,
         mut env_vars: Vec<serde_json::Value>,
     ) -> Result<(Vec<serde_json::Value>, Vec<serde_json::Value>)> {
@@ -1076,10 +1074,10 @@ impl<'a> CodeResourceManager<'a> {
         Ok((env_vars, env_from))
     }
 
-    fn create_task_labels(&self, code_run: &CodeRun) -> BTreeMap<String, String> {
+    fn create_task_labels(code_run: &CodeRun) -> BTreeMap<String, String> {
         let mut labels = BTreeMap::new();
         let cli_type = Self::code_run_cli_type(code_run);
-        let container_label = Self::container_name_for_cli(&cli_type, &code_run.spec.model);
+        let container_label = Self::container_name_for_cli(cli_type, &code_run.spec.model);
 
         // Update legacy orchestrator label to controller
         labels.insert("app".to_string(), "controller".to_string());
@@ -1090,7 +1088,7 @@ impl<'a> CodeResourceManager<'a> {
         if let Some(name) = code_run.metadata.name.as_deref() {
             labels.insert(
                 LABEL_CLEANUP_RUN.to_string(),
-                self.sanitize_label_value(name),
+                Self::sanitize_label_value(name),
             );
         }
 
@@ -1100,7 +1098,7 @@ impl<'a> CodeResourceManager<'a> {
         // Use service as project name for code tasks
         labels.insert(
             "project-name".to_string(),
-            self.sanitize_label_value(&code_run.spec.service),
+            Self::sanitize_label_value(&code_run.spec.service),
         );
 
         let github_identifier = code_run
@@ -1111,7 +1109,7 @@ impl<'a> CodeResourceManager<'a> {
             .unwrap_or("unknown");
         labels.insert(
             "github-user".to_string(),
-            self.sanitize_label_value(github_identifier),
+            Self::sanitize_label_value(github_identifier),
         );
         labels.insert(
             "context-version".to_string(),
@@ -1123,21 +1121,21 @@ impl<'a> CodeResourceManager<'a> {
         labels.insert("task-id".to_string(), code_run.spec.task_id.to_string());
         labels.insert(
             "service".to_string(),
-            self.sanitize_label_value(&code_run.spec.service),
+            Self::sanitize_label_value(&code_run.spec.service),
         );
         labels.insert(
             "cli-type".to_string(),
-            self.sanitize_label_value(&cli_type.to_string()),
+            Self::sanitize_label_value(&cli_type.to_string()),
         );
         if !code_run.spec.model.trim().is_empty() {
             labels.insert(
                 "cli-model".to_string(),
-                self.sanitize_label_value(&code_run.spec.model),
+                Self::sanitize_label_value(&code_run.spec.model),
             );
         }
         labels.insert(
             "cli-container".to_string(),
-            self.sanitize_label_value(&container_label),
+            Self::sanitize_label_value(&container_label),
         );
 
         labels
@@ -1177,8 +1175,8 @@ impl<'a> CodeResourceManager<'a> {
             .unwrap_or("unknown");
         let list_params = ListParams::default().labels(&format!(
             "app=controller,component=code-runner,github-user={},service={}",
-            self.sanitize_label_value(github_identifier),
-            self.sanitize_label_value(&code_run.spec.service)
+            Self::sanitize_label_value(github_identifier),
+            Self::sanitize_label_value(&code_run.spec.service)
         ));
 
         let jobs = self.jobs.list(&list_params).await?;
@@ -1193,9 +1191,10 @@ impl<'a> CodeResourceManager<'a> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn cleanup_old_configmaps(&self, code_run: &CodeRun) -> Result<()> {
         // Generate current ConfigMap name to avoid deleting it
-        let current_cm_name = self.generate_configmap_name(code_run);
+        let current_cm_name = Self::generate_configmap_name(code_run);
 
         let github_identifier = code_run
             .spec
@@ -1208,8 +1207,8 @@ impl<'a> CodeResourceManager<'a> {
         // This prevents accidentally matching ConfigMaps from other stages in multi-agent workflows
         let list_params = ListParams::default().labels(&format!(
             "app=controller,component=code-runner,github-user={},service={}",
-            self.sanitize_label_value(github_identifier),
-            self.sanitize_label_value(&code_run.spec.service)
+            Self::sanitize_label_value(github_identifier),
+            Self::sanitize_label_value(&code_run.spec.service)
         ));
 
         let configmaps = self.configmaps.list(&list_params).await?;
@@ -1315,8 +1314,8 @@ impl<'a> CodeResourceManager<'a> {
                     // Use same label filters as ConfigMap listing to scope the search
                     let job_list_params = ListParams::default().labels(&format!(
                         "app=controller,component=code-runner,github-user={},service={}",
-                        self.sanitize_label_value(github_identifier),
-                        self.sanitize_label_value(&code_run.spec.service)
+                        Self::sanitize_label_value(github_identifier),
+                        Self::sanitize_label_value(&code_run.spec.service)
                     ));
 
                     let all_jobs = match self.jobs.list(&job_list_params).await {
@@ -1336,16 +1335,14 @@ impl<'a> CodeResourceManager<'a> {
                             .as_ref()
                             .and_then(|spec| spec.template.spec.as_ref())
                             .and_then(|pod_spec| pod_spec.volumes.as_ref())
-                            .map(|volumes| {
+                            .is_some_and(|volumes| {
                                 volumes.iter().any(|vol| {
                                     vol.config_map
                                         .as_ref()
                                         .and_then(|cm| cm.name.as_ref())
-                                        .map(|name| name == &cm_name)
-                                        .unwrap_or(false)
+                                        .is_some_and(|name| name == &cm_name)
                                 })
                             })
-                            .unwrap_or(false)
                     });
 
                     if is_used_by_job {
@@ -1360,8 +1357,8 @@ impl<'a> CodeResourceManager<'a> {
                     // Use same label filters to scope the search
                     let pod_list_params = ListParams::default().labels(&format!(
                         "app=controller,component=code-runner,github-user={},service={}",
-                        self.sanitize_label_value(github_identifier),
-                        self.sanitize_label_value(&code_run.spec.service)
+                        Self::sanitize_label_value(github_identifier),
+                        Self::sanitize_label_value(&code_run.spec.service)
                     ));
 
                     match pods.list(&pod_list_params).await {
@@ -1370,16 +1367,14 @@ impl<'a> CodeResourceManager<'a> {
                                 pod.spec
                                     .as_ref()
                                     .and_then(|spec| spec.volumes.as_ref())
-                                    .map(|volumes| {
+                                    .is_some_and(|volumes| {
                                         volumes.iter().any(|vol| {
                                             vol.config_map
                                                 .as_ref()
                                                 .and_then(|cm| cm.name.as_ref())
-                                                .map(|name| name == &cm_name)
-                                                .unwrap_or(false)
+                                                .is_some_and(|name| name == &cm_name)
                                         })
                                     })
-                                    .unwrap_or(false)
                             });
 
                             if is_used_by_pod {
@@ -1411,7 +1406,7 @@ impl<'a> CodeResourceManager<'a> {
         Ok(())
     }
 
-    fn sanitize_label_value(&self, input: &str) -> String {
+    fn sanitize_label_value(input: &str) -> String {
         if input.is_empty() {
             return String::new();
         }
@@ -1446,7 +1441,7 @@ impl<'a> CodeResourceManager<'a> {
         sanitized
     }
 
-    fn container_name_for_cli(cli_type: &CLIType, model: &str) -> String {
+    fn container_name_for_cli(cli_type: CLIType, model: &str) -> String {
         let mut name = cli_type.to_string();
 
         if !model.trim().is_empty() {
@@ -1455,7 +1450,6 @@ impl<'a> CodeResourceManager<'a> {
                 .map(|c| match c {
                     'a'..='z' | '0'..='9' => c,
                     'A'..='Z' => c.to_ascii_lowercase(),
-                    '-' => '-',
                     _ => '-',
                 })
                 .collect();
@@ -1503,13 +1497,13 @@ impl<'a> CodeResourceManager<'a> {
 
     /// Select the appropriate Docker image based on the CLI type specified in the `CodeRun`
     /// Auto-populate CLI config based on agent GitHub app (if not already specified)
-    fn populate_cli_config_if_needed(&self, code_run: &Arc<CodeRun>) -> Result<Arc<CodeRun>> {
+    fn populate_cli_config_if_needed(&self, code_run: &Arc<CodeRun>) -> Arc<CodeRun> {
         // If we have no GitHub app context, we cannot enrich the CLI config
         let Some(github_app) = &code_run.spec.github_app else {
             if code_run.spec.cli_config.is_none() {
                 info!("No CLI config or GitHub app specified, using defaults");
             }
-            return Ok(code_run.clone());
+            return code_run.clone();
         };
 
         // Extract agent name for logging only—we still continue even if this fails
@@ -1523,7 +1517,7 @@ impl<'a> CodeResourceManager<'a> {
 
         let Some(agent_cli_config) = self.config.agent.agent_cli_configs.get(github_app) else {
             // Nothing to merge, fall back to whatever the CodeRun already provided
-            return Ok(code_run.clone());
+            return code_run.clone();
         };
 
         let mut new_code_run = (**code_run).clone();
@@ -1542,12 +1536,12 @@ impl<'a> CodeResourceManager<'a> {
             }
         }
 
-        Ok(Arc::new(new_code_run))
+        Arc::new(new_code_run)
     }
 
     fn merge_cli_config(existing: &mut CLIConfig, defaults: &CLIConfig) {
         if existing.model.trim().is_empty() {
-            existing.model = defaults.model.clone();
+            existing.model.clone_from(&defaults.model);
         }
 
         if existing.max_tokens.is_none() {
@@ -1559,7 +1553,7 @@ impl<'a> CodeResourceManager<'a> {
         }
 
         if existing.model_rotation.is_none() {
-            existing.model_rotation = defaults.model_rotation.clone();
+            existing.model_rotation.clone_from(&defaults.model_rotation);
         }
 
         for (key, value) in &defaults.settings {

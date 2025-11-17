@@ -110,8 +110,7 @@ impl LabelOrchestrator {
             })?;
 
         // Validate transition conditions
-        self.validate_transition_conditions(&transition, task_id)
-            .await?;
+        self.validate_transition_conditions(&transition, task_id)?;
 
         // Execute the transition
         self.execute_transition(pr_number, task_id, transition.clone(), context)
@@ -165,8 +164,7 @@ impl LabelOrchestrator {
             .label_schema
             .get_transition(from_state, to_state, trigger)
         {
-            self.validate_transition_conditions(transition, task_id)
-                .await?;
+            self.validate_transition_conditions(transition, task_id)?;
             Ok(true)
         } else {
             Ok(false)
@@ -187,7 +185,7 @@ impl LabelOrchestrator {
     }
 
     /// Validate all conditions for a transition
-    async fn validate_transition_conditions(
+    fn validate_transition_conditions(
         &self,
         transition: &StateTransition,
         task_id: &str,
@@ -209,7 +207,7 @@ impl LabelOrchestrator {
         task_id: &str,
     ) -> Result<bool, OrchestratorError> {
         if condition.starts_with("iteration ") {
-            let current_iteration = self.get_current_iteration(task_id)?;
+            let current_iteration = Self::get_current_iteration(task_id);
             self.evaluate_iteration_condition(condition, current_iteration)
         } else {
             warn!("Unknown condition type: {}", condition);
@@ -218,10 +216,10 @@ impl LabelOrchestrator {
     }
 
     /// Get the current iteration for a task
-    fn get_current_iteration(&self, _task_id: &str) -> Result<i32, OrchestratorError> {
+    fn get_current_iteration(_task_id: &str) -> i32 {
         // This would integrate with the state manager from Task 4
         // For now, return a placeholder
-        Ok(1)
+        1
     }
 
     /// Evaluate iteration-based conditions
@@ -273,8 +271,7 @@ impl LabelOrchestrator {
 
         // Process each action
         for action in &transition.actions {
-            self.process_action(action, task_id, &mut operations, &mut iteration_update)
-                .await?;
+            Self::process_action(action, task_id, &mut operations, &mut iteration_update);
         }
 
         // Execute label operations atomically
@@ -286,19 +283,18 @@ impl LabelOrchestrator {
         }
 
         // Log the transition
-        self.log_transition(pr_number, task_id, &transition, iteration_update, context);
+        Self::log_transition(pr_number, task_id, &transition, iteration_update, context);
 
         Ok(())
     }
 
     /// Process a single transition action
-    async fn process_action(
-        &self,
+    fn process_action(
         action: &str,
         task_id: &str,
         operations: &mut Vec<LabelOperation>,
         iteration_update: &mut Option<i32>,
-    ) -> Result<(), OrchestratorError> {
+    ) {
         match action {
             "add_needs_fixes" => {
                 operations.push(LabelOperation {
@@ -371,27 +367,24 @@ impl LabelOrchestrator {
                 });
             }
             "increment_iteration" => {
-                let new_iteration = self.increment_iteration(task_id)?;
+                let new_iteration = Self::increment_iteration(task_id);
                 *iteration_update = Some(new_iteration);
             }
             _ => {
                 warn!("Unknown transition action: {}", action);
             }
         }
-
-        Ok(())
     }
 
     /// Increment the iteration counter for a task
-    fn increment_iteration(&self, _task_id: &str) -> Result<i32, OrchestratorError> {
+    fn increment_iteration(_task_id: &str) -> i32 {
         // This would integrate with the state manager
         // For now, return a placeholder
-        Ok(1)
+        1
     }
 
     /// Log a completed transition
     fn log_transition(
-        &self,
         pr_number: i32,
         task_id: &str,
         transition: &StateTransition,

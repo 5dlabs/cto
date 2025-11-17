@@ -267,7 +267,7 @@ impl SharedAuthorValidator {
     }
 
     /// Add approved author with shared access
-    pub fn add_approved_author(&self, author: String) -> Result<()> {
+    pub fn add_approved_author(&self, author: &str) -> Result<()> {
         let mut validator = self
             .inner
             .write()
@@ -345,16 +345,12 @@ mod tests {
         let mut validator = AuthorValidator::new();
 
         // Add author
-        assert!(validator
-            .add_approved_author("test-author".to_string())
-            .is_ok());
+        assert!(validator.add_approved_author("test-author").is_ok());
         assert!(validator.allowed_authors.contains("test-author"));
         assert!(validator.validate_author("test-author").is_ok());
 
         // Try to add again (should fail)
-        assert!(validator
-            .add_approved_author("test-author".to_string())
-            .is_err());
+        assert!(validator.add_approved_author("test-author").is_err());
 
         // Remove author
         assert!(validator.remove_approved_author("test-author").is_ok());
@@ -367,7 +363,7 @@ mod tests {
         let mut validator = AuthorValidator::new();
 
         // Add team prefix
-        assert!(validator.add_team_prefix("MyTeam-".to_string()).is_ok());
+        assert!(validator.add_team_prefix("MyTeam-").is_ok());
         assert!(validator
             .allowed_team_prefixes
             .contains(&"MyTeam-".to_string()));
@@ -440,9 +436,7 @@ mod tests {
         assert!(shared_validator.validate_author("5DLabs-Tess").is_ok());
 
         // Test adding author
-        assert!(shared_validator
-            .add_approved_author("test-author".to_string())
-            .is_ok());
+        assert!(shared_validator.add_approved_author("test-author").is_ok());
 
         // Test getting authors
         let authors = shared_validator.get_approved_authors().unwrap();
@@ -457,12 +451,12 @@ mod tests {
         let mut validator = AuthorValidator::new();
 
         // Empty author should fail
-        assert!(validator.add_approved_author(String::new()).is_err());
-        assert!(validator.add_approved_author("   ".to_string()).is_err());
+        assert!(validator.add_approved_author("").is_err());
+        assert!(validator.add_approved_author("   ").is_err());
 
         // Empty prefix should fail
-        assert!(validator.add_team_prefix(String::new()).is_err());
-        assert!(validator.add_team_prefix("   ".to_string()).is_err());
+        assert!(validator.add_team_prefix("").is_err());
+        assert!(validator.add_team_prefix("   ").is_err());
     }
 
     #[test]

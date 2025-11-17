@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use thiserror::Error;
 
 /// Comprehensive error types for feedback parsing operations
@@ -150,7 +151,9 @@ impl ParseError {
     pub fn category(&self) -> &'static str {
         match self {
             ParseError::NotActionableFeedback => "not_actionable",
-            ParseError::UnauthorizedAuthor { .. } => "authorization",
+            ParseError::UnauthorizedAuthor { .. } | ParseError::AuthorValidationError { .. } => {
+                "authorization"
+            }
             ParseError::MissingRequiredField { .. } | ParseError::NoCriteriaFound => "missing_data",
             ParseError::InvalidFieldValue { .. } => "invalid_data",
             ParseError::MalformedComment { .. } => "malformed_input",
@@ -160,8 +163,9 @@ impl ParseError {
             | ParseError::DescriptionError { .. }
             | ParseError::ReproductionStepsError { .. }
             | ParseError::ExpectedActualError { .. } => "extraction_failure",
-            ParseError::MarkdownParseError { .. } | ParseError::RegexError { .. } => "parsing_failure",
-            ParseError::AuthorValidationError { .. } => "authorization",
+            ParseError::MarkdownParseError { .. } | ParseError::RegexError { .. } => {
+                "parsing_failure"
+            }
             ParseError::CacheError { .. } | ParseError::SerializationError { .. } => "system_error",
             ParseError::Generic { .. } => "generic_error",
             ParseError::ExternalServiceError { .. } => "external_error",
@@ -275,13 +279,13 @@ impl ParseError {
             }
             ParseError::ExpectedActualError { .. } => "Add ### Expected vs Actual section",
             ParseError::MarkdownParseError { .. } => "Fix markdown syntax and formatting",
-            ParseError::RegexError { .. } => "Report to system administrator",
+            ParseError::RegexError { .. }
+            | ParseError::SerializationError { .. }
+            | ParseError::ConfigurationError { .. } => "Report to system administrator",
             ParseError::AuthorValidationError { .. } => "Check author permissions and try again",
             ParseError::CacheError { .. } => "Try again in a few moments",
-            ParseError::SerializationError { .. } => "Report to system administrator",
             ParseError::Generic { .. } => "Check comment format and try again",
             ParseError::ExternalServiceError { .. } => "Try again later or contact administrator",
-            ParseError::ConfigurationError { .. } => "Report to system administrator",
             ParseError::TimeoutError { .. } => "Try again with smaller input",
             ParseError::ResourceExhausted { .. } => "Try again later with smaller input",
         }
@@ -335,11 +339,11 @@ impl ErrorContext {
         let mut message = self.error.user_message();
 
         if let Some(pr_number) = self.pr_number {
-            message.push_str(&format!(" (PR #{pr_number})"));
+            let _ = write!(message, " (PR #{pr_number})");
         }
 
         if let Some(author) = self.author.as_ref() {
-            message.push_str(&format!(" (Author: {author})"));
+            let _ = write!(message, " (Author: {author})");
         }
 
         message

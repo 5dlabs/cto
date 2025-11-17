@@ -1,50 +1,53 @@
 use crate::remediation::types::{IssueType, Severity};
 use anyhow::{Context, Result};
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 
 /// Pattern extractor for parsing structured feedback from QA comments
 pub struct PatternExtractor;
 
-lazy_static! {
-    /// Pattern for extracting Issue Type: **Issue Type**: [value]
-    static ref ISSUE_TYPE_PATTERN: Regex =
-        Regex::new(r"(?m)^\s*\*\*Issue Type\*\*:\s*\[(.*?)\]").unwrap();
+/// Pattern for extracting Issue Type: **Issue Type**: [value]
+static ISSUE_TYPE_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?m)^\s*\*\*Issue Type\*\*:\s*\[(.*?)\]").unwrap());
 
-    /// Pattern for extracting Severity: **Severity**: [value]
-    static ref SEVERITY_PATTERN: Regex =
-        Regex::new(r"(?m)^\s*\*\*Severity\*\*:\s*\[(.*?)\]").unwrap();
+/// Pattern for extracting Severity: **Severity**: [value]
+static SEVERITY_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?m)^\s*\*\*Severity\*\*:\s*\[(.*?)\]").unwrap());
 
-    /// Pattern for extracting Description section
-    static ref DESCRIPTION_PATTERN: Regex =
-        Regex::new(r"(?ms)### Description\s*\n(.*?)(?:\n### |\n\*\*|$)")
-            .context("Failed to compile description pattern")
-            .unwrap();
+/// Pattern for extracting Description section
+static DESCRIPTION_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?ms)### Description\s*\n(.*?)(?:\n### |\n\*\*|$)")
+        .context("Failed to compile description pattern")
+        .unwrap()
+});
 
-    /// Pattern for extracting Steps to Reproduce section
-    static ref STEPS_PATTERN: Regex =
-        Regex::new(r"(?ms)### Steps to Reproduce.*?\n(.*(?:\n###|\n\*\*|$))")
-            .context("Failed to compile steps pattern")
-            .unwrap();
+/// Pattern for extracting Steps to Reproduce section
+static STEPS_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?ms)### Steps to Reproduce.*?\n(.*(?:\n###|\n\*\*|$))")
+        .context("Failed to compile steps pattern")
+        .unwrap()
+});
 
-    /// Pattern for extracting Expected behavior: **Expected**: value
-    static ref EXPECTED_PATTERN: Regex =
-        Regex::new(r"(?m)^\s*-?\s*\*\*Expected\*\*:\s*(.+)$")
-            .context("Failed to compile expected pattern")
-            .unwrap();
+/// Pattern for extracting Expected behavior: **Expected**: value
+static EXPECTED_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?m)^\s*-?\s*\*\*Expected\*\*:\s*(.+)$")
+        .context("Failed to compile expected pattern")
+        .unwrap()
+});
 
-    /// Pattern for extracting Actual behavior: **Actual**: value
-    static ref ACTUAL_PATTERN: Regex =
-        Regex::new(r"(?m)^\s*-?\s*\*\*Actual\*\*:\s*(.+)$")
-            .context("Failed to compile actual pattern")
-            .unwrap();
+/// Pattern for extracting Actual behavior: **Actual**: value
+static ACTUAL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?m)^\s*-?\s*\*\*Actual\*\*:\s*(.+)$")
+        .context("Failed to compile actual pattern")
+        .unwrap()
+});
 
-    /// Pattern for extracting Expected vs Actual section
-    static ref EXPECTED_ACTUAL_SECTION_PATTERN: Regex =
-        Regex::new(r"(?ms)### Expected vs Actual.*?\n(.*?)(?:\n### |\n\*\*|$)")
-            .context("Failed to compile expected actual section pattern")
-            .unwrap();
-}
+/// Pattern for extracting Expected vs Actual section
+static EXPECTED_ACTUAL_SECTION_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?ms)### Expected vs Actual.*?\n(.*?)(?:\n### |\n\*\*|$)")
+        .context("Failed to compile expected actual section pattern")
+        .unwrap()
+});
 
 impl PatternExtractor {
     /// Extract Issue Type from comment body

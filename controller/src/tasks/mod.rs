@@ -247,6 +247,7 @@ async fn run_code_controller(
 
 /// Error policy for DocsRun controller - limit to single retry
 #[instrument(skip(_ctx), fields(docs_run_name = %_docs_run.name_any(), namespace = %_ctx.namespace))]
+#[allow(clippy::used_underscore_binding)]
 fn error_policy_docs(_docs_run: Arc<DocsRun>, err: &Error, _ctx: Arc<Context>) -> Action {
     error!(
         error = ?err,
@@ -259,6 +260,7 @@ fn error_policy_docs(_docs_run: Arc<DocsRun>, err: &Error, _ctx: Arc<Context>) -
 
 /// Error policy for CodeRun controller - limit to single retry
 #[instrument(skip(_ctx), fields(code_run_name = %_code_run.name_any(), namespace = %_ctx.namespace))]
+#[allow(clippy::used_underscore_binding)]
 fn error_policy_code(_code_run: Arc<CodeRun>, err: &Error, _ctx: Arc<Context>) -> Action {
     error!(
         error = ?err,

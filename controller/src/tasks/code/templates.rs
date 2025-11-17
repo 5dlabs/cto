@@ -118,7 +118,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -183,7 +183,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -252,7 +252,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -526,7 +526,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -801,6 +801,7 @@ impl CodeTemplateGenerator {
             })
     }
 
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
     fn generate_claude_memory(
         code_run: &CodeRun,
         cli_config: &Value,
@@ -1009,8 +1010,7 @@ impl CodeTemplateGenerator {
             .spec
             .cli_config
             .as_ref()
-            .map(|cfg| cfg.model.clone())
-            .unwrap_or_else(|| code_run.spec.model.clone());
+            .map_or_else(|| code_run.spec.model.clone(), |cfg| cfg.model.clone());
 
         let context = json!({
             "task_id": code_run.spec.task_id,
@@ -1149,6 +1149,7 @@ impl CodeTemplateGenerator {
         enriched
     }
 
+    #[allow(clippy::too_many_lines)]
     fn build_cli_render_settings(code_run: &CodeRun, cli_config: &Value) -> CliRenderSettings {
         let settings = cli_config
             .get("settings")
@@ -1169,7 +1170,7 @@ impl CodeTemplateGenerator {
                     .get("modelMaxOutputTokens")
                     .and_then(Value::as_u64)
             })
-            .map(|v| v as u32);
+            .and_then(|v| u32::try_from(v).ok());
 
         let temperature = cli_config
             .get("temperature")
@@ -1468,7 +1469,7 @@ impl CodeTemplateGenerator {
             Self::generate_github_guidelines(code_run)?,
         );
 
-        for (filename, content) in Self::generate_hook_scripts(code_run)? {
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
             templates.insert(format!("hooks-{filename}"), content);
         }
 
@@ -1481,6 +1482,7 @@ impl CodeTemplateGenerator {
         Ok(templates)
     }
 
+    #[allow(clippy::too_many_lines, clippy::items_after_statements)]
     fn generate_client_config(code_run: &CodeRun, config: &ControllerConfig) -> Result<String> {
         use serde_json::to_string_pretty;
 
@@ -2145,7 +2147,7 @@ impl CodeTemplateGenerator {
             })
     }
 
-    fn generate_hook_scripts(code_run: &CodeRun) -> Result<BTreeMap<String, String>> {
+    fn generate_hook_scripts(code_run: &CodeRun) -> BTreeMap<String, String> {
         let mut hook_scripts = BTreeMap::new();
         let cli_key = code_run.spec.cli_config.as_ref().map_or_else(
             || CLIType::Claude.to_string(),
@@ -2248,7 +2250,7 @@ impl CodeTemplateGenerator {
             }
         }
 
-        Ok(hook_scripts)
+        hook_scripts
     }
 
     /// Get working directory (defaults to service name if not specified)
@@ -2334,8 +2336,6 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/codex/container.sh.hbs",
-            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
         };
 
@@ -2382,7 +2382,6 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/opencode/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
         };
@@ -2432,7 +2431,6 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/cursor/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
         };
@@ -2480,7 +2478,6 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "code/factory/container.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };
@@ -2538,16 +2535,16 @@ impl CodeTemplateGenerator {
     fn get_agent_tools(
         agent_name: &str,
         config: &ControllerConfig,
-    ) -> Result<crate::tasks::config::AgentTools> {
+    ) -> crate::tasks::config::AgentTools {
         use crate::tasks::config::AgentTools;
 
         // Try to get agent tools from controller config
         if let Some(agent_config) = config.agents.get(agent_name) {
             if let Some(tools) = &agent_config.tools {
-                return Ok(AgentTools {
+                return AgentTools {
                     remote: tools.remote.clone(),
                     local_servers: tools.local_servers.clone(),
-                });
+                };
             }
         }
 
@@ -2556,10 +2553,10 @@ impl CodeTemplateGenerator {
             "No agent-specific tools found for '{}', using defaults",
             agent_name
         );
-        Ok(AgentTools {
+        AgentTools {
             remote: vec![],
             local_servers: None,
-        })
+        }
     }
 
     /// Load a template file from the mounted `ConfigMap`

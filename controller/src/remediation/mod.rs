@@ -47,7 +47,7 @@
 //! ```rust,ignore
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut validator = controller::remediation::AuthorValidator::new();
-//! validator.add_approved_author("custom-reviewer".to_string())
+//! validator.add_approved_author("custom-reviewer")
 //!     .expect("Failed to add author");
 //!
 //! let parser = controller::remediation::FeedbackParser::with_validator(validator);
@@ -208,7 +208,7 @@ Test feedback for parsing functionality.
     fn test_parser_with_custom_validator() {
         let mut validator = AuthorValidator::new();
         validator
-            .add_approved_author("custom-user".to_string())
+            .add_approved_author("custom-user")
             .expect("Failed to add author");
 
         let parser = parser_with_validator(validator);
@@ -221,8 +221,11 @@ Test feedback for parsing functionality.
     #[test]
     fn test_module_exports() {
         // Test that all expected types are exported
-        let _issue_type: IssueType = IssueType::Bug;
-        let _severity: Severity = Severity::High;
+        #[allow(clippy::no_effect_underscore_binding)]
+        {
+            let _issue_type: IssueType = IssueType::Bug;
+            let _severity: Severity = Severity::High;
+        }
         let _parser = FeedbackParser::new();
         let _validator = AuthorValidator::new();
     }

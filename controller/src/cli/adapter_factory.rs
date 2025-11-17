@@ -175,22 +175,22 @@ impl AdapterFactory {
 
     /// Register built-in adapters that are always available
     async fn register_default_adapters(&self) -> AdapterResult<()> {
-        let claude_adapter = Arc::new(ClaudeAdapter::new().await?);
+        let claude_adapter = Arc::new(ClaudeAdapter::new()?);
         self.register_adapter(CLIType::Claude, claude_adapter)
             .await?;
 
-        let codex_adapter = Arc::new(CodexAdapter::new().await?);
+        let codex_adapter = Arc::new(CodexAdapter::new()?);
         self.register_adapter(CLIType::Codex, codex_adapter).await?;
 
-        let cursor_adapter = Arc::new(CursorAdapter::new().await?);
+        let cursor_adapter = Arc::new(CursorAdapter::new()?);
         self.register_adapter(CLIType::Cursor, cursor_adapter)
             .await?;
 
-        let factory_adapter = Arc::new(FactoryAdapter::new().await?);
+        let factory_adapter = Arc::new(FactoryAdapter::new()?);
         self.register_adapter(CLIType::Factory, factory_adapter)
             .await?;
 
-        let opencode_adapter = Arc::new(OpenCodeAdapter::new().await?);
+        let opencode_adapter = Arc::new(OpenCodeAdapter::new()?);
         self.register_adapter(CLIType::OpenCode, opencode_adapter)
             .await?;
 
@@ -409,7 +409,7 @@ impl AdapterFactory {
                                     check_duration: start_time.elapsed(),
                                     error: None,
                                 };
-                                monitor.record_health_check(cli_type, record);
+                                monitor.record_health_check(cli_type, &record);
                             }
                             Err(e) => {
                                 let record = HealthCheckRecord {
@@ -418,7 +418,7 @@ impl AdapterFactory {
                                     check_duration: start_time.elapsed(),
                                     error: Some(e.to_string()),
                                 };
-                                monitor.record_health_check(cli_type, record);
+                                monitor.record_health_check(cli_type, &record);
                             }
                         }
                     });
@@ -459,7 +459,7 @@ impl HealthMonitor {
     }
 
     /// Record a health check result
-    pub fn record_health_check(&self, cli_type: CLIType, record: HealthCheckRecord) {
+    pub fn record_health_check(&self, cli_type: CLIType, record: &HealthCheckRecord) {
         if let Some(mut history) = self.health_history.get_mut(&cli_type) {
             // Add new record
             history.push(record.clone());
@@ -480,6 +480,7 @@ impl HealthMonitor {
     }
 
     /// Get health history for a CLI type
+    #[must_use]
     pub fn get_health_history(&self, cli_type: CLIType) -> Vec<HealthCheckRecord> {
         self.health_history
             .get(&cli_type)
@@ -488,6 +489,7 @@ impl HealthMonitor {
     }
 
     /// Check if an adapter is consistently unhealthy
+    #[must_use]
     pub fn is_consistently_unhealthy(&self, cli_type: CLIType) -> bool {
         if let Some(history) = self.health_history.get(&cli_type) {
             if history.len() < self.config.failure_threshold {
@@ -542,7 +544,7 @@ mod tests {
             Ok(crate::cli::adapter::ParsedResponse {
                 content: response.to_string(),
                 tool_calls: vec![],
-                metadata: ResponseMetadata::default(),
+                metadata: crate::cli::adapter::ResponseMetadata::default(),
                 finish_reason: crate::cli::adapter::FinishReason::Stop,
                 streaming_delta: None,
             })
@@ -731,7 +733,7 @@ mod tests {
             error: None,
         };
 
-        monitor.record_health_check(CLIType::Claude, record);
+        monitor.record_health_check(CLIType::Claude, &record);
 
         let history = monitor.get_health_history(CLIType::Claude);
         assert_eq!(history.len(), 1);

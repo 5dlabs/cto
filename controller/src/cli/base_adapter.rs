@@ -90,6 +90,7 @@ impl AdapterConfig {
         self
     }
 
+    #[must_use]
     pub fn with_template_root<P: Into<PathBuf>>(mut self, template_root: P) -> Self {
         self.template_root = template_root.into();
         self
@@ -177,7 +178,7 @@ impl BaseAdapter {
         // Record operation duration
         self.metrics
             .operation_duration
-            .record(duration.as_millis() as f64, &labels);
+            .record(duration.as_secs_f64() * 1_000.0, &labels);
 
         // Record failures
         if !success {
@@ -368,14 +369,12 @@ impl BaseAdapter {
 
         // Helper for conditional CLI features
         handlebars_helper!(if_cli_supports: |cli_type: str, feature: str, then_val: Value, else_val: Value| {
-            let supports = match (cli_type, feature) {
-                ("claude", "streaming") => true,
-                ("claude", "multimodal") => false,
-                ("codex", "streaming") => false,
-                ("codex", "toml_config") => true,
-                ("gemini", "multimodal") => true,
-                _ => false,
-            };
+            let supports = matches!(
+                (cli_type, feature),
+                ("claude", "streaming")
+                    | ("codex", "toml_config")
+                    | ("gemini", "multimodal")
+            );
 
             if supports { then_val } else { else_val }
         });
@@ -616,7 +615,7 @@ impl AdapterMetrics {
 
         self.operations_total.add(1, &labels);
         self.operation_duration
-            .record(duration.as_millis() as f64, &labels);
+            .record(duration.as_secs_f64() * 1_000.0, &labels);
 
         if !success {
             self.operation_failures.add(1, &labels);
@@ -632,7 +631,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_adapter_creation() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         assert_eq!(adapter.cli_type, CLIType::Claude);
         assert!(!adapter.config.correlation_id.is_empty());
@@ -652,7 +651,7 @@ mod tests {
     #[tokio::test]
     async fn test_template_rendering() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         let template = "Hello {{name}}, CLI: {{cli_type}}";
         let context = json!({"name": "World"});
@@ -665,7 +664,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_validation() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         // Valid config
         let valid_config = AgentConfig {
@@ -697,7 +696,7 @@ mod tests {
     #[tokio::test]
     async fn test_health_check() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         let container = ContainerContext {
             pod: None,
@@ -734,7 +733,7 @@ mod tests {
         let config =
             AdapterConfig::new(CLIType::Gemini).with_correlation_id("test-456".to_string());
 
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
         let summary = adapter.get_config_summary();
 
         assert_eq!(summary["cli_type"], json!("gemini"));
@@ -745,7 +744,7 @@ mod tests {
     #[tokio::test]
     async fn test_base_initialization_validation() {
         let config = AdapterConfig::new(CLIType::Claude);
-        let adapter = BaseAdapter::new(config).await.unwrap();
+        let adapter = BaseAdapter::new(config).unwrap();
 
         // Valid container context
         let valid_container = ContainerContext {

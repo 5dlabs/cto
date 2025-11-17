@@ -66,7 +66,7 @@ impl DocsTemplateGenerator {
         );
 
         // Generate hook scripts
-        let hook_scripts = Self::generate_hook_scripts(docs_run)?;
+        let hook_scripts = Self::generate_hook_scripts(docs_run);
         for (filename, content) in hook_scripts {
             // Use hooks- prefix to comply with ConfigMap key constraints
             templates.insert(format!("hooks-{filename}"), content);
@@ -214,6 +214,7 @@ impl DocsTemplateGenerator {
     ///
     /// # Errors
     /// Returns error if config generation fails
+    #[allow(clippy::too_many_lines)]
     fn generate_client_config(docs_run: &DocsRun, config: &ControllerConfig) -> Result<String> {
         let github_app = docs_run.spec.github_app.as_deref().unwrap_or("");
         debug!(
@@ -420,7 +421,7 @@ impl DocsTemplateGenerator {
 
     /// # Errors
     /// Returns error if hook script generation fails
-    fn generate_hook_scripts(docs_run: &DocsRun) -> Result<BTreeMap<String, String>> {
+    fn generate_hook_scripts(docs_run: &DocsRun) -> BTreeMap<String, String> {
         let mut hook_scripts = BTreeMap::new();
         let hooks_prefixes = vec![
             "docs_claude_hooks_".to_string(),
@@ -515,7 +516,7 @@ impl DocsTemplateGenerator {
             }
         }
 
-        Ok(hook_scripts)
+        hook_scripts
     }
 
     /// Load a template file from the mounted `ConfigMap`

@@ -196,11 +196,19 @@ fn load_controller_config() -> ControllerConfig {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn webhook_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<Value>, StatusCode> {
+    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
+    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
+    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
+    const LABEL_NEEDS_TESS: &str = "needs-tess";
+    const LABEL_APPROVED: &str = "approved";
+    const LABEL_FAILED: &str = "failed-remediation";
+
     let event = headers
         .get("X-GitHub-Event")
         .and_then(|value| value.to_str().ok())
@@ -249,13 +257,6 @@ async fn webhook_handler(
         .and_then(|name| name.as_str())
         .ok_or(StatusCode::BAD_REQUEST)?;
 
-    const LABEL_NEEDS_FIXES: &str = "needs-fixes";
-    const LABEL_FIXING_IN_PROGRESS: &str = "fixing-in-progress";
-    const LABEL_NEEDS_CLEO: &str = "needs-cleo";
-    const LABEL_NEEDS_TESS: &str = "needs-tess";
-    const LABEL_APPROVED: &str = "approved";
-    const LABEL_FAILED: &str = "failed-remediation";
-
     let target_state = match label_name {
         LABEL_NEEDS_FIXES => Some(WorkflowState::NeedsFixes),
         LABEL_FIXING_IN_PROGRESS => Some(WorkflowState::FixingInProgress),
@@ -289,9 +290,7 @@ async fn webhook_handler(
 
     let task_id = task_label.to_string();
 
-    let token = if let Ok(value) = std::env::var("GITHUB_TOKEN") {
-        value
-    } else {
+    let Ok(token) = std::env::var("GITHUB_TOKEN") else {
         warn!(
             "GITHUB_TOKEN not set; skipping orchestrator update for label '{}'",
             label_name
@@ -315,13 +314,13 @@ async fn webhook_handler(
 
     match state
         .remediation_state_manager
-        .load_state(pr_number as u32, &task_id)
+        .load_state(u32::try_from(pr_number).unwrap_or(0), &task_id)
         .await
     {
         Ok(None) => {
             if let Err(err) = state
                 .remediation_state_manager
-                .initialize_state(pr_number as u32, task_id.clone(), None)
+                .initialize_state(u32::try_from(pr_number).unwrap_or(0), task_id.clone(), None)
                 .await
             {
                 warn!(
@@ -340,7 +339,7 @@ async fn webhook_handler(
     }
 
     if let Err(err) = orchestrator
-        .force_state(pr_number as i32, &task_id, target_state.unwrap())
+        .force_state(i32::try_from(pr_number).unwrap_or(0), &task_id, target_state.unwrap())
         .await
     {
         error!(

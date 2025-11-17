@@ -71,6 +71,7 @@ pub async fn reconcile_docs_run(docs_run: Arc<DocsRun>, ctx: Arc<Context>) -> Re
 }
 
 #[instrument(skip(ctx), fields(docs_run_name = %docs_run.name_any(), namespace = %ctx.namespace))]
+#[allow(clippy::too_many_lines)]
 async fn reconcile_docs_create_or_update(docs_run: Arc<DocsRun>, ctx: &Context) -> Result<Action> {
     let docs_run_name = docs_run.name_any();
     info!(
@@ -480,9 +481,8 @@ async fn try_docs_cleanup_after_ttl(
         return Ok(None);
     }
 
-    let status = match &docs_run.status {
-        Some(status) => status,
-        None => return Ok(None),
+    let Some(status) = &docs_run.status else {
+        return Ok(None);
     };
 
     if status.cleanup_completed_at.is_some() {
@@ -585,5 +585,6 @@ fn compute_docs_cleanup_deadline(
         return None;
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }

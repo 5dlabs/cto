@@ -46,14 +46,14 @@ pub struct FactoryAdapter {
 
 impl FactoryAdapter {
     /// Create a new Factory adapter using default configuration.
-    pub async fn new() -> AdapterResult<Self> {
-        Self::with_config(AdapterConfig::new(CLIType::Factory)).await
+    pub fn new() -> AdapterResult<Self> {
+        Self::with_config(AdapterConfig::new(CLIType::Factory))
     }
 
     /// Create a new Factory adapter with a custom base configuration.
-    pub async fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
+    pub fn with_config(config: AdapterConfig) -> AdapterResult<Self> {
         info!("Initializing Factory adapter");
-        let base = Arc::new(BaseAdapter::new(config).await?);
+        let base = Arc::new(BaseAdapter::new(config)?);
         Ok(Self { base })
     }
 }
@@ -76,12 +76,11 @@ impl CliAdapter for FactoryAdapter {
         let model = first_string(&cli_config, &["model"])
             .or_else(|| first_string(&settings, &["model"]))
             .filter(|value| !value.trim().is_empty())
-            .map(std::string::ToString::to_string)
-            .unwrap_or_else(|| agent_config.model.clone());
+            .map_or_else(|| agent_config.model.clone(), str::to_string);
 
         let max_output_tokens = first_u64(&cli_config, &["maxTokens", "modelMaxOutputTokens"])
             .or_else(|| first_u64(&settings, &["maxOutputTokens", "modelMaxOutputTokens"]))
-            .map(|value| value as u32)
+            .and_then(|value| u32::try_from(value).ok())
             .or(agent_config.max_tokens);
 
         let temperature = first_f64(&cli_config, &["temperature"])
@@ -188,6 +187,7 @@ impl CliAdapter for FactoryAdapter {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn parse_response(&self, response: &str) -> Result<ParsedResponse> {
         let mut aggregated_messages: Vec<String> = Vec::new();
         let mut plain_segments: Vec<String> = Vec::new();
@@ -274,14 +274,14 @@ impl CliAdapter for FactoryAdapter {
                                     .or_else(|| usage.get("inputTokens"))
                                     .and_then(Value::as_u64)
                                 {
-                                    metadata.input_tokens = Some(input as u32);
+                                    metadata.input_tokens = u32::try_from(input).ok();
                                 }
                                 if let Some(output) = usage
                                     .get("output_tokens")
                                     .or_else(|| usage.get("outputTokens"))
                                     .and_then(Value::as_u64)
                                 {
-                                    metadata.output_tokens = Some(output as u32);
+                                    metadata.output_tokens = u32::try_from(output).ok();
                                 }
                             }
 
@@ -478,7 +478,7 @@ mod tests {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
         std::env::set_var("TOOLMAN_SERVER_URL", "http://localhost:3000/mcp");
 
-        let adapter = FactoryAdapter::new().await.unwrap();
+        let adapter = FactoryAdapter::new().unwrap();
         let config = adapter
             .generate_config(&sample_agent_config())
             .await
@@ -525,7 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_response_extracts_metadata() {
-        let adapter = FactoryAdapter::new().await.unwrap();
+        let adapter = FactoryAdapter::new().unwrap();
         let response = r#"{"type":"message","role":"assistant","text":"Running tasks"}
 {"type":"tool_call","toolName":"Execute","parameters":{"command":"ls"}}
 {"type":"result","is_error":false,"result":"Task completed","model":"gpt-5-factory","duration_ms":987,"usage":{"input_tokens":128,"output_tokens":256}}"#;
@@ -546,7 +546,7 @@ mod tests {
     #[tokio::test]
     async fn test_health_check_reports_details() {
         std::env::set_var("CLI_TEMPLATES_ROOT", templates_root());
-        let adapter = FactoryAdapter::new().await.unwrap();
+        let adapter = FactoryAdapter::new().unwrap();
         let health = adapter.health_check().await.unwrap();
 
         assert!(health.details.contains_key("config_generation"));

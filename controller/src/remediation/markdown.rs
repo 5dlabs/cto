@@ -73,11 +73,7 @@ impl MarkdownParser {
                     continue;
                 }
 
-                let completed = match checkbox_state {
-                    "x" | "X" => true,
-                    " " | "" => false,
-                    _ => false, // Treat unknown states as uncompleted
-                };
+                let completed = matches!(checkbox_state, "x" | "X");
 
                 criteria.push(CriteriaStatus {
                     description,

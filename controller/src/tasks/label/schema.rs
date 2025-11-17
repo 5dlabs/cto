@@ -132,6 +132,7 @@ pub struct OverrideBehavior {
 }
 
 impl Default for LabelSchema {
+    #[allow(clippy::too_many_lines)]
     fn default() -> Self {
         let mut type_schemas = HashMap::new();
 

@@ -16,7 +16,7 @@ use crate::tasks::types::{Context, Result};
 use anyhow;
 use chrono::{DateTime, Utc};
 use k8s_openapi::api::core::v1::ConfigMap;
-use kube::api::{Api, DeleteParams, Patch, PatchParams};
+use kube::api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -286,7 +286,7 @@ impl RemediationStateManager {
         };
 
         // Try to create first, then patch if it exists
-        match self.configmaps.create(&Default::default(), &cm).await {
+        match self.configmaps.create(&PostParams::default(), &cm).await {
             Ok(_) => {
                 debug!("Created new ConfigMap {}", cm_name);
             }
@@ -525,7 +525,7 @@ impl RemediationStateManager {
         let mut cleaned_count = 0;
 
         // List all remediation state ConfigMaps
-        let configmaps = self.configmaps.list(&Default::default()).await?;
+        let configmaps = self.configmaps.list(&ListParams::default()).await?;
 
         for cm in configmaps.items {
             if let Some(labels) = &cm.metadata.labels {
@@ -565,7 +565,7 @@ impl RemediationStateManager {
 
     /// Get statistics about current remediation workflows
     pub async fn get_statistics(&self) -> Result<RemediationStatistics> {
-        let configmaps = self.configmaps.list(&Default::default()).await?;
+        let configmaps = self.configmaps.list(&ListParams::default()).await?;
         let mut stats = RemediationStatistics::default();
 
         for cm in configmaps.items {
@@ -614,6 +614,7 @@ pub struct RemediationStatistics {
 
 impl RemediationStatistics {
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn average_iterations(&self) -> f64 {
         if self.total_workflows == 0 {
             0.0
@@ -623,6 +624,7 @@ impl RemediationStatistics {
     }
 
     #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn success_rate(&self) -> f64 {
         let total_completed = self.completed + self.failed + self.terminated;
         if total_completed == 0 {

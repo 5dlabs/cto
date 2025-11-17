@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::fmt;
 
 /// Main structured feedback container representing parsed QA feedback
@@ -67,19 +68,18 @@ impl PartialOrd for Severity {
 }
 
 impl Ord for Severity {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Custom ordering: Critical > High > Medium > Low
-        match (self, other) {
-            (Severity::Critical, Severity::Critical) => std::cmp::Ordering::Equal,
-            (Severity::Critical, _) => std::cmp::Ordering::Greater,
-            (_, Severity::Critical) => std::cmp::Ordering::Less,
-            (Severity::High, Severity::High) => std::cmp::Ordering::Equal,
-            (Severity::High, _) => std::cmp::Ordering::Greater,
-            (_, Severity::High) => std::cmp::Ordering::Less,
-            (Severity::Medium, Severity::Medium) => std::cmp::Ordering::Equal,
-            (Severity::Medium, _) => std::cmp::Ordering::Greater,
-            (_, Severity::Medium) => std::cmp::Ordering::Less,
-            (Severity::Low, Severity::Low) => std::cmp::Ordering::Equal,
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.rank().cmp(&other.rank())
+    }
+}
+
+impl Severity {
+    const fn rank(&self) -> u8 {
+        match self {
+            Severity::Critical => 3,
+            Severity::High => 2,
+            Severity::Medium => 1,
+            Severity::Low => 0,
         }
     }
 }

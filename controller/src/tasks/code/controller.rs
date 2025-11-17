@@ -76,6 +76,7 @@ pub async fn reconcile_code_run(code_run: Arc<CodeRun>, ctx: Arc<Context>) -> Re
 }
 
 #[instrument(skip(ctx), fields(code_run_name = %code_run.name_any(), namespace = %ctx.namespace))]
+#[allow(clippy::too_many_lines)]
 async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) -> Result<Action> {
     let code_run_name = code_run.name_any();
     debug!(
@@ -89,17 +90,17 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
         if status.work_completed == Some(true) {
             // Double-check with GitHub to ensure status hasn't changed
             if let Some(pr_url) = &status.pull_request_url {
-                if let Ok(is_still_complete) = verify_github_completion_status(pr_url) {
-                    if is_still_complete {
-                        debug!("Work already completed (verified with GitHub), no further action needed");
-                        return Ok(Action::await_change());
-                    }
-                    warn!("Local work_completed=true but GitHub shows incomplete - clearing stale status");
-                    clear_work_completed_status(&code_run, ctx).await?;
-                    // Continue with reconciliation
-                } else {
-                    warn!("Could not verify GitHub status, proceeding with caution");
+                if verify_github_completion_status(pr_url) {
+                    debug!(
+                        "Work already completed (verified with GitHub), no further action needed"
+                    );
+                    return Ok(Action::await_change());
                 }
+                warn!(
+                    "Local work_completed=true but GitHub shows incomplete - clearing stale status"
+                );
+                clear_work_completed_status(&code_run, ctx).await?;
+                // Continue with reconciliation
             } else {
                 debug!("Work already completed (work_completed=true), no further action needed");
                 return Ok(Action::await_change());
@@ -951,6 +952,7 @@ async fn handle_workflow_resumption_on_failure(code_run: &CodeRun, ctx: &Context
 }
 
 /// Handle timeout when no PR is created
+#[allow(clippy::too_many_lines)]
 async fn handle_no_pr_timeout(
     workflow_name: &str,
     code_run: &CodeRun,
@@ -1240,7 +1242,7 @@ async fn schedule_retry(
 }
 
 /// Verify completion status with GitHub to prevent stale local state
-fn verify_github_completion_status(_pr_url: &str) -> Result<bool> {
+fn verify_github_completion_status(_pr_url: &str) -> bool {
     // Extract PR number from GitHub URL
     // Format: https://github.com/owner/repo/pull/number
     // let pr_number = extract_pr_number_from_url(pr_url)?;
@@ -1255,7 +1257,7 @@ fn verify_github_completion_status(_pr_url: &str) -> Result<bool> {
     // 4. Latest comment checkbox states
 
     warn!("GitHub verification not fully implemented - returning true for now");
-    Ok(true) // Placeholder - assume complete for now
+    true // Placeholder - assume complete for now
 }
 
 /// Clear stale `work_completed` status
@@ -1296,9 +1298,8 @@ async fn try_cleanup_after_ttl(
         return Ok(None);
     }
 
-    let status = match &code_run.status {
-        Some(status) => status,
-        None => return Ok(None),
+    let Some(status) = &code_run.status else {
+        return Ok(None);
     };
 
     if status.cleanup_completed_at.is_some() {
@@ -1402,5 +1403,6 @@ fn compute_cleanup_deadline(
         return None;
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     Some(finished_at + ChronoDuration::seconds(ttl_seconds as i64))
 }

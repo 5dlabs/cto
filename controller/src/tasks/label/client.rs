@@ -291,6 +291,7 @@ impl GitHubLabelClient {
                             "Concurrent modification detected, retrying in {}ms (attempt {}/{})",
                             backoff_ms, attempt, max_retries
                         );
+                        #[allow(clippy::cast_sign_loss)]
                         sleep(Duration::from_millis(backoff_ms as u64)).await;
                     }
                 }
@@ -316,7 +317,7 @@ impl GitHubLabelClient {
         let (current_labels, etag) = self.get_labels_with_etag(pr_number).await?;
 
         // Calculate new labels based on operations
-        let new_labels = self.calculate_new_labels(&current_labels, operations);
+        let new_labels = Self::calculate_new_labels(&current_labels, operations);
 
         // Attempt atomic update
         let url = format!(
@@ -403,11 +404,7 @@ impl GitHubLabelClient {
     }
 
     /// Calculate new labels after applying operations
-    fn calculate_new_labels(
-        &self,
-        current: &[String],
-        operations: &[LabelOperation],
-    ) -> Vec<String> {
+    fn calculate_new_labels(current: &[String], operations: &[LabelOperation]) -> Vec<String> {
         let mut labels: std::collections::HashSet<String> = current.iter().cloned().collect();
 
         for operation in operations {
@@ -463,7 +460,7 @@ impl GitHubLabelClient {
 
         if response.status().as_u16() == 403 {
             // Check if it's a rate limit error
-            if let Some(reset_time) = self.get_rate_limit_reset(&response) {
+            if let Some(reset_time) = Self::get_rate_limit_reset(&response) {
                 return Err(GitHubLabelError::RateLimitExceeded {
                     reset_in: reset_time,
                 });
@@ -511,13 +508,14 @@ impl GitHubLabelClient {
             .and_then(|s| s.parse::<i64>().ok())
         {
             let now = chrono::Utc::now().timestamp();
+            #[allow(clippy::cast_sign_loss)]
             let seconds_until_reset = (reset - now).max(0) as u64;
             self.rate_limit_reset = Some(Instant::now() + Duration::from_secs(seconds_until_reset));
         }
     }
 
     /// Extract rate limit reset time from response
-    fn get_rate_limit_reset(&self, response: &Response) -> Option<Duration> {
+    fn get_rate_limit_reset(response: &Response) -> Option<Duration> {
         response
             .headers()
             .get("x-ratelimit-reset")
@@ -525,6 +523,7 @@ impl GitHubLabelClient {
             .and_then(|s| s.parse::<i64>().ok())
             .map(|reset_timestamp| {
                 let now = chrono::Utc::now().timestamp();
+                #[allow(clippy::cast_sign_loss)]
                 let seconds_until_reset = (reset_timestamp - now).max(0) as u64;
                 Duration::from_secs(seconds_until_reset)
             })

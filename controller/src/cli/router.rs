@@ -181,10 +181,7 @@ impl CLIRouter {
     }
 
     /// Prepare environment variables for CLI execution
-    fn prepare_environment(
-        cli_type: CLIType,
-        required_vars: &[String],
-    ) -> HashMap<String, String> {
+    fn prepare_environment(cli_type: CLIType, required_vars: &[String]) -> HashMap<String, String> {
         let mut env = HashMap::new();
 
         // Add CLI-specific environment setup
@@ -314,7 +311,6 @@ mod tests {
 
     #[test]
     fn test_environment_preparation() {
-        let router = CLIRouter::new();
         let env = CLIRouter::prepare_environment(CLIType::Codex, &["OPENAI_API_KEY".to_string()]);
 
         assert_eq!(env.get("HOME").unwrap(), "/home/node");
