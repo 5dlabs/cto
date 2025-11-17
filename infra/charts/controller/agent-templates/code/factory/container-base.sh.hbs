@@ -2215,7 +2215,7 @@ EOF
   
   # Commit the handoff document
   if [ -f "$HANDOFF_FILE" ]; then
-    git add "$(basename "$HANDOFF_FILE")" 2>/dev/null || true
+    git add "task/$(basename "$HANDOFF_FILE")" 2>/dev/null || true
     
     # Build commit message with proper variable expansion
     COMMIT_MSG="docs(task-{{task_id}}): add $HANDOFF_AGENT handoff document
