@@ -8,8 +8,11 @@ metadata:
 rules:
   # Core namespace-scoped resources
   - apiGroups: [""]
-    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets", "serviceaccounts"]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
   # Workload resources
   - apiGroups: ["apps", "extensions"]
     resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
@@ -20,11 +23,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Ingress/network policies
   - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses", "networkpolicies"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Allow managing roles/bindings within the namespace if chart defines them
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["roles", "rolebindings"]
+    resources: ["ingresses"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
 ---
