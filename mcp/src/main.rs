@@ -3049,11 +3049,13 @@ IMPORTANT:
                 }
                 '}' if !in_string => {
                     depth -= 1;
-                    if depth == 0 && start.is_some() {
-                        let json_str = &analysis_text[start.unwrap()..=i];
+                    if depth == 0 {
+                        if let Some(start_idx) = start {
+                            let json_str = &analysis_text[start_idx..=i];
                         if let Ok(json) = serde_json::from_str::<Value>(json_str) {
                             json_result = Some(json);
                             break;
+                        }
                         }
                     }
                 }
