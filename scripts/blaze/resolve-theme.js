@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const taskDescription = process.argv[2] || '';
 const repoPath = process.argv[3] || process.cwd();
@@ -184,9 +185,10 @@ console.log('');
 console.log('📄 Resolved Theme:');
 console.log(JSON.stringify(resolvedTheme, null, 2));
 
-// Save to file for container script
-const outputPath = '/tmp/resolved-theme.json';
-fs.writeFileSync(outputPath, JSON.stringify(resolvedTheme, null, 2));
+// Save to file for container script using a securely created temp path
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resolved-theme-'));
+const outputPath = path.join(tempDir, 'theme.json');
+fs.writeFileSync(outputPath, JSON.stringify(resolvedTheme, null, 2), { mode: 0o600 });
 console.log('');
 console.log(`💾 Theme saved to: ${outputPath}`);
 
