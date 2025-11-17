@@ -1478,34 +1478,45 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "════════════════════════════════════════════════════════════════"
 
   # =========================================================================
-  # FAST-PATH: Skip work if PR already approved
+  # FAST-PATH: Skip work if PR already approved (disabled for security)
   # =========================================================================
-  if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ]; then
+  FAST_PATH_ALLOWED=0
+  case "${WORKFLOW_STAGE:-}" in
+    "quality"|"quality-in-progress"|"testing"|"testing-in-progress")
+      FAST_PATH_ALLOWED=1
+      ;;
+    *)
+      FAST_PATH_ALLOWED=0
+      ;;
+  esac
+
+  if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ] && [ "$FAST_PATH_ALLOWED" -eq 1 ]; then
     echo ""
     echo "🔍 Checking if PR #${PR_NUMBER} already has approval..."
     
     APPROVAL_COUNT=$(gh pr view "$PR_NUMBER" --json reviews --jq '[.reviews[] | select(.state == "APPROVED")] | length' 2>/dev/null || echo "0")
     
     if [ "${APPROVAL_COUNT:-0}" -gt 0 ]; then
+      STAGE_LABEL="${WORKFLOW_STAGE:-stage}"
       echo "✅ PR #${PR_NUMBER} already has ${APPROVAL_COUNT} approval(s)"
-      echo "🚀 FAST-PATH: Skipping security scan since PR is already approved"
+      echo "🚀 FAST-PATH: Skipping ${STAGE_LABEL} checks since PR is already approved"
       
       gh pr comment "$PR_NUMBER" --body "✅ **Cipher Security Scan - Fast-Path**
 
-PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant security scan.
+PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant ${STAGE_LABEL} checks.
 
 **Fast-Path Benefits:**
-- Saves ~10-15 minutes of execution time
+- Saves execution time
 - Reduces unnecessary compute and model API calls
-- PR already validated by previous security gate
+- PR already validated by previous gate
 
-_Cipher will still run full scan if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
+_${STAGE_LABEL^} agent will still run full checks if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
 
       SUCCESS=1
       COMPLETED_ATTEMPTS=1
       break
     else
-      echo "ℹ️ No existing approvals found, proceeding with quality checks"
+      echo "ℹ️ No existing approvals found, proceeding with ${WORKFLOW_STAGE} checks"
     fi
   fi
   echo ""
