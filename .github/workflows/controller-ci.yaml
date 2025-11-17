@@ -461,3 +461,34 @@ jobs:
             controller/lcov.info
             controller/coverage-html/
             controller/coverage-summary.md
+
+  codeql:
+    name: CodeQL
+    needs: changes
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript, python]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-extended
+
+      - name: Autobuild
+        if: matrix.language != 'actions'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
