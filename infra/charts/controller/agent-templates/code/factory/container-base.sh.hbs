@@ -1165,6 +1165,14 @@ source /agent-templates/shared_task-setup-functions.sh || {
     attempt_task_recovery() { echo "❌ Recovery not available"; return 1; }
 }
 
+# Optional helper for billing/quota failure detection
+if [ -f /agent-templates/helpers_detect-billing-failure.sh ]; then
+  # shellcheck disable=SC1091
+  source /agent-templates/helpers_detect-billing-failure.sh
+else
+  echo "⚠️ Billing failure helper not found; skipping quota detection"
+fi
+
 # =========================================================================
 # Materialise task context (RESILIENT MODE)
 # =========================================================================
@@ -1469,6 +1477,10 @@ FACTORY_EXIT=1
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
 LAST_COMPLETION_REASON=""
+
+# Track provider billing failures
+BILLING_FAILURE_DETECTED=0
+BILLING_FAILURE_REASON=""
 
 if [ "$MAX_RETRIES" = "0" ]; then
   echo "🔄 Unlimited retries enabled - Factory will continue until completion criteria are met"
@@ -1775,6 +1787,29 @@ $PREV_FINDINGS
 
   if [ $FACTORY_EXIT -ne 0 ]; then
     echo "⚠️ Factory exited with status $FACTORY_EXIT on attempt $ATTEMPT"
+    
+    if command -v detect_billing_failure >/dev/null 2>&1; then
+      CLI_OUTPUT_SNIPPET=""
+      if [ -f "$RUN_LOG" ]; then
+        CLI_OUTPUT_SNIPPET=$(tail -n 400 "$RUN_LOG" 2>/dev/null || cat "$RUN_LOG" 2>/dev/null || true)
+      fi
+      
+      if [ -n "$CLI_OUTPUT_SNIPPET" ]; then
+        if ! detect_billing_failure "$CLI_OUTPUT_SNIPPET" "$FACTORY_EXIT" "${PR_NUMBER:-}" "${REPOSITORY:-}" "$AGENT_NAME" "{{task_id}}" "${WORKFLOW_STAGE:-}" "{{workflow_name}}"; then
+          BILLING_DETECT_EXIT=$?
+          if [ "$BILLING_DETECT_EXIT" -eq 1 ]; then
+            echo "🚫 Billing/quota failure detected - aborting additional Factory retries"
+            BILLING_FAILURE_DETECTED=1
+            BILLING_FAILURE_REASON="Billing or quota error detected for $AGENT_NAME. Restore provider credits/quota, then rerun task {{task_id}}."
+            LAST_COMPLETION_REASON="$BILLING_FAILURE_REASON"
+            NEXT_ITERATION_GUIDANCE=""
+            break
+          elif [ "$BILLING_DETECT_EXIT" -ne 0 ]; then
+            echo "⚠️ Billing failure detector exited with status $BILLING_DETECT_EXIT"
+          fi
+        fi
+      fi
+    fi
   fi
 
   # Circuit breaker: detect repeated failing commands
@@ -2046,6 +2081,27 @@ EOF
   COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
   ATTEMPT=$((ATTEMPT + 1))
 done
+
+if [ "${BILLING_FAILURE_DETECTED:-0}" -eq 1 ]; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo "║      TASK COMPLETION STATUS: BLOCKED - BILLING/QUOTA ISSUE    ║"
+  echo "════════════════════════════════════════════════════════════════"
+  echo ""
+  echo "❌ ${AGENT_NAME} cannot continue until provider billing/quota issues are resolved."
+  echo "   A remediation comment has been posted to the PR with details."
+  if [ -n "$BILLING_FAILURE_REASON" ]; then
+    echo ""
+    echo "📋 Reason:"
+    echo "$BILLING_FAILURE_REASON"
+  fi
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  EXIT_CODE=1
+  SUCCESS=0
+  FINAL_MESSAGE="$BILLING_FAILURE_REASON"
+  exit $EXIT_CODE
+fi
 
 FINAL_ATTEMPTS=$COMPLETED_ATTEMPTS
 if [ "${FINAL_ATTEMPTS:-0}" -le 0 ]; then
