@@ -46,6 +46,9 @@ spec:
             tag: v3.7.1
           authModes:
             - server
+          secure: false
+          extraArgs:
+            - --secure=false
           service:
             type: NodePort
             nodePort: 30081
