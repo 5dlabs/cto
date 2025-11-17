@@ -92,7 +92,7 @@ spec:
 
                   ACTIVE_CLAIMS="$(kubectl get pods -n agent-platform \
                     --field-selector=status.phase!=Succeeded,status.phase!=Failed \
-                    -o json | jq -r '.items[] | .spec.volumes[]? | select(.persistentVolumeClaim != null) | .persistentVolumeClaim.claimName' | sort -u || true)"
+                    -o json | jq -r '.items[]? | .spec.volumes[]? | select(.persistentVolumeClaim != null) | .persistentVolumeClaim.claimName' | sort -u)"
 
                   DELETE_COUNT=0
 
