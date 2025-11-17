@@ -2296,7 +2296,7 @@ EOF
   
   # Commit and push the handoff document
   cd "$OPENCODE_WORK_DIR"
-  git add "$(basename "$HANDOFF_FILE")" 2>/dev/null || true
+  git add "task/$(basename "$HANDOFF_FILE")" 2>/dev/null || true
   
   # Build commit message with proper variable expansion
   COMMIT_MSG="docs(task-{{task_id}}): add $HANDOFF_AGENT handoff document
