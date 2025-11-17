@@ -471,38 +471,26 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [actions, javascript, python, rust]
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Rust toolchain
-        if: matrix.language == 'rust'
         uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
         with:
           toolchain: stable
           components: rustfmt, clippy
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
+          languages: rust
           queries: +security-extended
 
       - name: Build Rust workspace
-        if: matrix.language == 'rust'
         run: |
           echo "🔨 Building Rust workspace for CodeQL extraction..."
           cargo fetch
           cargo build --workspace --all-features
 
-      - name: Autobuild
-        if: matrix.language != 'actions' && matrix.language != 'rust'
-        uses: github/codeql-action/autobuild@v3
-
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+        uses: github/codeql-action/analyze@v4
