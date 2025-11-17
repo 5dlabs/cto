@@ -53,15 +53,24 @@ spec:
               type: RuntimeDefault
           serviceAccountName: worker-patcher
           restartPolicy: OnFailure
+          volumes:
+          - name: workspace
+            emptyDir: {}
           containers:
           - name: patcher
             image: bitnami/kubectl:1.31.4
+            env:
+            - name: HOME
+              value: /tmp/patcher
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
               runAsNonRoot: true
               capabilities:
                 drop: ["ALL"]
+            volumeMounts:
+            - name: workspace
+              mountPath: /tmp/patcher
             command:
             - /bin/sh
             - -c
