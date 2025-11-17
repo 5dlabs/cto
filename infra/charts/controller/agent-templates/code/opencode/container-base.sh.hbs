@@ -2480,18 +2480,12 @@ EOF
         
         # Add security-approved label (create if missing)
         LABEL_NAME="security-approved"
-        LABEL_COLOR="0E8A16"
-        LABEL_DESC="Cipher security gate approval"
-        if [ -n "$REPO_SLUG" ] && [ "$REPO_SLUG" != "/" ]; then
-          echo "🏷️  Ensuring '$LABEL_NAME' label exists on $REPO_SLUG"
-          if ! gh label view "$LABEL_NAME" -R "$REPO_SLUG" >/dev/null 2>&1; then
-            gh label create "$LABEL_NAME" -R "$REPO_SLUG" --color "$LABEL_COLOR" --description "$LABEL_DESC" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
-          fi
-          echo "🏷️  Adding '$LABEL_NAME' label"
-          timeout 30 gh pr edit "$PR_NUM" -R "$REPO_SLUG" --add-label "$LABEL_NAME" 2>&1 || echo "⚠️ Failed to add $LABEL_NAME label"
-        else
-          echo "⚠️ Repository information missing; cannot manage '$LABEL_NAME' label"
+        echo "🏷️  Ensuring '$LABEL_NAME' label exists"
+        if ! gh label view "$LABEL_NAME" >/dev/null 2>&1; then
+          gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
         fi
+        echo "🏷️  Adding '$LABEL_NAME' label"
+        timeout 30 gh pr edit "$PR_NUM" --add-label "$LABEL_NAME" 2>&1 || echo "⚠️ Failed to add $LABEL_NAME label"
       elif [ "$WORKFLOW_STAGE" = "testing" ]; then
         # Tess has final approval authority
         STAGE_NAME="QA Testing"
