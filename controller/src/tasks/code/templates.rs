@@ -2186,7 +2186,7 @@ impl CodeTemplateGenerator {
             "service": code_run.spec.service,
             "repository_url": code_run.spec.repository_url,
             "docs_repository_url": code_run.spec.docs_repository_url,
-            "docs_project_directory": code_run.spec.docs_project_directory,
+            "docs_project_directory": code_run.spec.docs_project_directory.as_deref().unwrap_or(""),
             "working_directory": Self::get_working_directory(code_run),
             "docs_branch": code_run.spec.docs_branch,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),

@@ -819,7 +819,7 @@ if [ -d "/task-files" ]; then
 
   # Copy client-config.json to workspace root for MCP configuration
   if [ -f "/task-files/client-config.json" ]; then
-    cp $FACTORY_WORK_DIR/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
+    cp /task-files/client-config.json "$TASK_WORKSPACE/client-config.json" 2>/dev/null || true
     echo "✓ Copied client-config.json to workspace root for MCP configuration"
   else
     echo "⚠️ client-config.json not found in task-files, using defaults"
