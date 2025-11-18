@@ -2131,7 +2131,22 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
+  # Determine if security checks actually passed by checking Claude's final report
+  # Look for the security scan result in Claude's output
+  SECURITY_PASSED=0
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    # Check if Claude reported "APPROVED FOR PRODUCTION" or similar success indicators
+    if grep -q "APPROVED FOR PRODUCTION\|Security Review - PASSED\|NO CHANGES REQUIRED" "$CLAUDE_LOG" 2>/dev/null; then
+      SECURITY_PASSED=1
+    elif grep -q "Security issues detected\|Required Security Changes\|SECURITY VULNERABILITIES" "$CLAUDE_LOG" 2>/dev/null; then
+      SECURITY_PASSED=0
+    else
+      # Default to passed if Claude exited cleanly and didn't explicitly report issues
+      SECURITY_PASSED=1
+    fi
+  fi
+
+  if [ $SECURITY_PASSED -eq 1 ]; then
     echo "✅ Cipher security checks passed - handing off to Tess for E2E testing"
 
     # Post COMMENT (NOT APPROVE) - Tess has final approval authority
@@ -2209,6 +2224,9 @@ Rex will address these issues and resubmit for review.
     echo "🏷️  Adding 'needs-fixes' label to trigger remediation"
     timeout 30 gh pr edit "$PR_NUMBER" --add-label "needs-fixes" || echo "⚠️ Failed to add needs-fixes label"
 
+    # DO NOT add ready-for-qa label - block Tess until issues are fixed
+    echo "🛑 Blocking Tess handoff - security issues must be resolved first"
+
     update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
   fi
 else
@@ -2223,8 +2241,8 @@ fi
   # =========================================================================
   STATE_FILE="$AGENT_STATE_DIR/security-iteration-${ATTEMPT}.json"
   
-  # Check if security scan was successful
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  # Check if security scan was successful using SECURITY_PASSED variable (set earlier based on log analysis)
+  if [ ${SECURITY_PASSED:-0} -eq 1 ]; then
     # Save successful completion state
     cat > "$STATE_FILE" <<EOF
 {
@@ -2248,14 +2266,14 @@ EOF
   "iteration": $ATTEMPT,
   "status": "incomplete",
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Security checks incomplete - exit code $CLAUDE_EXIT_CODE",
+  "findings": "Security issues detected - remediation required",
   "exit_code": $CLAUDE_EXIT_CODE,
-  "issues": ["Claude exited with non-zero status"]
+  "issues": ["Security vulnerabilities or policy violations found"]
 }
 EOF
     echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
 
-    echo "⚠️ Attempt $ATTEMPT: Security checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    echo "⚠️ Attempt $ATTEMPT: Security issues detected - blocking Tess handoff"
 
     if [ $ATTEMPT -lt $MAX_RETRIES ]; then
       echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
@@ -2264,7 +2282,7 @@ EOF
       # Brief pause before retry
       sleep 2
     else
-      echo "❌ Maximum retry attempts reached"
+      echo "❌ Maximum retry attempts reached - Rex remediation required"
       break
     fi
   fi
@@ -2276,10 +2294,12 @@ echo "════════════════════════�
 if [ $SUCCESS -eq 1 ]; then
   echo "✅ CIPHER SECURITY SCAN SUCCESSFUL"
   echo "   Completed after $ATTEMPT attempt(s)"
+  echo "   All security checks passed - ready for Tess"
 else
-  echo "⚠️ CIPHER SECURITY SCAN INCOMPLETE"
+  echo "🛑 CIPHER SECURITY GATE: BLOCKING WORKFLOW"
   echo "   Attempted $ATTEMPT time(s)"
-  echo "   Security standards not yet met"
+  echo "   Security issues detected - Rex remediation required"
+  echo "   Tess handoff BLOCKED until issues resolved"
 fi
 echo "════════════════════════════════════════════════════════════════"
 
@@ -2288,7 +2308,11 @@ echo "════════════════════════�
 echo "║                 CIPHER SECURITY SCAN COMPLETE                ║"
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 Task: {{task_id}}"
-echo "✅ Security checks completed"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ Security checks passed"
+else
+  echo "❌ Security issues found - workflow blocked"
+fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Final termination sequence
@@ -2296,12 +2320,15 @@ echo "════════════════════════�
 echo "🔚 TERMINATING CIPHER CONTAINER"
 echo "════════════════════════════════════════════════════════════════"
 echo "Claude Exit Code: $CLAUDE_EXIT_CODE"
+echo "Security Gate Result: $([ $SUCCESS -eq 1 ] && echo 'PASSED' || echo 'BLOCKED')"
 echo "Container PID: $$"
 echo "Final Process Check:"
 ps aux | head -5
 
-# Write completion marker for workflow tracking
-echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+# Write completion marker for workflow tracking (only if passed)
+if [ $SUCCESS -eq 1 ]; then
+  echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+fi
 
 # Explicitly stop Docker sidecar before exiting
 echo "🛑 Explicitly stopping Docker sidecar..."
@@ -2313,6 +2340,6 @@ if [ $SUCCESS -eq 1 ]; then
   exit 0
 else
   echo "🔚 Terminating container with failure status..."
-  echo "📝 Security checks incomplete after $ATTEMPT attempt(s)"
+  echo "📝 Security issues detected - blocking workflow progression"
   exit 1
 fi

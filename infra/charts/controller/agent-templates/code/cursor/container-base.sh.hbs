@@ -2066,20 +2066,39 @@ Handoff document created for $HANDOFF_TARGET to continue work." 2>/dev/null || e
   fi
 
   if [ "$COMMITS_MADE" -eq 1 ]; then
-    # Agent made progress - handoff to next stage
-    echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
-    echo "════════════════════════════════════════════════════════════════"
-    echo ""
-    echo "🔄 NEXT STEPS:"
-    echo "   - Handoff document created at task/rex-handoff.md"
-    echo "   - Workflow will continue to next stage for completion"
-    echo "   - Next agent will review PR and finish remaining work"
-    echo ""
-    echo "════════════════════════════════════════════════════════════════"
-    
-    EXIT_CODE=0  # Exit successfully to allow Cleo to continue
+    # Agent made progress - BUT check if this is Cipher with security issues
+    # Cipher must NOT hand off to Tess if security issues found (even if commits were made)
+    if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║      CIPHER SECURITY GATE: ISSUES FOUND - BLOCKING TESS      ║"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      echo "🛑 Security issues detected - Tess handoff BLOCKED"
+      echo "   - Cipher found security vulnerabilities or policy violations"
+      echo "   - Rex remediation will be triggered to fix issues"
+      echo "   - Cipher will re-scan after Rex pushes fixes"
+      echo "   - Tess will only start after Cipher approves"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      
+      EXIT_CODE=1  # Exit with failure to block workflow progression
+    else
+      # Non-security stages can handoff with partial completion
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo "║          TASK COMPLETION STATUS: PARTIAL - HANDOFF           ║"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+      echo "🔄 NEXT STEPS:"
+      echo "   - Handoff document created at task/rex-handoff.md"
+      echo "   - Workflow will continue to next stage for completion"
+      echo "   - Next agent will review PR and finish remaining work"
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      
+      EXIT_CODE=0  # Exit successfully to allow next stage to continue
+    fi
   else
     # Agent made NO progress - this is a failure, should retry
     echo ""
@@ -2183,7 +2202,8 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
       NEXT_STAGE="security review by Cipher"
 
       if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
-        # Cipher security review
+        # Cipher security review - ONLY hand off to Tess if security actually passed
+        # This block only runs when SUCCESS=1, meaning Cursor confirmed completion
         STAGE_NAME="Security"
         STAGE_EMOJI="🔒"
         CHECKS_PASSED=$'- No vulnerabilities detected
