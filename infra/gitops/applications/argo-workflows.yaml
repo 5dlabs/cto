@@ -47,11 +47,15 @@ spec:
           authModes:
             - server
           secure: false
+          env:
+            - name: ARGO_SERVER_SECURE
+              value: "false"
           extraArgs:
             - --secure=false
-          service:
-            type: NodePort
-            nodePort: 30081
+          serviceType: NodePort
+          servicePort: 2746
+          serviceNodePort: 30081
+          servicePortName: http
         executor:
           image:
             tag: v3.7.1

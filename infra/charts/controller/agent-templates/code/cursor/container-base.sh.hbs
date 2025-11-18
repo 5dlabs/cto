@@ -2203,12 +2203,44 @@ EOF
 
         # Add security-approved label (create if missing)
         LABEL_NAME="security-approved"
+        LABEL_API_PATH=$(printf '%s' "$LABEL_NAME" | sed 's/ /%20/g')
         echo "🏷️  Ensuring '$LABEL_NAME' label exists"
-        if ! gh label view "$LABEL_NAME" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1; then
-          gh label create "$LABEL_NAME" --color "0E8A16" --description "Cipher security gate approval" -R "${REPO_OWNER}/${REPO_NAME}" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
+        if ! gh api -H "Accept: application/vnd.github+json" "repos/$REPO_OWNER/$REPO_NAME/labels/$LABEL_API_PATH" >/dev/null 2>&1; then
+          gh api -X POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REPO_OWNER/$REPO_NAME/labels" \
+            -f name="$LABEL_NAME" \
+            -f color="0E8A16" \
+            -f description="Cipher security gate approval" >/dev/null 2>&1 || echo "⚠️ Unable to create $LABEL_NAME label"
         fi
         echo "🏷️  Adding '$LABEL_NAME' label"
-        timeout 30 gh pr edit "$PR_NUM" --add-label "$LABEL_NAME" 2>&1 || echo "⚠️ Failed to add $LABEL_NAME label"
+        if ! gh api -X POST \
+          -H "Accept: application/vnd.github+json" \
+          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
+          -F labels[]="$LABEL_NAME" >/dev/null 2>&1; then
+          echo "⚠️ Failed to add $LABEL_NAME label"
+        fi
+
+        # Refresh ready-for-qa label so Tess sees a new webhook event
+        LABEL_READY_FOR_SECURITY="ready-for-security"
+        LABEL_READY_FOR_QA="ready-for-qa"
+        echo "🧹 Removing '$LABEL_READY_FOR_SECURITY' label after security approval"
+        gh api -X DELETE \
+          -H "Accept: application/vnd.github+json" \
+          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels/$LABEL_READY_FOR_SECURITY" >/dev/null 2>&1 || echo "ℹ️ '$LABEL_READY_FOR_SECURITY' label already absent"
+
+        echo "♻️ Refreshing '$LABEL_READY_FOR_QA' label to trigger Tess"
+        gh api -X DELETE \
+          -H "Accept: application/vnd.github+json" \
+          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels/$LABEL_READY_FOR_QA" >/dev/null 2>&1 || true
+        if gh api -X POST \
+          -H "Accept: application/vnd.github+json" \
+          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
+          -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
+          echo "🏷️  Added '$LABEL_READY_FOR_QA' label to signal Tess"
+        else
+          echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
+        fi
       elif [ "$WORKFLOW_STAGE" = "testing" ]; then
         # Tess has final approval authority
         STAGE_NAME="QA Testing"
@@ -2381,8 +2413,6 @@ echo "{{agent_completion_message}}"
 echo "⚠️ Cursor execution incomplete"
   {{/if}}
   # Force exit to ensure container stops
-  kill -TERM $$ 2>/dev/null || true
-  sleep 1
   exit $EXIT_CODE
 fi
 
@@ -2394,6 +2424,4 @@ echo "✅ Cursor execution complete"
 
 # Ensure container exits by terminating the shell process
 echo "🏁 Terminating container..."
-kill -TERM $$ 2>/dev/null || true
-sleep 1
-exit $EXIT_CODE
+  exit $EXIT_CODE

@@ -12,12 +12,12 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform
-  source:
-    repoURL: https://github.com/5dlabs/charts
-    targetRevision: main
-    path: agent-docs
-    helm:
-      values: |
+  sources:
+    - repoURL: https://github.com/5dlabs/charts
+      targetRevision: main
+      path: agent-docs
+      helm:
+        values: |
         serviceAccount:
           create: false
           name: default
@@ -98,6 +98,9 @@ spec:
               value: "6379"
         secret:
           existingSecret: doc-server-secrets
+          keys:
+            DATABASE_URL: DATABASE_URL
+            VECTOR_DATABASE_URL: VECTOR_DATABASE_URL
           # Explicitly mount API keys for documentation processing
           env:
             ANTHROPIC_API_KEY:
@@ -671,6 +674,9 @@ spec:
               }
             ]
           }
+    - repoURL: https://github.com/5dlabs/cto
+      targetRevision: main
+      path: infra/gitops/resources/doc-server
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp
