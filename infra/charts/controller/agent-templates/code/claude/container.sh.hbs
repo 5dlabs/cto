@@ -86,6 +86,16 @@ sync_gh_hosts_to_path() {
     fi
 }
 
+# Load shared task utilities (with safe fallback)
+if [ -f /agent-templates/shared_task-setup-functions.sh ]; then
+    # shellcheck disable=SC1091
+    . /agent-templates/shared_task-setup-functions.sh
+else
+    echo "⚠️ shared_task-setup-functions.sh not found; defining minimal fallbacks"
+    ensure_default_client_config() { :; }
+    ensure_default_toolman_guide() { :; }
+fi
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
@@ -619,7 +629,7 @@ else
 
         echo "✅ Copying client-config.json..."
         if [ -f "$TASK_DIR/client-config.json" ]; then
-            cp "$TASK_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
+            cp "$TASK_DIR/client-config.json" "$TASK_WORKSPACE/client-config.json" && echo "✓ client-config.json copied to task workspace" || echo "❌ client-config.json copy failed"
         else
             echo "⚠️ client-config.json not found - MCP client may not be configured"
         fi
@@ -739,6 +749,14 @@ mkdir -p "$CLAUDE_WORK_DIR" && cd "$CLAUDE_WORK_DIR"
 sync_gh_hosts_to_path "$CLAUDE_WORK_DIR"
 echo "✓ Set working directory: $CLAUDE_WORK_DIR"
 echo "🔑 CRITICAL: Claude will be launched from this directory"
+
+# Ensure client-config fallback is available now that CLAUDE_WORK_DIR is known
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+    ensure_default_client_config \
+        "$CLAUDE_WORK_DIR/client-config.json" \
+        "$TASK_WORKSPACE/client-config.json" \
+        "/workspace/$WORKSPACE_DIR/client-config.json"
+fi
 
 # Working directory setup completed above
 
@@ -1243,15 +1261,23 @@ else
         
         echo "🚀 Launching Claude Code (Task ID 0 mode)..."
 
-        # Wait for Claude to complete
-        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
-        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
-          echo "✅ Claude process completed normally"
+        # Wait for Claude to complete (timeout optional; default disabled)
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-0}"
+        case "$CLAUDE_TIMEOUT" in
+          ''|*[!0-9]*) CLAUDE_TIMEOUT=0 ;;
+        esac
+        if [ "$CLAUDE_TIMEOUT" -gt 0 ] 2>/dev/null; then
+          if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+            echo "✅ Claude process completed normally"
+          else
+            echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+            kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+            sleep 2
+            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          fi
         else
-          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
-          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
-          sleep 2
-          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          echo "⏳ Waiting for Claude completion without timeout guard (CLAUDE_TIMEOUT_SECONDS unset)"
+          wait $CLAUDE_PID
         fi
     elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
         echo "✓ Using task-specific prompt from docs service: task/prompt.md"
@@ -1272,6 +1298,7 @@ else
 
         # Prepare prompt prefix for toolman guidance
         PROMPT_PREFIX=""
+        ensure_default_toolman_guide "$CLAUDE_WORK_DIR/task" "{{task_id}}" "{{service}}"
         if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
             PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**
 
@@ -1342,17 +1369,23 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           ) & HANG_DIAG_PID=$!
         fi
 
-        # Wait for Claude process with timeout safety
-        # Claude should exit after completing work, but sometimes hangs
-        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
-        
-        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
-          echo "✅ Claude process completed normally"
+        # Wait for Claude process with optional timeout (default disabled)
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-0}"
+        case "$CLAUDE_TIMEOUT" in
+          ''|*[!0-9]*) CLAUDE_TIMEOUT=0 ;;
+        esac
+        if [ "$CLAUDE_TIMEOUT" -gt 0 ] 2>/dev/null; then
+          if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+            echo "✅ Claude process completed normally"
+          else
+            echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+            kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+            sleep 2
+            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          fi
         else
-          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
-          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
-          sleep 2
-          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          echo "⏳ Waiting for Claude completion without timeout guard (CLAUDE_TIMEOUT_SECONDS unset)"
+          wait $CLAUDE_PID
         fi
         
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
