@@ -2184,8 +2184,10 @@ $(echo -e "$QUALITY_REPORT")
     done
     
     if [ "$APPROVAL_SUCCESS" != "true" ]; then
-      echo "❌ CRITICAL: Failed to post PR approval after $APPROVAL_RETRIES attempts"
-      exit 1
+      echo "⚠️ WARNING: Failed to post PR approval after $APPROVAL_RETRIES attempts"
+      echo "   Quality checks passed, but GitHub API call failed"
+      echo "   This is non-fatal - continuing with label update"
+      # Don't exit - quality checks passed, approval is just a signal
     fi
     
     # Add ready-for-security label to signal Cipher
