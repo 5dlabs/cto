@@ -343,18 +343,13 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 } else if ctx.config.cleanup.enabled {
                     let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                     if cleanup_delay_minutes == 0 {
-                        if let Err(err) = jobs.delete(&job_name, &DeleteParams::default()).await {
-                            match err {
-                                KubeError::Api(api_err) if api_err.code == 404 => {}
-                                other => {
-                                    warn!(
-                                        "Failed to delete job {} after manual intervention required for CodeRun {}: {}",
-                                        job_name,
-                                        latest_code_run.name_any(),
-                                        other
-                                    );
-                                }
-                            }
+                        if let Err(err) = delete_job_with_cascade(&jobs, &job_name, false).await {
+                            warn!(
+                                "Failed to delete job {} after manual intervention required for CodeRun {}: {}",
+                                job_name,
+                                latest_code_run.name_any(),
+                                err
+                            );
                         } else {
                             info!(
                                 "Deleted job {} after manual intervention required for CodeRun {}",
@@ -455,7 +450,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 } else if ctx.config.cleanup.enabled {
                     let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                     if cleanup_delay_minutes == 0 {
-                        let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
+                        let _ = delete_job_with_cascade(&jobs, &job_name, false).await;
                         info!(
                             "Deleted job {} after exhausting retries for CodeRun {}",
                             job_name,
@@ -536,18 +531,13 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
                 } else if ctx.config.cleanup.enabled {
                     let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                     if cleanup_delay_minutes == 0 {
-                        if let Err(err) = jobs.delete(&job_name, &DeleteParams::default()).await {
-                            match err {
-                                KubeError::Api(api_err) if api_err.code == 404 => {}
-                                other => {
-                                    warn!(
-                                        "Failed to delete job {} after PR validation failure for CodeRun {}: {}",
-                                        job_name,
-                                        latest_code_run.name_any(),
-                                        other
-                                    );
-                                }
-                            }
+                        if let Err(err) = delete_job_with_cascade(&jobs, &job_name, false).await {
+                            warn!(
+                                "Failed to delete job {} after PR validation failure for CodeRun {}: {}",
+                                job_name,
+                                latest_code_run.name_any(),
+                                err
+                            );
                         }
                     }
                 }
@@ -591,7 +581,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             } else if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.completed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
-                    let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
+                    let _ = delete_job_with_cascade(&jobs, &job_name, false).await;
                     info!("Deleted completed code job: {}", job_name);
                 } else {
                     info!(
@@ -682,7 +672,7 @@ async fn reconcile_code_create_or_update(code_run: Arc<CodeRun>, ctx: &Context) 
             if ctx.config.cleanup.enabled {
                 let cleanup_delay_minutes = ctx.config.cleanup.failed_job_delay_minutes;
                 if cleanup_delay_minutes == 0 {
-                    let _ = jobs.delete(&job_name, &DeleteParams::default()).await;
+                    let _ = delete_job_with_cascade(&jobs, &job_name, false).await;
                     info!("Deleted failed code job: {}", job_name);
                 } else {
                     info!(
@@ -1175,6 +1165,34 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
     }
 }
 
+/// Delete a job with cascade propagation to clean up pods
+async fn delete_job_with_cascade(
+    jobs: &Api<Job>,
+    job_name: &str,
+    wait_for_deletion: bool,
+) -> Result<()> {
+    let delete_params = DeleteParams {
+        propagation_policy: Some(kube::api::PropagationPolicy::Background),
+        ..Default::default()
+    };
+    
+    match jobs.delete(job_name, &delete_params).await {
+        Ok(_) => {
+            debug!("Deleted job {}", job_name);
+            if wait_for_deletion {
+                // Wait for deletion to propagate
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            }
+            Ok(())
+        }
+        Err(KubeError::Api(api_err)) if api_err.code == 404 => {
+            debug!("Job {} already deleted", job_name);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 async fn schedule_retry(
     code_run: &CodeRun,
     ctx: &Context,
@@ -1184,18 +1202,16 @@ async fn schedule_retry(
     max_retries: u32,
     reason: &str,
 ) -> Result<()> {
-    if let Err(err) = jobs.delete(job_name, &DeleteParams::default()).await {
-        match err {
-            KubeError::Api(api_err) if api_err.code == 404 => {}
-            other => {
-                warn!(
-                    "Failed to delete job {} before scheduling retry for {}: {}",
-                    job_name,
-                    code_run.name_any(),
-                    other
-                );
-            }
-        }
+    // Delete old job and wait for deletion to prevent duplicate job versions
+    if let Err(err) = delete_job_with_cascade(jobs, job_name, true).await {
+        warn!(
+            "Failed to delete job {} before scheduling retry for {}: {}",
+            job_name,
+            code_run.name_any(),
+            err
+        );
+    } else {
+        info!("Deleted job {} to prepare for retry", job_name);
     }
 
     let coderuns_api: Api<CodeRun> = Api::namespaced(ctx.client.clone(), &ctx.namespace);
