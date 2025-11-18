@@ -1248,7 +1248,7 @@ if [ -f /task-files/client-config.json ]; then
 fi
 
 if declare -F ensure_default_client_config >/dev/null 2>&1; then
-  ensure_default_client_config "$OPENCODE_WORK_DIR/client-config.json"
+  ensure_default_client_config "$OPENCODE_WORK_DIR/client-config.json" "$REPO_ROOT/client-config.json" "$TASK_WORKSPACE/client-config.json"
 fi
 
 if [ -f /task-files/mcp.json ]; then

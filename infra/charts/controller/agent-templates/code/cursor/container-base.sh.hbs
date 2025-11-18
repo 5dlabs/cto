@@ -1184,10 +1184,6 @@ if [ -f /task-files/client-config.json ]; then
   echo "✓ Copied client-config.json to working directory"
 fi
 
-if declare -F ensure_default_client_config >/dev/null 2>&1; then
-  ensure_default_client_config "$CURSOR_WORK_DIR/client-config.json"
-fi
-
 if [ -f /task-files/mcp.json ]; then
   cp -f /task-files/mcp.json "$CURSOR_WORK_DIR/.mcp.json"
 fi
@@ -1206,6 +1202,10 @@ if [ -f /task-files/cursor-cli-config.json ]; then
   echo "✓ Installed global cursor CLI config"
 else
   echo "⚠️ cursor-cli-config.json not provided; using existing global Cursor config"
+fi
+
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+  ensure_default_client_config "$CURSOR_WORK_DIR/client-config.json" "$REPO_ROOT/client-config.json" "/workspace/$REPO_NAME/client-config.json"
 fi
 
 # Check if client-config.json exists in working directory

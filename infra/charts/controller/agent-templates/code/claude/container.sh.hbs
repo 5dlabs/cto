@@ -86,87 +86,15 @@ sync_gh_hosts_to_path() {
     fi
 }
 
-ensure_default_client_config() {
-    dest_file="$1"
-    if [ -z "$dest_file" ]; then
-        return 1
-    fi
-    if [ -f "$dest_file" ] && [ -s "$dest_file" ]; then
-        return 0
-    fi
-    dest_dir=$(dirname "$dest_file")
-    mkdir -p "$dest_dir" 2>/dev/null || true
-    cat >"$dest_file" <<'EOF'
-{
-  "localServers": {},
-  "remoteTools": [
-    "brave_search_brave_web_search",
-    "context7_get_library_docs",
-    "memory_create_entities",
-    "memory_add_observations",
-    "memory_read_graph",
-    "filesystem_read_text_file",
-    "filesystem_list_directory",
-    "filesystem_edit_file",
-    "filesystem_search_files",
-    "kubernetes_listResources"
-  ]
-}
-EOF
-    echo "🛠️ Created fallback client-config.json at $dest_file"
-    return 0
-}
-
-ensure_default_toolman_guide() {
-    task_dir="$1"
-    task_id="$2"
-    service_name="$3"
-    if [ -z "$task_dir" ]; then
-        return 1
-    fi
-    if [ -z "$task_id" ]; then
-        task_id="unknown"
-    fi
-    if [ -z "$service_name" ]; then
-        service_name="unknown service"
-    fi
-    guide_file="$task_dir/toolman-guide.md"
-    if [ -f "$guide_file" ] && [ -s "$guide_file" ]; then
-        return 0
-    fi
-    mkdir -p "$task_dir" 2>/dev/null || true
-    cat >"$guide_file" <<EOF
-# Toolman Guide – ${service_name} · Task ${task_id}
-
-## Mission
-- Validate the implementation for **${service_name}** against \`task/acceptance-criteria.md\`.
-- Run the required quality gate commands (format, lint, test) and capture logs.
-- Leave the workspace intact so downstream agents and humans can review artifacts.
-
-## Required Commands
-\`\`\`bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
-\`\`\`
-
-## Workflow
-1. Review \`task/task.md\`, \`task/acceptance-criteria.md\`, and architecture docs.
-2. Ensure the working branch matches the PR being validated.
-3. Run the commands above; on failure, capture logs and block the deployment.
-4. On success, summarize the results (PASS for each command) and update the PR with the appropriate status labels (task-{{task_id}}, service-${service_name}, run labels, etc.).
-5. Never rely on timeouts—explicitly finish by posting results or raising blocking issues.
-
-## Final Comment Checklist
-- List each command and whether it PASSED/FAILED.
-- Attach log excerpts for any failures.
-- State whether additional manual steps are required.
-
-Following this baseline keeps every CLI agent (Cursor, Claude, Codex, Factory, OpenCode, Tess) consistent.
-EOF
-    echo "🛠️ Created fallback toolman-guide.md at $guide_file"
-    return 0
-}
+# Load shared task utilities (with safe fallback)
+if [ -f /agent-templates/shared_task-setup-functions.sh ]; then
+    # shellcheck disable=SC1091
+    . /agent-templates/shared_task-setup-functions.sh
+else
+    echo "⚠️ shared_task-setup-functions.sh not found; defining minimal fallbacks"
+    ensure_default_client_config() { :; }
+    ensure_default_toolman_guide() { :; }
+fi
 
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
@@ -701,12 +629,10 @@ else
 
         echo "✅ Copying client-config.json..."
         if [ -f "$TASK_DIR/client-config.json" ]; then
-            cp "$TASK_DIR/client-config.json" "$CLAUDE_WORK_DIR/client-config.json" && echo "✓ client-config.json copied to Claude working directory" || echo "❌ client-config.json copy failed"
+            cp "$TASK_DIR/client-config.json" "$TASK_WORKSPACE/client-config.json" && echo "✓ client-config.json copied to task workspace" || echo "❌ client-config.json copy failed"
         else
             echo "⚠️ client-config.json not found - MCP client may not be configured"
         fi
-
-        ensure_default_client_config "$CLAUDE_WORK_DIR/client-config.json"
 
         echo "✅ Copying toolman-guide.md..."
         if [ -f "$TASK_DIR/toolman-guide.md" ]; then
@@ -823,6 +749,14 @@ mkdir -p "$CLAUDE_WORK_DIR" && cd "$CLAUDE_WORK_DIR"
 sync_gh_hosts_to_path "$CLAUDE_WORK_DIR"
 echo "✓ Set working directory: $CLAUDE_WORK_DIR"
 echo "🔑 CRITICAL: Claude will be launched from this directory"
+
+# Ensure client-config fallback is available now that CLAUDE_WORK_DIR is known
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+    ensure_default_client_config \
+        "$CLAUDE_WORK_DIR/client-config.json" \
+        "$TASK_WORKSPACE/client-config.json" \
+        "/workspace/$WORKSPACE_DIR/client-config.json"
+fi
 
 # Working directory setup completed above
 

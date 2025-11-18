@@ -267,9 +267,12 @@ attempt_task_recovery() {
 
 # Ensure a usable client-config.json exists even if task assets omitted it
 # Usage: ensure_default_client_config "/path/to/client-config.json"
+DEFAULT_CLIENT_CONFIG_PATH="${DEFAULT_CLIENT_CONFIG_PATH:-/agent-templates/code_client-config.json}"
+
 ensure_default_client_config() {
     local dest_file="$1"
-    local dest_dir
+    shift
+    local fallback_sources=("$@")
 
     if [ -z "$dest_file" ]; then
         echo "⚠️ ensure_default_client_config called without destination path"
@@ -281,32 +284,22 @@ ensure_default_client_config() {
         return 0
     fi
 
-    dest_dir=$(dirname "$dest_file")
-    if ! safe_ensure_directory "$dest_dir" "client-config destination"; then
-        echo "⚠️ Unable to prepare directory for $dest_file"
-        return 1
+    if [ "${#fallback_sources[@]}" -eq 0 ]; then
+        fallback_sources=("$DEFAULT_CLIENT_CONFIG_PATH")
     fi
 
-    cat >"$dest_file" <<'EOF'
-{
-  "localServers": {},
-  "remoteTools": [
-    "brave_search_brave_web_search",
-    "context7_get_library_docs",
-    "memory_create_entities",
-    "memory_add_observations",
-    "memory_read_graph",
-    "filesystem_read_text_file",
-    "filesystem_list_directory",
-    "filesystem_edit_file",
-    "filesystem_search_files",
-    "kubernetes_listResources"
-  ]
-}
-EOF
+    for source_file in "${fallback_sources[@]}"; do
+        [ -n "$source_file" ] || continue
+        if [ -f "$source_file" ] && [ -s "$source_file" ]; then
+            if safe_copy_file "$source_file" "$dest_file" "client-config.json fallback source ($source_file)"; then
+                echo "🛠️ Restored client-config.json from $source_file"
+                return 0
+            fi
+        fi
+    done
 
-    echo "🛠️ Created fallback client-config.json at $dest_file"
-    return 0
+    echo "⚠️ No fallback client-config.json source available; leaving unset"
+    return 1
 }
 
 # Ensure toolman-guide.md exists with baseline QA/implementation workflow guidance
