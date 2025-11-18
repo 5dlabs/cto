@@ -8,9 +8,9 @@ use crate::tasks::template_paths::{
     CODE_CODING_GUIDELINES_TEMPLATE, CODE_CURSOR_CONTAINER_BASE_TEMPLATE,
     CODE_CURSOR_GLOBAL_CONFIG_TEMPLATE, CODE_CURSOR_PROJECT_CONFIG_TEMPLATE,
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
-    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
-    CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
-    CODE_GEMINI_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_MEMORY_TEMPLATE,
+    CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GEMINI_CONTAINER_BASE_TEMPLATE,
+    CODE_GEMINI_MEMORY_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE, CODE_MCP_CONFIG_TEMPLATE,
+    CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -292,11 +292,7 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "container.sh".to_string(),
-            Self::generate_gemini_container_script(
-                code_run,
-                &enriched_cli_config,
-                &remote_tools,
-            )?,
+            Self::generate_gemini_container_script(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
@@ -2189,7 +2185,11 @@ impl CodeTemplateGenerator {
 
         // Parse continue_session from spec or env
         let continue_session = code_run.spec.continue_session
-            || code_run.spec.env.get("CONTINUE_SESSION").is_some_and(|v| v == "true");
+            || code_run
+                .spec
+                .env
+                .get("CONTINUE_SESSION")
+                .is_some_and(|v| v == "true");
 
         let retry_count = code_run
             .status
@@ -2214,11 +2214,13 @@ impl CodeTemplateGenerator {
             "attempts": retry_count + 1,
         });
 
-        handlebars.render("gemini_container", &context).map_err(|e| {
-            crate::tasks::types::Error::ConfigError(format!(
-                "Failed to render Gemini container script: {e}"
-            ))
-        })
+        handlebars
+            .render("gemini_container", &context)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to render Gemini container script: {e}"
+                ))
+            })
     }
 
     fn generate_gemini_memory(
@@ -2232,7 +2234,11 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template(CODE_GEMINI_MEMORY_TEMPLATE)?;
+        // Register shared agent system prompt partials
+        Self::register_agent_partials(&mut handlebars)?;
+
+        let template_path = Self::get_gemini_memory_template(code_run);
+        let template = Self::load_template(&template_path)?;
 
         handlebars
             .register_template_string("gemini_memory", template)
@@ -2731,6 +2737,12 @@ impl CodeTemplateGenerator {
         };
 
         template_name.to_string()
+    }
+
+    fn get_gemini_memory_template(_code_run: &CodeRun) -> String {
+        // Currently using single shared memory template for all Gemini agents
+        // Can be extended in the future for agent-specific templates similar to other CLIs
+        CODE_GEMINI_MEMORY_TEMPLATE.to_string()
     }
 
     fn get_factory_container_template(code_run: &CodeRun) -> String {
