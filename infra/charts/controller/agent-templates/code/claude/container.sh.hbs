@@ -86,6 +86,88 @@ sync_gh_hosts_to_path() {
     fi
 }
 
+ensure_default_client_config() {
+    dest_file="$1"
+    if [ -z "$dest_file" ]; then
+        return 1
+    fi
+    if [ -f "$dest_file" ] && [ -s "$dest_file" ]; then
+        return 0
+    fi
+    dest_dir=$(dirname "$dest_file")
+    mkdir -p "$dest_dir" 2>/dev/null || true
+    cat >"$dest_file" <<'EOF'
+{
+  "localServers": {},
+  "remoteTools": [
+    "brave_search_brave_web_search",
+    "context7_get_library_docs",
+    "memory_create_entities",
+    "memory_add_observations",
+    "memory_read_graph",
+    "filesystem_read_text_file",
+    "filesystem_list_directory",
+    "filesystem_edit_file",
+    "filesystem_search_files",
+    "kubernetes_listResources"
+  ]
+}
+EOF
+    echo "🛠️ Created fallback client-config.json at $dest_file"
+    return 0
+}
+
+ensure_default_toolman_guide() {
+    task_dir="$1"
+    task_id="$2"
+    service_name="$3"
+    if [ -z "$task_dir" ]; then
+        return 1
+    fi
+    if [ -z "$task_id" ]; then
+        task_id="unknown"
+    fi
+    if [ -z "$service_name" ]; then
+        service_name="unknown service"
+    fi
+    guide_file="$task_dir/toolman-guide.md"
+    if [ -f "$guide_file" ] && [ -s "$guide_file" ]; then
+        return 0
+    fi
+    mkdir -p "$task_dir" 2>/dev/null || true
+    cat >"$guide_file" <<EOF
+# Toolman Guide – ${service_name} · Task ${task_id}
+
+## Mission
+- Validate the implementation for **${service_name}** against \`task/acceptance-criteria.md\`.
+- Run the required quality gate commands (format, lint, test) and capture logs.
+- Leave the workspace intact so downstream agents and humans can review artifacts.
+
+## Required Commands
+\`\`\`bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+\`\`\`
+
+## Workflow
+1. Review \`task/task.md\`, \`task/acceptance-criteria.md\`, and architecture docs.
+2. Ensure the working branch matches the PR being validated.
+3. Run the commands above; on failure, capture logs and block the deployment.
+4. On success, summarize the results (PASS for each command) and update the PR with the appropriate status labels (task-{{task_id}}, service-${service_name}, run labels, etc.).
+5. Never rely on timeouts—explicitly finish by posting results or raising blocking issues.
+
+## Final Comment Checklist
+- List each command and whether it PASSED/FAILED.
+- Attach log excerpts for any failures.
+- State whether additional manual steps are required.
+
+Following this baseline keeps every CLI agent (Cursor, Claude, Codex, Factory, OpenCode, Tess) consistent.
+EOF
+    echo "🛠️ Created fallback toolman-guide.md at $guide_file"
+    return 0
+}
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
@@ -623,6 +705,8 @@ else
         else
             echo "⚠️ client-config.json not found - MCP client may not be configured"
         fi
+
+        ensure_default_client_config "$CLAUDE_WORK_DIR/client-config.json"
 
         echo "✅ Copying toolman-guide.md..."
         if [ -f "$TASK_DIR/toolman-guide.md" ]; then
@@ -1243,15 +1327,23 @@ else
         
         echo "🚀 Launching Claude Code (Task ID 0 mode)..."
 
-        # Wait for Claude to complete
-        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
-        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
-          echo "✅ Claude process completed normally"
+        # Wait for Claude to complete (timeout optional; default disabled)
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-0}"
+        case "$CLAUDE_TIMEOUT" in
+          ''|*[!0-9]*) CLAUDE_TIMEOUT=0 ;;
+        esac
+        if [ "$CLAUDE_TIMEOUT" -gt 0 ] 2>/dev/null; then
+          if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+            echo "✅ Claude process completed normally"
+          else
+            echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+            kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+            sleep 2
+            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          fi
         else
-          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
-          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
-          sleep 2
-          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          echo "⏳ Waiting for Claude completion without timeout guard (CLAUDE_TIMEOUT_SECONDS unset)"
+          wait $CLAUDE_PID
         fi
     elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
         echo "✓ Using task-specific prompt from docs service: task/prompt.md"
@@ -1272,6 +1364,7 @@ else
 
         # Prepare prompt prefix for toolman guidance
         PROMPT_PREFIX=""
+        ensure_default_toolman_guide "$CLAUDE_WORK_DIR/task" "{{task_id}}" "{{service}}"
         if [ -f "$CLAUDE_WORK_DIR/task/toolman-guide.md" ]; then
             PROMPT_PREFIX="🔧 **CRITICAL: Tool Usage Reference**
 
@@ -1342,17 +1435,23 @@ Before starting implementation, you MUST read and follow the task-specific tool 
           ) & HANG_DIAG_PID=$!
         fi
 
-        # Wait for Claude process with timeout safety
-        # Claude should exit after completing work, but sometimes hangs
-        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-21600}"  # 6 hours default
-        
-        if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
-          echo "✅ Claude process completed normally"
+        # Wait for Claude process with optional timeout (default disabled)
+        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-0}"
+        case "$CLAUDE_TIMEOUT" in
+          ''|*[!0-9]*) CLAUDE_TIMEOUT=0 ;;
+        esac
+        if [ "$CLAUDE_TIMEOUT" -gt 0 ] 2>/dev/null; then
+          if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
+            echo "✅ Claude process completed normally"
+          else
+            echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
+            kill -TERM "$CLAUDE_PID" 2>/dev/null || true
+            sleep 2
+            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          fi
         else
-          echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
-          kill -TERM "$CLAUDE_PID" 2>/dev/null || true
-          sleep 2
-          kill -KILL "$CLAUDE_PID" 2>/dev/null || true
+          echo "⏳ Waiting for Claude completion without timeout guard (CLAUDE_TIMEOUT_SECONDS unset)"
+          wait $CLAUDE_PID
         fi
         
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi

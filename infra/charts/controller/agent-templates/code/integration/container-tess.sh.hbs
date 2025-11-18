@@ -715,6 +715,10 @@ if [ -d "$TASK_DIR" ]; then
     else
         echo "ℹ️ toolman-guide.md not found - code agent won't have tool usage guidance"
     fi
+
+    if declare -F ensure_default_client_config >/dev/null 2>&1; then
+        ensure_default_client_config "$CLAUDE_WORK_DIR/client-config.json"
+    fi
     
     # Copy architecture.md from docs root
     ARCH_FILE="$DOCS_PATH/docs/architecture.md"
@@ -1034,6 +1038,10 @@ if [ -f "$TASK_FINAL_DIR/client-config.json" ]; then
     fi
 fi
 
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+    ensure_default_client_config "$CLAUDE_WORK_DIR/client-config.json"
+fi
+
 # Final comprehensive verification
 echo "🔍 FINAL VERIFICATION: Task setup completion check..."
 if verify_task_files "$TASK_FINAL_DIR" "{{task_id}}"; then
@@ -1044,6 +1052,10 @@ else
     echo "❌ TASK SETUP FAILED: Critical files missing in final verification"
     create_error_report "$TASK_FINAL_DIR" "{{task_id}}" "Final verification failed - critical files missing"
     exit 1
+fi
+
+if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
+    ensure_default_toolman_guide "$TASK_FINAL_DIR" "{{task_id}}" "{{service}}"
 fi
 
 # Verify client-config.json is available in Claude's working directory

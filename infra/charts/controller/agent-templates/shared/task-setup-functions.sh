@@ -264,3 +264,120 @@ attempt_task_recovery() {
     echo "❌ Recovery failed - no valid task files found"
     return 1
 }
+
+# Ensure a usable client-config.json exists even if task assets omitted it
+# Usage: ensure_default_client_config "/path/to/client-config.json"
+ensure_default_client_config() {
+    local dest_file="$1"
+    local dest_dir
+
+    if [ -z "$dest_file" ]; then
+        echo "⚠️ ensure_default_client_config called without destination path"
+        return 1
+    fi
+
+    if [ -f "$dest_file" ] && [ -s "$dest_file" ]; then
+        echo "✓ client-config.json already present at $dest_file"
+        return 0
+    fi
+
+    dest_dir=$(dirname "$dest_file")
+    if ! safe_ensure_directory "$dest_dir" "client-config destination"; then
+        echo "⚠️ Unable to prepare directory for $dest_file"
+        return 1
+    fi
+
+    cat >"$dest_file" <<'EOF'
+{
+  "localServers": {},
+  "remoteTools": [
+    "brave_search_brave_web_search",
+    "context7_get_library_docs",
+    "memory_create_entities",
+    "memory_add_observations",
+    "memory_read_graph",
+    "filesystem_read_text_file",
+    "filesystem_list_directory",
+    "filesystem_edit_file",
+    "filesystem_search_files",
+    "kubernetes_listResources"
+  ]
+}
+EOF
+
+    echo "🛠️ Created fallback client-config.json at $dest_file"
+    return 0
+}
+
+# Ensure toolman-guide.md exists with baseline QA/implementation workflow guidance
+# Usage: ensure_default_toolman_guide "/path/to/task/dir" "task_id" "service"
+ensure_default_toolman_guide() {
+    local task_dir="$1"
+    local task_id="${2:-unknown}"
+    local service_name="${3:-unknown service}"
+    local guide_file
+
+    if [ -z "$task_dir" ]; then
+        echo "⚠️ ensure_default_toolman_guide called without task directory"
+        return 1
+    fi
+
+    guide_file="$task_dir/toolman-guide.md"
+
+    if [ -f "$guide_file" ] && [ -s "$guide_file" ]; then
+        echo "✓ toolman-guide.md already present at $guide_file"
+        return 0
+    fi
+
+    if ! safe_ensure_directory "$task_dir" "task directory for toolman guide"; then
+        echo "⚠️ Unable to prepare task directory ($task_dir) for toolman guide"
+        return 1
+    fi
+
+    cat >"$guide_file" <<EOF
+# Toolman Guide – ${service_name} · Task ${task_id}
+
+## Mission
+- Validate the implementation for **${service_name}** against \`task/acceptance-criteria.md\`.
+- Execute the full quality gate (format, lint, test) and capture command output for the PR.
+- Leave the workspace intact so downstream agents and humans can inspect artifacts.
+
+## Required Commands
+Run these commands from the repository root unless instructions say otherwise:
+
+\`\`\`bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+\`\`\`
+
+If the task includes security or tooling checks (gitleaks, trivy, etc.), run those as well and include the results in your summary.
+
+## Execution Workflow
+1. **Review context**  
+   Read \`task/task.md\`, \`task/acceptance-criteria.md\`, and any architecture docs to understand scope.
+
+2. **Sync & prepare**  
+   Pull the latest commits, install dependencies, and ensure the feature branch matches the PR being validated.
+
+3. **Run required commands**  
+   Execute the commands above. Capture stdout/stderr for each command so failures can be diagnosed quickly.
+
+4. **Report status**  
+   - On failures: stop, collect logs, and post a detailed “changes requested” comment referencing the failing command.  
+   - On success: post a summary comment that lists each command and notes “PASS”, and move the workflow to the next stage (labels such as \`security-approved\`, \`ready-for-qa\`, etc.).
+
+5. **Never exit early**  
+   Do not mark the task complete until every required command has succeeded. Do not rely on timeouts; explicitly finish or report failures.
+
+## What to Include in the Final Comment
+- Commands executed and their PASS/FAIL status.
+- Relevant log excerpts for failures or flaky behavior.
+- Confirmation that no additional manual steps are required before QA/handoff.
+
+Following this guide ensures every CLI agent (Cursor, Claude, Codex, OpenCode, Factory, Tess) behaves consistently and delivers actionable verification for Task ${task_id}.
+EOF
+
+    echo "🛠️ Created fallback toolman-guide.md at $guide_file"
+    return 0
+}
