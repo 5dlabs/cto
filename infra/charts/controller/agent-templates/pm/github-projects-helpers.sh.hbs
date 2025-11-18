@@ -1114,14 +1114,23 @@ enable_branch_protection() {
     log "✅ Branch protection enabled for $branch"
     return 0
   else
-    # Check if branch doesn't exist yet
+    # Check for specific error conditions
     if echo "$result" | grep -qi "not found"; then
       log "⚠️  Branch $branch not found yet, protection will need to be enabled after first push"
       return 0
+    elif echo "$result" | grep -qi "upgrade to github pro"; then
+      log "⚠️  Branch protection requires GitHub Pro or public repository"
+      log "   Repository is private and requires GitHub Pro/Team/Enterprise"
+      log "   To enable: Make repository public or upgrade GitHub plan"
+      return 0
+    elif echo "$result" | grep -qi "403"; then
+      log "⚠️  Insufficient permissions to enable branch protection"
+      log "   GitHub App may need 'Administration: write' permission"
+      return 0
     fi
     
-    log "⚠️  Failed to enable branch protection (may lack permissions)"
-    log "Error: $result"
+    log "⚠️  Failed to enable branch protection"
+    log "   Error: $result"
     # Don't fail the whole workflow for this
     return 0
   fi

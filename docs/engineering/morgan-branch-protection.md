@@ -40,15 +40,19 @@ The branch protection feature is designed to be resilient:
 - **Insufficient permissions**: Logs a warning but continues (doesn't fail the workflow)
 - **API errors**: Logged for debugging but won't block project initialization
 
-### GitHub App Permissions Required
+### Requirements
 
-For branch protection to work, the Morgan GitHub App needs:
+For branch protection to work, **both** of these are required:
 
-- **Repository permissions**:
-  - Administration: Read & write (for branch protection rules)
-  - Contents: Read & write (existing requirement)
+1. **Repository must be public OR organization must have GitHub Pro/Team/Enterprise**
+   - GitHub's free plan only allows branch protection on public repositories
+   - Private repositories require a paid GitHub plan
+   
+2. **Morgan GitHub App permissions**:
+   - Administration: Read & write (for branch protection rules)
+   - Contents: Read & write (existing requirement)
 
-If the GitHub App lacks these permissions, Morgan will log a warning but continue with project initialization.
+If either requirement is not met, Morgan will log a specific warning but continue with project initialization.
 
 ## Benefits
 
