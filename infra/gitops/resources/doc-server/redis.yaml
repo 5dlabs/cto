@@ -79,12 +79,16 @@ spec:
               port: redis
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
             failureThreshold: 3
           livenessProbe:
             tcpSocket:
               port: redis
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
             failureThreshold: 3
           volumeMounts:
             - name: redis-data
