@@ -1345,66 +1345,6 @@ gh pr create \
         echo "You can create the PR manually"
     }
 
-# Enable branch protection on main branch
-echo "🔒 Enabling branch protection on main branch..."
-
-# Parse repository owner and name from URL
-if [[ "$REPOSITORY_URL" =~ github\.com[:/]([^/]+)/([^/\.]+)(\.git)?$ ]]; then
-    REPO_OWNER="${BASH_REMATCH[1]}"
-    REPO_NAME="${BASH_REMATCH[2]}"
-elif [[ "$REPOSITORY_URL" =~ ^([^/]+)/([^/]+)$ ]]; then
-    REPO_OWNER="${BASH_REMATCH[1]}"
-    REPO_NAME="${BASH_REMATCH[2]}"
-else
-    echo "⚠️ Could not parse repository URL for branch protection: $REPOSITORY_URL"
-    REPO_OWNER=""
-    REPO_NAME=""
-fi
-
-if [[ -n "$REPO_OWNER" ]] && [[ -n "$REPO_NAME" ]]; then
-    # Branch protection configuration
-    PROTECTION_CONFIG='{
-      "required_status_checks": null,
-      "enforce_admins": true,
-      "required_pull_request_reviews": {
-        "dismiss_stale_reviews": true,
-        "require_code_owner_reviews": false,
-        "required_approving_review_count": 1
-      },
-      "restrictions": null,
-      "allow_force_pushes": false,
-      "allow_deletions": false,
-      "required_conversation_resolution": false
-    }'
-    
-    # Use GitHub CLI to enable branch protection
-    PROTECT_RESULT=$(echo "$PROTECTION_CONFIG" | gh api \
-        -X PUT \
-        -H "Accept: application/vnd.github+json" \
-        "/repos/$REPO_OWNER/$REPO_NAME/branches/main/protection" \
-        --input - 2>&1)
-    
-    PROTECT_EXIT=$?
-    
-    if [ $PROTECT_EXIT -eq 0 ]; then
-        echo "✅ Branch protection enabled on main branch"
-        echo "   - Requires pull request reviews (1 approval)"
-        echo "   - No direct pushes allowed (enforced for admins)"
-        echo "   - No force pushes or deletions"
-    else
-        # Check if branch doesn't exist yet
-        if echo "$PROTECT_RESULT" | grep -qi "not found"; then
-            echo "⚠️ Branch main not found yet, protection will need to be enabled after first push"
-        else
-            echo "⚠️ Failed to enable branch protection (may lack permissions)"
-            echo "   Error: $PROTECT_RESULT"
-        fi
-        # Don't fail the whole workflow for this
-    fi
-else
-    echo "⚠️ Skipping branch protection (could not parse repository info)"
-fi
-
 echo "✅ Project intake complete!"
 echo "================================="
 echo "Project: $PROJECT_NAME"
