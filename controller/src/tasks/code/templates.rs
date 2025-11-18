@@ -10,6 +10,7 @@ use crate::tasks::template_paths::{
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
     CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
     CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
+    CODE_GEMINI_CONTAINER_TEMPLATE, CODE_GEMINI_MEMORY_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -58,6 +59,7 @@ impl CodeTemplateGenerator {
             CLIType::Cursor => Self::generate_cursor_templates(code_run, config),
             CLIType::Factory => Self::generate_factory_templates(code_run, config),
             CLIType::OpenCode => Self::generate_opencode_templates(code_run, config),
+            CLIType::Gemini => Self::generate_gemini_templates(code_run, config),
             _ => Self::generate_claude_templates(code_run, config),
         }
     }
@@ -241,6 +243,65 @@ impl CodeTemplateGenerator {
                 &client_config_value,
                 &remote_tools,
             )?,
+        );
+
+        templates.insert(
+            "coding-guidelines.md".to_string(),
+            Self::generate_coding_guidelines(code_run)?,
+        );
+        templates.insert(
+            "github-guidelines.md".to_string(),
+            Self::generate_github_guidelines(code_run)?,
+        );
+
+        for (filename, content) in Self::generate_hook_scripts(code_run) {
+            templates.insert(format!("hooks-{filename}"), content);
+        }
+
+        templates.insert(
+            "mcp.json".to_string(),
+            Self::generate_mcp_config(code_run, config)?,
+        );
+
+        Ok(templates)
+    }
+
+    fn generate_gemini_templates(
+        code_run: &CodeRun,
+        config: &ControllerConfig,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut templates = BTreeMap::new();
+
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        // Enrich cli_config with agent-level settings
+        let enriched_cli_config =
+            Self::enrich_cli_config_from_agent(cli_config_value, code_run, config);
+
+        let client_config = Self::generate_client_config(code_run, config)?;
+        let client_config_value: Value = serde_json::from_str(&client_config)
+            .unwrap_or_else(|_| json!({ "remoteTools": [], "localServers": {} }));
+        let remote_tools = Self::extract_remote_tools(&client_config_value);
+
+        templates.insert("client-config.json".to_string(), client_config);
+
+        templates.insert(
+            "container.sh".to_string(),
+            Self::generate_gemini_container_script(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+            )?,
+        );
+
+        templates.insert(
+            "GEMINI.md".to_string(),
+            Self::generate_gemini_memory(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
@@ -2090,6 +2151,114 @@ impl CodeTemplateGenerator {
         })
     }
 
+    fn generate_gemini_container_script(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_GEMINI_CONTAINER_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("gemini_container", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini container template: {e}"
+                ))
+            })?;
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        // Add standard environment vars
+        let env_vars = Self::build_env_vars(code_run, workflow_name.clone());
+
+        // Parse continue_session from spec or env
+        let continue_session = code_run.spec.continue_session.unwrap_or(false)
+            || code_run.spec.env.get("CONTINUE_SESSION").map_or(false, |v| v == "true");
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_project_directory": code_run.spec.docs_project_directory,
+            "working_directory": Self::get_working_directory(code_run),
+            "docs_branch": code_run.spec.docs_branch,
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "env_vars": env_vars,
+            "remote_tools": remote_tools,
+            "settings": cli_settings,
+            "continue_session": continue_session,
+            "overwrite_memory": code_run.spec.overwrite_memory.unwrap_or(false),
+        });
+
+        handlebars.render("gemini_container", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Gemini container script: {e}"
+            ))
+        })
+    }
+
+    fn generate_gemini_memory(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_GEMINI_MEMORY_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("gemini_memory", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini memory template: {e}"
+                ))
+            })?;
+
+        let workflow_name = extract_workflow_name(code_run)
+            .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
+
+        let cli_settings = cli_config
+            .get("settings")
+            .cloned()
+            .unwrap_or_else(|| json!({}));
+
+        let requirements = Self::extract_requirements(code_run);
+
+        let context = json!({
+            "task_id": code_run.spec.task_id,
+            "service": code_run.spec.service,
+            "repository_url": code_run.spec.repository_url,
+            "docs_repository_url": code_run.spec.docs_repository_url,
+            "docs_branch": code_run.spec.docs_branch,
+            "working_directory": Self::get_working_directory(code_run),
+            "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
+            "workflow_name": workflow_name,
+            "remote_tools": remote_tools,
+            "settings": cli_settings,
+            "workflow_env_vars": Self::extract_workflow_env_vars(code_run),
+            "requirements_env_vars": requirements.env_vars,
+            "requirements_secret_sources": requirements.secret_sources,
+        });
+
+        handlebars.render("gemini_memory", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Gemini memory template: {e}"
+            ))
+        })
+    }
+
     fn generate_coding_guidelines(code_run: &CodeRun) -> Result<String> {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
@@ -2297,7 +2466,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
             "5DLabs-Tess" => "integration/container-tess.sh.hbs",
-            "5DLabs-Atlas" => "claude/container.sh.hbs",
+            "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
                 // Default to the generic container template for unknown agents
@@ -2336,6 +2505,8 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
+            "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
         };
 
@@ -2382,6 +2553,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
         };
@@ -2431,6 +2603,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
         };
@@ -2478,6 +2651,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
             "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/factory/container.sh.hbs",
         };

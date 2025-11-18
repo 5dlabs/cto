@@ -2023,11 +2023,64 @@ if [ -n "$TOKEN_REFRESH_PID" ]; then
     echo "✓ Stopped token refresh process"
 fi
 
-# Always attempt to complete quality review - don't exit on Claude failures
-echo "🔄 Processing quality review results..."
-if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-  echo "✅ Claude quality review completed successfully"
+# =========================================================================
+# QUALITY GATE EXECUTION: Run actual checks and fix issues
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              CLEO QUALITY GATE EXECUTION                      ║"
+echo "════════════════════════════════════════════════════════════════"
+
+cd "$CLAUDE_WORK_DIR"
+
+QUALITY_PASSED=1
+QUALITY_REPORT=""
+
+# 1. Run cargo fmt
+echo "🎨 Running cargo fmt..."
+if cargo fmt --all -- --check 2>&1 | tee /tmp/fmt-check.log; then
+    echo "✅ Format check passed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Format check: PASSED\n"
+else
+    echo "⚠️ Format issues detected - fixing..."
+    cargo fmt --all
+    git add -A
+    git commit -m "style: auto-format code with cargo fmt" || echo "No format changes to commit"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Format check: FIXED\n"
 fi
+
+# 2. Run cargo clippy
+echo "🔍 Running cargo clippy..."
+if cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic 2>&1 | tee /tmp/clippy.log; then
+    echo "✅ Clippy passed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Clippy: PASSED\n"
+else
+    echo "❌ Clippy warnings detected"
+    QUALITY_REPORT="${QUALITY_REPORT}- ❌ Clippy: FAILED\n"
+    QUALITY_REPORT="${QUALITY_REPORT}\n**Clippy Output:**\n\`\`\`\n$(tail -50 /tmp/clippy.log)\n\`\`\`\n"
+    QUALITY_PASSED=0
+fi
+
+# 3. Run cargo test
+echo "🧪 Running cargo test..."
+if cargo test --workspace --all-features 2>&1 | tee /tmp/test.log; then
+    echo "✅ Tests passed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ✅ Tests: PASSED\n"
+else
+    echo "❌ Tests failed"
+    QUALITY_REPORT="${QUALITY_REPORT}- ❌ Tests: FAILED\n"
+    QUALITY_REPORT="${QUALITY_REPORT}\n**Test Output:**\n\`\`\`\n$(tail -50 /tmp/test.log)\n\`\`\`\n"
+    QUALITY_PASSED=0
+fi
+
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+if [ $QUALITY_PASSED -eq 1 ]; then
+    echo "✅ CLEO QUALITY GATE: ALL CHECKS PASSED"
+else
+    echo "❌ CLEO QUALITY GATE: ISSUES DETECTED"
+fi
+echo "════════════════════════════════════════════════════════════════"
 
 # Always attempt to post PR comment and add label regardless of Claude exit status
 # Determine OWNER/REPO slug for gh -R
@@ -2038,42 +2091,32 @@ else
   REPO_SLUG="$REPO_INPUT"
 fi
 
-# Post quality review comment to PR
+# Post quality review comment to PR based on ACTUAL quality check results
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   echo "💬 Posting quality review comment to PR..."
 
-  # Create comment body based on Claude exit status
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  # Create comment body based on actual quality check results
+  if [ $QUALITY_PASSED -eq 1 ]; then
     COMMENT_BODY="## ✅ Code Quality Review - PASSED
 
 All quality checks have passed:
-- Code formatting verified
-- Linting passed
-- Unit tests successful
-- Quality standards met
+$(echo -e "$QUALITY_REPORT")
 
-**Status:** Ready for end-to-end testing by Tess
-**Next Step:** Tess will now perform comprehensive QA validation
+**Status:** Ready for security review by Cipher
+**Next Step:** Cipher will now perform security scanning
 
 ---
 *Quality review by Cleo - 5DLabs Code Quality Agent*"
   else
-    COMMENT_BODY="## 🔍 Code Quality Review by Cleo
+    COMMENT_BODY="## ❌ Code Quality Review - ISSUES DETECTED
 
-⚠️ **Quality review encountered issues**
+Quality checks failed:
+$(echo -e "$QUALITY_REPORT")
 
-### Current Status
-- Quality checks are being processed
-- Some issues may need to be resolved
-- Review will continue until standards are met
-
-### Next Steps
-- Monitor CI/CD pipeline status
-- Address any failing quality checks
-- Iterate until all standards are met
+**Cleo will continue iterating to fix these issues.**
 
 ---
-*Reviewed by Cleo - 5DLabs Code Quality Agent*"
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
   fi
 
   # Post comment using PR number or URL
@@ -2102,26 +2145,29 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    echo "✅ Cleo quality checks passed - handing off to Tess for E2E testing"
+  if [ $QUALITY_PASSED -eq 1 ]; then
+    echo "✅ Cleo quality checks passed - handing off to Cipher for security review"
     
-    # Post APPROVE review so workflow can detect completion and skip re-runs
+    # Push any format fixes that were made
+    if ! git diff --cached --quiet 2>/dev/null; then
+      echo "📤 Pushing quality fixes..."
+      git push origin HEAD || echo "⚠️ Failed to push fixes"
+    fi
+    
+    # Post APPROVE review
     echo "✅ Posting APPROVE review to signal quality checks passed"
     REVIEW_BODY="### ✅ Code Quality Review - APPROVED
 
 All quality checks have passed:
-- Code formatting verified
-- Linting passed
-- Unit tests successful
-- Quality standards met
+$(echo -e "$QUALITY_REPORT")
 
-**Status:** Ready for end-to-end testing by Tess
-**Next Step:** Tess will now perform comprehensive QA validation
+**Status:** Ready for security review by Cipher
+**Next Step:** Cipher will now perform security scanning
 
 ---
 *Quality review by Cleo - 5DLabs Code Quality Agent*"
     
-    # Retry approval submission - critical for workflow progression
+    # Retry approval submission
     APPROVAL_RETRIES=3
     APPROVAL_SUCCESS=false
     for retry in $(seq 1 $APPROVAL_RETRIES); do
@@ -2139,36 +2185,24 @@ All quality checks have passed:
     
     if [ "$APPROVAL_SUCCESS" != "true" ]; then
       echo "❌ CRITICAL: Failed to post PR approval after $APPROVAL_RETRIES attempts"
-      echo "   Quality gate cannot be bypassed - workflow should fail"
-      echo "   This prevents Cleo from proceeding without proper GitHub approval"
       exit 1
     fi
     
-    # Add ready-for-qa label to signal Tess (comment already posted above)
-    echo "🏷️  Adding 'ready-for-qa' label to trigger Tess review"
-    timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-qa" || echo "⚠️ Failed to add ready-for-qa label"
+    # Add ready-for-security label to signal Cipher
+    echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"
+    timeout 30 gh pr edit "$PR_NUMBER" --add-label "ready-for-security" || echo "⚠️ Failed to add ready-for-security label"
     
-    update_coderun_status "ready-for-qa" "quality-passed" "$PR_URL"
+    update_coderun_status "ready-for-security" "quality-passed" "$PR_URL"
   else
-    echo "❌ Quality issues detected - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Changes
-
-Code quality issues detected. Please address the following:
-- Review code formatting
-- Fix linting errors
-- Ensure unit tests pass
-- Meet quality standards
-
-Rex will address these issues and resubmit for review.
-
----
-*Quality review by Cleo - 5DLabs Code Quality Agent*" || echo "⚠️ PR review command failed"
+    echo "❌ Quality issues detected - Cleo will retry to fix them"
     
-    # Add needs-fixes label so evaluate-remediation can detect it
-    echo "🏷️  Adding 'needs-fixes' label to trigger remediation"
-    timeout 30 gh pr edit "$PR_NUMBER" --add-label "needs-fixes" || echo "⚠️ Failed to add needs-fixes label"
+    # DO NOT add ready-for-security label - block Cipher until quality passes
+    echo "🛑 Blocking Cipher handoff - quality issues must be resolved first"
     
-    update_coderun_status "needs-fixes" "changes_requested" "$PR_URL"
+    update_coderun_status "needs-fixes" "quality-issues" "$PR_URL"
+    
+    # Exit with failure to trigger retry
+    exit 1
   fi
 else
   echo "⚠️ No PR reference available, skipping remediation label update"
@@ -2182,8 +2216,8 @@ fi
   # =========================================================================
   STATE_FILE="$AGENT_STATE_DIR/quality-iteration-${ATTEMPT}.json"
   
-  # Check if quality review was successful
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  # Check if quality review was successful using QUALITY_PASSED (from actual checks)
+  if [ ${QUALITY_PASSED:-0} -eq 1 ]; then
     # Save successful completion state
     cat > "$STATE_FILE" <<EOF
 {
@@ -2207,14 +2241,14 @@ EOF
   "iteration": $ATTEMPT,
   "status": "incomplete",
   "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "findings": "Quality checks incomplete - exit code $CLAUDE_EXIT_CODE",
-  "exit_code": $CLAUDE_EXIT_CODE,
-  "issues": ["Claude exited with non-zero status"]
+  "findings": "Quality checks failed - issues detected in fmt/clippy/tests",
+  "exit_code": 1,
+  "issues": ["Quality gate failures detected"]
 }
 EOF
     echo "💾 Saved incomplete state to $STATE_FILE for next iteration"
     
-    echo "⚠️ Attempt $ATTEMPT: Quality checks incomplete (exit code: $CLAUDE_EXIT_CODE)"
+    echo "⚠️ Attempt $ATTEMPT: Quality checks failed - Cleo will retry"
     
     if [ $ATTEMPT -lt $MAX_RETRIES ]; then
       echo "🔄 Will retry... ($((MAX_RETRIES - ATTEMPT)) attempts remaining)"
@@ -2223,7 +2257,7 @@ EOF
       # Brief pause before retry
       sleep 2
     else
-      echo "❌ Maximum retry attempts reached"
+      echo "❌ Maximum retry attempts reached - quality issues remain"
       break
     fi
   fi
@@ -2233,12 +2267,14 @@ done
 echo ""
 echo "════════════════════════════════════════════════════════════════"
 if [ $SUCCESS -eq 1 ]; then
-  echo "✅ CLEO QUALITY REVIEW SUCCESSFUL"
+  echo "✅ CLEO QUALITY GATE: ALL CHECKS PASSED"
   echo "   Completed after $ATTEMPT attempt(s)"
+  echo "   Ready for Cipher security review"
 else
-  echo "⚠️ CLEO QUALITY REVIEW INCOMPLETE"
+  echo "🛑 CLEO QUALITY GATE: BLOCKING WORKFLOW"
   echo "   Attempted $ATTEMPT time(s)"
-  echo "   Quality standards not yet met"
+  echo "   Quality issues detected - retries exhausted"
+  echo "   Cipher handoff BLOCKED until issues resolved"
 fi
 echo "════════════════════════════════════════════════════════════════"
 
@@ -2247,26 +2283,31 @@ echo "════════════════════════�
 echo "║                  CLEO CODE QUALITY COMPLETE                  ║"
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 Task: {{task_id}}"
-echo "✅ Code quality checks completed"
+if [ $SUCCESS -eq 1 ]; then
+  echo "✅ Quality checks passed"
+else
+  echo "❌ Quality issues found - workflow blocked"
+fi
 echo "════════════════════════════════════════════════════════════════"
 
 # Final termination sequence
 echo "════════════════════════════════════════════════════════════════"
 echo "🔚 TERMINATING CLEO CONTAINER"
 echo "════════════════════════════════════════════════════════════════"
-echo "Claude Exit Code: $CLAUDE_EXIT_CODE"
+echo "Quality Gate Result: $([ $SUCCESS -eq 1 ] && echo 'PASSED' || echo 'BLOCKED')"
 echo "Container PID: $$"
 echo "Final Process Check:"
 ps aux | head -5
 
-# Write completion marker for workflow tracking
-echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
+# Write completion marker only if passed
+if [ $SUCCESS -eq 1 ]; then
+  echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
+fi
 
 # Cleanup FIFO
 rm -f "$FIFO_PATH" 2>/dev/null || true
 
 # Note: Docker sidecar cleanup is handled by EXIT trap
-# No explicit call needed - trap will fire on exit
 
 # Exit with appropriate code based on success
 if [ $SUCCESS -eq 1 ]; then
@@ -2274,6 +2315,6 @@ if [ $SUCCESS -eq 1 ]; then
   exit 0
 else
   echo "🔚 Terminating container with failure status..."
-  echo "📝 Quality checks incomplete after $ATTEMPT attempt(s)"
+  echo "📝 Quality issues detected - blocking workflow progression"
   exit 1
 fi
