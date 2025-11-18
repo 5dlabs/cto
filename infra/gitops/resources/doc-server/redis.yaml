@@ -27,9 +27,16 @@ metadata:
     app.kubernetes.io/name: doc-server-redis
     app.kubernetes.io/component: cache
     app.kubernetes.io/part-of: doc-server
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
 spec:
   serviceName: redis
   replicas: 1
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: doc-server-redis
@@ -74,18 +81,28 @@ spec:
               port: redis
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
             failureThreshold: 3
           livenessProbe:
             tcpSocket:
               port: redis
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
             failureThreshold: 3
           volumeMounts:
             - name: redis-data
               mountPath: /bitnami/redis/data
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: redis-data
         labels:
           app.kubernetes.io/name: doc-server-redis

@@ -1184,7 +1184,12 @@ impl<'a> CodeResourceManager<'a> {
         for job in jobs {
             if let Some(job_name) = job.metadata.name {
                 info!("Deleting old code job: {}", job_name);
-                let _ = self.jobs.delete(&job_name, &DeleteParams::default()).await;
+                // Use Background propagation to ensure pods are cleaned up
+                let delete_params = DeleteParams {
+                    propagation_policy: Some(kube::api::PropagationPolicy::Background),
+                    ..Default::default()
+                };
+                let _ = self.jobs.delete(&job_name, &delete_params).await;
             }
         }
 
