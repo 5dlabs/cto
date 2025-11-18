@@ -1175,7 +1175,7 @@ async fn delete_job_with_cascade(
         propagation_policy: Some(kube::api::PropagationPolicy::Background),
         ..Default::default()
     };
-    
+
     match jobs.delete(job_name, &delete_params).await {
         Ok(_) => {
             debug!("Deleted job {}", job_name);

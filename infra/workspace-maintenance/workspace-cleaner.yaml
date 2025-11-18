@@ -67,11 +67,23 @@ spec:
             app.kubernetes.io/name: workspace-pvc-cleaner
         spec:
           serviceAccountName: workspace-cleaner
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            fsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
           restartPolicy: OnFailure
           containers:
             - name: cleaner
-              image: bitnami/kubectl:1.31.4
+              image: bitnami/kubectl:latest
               imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
               env:
                 - name: RETENTION_HOURS
                   value: "12"
