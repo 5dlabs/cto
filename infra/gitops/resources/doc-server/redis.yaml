@@ -89,6 +89,10 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /bitnami/redis/data
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   volumeClaimTemplates:
     - metadata:
         name: redis-data
