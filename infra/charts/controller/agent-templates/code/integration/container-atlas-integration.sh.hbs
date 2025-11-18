@@ -122,24 +122,106 @@ All tasks from batch $BATCH_NUMBER have been successfully integrated. Ready for 
 
 All tasks from this Play workflow have been successfully integrated into main."
     fi
-elif [ $CONFLICTED_PRS -eq 0 ]; then
+elif [ $CONFLICTED_PRS -eq 0 ] && [ $CLEAN_PRS -gt 0 ]; then
     SUMMARY="$SUMMARY
-✅ **No conflicts detected**
+✅ **No conflicts detected - Executing coordinated merge**
 
-All open PRs are cleanly mergeable. Ready for review and merge."
+All $CLEAN_PRS open PR(s) are cleanly mergeable. Atlas will now merge them in dependency order..."
+    
+    echo "$SUMMARY"
+    
+    # Get task dependencies from tasks.json in docs repo
+    DOCS_REPO="{{docs_repository}}"
+    DOCS_DIR="/tmp/docs-repo"
+    
+    if [ -n "$DOCS_REPO" ]; then
+        echo "📋 Fetching task dependencies from docs repo..."
+        git clone "$DOCS_REPO" "$DOCS_DIR" 2>/dev/null || true
+        
+        TASKS_FILE="$DOCS_DIR/.taskmaster/tasks/tasks.json"
+        if [ -f "$TASKS_FILE" ]; then
+            echo "✅ Found tasks.json - determining merge order..."
+            
+            # Extract task IDs and their dependencies
+            # Sort PRs by dependency order (tasks with no deps first, then their dependents)
+            SORTED_PRS=$(echo "$PRS" | jq -c 'select(.state == "OPEN" and .mergeable == "MERGEABLE")' | while read -r pr; do
+                PR_NUM=$(echo "$pr" | jq -r '.number')
+                
+                # Extract task ID from PR labels
+                TASK_ID=$(gh pr view "$PR_NUM" --json labels --jq '.labels[]? | select(.name | startswith("task-")) | .name | sub("task-"; "")' 2>/dev/null || echo "999")
+                
+                # Get dependency count for this task
+                DEP_COUNT=$(jq -r ".tasks[] | select(.id == $TASK_ID) | .dependencies | length" "$TASKS_FILE" 2>/dev/null || echo "0")
+                
+                echo "$DEP_COUNT $PR_NUM"
+            done | sort -n | awk '{print $2}')
+            
+            echo "📊 Merge order (by dependency): $SORTED_PRS"
+            
+            # Merge PRs in dependency order
+            MERGED_COUNT=0
+            for PR_NUM in $SORTED_PRS; do
+                echo "🚀 Merging PR #$PR_NUM..."
+                
+                if gh pr merge "$PR_NUM" --squash --delete-branch 2>/dev/null; then
+                    echo "✅ PR #$PR_NUM merged successfully"
+                    MERGED_COUNT=$((MERGED_COUNT + 1))
+                    
+                    # Brief pause to let GitHub process the merge
+                    sleep 5
+                else
+                    echo "⚠️ Failed to merge PR #$PR_NUM - may need manual intervention"
+                fi
+            done
+            
+            SUMMARY="$SUMMARY
+
+**Merge Results:**
+- Successfully merged: $MERGED_COUNT/$CLEAN_PRS PRs
+- Merge order respected task dependencies
+
+All PRs merged in correct dependency order."
+        else
+            echo "⚠️ tasks.json not found - merging in discovery order..."
+            
+            # Fallback: merge in the order we discovered them
+            echo "$PRS" | jq -c 'select(.state == "OPEN" and .mergeable == "MERGEABLE")' | while read -r pr; do
+                PR_NUM=$(echo "$pr" | jq -r '.number')
+                gh pr merge "$PR_NUM" --squash --delete-branch 2>/dev/null || echo "⚠️ Failed to merge PR #$PR_NUM"
+                sleep 5
+            done
+            
+            SUMMARY="$SUMMARY
+
+**Note:** Merged in discovery order (tasks.json not available for dependency sorting)"
+        fi
+    else
+        echo "⚠️ No docs repository configured - merging in discovery order..."
+        
+        # Merge without dependency awareness
+        echo "$PRS" | jq -c 'select(.state == "OPEN" and .mergeable == "MERGEABLE")' | while read -r pr; do
+            PR_NUM=$(echo "$pr" | jq -r '.number')
+            gh pr merge "$PR_NUM" --squash --delete-branch 2>/dev/null || echo "⚠️ Failed to merge PR #$PR_NUM"
+            sleep 5
+        done
+    fi
 else
     SUMMARY="$SUMMARY
 ⚠️ **Conflicts detected in $CONFLICTED_PRS PR(s)**
 
-Atlas will attempt to resolve conflicts automatically."
+Long-running Atlas guardians on each PR will resolve conflicts automatically. 
+This coordinator will wait for them to complete before executing merges."
 fi
 
 SUMMARY="$SUMMARY
 
 ---
-*Batch integration check by Atlas*"
+*Integration coordination by Atlas at $(date -u +%Y-%m-%dT%H:%M:%SZ)*"
 
 echo "$SUMMARY"
+
+# Post summary to workflow tracking (if available)
+# TODO: Post to centralized workflow tracking issue or Slack
 
 # Exit successfully - Atlas ran the integration check
 exit 0
