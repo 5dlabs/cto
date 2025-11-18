@@ -805,7 +805,7 @@ if [ -d "/task-files" ]; then
           # Preserve mode (default): Only copy if doesn't exist
           if [ ! -f "$GEMINI_WORK_DIR/GEMINI.md" ]; then
       # Initial creation - copy from ConfigMap
-      cp "/task-files/CLAUDE.md" "$GEMINI_WORK_DIR/GEMINI.md" 2>/dev/null || cp "/task-files/GEMINI.md" "$GEMINI_WORK_DIR/GEMINI.md" 2>/dev/null
+      cp "/task-files/GEMINI.md" "$GEMINI_WORK_DIR/GEMINI.md" 2>/dev/null || cp "/task-files/CLAUDE.md" "$GEMINI_WORK_DIR/GEMINI.md" 2>/dev/null
       cp "$GEMINI_WORK_DIR/GEMINI.md" "/workspace/GEMINI.md"
             echo "✓ Created initial GEMINI.md memory file"
             echo "✓ Copied GEMINI.md to workspace root for easy access"

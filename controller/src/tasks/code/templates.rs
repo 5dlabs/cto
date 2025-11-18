@@ -10,7 +10,7 @@ use crate::tasks::template_paths::{
     CODE_FACTORY_CONTAINER_BASE_TEMPLATE, CODE_FACTORY_GLOBAL_CONFIG_TEMPLATE,
     CODE_FACTORY_PROJECT_CONFIG_TEMPLATE, CODE_GITHUB_GUIDELINES_TEMPLATE,
     CODE_MCP_CONFIG_TEMPLATE, CODE_OPENCODE_CONFIG_TEMPLATE, CODE_OPENCODE_CONTAINER_BASE_TEMPLATE,
-    CODE_GEMINI_CONTAINER_TEMPLATE, CODE_GEMINI_MEMORY_TEMPLATE,
+    CODE_GEMINI_CONTAINER_BASE_TEMPLATE, CODE_GEMINI_MEMORY_TEMPLATE,
 };
 use crate::tasks::tool_catalog::resolve_tool_name;
 use crate::tasks::types::Result;
@@ -2159,13 +2159,23 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        let template = Self::load_template(CODE_GEMINI_CONTAINER_TEMPLATE)?;
+        let base_template = Self::load_template(CODE_GEMINI_CONTAINER_BASE_TEMPLATE)?;
+        handlebars
+            .register_partial("gemini_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Gemini container base partial: {e}"
+                ))
+            })?;
+
+        let template_path = Self::get_gemini_container_template(code_run);
+        let template = Self::load_template(&template_path)?;
 
         handlebars
             .register_template_string("gemini_container", template)
             .map_err(|e| {
                 crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Gemini container template: {e}"
+                    "Failed to register Gemini container template {template_path}: {e}"
                 ))
             })?;
 
@@ -2181,6 +2191,12 @@ impl CodeTemplateGenerator {
         let continue_session = code_run.spec.continue_session
             || code_run.spec.env.get("CONTINUE_SESSION").is_some_and(|v| v == "true");
 
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -2195,6 +2211,7 @@ impl CodeTemplateGenerator {
             "settings": cli_settings,
             "continue_session": continue_session,
             "overwrite_memory": code_run.spec.overwrite_memory,
+            "attempts": retry_count + 1,
         });
 
         handlebars.render("gemini_container", &context).map_err(|e| {
@@ -2209,6 +2226,9 @@ impl CodeTemplateGenerator {
         cli_config: &Value,
         remote_tools: &[String],
     ) -> Result<String> {
+        use base64::{engine::general_purpose, Engine as _};
+        use std::collections::BTreeSet;
+
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
@@ -2237,9 +2257,6 @@ impl CodeTemplateGenerator {
         // 2) From requirements.yaml (environment keys and mapped secret key names)
         let mut req_env_vars: Vec<String> = Vec::new();
         let mut req_secret_sources: Vec<String> = Vec::new();
-
-        // Base64 decode helper import for task_requirements parsing
-        use base64::{engine::general_purpose, Engine as _};
 
         if let Some(req_b64) = &code_run.spec.task_requirements {
             if !req_b64.trim().is_empty() {
@@ -2288,7 +2305,6 @@ impl CodeTemplateGenerator {
         }
 
         // De-duplicate and sort for stable output
-        use std::collections::BTreeSet;
         let wf_set: BTreeSet<_> = workflow_env_vars.into_iter().collect();
         let req_env_set: BTreeSet<_> = req_env_vars.into_iter().collect();
         let req_src_set: BTreeSet<_> = req_secret_sources.into_iter().collect();
@@ -2634,6 +2650,36 @@ impl CodeTemplateGenerator {
             "5DLabs-Atlas" => "agents/atlas-system-prompt.md.hbs",
             "5DLabs-Bolt" => "agents/bolt-system-prompt.md.hbs",
             _ => "code/opencode/agents.md.hbs",
+        };
+
+        template_name.to_string()
+    }
+
+    fn get_gemini_container_template(code_run: &CodeRun) -> String {
+        let github_app = code_run.spec.github_app.as_deref().unwrap_or("");
+
+        // Check if this is a remediation cycle
+        let retry_count = code_run
+            .status
+            .as_ref()
+            .and_then(|s| s.retry_count)
+            .unwrap_or(0);
+
+        let is_remediation = retry_count > 0;
+
+        let template_name = match github_app {
+            "5DLabs-Rex" | "5DLabs-Morgan" => {
+                if is_remediation {
+                    "code/gemini/container-rex-remediation.sh.hbs"
+                } else {
+                    "code/gemini/container-rex.sh.hbs"
+                }
+            }
+            "5DLabs-Blaze" => "code/gemini/container-blaze.sh.hbs",
+            "5DLabs-Cipher" => "code/gemini/container-cipher.sh.hbs",
+            "5DLabs-Cleo" => "code/gemini/container-cleo.sh.hbs",
+            "5DLabs-Tess" => "code/gemini/container-tess.sh.hbs",
+            _ => "code/gemini/container.sh.hbs",
         };
 
         template_name.to_string()
