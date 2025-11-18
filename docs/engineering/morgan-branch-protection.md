@@ -1,19 +1,39 @@
-# Morgan Branch Protection Feature
+# Branch Protection Feature
 
 ## Overview
 
-Morgan now automatically protects the `main` branch when initializing projects, ensuring all changes go through pull requests and preventing direct pushes.
+The platform automatically protects the `main` branch when creating new projects, ensuring all changes go through pull requests and preventing direct pushes.
 
 ## Implementation
 
 ### Location
 
-- **Helper Function**: `infra/charts/controller/agent-templates/pm/github-projects-helpers.sh.hbs`
-- **Integration**: `infra/charts/controller/agent-templates/pm/morgan-pm.sh.hbs`
+Branch protection is applied in **two places** to ensure coverage:
+
+1. **Intake Workflow** (Primary): `infra/charts/controller/agent-templates/intake/intake.sh`
+   - Applied immediately after repository setup and PR creation
+   - Ensures protection from the very beginning
+
+2. **Morgan PM** (Secondary): `infra/charts/controller/agent-templates/pm/morgan-pm.sh.hbs`
+   - Applied during Play workflow project initialization
+   - Acts as a backup/double-check for existing projects
 
 ### How It Works
 
-When Morgan initializes a new project during the Play workflow, it now performs these steps:
+#### During Intake (Primary Protection)
+
+When a new project is created via the Intake workflow, these steps occur:
+
+1. **Repository cloned** and project structure created
+2. **TaskMaster initialized** with PRD parsing
+3. **Branch created** and pushed (e.g., `intake-project-20251118-043000`)
+4. **Pull request created** targeting main
+5. **Branch protection enabled** ✨ (NEW)
+6. Intake complete
+
+#### During Play Workflows (Backup Protection)
+
+When Morgan initializes a project during the Play workflow, it now performs these steps:
 
 1. **Creates GitHub Project** (existing functionality)
 2. **Sets up custom fields** (existing functionality)
@@ -59,11 +79,24 @@ If the GitHub App lacks these permissions, Morgan will log a warning but continu
 
 ## Testing
 
-To verify branch protection is enabled:
+### Test with Intake Workflow (Primary)
 
-1. Trigger a Morgan workflow
-2. Check logs for: `🔒 Enabling branch protection for owner/repo:main`
-3. Verify on GitHub: Settings → Branches → Branch protection rules
+To verify branch protection is enabled during project creation:
+
+1. Trigger an Intake workflow for a new project
+2. Check logs for: `🔒 Enabling branch protection on main branch...`
+3. Look for success message: `✅ Branch protection enabled on main branch`
+4. Verify on GitHub: Settings → Branches → Branch protection rules
+
+### Test with Play Workflow (Backup)
+
+To verify Morgan also applies protection:
+
+1. Trigger a Play workflow
+2. Check Morgan PM logs for: `🔒 Configuring branch protection...`
+3. Verify protection is applied (or already exists)
+
+### Direct Test
 
 Or test directly:
 
