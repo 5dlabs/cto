@@ -1204,6 +1204,10 @@ else
   echo "⚠️ cursor-cli-config.json not provided; using existing global Cursor config"
 fi
 
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+  ensure_default_client_config "$CURSOR_WORK_DIR/client-config.json" "$REPO_ROOT/client-config.json" "/workspace/$REPO_NAME/client-config.json"
+fi
+
 # Check if client-config.json exists in working directory
 if [ ! -f "$CURSOR_WORK_DIR/client-config.json" ]; then
   echo "❌ client-config.json missing from workspace; required for MCP/toolman"
@@ -1378,6 +1382,10 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
+if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
+  ensure_default_toolman_guide "$CURSOR_WORK_DIR/task" "{{task_id}}" "{{service}}"
+fi
+
 if [ -f "$CURSOR_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CURSOR_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi

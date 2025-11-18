@@ -1394,6 +1394,10 @@ if [ -f /task-files/client-config.json ]; then
   echo "✓ Copied client-config.json to working directory"
 fi
 
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+  ensure_default_client_config "$CODEX_WORK_DIR/client-config.json"
+fi
+
 if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$CODEX_WORK_DIR/.mcp.json"
 fi
@@ -1588,6 +1592,10 @@ fi
 # =========================================================================
 
 PROMPT_PREFIX=""
+if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
+  ensure_default_toolman_guide "$CODEX_WORK_DIR/task" "{{task_id}}" "{{service}}"
+fi
+
 if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi

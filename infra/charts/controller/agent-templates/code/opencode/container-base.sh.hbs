@@ -1247,6 +1247,10 @@ if [ -f /task-files/client-config.json ]; then
   echo "✓ Copied client-config.json to working directory"
 fi
 
+if declare -F ensure_default_client_config >/dev/null 2>&1; then
+  ensure_default_client_config "$OPENCODE_WORK_DIR/client-config.json" "$REPO_ROOT/client-config.json" "$TASK_WORKSPACE/client-config.json"
+fi
+
 if [ -f /task-files/mcp.json ]; then
   cp /task-files/mcp.json "$OPENCODE_WORK_DIR/.mcp.json"
 fi
@@ -1451,6 +1455,10 @@ PROMPT_PREFIX="${PROMPT_PREFIX}You're working on **Task {{task_id}}** for servic
 PROMPT_PREFIX="${PROMPT_PREFIX}**Required Reading:**\n"
 PROMPT_PREFIX="${PROMPT_PREFIX}- @task/acceptance-criteria.md — Your success criteria (complete ALL of these)\n"
 PROMPT_PREFIX="${PROMPT_PREFIX}- @AGENTS.md — Repository guidelines and workflow\n"
+if declare -F ensure_default_toolman_guide >/dev/null 2>&1; then
+  ensure_default_toolman_guide "$OPENCODE_WORK_DIR/task" "{{task_id}}" "{{service}}"
+fi
+
 if [ -f "$OPENCODE_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}- @task/toolman-guide.md — Tool usage reference\n"
 fi
