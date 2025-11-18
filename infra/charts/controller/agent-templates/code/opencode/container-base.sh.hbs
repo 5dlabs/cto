@@ -2409,7 +2409,7 @@ else
   EXIT_CODE=0
 fi
 
-if [ $SUCCESS -eq 1 ]; then
+if [ $SUCCESS -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
 elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
