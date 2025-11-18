@@ -110,6 +110,37 @@ Rex (Implementation) → Cleo (Code Quality) → Cipher (Security) → Tess (QA/
 - Must run before Tess to catch security issues before expensive E2E testing
 - Security issues should block testing phase (no point testing insecure code)
 
+### CodeQL Baseline Enforcement
+
+- **First action**: When Cipher starts, it must verify that `.github/workflows/codeql.yml` exists in the target repository and is enabled on `push`, `pull_request`, and a weekly cron schedule.
+- **Language coverage**: The workflow must initialize CodeQL with both `javascript-typescript` and `rust` so it covers our TypeScript CLIs and Rust services.
+- **Self-healing**: If the workflow is missing or incomplete, Cipher writes the standard GitHub CodeQL template (checkout → optional Node setup → `dtolnay/rust-toolchain@stable` → `github/codeql-action/init`/`autobuild`/`analyze`), commits it to the feature branch, and documents the change.
+- **PR visibility**: Cipher’s review comment must explicitly state whether CodeQL is enabled to eliminate GitHub “workflow missing” warnings.
+
+### GitHub Security Settings Enforcement
+
+Before running dependency scans, Cipher now **must** ensure all GitHub-native security features are active using the GitHub CLI:
+
+1. **Security policy file**: Confirm `.github/SECURITY.md` exists; if not, copy the repo-standard policy template, commit it, and mention the addition in the PR body.
+2. **Dependabot alerts & security updates**:
+   ```bash
+   gh api -X PUT -H "Accept: application/vnd.github+json" /repos/${REPO_OWNER}/${REPO_NAME}/vulnerability-alerts
+   gh api -X PUT -H "Accept: application/vnd.github+json" /repos/${REPO_OWNER}/${REPO_NAME}/automated-security-fixes
+   ```
+3. **Advanced security & secret scanning**:
+   ```bash
+   gh api -X PATCH -H "Accept: application/vnd.github+json" /repos/${REPO_OWNER}/${REPO_NAME} \
+     -F security_and_analysis[advanced_security][status]=enabled \
+     -F security_and_analysis[secret_scanning][status]=enabled \
+     -F security_and_analysis[secret_scanning_push_protection][status]=enabled \
+     -F security_and_analysis[dependabot_security_updates][status]=enabled
+   ```
+4. **Private vulnerability reporting**:
+   ```bash
+   gh api -X PUT -H "Accept: application/vnd.github+json" /repos/${REPO_OWNER}/${REPO_NAME}/private-vulnerability-reporting
+   ```
+5. **Documentation**: Cipher’s PR review must call out the security settings it enabled so maintainers understand why GitHub Security warnings disappeared.
+
 ## Architecture Overview
 
 ### Multi-Agent Workflow Stages
