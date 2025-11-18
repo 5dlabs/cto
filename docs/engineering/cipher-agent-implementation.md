@@ -112,14 +112,14 @@ Rex (Implementation) → Cleo (Code Quality) → Cipher (Security) → Tess (QA/
 
 ### CodeQL Baseline Enforcement
 
-- **First action**: When Cipher starts, it must verify that `.github/workflows/codeql.yml` exists in the target repository and is enabled on `push`, `pull_request`, and a weekly cron schedule.
+- **First action (per repository)**: When Cipher runs on a repo for the first time, it must verify that `.github/workflows/codeql.yml` exists in the target repository and is enabled on `push`, `pull_request`, and a weekly cron schedule. For subsequent tasks, simply confirm the workflow is still present—only recreate it if it was removed.
 - **Language coverage**: The workflow must initialize CodeQL with both `javascript-typescript` and `rust` (only include TypeScript when the repo actually uses it) so it covers the relevant stacks.
 - **Self-healing**: If the workflow is missing or incomplete, Cipher writes the standard GitHub CodeQL template using `github/codeql-action@v4` (checkout → optional Node setup → `dtolnay/rust-toolchain@stable` → `codeql-action@v4 init`/`autobuild`/`analyze`), commits it to the feature branch, and documents the change.
 - **PR visibility**: Cipher’s review comment must explicitly state whether CodeQL is enabled to eliminate GitHub “workflow missing” warnings.
 
 ### GitHub Security Settings Enforcement
 
-Before running dependency scans, Cipher now **must** ensure all GitHub-native security features are active using the GitHub CLI:
+Before running dependency scans, Cipher now **must** ensure all GitHub-native security features are active using the GitHub CLI, **but only if they aren’t already enabled**. Query the current state via `gh api /repos/${REPO_OWNER}/${REPO_NAME}` and skip these steps when everything is already on to avoid redundant changes:
 
 1. **Security policy file**: Confirm `.github/SECURITY.md` exists; if not, copy the repo-standard policy template, commit it, and mention the addition in the PR body.
 2. **Dependabot alerts & security updates**:
@@ -139,7 +139,7 @@ Before running dependency scans, Cipher now **must** ensure all GitHub-native se
    ```bash
    gh api -X PUT -H "Accept: application/vnd.github+json" /repos/${REPO_OWNER}/${REPO_NAME}/private-vulnerability-reporting
    ```
-5. **Documentation**: Cipher’s PR review must call out the security settings it enabled so maintainers understand why GitHub Security warnings disappeared.
+5. **Documentation**: Cipher’s PR review must call out either (a) the security settings it enabled during the bootstrap, or (b) that the repository already had them enabled (no action needed). This keeps the first task from repeating on every run.
 
 ## Architecture Overview
 
