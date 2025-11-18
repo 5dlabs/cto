@@ -2413,8 +2413,6 @@ echo "{{agent_completion_message}}"
 echo "⚠️ Cursor execution incomplete"
   {{/if}}
   # Force exit to ensure container stops
-  kill -TERM $$ 2>/dev/null || true
-  sleep 1
   exit $EXIT_CODE
 fi
 
@@ -2426,6 +2424,4 @@ echo "✅ Cursor execution complete"
 
 # Ensure container exits by terminating the shell process
 echo "🏁 Terminating container..."
-kill -TERM $$ 2>/dev/null || true
-sleep 1
-exit $EXIT_CODE
+  exit $EXIT_CODE
