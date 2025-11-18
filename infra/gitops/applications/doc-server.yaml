@@ -98,6 +98,9 @@ spec:
               value: "6379"
         secret:
           existingSecret: doc-server-secrets
+          keys:
+            DATABASE_URL: DATABASE_URL
+            VECTOR_DATABASE_URL: VECTOR_DATABASE_URL
           # Explicitly mount API keys for documentation processing
           env:
             ANTHROPIC_API_KEY:
