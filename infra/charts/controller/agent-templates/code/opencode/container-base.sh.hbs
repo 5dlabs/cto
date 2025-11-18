@@ -2494,7 +2494,7 @@ EOF
         if ! gh api -X POST \
           -H "Accept: application/vnd.github+json" \
           "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
-          -f labels='["'"$LABEL_NAME"'"]' >/dev/null 2>&1; then
+          -F labels[]="$LABEL_NAME" >/dev/null 2>&1; then
           echo "⚠️ Failed to add $LABEL_NAME label"
         fi
 
@@ -2512,7 +2512,7 @@ EOF
         if gh api -X POST \
           -H "Accept: application/vnd.github+json" \
           "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
-          -f labels='["'"$LABEL_READY_FOR_QA"'"]' >/dev/null 2>&1; then
+          -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
           echo "🏷️  Added '$LABEL_READY_FOR_QA' label to signal Tess"
         else
           echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
