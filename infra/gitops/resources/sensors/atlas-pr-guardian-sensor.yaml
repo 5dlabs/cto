@@ -42,6 +42,15 @@ spec:
               - submitted
               - completed
               - requested
+        exprs:
+          # CRITICAL: Do NOT create Atlas guardians for PRs created by Atlas itself
+          # This prevents infinite loops where Atlas creates Task 0 PR → sensor fires → creates Atlas → creates Task 0 PR...
+          - expr: "!(body.pull_request.user.login contains 'atlas-5dlabs' || body.sender.login contains 'atlas-5dlabs')"
+            fields:
+              - name: body.pull_request.user.login
+                path: body.pull_request.user.login
+              - name: body.sender.login
+                path: body.sender.login
         # NOTE: Removed broken exprs filter - issue comment PR validation moved to workflow
         # The dedup workflow validates issue_comment events are on PRs (lines 98-106)
         # This is more reliable than Argo Events exprs which fail with field access errors
