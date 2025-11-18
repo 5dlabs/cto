@@ -33,6 +33,8 @@ spec:
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
+  podManagementPolicy: OrderedReady
+  revisionHistoryLimit: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: doc-server-redis
