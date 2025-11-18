@@ -97,7 +97,7 @@ spec:
               mountPath: /var/lib/postgresql
       containers:
         - name: postgres
-          image: docker.io/ankane/pgvector:0.7.4-pg16
+          image: ghcr.io/5dlabs/postgresql:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: PGDATA
