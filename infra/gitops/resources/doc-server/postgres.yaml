@@ -38,7 +38,7 @@ spec:
       protocol: TCP
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: vector-postgres
   namespace: databases
@@ -47,8 +47,9 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/part-of: doc-server
 spec:
-  serviceName: vector-postgres-headless
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: vector-postgres
@@ -60,24 +61,24 @@ spec:
         app.kubernetes.io/part-of: doc-server
     spec:
       securityContext:
-        runAsUser: 999
-        runAsGroup: 999
-        fsGroup: 999
+        runAsUser: 101
+        runAsGroup: 103
+        fsGroup: 103
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        - name: fix-permissions
+        - name: ensure-permissions
           image: busybox:1.36
           imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
             - |
-              TARGET=/var/lib/postgresql/data
-              CURRENT_OWNER=$(stat -c "%u:%g" "${TARGET}" || echo "0:0")
-              if [ "${CURRENT_OWNER}" != "999:999" ]; then
-                chown -R 999:999 "${TARGET}"
+              TARGET=/var/lib/postgresql/pgroot
+              if [ ! -d "${TARGET}" ]; then
+                mkdir -p "${TARGET}"
               fi
+              chown -R 101:103 /var/lib/postgresql
           securityContext:
             allowPrivilegeEscalation: false
             runAsUser: 0
@@ -93,16 +94,14 @@ spec:
               memory: 128Mi
           volumeMounts:
             - name: pgdata
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql
       containers:
         - name: postgres
           image: docker.io/ankane/pgvector:0.7.4-pg16
           imagePullPolicy: IfNotPresent
           env:
             - name: PGDATA
-              value: /var/lib/postgresql/data/pgroot/data
-            - name: POSTGRES_INITDB_ARGS
-              value: "--data-checksums"
+              value: /var/lib/postgresql/pgroot/data
           ports:
             - name: postgres
               containerPort: 5432
@@ -136,20 +135,9 @@ spec:
             failureThreshold: 3
           volumeMounts:
             - name: pgdata
-              mountPath: /var/lib/postgresql/data
-      volumes: []
-  volumeClaimTemplates:
-    - metadata:
-        name: pgdata
-        labels:
-          app.kubernetes.io/name: vector-postgres
-          app.kubernetes.io/component: database
-          app.kubernetes.io/part-of: doc-server
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        storageClassName: local-path
-        resources:
-          requests:
-            storage: 50Gi
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: pgdata-vector-postgres-0
 
