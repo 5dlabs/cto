@@ -2177,12 +2177,9 @@ impl CodeTemplateGenerator {
         let workflow_name = extract_workflow_name(code_run)
             .unwrap_or_else(|_| format!("play-task-{}-workflow", code_run.spec.task_id));
 
-        // Add standard environment vars
-        let env_vars = Self::build_env_vars(code_run, workflow_name.clone());
-
         // Parse continue_session from spec or env
-        let continue_session = code_run.spec.continue_session.unwrap_or(false)
-            || code_run.spec.env.get("CONTINUE_SESSION").map_or(false, |v| v == "true");
+        let continue_session = code_run.spec.continue_session
+            || code_run.spec.env.get("CONTINUE_SESSION").is_some_and(|v| v == "true");
 
         let context = json!({
             "task_id": code_run.spec.task_id,
@@ -2194,11 +2191,10 @@ impl CodeTemplateGenerator {
             "docs_branch": code_run.spec.docs_branch,
             "github_app": code_run.spec.github_app.as_deref().unwrap_or(""),
             "workflow_name": workflow_name,
-            "env_vars": env_vars,
             "remote_tools": remote_tools,
             "settings": cli_settings,
             "continue_session": continue_session,
-            "overwrite_memory": code_run.spec.overwrite_memory.unwrap_or(false),
+            "overwrite_memory": code_run.spec.overwrite_memory,
         });
 
         handlebars.render("gemini_container", &context).map_err(|e| {
@@ -2234,7 +2230,71 @@ impl CodeTemplateGenerator {
             .cloned()
             .unwrap_or_else(|| json!({}));
 
-        let requirements = Self::extract_requirements(code_run);
+        // Derive allowed env var name lists for inclusion in memory
+        // 1) Workflow-provided env names (keys only)
+        let workflow_env_vars: Vec<String> = code_run.spec.env.keys().cloned().collect();
+
+        // 2) From requirements.yaml (environment keys and mapped secret key names)
+        let mut req_env_vars: Vec<String> = Vec::new();
+        let mut req_secret_sources: Vec<String> = Vec::new();
+
+        // Base64 decode helper import for task_requirements parsing
+        use base64::{engine::general_purpose, Engine as _};
+
+        if let Some(req_b64) = &code_run.spec.task_requirements {
+            if !req_b64.trim().is_empty() {
+                if let Ok(decoded) = general_purpose::STANDARD.decode(req_b64) {
+                    if let Ok(req_yaml) = serde_yaml::from_slice::<serde_yaml::Value>(&decoded) {
+                        if let Some(env_map) =
+                            req_yaml.get("environment").and_then(|e| e.as_mapping())
+                        {
+                            for (k, _v) in env_map {
+                                if let Some(key) = k.as_str() {
+                                    req_env_vars.push(key.to_string());
+                                }
+                            }
+                        }
+                        if let Some(secrets) = req_yaml.get("secrets").and_then(|s| s.as_sequence())
+                        {
+                            for secret in secrets {
+                                if let Some(m) = secret.as_mapping() {
+                                    if let Some(name) = m
+                                        .get(serde_yaml::Value::from("name"))
+                                        .and_then(|n| n.as_str())
+                                    {
+                                        req_secret_sources.push(name.to_string());
+                                    }
+                                    // If there are key mappings, surface the env var names (right-hand side)
+                                    if let Some(keys) = m
+                                        .get(serde_yaml::Value::from("keys"))
+                                        .and_then(|k| k.as_sequence())
+                                    {
+                                        for entry in keys {
+                                            if let Some(map) = entry.as_mapping() {
+                                                for (_k8s_key, env_name) in map {
+                                                    if let Some(n) = env_name.as_str() {
+                                                        req_env_vars.push(n.to_string());
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // De-duplicate and sort for stable output
+        use std::collections::BTreeSet;
+        let wf_set: BTreeSet<_> = workflow_env_vars.into_iter().collect();
+        let req_env_set: BTreeSet<_> = req_env_vars.into_iter().collect();
+        let req_src_set: BTreeSet<_> = req_secret_sources.into_iter().collect();
+        let workflow_env_vars: Vec<_> = wf_set.into_iter().collect();
+        let requirements_env_vars: Vec<_> = req_env_set.into_iter().collect();
+        let requirements_secret_sources: Vec<_> = req_src_set.into_iter().collect();
 
         let context = json!({
             "task_id": code_run.spec.task_id,
@@ -2247,9 +2307,9 @@ impl CodeTemplateGenerator {
             "workflow_name": workflow_name,
             "remote_tools": remote_tools,
             "settings": cli_settings,
-            "workflow_env_vars": Self::extract_workflow_env_vars(code_run),
-            "requirements_env_vars": requirements.env_vars,
-            "requirements_secret_sources": requirements.secret_sources,
+            "workflow_env_vars": workflow_env_vars,
+            "requirements_env_vars": requirements_env_vars,
+            "requirements_secret_sources": requirements_secret_sources,
         });
 
         handlebars.render("gemini_memory", &context).map_err(|e| {
