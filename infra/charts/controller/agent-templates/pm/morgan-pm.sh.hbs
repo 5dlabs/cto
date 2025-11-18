@@ -398,6 +398,10 @@ initialize_project() {
   log "🔧 Setting up custom fields..."
   setup_custom_fields "$PROJECT_ID"
   
+  # Enable branch protection on main branch
+  log "🔒 Configuring branch protection..."
+  enable_branch_protection "$REPO_OWNER" "$REPO_NAME" "main"
+  
   # Store project configuration
   persist_project_config "$PROJECT_ID" "$PROJECT_TITLE" "$WORKFLOW_NAME" "$REPO_OWNER/$REPO_NAME"
   
