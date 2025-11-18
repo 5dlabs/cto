@@ -100,7 +100,9 @@ spec:
     rollingUpdate:
       partition: 0
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: redis-data
         labels:
           app.kubernetes.io/name: doc-server-redis
