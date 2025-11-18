@@ -12,12 +12,12 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform
-  source:
-    repoURL: https://github.com/5dlabs/charts
-    targetRevision: main
-    path: agent-docs
-    helm:
-      values: |
+  sources:
+    - repoURL: https://github.com/5dlabs/charts
+      targetRevision: main
+      path: agent-docs
+      helm:
+        values: |
         serviceAccount:
           create: false
           name: default
@@ -671,6 +671,9 @@ spec:
               }
             ]
           }
+    - repoURL: https://github.com/5dlabs/cto
+      targetRevision: main
+      path: infra/gitops/resources/doc-server
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp

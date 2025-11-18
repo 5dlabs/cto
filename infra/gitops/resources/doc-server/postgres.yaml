@@ -1,0 +1,155 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-postgres
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: vector-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: doc-server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: vector-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-postgres-headless
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: vector-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: doc-server
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: vector-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vector-postgres
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: vector-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: doc-server
+spec:
+  serviceName: vector-postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vector-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vector-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: doc-server
+    spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: fix-permissions
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              TARGET=/var/lib/postgresql/data
+              CURRENT_OWNER=$(stat -c "%u:%g" "${TARGET}" || echo "0:0")
+              if [ "${CURRENT_OWNER}" != "999:999" ]; then
+                chown -R 999:999 "${TARGET}"
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsUser: 0
+            runAsGroup: 0
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      containers:
+        - name: postgres
+          image: docker.io/ankane/pgvector:0.7.4-pg16
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgroot/data
+            - name: POSTGRES_INITDB_ARGS
+              value: "--data-checksums"
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -d postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -d postgres
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes: []
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+        labels:
+          app.kubernetes.io/name: vector-postgres
+          app.kubernetes.io/component: database
+          app.kubernetes.io/part-of: doc-server
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 50Gi
+
