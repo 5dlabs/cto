@@ -2318,6 +2318,15 @@ impl CodeTemplateGenerator {
         let requirements_env_vars: Vec<_> = req_env_set.into_iter().collect();
         let requirements_secret_sources: Vec<_> = req_src_set.into_iter().collect();
 
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
+        // Extract model from cli_config like other templates do
+        let cli_model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -2332,6 +2341,16 @@ impl CodeTemplateGenerator {
             "workflow_env_vars": workflow_env_vars,
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": cli_model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+            "toolman": {
+                "tools": remote_tools,
+            },
         });
 
         handlebars.render("gemini_memory", &context).map_err(|e| {
