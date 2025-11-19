@@ -1447,6 +1447,7 @@ MAX_RETRIES=${CURSOR_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
 ATTEMPT=1
 SUCCESS=0
 CURSOR_EXIT=1
+COMMITS_MADE=0
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
 LAST_COMPLETION_REASON=""
@@ -2052,7 +2053,6 @@ Handoff document created for $HANDOFF_TARGET to continue work." 2>/dev/null || e
   # Check if agent made any commits before deciding to handoff vs fail
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   REMOTE_BASE="origin/${BASE_BRANCH:-main}"
-  COMMITS_MADE=0
 
   if [ -n "$CURRENT_BRANCH" ]; then
     git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
