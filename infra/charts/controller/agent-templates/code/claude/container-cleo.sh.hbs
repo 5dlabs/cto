@@ -2154,9 +2154,10 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       git push origin HEAD || echo "⚠️ Failed to push fixes"
     fi
     
-    # Post APPROVE review
-    echo "✅ Posting APPROVE review to signal quality checks passed"
-    REVIEW_BODY="### ✅ Code Quality Review - APPROVED
+    # Cleo hands off to Cipher via comment and label (NOT approve)
+    # Only Tess has PR approval authority
+    echo "✅ Quality checks passed - handing off to Cipher"
+    REVIEW_BODY="### ✅ Code Quality Review - PASSED
 
 All quality checks have passed:
 $(echo -e "$QUALITY_REPORT")
@@ -2167,27 +2168,13 @@ $(echo -e "$QUALITY_REPORT")
 ---
 *Quality review by Cleo - 5DLabs Code Quality Agent*"
     
-    # Retry approval submission
-    APPROVAL_RETRIES=3
-    APPROVAL_SUCCESS=false
-    for retry in $(seq 1 $APPROVAL_RETRIES); do
-      if timeout 30 gh pr review "$PR_NUMBER" --approve --body "$REVIEW_BODY" 2>&1; then
-        APPROVAL_SUCCESS=true
-        echo "✅ PR approval posted successfully"
-        break
-      else
-        echo "⚠️ PR review command failed (attempt $retry/$APPROVAL_RETRIES)"
-        if [ $retry -lt $APPROVAL_RETRIES ]; then
-          sleep 2
-        fi
-      fi
-    done
-    
-    if [ "$APPROVAL_SUCCESS" != "true" ]; then
-      echo "⚠️ WARNING: Failed to post PR approval after $APPROVAL_RETRIES attempts"
+    # Post comment (NOT approve)
+    if timeout 30 gh pr comment "$PR_NUMBER" --body "$REVIEW_BODY" 2>&1; then
+      echo "✅ Quality review comment posted successfully"
+    else
+      echo "⚠️ Failed to post quality review comment"
       echo "   Quality checks passed, but GitHub API call failed"
       echo "   This is non-fatal - continuing with label update"
-      # Don't exit - quality checks passed, approval is just a signal
     fi
     
     # Add ready-for-security label to signal Cipher
