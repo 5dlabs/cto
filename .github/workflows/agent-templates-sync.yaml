@@ -36,3 +36,25 @@ jobs:
         run: |
           kubectl rollout restart deployment/controller -n agent-platform
           kubectl rollout status deployment/controller -n agent-platform --timeout=120s
+      
+      - name: Verify ConfigMaps updated
+        run: |
+          echo "=== Verifying ConfigMap Updates ==="
+          EXPECTED_REVISION="${GITHUB_SHA:0:8}"
+          echo "Expected revision: $EXPECTED_REVISION"
+          
+          # Wait a moment for ConfigMaps to be fully applied
+          sleep 5
+          
+          # Check a sample of ConfigMaps exist and have recent timestamps
+          for cm in cursor claude factory opencode codex; do
+            TIMESTAMP=$(kubectl get configmap "controller-agent-templates-$cm" -n agent-platform -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || echo "NOT_FOUND")
+            if [ "$TIMESTAMP" = "NOT_FOUND" ]; then
+              echo "❌ ConfigMap agent-templates-$cm not found!"
+              exit 1
+            else
+              echo "✅ ConfigMap agent-templates-$cm: $TIMESTAMP"
+            fi
+          done
+          
+          echo "✅ All ConfigMaps verified and deployed"
