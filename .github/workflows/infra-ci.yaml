@@ -10,6 +10,7 @@ on:
       - 'infra/gitops/**/*.yaml'
       - 'infra/charts/**/*'
       - '.github/workflows/infra-ci.yaml'
+  workflow_dispatch:
 
 env:
   ARGOCD_VERSION: v2.9.3
