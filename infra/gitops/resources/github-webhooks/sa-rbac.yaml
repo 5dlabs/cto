@@ -6,7 +6,7 @@ metadata:
   namespace: argo
 rules:
   - apiGroups: [""]
-    resources: ["pods", "pods/log", "services", "configmaps", "secrets"]
+    resources: ["pods", "pods/log", "configmaps", "secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["batch"]
     resources: ["jobs"]
