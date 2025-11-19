@@ -5,4 +5,5 @@ resources:
   - doc-server-worker-patcher.yaml
   - postgres.yaml
   - redis.yaml
+  - ../../databases/redis-auth-secret.yaml
 

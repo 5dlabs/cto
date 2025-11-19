@@ -76,8 +76,6 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
       server: https://kubernetes.default.svc
-    - namespace: test-db
-      server: https://kubernetes.default.svc
     # Removed Jupiter namespace
     - namespace: kube-system
       server: https://kubernetes.default.svc
