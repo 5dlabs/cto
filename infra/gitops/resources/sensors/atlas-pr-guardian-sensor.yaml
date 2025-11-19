@@ -168,7 +168,8 @@ spec:
                         set -e
 
                         # CRITICAL: Prevent infinite loops - Atlas should NOT monitor its own PRs
-                        if [[ "${SENDER_LOGIN:-}" == *"atlas-5dlabs"* ]]; then
+                        # Use exact match to avoid false positives with usernames containing "atlas-5dlabs"
+                        if [[ "${SENDER_LOGIN:-}" == "atlas-5dlabs[bot]" ]] || [[ "${SENDER_LOGIN:-}" == "atlas-5dlabs" ]]; then
                           echo "🛑 Event from Atlas itself (sender: $SENDER_LOGIN) - skipping to prevent infinite loop"
                           exit 0
                         fi
