@@ -46,6 +46,8 @@ spec:
 
   # Destinations that applications in this project can deploy to
   destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
     - namespace: agent-platform
       server: https://kubernetes.default.svc
     - namespace: 'agent-platform-preview-*'  # Preview deployments (Bolt)
