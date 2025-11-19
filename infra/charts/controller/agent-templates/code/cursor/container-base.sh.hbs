@@ -2133,7 +2133,7 @@ else
   EXIT_CODE=0
 fi
 
-if [ $SUCCESS -eq 1 ]; then
+if [ $SUCCESS -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
 elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
@@ -2212,10 +2212,10 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
 - Security best practices verified'
         NEXT_STAGE="QA testing by Tess"
 
-        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All security checks have passed:
 $CHECKS_PASSED
 
@@ -2226,7 +2226,7 @@ $CHECKS_PASSED
 *Security review by Cipher*
 EOF
         refresh_token_if_needed || true
-        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
         rm -f "$REVIEW_BODY_FILE"
 
         # Add security-approved label (create if missing)

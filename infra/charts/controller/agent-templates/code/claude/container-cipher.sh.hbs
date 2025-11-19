@@ -2147,10 +2147,10 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   fi
 
   if [ $SECURITY_PASSED -eq 1 ]; then
-    echo "✅ Cipher security checks passed - handing off to Tess for E2E testing"
+    echo "✅ Cipher security checks passed - posting APPROVE review"
 
-    # Post COMMENT (NOT APPROVE) - Tess has final approval authority
-    timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED
+    # Post APPROVE review - Cipher acts as security gate
+    timeout 30 gh pr review "$PR_NUMBER" --approve --body "### 🔒 Security Review - APPROVED
 
 All security checks have passed:
 - No vulnerabilities detected
@@ -2162,7 +2162,7 @@ All security checks have passed:
 **Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Security review by Cipher*" || echo "⚠️ PR comment command failed"
+*Security review by Cipher*" || echo "⚠️ PR review command failed"
 
     # Add security-approved label (create if missing)
     LABEL_NAME="security-approved"

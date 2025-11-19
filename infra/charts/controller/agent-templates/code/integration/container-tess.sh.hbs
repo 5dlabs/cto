@@ -1492,26 +1492,28 @@ COMBINED_SYS_PROMPT="/tmp/system-prompt-combined.md"
 CLAUDE_CMD="$CLAUDE_CMD --system-prompt $COMBINED_SYS_PROMPT"
 
 # =========================================================================
-# QA Mode Safeguard: Prevent PR creation when in testing mode
+# CRITICAL: Tess NEVER creates PRs - only reviews existing ones
 # =========================================================================
-if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
-  echo "🛡️  QA Review Mode: Installing PR creation safeguard"
-  
-  # Create a wrapper function that blocks 'gh pr create' in QA mode
-  gh() {
-    if [[ "$1" == "pr" && "$2" == "create" ]]; then
-      echo "❌ ERROR: 'gh pr create' is FORBIDDEN in QA review mode (WORKFLOW_STAGE=testing)"
-      echo "❌ You are reviewing PR #${PR_NUMBER}, not creating a new one"
-      echo "❌ Use 'gh pr checkout ${PR_NUMBER}' to work on the existing PR"
-      echo "❌ Use 'gh pr review ${PR_NUMBER}' to approve/reject the PR"
-      return 1
-    fi
-    command gh "$@"
-  }
-  export -f gh
-  
-  echo "✅ Safeguard installed: 'gh pr create' is now blocked"
-  echo "✅ You can only review PR #${PR_NUMBER}"
+echo "🛡️  Tess QA Agent: Installing PR creation safeguard"
+
+# Create a wrapper function that ALWAYS blocks 'gh pr create' for Tess
+gh() {
+  if [[ "$1" == "pr" && "$2" == "create" ]]; then
+    echo "❌ ERROR: 'gh pr create' is FORBIDDEN for Tess (QA agent)"
+    echo "❌ Tess only reviews existing PRs created by Rex/Blaze"
+    echo "❌ Current PR: #${PR_NUMBER:-unknown}"
+    echo "❌ Use 'gh pr review' to approve/reject, never 'gh pr create'"
+    return 1
+  fi
+  command gh "$@"
+}
+export -f gh
+
+echo "✅ Safeguard installed: 'gh pr create' is now permanently blocked for Tess"
+if [ -n "${PR_NUMBER:-}" ]; then
+  echo "✅ Tess will review PR #${PR_NUMBER}"
+else
+  echo "⚠️  No PR_NUMBER set - Tess should not run without an existing PR"
 fi
 
 # Initialize retry loop variables
