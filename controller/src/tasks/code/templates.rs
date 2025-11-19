@@ -802,16 +802,6 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
-        // Register claude_container_base partial for agent-specific templates
-        let base_template = Self::load_template(CODE_CLAUDE_CONTAINER_TEMPLATE)?;
-        handlebars
-            .register_partial("claude_container_base", base_template)
-            .map_err(|e| {
-                crate::tasks::types::Error::ConfigError(format!(
-                    "Failed to register Claude container base partial: {e}"
-                ))
-            })?;
-
         // Select agent-specific template based on github_app field
         let template_path = Self::get_agent_container_template(code_run);
 
@@ -2577,7 +2567,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "claude/container-tess.sh.hbs",
+            "5DLabs-Tess" => "claude/container.sh.hbs",  // Use default container for Tess
             "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
@@ -3011,7 +3001,8 @@ mod tests {
     fn test_tess_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/integration/container-tess.sh.hbs");
+        // For CLIType::Claude (default), path is prefixed with "code/" in template loading
+        assert_eq!(template_path, "code/claude/container.sh.hbs");
     }
 
     #[test]
