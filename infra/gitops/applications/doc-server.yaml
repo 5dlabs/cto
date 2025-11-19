@@ -650,6 +650,7 @@ spec:
       path: infra/gitops/resources/doc-server
   destination:
     server: https://kubernetes.default.svc
+    namespace: mcp
   syncPolicy:
     automated:
       prune: true
