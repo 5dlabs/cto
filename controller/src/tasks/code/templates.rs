@@ -2567,7 +2567,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "claude/container.sh.hbs",  // Use default container for Tess
+            "5DLabs-Tess" => "claude/container.sh.hbs", // Use default container for Tess
             "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
