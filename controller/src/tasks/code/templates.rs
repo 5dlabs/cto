@@ -802,6 +802,16 @@ impl CodeTemplateGenerator {
         let mut handlebars = Handlebars::new();
         handlebars.set_strict_mode(false);
 
+        // Register claude_container_base partial for agent-specific templates
+        let base_template = Self::load_template(CODE_CLAUDE_CONTAINER_TEMPLATE)?;
+        handlebars
+            .register_partial("claude_container_base", base_template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Claude container base partial: {e}"
+                ))
+            })?;
+
         // Select agent-specific template based on github_app field
         let template_path = Self::get_agent_container_template(code_run);
 
