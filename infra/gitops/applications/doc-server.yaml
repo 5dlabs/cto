@@ -116,49 +116,15 @@ spec:
             # Ensure chart uses correct binary path and migrate-only args
             command: ["/app/http_server"]
             args: ["--migrate-only"]
-          # Service configuration - exclude worker pods from service endpoints
+          # Service configuration - disabled, managed by doc-server-networking app
           service:
-            type: ClusterIP
-            port: 80
-            targetPort: 3001
-            annotations:
-              argocd.argoproj.io/sync-options: Skip=true
-              argocd.argoproj.io/managed-by: doc-server-networking
-            # Override selector to only include server pods (exclude worker pods)
-            selector:
-              app.kubernetes.io/name: agent-docs-server
-              app.kubernetes.io/instance: doc-server
-              app.kubernetes.io/component: server
+            enabled: false
           # Add component label to main server pods to distinguish from worker
           podLabels:
             app.kubernetes.io/component: server
-          # Ingress configuration for SSE-optimized MCP access
+          # Ingress configuration - disabled, managed by doc-server-networking app
           ingress:
-            enabled: true
-            className: "nginx"
-            annotations:
-              argocd.argoproj.io/sync-options: Skip=true
-              argocd.argoproj.io/managed-by: doc-server-networking
-              kubernetes.io/ingress.class: nginx
-              nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-              nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-              nginx.ingress.kubernetes.io/proxy-buffering: "off"
-              nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
-              nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
-              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-              nginx.ingress.kubernetes.io/configuration-snippet: |
-                proxy_set_header Connection keep-alive;
-                # helpful for SSE; app already sets Cache-Control: no-transform
-                add_header X-Accel-Buffering no always;
-              nginx.ingress.kubernetes.io/ssl-redirect: "false"
-            hosts:
-              - host: mcp.simple-cluster.local
-                paths:
-                  - path: /mcp
-                    pathType: Prefix
-                  - path: /health
-                    pathType: Prefix
-            tls: []
+            enabled: false
           # Tools configuration - managed by CTO
           # This will be mounted as /app/tools.json via ConfigMap
           # Single source of truth - edit this inline configuration directly
