@@ -1326,9 +1326,9 @@ fi
 
 # Look for Tess-specific system prompt file, then combine with inline SYSTEM_PROMPT so it is always utilized
 SELECTED_SYS_PROMPT=""
-if [ -f "/task-files/rex-system-prompt.md" ]; then
-    echo "✓ Found Rex system prompt file"
-    SELECTED_SYS_PROMPT="/task-files/rex-system-prompt.md"
+if [ -f "/task-files/tess-system-prompt.md" ]; then
+    echo "✓ Found Tess system prompt file"
+    SELECTED_SYS_PROMPT="/task-files/tess-system-prompt.md"
     if [ "${DEBUG_PROMPT:-false}" = "true" ]; then
         echo "[DEBUG] System prompt path: $SELECTED_SYS_PROMPT"
         echo "[DEBUG] System prompt first 10 lines:"; head -n 10 "$SELECTED_SYS_PROMPT" | sed 's/^/[DEBUG] /'
@@ -1522,7 +1522,7 @@ ATTEMPT=1
 SUCCESS=0
 CLAUDE_EXIT_CODE=1
 
-echo "🔄 Rex will retry up to $MAX_RETRIES times until implementation is complete"
+echo "🔄 Tess will retry up to $MAX_RETRIES times until testing is complete"
 echo ""
 
 # =========================================================================
@@ -1549,11 +1549,11 @@ if [ -n "$DEFAULT_MODEL" ]; then
   echo "🎯 Default model: $DEFAULT_MODEL"
 fi
 
-# Retry loop - Rex will continue until PR is created with working code
+# Retry loop - Tess will continue until testing is complete
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "════════════════════════════════════════════════════════════════"
-  echo "🚀 Rex Implementation Attempt $ATTEMPT/$MAX_RETRIES"
+  echo "🧪 Tess Testing Attempt $ATTEMPT/$MAX_RETRIES"
   echo "════════════════════════════════════════════════════════════════"
 
   CURRENT_ATTEMPT=$ATTEMPT

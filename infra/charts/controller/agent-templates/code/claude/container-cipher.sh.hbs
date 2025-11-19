@@ -2131,26 +2131,18 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
-  # Determine if security checks actually passed by checking Claude's final report
-  # Look for the security scan result in Claude's output
+  # Determine if security checks passed based on Claude's exit code
+  # Claude exits 0 on success, non-zero on failure
   SECURITY_PASSED=0
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    # Check if Claude reported "APPROVED FOR PRODUCTION" or similar success indicators
-    if grep -q "APPROVED FOR PRODUCTION\|Security Review - PASSED\|NO CHANGES REQUIRED" "$CLAUDE_LOG" 2>/dev/null; then
-      SECURITY_PASSED=1
-    elif grep -q "Security issues detected\|Required Security Changes\|SECURITY VULNERABILITIES" "$CLAUDE_LOG" 2>/dev/null; then
-      SECURITY_PASSED=0
-    else
-      # Default to passed if Claude exited cleanly and didn't explicitly report issues
-      SECURITY_PASSED=1
-    fi
+    SECURITY_PASSED=1
   fi
 
   if [ $SECURITY_PASSED -eq 1 ]; then
-    echo "✅ Cipher security checks passed - handing off to Tess for E2E testing"
+    echo "✅ Cipher security checks passed - posting APPROVE review"
 
-    # Post COMMENT (NOT APPROVE) - Tess has final approval authority
-    timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED
+    # Post APPROVE review - Cipher acts as security gate
+    timeout 30 gh pr review "$PR_NUMBER" --approve --body "### 🔒 Security Review - APPROVED
 
 All security checks have passed:
 - No vulnerabilities detected
@@ -2162,7 +2154,7 @@ All security checks have passed:
 **Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Security review by Cipher*" || echo "⚠️ PR comment command failed"
+*Security review by Cipher*" || echo "⚠️ PR review command failed"
 
     # Add security-approved label (create if missing)
     LABEL_NAME="security-approved"

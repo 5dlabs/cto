@@ -45,10 +45,9 @@ spec:
         exprs:
           # CRITICAL: Do NOT create Atlas guardians for PRs created by Atlas itself
           # This prevents infinite loops where Atlas creates Task 0 PR → sensor fires → creates Atlas → creates Task 0 PR...
-          - expr: "!(body.pull_request.user.login contains 'atlas-5dlabs' || body.sender.login contains 'atlas-5dlabs')"
+          # Use sender.login which exists for all event types (pull_request, workflow_run, issue_comment, etc.)
+          - expr: "!(body.sender.login contains 'atlas-5dlabs')"
             fields:
-              - name: body.pull_request.user.login
-                path: body.pull_request.user.login
               - name: body.sender.login
                 path: body.sender.login
         # NOTE: Removed broken exprs filter - issue comment PR validation moved to workflow
