@@ -54,10 +54,21 @@ spec:
         fsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        - name: redis-tmp
+          emptyDir: {}
+        - name: redis-run
+          emptyDir: {}
       containers:
         - name: redis
           image: redis:7.2-alpine
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: ALLOW_EMPTY_PASSWORD
               value: "yes"
@@ -95,6 +106,10 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /bitnami/redis/data
+            - name: redis-tmp
+              mountPath: /tmp
+            - name: redis-run
+              mountPath: /opt/bitnami/redis/tmp
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
