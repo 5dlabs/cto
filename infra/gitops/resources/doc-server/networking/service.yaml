@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: doc-server
+  namespace: mcp
+  labels:
+    app.kubernetes.io/name: agent-docs-server
+    app.kubernetes.io/part-of: doc-server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: agent-docs-server
+    app.kubernetes.io/instance: doc-server
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 3001
+
