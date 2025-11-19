@@ -2238,12 +2238,12 @@ else
   EXIT_CODE=0
 fi
 
-if [ $SUCCESS -eq 1 ]; then
+if [ $SUCCESS -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
   echo "🔍 Verifying pull request status"
   ensure_pr_created
 else
-  # In single-iteration mode, still try to create PR for inspection
-  if [ "$MAX_RETRIES" = "1" ]; then
+  # In single-iteration mode, still try to create PR for inspection (implementation only)
+  if [ "$MAX_RETRIES" = "1" ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
     echo "🔍 Single-iteration mode - attempting PR creation for result inspection"
     ensure_pr_created || echo "⚠️ PR creation failed or no PR was created"
   elif [ "$COMMITS_MADE" -eq 1 ] && [ "$WORKFLOW_STAGE" = "implementation" ]; then
