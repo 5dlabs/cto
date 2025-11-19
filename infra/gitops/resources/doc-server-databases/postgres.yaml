@@ -85,7 +85,6 @@ spec:
             runAsGroup: 0
             seccompProfile:
               type: RuntimeDefault
-            readOnlyRootFilesystem: true
           resources:
             requests:
               cpu: 50m
@@ -96,17 +95,12 @@ spec:
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql
-            - name: postgres-tmp
-              mountPath: /tmp
-            - name: postgres-run
-              mountPath: /var/run/postgresql
       containers:
         - name: postgres
           image: ghcr.io/5dlabs/postgresql:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -147,28 +141,8 @@ spec:
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql
-            - name: postgres-tmp
-              mountPath: /tmp
-            - name: postgres-run
-              mountPath: /var/run/postgresql
-            - name: postgres-run-service
-              mountPath: /run
-            - name: postgres-home
-              mountPath: /home/postgres
-            - name: postgres-etc
-              mountPath: /etc/postgres
       volumes:
         - name: pgdata
           persistentVolumeClaim:
             claimName: pgdata-vector-postgres-0
-        - name: postgres-tmp
-          emptyDir: {}
-        - name: postgres-run
-          emptyDir: {}
-        - name: postgres-run-service
-          emptyDir: {}
-        - name: postgres-home
-          emptyDir: {}
-        - name: postgres-etc
-          emptyDir: {}
 
