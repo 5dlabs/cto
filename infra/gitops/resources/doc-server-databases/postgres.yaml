@@ -151,6 +151,12 @@ spec:
               mountPath: /tmp
             - name: postgres-run
               mountPath: /var/run/postgresql
+            - name: postgres-run-service
+              mountPath: /run
+            - name: postgres-home
+              mountPath: /home/postgres
+            - name: postgres-etc
+              mountPath: /etc/postgres
       volumes:
         - name: pgdata
           persistentVolumeClaim:
@@ -158,5 +164,11 @@ spec:
         - name: postgres-tmp
           emptyDir: {}
         - name: postgres-run
+          emptyDir: {}
+        - name: postgres-run-service
+          emptyDir: {}
+        - name: postgres-home
+          emptyDir: {}
+        - name: postgres-etc
           emptyDir: {}
 
