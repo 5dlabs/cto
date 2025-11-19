@@ -2223,6 +2223,7 @@ impl CodeTemplateGenerator {
             })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn generate_gemini_memory(
         code_run: &CodeRun,
         cli_config: &Value,
