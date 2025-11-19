@@ -14,10 +14,18 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["doc-server-agent-docs-server"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["create"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    resourceNames: ["doc-server-agent-docs-server"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1

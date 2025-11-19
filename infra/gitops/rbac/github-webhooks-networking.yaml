@@ -14,10 +14,18 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["services"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["github-eventsource-svc"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
   - apiGroups: ["gateway.networking.k8s.io"]
     resources: ["httproutes"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["create"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    resourceNames: ["github-webhooks"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
