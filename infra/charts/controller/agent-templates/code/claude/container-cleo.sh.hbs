@@ -2091,8 +2091,49 @@ else
   REPO_SLUG="$REPO_INPUT"
 fi
 
-# Note: Quality review comments are posted in the conditional blocks below
-# to avoid duplicate comments (separate success/failure paths)
+# Post quality review comment to PR based on ACTUAL quality check results
+if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
+  echo "💬 Posting quality review comment to PR..."
+
+  # Create comment body based on actual quality check results
+  if [ $QUALITY_PASSED -eq 1 ]; then
+    COMMENT_BODY="## ✅ Code Quality Review - PASSED
+
+All quality checks have passed:
+$(echo -e "$QUALITY_REPORT")
+
+**Status:** Ready for security review by Cipher
+**Next Step:** Cipher will now perform security scanning
+
+---
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
+  else
+    COMMENT_BODY="## ❌ Code Quality Review - ISSUES DETECTED
+
+Quality checks failed:
+$(echo -e "$QUALITY_REPORT")
+
+**Cleo will continue iterating to fix these issues.**
+
+---
+*Quality review by Cleo - 5DLabs Code Quality Agent*"
+  fi
+
+  # Post comment using PR number or URL
+  if [ -n "$PR_NUMBER" ]; then
+    if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
+      echo "✅ Successfully posted quality review comment"
+    else
+      echo "⚠️ Failed to post comment using PR number"
+    fi
+  elif [ -n "$PR_URL" ]; then
+    if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
+      echo "✅ Successfully posted quality review comment"
+    else
+      echo "⚠️ Failed to post comment"
+    fi
+  fi
+fi
 
 # Update remediation status labels for Cleo's outcome
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
@@ -2113,28 +2154,10 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       git push origin HEAD || echo "⚠️ Failed to push fixes"
     fi
     
-    # Cleo hands off to Cipher via comment and label (NOT approve)
+    # Cleo hands off to Cipher via label (NOT approve)
+    # Comment already posted above at lines 2095-2136
     # Only Tess has PR approval authority
-    echo "✅ Quality checks passed - handing off to Cipher"
-    REVIEW_BODY="### ✅ Code Quality Review - PASSED
-
-All quality checks have passed:
-$(echo -e "$QUALITY_REPORT")
-
-**Status:** Ready for security review by Cipher
-**Next Step:** Cipher will now perform security scanning
-
----
-*Quality review by Cleo - 5DLabs Code Quality Agent*"
-    
-    # Post comment (NOT approve)
-    if timeout 30 gh pr comment "$PR_NUMBER" --body "$REVIEW_BODY" 2>&1; then
-      echo "✅ Quality review comment posted successfully"
-    else
-      echo "⚠️ Failed to post quality review comment"
-      echo "   Quality checks passed, but GitHub API call failed"
-      echo "   This is non-fatal - continuing with label update"
-    fi
+    echo "✅ Quality checks passed - adding ready-for-security label to trigger Cipher"
     
     # Add ready-for-security label to signal Cipher
     echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"
