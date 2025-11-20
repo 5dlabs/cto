@@ -478,6 +478,49 @@ impl CLIAdapter for FactoryCLIAdapter {
     }
 }
 
+/// Gemini CLI adapter
+pub struct GeminiCLIAdapter;
+
+#[async_trait]
+impl CLIAdapter for GeminiCLIAdapter {
+    async fn to_cli_config(&self, universal: &UniversalConfig) -> Result<TranslationResult> {
+        let json_obj = json!({
+            "model": universal.settings.model,
+            "temperature": universal.settings.temperature,
+            "max_tokens": universal.settings.max_tokens,
+            "tools": universal.tools,
+            "memory_file": "GEMINI.md",
+            "api_key_env": "GOOGLE_API_KEY",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta"
+        });
+
+        let json_config = serde_json::to_string_pretty(&json_obj)
+            .map_err(|e| BridgeError::ConfigSerializationError(e.to_string()))?;
+
+        Ok(TranslationResult {
+            content: json_config.clone(),
+            config_files: vec![ConfigFile {
+                path: "/workspace/.gemini/config.json".to_string(),
+                content: json_config,
+                permissions: Some("0644".to_string()),
+            }],
+            env_vars: vec!["GOOGLE_API_KEY".to_string()],
+        })
+    }
+
+    async fn generate_command(&self, task: &str, _config: &UniversalConfig) -> Result<Vec<String>> {
+        Ok(vec!["gemini-cli".to_string(), task.to_string()])
+    }
+
+    fn required_env_vars(&self) -> Vec<String> {
+        vec!["GOOGLE_API_KEY".to_string()]
+    }
+
+    fn cli_type(&self) -> CLIType {
+        CLIType::Gemini
+    }
+}
+
 /// Main configuration bridge
 pub struct ConfigurationBridge {
     adapters: std::collections::HashMap<CLIType, Box<dyn CLIAdapter>>,
@@ -508,6 +551,10 @@ impl ConfigurationBridge {
         adapters.insert(
             CLIType::Factory,
             Box::new(FactoryCLIAdapter) as Box<dyn CLIAdapter>,
+        );
+        adapters.insert(
+            CLIType::Gemini,
+            Box::new(GeminiCLIAdapter) as Box<dyn CLIAdapter>,
         );
 
         Self { adapters }

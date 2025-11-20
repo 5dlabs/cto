@@ -46,4 +46,6 @@ pub const DOCS_CLAUDE_TOOLMAN_TEMPLATE: &str = "docs/claude/toolman-catalog.md.h
 
 // Gemini code templates
 pub const CODE_GEMINI_CONTAINER_BASE_TEMPLATE: &str = "code/gemini/container-base.sh.hbs";
+pub const CODE_GEMINI_CONTAINER_TEMPLATE: &str = "code/gemini/container.sh.hbs";
 pub const CODE_GEMINI_MEMORY_TEMPLATE: &str = "code/gemini/memory.md.hbs";
+pub const CODE_GEMINI_CONFIG_TEMPLATE: &str = "code/gemini/config.json.hbs";
