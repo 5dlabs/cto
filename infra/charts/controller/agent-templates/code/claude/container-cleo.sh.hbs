@@ -578,8 +578,9 @@ fi
 if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
   TASK_LABEL="task-${TASK_ID}"
   if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
-    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
-    if [ -n "$CAND_NUM" ]; then
+    # Only search OPEN PRs, sorted by creation date (newest first)
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --state open --json number,createdAt --jq 'sort_by(.createdAt) | reverse | .[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ] && [ "$CAND_NUM" != "null" ]; then
       PR_NUMBER="$CAND_NUM"
       PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
       echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
