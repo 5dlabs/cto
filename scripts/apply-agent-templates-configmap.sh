@@ -76,7 +76,16 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
   fi
   
   # Extract ConfigMap name for delete/recreate
-  CM_NAME=$(grep "^  name:" "$TMP_FILE" | head -1 | awk '{print $2}')
+  # Use flexible pattern to handle various indentation levels
+  CM_NAME=$(grep -E "^\s+name:\s+" "$TMP_FILE" | head -1 | awk '{print $2}')
+  
+  # Validate that we extracted a non-empty name
+  if [[ -z "$CM_NAME" ]]; then
+    echo "❌ Failed to extract ConfigMap name from $template" >&2
+    echo "   Check the YAML structure in the rendered template" >&2
+    rm -f "$TMP_FILE"
+    exit 1
+  fi
   
   # FORCE DELETE/RECREATE instead of patch to guarantee fresh content
   echo "🗑️  Force deleting: $CM_NAME"
