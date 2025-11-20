@@ -5,6 +5,8 @@ metadata:
   name: atlas-pr-guardian
   namespace: argo
 spec:
+  # Disable Atlas PR Guardian - not needed with proper play workflows
+  replicas: 0
   template:
     serviceAccountName: argo-events-sa
 
