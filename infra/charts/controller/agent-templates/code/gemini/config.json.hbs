@@ -1,0 +1,26 @@
+{
+  "model": "{{agent.model}}",
+  "apiVersion": "v1beta",
+  "apiKeyEnv": "{{agent.api_key_env}}",
+  "baseUrl": "{{agent.base_url}}",
+  {{#if agent.max_output_tokens}}
+  "maxOutputTokens": {{agent.max_output_tokens}},
+  {{/if}}
+  {{#if agent.temperature}}
+  "temperature": {{agent.temperature}},
+  {{/if}}
+  "tools": {
+    "remote": [
+      {{#each agent.remote_tools}}
+      "{{this}}"{{#unless @last}},{{/unless}}
+      {{/each}}
+    ]
+  },
+  "metadata": {
+    "timestamp": "{{metadata.timestamp}}",
+    "correlationId": "{{metadata.correlation_id}}",
+    "cli": "{{metadata.cli}}",
+    "githubApp": "{{metadata.github_app}}"
+  }
+}
+

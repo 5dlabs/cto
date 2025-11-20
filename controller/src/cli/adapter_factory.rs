@@ -5,7 +5,7 @@
 
 use crate::cli::adapter::{AdapterError, AdapterResult, CliAdapter, HealthState, HealthStatus};
 use crate::cli::adapters::{
-    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, OpenCodeAdapter,
+    ClaudeAdapter, CodexAdapter, CursorAdapter, FactoryAdapter, GeminiAdapter, OpenCodeAdapter,
 };
 use crate::cli::base_adapter::AdapterConfig;
 use crate::cli::types::CLIType;
@@ -188,6 +188,10 @@ impl AdapterFactory {
 
         let factory_adapter = Arc::new(FactoryAdapter::new()?);
         self.register_adapter(CLIType::Factory, factory_adapter)
+            .await?;
+
+        let gemini_adapter = Arc::new(GeminiAdapter::new()?);
+        self.register_adapter(CLIType::Gemini, gemini_adapter)
             .await?;
 
         let opencode_adapter = Arc::new(OpenCodeAdapter::new()?);
@@ -606,11 +610,12 @@ mod tests {
     #[tokio::test]
     async fn test_factory_creation() {
         let factory = AdapterFactory::new().await.unwrap();
-        assert_eq!(factory.get_supported_clis().len(), 5);
+        assert_eq!(factory.get_supported_clis().len(), 6);
         assert!(factory.supports_cli(CLIType::Claude));
         assert!(factory.supports_cli(CLIType::Codex));
         assert!(factory.supports_cli(CLIType::Cursor));
         assert!(factory.supports_cli(CLIType::Factory));
+        assert!(factory.supports_cli(CLIType::Gemini));
         assert!(factory.supports_cli(CLIType::OpenCode));
     }
 
@@ -628,7 +633,7 @@ mod tests {
             .unwrap();
 
         assert!(factory.supports_cli(CLIType::Claude));
-        assert_eq!(factory.get_supported_clis().len(), 5);
+        assert_eq!(factory.get_supported_clis().len(), 6);
     }
 
     #[tokio::test]
@@ -652,7 +657,8 @@ mod tests {
     async fn test_unsupported_cli_error() {
         let factory = AdapterFactory::new().await.unwrap();
 
-        let result = factory.create(CLIType::Gemini).await;
+        // Use Grok as it's not yet implemented
+        let result = factory.create(CLIType::Grok).await;
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -685,7 +691,7 @@ mod tests {
 
         let health_summary = factory.get_health_summary().await;
 
-        assert_eq!(health_summary.len(), 5);
+        assert_eq!(health_summary.len(), 6);
         assert_eq!(
             health_summary[&CLIType::Claude].status,
             HealthState::Healthy
@@ -714,8 +720,8 @@ mod tests {
 
         let stats = factory.get_factory_stats().await;
 
-        assert_eq!(stats.total_adapters, 5);
-        assert_eq!(stats.healthy_adapters, 5);
+        assert_eq!(stats.total_adapters, 6);
+        assert_eq!(stats.healthy_adapters, 6);
         assert_eq!(stats.warning_adapters, 0);
         assert_eq!(stats.unhealthy_adapters, 0);
     }
