@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const taskDescription = process.argv[2] || '';
 const repoPath = process.argv[3] || process.cwd();
@@ -188,7 +189,8 @@ console.log(JSON.stringify(resolvedTheme, null, 2));
 // Save to file for container script using a securely created temp path, then move to stable location
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resolved-theme-'));
 const tempFile = path.join(tempDir, 'theme.json');
-const outputPath = path.join(os.tmpdir(), 'resolved-theme.json');
+const randomSuffix = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+const outputPath = path.join(os.tmpdir(), `resolved-theme-${randomSuffix}.json`);
 fs.writeFileSync(tempFile, JSON.stringify(resolvedTheme, null, 2), { mode: 0o600 });
 fs.renameSync(tempFile, outputPath);
 fs.rmSync(tempDir, { recursive: true, force: true });

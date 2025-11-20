@@ -578,8 +578,9 @@ fi
 if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
   TASK_LABEL="task-${TASK_ID}"
   if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
-    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
-    if [ -n "$CAND_NUM" ]; then
+    # Only search OPEN PRs, sorted by creation date (newest first)
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --state open --json number,createdAt --jq 'sort_by(.createdAt) | reverse | .[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ] && [ "$CAND_NUM" != "null" ]; then
       PR_NUMBER="$CAND_NUM"
       PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
       echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
@@ -2154,41 +2155,10 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       git push origin HEAD || echo "⚠️ Failed to push fixes"
     fi
     
-    # Post APPROVE review
-    echo "✅ Posting APPROVE review to signal quality checks passed"
-    REVIEW_BODY="### ✅ Code Quality Review - APPROVED
-
-All quality checks have passed:
-$(echo -e "$QUALITY_REPORT")
-
-**Status:** Ready for security review by Cipher
-**Next Step:** Cipher will now perform security scanning
-
----
-*Quality review by Cleo - 5DLabs Code Quality Agent*"
-    
-    # Retry approval submission
-    APPROVAL_RETRIES=3
-    APPROVAL_SUCCESS=false
-    for retry in $(seq 1 $APPROVAL_RETRIES); do
-      if timeout 30 gh pr review "$PR_NUMBER" --approve --body "$REVIEW_BODY" 2>&1; then
-        APPROVAL_SUCCESS=true
-        echo "✅ PR approval posted successfully"
-        break
-      else
-        echo "⚠️ PR review command failed (attempt $retry/$APPROVAL_RETRIES)"
-        if [ $retry -lt $APPROVAL_RETRIES ]; then
-          sleep 2
-        fi
-      fi
-    done
-    
-    if [ "$APPROVAL_SUCCESS" != "true" ]; then
-      echo "⚠️ WARNING: Failed to post PR approval after $APPROVAL_RETRIES attempts"
-      echo "   Quality checks passed, but GitHub API call failed"
-      echo "   This is non-fatal - continuing with label update"
-      # Don't exit - quality checks passed, approval is just a signal
-    fi
+    # Cleo hands off to Cipher via label (NOT approve)
+    # Comment already posted above at lines 2095-2136
+    # Only Tess has PR approval authority
+    echo "✅ Quality checks passed - adding ready-for-security label to trigger Cipher"
     
     # Add ready-for-security label to signal Cipher
     echo "🏷️  Adding 'ready-for-security' label to trigger Cipher review"

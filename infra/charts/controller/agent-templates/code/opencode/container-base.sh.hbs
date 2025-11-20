@@ -2488,10 +2488,10 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
 - Security best practices verified'
         NEXT_STAGE="QA testing by Tess"
         
-        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All security checks have passed:
 $CHECKS_PASSED
 
@@ -2502,7 +2502,7 @@ $CHECKS_PASSED
 *Security review by Cipher*
 EOF
         refresh_token_if_needed || true
-        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
         rm -f "$REVIEW_BODY_FILE"
         
         # Add security-approved label (create if missing)
@@ -2545,7 +2545,7 @@ EOF
           echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
         fi
       elif [ "$WORKFLOW_STAGE" = "testing" ]; then
-        # Tess has final approval authority
+        # Tess has final approval authority - but ONLY if CI passes
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
         CHECKS_PASSED=$'- End-to-end tests passed
@@ -2554,9 +2554,52 @@ EOF
 - Production readiness confirmed'
         NEXT_STAGE="human review and merge"
         
+        # CRITICAL: Check GitHub CI status before approving
+        if [ $SUCCESS -eq 1 ]; then
+          echo "🔍 Verifying GitHub CI status before Tess approval..."
+          CI_CHECK_FAILED=0
+          
+          CI_TIMEOUT=300
+          CI_WAIT=0
+          CI_ALL_COMPLETE=false
+          
+          while [ $CI_WAIT -lt $CI_TIMEOUT ]; do
+            PENDING_COUNT=$(gh pr checks "$PR_NUM" --json state --jq '[.[] | select(.state != "COMPLETED")] | length' 2>/dev/null || echo "99")
+            
+            if [ "${PENDING_COUNT:-99}" -eq 0 ]; then
+              CI_ALL_COMPLETE=true
+              echo "✅ All CI checks completed"
+              break
+            fi
+            
+            echo "⏳ Waiting for CI... ${PENDING_COUNT} pending (${CI_WAIT}s / ${CI_TIMEOUT}s)"
+            sleep 15
+            CI_WAIT=$((CI_WAIT + 15))
+          done
+          
+          if [ "$CI_ALL_COMPLETE" = "false" ]; then
+            echo "⚠️ CI still running after ${CI_TIMEOUT}s - NOT approving"
+            CI_CHECK_FAILED=1
+          else
+            FAILED_COUNT=$(gh pr checks "$PR_NUM" --json conclusion --jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED")] | length' 2>/dev/null || echo "0")
+            
+            if [ "${FAILED_COUNT:-0}" -gt 0 ]; then
+              echo "❌ ${FAILED_COUNT} CI check(s) FAILED - NOT approving"
+              CI_CHECK_FAILED=1
+            else
+              echo "✅ All CI checks PASSED"
+            fi
+          fi
+          
+          if [ $CI_CHECK_FAILED -eq 1 ]; then
+            SUCCESS=0
+            CHECKS_PASSED="CI checks must pass before approval"
+          fi
+        fi
+        
         # Check if this is the final task requiring deployment verification
         DEPLOYMENT_STATUS=""
-        if [ "${FINAL_TASK:-false}" = "true" ]; then
+        if [ "${FINAL_TASK:-false}" = "true" ] && [ $SUCCESS -eq 1 ]; then
           echo "🎯 Final task detected - verifying Kubernetes deployment"
           
           # Extract service name from repository or use default

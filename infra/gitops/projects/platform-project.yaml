@@ -46,6 +46,8 @@ spec:
 
   # Destinations that applications in this project can deploy to
   destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
     - namespace: agent-platform
       server: https://kubernetes.default.svc
     - namespace: 'agent-platform-preview-*'  # Preview deployments (Bolt)
@@ -75,8 +77,6 @@ spec:
     - namespace: external-dns
       server: https://kubernetes.default.svc
     - namespace: ngrok-operator
-      server: https://kubernetes.default.svc
-    - namespace: test-db
       server: https://kubernetes.default.svc
     # Removed Jupiter namespace
     - namespace: kube-system

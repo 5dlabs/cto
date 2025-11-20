@@ -5,6 +5,8 @@ metadata:
   name: atlas-pr-guardian
   namespace: argo
 spec:
+  # Disable Atlas PR Guardian - not needed with proper play workflows
+  replicas: 0
   template:
     serviceAccountName: argo-events-sa
 
@@ -42,18 +44,10 @@ spec:
               - submitted
               - completed
               - requested
-        exprs:
-          # CRITICAL: Do NOT create Atlas guardians for PRs created by Atlas itself
-          # This prevents infinite loops where Atlas creates Task 0 PR → sensor fires → creates Atlas → creates Task 0 PR...
-          - expr: "!(body.pull_request.user.login contains 'atlas-5dlabs' || body.sender.login contains 'atlas-5dlabs')"
-            fields:
-              - name: body.pull_request.user.login
-                path: body.pull_request.user.login
-              - name: body.sender.login
-                path: body.sender.login
-        # NOTE: Removed broken exprs filter - issue comment PR validation moved to workflow
-        # The dedup workflow validates issue_comment events are on PRs (lines 98-106)
-        # This is more reliable than Argo Events exprs which fail with field access errors
+        # NOTE: Atlas self-filtering moved to workflow script due to Argo Events expr limitations
+        # The expr filter "!(body.sender.login contains 'atlas-5dlabs')" was causing 100% event discard
+        # with error: "Unable to access unexported field 'sender' in token 'body.sender.login'"
+        # Now handled as first step in workflow: exit early if sender is atlas-5dlabs
 
   triggers:
     - template:
@@ -125,6 +119,10 @@ spec:
                 dependencyName: pr-events
                 dataTemplate: "{{ .Input.body.workflow_run.html_url | default \"\" }}"
               dest: spec.templates.0.script.env.9.value
+            - src:
+                dependencyName: pr-events
+                dataKey: body.sender.login
+              dest: spec.templates.0.script.env.10.value
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -165,9 +163,18 @@ spec:
                           value: ""
                         - name: WORKFLOW_RUN_URL
                           value: ""
+                        - name: SENDER_LOGIN
+                          value: ""
                       source: |
                         #!/bin/bash
                         set -e
+
+                        # CRITICAL: Prevent infinite loops - Atlas should NOT monitor its own PRs
+                        # Use exact match to avoid false positives with usernames containing "atlas-5dlabs"
+                        if [[ "${SENDER_LOGIN:-}" == "atlas-5dlabs[bot]" ]] || [[ "${SENDER_LOGIN:-}" == "atlas-5dlabs" ]]; then
+                          echo "🛑 Event from Atlas itself (sender: $SENDER_LOGIN) - skipping to prevent infinite loop"
+                          exit 0
+                        fi
 
                         # Ensure jq is available
                         if ! command -v jq >/dev/null 2>&1; then
@@ -177,6 +184,7 @@ spec:
                         fi
 
                         echo "=== Atlas PR Guardian Deduplication ==="
+                        echo "Sender: ${SENDER_LOGIN:-unknown}"
                         echo "Event: $EVENT_TYPE"
                         echo "Action: $ACTION"
                         echo "PR Number: $PR_NUMBER"

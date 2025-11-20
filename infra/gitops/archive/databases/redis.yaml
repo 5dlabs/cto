@@ -23,9 +23,18 @@ spec:
         app.kubernetes.io/name: redis
         app.kubernetes.io/component: cache
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: redis
         image: redis:7.2-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
         ports:
         - name: redis
           containerPort: 6379
@@ -42,6 +51,10 @@ spec:
           mountPath: /data
         - name: config
           mountPath: /etc/redis
+        - name: redis-tmp
+          mountPath: /tmp
+        - name: redis-run
+          mountPath: /opt/bitnami/redis/tmp
         command:
         - redis-server
         - /etc/redis/redis.conf
@@ -64,6 +77,10 @@ spec:
       - name: config
         configMap:
           name: redis-config
+      - name: redis-tmp
+        emptyDir: {}
+      - name: redis-run
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

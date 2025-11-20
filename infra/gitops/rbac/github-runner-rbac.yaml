@@ -8,10 +8,6 @@ rules:
   resources: ["applications"]
   verbs: ["get", "list", "patch", "update"]
 - apiGroups: [""]
-  resources: ["secrets"]
-  resourceNames: ["argocd-initial-admin-secret"]
-  verbs: ["get", "list"]
-- apiGroups: [""]
   resources:
     ["pods", "services", "nodes", "namespaces", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
   verbs: ["get", "list", "watch"]

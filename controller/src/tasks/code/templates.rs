@@ -2223,6 +2223,7 @@ impl CodeTemplateGenerator {
             })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn generate_gemini_memory(
         code_run: &CodeRun,
         cli_config: &Value,
@@ -2318,6 +2319,15 @@ impl CodeTemplateGenerator {
         let requirements_env_vars: Vec<_> = req_env_set.into_iter().collect();
         let requirements_secret_sources: Vec<_> = req_src_set.into_iter().collect();
 
+        let cli_type = Self::determine_cli_type(code_run).to_string();
+
+        // Extract model from cli_config like other templates do
+        let cli_model = cli_config
+            .get("model")
+            .and_then(Value::as_str)
+            .unwrap_or(&code_run.spec.model)
+            .to_string();
+
         let context = json!({
             "task_id": code_run.spec.task_id,
             "service": code_run.spec.service,
@@ -2332,6 +2342,16 @@ impl CodeTemplateGenerator {
             "workflow_env_vars": workflow_env_vars,
             "requirements_env_vars": requirements_env_vars,
             "requirements_secret_sources": requirements_secret_sources,
+            "cli_type": cli_type,
+            "cli": {
+                "type": cli_type,
+                "model": cli_model,
+                "settings": cli_settings,
+                "remote_tools": remote_tools,
+            },
+            "toolman": {
+                "tools": remote_tools,
+            },
         });
 
         handlebars.render("gemini_memory", &context).map_err(|e| {
@@ -2547,7 +2567,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "claude/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "claude/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "claude/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "integration/container-tess.sh.hbs",
+            "5DLabs-Tess" => "claude/container.sh.hbs", // Use default container for Tess
             "5DLabs-Atlas" => "integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "integration/container-bolt.sh.hbs",
             _ => {
@@ -2586,7 +2606,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/codex/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/codex/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/codex/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/codex/container-tess.sh.hbs",
             "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/codex/container.sh.hbs",
@@ -2634,7 +2654,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/opencode/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/opencode/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/opencode/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/opencode/container-tess.sh.hbs",
             "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/opencode/container.sh.hbs",
@@ -2714,7 +2734,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/cursor/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/cursor/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/cursor/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/cursor/container-tess.sh.hbs",
             "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/cursor/container.sh.hbs",
@@ -2768,7 +2788,7 @@ impl CodeTemplateGenerator {
             "5DLabs-Blaze" => "code/factory/container-blaze.sh.hbs",
             "5DLabs-Cipher" => "code/factory/container-cipher.sh.hbs",
             "5DLabs-Cleo" => "code/factory/container-cleo.sh.hbs",
-            "5DLabs-Tess" => "code/integration/container-tess.sh.hbs",
+            "5DLabs-Tess" => "code/factory/container-tess.sh.hbs",
             "5DLabs-Atlas" => "code/integration/container-atlas.sh.hbs",
             "5DLabs-Bolt" => "code/integration/container-bolt.sh.hbs",
             _ => "code/factory/container.sh.hbs",
@@ -2981,7 +3001,8 @@ mod tests {
     fn test_tess_agent_template_selection() {
         let code_run = create_test_code_run(Some("5DLabs-Tess".to_string()));
         let template_path = CodeTemplateGenerator::get_agent_container_template(&code_run);
-        assert_eq!(template_path, "code/integration/container-tess.sh.hbs");
+        // For CLIType::Claude (default), path is prefixed with "code/" in template loading
+        assert_eq!(template_path, "code/claude/container.sh.hbs");
     }
 
     #[test]

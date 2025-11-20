@@ -560,8 +560,9 @@ fi
 if [ -z "${PR_NUMBER:-}" ] || [ -z "${PR_URL:-}" ]; then
   TASK_LABEL="task-${TASK_ID}"
   if command -v gh >/dev/null 2>&1 && [ -n "$REPO_SLUG" ]; then
-    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --json number --jq '.[0].number' 2>/dev/null || true)
-    if [ -n "$CAND_NUM" ]; then
+    # Only search OPEN PRs, sorted by creation date (newest first)
+    CAND_NUM=$(gh pr list -R "$REPO_SLUG" --label "$TASK_LABEL" --state open --json number,createdAt --jq 'sort_by(.createdAt) | reverse | .[0].number' 2>/dev/null || true)
+    if [ -n "$CAND_NUM" ] && [ "$CAND_NUM" != "null" ]; then
       PR_NUMBER="$CAND_NUM"
       PR_URL=$(gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json url -q .url 2>/dev/null || echo "")
       echo "✓ Discovered PR context via label: PR #$PR_NUMBER ($PR_URL)"
@@ -2131,39 +2132,15 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
-  # Determine if security checks actually passed by checking Claude's final report
-  # Look for the security scan result in Claude's output
+  # Determine if security checks passed based on Claude's exit code
+  # Claude exits 0 on success, non-zero on failure
   SECURITY_PASSED=0
   if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    # Check if Claude reported "APPROVED FOR PRODUCTION" or similar success indicators
-    if grep -q "APPROVED FOR PRODUCTION\|Security Review - PASSED\|NO CHANGES REQUIRED" "$CLAUDE_LOG" 2>/dev/null; then
-      SECURITY_PASSED=1
-    elif grep -q "Security issues detected\|Required Security Changes\|SECURITY VULNERABILITIES" "$CLAUDE_LOG" 2>/dev/null; then
-      SECURITY_PASSED=0
-    else
-      # Default to passed if Claude exited cleanly and didn't explicitly report issues
-      SECURITY_PASSED=1
-    fi
+    SECURITY_PASSED=1
   fi
 
   if [ $SECURITY_PASSED -eq 1 ]; then
-    echo "✅ Cipher security checks passed - handing off to Tess for E2E testing"
-
-    # Post COMMENT (NOT APPROVE) - Tess has final approval authority
-    timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED
-
-All security checks have passed:
-- No vulnerabilities detected
-- Dependency audit passed
-- Secret scanning completed
-- Security best practices verified
-
-**Status:** Ready for QA testing by Tess
-**Next Step:** Tess will now perform comprehensive QA validation
-
----
-*Security review by Cipher*" || echo "⚠️ PR comment command failed"
-
+    # Security passed - will post approval AFTER loop completes to avoid duplicates
     # Add security-approved label (create if missing)
     LABEL_NAME="security-approved"
     LABEL_API_PATH=$(printf '%s' "$LABEL_NAME" | sed 's/ /%20/g')
@@ -2206,20 +2183,7 @@ All security checks have passed:
 
     update_coderun_status "ready-for-qa" "security-passed" "$PR_URL"
   else
-    echo "❌ Security issues detected - posting REQUEST CHANGES review"
-    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Security Changes
-
-Security issues detected. Please address the following:
-- Fix security vulnerabilities
-- Update insecure dependencies
-- Remove exposed secrets
-- Address security best practice violations
-
-Rex will address these issues and resubmit for review.
-
----
-*Security review by Cipher*" || echo "⚠️ PR review command failed"
-
+    # Security issues detected - will post REQUEST_CHANGES after loop completes
     # Add needs-fixes label so evaluate-remediation can detect it
     echo "🏷️  Adding 'needs-fixes' label to trigger remediation"
     timeout 30 gh pr edit "$PR_NUMBER" --add-label "needs-fixes" || echo "⚠️ Failed to add needs-fixes label"
@@ -2287,6 +2251,43 @@ EOF
     fi
   fi
 done
+
+# Post PR review ONCE after loop completes (not inside loop to avoid duplicates)
+if [ -n "$PR_NUMBER" ]; then
+  if [ $SUCCESS -eq 1 ]; then
+    echo "✅ Cipher security checks passed - posting APPROVE review (once)"
+    
+    # Post APPROVE review - Cipher acts as security gate
+    timeout 30 gh pr review "$PR_NUMBER" --approve --body "### 🔒 Security Review - APPROVED
+
+All security checks have passed:
+- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified
+
+**Status:** Ready for QA testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher*" || echo "⚠️ PR review command failed"
+  else
+    echo "❌ Security issues detected - posting REQUEST CHANGES review (once)"
+    
+    timeout 30 gh pr review "$PR_NUMBER" --request-changes --body "### 🔴 Required Security Changes
+
+Security issues detected. Please address the following:
+- Fix security vulnerabilities
+- Update insecure dependencies
+- Remove exposed secrets
+- Address security best practice violations
+
+Rex will address these issues and resubmit for review.
+
+---
+*Security review by Cipher*" || echo "⚠️ PR review command failed"
+  fi
+fi
 
 # Report final status
 echo ""

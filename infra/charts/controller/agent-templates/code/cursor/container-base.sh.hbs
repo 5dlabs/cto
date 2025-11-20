@@ -1447,6 +1447,7 @@ MAX_RETRIES=${CURSOR_MAX_RETRIES:-${EXECUTION_MAX_RETRIES:-5}}
 ATTEMPT=1
 SUCCESS=0
 CURSOR_EXIT=1
+COMMITS_MADE=0
 LAST_MESSAGE_FILE=""
 RUN_LOG=""
 LAST_COMPLETION_REASON=""
@@ -2052,7 +2053,6 @@ Handoff document created for $HANDOFF_TARGET to continue work." 2>/dev/null || e
   # Check if agent made any commits before deciding to handoff vs fail
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   REMOTE_BASE="origin/${BASE_BRANCH:-main}"
-  COMMITS_MADE=0
 
   if [ -n "$CURRENT_BRANCH" ]; then
     git fetch origin "$BASE_BRANCH" >/dev/null 2>&1 || true
@@ -2212,10 +2212,10 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
 - Security best practices verified'
         NEXT_STAGE="QA testing by Tess"
 
-        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - PASSED
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
 All security checks have passed:
 $CHECKS_PASSED
 
@@ -2226,7 +2226,7 @@ $CHECKS_PASSED
 *Security review by Cipher*
 EOF
         refresh_token_if_needed || true
-        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
         rm -f "$REVIEW_BODY_FILE"
 
         # Add security-approved label (create if missing)
@@ -2249,28 +2249,24 @@ EOF
           echo "⚠️ Failed to add $LABEL_NAME label"
         fi
 
-        # Refresh ready-for-qa label so Tess sees a new webhook event
-        LABEL_READY_FOR_SECURITY="ready-for-security"
+        # Add ready-for-qa label to trigger Tess (DO NOT refresh - causes duplicate runs)
         LABEL_READY_FOR_QA="ready-for-qa"
-        echo "🧹 Removing '$LABEL_READY_FOR_SECURITY' label after security approval"
-        gh api -X DELETE \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels/$LABEL_READY_FOR_SECURITY" >/dev/null 2>&1 || echo "ℹ️ '$LABEL_READY_FOR_SECURITY' label already absent"
-
-        echo "♻️ Refreshing '$LABEL_READY_FOR_QA' label to trigger Tess"
-        gh api -X DELETE \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels/$LABEL_READY_FOR_QA" >/dev/null 2>&1 || true
-        if gh api -X POST \
-          -H "Accept: application/vnd.github+json" \
-          "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
-          -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
-          echo "🏷️  Added '$LABEL_READY_FOR_QA' label to signal Tess"
+        echo "🏷️  Adding '$LABEL_READY_FOR_QA' label to signal Tess (if not already present)"
+        # Only add if not present - don't remove/re-add to avoid triggering sensor multiple times
+        if ! gh api "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" --jq '.[].name' 2>/dev/null | grep -q "^${LABEL_READY_FOR_QA}$"; then
+          if gh api -X POST \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REPO_OWNER/$REPO_NAME/issues/$PR_NUM/labels" \
+            -F labels[]="$LABEL_READY_FOR_QA" >/dev/null 2>&1; then
+            echo "✅ Added '$LABEL_READY_FOR_QA' label to trigger Tess"
+          else
+            echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
+          fi
         else
-          echo "⚠️ Failed to add $LABEL_READY_FOR_QA label"
+          echo "ℹ️  Label '$LABEL_READY_FOR_QA' already present - no action needed"
         fi
       elif [ "$WORKFLOW_STAGE" = "testing" ]; then
-        # Tess has final approval authority
+        # Tess has final approval authority - but ONLY if CI passes
         STAGE_NAME="QA Testing"
         STAGE_EMOJI="🧪"
         CHECKS_PASSED=$'- End-to-end tests passed
@@ -2279,9 +2275,59 @@ EOF
 - Production readiness confirmed'
         NEXT_STAGE="human review and merge"
 
+        # CRITICAL: Check GitHub CI status before approving
+        if [ $SUCCESS -eq 1 ]; then
+          echo "🔍 Verifying GitHub CI status before Tess approval..."
+          CI_CHECK_FAILED=0
+          
+          # Wait for CI to complete (max 5 minutes)
+          CI_TIMEOUT=300
+          CI_WAIT=0
+          CI_ALL_COMPLETE=false
+          
+          while [ $CI_WAIT -lt $CI_TIMEOUT ]; do
+            # Check if any checks are still pending/queued
+            PENDING_COUNT=$(gh pr checks "$PR_NUM" --json state --jq '[.[] | select(.state != "COMPLETED")] | length' 2>/dev/null || echo "99")
+            
+            if [ "${PENDING_COUNT:-99}" -eq 0 ]; then
+              CI_ALL_COMPLETE=true
+              echo "✅ All CI checks completed"
+              break
+            fi
+            
+            echo "⏳ Waiting for CI to complete... ${PENDING_COUNT} checks pending (${CI_WAIT}s / ${CI_TIMEOUT}s)"
+            sleep 15
+            CI_WAIT=$((CI_WAIT + 15))
+          done
+          
+          if [ "$CI_ALL_COMPLETE" = "false" ]; then
+            echo "⚠️ CI checks still running after ${CI_TIMEOUT}s - NOT approving"
+            CI_CHECK_FAILED=1
+          else
+            # All checks completed - verify they passed
+            FAILED_COUNT=$(gh pr checks "$PR_NUM" --json conclusion --jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED")] | length' 2>/dev/null || echo "0")
+            
+            if [ "${FAILED_COUNT:-0}" -gt 0 ]; then
+              echo "❌ ${FAILED_COUNT} CI check(s) FAILED - NOT approving"
+              FAILED_CHECKS=$(gh pr checks "$PR_NUM" --json name,conclusion --jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "CANCELLED")] | .[].name' 2>/dev/null | head -5)
+              echo "   Failed checks: $FAILED_CHECKS"
+              CI_CHECK_FAILED=1
+            else
+              echo "✅ All CI checks PASSED - safe to approve"
+            fi
+          fi
+          
+          # Override SUCCESS if CI failed
+          if [ $CI_CHECK_FAILED -eq 1 ]; then
+            echo "🛑 Blocking approval due to CI failures"
+            SUCCESS=0
+            CHECKS_PASSED="CI checks must pass before Tess approval"
+          fi
+        fi
+
         # Check if this is the final task requiring deployment verification
         DEPLOYMENT_STATUS=""
-        if [ "${FINAL_TASK:-false}" = "true" ]; then
+        if [ "${FINAL_TASK:-false}" = "true" ] && [ $SUCCESS -eq 1 ]; then
           echo "🎯 Final task detected - verifying Kubernetes deployment"
 
           # Extract service name from repository or use default
