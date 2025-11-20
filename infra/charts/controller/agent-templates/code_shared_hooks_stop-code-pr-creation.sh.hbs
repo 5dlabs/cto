@@ -16,10 +16,10 @@ echo "=== END DEBUG ==="
 
 echo "🔗 STOP HOOK - Starting code implementation PR creation..."
  
-# Hard guard: never create PRs from QA/quality agents or when PR context is present
+# Hard guard: never create PRs from QA/quality/integration agents or when PR context is present
 AGENT_NAME="${GITHUB_APP:-${AGENT_NAME:-}}"
-if echo "${AGENT_NAME}" | grep -qiE 'cleo|tess'; then
-  echo "ℹ️ Detected agent '${AGENT_NAME}' (QA/quality). Skipping PR creation."
+if echo "${AGENT_NAME}" | grep -qiE 'cleo|tess|atlas'; then
+  echo "ℹ️ Detected agent '${AGENT_NAME}' (QA/quality/integration). Skipping PR creation."
   exit 0
 fi
 
