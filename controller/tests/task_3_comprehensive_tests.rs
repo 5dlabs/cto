@@ -428,7 +428,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let supported = factory.get_supported_clis();
     assert_eq!(
         supported.len(),
-        5,
+        6,
         "Factory must return correct supported CLI count"
     );
     assert!(
@@ -464,7 +464,7 @@ async fn test_fr4_adapter_factory_implementation() {
     );
 
     // ✅ Test unsupported CLI error
-    let unsupported_result = factory.create(CLIType::Gemini).await;
+    let unsupported_result = factory.create(CLIType::Grok).await;
     assert!(
         unsupported_result.is_err(),
         "Factory must reject unsupported CLI types"
@@ -481,7 +481,7 @@ async fn test_fr4_adapter_factory_implementation() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        5,
+        6,
         "Factory must provide health summary"
     );
     assert_eq!(
@@ -1021,7 +1021,7 @@ async fn test_error_handling() {
 
     // ✅ Test factory error handling
     let factory = AdapterFactory::new().await.expect("Factory must work");
-    let unsupported_result = factory.create(CLIType::Gemini).await;
+    let unsupported_result = factory.create(CLIType::Grok).await;
     assert!(
         unsupported_result.is_err(),
         "Unsupported CLI must return error"
@@ -1031,7 +1031,7 @@ async fn test_error_handling() {
         AdapterError::UnsupportedCliType(cli_type) => {
             // CLI type is stored as lowercase in the error
             assert!(
-                cli_type.to_lowercase().contains("gemini"),
+                cli_type.to_lowercase().contains("grok"),
                 "Error must contain correct CLI type"
             );
         }
@@ -1174,7 +1174,7 @@ async fn test_factory_health_monitoring() {
     let health_summary = factory.get_health_summary().await;
     assert_eq!(
         health_summary.len(),
-        5,
+        6,
         "Health summary must include all adapters"
     );
     assert_eq!(
@@ -1200,9 +1200,9 @@ async fn test_factory_health_monitoring() {
 
     // ✅ Test factory statistics
     let stats = factory.get_factory_stats().await;
-    assert_eq!(stats.total_adapters, 5, "Stats must show correct total");
+    assert_eq!(stats.total_adapters, 6, "Stats must show correct total");
     assert_eq!(
-        stats.healthy_adapters, 4,
+        stats.healthy_adapters, 5,
         "Stats must show correct healthy count"
     );
     assert_eq!(
