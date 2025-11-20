@@ -214,9 +214,7 @@ impl CliAdapter for GeminiAdapter {
     async fn validate_model(&self, model: &str) -> Result<bool> {
         // Gemini models should start with "gemini-" or "models/gemini-"
         let normalized = model.trim().to_lowercase();
-        Ok(normalized.starts_with("gemini-") 
-            || normalized.starts_with("models/gemini-")
-            || !normalized.is_empty())
+        Ok(normalized.starts_with("gemini-") || normalized.starts_with("models/gemini-"))
     }
 
     async fn generate_config(&self, agent_config: &AgentConfig) -> Result<String> {
@@ -408,10 +406,29 @@ mod tests {
     #[tokio::test]
     async fn test_validate_model() {
         let adapter = GeminiAdapter::new().unwrap();
-        
-        assert!(adapter.validate_model("gemini-3-pro-preview").await.unwrap());
+
+        // Valid Gemini models
+        assert!(adapter
+            .validate_model("gemini-3-pro-preview")
+            .await
+            .unwrap());
         assert!(adapter.validate_model("gemini-2.5-flash").await.unwrap());
-        assert!(adapter.validate_model("models/gemini-3-pro-preview").await.unwrap());
+        assert!(adapter
+            .validate_model("models/gemini-3-pro-preview")
+            .await
+            .unwrap());
+        assert!(adapter
+            .validate_model("GEMINI-3-PRO-PREVIEW")
+            .await
+            .unwrap());
+        assert!(adapter.validate_model(" gemini-3-pro ").await.unwrap());
+
+        // Invalid models should be rejected
+        assert!(!adapter.validate_model("gpt-4").await.unwrap());
+        assert!(!adapter.validate_model("claude-sonnet").await.unwrap());
+        assert!(!adapter.validate_model("anthropic/claude-3").await.unwrap());
+        assert!(!adapter.validate_model("random-model").await.unwrap());
+        assert!(!adapter.validate_model("").await.unwrap());
     }
 
     #[tokio::test]
@@ -453,4 +470,3 @@ mod tests {
         assert_eq!(caps.max_context_tokens, 1_048_576);
     }
 }
-
