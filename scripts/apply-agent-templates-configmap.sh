@@ -75,11 +75,62 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
       --show-only "templates/$template" > "$TMP_FILE"
   fi
   
-  kubectl apply --server-side --force-conflicts -f "$TMP_FILE"
-  echo "✅ Applied: $template"
-  echo ""
+  # Extract ConfigMap name using yq for robust YAML parsing
+  # Falls back to grep if yq is not available
+  if command -v yq >/dev/null 2>&1; then
+    CM_NAME=$(yq eval '.metadata.name' "$TMP_FILE")
+  else
+    # Fallback: Use grep with more robust pattern
+    # Match "name:" at any indentation level under metadata
+    CM_NAME=$(grep -E '^\s*name:\s*\S+' "$TMP_FILE" | grep -v "kind:" | head -1 | sed -E 's/^\s*name:\s*//')
+  fi
+  
+  # Validate that we extracted a non-empty name
+  if [[ -z "$CM_NAME" ]] || [[ "$CM_NAME" == "null" ]]; then
+    echo "❌ Failed to extract ConfigMap name from $template" >&2
+    echo "   Check the YAML structure in the rendered template" >&2
+    echo "   Template content:" >&2
+    head -20 "$TMP_FILE" >&2
+    rm -f "$TMP_FILE"
+    exit 1
+  fi
+  
+  echo "   ConfigMap name: $CM_NAME"
+  
+  # FORCE DELETE/RECREATE instead of patch to guarantee fresh content
+  echo "🗑️  Force deleting: $CM_NAME"
+  kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found
+  sleep 2
+  
+  # Create with retry logic
+  MAX_RETRIES=3
+  RETRY=0
+  SUCCESS=false
+  
+  while [ $RETRY -lt $MAX_RETRIES ]; do
+    if kubectl create -f "$TMP_FILE" 2>&1; then
+      echo "✅ Applied: $template"
+      SUCCESS=true
+      break
+    else
+      RETRY=$((RETRY + 1))
+      if [ $RETRY -lt $MAX_RETRIES ]; then
+        WAIT=$((2 ** RETRY))
+        echo "⚠️  Attempt $RETRY failed, retrying in ${WAIT}s..."
+        sleep $WAIT
+      fi
+    fi
+  done
+  
+  if [ "$SUCCESS" = "false" ]; then
+    echo "❌ Failed to create $template after $MAX_RETRIES attempts"
+    rm -f "$TMP_FILE"
+    exit 1
+  fi
   
   rm -f "$TMP_FILE"
+  echo ""
 done
 
 echo "✅ All agent templates ConfigMaps applied successfully!"
+
