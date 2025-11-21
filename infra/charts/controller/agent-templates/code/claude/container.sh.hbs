@@ -4,6 +4,10 @@
 # Define BEFORE cleanup function so cleanup uses correct path
 TASK_WORKSPACE="/workspace/task-{{task_id}}"
 
+# Ensure the workspace exists before any cleanup to avoid sentinel races
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+
 # Clean up any leftover sentinel file from previous runs
 # This prevents premature sidecar shutdown on sequential task executions
 if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
@@ -58,9 +62,7 @@ printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
 echo '║  IMPLEMENTATION TASK STARTING                                ║'
 echo '════════════════════════════════════════════════════════════════'
 
-# Ensure workspace directories exist (TASK_WORKSPACE already defined above)
-mkdir -p /workspace
-mkdir -p "$TASK_WORKSPACE"
+# Workspace directories ensured above; initialize GH configuration directory
 export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
 mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
