@@ -106,8 +106,8 @@ async fn verify_required_configmaps(
         match configmaps.get(cm_name).await {
             Ok(cm) => {
                 // Check if ConfigMap has data (could be in .data or .binaryData fields)
-                let data_count = cm.data.as_ref().map(|d| d.len()).unwrap_or(0);
-                let binary_count = cm.binary_data.as_ref().map(|d| d.len()).unwrap_or(0);
+                let data_count = cm.data.as_ref().map_or(0, std::collections::BTreeMap::len);
+                let binary_count = cm.binary_data.as_ref().map_or(0, std::collections::BTreeMap::len);
                 let total_files = data_count + binary_count;
 
                 if total_files == 0 {
