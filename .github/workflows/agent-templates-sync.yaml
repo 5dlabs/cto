@@ -53,32 +53,32 @@ jobs:
           CURSOR_FILE=$(mktemp)
           export CURSOR_JSON CURSOR_FILE
           kubectl get configmap controller-agent-templates-cursor -n agent-platform -o json > "$CURSOR_JSON"
-          python3 - <<'PY'
-            import base64
-            import json
-            import os
-            import sys
+          python3 - <<'EOF'
+          import base64
+          import json
+          import os
+          import sys
 
-            json_path = os.environ.get("CURSOR_JSON")
-            out_path = os.environ.get("CURSOR_FILE")
-            KEY = "code_cursor_container-base.sh.hbs"
+          json_path = os.environ.get("CURSOR_JSON")
+          out_path = os.environ.get("CURSOR_FILE")
+          KEY = "code_cursor_container-base.sh.hbs"
 
-            if not json_path or not out_path:
-                print("Missing CURSOR_JSON or CURSOR_FILE env vars", file=sys.stderr)
-                sys.exit(1)
+          if not json_path or not out_path:
+              print("Missing CURSOR_JSON or CURSOR_FILE env vars", file=sys.stderr)
+              sys.exit(1)
 
-            with open(json_path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
+          with open(json_path, "r", encoding="utf-8") as fh:
+              data = json.load(fh)
 
-            binary_data = data.get("binaryData") or {}
-            if KEY not in binary_data:
-                print(f"Key {KEY} missing from ConfigMap", file=sys.stderr)
-                sys.exit(1)
+          binary_data = data.get("binaryData") or {}
+          if KEY not in binary_data:
+              print(f"Key {KEY} missing from ConfigMap", file=sys.stderr)
+              sys.exit(1)
 
-            decoded = base64.b64decode(binary_data[KEY])
-            with open(out_path, "wb") as fh:
-                fh.write(decoded)
-PY
+          decoded = base64.b64decode(binary_data[KEY])
+          with open(out_path, "wb") as fh:
+              fh.write(decoded)
+          EOF
           
           # Check for key fix markers
           if grep -q "Verifying GitHub CI status before Tess approval" "$CURSOR_FILE"; then
