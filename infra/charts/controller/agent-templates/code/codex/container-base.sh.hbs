@@ -1600,7 +1600,14 @@ if [ -f "$CODEX_WORK_DIR/task/toolman-guide.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}🔧 **CRITICAL: Tool Usage Reference**\n\n$(cat "$CODEX_WORK_DIR/task/toolman-guide.md")\n\n---\n\n"
 fi
 
-PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **GitHub auth ready**: the GitHub App token (\`GH_TOKEN\`) is already configured; skip manual \`gh auth login\` flows and avoid hitting user-only endpoints like \`/user\`.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}.\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
+PR_STAGE="${WORKFLOW_STAGE:-implementation}"
+if [ "$PR_STAGE" = "implementation" ]; then
+  PR_DIRECTIVE="- **Documentation & PR**: update project docs and open a PR via \`gh pr create\` with labels task-{{task_id}}, service-{{service}}, and run-{{workflow_name}}."
+else
+  PR_DIRECTIVE="- **Documentation & PR**: update project docs and push commits to the existing PR branch. Implementation agents already created the PR, so never run \`gh pr create\`; focus on reviews and fixes."
+fi
+
+PROMPT_PREFIX="${PROMPT_PREFIX}⚠️ **EXECUTION REQUIREMENTS (MANDATORY)**\n\n- **Follow patterns**: reference @coding-guidelines.md and @github-guidelines.md in this workspace.\n- **No mocks or stubs**: integrate with live services, APIs, and configuration; remove all placeholders.\n- **Parameterize everything**: every endpoint, threshold, or trading pair must come from env vars, config, or CLI flags.\n- **GitHub auth ready**: the GitHub App token (\`GH_TOKEN\`) is already configured; skip manual \`gh auth login\` flows and avoid hitting user-only endpoints like \`/user\`.\n- **Feature branch only**: stay on \`feature/task-{{task_id}}-implementation\`; never push directly to main/master or retarget the branch upstream.\n- **Execute without pause**: if you outline a plan, immediately carry it out—do not wait for confirmation or additional input.\n- **Quality gates**: run \`cargo fmt --all -- --check\`, \`cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic\`, and \`cargo test --workspace --all-features\` before declaring success.\n${PR_DIRECTIVE}\n- **Preserve workspace**: never delete the repository or run destructive cleanup commands (for example \`rm -rf\`); leave artifacts in place for QA.\n\n---\n\n"
 
 if [ -f "$CODEX_WORK_DIR/github-guidelines.md" ] || [ -f "$CODEX_WORK_DIR/coding-guidelines.md" ]; then
   PROMPT_PREFIX="${PROMPT_PREFIX}📚 **Reference Materials Available**\n"
@@ -1771,24 +1778,37 @@ fi
 # =========================================================================
 # QA Mode Safeguard: Prevent PR creation when in testing mode
 # =========================================================================
-if [ "${WORKFLOW_STAGE:-}" = "testing" ]; then
-  echo "🛡️  QA Review Mode: Installing PR creation safeguard"
+if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
+  echo "🛡️  Installing PR creation safeguard for ${WORKFLOW_STAGE:-unknown} stage"
 
-  # Create a wrapper function that blocks 'gh pr create' in QA mode
+  block_pr_create_stage="${WORKFLOW_STAGE:-unknown}"
+  case "$block_pr_create_stage" in
+    "quality"|"quality-in-progress")
+      block_reason="Cleo reviews existing PRs. You're working on PR #${PR_NUMBER:-unknown}, so never create a new one."
+      ;;
+    "security"|"security-in-progress")
+      block_reason="Cipher performs security scans on the implementation PR. Creating a new PR would bypass Rex/Blaze ownership."
+      ;;
+    "testing"|"testing-in-progress")
+      block_reason="Tess is in QA review mode and must validate PR #${PR_NUMBER:-unknown}; PR creation is forbidden."
+      ;;
+    *)
+      block_reason="Non-implementation stages must only review the branch created by Rex/Blaze. Do not open new PRs."
+      ;;
+  esac
+
   gh() {
     if [[ "$1" == "pr" && "$2" == "create" ]]; then
-      echo "❌ ERROR: 'gh pr create' is FORBIDDEN in QA review mode (WORKFLOW_STAGE=testing)"
-      echo "❌ You are reviewing PR #${PR_NUMBER}, not creating a new one"
-      echo "❌ Use 'gh pr checkout ${PR_NUMBER}' to work on the existing PR"
-      echo "❌ Use 'gh pr review ${PR_NUMBER}' to approve/reject the PR"
+      echo "❌ ERROR: 'gh pr create' is blocked for ${block_pr_create_stage:-non-implementation} stage."
+      echo "❌ ${block_reason}"
+      echo "❌ Use review commands such as 'gh pr checkout ${PR_NUMBER:-...}' or 'gh pr review ${PR_NUMBER:-...}' instead."
       return 1
     fi
     command gh "$@"
   }
   export -f gh
 
-  echo "✅ Safeguard installed: 'gh pr create' is now blocked"
-  echo "✅ You can only review PR #${PR_NUMBER}"
+  echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
 fi
 
 COMPLETED_ATTEMPTS=0
