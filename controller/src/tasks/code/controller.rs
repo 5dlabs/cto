@@ -1073,6 +1073,7 @@ async fn handle_no_pr_timeout(
 enum WorkflowStage {
     Implementation,
     Quality,
+    Security,
     Testing,
     Unknown(String),
 }
@@ -1083,6 +1084,7 @@ fn get_workflow_stage(code_run: &CodeRun) -> WorkflowStage {
             return match stage.as_str() {
                 "implementation" => WorkflowStage::Implementation,
                 "quality" => WorkflowStage::Quality,
+                "security" => WorkflowStage::Security,
                 "testing" => WorkflowStage::Testing,
                 other => WorkflowStage::Unknown(other.to_string()),
             };
@@ -1145,6 +1147,12 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
                 return Some("Quality workflow reported remediation needed".to_string());
             }
 
+            None
+        }
+        WorkflowStage::Security => {
+            // Security agent (Cipher) posts GitHub review and adds security-approved label
+            // No specific retry conditions - security review is always final
+            // Agent either approves or requests changes via GitHub review state
             None
         }
         WorkflowStage::Testing => {
