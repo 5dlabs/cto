@@ -2132,11 +2132,48 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
 
-  # Determine if security checks passed based on Claude's exit code
-  # Claude exits 0 on success, non-zero on failure
+  # =========================================================================
+  # COMPLETION PROBE: Ask Claude if security checks are complete
+  # =========================================================================
+  echo "🧭 Running security completion probe..."
+  
+  COMPLETION_PROMPT="Security scan completion check.
+
+Review security findings. Answer 'yes' ONLY if:
+1. Zero CRITICAL/HIGH vulnerabilities in git-tracked files
+2. Files in .gitignore (like .config/, .env) are NOT issues
+3. Quality checks pass (or fail only due to missing external services)
+
+Respond 'yes' if complete, 'no' if security issues remain in tracked files.
+
+Your response:"
+
+  COMPLETION_LOG="/tmp/cipher-completion-${ATTEMPT}.log"
+  
+  set +e
+  COMPLETION_OUTPUT=$(claude --stream-json false "$COMPLETION_PROMPT" 2>&1 | tee "$COMPLETION_LOG")
+  COMPLETION_EXIT=${PIPESTATUS[0]}
+  set -e
+
+  echo "🧭 Completion response:"
+  printf '%s\n' "$COMPLETION_OUTPUT"
+
+  # Extract yes/no from response
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
+
+  # Determine if security checks passed based on completion probe
   SECURITY_PASSED=0
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  if [ "$COMPLETION_RESPONSE" = "yes" ]; then
+    echo "✅ Cipher confirmed security checks complete"
     SECURITY_PASSED=1
+  elif [ "$COMPLETION_RESPONSE" = "no" ]; then
+    echo "🔴 Cipher reports security issues remain"
+    SECURITY_PASSED=0
+  elif [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+    echo "⚠️ Completion probe unclear, using exit code"
+    SECURITY_PASSED=1
+  else
+    SECURITY_PASSED=0
   fi
 
   if [ $SECURITY_PASSED -eq 1 ]; then
