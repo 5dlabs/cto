@@ -101,19 +101,18 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
   echo "🗑️  Force deleting: $CM_NAME"
   kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
 
-  # Wait for the ConfigMap to actually disappear before recreating
-  MAX_DELETE_WAIT=10
-  DELETE_WAITED=0
-  while kubectl get configmap "$CM_NAME" -n "$NAMESPACE" >/dev/null 2>&1; do
-    if [ $DELETE_WAITED -ge $MAX_DELETE_WAIT ]; then
-      echo "⚠️  $CM_NAME still exists after ${MAX_DELETE_WAIT}s, forcing immediate removal"
-      kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --grace-period=0 --force >/dev/null 2>&1 || true
-      DELETE_WAITED=0
-      MAX_DELETE_WAIT=5
+  DELETE_TIMEOUT=30
+  FORCE_TIMEOUT=15
+  echo "   Waiting up to ${DELETE_TIMEOUT}s for deletion..."
+  if ! kubectl wait --for=delete "configmap/$CM_NAME" -n "$NAMESPACE" --timeout="${DELETE_TIMEOUT}s" >/dev/null 2>&1; then
+    echo "⚠️  $CM_NAME still exists after ${DELETE_TIMEOUT}s, forcing removal"
+    kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --grace-period=0 --force >/dev/null 2>&1 || true
+    echo "   Waiting an additional ${FORCE_TIMEOUT}s for forced deletion..."
+    if ! kubectl wait --for=delete "configmap/$CM_NAME" -n "$NAMESPACE" --timeout="${FORCE_TIMEOUT}s" >/dev/null 2>&1; then
+      echo "❌ Unable to delete $CM_NAME after ${DELETE_TIMEOUT}+${FORCE_TIMEOUT}s. Check for finalizers or admission webhooks." >&2
+      exit 1
     fi
-    sleep 1
-    DELETE_WAITED=$((DELETE_WAITED + 1))
-  done
+  fi
   echo "   Confirmed deletion of $CM_NAME"
   
   # Create with retry logic
