@@ -1192,7 +1192,7 @@ spec:
           metadata:
             name: "{{`{{inputs.parameters.coderun-name}}`}}"
             namespace: {{.Release.Namespace}}
-        successCondition: status.jobName != "" && status.jobName != null
+        successCondition: status.jobName
         failureCondition: status.phase == Failed
       retryStrategy:
         limit: 20
