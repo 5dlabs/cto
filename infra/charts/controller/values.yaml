@@ -304,6 +304,10 @@ agents:
 
       3. **Static Code Analysis**
          - Scan for hardcoded secrets, API keys, passwords
+         - **CRITICAL**: Check if detected secrets are in .gitignore first
+           - Run: `git check-ignore <file>` before flagging
+           - Files in .gitignore are NOT repository security issues
+           - Only flag files that would be committed to git
          - Check for unsafe code blocks (Rust)
          - Validate input sanitization
          - Review cryptographic implementations
@@ -386,8 +390,8 @@ agents:
       gh pr review <PR_NUMBER> --approve --body "### ✅ Security Analysis Complete
 
       ## Scan Results
-      - ✅ No CRITICAL vulnerabilities
-      - ✅ No HIGH severity issues
+      - ✅ No CRITICAL vulnerabilities in git-tracked files
+      - ✅ No HIGH severity issues in production code
       - ✅ No MEDIUM severity issues
       - ℹ️ 2 LOW severity informational items
 
@@ -396,7 +400,12 @@ agents:
       - ✅ Supply chain security check (cargo deny)
       - ✅ Static code analysis
       - ✅ GitHub security alerts check
-      - ✅ Secret scanning
+      - ✅ Secret scanning (gitleaks, trivy)
+
+      ## Notes
+      - Any secrets detected in .gitignore'd files are not security risks
+      - Gitignored files (.config/, .env, etc.) will not be committed
+      - All code changes pass quality gates (format, lint, tests)
 
       ## Recommendations
       1. Consider updating dependency X (informational)
@@ -472,25 +481,44 @@ agents:
       gh api /repos/{owner}/{repo}/secret-scanning/alerts
       ```
 
-      ## Success Criteria
+      ## Success Criteria & Completion Detection
 
-      ### Must Have (Blocking)
-      - ✅ Zero CRITICAL vulnerabilities
+      ### Must Have (Blocking - Must Fix to Approve)
+      - ✅ Zero CRITICAL vulnerabilities in git-tracked files
       - ✅ Zero HIGH vulnerabilities in production code
       - ✅ All dependencies have known-good versions
-      - ✅ No hardcoded secrets or credentials
+      - ✅ No hardcoded secrets in files that will be committed
       - ✅ Cargo.lock/package-lock committed
 
-      ### Should Have (Recommended)
+      ### Should Have (Recommended - Can Approve with Notes)
       - ✅ Zero MEDIUM vulnerabilities
       - ✅ All dependencies up-to-date with latest secure versions
       - ✅ Security CI checks configured
       - ✅ CodeQL or similar SAST enabled
 
-      ### Nice to Have (Informational)
+      ### Nice to Have (Informational - Does Not Block Approval)
       - ✅ Zero LOW severity issues
       - ✅ Dependency license compliance
       - ✅ Supply chain attestation
+
+      ### Completion Logic
+      **Declare task complete and STOP iterating when:**
+      1. All CRITICAL/HIGH issues in git-tracked files are fixed
+      2. OR no CRITICAL/HIGH issues were found in git-tracked files
+      3. All quality checks pass (format, lint, tests)
+      4. Changes (if any) are committed and pushed
+
+      **Continue iterating when:**
+      - CRITICAL or HIGH vulnerabilities exist in git-tracked files
+      - Security fixes failed to apply correctly
+      - Quality checks fail after security fixes
+
+      **IMPORTANT - Gitignored Files:**
+      - Files in .gitignore (like .config/, .env) are NOT security risks
+      - These files will never be committed to the repository
+      - Do NOT flag gitignored files as security issues
+      - Do NOT iterate to "fix" gitignored files
+      - Verify with: `git check-ignore <file>` before flagging
 
       ## Important Notes
 
@@ -502,6 +530,7 @@ agents:
       - Add `ready-for-qa` label to trigger Tess handoff
       - DO push security fixes to PR branch
       - DO NOT modify business logic (only security-related changes)
+      - DO NOT iterate if only gitignored files contain secrets
     tools:
       remote: ["memory_create_entities", "memory_add_observations", "brave_search_brave_web_search"]
 
