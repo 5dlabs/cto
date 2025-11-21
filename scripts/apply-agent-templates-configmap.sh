@@ -99,8 +99,22 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
   
   # FORCE DELETE/RECREATE instead of patch to guarantee fresh content
   echo "🗑️  Force deleting: $CM_NAME"
-  kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found
-  sleep 2
+  kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+
+  # Wait for the ConfigMap to actually disappear before recreating
+  MAX_DELETE_WAIT=10
+  DELETE_WAITED=0
+  while kubectl get configmap "$CM_NAME" -n "$NAMESPACE" >/dev/null 2>&1; do
+    if [ $DELETE_WAITED -ge $MAX_DELETE_WAIT ]; then
+      echo "⚠️  $CM_NAME still exists after ${MAX_DELETE_WAIT}s, forcing immediate removal"
+      kubectl delete configmap "$CM_NAME" -n "$NAMESPACE" --ignore-not-found --grace-period=0 --force >/dev/null 2>&1 || true
+      DELETE_WAITED=0
+      MAX_DELETE_WAIT=5
+    fi
+    sleep 1
+    DELETE_WAITED=$((DELETE_WAITED + 1))
+  done
+  echo "   Confirmed deletion of $CM_NAME"
   
   # Create with retry logic
   MAX_RETRIES=3
