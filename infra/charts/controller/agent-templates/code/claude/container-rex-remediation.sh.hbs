@@ -50,6 +50,13 @@ mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true

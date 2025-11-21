@@ -49,6 +49,13 @@ mkdir -p /workspace
 mkdir -p "$TASK_WORKSPACE"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
 # Docker sidecar cleanup function
 stop_docker_sidecar() {
   echo "🔄 Trap fired: Attempting Docker sidecar cleanup..."
