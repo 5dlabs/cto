@@ -1313,33 +1313,12 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         CLAUDE_PID=$!
         echo "✓ Started Claude with task prompt (PID: $CLAUDE_PID), stdin will close after prompt"
 
-        # Start background token refresh for long-running jobs
-        (
-            while kill -0 $CLAUDE_PID 2>/dev/null; do
-                sleep 2700  # Check every 45 minutes
-
-                if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
-                    NOW=$(date +%s)
-                    TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
-
-                    if [ $TOKEN_AGE -gt 2700 ]; then
-                        echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
-                        refresh_github_token
-                    fi
-                fi
-            done
-        ) &
-        TOKEN_REFRESH_PID=$!
-        echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
-
         # Wait for Claude process to complete naturally
+        # Note: GitHub App tokens are valid for 1 hour. Most tasks complete within this window.
+        # For tasks >1 hour, the retry logic will handle token expiration if needed.
         echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
-
-        # Simple wait - Claude exits naturally when stdin closes
         wait "$CLAUDE_PID"
         CLAUDE_EXIT_CODE=$?
-        
-        if [ -n "${TOKEN_REFRESH_PID:-}" ]; then kill "$TOKEN_REFRESH_PID" 2>/dev/null || true; fi
 
         if [ $CLAUDE_EXIT_CODE -ne 0 ]; then
           echo "⚠️ Claude exited with code $CLAUDE_EXIT_CODE"
