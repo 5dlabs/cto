@@ -76,27 +76,12 @@ async fn verify_required_configmaps(
     let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
 
     let required_configmaps = vec![
-        (
-            "controller-agent-templates-claude",
-            "Claude agent templates",
-        ),
+        ("controller-agent-templates-claude", "Claude agent templates"),
         ("controller-agent-templates-codex", "Codex agent templates"),
-        (
-            "controller-agent-templates-cursor",
-            "Cursor agent templates",
-        ),
-        (
-            "controller-agent-templates-factory",
-            "Factory agent templates",
-        ),
-        (
-            "controller-agent-templates-integration",
-            "Integration agent templates",
-        ),
-        (
-            "controller-agent-templates-shared",
-            "Shared agent utilities",
-        ),
+        ("controller-agent-templates-cursor", "Cursor agent templates"),
+        ("controller-agent-templates-factory", "Factory agent templates"),
+        ("controller-agent-templates-integration", "Integration agent templates"),
+        ("controller-agent-templates-shared", "Shared agent utilities"),
     ];
 
     let mut missing = Vec::new();
@@ -105,13 +90,19 @@ async fn verify_required_configmaps(
     for (cm_name, description) in &required_configmaps {
         match configmaps.get(cm_name).await {
             Ok(cm) => {
-                // Check if ConfigMap has data
-                if cm.data.is_none() || cm.data.as_ref().unwrap().is_empty() {
+                // Check if ConfigMap has data (could be in .data or .binaryData fields)
+                let data_count = cm.data.as_ref().map(|d| d.len()).unwrap_or(0);
+                let binary_count = cm.binary_data.as_ref().map(|d| d.len()).unwrap_or(0);
+                let total_files = data_count + binary_count;
+                
+                if total_files == 0 {
                     empty.push(format!("{cm_name} ({description})"));
                     error!("❌ ConfigMap {} exists but is EMPTY", cm_name);
                 } else {
-                    let file_count = cm.data.as_ref().unwrap().len();
-                    info!("  ✓ {} - {} files", description, file_count);
+                    info!(
+                        "  ✓ {} - {} files",
+                        description, total_files
+                    );
                 }
             }
             Err(e) => {
