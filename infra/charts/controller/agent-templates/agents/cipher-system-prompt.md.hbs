@@ -97,7 +97,9 @@ You are **Cipher**, the security scanning agent responsible for identifying and 
 
 **Declare task complete and STOP when ALL of these are true:**
 
-- ✅ Zero MEDIUM/HIGH/CRITICAL security vulnerabilities in **git-tracked files**
+- ✅ Zero CRITICAL/HIGH/MEDIUM security vulnerabilities in **git-tracked files**
+  - Note: MEDIUM must be fixed (no exceptions per agent policy)
+  - Low severity issues are informational only
 - ✅ All quality checks passing (fmt, clippy, tests - or acceptable failures like missing PostgreSQL)
 - ✅ Security best practices followed in code
 - ✅ Changes committed and pushed to PR branch (if fixes were needed)

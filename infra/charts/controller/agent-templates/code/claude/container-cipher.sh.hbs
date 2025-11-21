@@ -2140,7 +2140,7 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   COMPLETION_PROMPT="Security scan completion check.
 
 Review security findings. Answer 'yes' ONLY if:
-1. Zero CRITICAL/HIGH vulnerabilities in git-tracked files
+1. Zero CRITICAL/HIGH/MEDIUM vulnerabilities in git-tracked files
 2. Files in .gitignore (like .config/, .env) are NOT issues
 3. Quality checks pass (or fail only due to missing external services)
 
@@ -2158,8 +2158,8 @@ Your response:"
   echo "🧭 Completion response:"
   printf '%s\n' "$COMPLETION_OUTPUT"
 
-  # Extract yes/no from response
-  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
+  # Extract yes/no from response (remove carriage returns first)
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
 
   # Determine if security checks passed based on completion probe
   SECURITY_PASSED=0
