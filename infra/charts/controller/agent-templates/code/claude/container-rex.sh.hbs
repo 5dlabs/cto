@@ -165,9 +165,9 @@ echo "⛔ CRITICAL: You must ONLY work on Task {{task_id}} - ignore ALL other ta
 
 # Clean up any leftover sentinel file from previous runs
 # This prevents premature sidecar shutdown on sequential task executions
-if [ -f /workspace/.agent_done ]; then
-    echo "🧹 Cleaning up sentinel file from previous run"
-    rm -f /workspace/.agent_done
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
 fi
 
 # Disable interactive Git prompts globally

@@ -1,4 +1,21 @@
 ---
+# GitHub Actions runner RBAC for agent-platform namespace
+#
+# SECURITY NOTE: Uses Role (namespace-scoped) instead of ClusterRole (cluster-wide)
+# This follows the principle of least privilege and prevents runners from accessing
+# resources outside the agent-platform namespace.
+#
+# Scope verification:
+# - Runners are deployed in arc-runners namespace
+# - Runners manage CodeRun/DocsRun resources in agent-platform namespace
+# - ConfigMaps, Deployments, Pods accessed are all in agent-platform namespace
+# - No documented use case requires cross-namespace access
+#
+# If cross-namespace access becomes necessary:
+# - Create additional Role + RoleBinding for specific target namespaces
+# - Document the specific use case and required permissions
+# - DO NOT use ClusterRole unless absolutely necessary
+#
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
