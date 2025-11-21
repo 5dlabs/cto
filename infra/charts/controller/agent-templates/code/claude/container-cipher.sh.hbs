@@ -2057,72 +2057,22 @@ if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
 fi
 
 # Always attempt to post PR comment and add label regardless of Claude exit status
-# Determine OWNER/REPO slug for gh -R
-REPO_INPUT="{{repository_url}}"
-if echo "$REPO_INPUT" | grep -q "^https://github.com/"; then
-  REPO_SLUG=$(echo "$REPO_INPUT" | sed -E 's|https://github.com/([^/]+/[^/.]+)(\.git)?$|\1|')
-else
-  REPO_SLUG="$REPO_INPUT"
-fi
-
-# Post security scan comment to PR
-if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
-  echo "💬 Posting security scan comment to PR..."
-
-  # Create comment body based on Claude exit status
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    COMMENT_BODY="## 🔒 Security Review by Cipher
-
-✅ **Security checks completed successfully**
-
-### Security Gates Passed
-- No vulnerabilities detected
-- Dependency audit passed
-- Secret scanning completed
-- Security best practices verified
-
-**Status:** Ready for QA testing by Tess
-**Next Step:** Tess will now perform comprehensive QA validation
-
----
-*Security review by Cipher*"
-  else
-    COMMENT_BODY="## 🔒 Security Review by Cipher
-
-⚠️ **Security review encountered issues**
-
-### Current Status
-- Security checks are being processed
-- Some issues may need to be resolved
-- Review will continue until standards are met
-
-### Next Steps
-- Fix security vulnerabilities
-- Update insecure dependencies
-- Remove exposed secrets
-- Address security best practice violations
-
----
-*Security review by Cipher*"
-  fi
-
-  # Post comment using PR number or URL
-  if [ -n "$PR_NUMBER" ]; then
-    if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted security scan comment"
-    else
-      echo "⚠️ Failed to post comment using PR number"
-    fi
-  elif [ -n "$PR_URL" ]; then
-    if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted security scan comment"
-    else
-      echo "⚠️ Failed to post comment"
-    fi
-  fi
-fi
-
 # Update remediation status labels for Cipher's outcome
+# Ensure OWNER/REPO slug for gh -R
+if [ -z "${REPO_SLUG:-}" ]; then
+  REPO_INPUT="{{repository_url}}"
+  if echo "$REPO_INPUT" | grep -q "^https://github.com/"; then
+    REPO_SLUG=$(echo "$REPO_INPUT" | sed -E 's|https://github.com/([^/]+/[^/.]+)(\.git)?$|\1|')
+  else
+    REPO_SLUG="$REPO_INPUT"
+  fi
+fi
+
+SECURITY_PASSED=0
+if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
+  SECURITY_PASSED=1
+fi
+
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
   ensure_status_labels "$REPO_SLUG" \
     "${STATUS_LABEL_NEEDS_FIXES}:d73a4a:Remediation requested by Tess" \
@@ -2131,13 +2081,6 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
     "${STATUS_LABEL_NEEDS_TESS}:5319e7:Awaiting Tess QA review" \
     "${STATUS_LABEL_APPROVED}:2da44e:All automated reviews approved" \
     "${STATUS_LABEL_FAILED}:b60205:Remediation failed or aborted"
-
-  # Determine if security checks passed based on Claude's exit code
-  # Claude exits 0 on success, non-zero on failure
-  SECURITY_PASSED=0
-  if [ $CLAUDE_EXIT_CODE -eq 0 ]; then
-    SECURITY_PASSED=1
-  fi
 
   if [ $SECURITY_PASSED -eq 1 ]; then
     # Security passed - will post approval AFTER loop completes to avoid duplicates
@@ -2251,6 +2194,62 @@ EOF
     fi
   fi
 done
+
+# Post a single security summary comment per CodeRun
+if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
+  echo "💬 Posting final security scan summary to PR..."
+
+  if [ $SUCCESS -eq 1 ]; then
+    COMMENT_BODY="## 🔒 Security Review by Cipher
+
+✅ **Security checks completed successfully**
+
+### Security Gates Passed
+- No vulnerabilities detected
+- Dependency audit passed
+- Secret scanning completed
+- Security best practices verified
+
+**Status:** Ready for QA testing by Tess
+**Next Step:** Tess will now perform comprehensive QA validation
+
+---
+*Security review by Cipher*"
+  else
+    COMMENT_BODY="## 🔒 Security Review by Cipher
+
+⚠️ **Security review encountered issues**
+
+### Current Status
+- Security checks are being processed
+- Some issues must be resolved before QA
+
+### Next Steps
+- Fix the security vulnerabilities called out in the logs
+- Update insecure dependencies or configurations
+- Remove any exposed secrets
+- Address security best practice violations
+
+---
+*Security review by Cipher*"
+  fi
+
+  if [ -n "$PR_NUMBER" ]; then
+    if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
+      echo "✅ Successfully posted security scan summary"
+    else
+      echo "⚠️ Failed to post security comment using PR number"
+    fi
+  elif [ -n "$PR_URL" ]; then
+    if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
+      echo "✅ Successfully posted security scan summary"
+    else
+      echo "⚠️ Failed to post security comment using PR URL"
+    fi
+  fi
+else
+  echo "ℹ️ No PR reference available, skipping security summary comment"
+fi
 
 # Post PR review ONCE after loop completes (not inside loop to avoid duplicates)
 if [ -n "$PR_NUMBER" ]; then
