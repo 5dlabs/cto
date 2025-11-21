@@ -1716,11 +1716,22 @@ CIPHER_PROMPT="$CIPHER_PROMPT
 You are working on **PR #${PR_NUMBER:-UNKNOWN}** that Rex already created.
 - **DO NOT create a new PR** - Rex already created one
 - **DO NOT create a new branch** - you're already on Rex's PR branch
+- **DO NOT post PR reviews** - the container script handles all reviews after you finish
 - **DO push your fixes** to the EXISTING PR branch
 - All your commits will automatically appear on PR #${PR_NUMBER:-UNKNOWN}
 - The repository is already checked out to the correct PR branch
 
-**Your job**: Fix security vulnerabilities on Rex's PR, NOT create your own PR.
+**Your job**: Fix security vulnerabilities on Rex's PR, NOT create your own PR or post reviews.
+
+**CRITICAL RESTRICTION**: Never run \`gh pr review\` commands. You can:
+- ✅ Post comments: \`gh pr comment\`
+- ✅ Add labels: \`gh pr edit --add-label\`
+- ✅ Push commits: \`git push\`
+- ❌ NEVER: \`gh pr review --approve\`
+- ❌ NEVER: \`gh pr review --request-changes\`
+- ❌ NEVER: \`gh pr review --comment\`
+
+The container will post the final review based on your exit code.
 
 1. **Analyze the PR changes**: The repository has been automatically positioned at the PR branch with latest changes
 2. **Detect change types**: Identify Rust files (.rs, .toml) and YAML files (.yml, .yaml)
