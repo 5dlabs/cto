@@ -908,6 +908,7 @@ impl<'a> CodeResourceManager<'a> {
             },
             "spec": {
                 "backoffLimit": 0,
+                "activeDeadlineSeconds": 86400,  // 24-hour ultimate safety net (tasks can legitimately run for hours)
                 "template": {
                     "metadata": { "labels": labels },
                     "spec": pod_spec

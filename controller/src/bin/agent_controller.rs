@@ -40,6 +40,8 @@ use controller::tasks::{
     run_task_controller,
     types::Context as TaskContext,
 };
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::Api;
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Arc;
@@ -61,6 +63,95 @@ struct AppState {
     namespace: String,
     config: Arc<ControllerConfig>,
     remediation_state_manager: Arc<RemediationStateManager>,
+}
+
+/// Verify that all required agent template `ConfigMaps` exist and are healthy
+///
+/// This health check runs at controller startup to fail-fast if `ConfigMaps` are missing.
+/// Prevents 8-hour silent retry loops when template generation cannot succeed.
+async fn verify_required_configmaps(
+    client: &kube::Client,
+    namespace: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let configmaps: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
+
+    let required_configmaps = vec![
+        ("controller-agent-templates-claude", "Claude agent templates"),
+        ("controller-agent-templates-codex", "Codex agent templates"),
+        ("controller-agent-templates-cursor", "Cursor agent templates"),
+        ("controller-agent-templates-factory", "Factory agent templates"),
+        ("controller-agent-templates-integration", "Integration agent templates"),
+        ("controller-agent-templates-shared", "Shared agent utilities"),
+    ];
+
+    let mut missing = Vec::new();
+    let mut empty = Vec::new();
+
+    for (cm_name, description) in &required_configmaps {
+        match configmaps.get(cm_name).await {
+            Ok(cm) => {
+                // Check if ConfigMap has data
+                if cm.data.is_none() || cm.data.as_ref().unwrap().is_empty() {
+                    empty.push(format!("{cm_name} ({description})"));
+                    error!("❌ ConfigMap {} exists but is EMPTY", cm_name);
+                } else {
+                    let file_count = cm.data.as_ref().unwrap().len();
+                    info!(
+                        "  ✓ {} - {} files",
+                        description, file_count
+                    );
+                }
+            }
+            Err(e) => {
+                missing.push(format!("{cm_name} ({description})"));
+                error!("❌ ConfigMap {} NOT FOUND: {}", cm_name, e);
+            }
+        }
+    }
+
+    if !missing.is_empty() || !empty.is_empty() {
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        error!("❌ CRITICAL: Required ConfigMaps are unavailable");
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        if !missing.is_empty() {
+            error!("Missing ConfigMaps:");
+            for cm in &missing {
+                error!("  - {}", cm);
+            }
+        }
+
+        if !empty.is_empty() {
+            error!("Empty ConfigMaps:");
+            for cm in &empty {
+                error!("  - {}", cm);
+            }
+        }
+
+        error!("");
+        error!("Controller cannot start without these ConfigMaps.");
+        error!("They contain agent templates required for job creation.");
+        error!("");
+        error!("Possible causes:");
+        error!("  1. ArgoCD hasn't synced yet (check: kubectl get app controller -n argocd)");
+        error!("  2. Helm chart not deployed properly");
+        error!("  3. ConfigMaps were manually deleted");
+        error!("");
+        error!("To fix:");
+        error!("  1. Check ArgoCD sync status");
+        error!("  2. Verify Helm values.yaml has agent templates enabled");
+        error!("  3. Re-run: helm upgrade controller ./charts/controller");
+        error!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        return Err(format!(
+            "Missing {} ConfigMaps, {} empty ConfigMaps",
+            missing.len(),
+            empty.len()
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
@@ -85,6 +176,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let namespace = "agent-platform".to_string();
     let controller_config = Arc::new(load_controller_config());
+
+    // Verify required ConfigMaps exist before starting controller
+    // This prevents 8-hour silent retry loops when ConfigMaps are broken
+    info!("Verifying required ConfigMaps are available...");
+    verify_required_configmaps(&client, &namespace).await?;
+    info!("✅ All required ConfigMaps verified");
 
     // Create shared remediation state manager for webhook reuse
     let task_context = TaskContext {
