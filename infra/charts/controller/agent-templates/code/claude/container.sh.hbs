@@ -1344,6 +1344,10 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         # Send initial prompt via FIFO
         exec 9>"$FIFO_PATH"
         printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
+        # CRITICAL: Close FIFO writer immediately after sending prompt
+        # This allows Claude to receive EOF and exit cleanly when finished
+        # Keeping writer open causes deadlock - Claude waits for EOF, script waits for Claude
+        exec 9>&- 2>/dev/null || true
 
         # Optional debug: dump FIFO holders if requested
         if [ "${DEBUG_FIFO:-false}" = "true" ]; then
@@ -1398,8 +1402,7 @@ Before starting implementation, you MUST read and follow the task-specific tool 
         fi
         
         if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
-        # Close FIFO writer if it was opened (in fallback) now that Claude has exited
-        exec 9>&- 2>/dev/null || true
+        # FIFO writer already closed before wait - no need to close again
 
         # No sidecar shutdown needed - container will exit naturally when main process completes
     else
