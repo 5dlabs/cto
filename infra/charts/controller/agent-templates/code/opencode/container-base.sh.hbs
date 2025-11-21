@@ -132,6 +132,13 @@ export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
 mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
 
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
 export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
 CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 

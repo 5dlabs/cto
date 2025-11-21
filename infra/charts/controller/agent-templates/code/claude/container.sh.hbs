@@ -4,6 +4,13 @@
 # Define BEFORE cleanup function so cleanup uses correct path
 TASK_WORKSPACE="/workspace/task-{{task_id}}"
 
+# Clean up any leftover sentinel file from previous runs
+# This prevents premature sidecar shutdown on sequential task executions
+if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
+    echo "🧹 Cleaning up sentinel file from previous run at $TASK_WORKSPACE/.agent_done"
+    rm -f "$TASK_WORKSPACE/.agent_done"
+fi
+
 # Signal docker-daemon to shut down on ANY exit (success or failure)
 # This prevents docker-daemon from running indefinitely when Claude crashes
 cleanup_docker() {
