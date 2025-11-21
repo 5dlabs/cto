@@ -9,6 +9,7 @@ on:
       - 'scripts/generate-templates-configmap.sh'
       - 'infra/charts/controller/scripts/generate-agent-templates-configmaps-split.sh'
       - 'scripts/apply-agent-templates-configmap.sh'
+  workflow_dispatch:
 
 jobs:
   sync-configmap:
