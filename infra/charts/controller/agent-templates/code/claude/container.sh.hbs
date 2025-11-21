@@ -1224,17 +1224,10 @@ SAFE_MODE="false"  # Set to "false" for full task execution
 
 if [ "$SAFE_MODE" = "true" ]; then
     echo "🛡️ SAFE MODE ENABLED - Running simple test instead of full task"
-    FIFO_PATH="/workspace/agent-input.jsonl"
-    rm -f "$FIFO_PATH" 2>/dev/null || true
-    mkfifo "$FIFO_PATH"
-    chmod 666 "$FIFO_PATH" || true
-    # Keep a persistent writer open and start Claude in background to avoid EOF race
-    exec 9>"$FIFO_PATH"
-    $CLAUDE_CMD < "$FIFO_PATH" &
+    # Use subshell pattern with explicit stdin close
+    SAFE_MSG='{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}'
+    (printf '%s\n' "$SAFE_MSG"; exec 0<&-) | $CLAUDE_CMD &
     CLAUDE_PID=$!
-    printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What time is it? Please answer this simple question and exit immediately."}]}}\n' >&9
-    # Close writer so reader can exit cleanly
-    exec 9>&-
     wait $CLAUDE_PID
 else
     # Debug: Show what's actually in the task directory before checking for prompt.md
@@ -1251,42 +1244,25 @@ else
         echo "  This is a non-TaskMaster workflow (e.g., PR Guardian, standalone agent)"
         echo "  Claude will use its system prompt and environment variables"
 
-        # For task ID 0, provide FIFO with initial message to avoid hanging
-        # Claude expects stream-json input, so we must provide it via FIFO
-        FIFO_PATH="/workspace/agent-input.jsonl"
-        rm -f "$FIFO_PATH" 2>/dev/null || true
-        mkfifo "$FIFO_PATH"
-        chmod 666 "$FIFO_PATH" || true
-        
-        # Start Claude (reader) in background
-        $CLAUDE_CMD < "$FIFO_PATH" &
-        CLAUDE_PID=$!
-        
-        # Send initial message via FIFO to unblock Claude
+        # For task ID 0, use subshell pattern with explicit stdin close
         INITIAL_MSG='{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Begin execution."}]}}'
-        exec 9>"$FIFO_PATH"
-        printf '%s\n' "$INITIAL_MSG" >&9
-        exec 9>&-  # Close writer immediately after sending initial message
         
         echo "🚀 Launching Claude Code (Task ID 0 mode)..."
+        
+        # Start Claude with prompt piped via subshell (stdin closes after prompt)
+        (printf '%s\n' "$INITIAL_MSG"; exec 0<&-) | $CLAUDE_CMD &
+        CLAUDE_PID=$!
+        echo "✓ Started Claude with initial message (PID: $CLAUDE_PID), stdin will close after prompt"
 
-        # Wait for Claude to complete (timeout optional; default disabled)
-        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-0}"
-        case "$CLAUDE_TIMEOUT" in
-          ''|*[!0-9]*) CLAUDE_TIMEOUT=0 ;;
-        esac
-        if [ "$CLAUDE_TIMEOUT" -gt 0 ] 2>/dev/null; then
-          if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
-            echo "✅ Claude process completed normally"
-          else
-            echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
-            kill -TERM "$CLAUDE_PID" 2>/dev/null || true
-            sleep 2
-            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
-          fi
+        # Simple wait - Claude exits naturally when stdin closes
+        echo "⏳ Waiting for Claude process to complete..."
+        wait "$CLAUDE_PID"
+        CLAUDE_EXIT_CODE=$?
+        
+        if [ $CLAUDE_EXIT_CODE -ne 0 ]; then
+          echo "⚠️ Claude exited with code $CLAUDE_EXIT_CODE"
         else
-          echo "⏳ Waiting for Claude completion without timeout guard (CLAUDE_TIMEOUT_SECONDS unset)"
-          wait $CLAUDE_PID
+          echo "✅ Claude completed successfully"
         fi
     elif [ -f "$CLAUDE_WORK_DIR/task/prompt.md" ]; then
         echo "✓ Using task-specific prompt from docs service: task/prompt.md"
@@ -1328,81 +1304,48 @@ Before starting implementation, you MUST read and follow the task-specific tool 
             echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
         fi
 
-        # Seed initial user turn via a FIFO (system prompts are set via CLI flags, not streamed)
-        FIFO_PATH="/workspace/agent-input.jsonl"
-        rm -f "$FIFO_PATH" 2>/dev/null || true
-        mkfifo "$FIFO_PATH"
-        chmod 666 "$FIFO_PATH" || true
-
-        # Start Claude (reader) first in background to avoid writer-open blocking
-        $CLAUDE_CMD < "$FIFO_PATH" &
-        CLAUDE_PID=$!
-
         # Compose initial user turn
         USER_COMBINED=$(printf "%s" "${PROMPT_PREFIX}$(cat "$CLAUDE_WORK_DIR/task/prompt.md")" | jq -Rs .)
-
-        # Send initial prompt via FIFO
-        exec 9>"$FIFO_PATH"
-        printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED" >&9
-        # CRITICAL: Close FIFO writer immediately after sending prompt
-        # This allows Claude to receive EOF and exit cleanly when finished
-        # Keeping writer open causes deadlock - Claude waits for EOF, script waits for Claude
-        exec 9>&- 2>/dev/null || true
-
-        # Optional debug: dump FIFO holders if requested
-        if [ "${DEBUG_FIFO:-false}" = "true" ]; then
-          echo "[DEBUG] Dumping FIFO holders for $FIFO_PATH"
-          for p in /proc/[0-9]*; do
-            pid=${p##*/}
-            [ -d "$p/fd" ] || continue
-            for fd in "$p"/fd/*; do
-              tgt=$(readlink "$fd" 2>/dev/null || true)
-              case "$tgt" in *agent-input.jsonl*)
-                fdnum=${fd##*/}
-                comm=$(cat "$p/comm" 2>/dev/null || echo "?")
-                echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt"
-              ;;
-              esac
-            done
-          done
-        fi
-
-        # Optional hang diagnostics without enforcing a timeout
-        if [ -n "${HANG_DIAG_SECONDS:-}" ] && [ "$HANG_DIAG_SECONDS" -gt 0 ] 2>/dev/null; then
-          (
-            sleep "$HANG_DIAG_SECONDS"
-            if kill -0 "$CLAUDE_PID" 2>/dev/null; then
-              echo "[DEBUG] Hang diag after ${HANG_DIAG_SECONDS}s: dumping FIFO holders and ps"
-              for p in /proc/[0-9]*; do
-                pid=${p##*/}; [ -d "$p/fd" ] || continue
-                for fd in "$p"/fd/*; do tgt=$(readlink "$fd" 2>/dev/null || true); case "$tgt" in *agent-input.jsonl*) fdnum=${fd##*/}; comm=$(cat "$p/comm" 2>/dev/null || echo "?"); echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt";; esac; done
-              done
-              ps -eo pid,ppid,comm,args | head -200 || true
-            fi
-          ) & HANG_DIAG_PID=$!
-        fi
-
-        # Wait for Claude process with optional timeout (default disabled)
-        CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT_SECONDS:-0}"
-        case "$CLAUDE_TIMEOUT" in
-          ''|*[!0-9]*) CLAUDE_TIMEOUT=0 ;;
-        esac
-        if [ "$CLAUDE_TIMEOUT" -gt 0 ] 2>/dev/null; then
-          if timeout "$CLAUDE_TIMEOUT" bash -c "wait $CLAUDE_PID"; then
-            echo "✅ Claude process completed normally"
-          else
-            echo "⚠️  Claude process exceeded timeout (${CLAUDE_TIMEOUT}s), forcing termination"
-            kill -TERM "$CLAUDE_PID" 2>/dev/null || true
-            sleep 2
-            kill -KILL "$CLAUDE_PID" 2>/dev/null || true
-          fi
-        else
-          echo "⏳ Waiting for Claude completion without timeout guard (CLAUDE_TIMEOUT_SECONDS unset)"
-          wait $CLAUDE_PID
-        fi
         
-        if [ -n "${HANG_DIAG_PID:-}" ]; then kill "$HANG_DIAG_PID" 2>/dev/null || true; fi
-        # FIFO writer already closed before wait - no need to close again
+        # Start Claude with prompt piped directly to stdin using subshell pattern
+        # Subshell explicitly closes stdin after sending prompt so Claude receives EOF
+        (printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$USER_COMBINED"; exec 0<&-) | $CLAUDE_CMD &
+        CLAUDE_PID=$!
+        echo "✓ Started Claude with task prompt (PID: $CLAUDE_PID), stdin will close after prompt"
+
+        # Start background token refresh for long-running jobs
+        (
+            while kill -0 $CLAUDE_PID 2>/dev/null; do
+                sleep 2700  # Check every 45 minutes
+
+                if [ -n "$TOKEN_GENERATED_AT" ] && [ -n "$GITHUB_APP_PRIVATE_KEY" ]; then
+                    NOW=$(date +%s)
+                    TOKEN_AGE=$((NOW - TOKEN_GENERATED_AT))
+
+                    if [ $TOKEN_AGE -gt 2700 ]; then
+                        echo "[Background] Token is $(($TOKEN_AGE / 60)) minutes old, refreshing..."
+                        refresh_github_token
+                    fi
+                fi
+            done
+        ) &
+        TOKEN_REFRESH_PID=$!
+        echo "✓ Started background token refresh (PID: $TOKEN_REFRESH_PID)"
+
+        # Wait for Claude process to complete naturally
+        echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
+
+        # Simple wait - Claude exits naturally when stdin closes
+        wait "$CLAUDE_PID"
+        CLAUDE_EXIT_CODE=$?
+        
+        if [ -n "${TOKEN_REFRESH_PID:-}" ]; then kill "$TOKEN_REFRESH_PID" 2>/dev/null || true; fi
+
+        if [ $CLAUDE_EXIT_CODE -ne 0 ]; then
+          echo "⚠️ Claude exited with code $CLAUDE_EXIT_CODE"
+        else
+          echo "✅ Claude completed successfully"
+        fi
 
         # No sidecar shutdown needed - container will exit naturally when main process completes
     else
