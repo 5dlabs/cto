@@ -1018,6 +1018,12 @@ spec:
                   value: "{{`{{inputs.parameters.task-id}}`}}"
                 - name: candidate-name
                   value: "{{`{{steps.create-coderun-resource.outputs.parameters.name}}`}}"
+        - - name: wait-for-job-creation
+            template: wait-for-job-creation
+            arguments:
+              parameters:
+                - name: coderun-name
+                  value: "{{`{{steps.resolve-coderun-name.outputs.parameters.coderun-name}}`}}"
         - - name: wait-for-completion
             template: wait-coderun-completion
             arguments:
@@ -1172,7 +1178,31 @@ spec:
           factor: 2
           # No maxDuration - allow unlimited time for CodeRun creation
 
-    # Template for waiting for CodeRun completion
+    # Template for waiting for Job to be created by controller (should be fast)
+    # This detects ConfigMap/controller issues quickly without limiting execution time
+    - name: wait-for-job-creation
+      inputs:
+        parameters:
+          - name: coderun-name
+      resource:
+        action: get
+        manifest: |
+          apiVersion: agents.platform/v1
+          kind: CodeRun
+          metadata:
+            name: "{{`{{inputs.parameters.coderun-name}}`}}"
+            namespace: {{.Release.Namespace}}
+        successCondition: status.jobName != "" && status.jobName != null
+        failureCondition: status.phase == Failed
+      retryStrategy:
+        limit: 20
+        retryPolicy: "OnError"
+        backoff:
+          duration: "30s"
+          factor: 2
+          maxDuration: "10m"  # Fail fast if controller can't create job (ConfigMap issues)
+
+    # Template for waiting for CodeRun completion (can take hours)
     - name: wait-coderun-completion
       inputs:
         parameters:
@@ -1193,7 +1223,7 @@ spec:
         backoff:
           duration: "60s"
           factor: 2
-          # No maxDuration - allow unlimited time for CodeRun completion
+          # No maxDuration - allow unlimited time for agent execution
 
     # Template for atomic workflow stage updates with optimistic locking
     - name: update-workflow-stage
