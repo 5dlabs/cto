@@ -43,6 +43,13 @@ jobs:
           EXPECTED_REVISION="${GITHUB_SHA:0:8}"
           echo "Expected revision: $EXPECTED_REVISION"
           
+          # Only verify on main branch - feature branches conflict with ArgoCD
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "ℹ️  Skipping verification on feature branch (ArgoCD only syncs from main)"
+            echo "✅ ConfigMaps applied successfully - verification will run after merge"
+            exit 0
+          fi
+          
           # Wait for ConfigMaps to propagate
           sleep 5
           
