@@ -2094,7 +2094,8 @@ Review security findings. Answer 'yes' ONLY if:
 2. Files in .gitignore (like .config/, .env) are NOT issues
 3. Quality checks pass (or fail only due to missing external services)
 
-Respond 'yes' if complete, 'no' if security issues remain in tracked files.
+IMPORTANT: Respond with ONLY the word 'yes' or 'no' on a single line.
+Do not add explanations or additional text.
 
 Your response:"
 
@@ -2108,7 +2109,9 @@ Your response:"
   echo "🧭 Completion response:"
   printf '%s\n' "$COMPLETION_OUTPUT"
 
-  # Extract yes/no from response (remove carriage returns first)
+  # Extract yes/no from lines starting with ** (markdown bold) or standalone lines
+  # This avoids false matches from phrases like "no warnings" or "no errors"
+  # Claude is instructed to respond with just "yes" or "no" on its own line
   COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
 
   # Determine if security checks passed based on completion probe
