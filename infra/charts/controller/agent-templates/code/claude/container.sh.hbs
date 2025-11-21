@@ -4,6 +4,10 @@
 # Define BEFORE cleanup function so cleanup uses correct path
 TASK_WORKSPACE="/workspace/task-{{task_id}}"
 
+# Ensure workspace directories exist BEFORE cleanup trap
+mkdir -p /workspace
+mkdir -p "$TASK_WORKSPACE"
+
 # Signal docker-daemon to shut down on ANY exit (success or failure)
 # This prevents docker-daemon from running indefinitely when Claude crashes
 cleanup_docker() {
@@ -51,9 +55,7 @@ printf '║  🤖 AGENT: %-50s║\n' '{{github_app}}'
 echo '║  IMPLEMENTATION TASK STARTING                                ║'
 echo '════════════════════════════════════════════════════════════════'
 
-# Ensure workspace directories exist (TASK_WORKSPACE already defined above)
-mkdir -p /workspace
-mkdir -p "$TASK_WORKSPACE"
+# Setup GH config directory (TASK_WORKSPACE already created at top of file)
 export GH_CONFIG_DIR="$TASK_WORKSPACE/.config/gh"
 mkdir -p "$GH_CONFIG_DIR"
 echo "📁 Using task-specific workspace: $TASK_WORKSPACE"
