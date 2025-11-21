@@ -75,17 +75,27 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
       --show-only "templates/$template" > "$TMP_FILE"
   fi
   
-  # Extract ConfigMap name for delete/recreate
-  # Use flexible pattern to handle various indentation levels
-  CM_NAME=$(grep -E "^\s+name:\s+" "$TMP_FILE" | head -1 | awk '{print $2}')
+  # Extract ConfigMap name using yq for robust YAML parsing
+  # Falls back to grep if yq is not available
+  if command -v yq >/dev/null 2>&1; then
+    CM_NAME=$(yq eval '.metadata.name' "$TMP_FILE")
+  else
+    # Fallback: Use grep with more robust pattern
+    # Match "name:" at any indentation level under metadata
+    CM_NAME=$(grep -E '^\s*name:\s*\S+' "$TMP_FILE" | grep -v "kind:" | head -1 | sed -E 's/^\s*name:\s*//')
+  fi
   
   # Validate that we extracted a non-empty name
-  if [[ -z "$CM_NAME" ]]; then
+  if [[ -z "$CM_NAME" ]] || [[ "$CM_NAME" == "null" ]]; then
     echo "❌ Failed to extract ConfigMap name from $template" >&2
     echo "   Check the YAML structure in the rendered template" >&2
+    echo "   Template content:" >&2
+    head -20 "$TMP_FILE" >&2
     rm -f "$TMP_FILE"
     exit 1
   fi
+  
+  echo "   ConfigMap name: $CM_NAME"
   
   # FORCE DELETE/RECREATE instead of patch to guarantee fresh content
   echo "🗑️  Force deleting: $CM_NAME"
@@ -123,3 +133,4 @@ for template in "${CONFIGMAP_TEMPLATES[@]}"; do
 done
 
 echo "✅ All agent templates ConfigMaps applied successfully!"
+

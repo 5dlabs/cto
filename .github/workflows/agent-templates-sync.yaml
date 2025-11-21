@@ -48,7 +48,8 @@ jobs:
           
           # Check ConfigMaps exist AND contain the actual fixes
           echo "Checking Cursor ConfigMap for latest fixes..."
-          CURSOR_CONTENT=$(kubectl get configmap controller-agent-templates-cursor -n agent-platform -o jsonpath='{.binaryData.code_cursor_container-base\.sh\.hbs}' | base64 -d)
+          # Use bracket notation for keys with dots - this is the correct JSONPath syntax
+          CURSOR_CONTENT=$(kubectl get configmap controller-agent-templates-cursor -n agent-platform -o jsonpath='{.binaryData["code_cursor_container-base.sh.hbs"]}' | base64 -d)
           
           # Check for key fix markers
           if echo "$CURSOR_CONTENT" | grep -q "Verifying GitHub CI status before Tess approval"; then
@@ -84,3 +85,4 @@ jobs:
           done
           
           echo "✅ All ConfigMaps verified with correct content"
+
