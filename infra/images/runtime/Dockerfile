@@ -384,6 +384,10 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     fi; \
     chmod +x /usr/local/bin/hadolint
 
+# Install Semgrep for comprehensive static analysis
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --break-system-packages --no-cache-dir semgrep
+
 # Configure npm globals before installing CLI tooling as non-root
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin:/home/node/.cargo/bin
@@ -463,7 +467,9 @@ RUN --mount=type=cache,target=/home/node/.cache,uid=1000,gid=1000,mode=0777 \
     cargo-outdated \
     cargo-watch \
     cargo-expand \
-    cargo-udeps || true
+    cargo-udeps \
+    cargo-audit \
+    cargo-geiger || true
 
 # Configure Rust build environment (without problematic sccache wrapper)
 ENV CC=clang \
