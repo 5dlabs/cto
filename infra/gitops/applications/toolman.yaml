@@ -102,6 +102,8 @@ spec:
               command: "npx"
               args: ["-y", "@upstash/context7-mcp"]
               workingDirectory: "/tmp"
+              env:
+                CONTEXT7_API_KEY: ""  # Injected from secret
 
             agent-docs:
               name: "Agent Docs"
@@ -133,6 +135,7 @@ spec:
         secretRefs:
           - name: toolman-brave-search-secrets
           - name: toolman-reddit-secrets
+          - name: toolman-context7-secrets
 
         # Security context (explicit configuration)
         securityContext:

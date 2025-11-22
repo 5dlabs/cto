@@ -229,8 +229,24 @@
     },
     "cipher": {
       "githubApp": "5DLabs-Cipher",
-      "cli": "codex",
-      "model": "gpt-4o",
+      "cli": "cursor",
+      "model": "sonnet-4.5",
+      "maxTokens": 200000,
+      "temperature": 0.6,
+      "reasoningEffort": "high",
+      "modelRotation": {
+        "enabled": true,
+        "models": [
+          "sonnet-4.5",
+          "sonnet-4.5-thinking",
+          "opus-4.1",
+          "gpt-5",
+          "gpt-5-codex",
+          "cheetah",
+          "grok",
+          "auto"
+        ]
+      },
       "tools": {
         "remote": [
           "brave_search_brave_web_search",
