@@ -626,7 +626,8 @@ impl<'a> CodeResourceManager<'a> {
         ];
 
         // Process task requirements if present
-        let (mut final_env_vars, mut env_from) = Self::process_task_requirements(code_run, env_vars)?;
+        let (mut final_env_vars, mut env_from) =
+            Self::process_task_requirements(code_run, env_vars)?;
 
         // Critical system variables that must not be overridden
         // Add these AFTER requirements processing to ensure they take precedence
