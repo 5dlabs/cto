@@ -385,8 +385,9 @@ RUN --mount=type=cache,target=/tmp/downloads,sharing=locked \
     chmod +x /usr/local/bin/hadolint
 
 # Install Semgrep for comprehensive static analysis
+# Use --ignore-installed for rich to avoid conflicts with system package
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --break-system-packages --no-cache-dir semgrep
+    pip3 install --break-system-packages --no-cache-dir --ignore-installed=rich semgrep
 
 # Configure npm globals before installing CLI tooling as non-root
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
