@@ -981,7 +981,7 @@ get_actual_running_agent() {
       --field-selector=status.phase=Running \
       -o json 2>/dev/null | jq --arg tid "$task_id" \
       '{items: [.items[] | select(.metadata.name | test("coderun-.*-t" + $tid + "-"))]}' || echo "{}")
-  
+  fi  
   if [[ "$running_pods" != "{}" ]]; then
     local pod_count=$(echo "$running_pods" | jq -r '.items | length')
     
