@@ -144,8 +144,7 @@ spec:
                             repository: "$REPO_LABEL"
                             trigger: "$INTEGRATION_TYPE"
                         spec:
-                          taskId: "0"
-                          service: "atlas"
+                          service: "atlas-integration"
                           githubApp: "5DLabs-Atlas"
                           model: "claude-sonnet-4-5-20250929"
                           repositoryUrl: "$REPO_URL"
