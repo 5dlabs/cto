@@ -113,6 +113,16 @@ spec:
               args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
               workingDirectory: "/tmp"
 
+            github:
+              name: "GitHub"
+              description: "GitHub API operations for repositories, issues, and pull requests"
+              transport: "stdio"
+              command: "docker"
+              args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+              workingDirectory: "/tmp"
+              env:
+                GITHUB_PERSONAL_ACCESS_TOKEN: ""  # Injected from secret
+
             agent-docs:
               name: "Agent Docs"
               description: "Agent documentation and knowledge base server"
@@ -144,6 +154,7 @@ spec:
           - name: toolman-brave-search-secrets
           - name: toolman-reddit-secrets
           - name: toolman-context7-secrets
+          - name: toolman-github-secrets
 
         # Security context (explicit configuration)
         securityContext:
