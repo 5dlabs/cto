@@ -2099,13 +2099,13 @@ else
   REPO_SLUG="$REPO_INPUT"
 fi
 
-# Post quality review comment to PR based on ACTUAL quality check results
+# Post quality review to PR based on ACTUAL quality check results
 if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
-  echo "💬 Posting quality review comment to PR..."
+  echo "📝 Posting quality review to PR..."
 
-  # Create comment body based on actual quality check results
+  # Create review body based on actual quality check results
   if [ $QUALITY_PASSED -eq 1 ]; then
-    COMMENT_BODY="## ✅ Code Quality Review - PASSED
+    REVIEW_BODY="## ✅ Code Quality Review - APPROVED
 
 All quality checks have passed:
 $(echo -e "$QUALITY_REPORT")
@@ -2115,8 +2115,23 @@ $(echo -e "$QUALITY_REPORT")
 
 ---
 *Quality review by Cleo - 5DLabs Code Quality Agent*"
+    
+    # Post APPROVE review using PR number or URL
+    if [ -n "$PR_NUMBER" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted APPROVE review"
+      else
+        echo "⚠️ Failed to post APPROVE review using PR number"
+      fi
+    elif [ -n "$PR_URL" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_URL" --approve --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted APPROVE review"
+      else
+        echo "⚠️ Failed to post APPROVE review"
+      fi
+    fi
   else
-    COMMENT_BODY="## ❌ Code Quality Review - ISSUES DETECTED
+    REVIEW_BODY="## ❌ Code Quality Review - CHANGES REQUESTED
 
 Quality checks failed:
 $(echo -e "$QUALITY_REPORT")
@@ -2125,20 +2140,20 @@ $(echo -e "$QUALITY_REPORT")
 
 ---
 *Quality review by Cleo - 5DLabs Code Quality Agent*"
-  fi
-
-  # Post comment using PR number or URL
-  if [ -n "$PR_NUMBER" ]; then
-    if echo "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" -R "$REPO_SLUG" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
-    else
-      echo "⚠️ Failed to post comment using PR number"
-    fi
-  elif [ -n "$PR_URL" ]; then
-    if echo "$COMMENT_BODY" | gh pr comment "$PR_URL" --body-file - 2>/dev/null; then
-      echo "✅ Successfully posted quality review comment"
-    else
-      echo "⚠️ Failed to post comment"
+    
+    # Post REQUEST CHANGES review using PR number or URL
+    if [ -n "$PR_NUMBER" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --request-changes --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted REQUEST CHANGES review"
+      else
+        echo "⚠️ Failed to post REQUEST CHANGES review using PR number"
+      fi
+    elif [ -n "$PR_URL" ]; then
+      if echo "$REVIEW_BODY" | gh pr review "$PR_URL" --request-changes --body-file - 2>/dev/null; then
+        echo "✅ Successfully posted REQUEST CHANGES review"
+      else
+        echo "⚠️ Failed to post REQUEST CHANGES review"
+      fi
     fi
   fi
 fi
@@ -2162,9 +2177,8 @@ if [ -n "$PR_NUMBER" ] || [ -n "$PR_URL" ]; then
       git push origin HEAD || echo "⚠️ Failed to push fixes"
     fi
     
-    # Cleo hands off to Cipher via label (NOT approve)
-    # Comment already posted above at lines 2095-2136
-    # Only Tess has PR approval authority
+    # Cleo hands off to Cipher via APPROVE review and label
+    # Review already posted above
     echo "✅ Quality checks passed - adding ready-for-security label to trigger Cipher"
     
     # Add ready-for-security label to signal Cipher

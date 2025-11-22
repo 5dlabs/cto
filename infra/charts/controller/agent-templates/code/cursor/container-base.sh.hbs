@@ -2511,12 +2511,12 @@ EOF
           fi
         fi
       else
-        # Cleo hands off to Tess via comment and label (NOT approve)
-        echo "✅ $STAGE_NAME checks passed - handing off to Tess"
+        # Cleo posts APPROVE review to show up in Reviews tab
+        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - PASSED
-All checks have passed:
+### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+All quality checks have passed:
 $CHECKS_PASSED
 
 **Status:** Ready for $NEXT_STAGE
@@ -2526,7 +2526,7 @@ $CHECKS_PASSED
 *Quality review by Cleo*
 EOF
         refresh_token_if_needed || true
-        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
+        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
         rm -f "$REVIEW_BODY_FILE"
 
         # Add ready-for-security label to trigger Cipher
