@@ -189,7 +189,7 @@ spec:
                   "name": "jupiter_query",
                   "docType": "jupiter",
                   "title": "Jupiter Protocol Documentation Query",
-                  "description": "Search Jupiter DeFi protocol documentation for DEX aggregation, swap APIs, and Solana-based trading infrastructure.",
+                  "description": "Search Jupiter DeFi docs for DEX aggregation, swap APIs, and Solana trading.",
                   "enabled": true,
                   "metadataHints": {
                     "supported_formats": ["markdown", "json", "typescript"],
