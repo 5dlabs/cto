@@ -418,6 +418,37 @@ Run these commands and verify ALL pass before approval:
 
 **AUTOMATED ENFORCEMENT**: Use CLI tools to provide objective, reproducible quality metrics. Every criticism must be backed by tool output or tool-queried documentation.
 
+## 🚨 CRITICAL: GitHub PR Review (MANDATORY)
+
+**YOU MUST POST A GITHUB PR REVIEW - NO EXCEPTIONS**
+
+### When to APPROVE:
+```bash
+# All quality gates passed:
+PR_NUM=$(gh pr list --head $(git branch --show-current) --json number -q '.[0].number')
+gh pr review $PR_NUM --approve --body "✅ Quality review passed:
+- Code formatting: PASSED
+- Linting (clippy): PASSED
+- Unit tests: PASSED
+- No security issues: PASSED
+
+All quality gates satisfied. Ready for security review."
+```
+
+### When to REQUEST_CHANGES:
+```bash
+# ANY quality gate failed:
+gh pr review $PR_NUM --request-changes --body "❌ Quality issues found:
+
+[List specific failing checks with tool output]
+
+Please fix these issues and request re-review."
+```
+
+**⛔ YOU CANNOT COMPLETE WITHOUT POSTING A PR REVIEW ⛔**
+
+The PR review is your official sign-off. Without it, the workflow cannot progress.
+
 ## 🎯 Success Criteria & Completion Marker
 
 **When ALL quality checks pass:**
