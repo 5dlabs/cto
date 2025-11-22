@@ -1386,6 +1386,115 @@ else
   echo "⚠️ jq not available; skipping client-config summary"
 fi
 
+# =========================================================================
+# TOOL VERIFICATION (Debug Mode - Remove after Context7 is stable)
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    TOOL VERIFICATION                          ║"
+echo "════════════════════════════════════════════════════════════════"
+
+TOOL_VERIFICATION_FAILED=false
+
+# Verify Context7 is available (if configured as local server)
+if grep -q '"context7"' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null; then
+  echo "🔍 Context7 configured - verifying availability..."
+  
+  # Check API key
+  if [ -n "${CONTEXT7_API_KEY:-}" ]; then
+    echo "  ✓ CONTEXT7_API_KEY is set"
+  else
+    echo "  ❌ CONTEXT7_API_KEY is missing"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Check npx is available
+  if command -v npx >/dev/null 2>&1; then
+    echo "  ✓ npx is available"
+  else
+    echo "  ❌ npx not found (required for Context7)"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Test Context7 package can be loaded
+  if timeout 10 npx -y @upstash/context7-mcp --help >/dev/null 2>&1; then
+    echo "  ✓ Context7 package can be loaded"
+  else
+    echo "  ⚠️ Context7 package test timed out or failed (may work at runtime)"
+  fi
+else
+  echo "ℹ️ Context7 not configured in client-config.json"
+fi
+
+# Verify Toolman connectivity (already checked above, just summarize)
+if [ "$TOOLMAN_SUCCESS" = "true" ]; then
+  echo "✓ Toolman connectivity verified"
+else
+  echo "⚠️ Toolman connectivity check failed (proceeding anyway)"
+fi
+
+# Use droid --list-tools to verify MCP tools are available
+echo ""
+echo "🔍 Verifying Factory MCP tools..."
+if command -v droid >/dev/null 2>&1; then
+  TOOL_LIST=$(droid exec --list-tools 2>&1 || echo "FAILED")
+  
+  # Check for critical tools based on agent role
+  {{#if (eq agent_name "rex")}}
+  # Rex needs: Context7, GitHub, Brave Search
+  REQUIRED_TOOLS=("Read" "Edit" "Execute")
+  {{else if (eq agent_name "blaze")}}
+  # Blaze needs: Context7, shadcn, GitHub
+  REQUIRED_TOOLS=("Read" "Edit" "Execute")
+  {{else if (eq agent_name "cleo")}}
+  # Cleo needs: Context7, GitHub
+  REQUIRED_TOOLS=("Read" "Execute")
+  {{else if (eq agent_name "tess")}}
+  # Tess needs: Context7, Kubernetes, GitHub
+  REQUIRED_TOOLS=("Read" "Execute")
+  {{else}}
+  # Default: Basic tools
+  REQUIRED_TOOLS=("Read" "Execute")
+  {{/if}}
+  
+  for tool in "${REQUIRED_TOOLS[@]}"; do
+    if echo "$TOOL_LIST" | grep -q "$tool"; then
+      echo "  ✓ $tool tool available"
+    else
+      echo "  ❌ $tool tool NOT available"
+      TOOL_VERIFICATION_FAILED=true
+    fi
+  done
+  
+  # Show tool count
+  TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
+  echo "  📊 Total tools available: $TOOL_COUNT"
+else
+  echo "  ⚠️ droid CLI not available for tool verification"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "Critical tools are not available. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - CONTEXT7_API_KEY not set (check secret mounting)"
+  echo "  - MCP servers not initialized properly"
+  echo "  - client-config.json misconfigured"
+  echo ""
+  echo "Full tool list:"
+  droid exec --list-tools 2>&1 || echo "Failed to list tools"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical tools verified successfully"
+echo ""
+# =========================================================================
+
 if [ -z "${FACTORY_API_KEY:-}" ]; then
   echo "❌ FACTORY_API_KEY is not set; Factory cannot authenticate"
   exit 1
