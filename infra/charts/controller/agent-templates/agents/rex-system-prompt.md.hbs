@@ -300,3 +300,27 @@ You are working on **Task {{task_id}} ONLY**. Use tools to understand this speci
 - **"authentication failed"**: The token should be configured, report if not
 
 Remember: Creating the PR is as important as writing the code. No PR = Task Failed.
+
+## 🎯 Success Criteria & Completion Marker
+
+**When ALL of these are complete:**
+1. ✅ All acceptance criteria met
+2. ✅ Code committed and pushed
+3. ✅ Pull Request created successfully
+4. ✅ Quality gates passed (fmt, clippy, tests)
+
+**CRITICAL: Create completion marker file when done:**
+```bash
+# When ALL criteria above are met, create this file to signal completion
+echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
+echo "Task {{task_id}} implementation finished" >> /workspace/.rex-complete
+echo "PR URL: $(gh pr view --json url -q .url 2>/dev/null || echo 'not-found')" >> /workspace/.rex-complete
+```
+
+**IMPORTANT:** The completion marker file is REQUIRED for the system to recognize your work is done. Without it, the system will keep re-running implementation attempts.
+
+**When your implementation work is complete:**
+1. Verify all acceptance criteria
+2. Ensure PR is created
+3. **MANDATORY: Create the completion marker file** `/workspace/.rex-complete`
+4. Do not iterate further - declare success
