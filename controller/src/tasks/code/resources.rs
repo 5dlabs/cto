@@ -626,7 +626,7 @@ impl<'a> CodeResourceManager<'a> {
         ];
 
         // Process task requirements if present
-        let (mut final_env_vars, env_from) = Self::process_task_requirements(code_run, env_vars)?;
+        let (mut final_env_vars, mut env_from) = Self::process_task_requirements(code_run, env_vars)?;
 
         // Critical system variables that must not be overridden
         // Add these AFTER requirements processing to ensure they take precedence
@@ -754,6 +754,13 @@ impl<'a> CodeResourceManager<'a> {
                 }
             });
         }
+
+        // Mount Context7 API key secret for direct MCP connections (all agents)
+        env_from.push(json!({
+            "secretRef": {
+                "name": "context7-api-key"
+            }
+        }));
 
         // Add envFrom if we have secrets to mount
         if !env_from.is_empty() {
