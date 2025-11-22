@@ -1150,9 +1150,18 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
             None
         }
         WorkflowStage::Security => {
+            // Security stage doesn't need retries unless explicitly requested
+            // The agent should complete its scan in one pass
+            if matches!(
+                status.remediation_status.as_deref(),
+                Some("needs-fixes" | "failed-remediation")
+            ) {
+                return Some("Security workflow reported critical issues".to_string());
+            }
+
+            // For security stage, we consider it complete if job finished
+            // even without explicit success signals (security scans are deterministic)
             // Security agent (Cipher) posts GitHub review and adds security-approved label
-            // No specific retry conditions - security review is always final
-            // Agent either approves or requests changes via GitHub review state
             None
         }
         WorkflowStage::Testing => {

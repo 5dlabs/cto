@@ -1633,6 +1633,13 @@ if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
   echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
 fi
 
+# Clean up any leftover completion marker from previous runs ONLY if we're Cipher
+# This prevents issues with sequential task executions on the same PVC
+if [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cipher cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"
@@ -1883,7 +1890,20 @@ Try instead:
     : > "$LAST_MESSAGE_FILE"
   fi
 
-  if [[ "{{github_app}}" =~ [Rr]ex ]]; then
+  # Special handling for security stage - check for completion marker file
+  if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+    if [ -f "/workspace/.cipher-complete" ]; then
+      echo "✅ Security completion marker found - Cipher has declared work complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+      break
+    else
+      echo "⚠️ Security completion marker not found (/workspace/.cipher-complete)"
+      echo "   Cipher must create this file when all security checks pass"
+      LAST_COMPLETION_REASON="Security scan incomplete - marker file /workspace/.cipher-complete not created by Cipher"
+      # Continue to retry
+    fi
+  elif [[ "{{github_app}}" =~ [Rr]ex ]]; then
     COMPLETION_PROMPT="Task {{task_id}} completion verification — Rex Implementation Agent (Factory)
 
 **Your Role**: You are Rex, the IMPLEMENTATION agent. Cleo will handle code quality in the next stage.
@@ -2284,6 +2304,12 @@ fi
 RESOLVED_PR_URL="$(resolve_pr_url)"
 
 if [ $SUCCESS -eq 1 ]; then
+  # Create completion marker ONLY for Cipher agent
+  if [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]); then
+    echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+    echo "✅ Cipher created security completion marker at /workspace/.cipher-complete"
+  fi
+  
   # Mark as Succeeded to allow workflow progression to Cipher
   patch_coderun_status \
     "Succeeded" \
