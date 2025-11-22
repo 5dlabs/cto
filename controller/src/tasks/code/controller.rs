@@ -1073,6 +1073,7 @@ async fn handle_no_pr_timeout(
 enum WorkflowStage {
     Implementation,
     Quality,
+    Security,
     Testing,
     Unknown(String),
 }
@@ -1083,6 +1084,7 @@ fn get_workflow_stage(code_run: &CodeRun) -> WorkflowStage {
             return match stage.as_str() {
                 "implementation" => WorkflowStage::Implementation,
                 "quality" => WorkflowStage::Quality,
+                "security" => WorkflowStage::Security,
                 "testing" => WorkflowStage::Testing,
                 other => WorkflowStage::Unknown(other.to_string()),
             };
@@ -1145,6 +1147,20 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
                 return Some("Quality workflow reported remediation needed".to_string());
             }
 
+            None
+        }
+        WorkflowStage::Security => {
+            // Security stage doesn't need retries unless explicitly requested
+            // The agent should complete its scan in one pass
+            if matches!(
+                status.remediation_status.as_deref(),
+                Some("needs-fixes" | "failed-remediation")
+            ) {
+                return Some("Security workflow reported critical issues".to_string());
+            }
+
+            // For security stage, we consider it complete if job finished
+            // even without explicit success signals (security scans are deterministic)
             None
         }
         WorkflowStage::Testing => {

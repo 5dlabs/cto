@@ -2051,7 +2051,25 @@ Try instead:
     fi
   fi
 
-  COMPLETION_PROMPT="Task {{task_id}} completion verification.
+  # Special handling for security stage - check for completion marker file
+  if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+    if [ -f "/workspace/.cipher-complete" ]; then
+      echo "✅ Security completion marker found - Cipher has declared work complete"
+      COMPLETION_RESPONSE="yes"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+      break
+    else
+      echo "⚠️ Security completion marker not found (/workspace/.cipher-complete)"
+      echo "   Cipher must create this file when all security checks pass"
+      COMPLETION_RESPONSE="no"
+      CURRENT_REASON="Security scan incomplete - marker file /workspace/.cipher-complete not created by Cipher"
+    fi
+  fi
+
+  # Skip normal completion probe if we already have a response from security check
+  if [ -z "$COMPLETION_RESPONSE" ]; then
+    COMPLETION_PROMPT="Task {{task_id}} completion verification.
 
 **FIRST**: Review the acceptance criteria in task/acceptance-criteria.md
 
@@ -2147,6 +2165,7 @@ Your response:"
   set -e
 
   echo "[codex-debug] Final completion response: ${COMPLETION_RESPONSE:-<none>}"
+  fi  # End of if [ -z "$COMPLETION_RESPONSE" ]
 
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
