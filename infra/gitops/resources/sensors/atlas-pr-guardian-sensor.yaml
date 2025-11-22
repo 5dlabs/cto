@@ -5,8 +5,8 @@ metadata:
   name: atlas-pr-guardian
   namespace: argo
 spec:
-  # Enable Atlas PR Guardian for integration, CI fixing, and auto-merge
-  replicas: 1
+  # Legacy sensor replaced by atlas-pr-monitor in github-webhooks (kept for rollback)
+  replicas: 0
   template:
     serviceAccountName: argo-events-sa
 

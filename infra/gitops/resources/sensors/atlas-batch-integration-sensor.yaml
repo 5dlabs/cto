@@ -5,6 +5,8 @@ metadata:
   name: atlas-batch-integration
   namespace: argo
 spec:
+  # Legacy sensor superseded by github-webhooks/atlas-batch-integration-sensor.yaml
+  replicas: 0
   template:
     serviceAccountName: argo-events-sa
 

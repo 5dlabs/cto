@@ -5,6 +5,8 @@ metadata:
   name: atlas-conflict-detection
   namespace: argo
 spec:
+  # Legacy sensor replaced by github-webhooks/atlas-conflict-monitor-sensor.yaml
+  replicas: 0
   template:
     serviceAccountName: argo-events-sa
 
