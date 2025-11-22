@@ -1184,10 +1184,10 @@ echo '════════════════════════�
 echo '║                 IMPLEMENTATION TASK COMPLETE                 ║'
 echo '════════════════════════════════════════════════════════════════'
 
-# Create completion marker for security stage
-if [ "${WORKFLOW_STAGE:-}" = "security" ] || [ "${WORKFLOW_STAGE:-}" = "security-in-progress" ]; then
+# Create completion marker ONLY for Cipher agent
+if [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "${WORKFLOW_STAGE:-}" = "security" ] || [ "${WORKFLOW_STAGE:-}" = "security-in-progress" ]); then
     echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
-    echo "✅ Created security completion marker at /workspace/.cipher-complete"
+    echo "✅ Cipher created security completion marker at /workspace/.cipher-complete"
 fi
 
 # Gemini execution completed
