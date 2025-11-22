@@ -1469,6 +1469,12 @@ if command -v droid >/dev/null 2>&1; then
   # Show tool count
   TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
   echo "  📊 Total tools available: $TOOL_COUNT"
+  
+  # List all available tools for verification
+  echo ""
+  echo "📋 Available Tools:"
+  echo "$TOOL_LIST" | grep "status:" | sed 's/^/  /'
+  echo ""
 else
   echo "  ⚠️ droid CLI not available for tool verification"
 fi
@@ -1492,6 +1498,54 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
 fi
 
 echo "✅ All critical tools verified successfully"
+echo ""
+# =========================================================================
+
+# =========================================================================
+# MCP TOOLS LISTING
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                    MCP TOOLS CONFIGURATION                    ║"
+echo "════════════════════════════════════════════════════════════════"
+
+if [ -f "$FACTORY_WORK_DIR/client-config.json" ] && command -v jq >/dev/null 2>&1; then
+  echo "📋 Remote Tools (via Toolman):"
+  REMOTE_TOOLS=$(jq -r '.remoteTools[]? // empty' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
+  if [ -n "$REMOTE_TOOLS" ]; then
+    echo "$REMOTE_TOOLS" | while read -r tool; do
+      echo "  • $tool"
+    done
+    REMOTE_COUNT=$(echo "$REMOTE_TOOLS" | wc -l | tr -d ' ')
+    echo "  📊 Total remote tools: $REMOTE_COUNT"
+  else
+    echo "  (none configured)"
+  fi
+  
+  echo ""
+  echo "📋 Local MCP Servers:"
+  LOCAL_SERVERS=$(jq -r '.localServers | keys[]? // empty' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
+  if [ -n "$LOCAL_SERVERS" ]; then
+    echo "$LOCAL_SERVERS" | while read -r server; do
+      TOOLS=$(jq -r ".localServers[\"$server\"].tools[]? // empty" "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null)
+      if [ -n "$TOOLS" ]; then
+        TOOL_COUNT=$(echo "$TOOLS" | wc -l | tr -d ' ')
+        echo "  • $server ($TOOL_COUNT tools):"
+        echo "$TOOLS" | while read -r tool; do
+          echo "    - $tool"
+        done
+      else
+        echo "  • $server (no tools specified)"
+      fi
+    done
+  else
+    echo "  (none configured)"
+  fi
+else
+  echo "⚠️ Cannot list MCP tools (client-config.json not found or jq unavailable)"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
 echo ""
 # =========================================================================
 
