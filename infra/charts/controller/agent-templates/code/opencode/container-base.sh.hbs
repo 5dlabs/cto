@@ -1781,11 +1781,20 @@ if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
   echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
 fi
 
-# Clean up any leftover completion marker from previous runs ONLY if we're Cipher
+# Clean up any leftover completion markers from previous runs (agent-specific)
 # This prevents issues with sequential task executions on the same PVC
-if [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
+if [[ "{{github_app}}" =~ [Rr]ex ]] && [ -f /workspace/.rex-complete ]; then
+    echo "🧹 Rex cleaning up completion marker from previous run"
+    rm -f /workspace/.rex-complete
+elif [[ "{{github_app}}" =~ [Cc]leo ]] && [ -f /workspace/.cleo-complete ]; then
+    echo "🧹 Cleo cleaning up completion marker from previous run"
+    rm -f /workspace/.cleo-complete
+elif [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
     echo "🧹 Cipher cleaning up completion marker from previous run"
     rm -f /workspace/.cipher-complete
+elif [[ "{{github_app}}" =~ [Tt]ess ]] && [ -f /workspace/.tess-complete ]; then
+    echo "🧹 Tess cleaning up completion marker from previous run"
+    rm -f /workspace/.tess-complete
 fi
 
 COMPLETED_ATTEMPTS=0
@@ -1811,16 +1820,34 @@ while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
     fi
   fi
 
-  # Special handling for security stage - check for completion marker file
-  if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
+  # Special handling for different workflow stages - check for completion marker files
+  if [ "$WORKFLOW_STAGE" = "implementation" ] || [ "$WORKFLOW_STAGE" = "implementation-in-progress" ]; then
+    if [ -f "/workspace/.rex-complete" ]; then
+      echo "✅ Implementation completion marker found - Rex has declared work complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+      break
+    fi
+  elif [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "quality-in-progress" ]; then
+    if [ -f "/workspace/.cleo-complete" ]; then
+      echo "✅ Quality completion marker found - Cleo has declared review complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+      break
+    fi
+  elif [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
     if [ -f "/workspace/.cipher-complete" ]; then
       echo "✅ Security completion marker found - Cipher has declared work complete"
       SUCCESS=1
       COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
       break
-    else
-      echo "⚠️ Security completion marker not found (/workspace/.cipher-complete)"
-      echo "   Cipher must create this file when all security checks pass"
+    fi
+  elif [ "$WORKFLOW_STAGE" = "testing" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]; then
+    if [ -f "/workspace/.tess-complete" ]; then
+      echo "✅ Testing completion marker found - Tess has declared QA complete"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+      break
     fi
   fi
   
@@ -2472,10 +2499,19 @@ fi
 RESOLVED_PR_URL="$(resolve_pr_url)"
 
 if [ $SUCCESS -eq 1 ]; then
-  # Create completion marker ONLY for Cipher agent
-  if [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]); then
+  # Create completion marker for the appropriate agent based on workflow stage
+  if [[ "{{github_app}}" =~ [Rr]ex ]] && ([ "$WORKFLOW_STAGE" = "implementation" ] || [ "$WORKFLOW_STAGE" = "implementation-in-progress" ]); then
+    echo "rex-implementation-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.rex-complete
+    echo "✅ Rex created implementation completion marker at /workspace/.rex-complete"
+  elif [[ "{{github_app}}" =~ [Cc]leo ]] && ([ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "quality-in-progress" ]); then
+    echo "cleo-quality-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cleo-complete
+    echo "✅ Cleo created quality completion marker at /workspace/.cleo-complete"
+  elif [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]); then
     echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
     echo "✅ Cipher created security completion marker at /workspace/.cipher-complete"
+  elif [[ "{{github_app}}" =~ [Tt]ess ]] && ([ "$WORKFLOW_STAGE" = "testing" ] || [ "$WORKFLOW_STAGE" = "testing-in-progress" ]); then
+    echo "tess-testing-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.tess-complete
+    echo "✅ Tess created testing completion marker at /workspace/.tess-complete"
   fi
   
   patch_coderun_status \
@@ -2544,10 +2580,10 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
 - Security best practices verified'
         NEXT_STAGE="QA testing by Tess"
         
-        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
+        echo "✅ $STAGE_NAME checks passed - posting status comment (no approval)"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED (Status Only)
 All security checks have passed:
 $CHECKS_PASSED
 
@@ -2555,10 +2591,10 @@ $CHECKS_PASSED
 **Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Security review by Cipher*
+*Security review by Cipher — final approval belongs to Tess*
 EOF
         refresh_token_if_needed || true
-        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
+        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
         rm -f "$REVIEW_BODY_FILE"
         
         # Add security-approved label (create if missing)

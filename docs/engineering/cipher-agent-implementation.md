@@ -434,8 +434,8 @@ esac
 3. **Decision Matrix**
    ```
    CRITICAL/HIGH vulnerabilities → REQUEST_CHANGES + detailed fixes
-   MEDIUM vulnerabilities only → APPROVE with recommendations
-   LOW/no vulnerabilities → APPROVE + add security-approved label
+   MEDIUM vulnerabilities only → COMMENT with recommendations (no approval)
+   LOW/no vulnerabilities → COMMENT + add security-approved label (no approval)
    ```
 
 ### Phase 3: Automated Remediation (When Possible)
@@ -484,8 +484,8 @@ gh pr review <PR_NUMBER> --request-changes --body "### 🔴 Security Issues Foun
 
 **Action Required**: Fix all CRITICAL and HIGH severity issues before merge."
 
-# For clean security posture - APPROVE
-gh pr review <PR_NUMBER> --approve --body "### ✅ Security Analysis Complete
+# For clean security posture - STATUS COMMENT (NO APPROVAL)
+gh pr comment <PR_NUMBER> --body "### ✅ Security Analysis Complete (Status Only)
 
 ## Scan Results
 - ✅ No CRITICAL vulnerabilities
@@ -504,7 +504,7 @@ gh pr review <PR_NUMBER> --approve --body "### ✅ Security Analysis Complete
 1. Consider updating dependency X (informational)
 2. Enable CodeQL for enhanced security scanning
 
-**Status**: Security approved - safe to proceed to QA testing."
+**Status**: Security checks passed — Tess will provide the only PR approval."
 ```
 
 ## Security-Specific Guidelines

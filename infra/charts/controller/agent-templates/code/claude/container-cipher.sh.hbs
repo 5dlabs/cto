@@ -2321,10 +2321,10 @@ fi
 # Post PR review ONCE after loop completes (not inside loop to avoid duplicates)
 if [ -n "$PR_NUMBER" ]; then
   if [ $SUCCESS -eq 1 ]; then
-    echo "✅ Cipher security checks passed - posting APPROVE review (once)"
+    echo "✅ Cipher security checks passed - posting status comment (no approval)"
     
-    # Post APPROVE review - Cipher acts as security gate
-    timeout 30 gh pr review "$PR_NUMBER" --approve --body "### 🔒 Security Review - APPROVED
+    # Post status comment - Tess retains sole approval authority
+    timeout 30 gh pr comment "$PR_NUMBER" --body "### 🔒 Security Review - PASSED (Status Only)
 
 All security checks have passed:
 - No vulnerabilities detected
@@ -2336,7 +2336,7 @@ All security checks have passed:
 **Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Security review by Cipher*" || echo "⚠️ PR review command failed"
+*Security review by Cipher — Tess grants the approval*" || echo "⚠️ PR comment command failed"
   else
     echo "❌ Security issues detected - posting REQUEST CHANGES review (once)"
     

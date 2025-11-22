@@ -62,7 +62,7 @@ This had several problems:
 - ✅ **Immediate visual clarity** - see which agent is working on what
 - ✅ **Matches workflow reality** - columns ARE the agent stages
 - ✅ **Real cluster state** - detects actual running agents from Kubernetes
-- ✅ **Simplified field structure** - one "Stage" field instead of two separate fields
+- ✅ **Simplified field structure** - GitHub's built-in **Status** field now drives the board, while Morgan mirrors values into the legacy **Stage** field so existing boards continue to work without intervention
 - ✅ **Better UX** - drag tasks between agents to change workflow stage
 - ✅ **Self-documenting** - the board tells the story of the multi-agent pipeline
 - ✅ **Accurate tracking** - three-tier detection strategy prioritizes actual pod/CodeRun state
@@ -175,6 +175,8 @@ setup_custom_fields() {
     "High" "Medium" "Low" || true
 }
 ```
+
+> **Update (Nov 2025):** Morgan now creates **both** `Status` (for GitHub's auto-generated columns) **and** a legacy `Stage` field. The values are mirrored so any existing boards that still group by Stage continue to display every task.
 
 **Changes:**
 - ❌ Removed: "Current Agent" field (redundant)

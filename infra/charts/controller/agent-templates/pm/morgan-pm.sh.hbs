@@ -1236,7 +1236,7 @@ map_workflow_to_status() {
 
 map_taskmaster_status_to_stage() {
   # Maps TaskMaster status values (from tasks.json) to GitHub Project "Stage" field values
-  # Using simplified agent names to match Stage field options
+  # MUST match exact Status field options configured in setup_custom_fields
   local taskmaster_status="$1"
   
   case "$taskmaster_status" in
@@ -1244,13 +1244,13 @@ map_taskmaster_status_to_stage() {
       echo "Complete ✅"
       ;;
     "in-progress"|"in_progress"|"active")
-      echo "Rex"  # Default to Rex for active tasks
+      echo "Rex (Implementation)"  # Match exact Status field option
       ;;
     "review"|"in-review"|"in_review")
-      echo "Cleo"  # Tasks in review go to Cleo
+      echo "Cleo (Quality)"  # Match exact Status field option
       ;;
     "testing"|"qa")
-      echo "Tess"
+      echo "Tess (QA)"  # Match exact Status field option
       ;;
     "blocked"|"deferred"|"cancelled")
       echo "Pending"  # Blocked tasks go back to Pending

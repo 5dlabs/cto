@@ -193,14 +193,14 @@ test_project_fields() {
     }
   " 2>/dev/null | jq -r '.data.node.fields.nodes[].name' || echo "")
   
-  local has_agent=$(echo "$fields" | grep -c "Current Agent" || echo "0")
+  local has_status=$(echo "$fields" | grep -c "Status" || echo "0")
   local has_stage=$(echo "$fields" | grep -c "Stage" || echo "0")
   
-  if [[ $has_agent -gt 0 ]] && [[ $has_stage -gt 0 ]]; then
-    pass "Custom fields are configured (Current Agent, Stage)"
+  if [[ $has_status -gt 0 ]] && [[ $has_stage -gt 0 ]]; then
+    pass "Custom fields are configured (Status + legacy Stage)"
     return 0
   else
-    fail "Custom fields missing" "Expected: Current Agent, Stage. Found: $fields"
+    fail "Custom fields missing" "Expected: Status + Stage. Found: $fields"
     return 1
   fi
 }
