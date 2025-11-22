@@ -968,10 +968,19 @@ get_actual_running_agent() {
   log "🔍 Detecting actual running agent for task-$task_id from cluster..."
   
   # Strategy 1: Check for RUNNING CodeRun pods (most accurate - shows who's working NOW)
+  # First try label selector (if controller propagates labels)
   local running_pods=$(kubectl get pods -n "$NAMESPACE" \
     -l "task-id=$task_id" \
     --field-selector=status.phase=Running \
     -o json 2>/dev/null || echo "{}")
+  
+  # If no pods found by label, try by name pattern (coderun-*-t{task-id}-*)
+  if [[ "$running_pods" == "{}" ]] || [[ $(echo "$running_pods" | jq '.items | length') -eq 0 ]]; then
+    log "🔍 No pods found with task-id label, trying name pattern coderun-*-t${task_id}-*"
+    running_pods=$(kubectl get pods -n "$NAMESPACE" \
+      --field-selector=status.phase=Running \
+      -o json 2>/dev/null | jq --arg tid "$task_id" \
+      '{items: [.items[] | select(.metadata.name | test("coderun-.*-t" + $tid + "-"))]}' || echo "{}")
   
   if [[ "$running_pods" != "{}" ]]; then
     local pod_count=$(echo "$running_pods" | jq -r '.items | length')
@@ -979,6 +988,21 @@ get_actual_running_agent() {
     if [[ "$pod_count" -gt 0 ]]; then
       # Get agent from the most recent running pod
       local agent=$(echo "$running_pods" | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.labels.agent // ""')
+      
+      # If no agent label, try to extract from pod name (coderun-{service}-t{task-id}-{stage}-*)
+      if [[ -z "$agent" ]]; then
+        local pod_name=$(echo "$running_pods" | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.name // ""')
+        log "🔍 Pod name: $pod_name, checking ownerReferences for CodeRun"
+        
+        # Get the CodeRun that owns this pod
+        local coderun_name=$(echo "$running_pods" | jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.ownerReferences[] | select(.kind == "CodeRun") | .name // ""' | head -1)
+        
+        if [[ -n "$coderun_name" ]]; then
+          log "🔍 Found owning CodeRun: $coderun_name"
+          # Get agent from CodeRun spec
+          agent=$(kubectl get coderun "$coderun_name" -n "$NAMESPACE" -o jsonpath='{.spec.githubApp}' 2>/dev/null || echo "")
+        fi
+      fi
       
       if [[ -n "$agent" ]]; then
         log "✅ Found RUNNING pod with agent: $agent"
