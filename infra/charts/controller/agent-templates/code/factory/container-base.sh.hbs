@@ -1469,6 +1469,12 @@ if command -v droid >/dev/null 2>&1; then
   # Show tool count
   TOOL_COUNT=$(echo "$TOOL_LIST" | grep -c "status:" || echo "0")
   echo "  📊 Total tools available: $TOOL_COUNT"
+  
+  # List all available tools for verification
+  echo ""
+  echo "📋 Available Tools:"
+  echo "$TOOL_LIST" | grep -E "^\s+•" | sed 's/^/  /'
+  echo ""
 else
   echo "  ⚠️ droid CLI not available for tool verification"
 fi
