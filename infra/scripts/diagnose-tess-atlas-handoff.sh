@@ -126,3 +126,4 @@ fi
 echo ""
 echo "=== Diagnostics Complete ==="
 echo "For detailed workflow analysis, run: $0 <workflow-name>"
+

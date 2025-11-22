@@ -2479,18 +2479,19 @@ All end-to-end and integration tests have passed:
         # Exit with failure to signal the issue
         echo "❌ Failing CodeRun due to PR review submission failure"
         CLAUDE_EXIT_CODE=1
-      fi
-      
-      # Auto-merge if enabled (Tess only)
-      if [ "${AUTO_MERGE:-false}" = "true" ]; then
-        echo "🔀 AUTO_MERGE enabled - merging PR automatically"
-        if timeout 30 gh pr merge "$PR_NUMBER" -R "$REPO_SLUG" --auto --squash --delete-branch; then
-          echo "✅ PR scheduled for auto-merge"
-        else
-          echo "⚠️ Auto-merge failed - PR may need manual intervention"
-        fi
       else
-        echo "ℹ️ AUTO_MERGE is disabled (set to 'true' in workflow parameters to enable)"
+        # Only attempt auto-merge if PR review was successfully submitted
+        # Auto-merge if enabled (Tess only)
+        if [ "${AUTO_MERGE:-false}" = "true" ]; then
+          echo "🔀 AUTO_MERGE enabled - merging PR automatically"
+          if timeout 30 gh pr merge "$PR_NUMBER" -R "$REPO_SLUG" --auto --squash --delete-branch; then
+            echo "✅ PR scheduled for auto-merge"
+          else
+            echo "⚠️ Auto-merge failed - PR may need manual intervention"
+          fi
+        else
+          echo "ℹ️ AUTO_MERGE is disabled (set to 'true' in workflow parameters to enable)"
+        fi
       fi
     else
       echo "❌ Tests failed - posting REQUEST CHANGES review"

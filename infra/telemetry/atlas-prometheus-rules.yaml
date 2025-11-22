@@ -185,3 +185,4 @@ spec:
           annotations:
             summary: "Atlas sensor controller is down"
             description: "The Argo Events sensor controller is not responding, Atlas sensors will not function."
+

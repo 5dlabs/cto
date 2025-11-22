@@ -320,3 +320,4 @@ Legacy sensors disabled but retained for rollback:
 *Last Updated: November 2025*
 *Architecture Version: 2.0*
 *Implementation PR: #[pending]*
+

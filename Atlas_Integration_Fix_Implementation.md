@@ -220,3 +220,4 @@ kubectl get workflows -n agent-platform -o name | xargs -I {} kubectl patch {} -
 **Impact**: Restores full multi-agent pipeline
 
 *Implementation Plan - November 22, 2025*
+
