@@ -4,6 +4,8 @@
     "brave_search_brave_web_search",
     "context7_resolve-library-id",
     "context7_get-library-docs",
+    "shadcn_list_components",
+    "shadcn_get_component",
     "memory_create_entities",
     "memory_add_observations",
     "memory_read_graph",
@@ -14,3 +16,5 @@
     "kubernetes_listResources"
   ]
 }
+
+

@@ -105,6 +105,14 @@ spec:
               env:
                 CONTEXT7_API_KEY: ""  # Injected from secret
 
+            shadcn:
+              name: "shadcn/ui"
+              description: "shadcn/ui component library with source code and demos"
+              transport: "stdio"
+              command: "npx"
+              args: ["-y", "@jpisnice/shadcn-ui-mcp-server"]
+              workingDirectory: "/tmp"
+
             agent-docs:
               name: "Agent Docs"
               description: "Agent documentation and knowledge base server"
