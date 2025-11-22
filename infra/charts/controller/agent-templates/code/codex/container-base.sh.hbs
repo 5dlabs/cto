@@ -1821,6 +1821,9 @@ fi
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
+  
+  # Reset completion response for each iteration (fixes bug where it persists across retries)
+  COMPLETION_RESPONSE=""
 
   # Calculate which model to use for this attempt
   CURRENT_MODEL="$DEFAULT_MODEL"
@@ -2053,18 +2056,37 @@ Try instead:
 
   # Special handling for security stage - check for completion marker file
   if [ "$WORKFLOW_STAGE" = "security" ] || [ "$WORKFLOW_STAGE" = "security-in-progress" ]; then
-    if [ -f "/workspace/.cipher-complete" ]; then
+    # Use agent_completion_check parameter if provided, otherwise default to standard marker
+    COMPLETION_MARKER="/workspace/.cipher-complete"
+    {{#if agent_completion_check}}
+    # Check using custom completion check command
+    if {{agent_completion_check}}; then
+      echo "✅ Security completion check passed - Cipher has declared work complete"
+      COMPLETION_RESPONSE="yes"
+      SUCCESS=1
+      COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
+      break
+    else
+      echo "⚠️ Security completion check failed: {{agent_completion_check}}"
+      echo "   Cipher must satisfy this check when all security checks pass"
+      COMPLETION_RESPONSE="no"
+      CURRENT_REASON="Security scan incomplete - completion check failed: {{agent_completion_check}}"
+    fi
+    {{else}}
+    # Default completion marker check
+    if [ -f "$COMPLETION_MARKER" ]; then
       echo "✅ Security completion marker found - Cipher has declared work complete"
       COMPLETION_RESPONSE="yes"
       SUCCESS=1
       COMPLETED_ATTEMPTS=$CURRENT_ATTEMPT
       break
     else
-      echo "⚠️ Security completion marker not found (/workspace/.cipher-complete)"
+      echo "⚠️ Security completion marker not found ($COMPLETION_MARKER)"
       echo "   Cipher must create this file when all security checks pass"
       COMPLETION_RESPONSE="no"
-      CURRENT_REASON="Security scan incomplete - marker file /workspace/.cipher-complete not created by Cipher"
+      CURRENT_REASON="Security scan incomplete - marker file $COMPLETION_MARKER not created by Cipher"
     fi
+    {{/if}}
   fi
 
   # Skip normal completion probe if we already have a response from security check

@@ -1139,6 +1139,15 @@ else
     echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
 fi
 
+# Check for security completion marker if this is a security stage
+if [ "${WORKFLOW_STAGE:-}" = "security" ] || [ "${WORKFLOW_STAGE:-}" = "security-in-progress" ]; then
+    if [ -f "/workspace/.cipher-complete" ]; then
+        echo "✅ Security completion marker found - previous run already completed"
+        echo "   Exiting successfully as security scan is already complete"
+        exit 0
+    fi
+fi
+
 # Execution
 if [ "{{task_id}}" = "0" ]; then
     echo "ℹ️ Task ID 0 detected - launching Gemini without task prompt"
@@ -1174,6 +1183,12 @@ fi
 echo '════════════════════════════════════════════════════════════════'
 echo '║                 IMPLEMENTATION TASK COMPLETE                 ║'
 echo '════════════════════════════════════════════════════════════════'
+
+# Create completion marker for security stage
+if [ "${WORKFLOW_STAGE:-}" = "security" ] || [ "${WORKFLOW_STAGE:-}" = "security-in-progress" ]; then
+    echo "cipher-security-completed:$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /workspace/.cipher-complete
+    echo "✅ Created security completion marker at /workspace/.cipher-complete"
+fi
 
 # Gemini execution completed
 echo "Gemini has completed successfully."
