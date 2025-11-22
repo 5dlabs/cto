@@ -175,6 +175,90 @@ if [ -f /workspace/.cipher-complete ]; then
     rm -f /workspace/.cipher-complete
 fi
 
+# =========================================================================
+# SECURITY TOOLS SETUP
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║              CIPHER SECURITY TOOLS VERIFICATION               ║"
+echo "════════════════════════════════════════════════════════════════"
+
+# Verify all security tools are available
+echo "🔍 Verifying security scanning tools..."
+
+# Multi-language SAST
+if command -v semgrep >/dev/null 2>&1; then
+    echo "✅ Semgrep: $(semgrep --version | head -1)"
+else
+    echo "⚠️ Semgrep not found - installing..."
+    pip3 install --break-system-packages semgrep || echo "❌ Failed to install Semgrep"
+fi
+
+# Rust security tools
+if command -v cargo >/dev/null 2>&1; then
+    if cargo audit --version >/dev/null 2>&1; then
+        echo "✅ cargo-audit: $(cargo audit --version)"
+    else
+        echo "⚠️ cargo-audit not found - will install if Rust project detected"
+    fi
+    
+    if cargo geiger --version >/dev/null 2>&1; then
+        echo "✅ cargo-geiger: $(cargo geiger --version 2>&1 | head -1)"
+    else
+        echo "⚠️ cargo-geiger not found - will install if Rust project detected"
+    fi
+    
+    if cargo deny --version >/dev/null 2>&1; then
+        echo "✅ cargo-deny: $(cargo deny --version)"
+    else
+        echo "⚠️ cargo-deny not found - will install if Rust project detected"
+    fi
+fi
+
+# Secret scanning
+if command -v gitleaks >/dev/null 2>&1; then
+    echo "✅ gitleaks: $(gitleaks version)"
+else
+    echo "❌ gitleaks not found"
+fi
+
+# Vulnerability scanning
+if command -v trivy >/dev/null 2>&1; then
+    echo "✅ trivy: $(trivy --version | head -1)"
+else
+    echo "❌ trivy not found"
+fi
+
+# Dockerfile linting
+if command -v hadolint >/dev/null 2>&1; then
+    echo "✅ hadolint: $(hadolint --version)"
+else
+    echo "⚠️ hadolint not found"
+fi
+
+echo ""
+echo "📚 Security Guidelines Available:"
+if [ -f "/workspace/CIPHER_SECURITY_GUIDELINES.md" ]; then
+    echo "✅ Complete security guidelines: /workspace/CIPHER_SECURITY_GUIDELINES.md"
+else
+    echo "⚠️ Security guidelines not found at /workspace/CIPHER_SECURITY_GUIDELINES.md"
+fi
+
+if [ -f "/workspace/CIPHER_QUICK_REFERENCE.md" ]; then
+    echo "✅ Quick reference: /workspace/CIPHER_QUICK_REFERENCE.md"
+else
+    echo "⚠️ Quick reference not found at /workspace/CIPHER_QUICK_REFERENCE.md"
+fi
+
+if [ -f "/workspace/.semgrep.yaml" ]; then
+    echo "✅ Semgrep custom rules: /workspace/.semgrep.yaml"
+else
+    echo "⚠️ Semgrep rules not found at /workspace/.semgrep.yaml"
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
 # Disable interactive Git prompts globally
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=/bin/true
@@ -448,6 +532,227 @@ export GIT_AUTHOR_NAME="$GIT_AUTHOR_NAME"
 export GIT_AUTHOR_EMAIL="$GIT_AUTHOR_EMAIL"
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+
+# =============================================================================
+# CIPHER SECURITY SCAN HELPER FUNCTIONS
+# =============================================================================
+
+# Comprehensive security scan function
+run_cipher_security_scan() {
+    local scan_dir="${1:-.}"
+    local report_dir="${2:-/workspace/security-reports}"
+    
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║           CIPHER COMPREHENSIVE SECURITY SCAN                  ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    
+    mkdir -p "$report_dir"
+    local has_critical=0
+    local has_high=0
+    
+    # 1. Semgrep Static Analysis (Multi-language)
+    echo "🔍 [1/6] Running Semgrep static analysis..."
+    if command -v semgrep >/dev/null 2>&1; then
+        if [ -f "/workspace/.semgrep.yaml" ]; then
+            semgrep scan --config /workspace/.semgrep.yaml --severity ERROR \
+                --json --output "$report_dir/semgrep-results.json" "$scan_dir" 2>&1 | tee "$report_dir/semgrep.log"
+        else
+            semgrep scan --config auto --severity ERROR \
+                --json --output "$report_dir/semgrep-results.json" "$scan_dir" 2>&1 | tee "$report_dir/semgrep.log"
+        fi
+        
+        # Check for critical/high findings
+        if [ -f "$report_dir/semgrep-results.json" ]; then
+            local semgrep_errors=$(jq -r '.results | length' "$report_dir/semgrep-results.json" 2>/dev/null || echo "0")
+            if [ "$semgrep_errors" -gt 0 ]; then
+                echo "⚠️ Semgrep found $semgrep_errors ERROR-level issues"
+                has_high=1
+            else
+                echo "✅ Semgrep: No ERROR-level issues found"
+            fi
+        fi
+    else
+        echo "⚠️ Semgrep not available - skipping"
+    fi
+    
+    # 2. Rust Security (if Cargo.toml exists)
+    if [ -f "$scan_dir/Cargo.toml" ]; then
+        echo ""
+        echo "🦀 [2/6] Running Rust security scans..."
+        
+        # cargo audit
+        if command -v cargo >/dev/null 2>&1 && cargo audit --version >/dev/null 2>&1; then
+            echo "  📦 Running cargo audit..."
+            cd "$scan_dir" && cargo audit --json > "$report_dir/cargo-audit.json" 2>&1 || true
+            
+            if [ -f "$report_dir/cargo-audit.json" ]; then
+                local critical_vulns=$(jq -r '[.vulnerabilities.list[] | select(.advisory.severity == "critical")] | length' "$report_dir/cargo-audit.json" 2>/dev/null || echo "0")
+                local high_vulns=$(jq -r '[.vulnerabilities.list[] | select(.advisory.severity == "high")] | length' "$report_dir/cargo-audit.json" 2>/dev/null || echo "0")
+                
+                if [ "$critical_vulns" -gt 0 ]; then
+                    echo "  ❌ Found $critical_vulns CRITICAL vulnerabilities"
+                    has_critical=1
+                fi
+                if [ "$high_vulns" -gt 0 ]; then
+                    echo "  ⚠️ Found $high_vulns HIGH vulnerabilities"
+                    has_high=1
+                fi
+                if [ "$critical_vulns" -eq 0 ] && [ "$high_vulns" -eq 0 ]; then
+                    echo "  ✅ cargo audit: No CRITICAL/HIGH vulnerabilities"
+                fi
+            fi
+        else
+            echo "  ⚠️ cargo-audit not available - installing..."
+            cargo install cargo-audit 2>&1 | tail -5
+        fi
+        
+        # cargo geiger
+        if cargo geiger --version >/dev/null 2>&1; then
+            echo "  ☢️ Running cargo geiger (unsafe code detection)..."
+            cd "$scan_dir" && cargo geiger --output-format Json > "$report_dir/cargo-geiger.json" 2>&1 || true
+            echo "  ✅ cargo geiger scan complete"
+        fi
+        
+        # cargo deny
+        if cargo deny --version >/dev/null 2>&1; then
+            echo "  🚫 Running cargo deny..."
+            cd "$scan_dir" && cargo deny check advisories > "$report_dir/cargo-deny.log" 2>&1 || true
+            echo "  ✅ cargo deny scan complete"
+        fi
+    else
+        echo ""
+        echo "ℹ️ [2/6] No Cargo.toml found - skipping Rust security scans"
+    fi
+    
+    # 3. TypeScript/JavaScript Security (if package.json exists)
+    if [ -f "$scan_dir/package.json" ]; then
+        echo ""
+        echo "📦 [3/6] Running npm security audit..."
+        cd "$scan_dir" && npm audit --json > "$report_dir/npm-audit.json" 2>&1 || true
+        
+        if [ -f "$report_dir/npm-audit.json" ]; then
+            local npm_critical=$(jq -r '.metadata.vulnerabilities.critical // 0' "$report_dir/npm-audit.json" 2>/dev/null || echo "0")
+            local npm_high=$(jq -r '.metadata.vulnerabilities.high // 0' "$report_dir/npm-audit.json" 2>/dev/null || echo "0")
+            
+            if [ "$npm_critical" -gt 0 ]; then
+                echo "  ❌ Found $npm_critical CRITICAL npm vulnerabilities"
+                has_critical=1
+            fi
+            if [ "$npm_high" -gt 0 ]; then
+                echo "  ⚠️ Found $npm_high HIGH npm vulnerabilities"
+                has_high=1
+            fi
+            if [ "$npm_critical" -eq 0 ] && [ "$npm_high" -eq 0 ]; then
+                echo "  ✅ npm audit: No CRITICAL/HIGH vulnerabilities"
+            fi
+        fi
+    else
+        echo ""
+        echo "ℹ️ [3/6] No package.json found - skipping npm security audit"
+    fi
+    
+    # 4. Secret Scanning with gitleaks
+    echo ""
+    echo "🔐 [4/6] Running secret scanning with gitleaks..."
+    if command -v gitleaks >/dev/null 2>&1; then
+        gitleaks detect --source "$scan_dir" --report-path "$report_dir/gitleaks-report.json" \
+            --verbose --no-git 2>&1 | tee "$report_dir/gitleaks.log" || true
+        
+        if [ -f "$report_dir/gitleaks-report.json" ]; then
+            local secrets_found=$(jq -r '. | length' "$report_dir/gitleaks-report.json" 2>/dev/null || echo "0")
+            if [ "$secrets_found" -gt 0 ]; then
+                echo "  ⚠️ Found $secrets_found potential secrets - verify they are in .gitignore"
+                echo "  ⚠️ CRITICAL: Check with 'git check-ignore <file>' before flagging"
+            else
+                echo "  ✅ gitleaks: No secrets detected"
+            fi
+        fi
+    else
+        echo "  ⚠️ gitleaks not available"
+    fi
+    
+    # 5. Trivy Vulnerability Scanning
+    echo ""
+    echo "🛡️ [5/6] Running trivy vulnerability scan..."
+    if command -v trivy >/dev/null 2>&1; then
+        trivy fs --severity HIGH,CRITICAL --format json \
+            --output "$report_dir/trivy-report.json" "$scan_dir" 2>&1 | tee "$report_dir/trivy.log" || true
+        
+        if [ -f "$report_dir/trivy-report.json" ]; then
+            local trivy_critical=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' "$report_dir/trivy-report.json" 2>/dev/null || echo "0")
+            local trivy_high=$(jq -r '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' "$report_dir/trivy-report.json" 2>/dev/null || echo "0")
+            
+            if [ "$trivy_critical" -gt 0 ]; then
+                echo "  ❌ Found $trivy_critical CRITICAL vulnerabilities"
+                has_critical=1
+            fi
+            if [ "$trivy_high" -gt 0 ]; then
+                echo "  ⚠️ Found $trivy_high HIGH vulnerabilities"
+                has_high=1
+            fi
+            if [ "$trivy_critical" -eq 0 ] && [ "$trivy_high" -eq 0 ]; then
+                echo "  ✅ trivy: No CRITICAL/HIGH vulnerabilities"
+            fi
+        fi
+    else
+        echo "  ⚠️ trivy not available"
+    fi
+    
+    # 6. GitHub Code Scanning Alerts
+    echo ""
+    echo "🔍 [6/6] Checking GitHub Code Scanning alerts..."
+    if [ -n "${PR_NUMBER:-}" ]; then
+        gh api "/repos/$REPO_OWNER/$REPO_NAME/code-scanning/alerts?state=open&pr=$PR_NUMBER" \
+            > "$report_dir/github-code-scanning.json" 2>&1 || true
+        
+        if [ -f "$report_dir/github-code-scanning.json" ]; then
+            local gh_critical=$(jq -r '[.[] | select(.rule.severity == "error")] | length' "$report_dir/github-code-scanning.json" 2>/dev/null || echo "0")
+            local gh_high=$(jq -r '[.[] | select(.rule.severity == "warning")] | length' "$report_dir/github-code-scanning.json" 2>/dev/null || echo "0")
+            
+            if [ "$gh_critical" -gt 0 ]; then
+                echo "  ❌ Found $gh_critical CRITICAL GitHub Code Scanning alerts"
+                has_critical=1
+            fi
+            if [ "$gh_high" -gt 0 ]; then
+                echo "  ⚠️ Found $gh_high HIGH GitHub Code Scanning alerts"
+                has_high=1
+            fi
+            if [ "$gh_critical" -eq 0 ] && [ "$gh_high" -eq 0 ]; then
+                echo "  ✅ GitHub Code Scanning: No CRITICAL/HIGH alerts"
+            fi
+        fi
+    else
+        echo "  ℹ️ No PR number - skipping GitHub Code Scanning check"
+    fi
+    
+    # Summary
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo "║                    SCAN SUMMARY                               ║"
+    echo "════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "📊 Security scan reports saved to: $report_dir"
+    echo ""
+    
+    if [ "$has_critical" -eq 1 ]; then
+        echo "❌ CRITICAL vulnerabilities found - PR MUST be blocked"
+        echo "   Review reports and fix all CRITICAL issues before proceeding"
+        return 2
+    elif [ "$has_high" -eq 1 ]; then
+        echo "⚠️ HIGH severity vulnerabilities found - must fix before merge"
+        echo "   Review reports and address all HIGH severity issues"
+        return 1
+    else
+        echo "✅ No CRITICAL or HIGH severity vulnerabilities detected"
+        echo "   Security scan passed - proceed with code quality checks"
+        return 0
+    fi
+}
+
+# Export the function so Claude can reference it
+export -f run_cipher_security_scan
 
 # =============================================================================
 # AUTHENTICATION VERIFICATION
@@ -1627,10 +1932,45 @@ case "$TASK_LANG" in
   typescript|javascript|ts|js)
     LANGUAGE_SECURITY="
 ## TypeScript/JavaScript Security Standards
-- **Dependency Audit**: Run \`npm audit\` and fix all HIGH/CRITICAL vulnerabilities
+
+### Comprehensive Security Scan Commands:
+\`\`\`bash
+# 1. Semgrep static analysis (CRITICAL - run first)
+semgrep scan --config auto --severity ERROR --json > semgrep-results.json
+
+# 2. Dependency vulnerabilities (CRITICAL)
+npm audit --json > npm-audit.json
+
+# 3. Secret scanning (CRITICAL - check .gitignore first)
+gitleaks detect --source . --report-path gitleaks-report.json --verbose
+
+# 4. Vulnerability scanning (HIGH)
+trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+
+# 5. ESLint with security plugins (if configured)
+eslint --ext .ts,.tsx . --config .eslintrc.json
+\`\`\`
+
+### Security Requirements:
+- **Semgrep**: No CRITICAL/HIGH issues (XSS, eval, innerHTML, SQL injection)
+- **Dependency Audit**: Run \`npm audit\` - zero CRITICAL/HIGH CVEs
 - **Package Security**: Check for known vulnerable packages in package.json
 - **Secret Detection**: Scan for exposed API keys, tokens, credentials
-- **XSS Protection**: Verify input sanitization and output encoding"
+- **XSS Protection**: Verify input sanitization and output encoding
+- **Secrets**: Use \`gitleaks\` but verify files are NOT in .gitignore first
+
+### Helper Function Available:
+Run comprehensive security scan with a single command:
+\`\`\`bash
+run_cipher_security_scan . /workspace/security-reports
+\`\`\`
+
+This runs ALL security tools and generates reports. Returns: 0 (pass), 1 (HIGH issues), 2 (CRITICAL issues)
+
+### Guidelines:
+- **Complete guide**: /workspace/CIPHER_SECURITY_GUIDELINES.md
+- **Quick reference**: /workspace/CIPHER_QUICK_REFERENCE.md
+- **Custom rules**: /workspace/.semgrep.yaml"
     if echo "$TASK_FW" | grep -q "react\|next"; then
       LANGUAGE_SECURITY="$LANGUAGE_SECURITY
 - **React Security**: Check for dangerouslySetInnerHTML usage, validate prop types
@@ -1640,10 +1980,49 @@ case "$TASK_LANG" in
   rust)
     LANGUAGE_SECURITY="
 ## Rust Security Standards
-- **Dependency Audit**: Run \`cargo audit\` and fix all vulnerabilities
-- **Unsafe Code**: Review all \`unsafe\` blocks for memory safety
+
+### Comprehensive Security Scan Commands:
+\`\`\`bash
+# 1. Semgrep static analysis (CRITICAL - run first)
+semgrep scan --config auto --severity ERROR --json > semgrep-results.json
+
+# 2. Dependency vulnerabilities (CRITICAL)
+cargo audit --json > cargo-audit.json
+
+# 3. Unsafe code detection (HIGH)
+cargo geiger --output-format Json > cargo-geiger.json
+
+# 4. Policy enforcement (HIGH)
+cargo deny check advisories
+cargo deny check licenses
+
+# 5. Secret scanning (CRITICAL - check .gitignore first)
+gitleaks detect --source . --report-path gitleaks-report.json --verbose
+
+# 6. Vulnerability scanning (HIGH)
+trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+\`\`\`
+
+### Security Requirements:
+- **Semgrep**: No CRITICAL/HIGH issues in custom rules
+- **Dependency Audit**: Run \`cargo audit\` - zero CRITICAL/HIGH CVEs
+- **Unsafe Code**: Review all \`unsafe\` blocks with \`cargo geiger\`
 - **Input Validation**: Verify bounds checking and input sanitization
-- **Cryptography**: Ensure proper use of cryptographic libraries"
+- **Cryptography**: Ensure proper use of cryptographic libraries
+- **Secrets**: Use \`gitleaks\` but verify files are NOT in .gitignore first
+
+### Helper Function Available:
+Run comprehensive security scan with a single command:
+\`\`\`bash
+run_cipher_security_scan . /workspace/security-reports
+\`\`\`
+
+This runs ALL security tools and generates reports. Returns: 0 (pass), 1 (HIGH issues), 2 (CRITICAL issues)
+
+### Guidelines:
+- **Complete guide**: /workspace/CIPHER_SECURITY_GUIDELINES.md
+- **Quick reference**: /workspace/CIPHER_QUICK_REFERENCE.md
+- **Custom rules**: /workspace/.semgrep.yaml"
     ;;
   python)
     LANGUAGE_SECURITY="

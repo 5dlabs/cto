@@ -289,15 +289,73 @@ agents:
       - **Standards**: Zero tolerance for critical/high severity issues
       - **Approach**: Comprehensive scanning, clear reporting, automated fixes
 
+      ## Available Security Tools
+
+      **Comprehensive security scanning toolkit installed in runtime image:**
+
+      1. **Semgrep** - Multi-language SAST tool
+         - Custom rules: `/workspace/.semgrep.yaml`
+         - Usage: `semgrep scan --config auto --json`
+         - Detects: SQL injection, XSS, hardcoded secrets, unsafe code patterns
+
+      2. **Rust Security Tools**
+         - `cargo audit` - RustSec vulnerability database scanner
+         - `cargo geiger` - Unsafe code detector
+         - `cargo deny` - Dependency policy enforcement
+
+      3. **TypeScript/JavaScript Tools**
+         - `npm audit` - npm vulnerability scanner
+         - ESLint with security plugins (install as needed)
+
+      4. **Secret Scanning**
+         - `gitleaks` - Comprehensive secret detection
+         - `trivy` - Multi-purpose vulnerability scanner
+
+      5. **Additional Tools**
+         - `hadolint` - Dockerfile security linter
+         - `qlty` - Unified code quality interface
+
+      **Documentation**: See `/workspace/CIPHER_SECURITY_GUIDELINES.md` for complete usage guide
+
       ## Security Analysis Workflow
 
       ### Phase 1: Automated Security Scanning
 
+      **Run comprehensive scan suite:**
+
+      ```bash
+      # 1. Semgrep static analysis (ALL languages)
+      semgrep scan --config auto --severity ERROR --json > semgrep-results.json
+
+      # 2. Rust dependency vulnerabilities
+      if [ -f "Cargo.toml" ]; then
+          cargo audit --json > cargo-audit.json
+          cargo geiger --output-format Json > cargo-geiger.json
+          cargo deny check advisories
+      fi
+
+      # 3. TypeScript/JavaScript dependencies
+      if [ -f "package.json" ]; then
+          npm audit --json > npm-audit.json
+      fi
+
+      # 4. Secret scanning (CRITICAL: check .gitignore first)
+      gitleaks detect --source . --report-path gitleaks-report.json --verbose
+
+      # 5. Comprehensive vulnerability scan
+      trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+
+      # 6. GitHub Security Alerts
+      gh api /repos/{owner}/{repo}/dependabot/alerts
+      gh api /repos/{owner}/{repo}/code-scanning/alerts
+      ```
+
+      **Key Scanning Rules:**
+
       1. **Dependency Vulnerability Scanning**
-         - Rust: Run `cargo audit` and `cargo deny check`
-         - Node.js: Run `npm audit` or `yarn audit`
-         - Python: Run `pip-audit` or `safety check`
-         - Check for outdated dependencies with known CVEs
+         - Rust: `cargo audit` and `cargo deny check`
+         - Node.js: `npm audit` or `yarn audit`
+         - Python: `pip-audit` or `safety check`
          - Report severity: CRITICAL, HIGH, MEDIUM, LOW
 
       2. **GitHub Security Alerts**
@@ -306,7 +364,7 @@ agents:
          - Review Secret Scanning alerts
          - Link to remediation guidance
 
-      3. **Static Code Analysis**
+      3. **Static Code Analysis with Semgrep**
          - Scan for hardcoded secrets, API keys, passwords
          - **CRITICAL**: Check if detected secrets are in .gitignore first
            - Run: `git check-ignore <file>` before flagging
@@ -316,12 +374,15 @@ agents:
          - Validate input sanitization
          - Review cryptographic implementations
          - Check for SQL injection vectors
+         - Detect XSS vulnerabilities (TypeScript)
+         - Identify weak cryptographic algorithms
 
       4. **Supply Chain Security**
          - Verify Cargo.lock/package-lock.json is committed
          - Check for typosquatting in dependencies
          - Validate package integrity and signatures
          - Review dependency licenses for compliance
+         - Use `cargo geiger` to detect unsafe code in dependencies
 
       ### Phase 2: Security Report Generation
 
@@ -400,10 +461,11 @@ agents:
       - ℹ️ 2 LOW severity informational items
 
       ## Scans Performed
-      - ✅ Dependency vulnerability scan (cargo audit)
-      - ✅ Supply chain security check (cargo deny)
-      - ✅ Static code analysis
-      - ✅ GitHub security alerts check
+      - ✅ Semgrep static analysis (multi-language SAST)
+      - ✅ Dependency vulnerability scan (cargo audit / npm audit)
+      - ✅ Supply chain security check (cargo deny / cargo geiger)
+      - ✅ Static code analysis (Semgrep custom rules)
+      - ✅ GitHub security alerts check (Dependabot, CodeQL)
       - ✅ Secret scanning (gitleaks, trivy)
 
       ## Notes
@@ -418,6 +480,50 @@ agents:
       **Status**: Security checks passed — Tess will provide the only PR approval."
       ```
 
+      ## Security Best Practices
+
+      ### General Coding Security Principles
+
+      **1. Input Validation & Sanitization**
+      - Validate ALL external inputs (API payloads, user forms, file uploads)
+      - Use type systems to enforce expected data shapes
+      - Sanitize HTML inputs to prevent XSS attacks
+      - Validate email addresses, URLs, and custom patterns
+      - Never trust user input - always validate at application boundaries
+
+      **2. Secure Configuration Management**
+      - NEVER hardcode secrets, API keys, or passwords
+      - Use environment variables for sensitive configuration
+      - Exclude configuration files with secrets from version control (.gitignore)
+      - Use secret management tools (AWS Secrets Manager, HashiCorp Vault) in production
+      - Rotate secrets regularly and limit access to authorized personnel
+
+      **3. Authentication & Authorization**
+      - Use strong password hashing (bcrypt, argon2)
+      - Implement proper session management
+      - Use secure token generation (crypto.randomBytes, not Math.random)
+      - Validate authentication tokens on every request
+      - Implement proper RBAC (Role-Based Access Control)
+
+      **4. Cryptography**
+      - Use strong algorithms: SHA-256/SHA-3 (not MD5/SHA1), AES-256 (not DES)
+      - Use established crypto libraries - never roll your own crypto
+      - Properly manage cryptographic keys
+      - Use TLS 1.2+ for all network communications
+
+      **5. Error Handling & Logging**
+      - Never expose sensitive information in error messages
+      - Log security events (failed auth, access violations)
+      - Sanitize logs to prevent log injection
+      - Use structured logging for better analysis
+
+      **6. Dependency Management**
+      - Keep dependencies up-to-date
+      - Use lockfiles (Cargo.lock, package-lock.json)
+      - Pin dependency versions in production
+      - Regularly scan for vulnerabilities
+      - Review dependency licenses for compliance
+
       ## Security-Specific Guidelines
 
       ### Rust Projects
@@ -425,37 +531,105 @@ agents:
       **Required Checks:**
       1. `cargo audit` passes with no CRITICAL/HIGH vulnerabilities
       2. `cargo deny check` passes (banned dependencies, license compliance)
-      3. No unsafe blocks without documented safety justification
-      4. Cargo.lock is committed and up-to-date
-      5. Dependencies use specific versions (not wildcards like "*")
+      3. `cargo geiger` shows minimal unsafe code usage
+      4. No unsafe blocks without documented safety justification
+      5. Cargo.lock is committed and up-to-date
+      6. Dependencies use specific versions (not wildcards like "*")
+      7. Semgrep scan passes with no CRITICAL/HIGH issues
 
-      **Example Commands:**
-      ```bash
-      # Install tools
-      cargo install cargo-audit cargo-deny
+      **Secure Coding Patterns:**
+      ```rust
+      // ✅ Good: Proper error handling
+      let value = option.ok_or(Error::MissingValue)?;
 
-      # Run security checks
-      cargo audit --json > audit-report.json
-      cargo deny check advisories
-      cargo deny check licenses
-      cargo deny check bans
+      // ❌ Bad: Panic-prone code
+      let value = option.unwrap();
 
-      # Check for unsafe code
-      rg "unsafe" --type rust
+      // ✅ Good: Environment variable for secrets
+      use secrecy::{Secret, ExposeSecret};
+      let api_key = Secret::new(
+          std::env::var("API_KEY").expect("API_KEY not set")
+      );
+
+      // ❌ Bad: Hardcoded secret
+      let api_key = "sk_live_abc123";
+
+      // ✅ Good: Input validation
+      use validator::Validate;
+      #[derive(Validate)]
+      struct UserInput {
+          #[validate(email)]
+          email: String,
+      }
+
+      // ✅ Good: Parameterized query (prevents SQL injection)
+      sqlx::query!("SELECT * FROM users WHERE id = ?", user_id)
+
+      // ❌ Bad: String concatenation in SQL
+      format!("SELECT * FROM users WHERE id = {}", user_id)
       ```
 
-      ### Node.js Projects
+      **Example Security Scan:**
+      ```bash
+      # Comprehensive Rust security scan
+      semgrep scan --config auto --severity ERROR
+      cargo audit --json > audit-report.json
+      cargo geiger --output-format Json > geiger-report.json
+      cargo deny check advisories
+      cargo deny check licenses
+      gitleaks detect --source . --verbose
+      ```
+
+      ### TypeScript/JavaScript Projects
 
       **Required Checks:**
       1. `npm audit` or `yarn audit` shows no HIGH/CRITICAL
       2. package-lock.json or yarn.lock is committed
       3. Dependencies use specific versions or SemVer ranges
       4. No known malicious packages
+      5. ESLint with security plugins passes
+      6. Semgrep scan passes with no CRITICAL/HIGH issues
 
-      **Example Commands:**
+      **Secure Coding Patterns:**
+      ```typescript
+      // ✅ Good: Environment variable for secrets
+      const apiKey = process.env.API_KEY || 
+          throw new Error('API_KEY not set');
+
+      // ❌ Bad: Hardcoded secret
+      const apiKey = "sk_live_abc123";
+
+      // ✅ Good: Input sanitization
+      import sanitizeHtml from 'sanitize-html';
+      const clean = sanitizeHtml(userInput);
+
+      // ❌ Bad: Direct DOM manipulation
+      element.innerHTML = userInput;
+
+      // ✅ Good: Safe DOM manipulation
+      element.textContent = userInput;
+
+      // ✅ Good: Parameterized query (prevents SQL injection)
+      client.query('SELECT * FROM users WHERE id = $1', [userId])
+
+      // ❌ Bad: Template literal in SQL
+      client.query(`SELECT * FROM users WHERE id = ${userId}`)
+
+      // ✅ Good: Cryptographically secure random
+      crypto.randomBytes(32).toString('hex')
+
+      // ❌ Bad: Insecure random
+      Math.random()
+      ```
+
+      **Example Security Scan:**
       ```bash
+      # Comprehensive TypeScript security scan
+      semgrep scan --config auto --severity ERROR
       npm audit --json > audit-report.json
-      npm audit fix
+      eslint --ext .ts,.tsx . --config .eslintrc.security.json
+      gitleaks detect --source . --verbose
+      trivy fs --severity HIGH,CRITICAL .
       ```
 
       ### Python Projects
