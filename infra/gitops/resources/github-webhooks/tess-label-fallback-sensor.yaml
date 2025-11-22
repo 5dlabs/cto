@@ -113,7 +113,10 @@ spec:
                         # Extract task ID from labels or branch
                         TASK_ID=""
                         if [ -n "$PR_LABELS" ] && [ "$PR_LABELS" != "null" ]; then
-                          TASK_ID=$(echo "$PR_LABELS" | jq -r '.[] | select(.name | test("task-[0-9]+")) | .name | capture("task-(?<id>[0-9]+)") | .id' 2>/dev/null | head -n1 || true)
+                          TASK_ID=$(echo "$PR_LABELS" | \
+                            jq -r '.[] | select(.name | test("task-[0-9]+")) | .name |
+                              capture("task-(?<id>[0-9]+)") | .id' \
+                            2>/dev/null | head -n1 || true)
                         fi
 
                         if [ -z "$TASK_ID" ] && [ -n "$PR_BRANCH" ] && [ "$PR_BRANCH" != "null" ]; then
@@ -144,7 +147,12 @@ spec:
                           # Look for any workflow with suspended nodes
                           WORKFLOW_NAME=$(kubectl get workflows -n agent-platform \
                             -l "task-id=$TASK_ID" \
-                            -o json | jq -r '.items[] | select(.status.nodes | to_entries[] | select(.value.type == "Suspend" and .value.phase == "Running")) | .metadata.name' | head -n1)
+                            -o json | \
+                            jq -r '.items[] |
+                              select(.status.nodes | to_entries[] |
+                                select(.value.type == "Suspend" and .value.phase == "Running"))
+                              | .metadata.name' | \
+                            head -n1)
 
                           if [ -z "$WORKFLOW_NAME" ]; then
                             echo "❌ No suspended workflow found to resume"
