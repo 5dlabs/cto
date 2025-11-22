@@ -1473,7 +1473,7 @@ if command -v droid >/dev/null 2>&1; then
   # List all available tools for verification
   echo ""
   echo "📋 Available Tools:"
-  echo "$TOOL_LIST" | grep -E "^\s+•" | sed 's/^/  /'
+  echo "$TOOL_LIST" | grep "status:" | sed 's/^/  /'
   echo ""
 else
   echo "  ⚠️ droid CLI not available for tool verification"
