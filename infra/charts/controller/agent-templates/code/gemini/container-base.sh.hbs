@@ -1139,10 +1139,17 @@ else
     echo "⚠️ No toolman-guide.md found - proceeding without tool guidance"
 fi
 
-# Check for security completion marker if this is a security stage
-if [ "${WORKFLOW_STAGE:-}" = "security" ] || [ "${WORKFLOW_STAGE:-}" = "security-in-progress" ]; then
+# Clean up any leftover completion marker from previous runs ONLY if we're Cipher
+# This prevents issues with sequential task executions on the same PVC
+if [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cipher cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
+# Check for security completion marker if this is a security stage (for non-Cipher agents)
+if ! [[ "{{github_app}}" =~ [Cc]ipher ]] && ([ "${WORKFLOW_STAGE:-}" = "security" ] || [ "${WORKFLOW_STAGE:-}" = "security-in-progress" ]); then
     if [ -f "/workspace/.cipher-complete" ]; then
-        echo "✅ Security completion marker found - previous run already completed"
+        echo "✅ Security completion marker found - Cipher already completed"
         echo "   Exiting successfully as security scan is already complete"
         exit 0
     fi

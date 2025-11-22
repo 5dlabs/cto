@@ -1161,6 +1161,7 @@ fn determine_retry_reason(code_run: &CodeRun, stage: &WorkflowStage) -> Option<S
 
             // For security stage, we consider it complete if job finished
             // even without explicit success signals (security scans are deterministic)
+            // Security agent (Cipher) posts GitHub review and adds security-approved label
             None
         }
         WorkflowStage::Testing => {

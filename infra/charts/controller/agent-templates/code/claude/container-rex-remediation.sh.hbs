@@ -1330,72 +1330,20 @@ else
 
 
 
-        # Seed initial user turn via a FIFO (system prompts are set via CLI flags, not streamed)
-        FIFO_PATH="/workspace/agent-input.jsonl"
-        rm -f "$FIFO_PATH" 2>/dev/null || true
-        mkfifo "$FIFO_PATH"
-        chmod 666 "$FIFO_PATH" || true
-
-        # Start Claude (reader) first in background to avoid writer-open blocking
-        $CLAUDE_CMD < "$FIFO_PATH" &
-        CLAUDE_PID=$!
-
-        # For remediation, we send a simple start message since CLAUDE.md contains all context
+        # For remediation, send a simple start message since CLAUDE.md contains all context
         USER_MESSAGE="🔧 REMEDIATION MODE ACTIVATED
 
 Please review the CLAUDE.md file for complete context and instructions. You are in remediation mode - focus on fixing the specific issues identified in the feedback while preserving existing functionality."
 
-        # Prefer sending via sidecar HTTP endpoint (opens-writes-closes per request)
-        if printf '{"text":%s}\n' "$(printf '%s' "$USER_MESSAGE" | jq -Rs .)" | \
-             curl -fsS -X POST http://127.0.0.1:8080/input \
-               -H 'Content-Type: application/json' \
-               --data-binary @- >/dev/null 2>&1; then
-          echo "✓ Remediation prompt sent via sidecar /input"
-        else
-          echo "⚠️ Sidecar /input failed, falling back to direct FIFO write"
-          # Fallback: open FIFO writer, send prompt, and close immediately to send EOF
-          exec 9>"$FIFO_PATH"
-          printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$(printf '%s' "$USER_MESSAGE" | jq -Rs .)" >&9
-          exec 9>&-  # Close immediately to send EOF to Claude
-        fi
-
-        # Optional debug: dump FIFO holders if requested
-        if [ "${DEBUG_FIFO:-false}" = "true" ]; then
-          echo "[DEBUG] Dumping FIFO holders for $FIFO_PATH"
-          for p in /proc/[0-9]*; do
-            pid=${p##*/}
-            [ -d "$p/fd" ] || continue
-            for fd in "$p"/fd/*; do
-              tgt=$(readlink "$fd" 2>/dev/null || true)
-              case "$tgt" in *agent-input.jsonl*)
-                fdnum=${fd##*/}
-                comm=$(cat "$p/comm" 2>/dev/null || echo "?")
-                echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt"
-              ;;
-              esac
-            done
-          done
-        fi
-
-        # Optional hang diagnostics without enforcing a timeout
-        if [ -n "${HANG_DIAG_SECONDS:-}" ] && [ "$HANG_DIAG_SECONDS" -gt 0 ] 2>/dev/null; then
-          (
-            sleep "$HANG_DIAG_SECONDS"
-            if kill -0 "$CLAUDE_PID" 2>/dev/null; then
-              echo "[DEBUG] Hang diag after ${HANG_DIAG_SECONDS}s: dumping FIFO holders and ps"
-              for p in /proc/[0-9]*; do
-                pid=${p##*/}; [ -d "$p/fd" ] || continue
-                for fd in "$p"/fd/*; do tgt=$(readlink "$fd" 2>/dev/null || true); case "$tgt" in *agent-input.jsonl*) fdnum=${fd##*/}; comm=$(cat "$p/comm" 2>/dev/null || echo "?"); echo "  PID=$pid COMM=$comm FD=$fdnum -> $tgt";; esac; done
-              done
-              ps -eo pid,ppid,comm,args | head -200 || true
-            fi
-          ) & HANG_DIAG_PID=$!
-        fi
+        # Start Claude with prompt piped via subshell (stdin closes after prompt)
+        (printf '{"type":"user","message":{"role":"user","content":[{"type":"text","text":%s}]}}\n' "$(printf '%s' "$USER_MESSAGE" | jq -Rs .)"; exec 0<&-) | $CLAUDE_CMD &
+        CLAUDE_PID=$!
+        echo "✓ Started Claude with remediation prompt (PID: $CLAUDE_PID), stdin will close after prompt"
 
         # Wait for Claude process to complete naturally
+        # Note: GitHub tokens are valid for 1 hour. Remediation tasks are typically quick.
+        # If longer, the retry logic will handle token expiration.
         echo "⏳ Waiting for Claude process (PID: $CLAUDE_PID) to complete..."
-
-        # Simple wait - Claude should exit naturally when done
         wait "$CLAUDE_PID"
         CLAUDE_EXIT_CODE=$?
 

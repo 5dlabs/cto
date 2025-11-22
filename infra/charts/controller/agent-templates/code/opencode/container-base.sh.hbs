@@ -1774,6 +1774,13 @@ if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
   echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
 fi
 
+# Clean up any leftover completion marker from previous runs ONLY if we're Cipher
+# This prevents issues with sequential task executions on the same PVC
+if [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cipher cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"

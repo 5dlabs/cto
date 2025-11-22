@@ -1576,6 +1576,13 @@ if [ "${WORKFLOW_STAGE:-implementation}" != "implementation" ]; then
   echo "✅ Safeguard installed: 'gh pr create' is now blocked for ${WORKFLOW_STAGE:-non-implementation} stage"
 fi
 
+# Clean up any leftover completion marker from previous runs ONLY if we're Cipher
+# This prevents issues with sequential task executions on the same PVC
+if [[ "{{github_app}}" =~ [Cc]ipher ]] && [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cipher cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
@@ -1881,9 +1888,12 @@ Your response:"
     echo "⚠️ Completion probe exited with status $COMPLETION_EXIT"
   fi
 
-  # Extract yes/no from lines starting with ** (markdown bold) or standalone lines
-  # This avoids false matches from phrases like "no warnings" or "no errors"
-  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^\*\*(yes|no)\*\*|^(yes|no)$' | sed 's/\*//g' | head -n1 | tr '[:upper:]' '[:lower:]')
+  # Extract yes/no from response - handles multiple formats:
+  # - **yes** or **no** (markdown bold)
+  # - ## **YES** (markdown heading with bold)
+  # - Standalone yes/no
+  # Avoids false matches from "no warnings", "no errors"
+  COMPLETION_RESPONSE=$(printf '%s\n' "$COMPLETION_OUTPUT" | tr -d '\r' | grep -Eio '^[#* ]*\*?\*?(yes|no)\*?\*?[* ]*$|^(yes|no)$' | sed 's/[#*]//g' | sed 's/^ *//;s/ *$//' | head -n1 | tr '[:upper:]' '[:lower:]')
   CURRENT_REASON=""
   if [ "$COMPLETION_RESPONSE" = "no" ]; then
     CURRENT_REASON=$(printf '%s\n' "$COMPLETION_OUTPUT" | awk 'BEGIN{IGNORECASE=1}/^reason:/{sub(/^reason:[[:space:]]*/,"");flag=1} flag{print}')
