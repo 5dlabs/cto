@@ -2414,9 +2414,14 @@ if [ -n "${GITHUB_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
         echo "⚠️ Failed to add approved label - continuing anyway"
       fi
       
-      # Try to post APPROVE review (may fail if other agents requested changes)
-      echo "📝 Posting APPROVE review..."
-      REVIEW_OUTPUT=$(timeout 30 gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body "### 🧪 QA Testing - APPROVED
+      # Post APPROVE review (CRITICAL for Atlas integration gate)
+      echo "📝 Posting APPROVE review (required for workflow progression)..."
+      MAX_RETRIES=3
+      RETRY_COUNT=0
+      REVIEW_SUCCESS=false
+      
+      while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if REVIEW_OUTPUT=$(timeout 30 gh pr review "$PR_NUMBER" -R "$REPO_SLUG" --approve --body "### 🧪 QA Testing - APPROVED
 
 All end-to-end and integration tests have passed:
 - End-to-end tests passed
@@ -2428,13 +2433,53 @@ All end-to-end and integration tests have passed:
 **Result:** All quality gates passed
 
 ---
-*QA testing by Tess*" 2>&1) || {
-        REVIEW_EXIT=$?
-        echo "⚠️ PR approval review failed (exit code: $REVIEW_EXIT)"
-        echo "   This is expected if other agents have requested changes"
-        echo "   Output: $REVIEW_OUTPUT"
-        echo "ℹ️  Label added successfully - workflow will proceed"
-      }
+*QA testing by Tess*" 2>&1); then
+          REVIEW_SUCCESS=true
+          echo "✅ PR review submitted successfully (attempt $((RETRY_COUNT+1))/$MAX_RETRIES)"
+          break
+        else
+          REVIEW_EXIT=$?
+          echo "⚠️ PR approval review failed (attempt $((RETRY_COUNT+1))/$MAX_RETRIES, exit code: $REVIEW_EXIT)"
+          echo "   Output: $REVIEW_OUTPUT"
+          
+          # Check if blocked by changes requested
+          if echo "$REVIEW_OUTPUT" | grep -qi "changes requested"; then
+            echo "⚠️ BLOCKED: Another agent has requested changes"
+            # Check specifically for Cipher's changes
+            if gh pr view "$PR_NUMBER" -R "$REPO_SLUG" --json reviews | \
+               jq -e '.reviews[] | select(.author.login | test("cipher|security")) | select(.state == "CHANGES_REQUESTED")' >/dev/null 2>&1; then
+              echo "🔒 Security review has requested changes - this may block PR approval"
+              echo "   The 'approved' label has been added as a fallback trigger"
+            fi
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT+1))
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo "   Retrying in 5 seconds..."
+            sleep 5
+          fi
+        fi
+      done
+      
+      if [ "$REVIEW_SUCCESS" = "false" ]; then
+        echo "❌ CRITICAL: Failed to submit PR approval review after $MAX_RETRIES attempts"
+        echo "   The Atlas integration gate requires this PR review event to proceed"
+        
+        # Check GitHub App permissions
+        echo "🔍 Checking GitHub App permissions..."
+        if ! gh api "/repos/$REPO_SLUG/installation" >/dev/null 2>&1; then
+          echo "❌ GitHub App '5DLabs-Tess' is not installed on repository: $REPO_SLUG"
+          echo "   Please install the app with 'pull_requests:write' permission"
+        else
+          echo "✅ GitHub App is installed, but review still failed"
+          echo "   The 'approved' label was added as a fallback"
+          echo "   A fallback sensor should trigger Atlas integration"
+        fi
+        
+        # Exit with failure to signal the issue
+        echo "❌ Failing CodeRun due to PR review submission failure"
+        CLAUDE_EXIT_CODE=1
+      fi
       
       # Auto-merge if enabled (Tess only)
       if [ "${AUTO_MERGE:-false}" = "true" ]; then

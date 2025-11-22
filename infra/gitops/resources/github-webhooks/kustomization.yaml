@@ -10,6 +10,7 @@ resources:
   - stage-aware-cleo-approval-sensor.yaml
   - stage-aware-pr-created.yaml
   - stage-aware-tess-approval-sensor.yaml
+  - tess-label-fallback-sensor.yaml
   - stage-aware-pr-merged-sensor.yaml
   - atlas-pr-monitor-sensor.yaml
   - atlas-conflict-monitor-sensor.yaml
