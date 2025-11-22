@@ -520,8 +520,9 @@ create_default_board_view() {
     
     echo "💡 To group by agents in the UI:" >&2
     echo "   1. Open the project board" >&2
-    echo "   2. Click 'Group by' → Select 'Stage'" >&2
+    echo "   2. Click 'Group by' → Select 'Status' (auto-generated columns)" >&2
     echo "   3. Columns will show: Pending | Rex | Cleo | Cipher | Tess | Atlas | Bolt | Complete ✅" >&2
+    echo "   🔁 Legacy boards that still group by 'Stage' stay accurate because Morgan now mirrors values into both fields." >&2
     
     # Delete ALL table views - GitHub Projects V2 API doesn't support configuring field visibility
     # Table views will show default columns (Assignees, Sub-issues progress) which we don't want
@@ -579,6 +580,10 @@ setup_custom_fields() {
   create_single_select_field "$project_id" "Status" \
     "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
   
+  # Legacy compatibility: keep Stage field populated so historical boards continue to work
+  create_single_select_field "$project_id" "Stage" \
+    "Pending" "Rex (Implementation)" "Blaze (Frontend)" "Cleo (Quality)" "Cipher (Security)" "Tess (QA)" "Atlas (Integration)" "Bolt (Deployment)" "Complete ✅"
+  
   # Create "Task ID" field (text)
   create_text_field "$project_id" "Task ID" || true
   
@@ -600,9 +605,9 @@ create_single_select_field() {
   if [[ -n "$existing_field" ]] && [[ "$existing_field" != "null" ]]; then
     log "✅ Field '$field_name' already exists"
     
-    # CRITICAL: Status field may exist but have NO options - add them!
-    if [[ "$field_name" == "Status" ]]; then
-      log "🔧 Ensuring Status field has agent options..."
+    # CRITICAL: Status/Stage fields may exist but have NO options - add them!
+    if [[ "$field_name" == "Status" ]] || [[ "$field_name" == "Stage" ]]; then
+      log "🔧 Ensuring $field_name field has agent options..."
       local colors=("GRAY" "RED" "ORANGE" "YELLOW" "GREEN" "BLUE" "PURPLE" "PINK")
       local opts_json="[]"
       for i in "${!options[@]}"; do
@@ -612,18 +617,18 @@ create_single_select_field() {
       
       local upd=$(jq -n --arg q 'mutation($fieldId: ID!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) { updateProjectV2Field(input: {fieldId: $fieldId, singleSelectOptions: $options}) { projectV2Field { ... on ProjectV2SingleSelectField { id options { name } } } } }' --arg fieldId "$existing_field" --argjson options "$opts_json" '{query: $q, variables: {fieldId: $fieldId, options: $options}}')
       
-      log "🔍 DEBUG: Updating Status field with options: $(echo "$opts_json" | jq -c '[.[] | .name]')"
+      log "🔍 DEBUG: Updating $field_name field with options: $(echo "$opts_json" | jq -c '[.[] | .name]')"
       
       local result=$(echo "$upd" | gh api graphql --input - 2>&1)
       
       if echo "$result" | jq -e '.errors' >/dev/null 2>&1; then
-        log "❌ GraphQL ERROR updating Status field options:"
+        log "❌ GraphQL ERROR updating $field_name field options:"
         echo "$result" | jq '.errors' | tee -a "$SYNC_LOG" >&2
       elif echo "$result" | jq -e '.data.updateProjectV2Field.projectV2Field.options' >/dev/null 2>&1; then
         local added_opts=$(echo "$result" | jq -r '.data.updateProjectV2Field.projectV2Field.options[].name' | tr '\n' ', ')
-        log "✅ Added agent options to Status field: $added_opts"
+        log "✅ Added agent options to $field_name field: $added_opts"
       else
-        log "⚠️  Status field update returned but no confirmation"
+        log "⚠️  $field_name field update returned but no confirmation"
         echo "$result" | jq '.' | tee -a "$SYNC_LOG" >&2
       fi
     fi
@@ -925,30 +930,51 @@ set_project_item_stage() {
   local item_id="$2"
   local stage="$3"
   
-  log "🔍 Setting Status field: item=$item_id, status='$stage'"
+  log "🔍 Setting Status/Stage fields: item=$item_id, status='$stage'"
   
-  # Use built-in "Status" field - enables AUTO-COLUMN CREATION!
-  local field_id=$(get_project_field "$project_id" "Status")
+  local status_updated=false
+  local stage_updated=false
+  local status_field_id=$(get_project_field "$project_id" "Status")
   
-  if [[ -z "$field_id" ]] || [[ "$field_id" == "null" ]]; then
-    log "❌ Status field not found"
-    return 1
-  fi
-  
-  local option_id=$(get_field_option_id "$project_id" "$field_id" "$stage")
-  
-  if [[ -z "$option_id" ]] || [[ "$option_id" == "null" ]]; then
-    log "❌ Status option '$stage' not found"
-    return 1
-  fi
-  
-  if update_project_item_field "$project_id" "$item_id" "$field_id" "$option_id"; then
-    log "✅ Updated status to: $stage"
-    return 0
+  if [[ -n "$status_field_id" ]] && [[ "$status_field_id" != "null" ]]; then
+    local status_option_id=$(get_field_option_id "$project_id" "$status_field_id" "$stage")
+    
+    if [[ -z "$status_option_id" ]] || [[ "$status_option_id" == "null" ]]; then
+      log "❌ Status option '$stage' not found"
+    elif update_project_item_field "$project_id" "$item_id" "$status_field_id" "$status_option_id"; then
+      log "✅ Updated Status field to: $stage"
+      status_updated=true
+    else
+      log "❌ Failed to update Status field"
+    fi
   else
-    log "❌ Failed to update status"
+    log "⚠️  Status field not found (will rely on legacy Stage field)"
+  fi
+  
+  local legacy_stage_id=$(get_project_field "$project_id" "Stage")
+  if [[ -n "$legacy_stage_id" ]] && [[ "$legacy_stage_id" != "null" ]]; then
+    local stage_option_id=$(get_field_option_id "$project_id" "$legacy_stage_id" "$stage")
+    
+    if [[ -z "$stage_option_id" ]] || [[ "$stage_option_id" == "null" ]]; then
+      log "⚠️  Legacy Stage option '$stage' not found"
+    elif update_project_item_field "$project_id" "$item_id" "$legacy_stage_id" "$stage_option_id"; then
+      log "✅ Updated legacy Stage field to: $stage"
+      stage_updated=true
+    else
+      log "⚠️  Failed to update legacy Stage field"
+    fi
+  fi
+  
+  if [[ "$status_updated" == false ]] && [[ "$stage_updated" == false ]]; then
+    log "❌ Failed to update both Status and Stage fields"
     return 1
   fi
+  
+  if [[ "$status_updated" == false ]] && [[ "$stage_updated" == true ]]; then
+    log "⚠️  Status field missing; continuing with legacy Stage updates only"
+  fi
+  
+  return 0
 }
 
 # Legacy function - now stage and agent are the same thing (agent-based columns)
