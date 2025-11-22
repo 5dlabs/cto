@@ -15,12 +15,13 @@ spec:
   template:
     metadata:
       annotations:
-        # Checksums removed to prevent annotation size limit (262KB) errors
-        # ConfigMap changes will be detected by the controller itself
         # Force pod restart when main config changes
         config/checksum: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         # Force pod restart when toolman catalog changes
         toolman-catalog/checksum: {{ include "controller.toolmanCatalogChecksum" . }}
+        # Template checksums using file hashes to avoid annotation size limits
+        # This triggers pod restart when agent templates change
+        templates/version: "{{ .Values.templatesVersion | default "v1" }}"
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}

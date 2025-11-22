@@ -3,6 +3,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Template version - bump this to force controller pod restart when templates change
+# Format: v<major>.<minor> or any string that changes when templates are updated
+templatesVersion: "v1.1.0"
+
 replicaCount: 1
 
 image:
