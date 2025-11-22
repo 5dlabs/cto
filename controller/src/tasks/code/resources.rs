@@ -756,10 +756,10 @@ impl<'a> CodeResourceManager<'a> {
             });
         }
 
-        // Mount Context7 API key secret for direct MCP connections (all agents)
+        // Mount agent-platform-secrets for API keys (includes Context7, Anthropic, OpenAI, etc.)
         env_from.push(json!({
             "secretRef": {
-                "name": "context7-api-key"
+                "name": "agent-platform-secrets"
             }
         }));
 
