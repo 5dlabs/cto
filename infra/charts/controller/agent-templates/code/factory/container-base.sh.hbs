@@ -130,6 +130,13 @@ if [ -f "$TASK_WORKSPACE/.agent_done" ]; then
     rm -f "$TASK_WORKSPACE/.agent_done"
 fi
 
+# Clean up any leftover completion marker from previous runs
+# This prevents issues with sequential task executions on the same PVC
+if [ -f /workspace/.cipher-complete ]; then
+    echo "🧹 Cleaning up completion marker from previous run"
+    rm -f /workspace/.cipher-complete
+fi
+
 export GIT_CONFIG_GLOBAL="$TASK_WORKSPACE/.gitconfig"
 CREDENTIALS_FILE="$TASK_WORKSPACE/.git-credentials"
 
