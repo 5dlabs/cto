@@ -44,14 +44,19 @@ kubectl get coderuns -n agent-platform \
 
 echo ""
 echo "📡 Sensor Health Check:"
-for sensor in stage-aware-tess-approval-sensor tess-label-fallback atlas-pr-monitor-sensor; do
+# Note: Sensor names don't have '-sensor' suffix in the cluster
+for sensor in stage-aware-tess-approval tess-label-fallback atlas-pr-monitor; do
   STATUS=$(kubectl get sensor $sensor -n argo -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "NotFound")
+  DEPLOYED=$(kubectl get sensor $sensor -n argo -o jsonpath='{.status.conditions[?(@.type=="Deployed")].status}' 2>/dev/null || echo "NotFound")
+  
   if [ "$STATUS" = "True" ]; then
     echo -e "  ${GREEN}✅ $sensor: Ready${NC}"
+  elif [ "$DEPLOYED" = "True" ]; then
+    echo -e "  ${YELLOW}⚠️ $sensor: Deployed but not Ready${NC}"
   elif [ "$STATUS" = "NotFound" ]; then
     echo -e "  ${RED}❌ $sensor: Not Found${NC}"
   else
-    echo -e "  ${YELLOW}⚠️ $sensor: Not Ready${NC}"
+    echo -e "  ${YELLOW}⚠️ $sensor: Not Ready (Status: $STATUS)${NC}"
   fi
 done
 
