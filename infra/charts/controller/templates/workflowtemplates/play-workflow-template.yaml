@@ -49,6 +49,7 @@ spec:
           "service": "{{`{{workflow.parameters.service}}`}}",
           "docs-repository": "{{`{{workflow.parameters.docs-repository}}`}}",
           "docs-project-directory": "{{`{{workflow.parameters.docs-project-directory}}`}}",
+          "working-directory": "{{`{{workflow.parameters.working-directory}}`}}",
           "implementation-max-retries": "{{`{{workflow.parameters.implementation-max-retries}}`}}",
           "frontend-max-retries": "{{`{{workflow.parameters.frontend-max-retries}}`}}",
           "quality-max-retries": "{{`{{workflow.parameters.quality-max-retries}}`}}",
@@ -97,6 +98,9 @@ spec:
       - name: docs-project-directory
         description: "Directory within docs repository containing project documentation"
         value: ""  # Must be provided by MCP client
+      - name: working-directory
+        description: "Working directory for code implementation (where agents write code)"
+        value: "."  # Default to repository root
 
       # CLI configuration per agent (multi-CLI aware)
       - name: implementation-cli
@@ -1117,7 +1121,7 @@ spec:
             repositoryUrl: "{{`{{workflow.parameters.repository}}`}}"
             docsRepositoryUrl: "https://github.com/{{`{{workflow.parameters.docs-repository}}`}}"
             docsProjectDirectory: "{{`{{workflow.parameters.docs-project-directory}}`}}"
-            workingDirectory: "."
+            workingDirectory: "{{`{{workflow.parameters.working-directory}}`}}"
             githubApp: "{{`{{inputs.parameters.github-app}}`}}"
             model: "{{`{{inputs.parameters.model}}`}}"
             continueSession: true
