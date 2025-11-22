@@ -4,7 +4,11 @@
 
 set -e
 
-echo "🔱 Atlas: Starting PR guardian for task {{task_id}}"
+MODE="${ATLAS_MODE:-guardian}"
+MAX_CYCLES="${ATLAS_MAX_CYCLES:-0}"
+CYCLE_COUNT=0
+
+echo "🔱 Atlas: Starting PR guardian for task {{task_id}} (mode: $MODE)"
 
 # Source common setup from shared functions
 source /agent-templates/shared_task-setup-functions.sh 2>/dev/null || {
@@ -49,7 +53,11 @@ git clone "{{repository_url}}" "$REPO_DIR"
 cd "$REPO_DIR"
 
 # Polling interval (seconds)
-POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-60}"
+if [ "$MODE" = "integration-gate" ]; then
+    POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-30}"
+else
+    POLL_INTERVAL="${ATLAS_POLL_INTERVAL:-60}"
+fi
 LAST_CHECK_TIMESTAMP=$(date +%s)
 
 # Main guardian loop
@@ -187,12 +195,12 @@ $BUGBOT_COMMENTS new Bugbot comment(s) found. Analyzing feedback..."
             # Check if this is part of a multi-task play
             PLAY_WORKFLOW=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[]? | select(.name | startswith("workflow-")) | .name' 2>/dev/null || echo "")
             
-            if [ -n "$PLAY_WORKFLOW" ]; then
+            if [ -n "$PLAY_WORKFLOW" ] && [ "$MODE" != "integration-gate" ]; then
                 echo "🎯 Part of play workflow: $PLAY_WORKFLOW"
                 echo "⏳ Waiting for final merge coordinator to handle merge order..."
                 # Don't auto-merge - let the final coordinator handle it
             else
-                echo "🚀 Standalone PR - auto-merging..."
+                echo "🚀 Auto-merging PR during Atlas integration gate..."
                 
                 if gh pr merge "$PR_NUMBER" --squash --delete-branch; then
                     echo "✅ PR merged successfully!"
@@ -212,6 +220,13 @@ $BUGBOT_COMMENTS new Bugbot comment(s) found. Analyzing feedback..."
     LAST_CHECK_TIMESTAMP=$(date +%s)
     
     # Sleep until next poll
+    CYCLE_COUNT=$((CYCLE_COUNT + 1))
+
+    if [ "$MODE" = "integration-gate" ] && [ "$MAX_CYCLES" -gt 0 ] && [ "$CYCLE_COUNT" -ge "$MAX_CYCLES" ]; then
+        echo "⏳ Atlas integration gate timed out after $CYCLE_COUNT cycles"
+        exit 1
+    fi
+
     echo "💤 Sleeping for ${POLL_INTERVAL}s..."
     sleep "$POLL_INTERVAL"
 done

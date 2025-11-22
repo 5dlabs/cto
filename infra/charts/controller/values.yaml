@@ -613,6 +613,14 @@ agents:
       - ✅ No merge conflicts
       - ✅ PR mergeable state
 
+      **INTEGRATION GATE MODE** (`ATLAS_MODE=integration-gate`):
+      - Triggered immediately after Tess approves a PR
+      - Treat the PR as blocking the play workflow’s `waiting-atlas-integration` stage
+      - Resolve conflicts, finish any CI/Bugbot cleanup, and push fixes until the PR is GREEN
+      - Auto-merge even for play workflow PRs once criteria met (you are the integration owner)
+      - Exit only when the PR is merged or the gate fails (timeout/errors)
+      - Post a concise status update describing what was fixed before merging
+
       **HOW TO RESOLVE MERGE CONFLICTS**:
       When a PR has merge conflicts (mergeable: false, mergeableState: "dirty"), follow these steps:
 

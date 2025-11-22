@@ -1,0 +1,187 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: atlas-integration-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: atlas.rules
+      interval: 30s
+      rules:
+        # Atlas CodeRun Metrics
+        - record: atlas:coderuns:active
+          expr: |
+            sum(kube_pod_container_status_running{
+              namespace="agent-platform",
+              pod=~"coderun-atlas-.*"
+            })
+        
+        - record: atlas:coderuns:guardian
+          expr: |
+            sum(kube_pod_container_status_running{
+              namespace="agent-platform",
+              pod=~"coderun-atlas-guardian-.*"
+            })
+        
+        - record: atlas:coderuns:integration
+          expr: |
+            sum(kube_pod_container_status_running{
+              namespace="agent-platform",
+              pod=~"coderun-atlas-integration-.*"
+            })
+        
+        # Success Rate Metrics
+        - record: atlas:success_rate:bugbot
+          expr: |
+            rate(atlas_bugbot_fixes_total[5m]) / 
+            (rate(atlas_bugbot_fixes_total[5m]) + rate(atlas_bugbot_failures_total[5m]) + 0.001)
+        
+        - record: atlas:success_rate:conflicts
+          expr: |
+            rate(atlas_conflict_resolutions_total[5m]) / 
+            (rate(atlas_conflict_resolutions_total[5m]) + rate(atlas_conflict_failures_total[5m]) + 0.001)
+        
+        - record: atlas:success_rate:ci
+          expr: |
+            rate(atlas_ci_fixes_total[5m]) / 
+            (rate(atlas_ci_fixes_total[5m]) + rate(atlas_ci_failures_total[5m]) + 0.001)
+    
+    - name: atlas.alerts
+      interval: 1m
+      rules:
+        # High number of active Atlas instances
+        - alert: AtlasHighActiveInstances
+          expr: atlas:coderuns:active > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: atlas
+          annotations:
+            summary: "High number of active Atlas CodeRuns ({{ $value }})"
+            description: "There are {{ $value }} active Atlas CodeRuns, which may indicate a problem with completion or duplicate launches."
+        
+        # Atlas integration gate timeout
+        - alert: AtlasIntegrationGateTimeout
+          expr: |
+            (time() - kube_pod_created{namespace="agent-platform", pod=~"coderun-atlas-integration-.*"}) > 3600
+            and kube_pod_container_status_running{namespace="agent-platform", pod=~"coderun-atlas-integration-.*"} == 1
+          for: 5m
+          labels:
+            severity: critical
+            component: atlas
+          annotations:
+            summary: "Atlas integration gate running for over 1 hour"
+            description: "Atlas integration CodeRun {{ $labels.pod }} has been running for over 1 hour, indicating a potential stuck integration."
+        
+        # Low success rate for Bugbot fixes
+        - alert: AtlasBugbotLowSuccessRate
+          expr: atlas:success_rate:bugbot < 0.7
+          for: 15m
+          labels:
+            severity: warning
+            component: atlas
+          annotations:
+            summary: "Atlas Bugbot fix success rate below 70%"
+            description: "Atlas is successfully fixing only {{ $value | humanizePercentage }} of Bugbot comments, below the 70% threshold."
+        
+        # Low success rate for conflict resolution
+        - alert: AtlasConflictLowSuccessRate
+          expr: atlas:success_rate:conflicts < 0.8
+          for: 15m
+          labels:
+            severity: warning
+            component: atlas
+          annotations:
+            summary: "Atlas conflict resolution success rate below 80%"
+            description: "Atlas is successfully resolving only {{ $value | humanizePercentage }} of merge conflicts, below the 80% threshold."
+        
+        # Atlas guardian stuck
+        - alert: AtlasGuardianStuck
+          expr: |
+            (time() - kube_pod_created{namespace="agent-platform", pod=~"coderun-atlas-guardian-.*"}) > 7200
+            and kube_pod_container_status_running{namespace="agent-platform", pod=~"coderun-atlas-guardian-.*"} == 1
+          for: 10m
+          labels:
+            severity: warning
+            component: atlas
+          annotations:
+            summary: "Atlas guardian running for over 2 hours"
+            description: "Atlas guardian {{ $labels.pod }} has been running for over 2 hours without completing."
+        
+        # No Atlas activity
+        - alert: AtlasNoActivity
+          expr: |
+            (sum(increase(atlas_guardian_activations_total[1h])) or 0) == 0
+            and (sum(increase(atlas_integration_gate_activations_total[1h])) or 0) == 0
+            and hour() >= 9 and hour() <= 17
+          for: 2h
+          labels:
+            severity: info
+            component: atlas
+          annotations:
+            summary: "No Atlas activity in the last 2 hours during work hours"
+            description: "Atlas has not been activated in any mode for 2 hours during normal work hours, which may indicate sensor issues."
+        
+        # Atlas CodeRun failures
+        - alert: AtlasCodeRunFailures
+          expr: |
+            sum(rate(kube_pod_container_status_terminated_reason{
+              namespace="agent-platform",
+              pod=~"coderun-atlas-.*",
+              reason!="Completed"
+            }[10m])) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+            component: atlas
+          annotations:
+            summary: "High Atlas CodeRun failure rate"
+            description: "Atlas CodeRuns are failing at {{ $value }} per second, indicating systematic issues."
+        
+        # ConfigMap lock contention
+        - alert: AtlasLockContention
+          expr: |
+            count(kube_configmap_info{
+              namespace="agent-platform",
+              configmap=~"atlas-.*-lock-.*"
+            }) > 50
+          for: 10m
+          labels:
+            severity: warning
+            component: atlas
+          annotations:
+            summary: "High number of Atlas locks ({{ $value }})"
+            description: "There are {{ $value }} Atlas ConfigMap locks, indicating potential lock leaks or contention."
+        
+        # Workflow stage stuck at Atlas
+        - alert: WorkflowStuckAtAtlas
+          expr: |
+            count(kube_workflow_info{
+              namespace="agent-platform",
+              workflow=~"play-.*",
+              label_current_stage="waiting-atlas-integration"
+            }) > 0
+          for: 30m
+          labels:
+            severity: critical
+            component: atlas
+          annotations:
+            summary: "Workflow stuck at Atlas integration stage"
+            description: "{{ $value }} workflow(s) have been waiting for Atlas integration for over 30 minutes."
+        
+        # Sensor health check
+        - alert: AtlasSensorUnhealthy
+          expr: |
+            up{job="argo-events-sensor-controller", namespace="argo"} == 0
+            or absent(up{job="argo-events-sensor-controller", namespace="argo"})
+          for: 5m
+          labels:
+            severity: critical
+            component: atlas
+          annotations:
+            summary: "Atlas sensor controller is down"
+            description: "The Argo Events sensor controller is not responding, Atlas sensors will not function."

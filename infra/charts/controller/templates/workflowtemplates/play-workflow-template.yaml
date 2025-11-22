@@ -253,9 +253,30 @@ spec:
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
-          # Update stage after agents complete
-          - name: update-to-waiting-merge
+          # Atlas integration gate (pause workflow until Atlas finishes)
+          - name: update-to-waiting-atlas
             dependencies: [agent-sequence]
+            template: update-workflow-stage
+            arguments:
+              parameters:
+                - name: new-stage
+                  value: "waiting-atlas-integration"
+                - name: verify-update
+                  value: "true"
+
+          - name: wait-for-atlas-integration
+            dependencies: [update-to-waiting-atlas]
+            template: suspend-for-event
+            arguments:
+              parameters:
+                - name: event-type
+                  value: "atlas-integration"
+                - name: stage-name
+                  value: "waiting-atlas-integration"
+
+          # Update stage after Atlas completes integration checks
+          - name: update-to-waiting-merge
+            dependencies: [wait-for-atlas-integration]
             template: update-workflow-stage
             arguments:
               parameters:
@@ -1303,7 +1324,9 @@ spec:
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "testing-in-progress")
-                # Testing → completion (Tess done)
+                # Testing → Atlas integration gate before completion
+                [[ $new_stage == "waiting-atlas-integration" ]] && return 0
+                # Testing → completion (legacy direct merge path)
                 [[ $new_stage == "waiting-pr-merged" ]] && return 0
                 [[ $new_stage == "completed" ]] && return 0
                 ;;
@@ -1311,8 +1334,17 @@ spec:
                 [[ $new_stage == "waiting-ready-for-qa" ]] && return 0
                 ;;
               "waiting-ready-for-qa")
+                [[ $new_stage == "waiting-atlas-integration" ]] && return 0
                 [[ $new_stage == "waiting-pr-merged" ]] && return 0
                 [[ $new_stage == "testing-in-progress" ]] && return 0
+                ;;
+              "waiting-atlas-integration")
+                [[ $new_stage == "atlas-integration-in-progress" ]] && return 0
+                [[ $new_stage == "waiting-pr-merged" ]] && return 0
+                ;;
+              "atlas-integration-in-progress")
+                [[ $new_stage == "waiting-pr-merged" ]] && return 0
+                [[ $new_stage == "waiting-atlas-integration" ]] && return 0
                 ;;
               "waiting-pr-merged")
                 # Allow re-entering remediation stages during retry loops

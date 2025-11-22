@@ -8,8 +8,12 @@ resources:
   - sa-rbac.yaml
   - play-workflow-sensors.yaml
   - stage-aware-cleo-approval-sensor.yaml
+  - stage-aware-pr-created.yaml
   - stage-aware-tess-approval-sensor.yaml
   - stage-aware-pr-merged-sensor.yaml
+  - atlas-pr-monitor-sensor.yaml
+  - atlas-conflict-monitor-sensor.yaml
+  - atlas-batch-integration-sensor.yaml
   - merge-to-main-sensor.yaml
   - remediation-feedback-sensor.yaml
 
