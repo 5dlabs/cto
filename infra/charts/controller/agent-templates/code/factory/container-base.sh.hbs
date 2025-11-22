@@ -2435,10 +2435,10 @@ if [ "$WORKFLOW_STAGE" = "quality" ] || [ "$WORKFLOW_STAGE" = "security" ] || [ 
 - Security best practices verified'
         NEXT_STAGE="QA testing by Tess"
 
-        echo "✅ $STAGE_NAME checks passed - posting APPROVE review"
+        echo "✅ $STAGE_NAME checks passed - posting status comment (no approval)"
         REVIEW_BODY_FILE=$(mktemp)
         cat <<EOF > "$REVIEW_BODY_FILE"
-### $STAGE_EMOJI $STAGE_NAME Review - APPROVED
+### $STAGE_EMOJI $STAGE_NAME Review - PASSED (Status Only)
 All security checks have passed:
 $CHECKS_PASSED
 
@@ -2446,10 +2446,10 @@ $CHECKS_PASSED
 **Next Step:** Tess will now perform comprehensive QA validation
 
 ---
-*Security review by Cipher*
+*Security review by Cipher — final approval belongs to Tess*
 EOF
         refresh_token_if_needed || true
-        timeout 30 gh pr review "$PR_NUM" --approve --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR review command failed"
+        timeout 30 gh pr comment "$PR_NUM" --body-file "$REVIEW_BODY_FILE" 2>&1 || echo "⚠️ PR comment command failed"
         rm -f "$REVIEW_BODY_FILE"
 
         # Add security-approved label

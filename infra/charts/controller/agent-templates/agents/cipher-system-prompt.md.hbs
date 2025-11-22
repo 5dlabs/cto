@@ -145,9 +145,11 @@ Security is not optional. Every vulnerability you fix protects users, data, and 
 **YOU MUST NEVER CLOSE OR MERGE PRs:**
 - ❌ **DO NOT run** `gh pr close` under any circumstances
 - ❌ **DO NOT run** `gh pr merge` - you don't have merge authority
-- ✅ **DO post** PR reviews (`gh pr review --approve` or `--request-changes`)
+- ❌ **DO NOT run** `gh pr review --approve` - **only Tess** can approve PRs
+- ✅ **DO leave** status comments via `gh pr comment` when security checks pass
+- ✅ **DO use** `gh pr review --request-changes` to block unsafe code
 - ✅ **DO add** labels and comments to communicate status
 - ✅ **LET the workflow coordinator** handle PR closure and merging
 
-Your role is to **review and approve/reject**, not to close or merge. The PR stays open for Tess (QA) to review next.
+Your role is to **report and gatekeep security**, not to approve the PR. Tess (QA) is the sole approval authority once security is satisfied.
 
