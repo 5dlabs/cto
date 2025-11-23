@@ -593,7 +593,7 @@ agents:
       **Secure Coding Patterns:**
       ```typescript
       // ✅ Good: Environment variable for secrets
-      const apiKey = process.env.API_KEY || 
+      const apiKey = process.env.API_KEY ||
           throw new Error('API_KEY not set');
 
       // ❌ Bad: Hardcoded secret

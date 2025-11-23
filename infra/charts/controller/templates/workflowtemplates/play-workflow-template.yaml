@@ -227,9 +227,22 @@ spec:
     - name: main
       dag:
         tasks:
-          # Stage 0: Initialize workflow stage tracking
+          # Stage 0: Determine resume point (must run first)
+          - name: check-main-resume
+            template: determine-resume-point
+            arguments:
+              parameters:
+                - name: task-id
+                  value: "{{`{{workflow.parameters.task-id}}`}}"
+                - name: repository
+                  value: "{{`{{workflow.parameters.repository}}`}}"
+
+          # Stage 1: Initialize workflow stage tracking
+          # Only run if starting fresh (not resuming from later stage)
           - name: initialize-stage
+            depends: "check-main-resume.Succeeded"
             template: update-workflow-stage
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' == 'implementation'"
             arguments:
               parameters:
                 - name: new-stage
@@ -237,10 +250,12 @@ spec:
                 - name: verify-update
                   value: "true"
 
-          # Stage 1: Update to implementation stage before Rex starts
+          # Stage 2: Update to implementation stage before Rex starts
+          # Only run if starting fresh (not resuming from later stage)
           - name: update-to-implementation
-            dependencies: [initialize-stage]
+            depends: "(initialize-stage.Succeeded || initialize-stage.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' == 'implementation'"
             arguments:
               parameters:
                 - name: new-stage
@@ -249,18 +264,23 @@ spec:
                   value: "false"
 
           # Agent execution sequence: Rex → Cleo → Cipher → Tess
+          # Skip if resuming at or after waiting-atlas
           - name: agent-sequence
-            dependencies: [update-to-implementation]
+            depends: "(update-to-implementation.Succeeded || update-to-implementation.Skipped) && check-main-resume.Succeeded"
             template: agent-sequence
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: max-retries
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
           # Atlas integration gate (pause workflow until Atlas finishes)
+          # Only run if coming from agent-sequence (not resuming at Atlas stage)
+          # Skip if resuming at waiting-atlas or waiting-merge
           - name: update-to-waiting-atlas
-            dependencies: [agent-sequence]
+            depends: "(agent-sequence.Succeeded || agent-sequence.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -269,8 +289,9 @@ spec:
                   value: "true"
 
           - name: wait-for-atlas-integration
-            dependencies: [update-to-waiting-atlas]
+            depends: "(update-to-waiting-atlas.Succeeded || update-to-waiting-atlas.Skipped) && check-main-resume.Succeeded"
             template: suspend-for-event
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: event-type
@@ -280,7 +301,7 @@ spec:
 
           # Update stage after Atlas completes integration checks
           - name: update-to-waiting-merge
-            dependencies: [wait-for-atlas-integration]
+            depends: "wait-for-atlas-integration.Succeeded || wait-for-atlas-integration.Skipped"
             template: update-workflow-stage
             arguments:
               parameters:
@@ -291,7 +312,7 @@ spec:
 
           # Wait for PR merged to main
           - name: wait-merge-to-main
-            dependencies: [update-to-waiting-merge]
+            depends: "update-to-waiting-merge.Succeeded"
             template: suspend-for-event
             arguments:
               parameters:
@@ -301,7 +322,7 @@ spec:
                   value: "waiting-pr-merged"
 
           - name: complete-task
-            dependencies: [wait-merge-to-main]
+            depends: "wait-merge-to-main.Succeeded"
             template: task-completion
             arguments:
               parameters:
@@ -807,10 +828,10 @@ spec:
               else
                 resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
               fi
-              
+
               pr_url=$(echo "$resp" | jq -r '.[0].html_url // empty' | head -n1)
               pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
-              
+
               if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
                 echo "✅ Found PR #$pr_number by branch name: $EXPECTED_BRANCH"
               else
@@ -822,10 +843,10 @@ spec:
                 else
                   resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
                 fi
-                
+
                 closed_pr_number=$(echo "$resp" | jq -r '.[0].number // empty' | head -n1)
                 closed_pr_merged=$(echo "$resp" | jq -r '.[0].merged // false' | head -n1)
-                
+
                 if [ -n "$closed_pr_number" ] && [ "$closed_pr_number" != "null" ]; then
                   if [ "$closed_pr_merged" = "true" ]; then
                     # PR was merged - task is complete!
@@ -856,7 +877,7 @@ spec:
               else
                 resp=$(curl -sL -H "Accept: application/vnd.github+json" "$url") || resp="[]"
               fi
-              
+
               # Check all PRs with task label and verify branch matches
               found_valid_pr=false
               for pr_item in $(echo "$resp" | jq -c '.[] | select(.pull_request != null)'); do
@@ -869,7 +890,7 @@ spec:
                   else
                     pr_detail=$(curl -sL -H "Accept: application/vnd.github+json" "$pr_detail_url") || pr_detail="{}"
                   fi
-                  
+
                   pr_branch=$(echo "$pr_detail" | jq -r '.head.ref // ""')
                   # Normalize both branches for comparison (handle with/without feature/ prefix)
                   expected_normalized=$(echo "$EXPECTED_BRANCH" | sed 's|^feature/||')
@@ -884,7 +905,7 @@ spec:
                   fi
                 fi
               done
-              
+
               if [ "$found_valid_pr" = "false" ]; then
                 echo "⚠️ Found PR(s) with task label but none match expected branch ($EXPECTED_BRANCH)"
                 echo "   Skipping to avoid using PRs from previous workflow runs"
@@ -1521,7 +1542,26 @@ spec:
 
             echo "✅ ConfigMap updated with stage: {{`{{inputs.parameters.new-stage}}`}}"
           else
-            echo "ConfigMap does not exist yet - will be created by controller"
+            echo "⚠️ ConfigMap does not exist - creating it now..."
+
+            # Create ConfigMap with current stage using kubectl create
+            kubectl create configmap "$CONFIGMAP_NAME" \
+              -n {{ .Release.Namespace }} \
+              --from-literal=repository="$REPO" \
+              --from-literal=branch="main" \
+              --from-literal=current-task-id="$TASK_ID" \
+              --from-literal=workflow-name="{{`{{workflow.name}}`}}" \
+              --from-literal=status="in-progress" \
+              --from-literal=stage="{{`{{inputs.parameters.new-stage}}`}}" \
+              --from-literal=started-at="$CURRENT_TIMESTAMP" \
+              --from-literal=last-updated="$CURRENT_TIMESTAMP" \
+              --dry-run=client -o yaml | \
+              kubectl label -f - --local play-tracking=true -o yaml | \
+              kubectl apply -f - || {
+              echo "❌ Failed to create ConfigMap, but workflow will continue"
+            }
+
+            echo "✅ ConfigMap created with stage: {{`{{inputs.parameters.new-stage}}`}}"
           fi
 
           # Output monitoring metrics
@@ -1691,23 +1731,23 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
           DOCS_REPO="{{`{{inputs.parameters.docs-repository}}`}}"
           DOCS_PROJECT_DIR="{{`{{inputs.parameters.docs-project-directory}}`}}"
-          
+
           echo "🔍 Determining agent for task ${TASK_ID}"
           echo "   Docs repository: ${DOCS_REPO}"
           echo "   Project directory: ${DOCS_PROJECT_DIR}"
-          
+
           # Install tools
           apk add --no-cache curl jq openssl git >/dev/null 2>&1 || true
-          
+
           # Authenticate with GitHub App
           TEMP_KEY="/tmp/github-app-key.pem"
           printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
           chmod 600 "$TEMP_KEY"
-          
+
           NOW=$(date +%s)
           EXP=$((NOW + 600))
           HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
@@ -1717,34 +1757,34 @@ spec:
           SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
           SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
           JWT="$HDR.$PAY.$SIG"
-          
+
           OWNER=$(echo "$DOCS_REPO" | cut -d'/' -f1)
           REPO_NAME=$(echo "$DOCS_REPO" | cut -d'/' -f2)
-          
+
           # Get installation token
           INSTALLATION_ID=$(curl -s -L \
             -H "Authorization: Bearer $JWT" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
-          
+
           if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
             INSTALLATION_ID=$(curl -s -L \
               -H "Authorization: Bearer $JWT" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
           fi
-          
+
           TOKEN=$(curl -s -X POST \
             -H "Authorization: Bearer $JWT" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
-          
+
           rm -f "$TEMP_KEY"
-          
+
           # Clone docs repository to read task file
           CLONE_DIR="/tmp/docs-repo"
           rm -rf "$CLONE_DIR"
-          
+
           echo "📥 Cloning docs repository..."
           git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${DOCS_REPO}.git" "$CLONE_DIR" 2>&1 || {
             echo "❌ Failed to clone repository"
@@ -1758,7 +1798,7 @@ spec:
             echo "" > /tmp/task-framework.txt
             exit 0
           }
-          
+
           # Load task metadata from tasks.json when available
           TASKS_JSON="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks/tasks.json"
           TASK_ENTRY=""
@@ -1772,14 +1812,14 @@ spec:
               )
             ' "$TASKS_JSON" 2>/dev/null | head -n 1)
           fi
-          
+
           AGENT_TYPE=""
           LANGUAGE=""
           FRAMEWORK=""
           TASK_TITLE=""
           TASK_DESC=""
           TASK_DETAILS=""
-          
+
           FOUND_TASK_METADATA=false
           if [ -n "$TASK_ENTRY" ]; then
             FOUND_TASK_METADATA=true
@@ -1790,7 +1830,7 @@ spec:
             LANGUAGE=$(echo "$TASK_ENTRY" | jq -r '.language // .taskLanguage // empty')
             FRAMEWORK=$(echo "$TASK_ENTRY" | jq -r '.framework // .taskFramework // empty')
           fi
-          
+
           # Attempt to locate task file for supplemental metadata
           TASK_FILE=""
           TASK_BASE_DIR="${CLONE_DIR}/${DOCS_PROJECT_DIR}/.taskmaster/tasks"
@@ -1804,7 +1844,7 @@ spec:
                 PADDED_ID=$(printf "%03d" "$TASK_ID")
                 ;;
             esac
-            
+
             for candidate in \
               "$TASK_BASE_DIR/task-${TASK_ID}.md" \
               "$TASK_BASE_DIR/task-${TASK_ID}.txt" \
@@ -1814,7 +1854,7 @@ spec:
                 TASK_FILE="$candidate"
               fi
             done
-            
+
             if [ -z "$TASK_FILE" ] && [ -n "$PADDED_ID" ]; then
               for candidate in \
                 "$TASK_BASE_DIR/task-${PADDED_ID}.md" \
@@ -1827,7 +1867,7 @@ spec:
               done
             fi
           fi
-          
+
           if [ -n "$TASK_FILE" ]; then
             echo "📄 Reading task file: ${TASK_FILE}"
           if [ -z "$AGENT_TYPE" ]; then
@@ -1851,12 +1891,12 @@ spec:
           else
             echo "ℹ️ Task file not found in expected locations"
           fi
-          
+
           # Convert extracted values to lowercase for comparison
           AGENT_TYPE=$(echo "$AGENT_TYPE" | tr '[:upper:]' '[:lower:]')
           LANGUAGE=$(echo "$LANGUAGE" | tr '[:upper:]' '[:lower:]')
           FRAMEWORK=$(echo "$FRAMEWORK" | tr '[:upper:]' '[:lower:]')
-          
+
           # Content-based auto-detection ONLY if we have no structured task metadata
           if [ "$FOUND_TASK_METADATA" = "false" ] && [ -z "$AGENT_TYPE" ]; then
             echo "ℹ️ No task metadata found, attempting content-based detection"
@@ -1864,14 +1904,14 @@ spec:
             if [ -n "$TASK_FILE" ]; then
               TASK_CONTENT="$TASK_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
             fi
-            
+
             # Enhanced frontend detection - check for Material-UI to catch misrouted tasks
             if echo "$TASK_CONTENT" | grep -qiE "(frontend|react|component|ui|interface|styling|css|html|jsx|tsx|vue|angular|svelte|material-ui|mui|@mui)"; then
               echo "🔍 Auto-detected frontend task (keywords matched)"
               echo "⚠️ WARNING: If Material-UI/MUI keywords detected, this MUST route to Blaze (frontend agent)"
               AGENT_TYPE="frontend"
             fi
-            
+
             # Also try to detect framework when no metadata
             if [ -z "$FRAMEWORK" ]; then
               if echo "$TASK_CONTENT" | grep -qi "next"; then
@@ -1881,14 +1921,14 @@ spec:
               fi
             fi
           fi
-          
+
           # CRITICAL: Additional validation - check task content for Material-UI to catch misrouted frontend tasks
           if [ -z "$AGENT_TYPE" ] || [ "$AGENT_TYPE" != "frontend" ]; then
             VALIDATION_CONTENT="$TASK_TITLE $TASK_DESC $TASK_DETAILS"
             if [ -n "$TASK_FILE" ]; then
               VALIDATION_CONTENT="$VALIDATION_CONTENT $(cat "$TASK_FILE" 2>/dev/null)"
             fi
-            
+
             # If we find React/frontend keywords but agent type isn't frontend, force frontend routing
             if echo "$VALIDATION_CONTENT" | grep -qiE "(react.*component|react.*frontend|material-ui|mui|@mui/material|next\.js.*component)"; then
               echo "🚨 CRITICAL: Detected frontend/React task but agent type is '${AGENT_TYPE}'"
@@ -1896,7 +1936,7 @@ spec:
               AGENT_TYPE="frontend"
             fi
           fi
-          
+
           # Default language if not specified
           if [ -z "$LANGUAGE" ]; then
             if [ "$AGENT_TYPE" = "frontend" ] || [ "$AGENT_TYPE" = "ui" ]; then
@@ -1905,17 +1945,17 @@ spec:
               LANGUAGE="rust"
             fi
           fi
-          
+
           echo "   Detected agent type: '${AGENT_TYPE}'"
           echo "   Detected language: '${LANGUAGE}'"
           echo "   Detected framework: '${FRAMEWORK}'"
-          
+
           # Determine which agent to use based on agent type
           case "$AGENT_TYPE" in
             "frontend"|"ui"|"react"|"nextjs")
               echo "✅ Routing to FRONTEND agent (Blaze)"
               FRONTEND_AGENT="{{`{{workflow.parameters.frontend-agent}}`}}"
-              
+
               # Validate frontend-agent is not empty
               if [ -z "$FRONTEND_AGENT" ] || [ "$FRONTEND_AGENT" = "" ]; then
                 echo "❌ ERROR: frontend-agent parameter is empty but task requires frontend agent!"
@@ -1936,14 +1976,14 @@ spec:
             *)
               echo "✅ Routing to IMPLEMENTATION agent (Rex)"
               IMPL_AGENT="{{`{{workflow.parameters.implementation-agent}}`}}"
-              
+
               # Validate implementation-agent is not empty
               if [ -z "$IMPL_AGENT" ] || [ "$IMPL_AGENT" = "" ]; then
                 echo "❌ ERROR: implementation-agent parameter is empty!"
                 echo "⚠️ Cannot proceed without agent configuration"
                 exit 1
               fi
-              
+
               echo "$IMPL_AGENT" > /tmp/github-app.txt
               echo "{{`{{workflow.parameters.implementation-cli}}`}}" > /tmp/cli-type.txt
               echo "{{`{{workflow.parameters.implementation-model}}`}}" > /tmp/model.txt
@@ -1951,7 +1991,7 @@ spec:
               echo "{{`{{workflow.parameters.implementation-max-retries}}`}}" > /tmp/max-retries.txt
               ;;
           esac
-          
+
           # Final validation - ensure we have a valid agent
           FINAL_AGENT=$(cat /tmp/github-app.txt 2>/dev/null || echo "")
           if [ -z "$FINAL_AGENT" ] || [ "$FINAL_AGENT" = "" ]; then
@@ -1961,7 +2001,7 @@ spec:
             echo "   Framework: ${FRAMEWORK}"
             exit 1
           fi
-          
+
           # Validate agent is not testing-agent (Tess should never do implementation)
           if echo "$FINAL_AGENT" | grep -qiE "(tess|testing)"; then
             echo "🚨 CRITICAL ERROR: Testing agent (Tess) cannot perform implementation work!"
@@ -1970,11 +2010,11 @@ spec:
             echo "   Aborting to prevent incorrect implementation"
             exit 1
           fi
-          
+
           # Write language and framework to output files
           echo "$LANGUAGE" > /tmp/task-language.txt
           echo "$FRAMEWORK" > /tmp/task-framework.txt
-          
+
           echo "   GitHub App: $(cat /tmp/github-app.txt)"
           echo "   CLI Type: $(cat /tmp/cli-type.txt)"
           echo "   Model: $(cat /tmp/model.txt)"
@@ -2111,7 +2151,7 @@ spec:
             echo "✅ PR is already merged/closed - task is complete!"
             echo "true" > /tmp/is-merged.txt
             echo "true" > /tmp/skip-stage.txt
-            
+
             echo ""
             echo "🎯 Skipping $STAGE_NAME stage - work already complete"
             exit 0
@@ -2137,7 +2177,7 @@ spec:
           if [ -n "$AGENT_BOT" ]; then
             echo ""
             echo "🔍 Checking $AGENT_BOT review status for PR #$PR_NUMBER..."
-            
+
             REVIEWS_DATA=$(curl -s -L \
               -H "Accept: application/vnd.github+json" \
               -H "$AUTH_HEADER" \
@@ -2252,6 +2292,10 @@ spec:
               RESUME_STAGE="testing"
               echo "✅ Resuming at: Testing (Tess)"
               ;;
+            "waiting-atlas-integration"|"atlas-integration-in-progress")
+              RESUME_STAGE="waiting-atlas"
+              echo "✅ Resuming at: Atlas Integration"
+              ;;
             "waiting-pr-merged")
               RESUME_STAGE="waiting-merge"
               echo "✅ Resuming at: Waiting for Merge"
@@ -2299,8 +2343,8 @@ spec:
           echo "Current stage: $CURRENT_STAGE"
 
           # Stage order (must match workflow progression)
-          # implementation → quality → security → testing → waiting-merge → completed
-          STAGES=("implementation" "quality" "security" "testing" "waiting-merge" "completed")
+          # implementation → quality → security → testing → waiting-atlas → waiting-merge → completed
+          STAGES=("implementation" "quality" "security" "testing" "waiting-atlas" "waiting-merge" "completed")
 
           # Find indices
           RESUME_IDX=-1
@@ -2360,27 +2404,27 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           REPO="{{`{{inputs.parameters.repository}}`}}"
           TASK_ID="{{`{{inputs.parameters.task-id}}`}}"
           TASK_LABEL="task-${TASK_ID}"
           RUN_LABEL="run-{{`{{workflow.name}}`}}"
-          
+
           echo "" > /tmp/pr-url-github.txt
           echo "" > /tmp/pr-number-github.txt
-          
+
           apk add --no-cache curl jq openssl >/dev/null 2>&1 || true
-          
+
           OWNER=$(echo "$REPO" | cut -d'/' -f1)
           REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
-          
+
           # GitHub App authentication
           AUTH_HEADER=""
           if [ -n "${GITHUB_APP_ID:-}" ] && [ -n "${GITHUB_APP_PRIVATE_KEY:-}" ]; then
             TEMP_KEY="/tmp/github-app-key.pem"
             printf '%b' "$GITHUB_APP_PRIVATE_KEY" > "$TEMP_KEY"
             chmod 600 "$TEMP_KEY"
-            
+
             NOW=$(date +%s)
             EXP=$((NOW + 600))
             HDR=$(printf '{"alg":"RS256","typ":"JWT"}' | base64 -w 0 2>/dev/null || printf '{"alg":"RS256","typ":"JWT"}' | base64)
@@ -2390,19 +2434,19 @@ spec:
             SIG=$(printf '%s.%s' "$HDR" "$PAY" | openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64 -w 0 2>/dev/null || openssl dgst -sha256 -sign "$TEMP_KEY" -binary | base64)
             SIG=$(echo -n "$SIG" | tr '+/' '-_' | tr -d '=')
             JWT="$HDR.$PAY.$SIG"
-            
+
             INSTALLATION_ID=$(curl -s -L \
               -H "Authorization: Bearer $JWT" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/$OWNER/$REPO_NAME/installation" | jq -r '.id')
-            
+
             if [ -z "$INSTALLATION_ID" ] || [ "$INSTALLATION_ID" = "null" ]; then
               INSTALLATION_ID=$(curl -s -L \
                 -H "Authorization: Bearer $JWT" \
                 -H "Accept: application/vnd.github+json" \
                 "https://api.github.com/orgs/$OWNER/installation" | jq -r '.id')
             fi
-            
+
             if [ -n "$INSTALLATION_ID" ] && [ "$INSTALLATION_ID" != "null" ]; then
               TOKEN=$(curl -s -X POST \
                 -H "Authorization: Bearer $JWT" \
@@ -2412,23 +2456,23 @@ spec:
                 AUTH_HEADER="Authorization: Bearer $TOKEN"
               fi
             fi
-            
+
             rm -f "$TEMP_KEY"
           fi
-          
+
           if [ -z "$AUTH_HEADER" ]; then
             echo "⚠️ No GitHub authentication - cannot fetch PR info"
             exit 0
           fi
-          
+
           # Search for PR by labels
           q_labels=$(printf "%s" "$TASK_LABEL,$RUN_LABEL" | sed 's/,/%2C/g')
           url="https://api.github.com/repos/${REPO}/issues?state=open&labels=${q_labels}"
           resp=$(curl -sL -H "Accept: application/vnd.github+json" -H "$AUTH_HEADER" "$url") || resp="[]"
-          
+
           pr_url=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .html_url' | head -n1)
           pr_number=$(echo "$resp" | jq -r '.[] | select(.pull_request != null) | .number' | head -n1)
-          
+
           if [ -n "$pr_number" ] && [ "$pr_number" != "null" ]; then
             echo "$pr_url" > /tmp/pr-url-github.txt
             echo "$pr_number" > /tmp/pr-number-github.txt
@@ -2470,7 +2514,7 @@ spec:
         source: |
           #!/bin/sh
           set -e
-          
+
           RESUME_STAGE="{{`{{inputs.parameters.resume-stage}}`}}"
           PR_URL_CONFIGMAP="{{`{{inputs.parameters.pr-url-from-configmap}}`}}"
           PR_NUMBER_CONFIGMAP="{{`{{inputs.parameters.pr-number-from-configmap}}`}}"
@@ -2478,11 +2522,11 @@ spec:
           PR_NUMBER_GITHUB="{{`{{inputs.parameters.pr-number-from-github}}`}}"
           PR_URL_IMPL="{{`{{inputs.parameters.pr-url-from-implementation}}`}}"
           PR_NUMBER_IMPL="{{`{{inputs.parameters.pr-number-from-implementation}}`}}"
-          
+
           # Priority: implementation output > GitHub > ConfigMap
           PR_URL=""
           PR_NUMBER=""
-          
+
           if [ -n "$PR_URL_IMPL" ] && [ "$PR_URL_IMPL" != "" ] && [ "$PR_NUMBER_IMPL" != "" ]; then
             PR_URL="$PR_URL_IMPL"
             PR_NUMBER="$PR_NUMBER_IMPL"
@@ -2498,10 +2542,10 @@ spec:
           else
             echo "ℹ️ No PR info available from any source"
           fi
-          
+
           echo "$PR_URL" > /tmp/pr-url-final.txt
           echo "$PR_NUMBER" > /tmp/pr-number-final.txt
-          
+
           if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "" ]; then
             echo "   PR #$PR_NUMBER: $PR_URL"
           fi
