@@ -573,16 +573,20 @@ spec:
                         echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE"
 
                         # Check if current PR has merge conflicts using GitHub API
+                        # Query both mergeable (boolean) and mergeable_state (string) fields
                         MERGEABLE="UNKNOWN"
+                        MERGE_STATE="UNKNOWN"
                         if [ -n "$INSTALLATION_TOKEN" ]; then
-                          MERGEABLE=$(curl -s -L \
+                          PR_DATA=$(curl -s -L \
                             -H "Accept: application/vnd.github+json" \
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
-                            "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" | \
-                            jq -r '.mergeable_state // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+                            "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" 2>/dev/null || echo "{}")
+
+                          MERGEABLE=$(echo "$PR_DATA" | jq -r '.mergeable // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+                          MERGE_STATE=$(echo "$PR_DATA" | jq -r '.mergeable_state // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
                         fi
 
-                        echo "🔍 PR #$PR_NUMBER mergeable status: $MERGEABLE"
+                        echo "🔍 PR #$PR_NUMBER mergeable: $MERGEABLE, state: $MERGE_STATE"
 
                         ATLAS_NEEDED=false
                         ATLAS_REASON=""
@@ -591,11 +595,11 @@ spec:
                           ATLAS_NEEDED=true
                           ATLAS_REASON="batch-integration"
                           echo "🔀 Multiple approved PRs detected - Atlas batch integration required"
-                        elif [ "$MERGEABLE" = "dirty" ] || [ "$MERGEABLE" = "CONFLICTING" ]; then
+                        elif [ "$MERGEABLE" = "false" ] || [ "$MERGE_STATE" = "dirty" ]; then
                           ATLAS_NEEDED=true
                           ATLAS_REASON="conflict-resolution"
                           echo "⚠️ Merge conflicts detected - Atlas conflict resolution required"
-                        elif [ "$MERGEABLE" = "UNKNOWN" ] || [ "$MERGEABLE" = "unknown" ]; then
+                        elif [ "$MERGEABLE" = "UNKNOWN" ] || [ "$MERGE_STATE" = "unknown" ]; then
                           ATLAS_NEEDED=true
                           ATLAS_REASON="status-verification"
                           echo "⚠️ Unable to determine mergeable status - Atlas will verify"
