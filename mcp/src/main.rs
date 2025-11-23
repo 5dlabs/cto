@@ -311,12 +311,11 @@ fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
                             eprintln!("✅ Repository configuration loaded successfully");
                             eprintln!("   Agents defined: {}", config.agents.len());
                             return Some(config);
-                        } else {
-                            eprintln!(
-                                "⚠️  Repository config version mismatch: {} (expected 1.0)",
-                                config.version
-                            );
                         }
+                        eprintln!(
+                            "⚠️  Repository config version mismatch: {} (expected 1.0)",
+                            config.version
+                        );
                     }
                     Err(e) => {
                         eprintln!("⚠️  Failed to parse repository config: {e}");
