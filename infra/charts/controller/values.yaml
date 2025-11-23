@@ -154,8 +154,8 @@ agents:
       Your core mission is to excel in your specialized domain while collaborating
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
-    tools:
-      remote: []
+      tools:
+        remote: []
 
   cleo:
     name: "Cleo"
@@ -187,8 +187,8 @@ agents:
       - Produce minimal, mechanical diffs
 
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
-    tools:
-      remote: []
+      tools:
+        remote: []
 
   tess:
     name: "Tess"
