@@ -356,7 +356,7 @@ fn resolve_workspace_dir() -> Option<std::path::PathBuf> {
     
     // 2. Check WORKSPACE_FOLDER_PATHS as fallback (Cursor environment)
     if let Ok(paths_str) = std::env::var("WORKSPACE_FOLDER_PATHS") {
-        let paths: Vec<&str> = paths_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        let paths: Vec<&str> = paths_str.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
         
         // If only one path, use it
         if paths.len() == 1 {
@@ -1491,7 +1491,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             .play
             .docs_project_directory
             .as_ref()
-            .and_then(|dd| if dd == "." { None } else { Some(dd.to_string()) })
+            .and_then(|dd| if dd == "." { None } else { Some(dd.clone()) })
     };
 
     // Check if task_id is provided
@@ -1607,60 +1607,77 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 }
             });
 
-            // Check if the requested repository matches the workspace
-            let is_local_repo = workspace_repo.as_ref() == Some(&repository);
-            
-            if !is_local_repo {
-                // Repository is not in local workspace - use task_id 1 for first run
-                eprintln!("📦 Repository '{repository}' is not in local workspace");
-                eprintln!("   Workspace repository: {}", workspace_repo.as_deref().unwrap_or("unknown"));
-                eprintln!("   Starting with task 1 for remote repository");
-                Some(1) // Default to task 1 for remote repositories on first run
+            // Normalize repository to org/repo format for comparison
+            let normalized_repo = if repository.starts_with("https://github.com/") {
+                repository.strip_prefix("https://github.com/")
+                    .unwrap()
+                    .trim_end_matches(".git")
+                    .to_string()
             } else {
+                repository.clone()
+            };
+            
+            // Check if the requested repository matches the workspace
+            let is_local_repo = workspace_repo.as_ref() == Some(&normalized_repo);
+            
+            if is_local_repo {
                 // Repository is local - try to auto-detect next task
                 eprintln!("🔍 Querying TaskMaster for next available task...");
                 match get_next_taskmaster_task(docs_dir.as_deref()) {
-                Ok(Some(task)) => {
-                    eprintln!("✅ Found next task: {} - {}", task.id, task.title);
-                    Some(task.id)
-                }
-                Ok(None) => {
-                    // Check for blocked tasks to provide helpful feedback
-                    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+                    Ok(Some(task)) => {
+                        eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                        Some(task.id)
+                    }
+                    Ok(None) => {
+                        // Check for blocked tasks to provide helpful feedback
+                        let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
 
-                    let message = if blocked_tasks.is_empty() {
-                        "No tasks available - all tasks are completed".to_string()
-                    } else {
-                        let blocked_ids: Vec<String> = blocked_tasks
-                            .iter()
-                            .map(|t| format!("Task {} ({})", t.id, t.title))
-                            .collect();
+                        let message = if blocked_tasks.is_empty() {
+                            "No tasks available - all tasks are completed".to_string()
+                        } else {
+                            let blocked_ids: Vec<String> = blocked_tasks
+                                .iter()
+                                .map(|t| format!("Task {} ({})", t.id, t.title))
+                                .collect();
 
-                        format!(
-                            "No tasks available. {} task(s) blocked by dependencies:\n{}",
-                            blocked_tasks.len(),
-                            blocked_ids.join("\n")
-                        )
-                    };
+                            format!(
+                                "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                                blocked_tasks.len(),
+                                blocked_ids.join("\n")
+                            )
+                        };
 
-                    return Ok(json!({
-                        "success": false,
-                        "message": message,
-                        "repository": repository,
-                        "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
-                            "id": t.id,
-                            "title": t.title,
-                            "dependencies": t.dependencies
-                        })).collect::<Vec<_>>(),
-                    }));
+                        return Ok(json!({
+                            "success": false,
+                            "message": message,
+                            "repository": repository,
+                            "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                                "id": t.id,
+                                "title": t.title,
+                                "dependencies": t.dependencies
+                            })).collect::<Vec<_>>(),
+                        }));
+                    }
+                    Err(e) => {
+                        // Unexpected error reading tasks.json
+                        eprintln!("❌ Error reading tasks.json: {e}");
+                        return Err(anyhow!("Failed to read tasks.json: {e}"));
+                    }
                 }
-                Err(e) => {
-                    // Unexpected error reading tasks.json
-                    eprintln!("❌ Error reading tasks.json: {e}");
-                    return Err(anyhow!("Failed to read tasks.json: {e}"));
-                }
+            } else {
+                // Repository is not in local workspace
+                eprintln!("📦 Repository '{repository}' is not in local workspace");
+                eprintln!("   Workspace repository: {}", workspace_repo.as_deref().unwrap_or("unknown"));
+                eprintln!("⚠️  Cannot auto-detect tasks for remote repository");
+                eprintln!("   Please specify task_id explicitly or use repository_path parameter");
+                
+                return Ok(json!({
+                    "success": false,
+                    "message": "Repository not in local workspace. Please specify task_id explicitly or use repository_path parameter to point to the local repository location.",
+                    "repository": repository,
+                    "hint": "Use cto_play({ task_id: 1 }) or cto_play({ repository_path: '/path/to/repo' })"
+                }));
             }
-        }
         }
     };
 
