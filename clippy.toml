@@ -1,0 +1,31 @@
+# Clippy configuration for consistent linting
+# Based on AWS SDK Rust (smithy-rs) best practices
+
+# Set the maximum cognitive complexity allowed
+cognitive-complexity-threshold = 30
+
+# Set maximum function arguments
+too-many-arguments-threshold = 7
+
+# Set maximum lines for functions
+too-many-lines-threshold = 100
+
+# Allow unwrap/expect in tests (common practice)
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+
+# Disallow direct time APIs for better testability (AWS smithy-rs pattern)
+# Note: Only enforce for SystemTime (wall-clock time that needs mocking)
+# Instant is fine for performance measurements
+disallowed-methods = [
+    { path = "std::time::SystemTime::now", reason = "use a Clock abstraction for testability" },
+    { path = "std::time::SystemTime::elapsed", reason = "use a Clock abstraction for testability" },
+]
+
+# Disallow certain macros
+disallowed-macros = [
+    # We prefer tracing over println for logging
+    { path = "std::println", reason = "use tracing::info! instead" },
+    { path = "std::eprintln", reason = "use tracing::error! instead" },
+    { path = "std::dbg", reason = "use tracing::debug! instead; remove before committing" },
+]
