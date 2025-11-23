@@ -346,25 +346,37 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
 }
 
 fn resolve_workspace_dir() -> Option<std::path::PathBuf> {
-    // 1. Check WORKSPACE_FOLDER_PATHS first (Cursor environment)
-    // We prioritize this because the process CWD might be the binary location (e.g. in the main 'cto' repo)
-    // while the intended workspace is the one open in Cursor (e.g. 'cto-parallel-test')
-    if let Ok(paths_str) = std::env::var("WORKSPACE_FOLDER_PATHS") {
-        let paths: Vec<&str> = paths_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
-        if !paths.is_empty() {
-            // If multiple paths, try to find one that matches current_dir to be safe
-            if let Ok(cwd) = std::env::current_dir() {
-                if let Some(matched) = paths.iter().find(|p| std::path::Path::new(*p) == cwd) {
-                    return Some(std::path::PathBuf::from(matched));
-                }
-            }
-            // Otherwise, default to the first path (standard behavior for single-root workspaces)
-            return Some(std::path::PathBuf::from(paths[0]));
+    // 1. Try current directory first - this is most likely the intended workspace
+    if let Ok(cwd) = std::env::current_dir() {
+        // Verify it's a valid workspace (has .git or cto-config.json)
+        if cwd.join(".git").exists() || cwd.join("cto-config.json").exists() {
+            return Some(cwd);
         }
     }
+    
+    // 2. Check WORKSPACE_FOLDER_PATHS as fallback (Cursor environment)
+    if let Ok(paths_str) = std::env::var("WORKSPACE_FOLDER_PATHS") {
+        let paths: Vec<&str> = paths_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        
+        // If only one path, use it
+        if paths.len() == 1 {
+            return Some(std::path::PathBuf::from(paths[0]));
+        }
+        
+        // Multiple paths - try to find one with cto-config.json
+        for path_str in &paths {
+            let path = std::path::PathBuf::from(path_str);
+            if path.join("cto-config.json").exists() {
+                return Some(path);
+            }
+        }
+        
+        // No path has cto-config.json - return None to signal ambiguity
+        // Callers should handle this by requiring explicit configuration
+    }
 
-    // 2. Fallback to current directory if env var is missing
-    std::env::current_dir().ok()
+    // 3. No valid workspace found
+    None
 }
 
 fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
@@ -1456,22 +1468,21 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
     let docs_dir = if let Some(repo_path) = &repository_path {
         // If repository_path is provided, construct full path to docs directory
-        eprintln!("📁 Using explicit repository path: {}", repo_path);
+        eprintln!("📁 Using explicit repository path: {repo_path}");
         let docs_project_dir = config
             .defaults
             .play
             .docs_project_directory
-            .as_ref()
-            .map(|s| s.as_str())
+            .as_deref()
             .unwrap_or("docs");
         
         let full_docs_path = if docs_project_dir == "." {
             repo_path.clone()
         } else {
-            format!("{}/{}", repo_path, docs_project_dir)
+            format!("{repo_path}/{docs_project_dir}")
         };
         
-        eprintln!("   Looking for tasks in: {}", full_docs_path);
+        eprintln!("   Looking for tasks in: {full_docs_path}");
         Some(full_docs_path)
     } else {
         // Otherwise use config with workspace detection
@@ -1568,10 +1579,12 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     }));
                 }
                 Err(e) => {
-                    eprintln!("❌ Could not find tasks.json at repository_path: {}", e);
-                    eprintln!("   Please ensure .taskmaster/tasks/tasks.json exists at the specified path");
-                    // Fall back to task 1 for first run
-                    Some(1)
+                    // Missing tasks.json is a serious error when repository_path is explicitly provided
+                    eprintln!("❌ Could not find tasks.json at repository_path: {e}");
+                    return Err(anyhow!(
+                        "tasks.json not found at specified repository_path: {}. Please ensure .taskmaster/tasks/tasks.json exists.",
+                        repository_path.as_ref().unwrap()
+                    ));
                 }
             }
         } else {
@@ -1595,11 +1608,11 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             });
 
             // Check if the requested repository matches the workspace
-            let is_local_repo = workspace_repo.as_ref().map_or(false, |wr| wr == &repository);
+            let is_local_repo = workspace_repo.as_ref() == Some(&repository);
             
             if !is_local_repo {
                 // Repository is not in local workspace - use task_id 1 for first run
-                eprintln!("📦 Repository '{}' is not in local workspace", repository);
+                eprintln!("📦 Repository '{repository}' is not in local workspace");
                 eprintln!("   Workspace repository: {}", workspace_repo.as_deref().unwrap_or("unknown"));
                 eprintln!("   Starting with task 1 for remote repository");
                 Some(1) // Default to task 1 for remote repositories on first run
@@ -1643,8 +1656,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                 }
                 Err(e) => {
                     // Unexpected error reading tasks.json
-                    eprintln!("❌ Error reading tasks.json: {}", e);
-                    return Err(anyhow!("Failed to read tasks.json: {}", e));
+                    eprintln!("❌ Error reading tasks.json: {e}");
+                    return Err(anyhow!("Failed to read tasks.json: {e}"));
                 }
             }
         }
