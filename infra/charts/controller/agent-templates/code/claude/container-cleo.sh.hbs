@@ -1473,39 +1473,6 @@ while [ $ATTEMPT -le $MAX_RETRIES ]; do
   echo "════════════════════════════════════════════════════════════════"
 
   # =========================================================================
-  # FAST-PATH: Skip work if PR already approved
-  # =========================================================================
-  if [ -n "${PR_NUMBER:-}" ] && [ "$ATTEMPT" -eq 1 ]; then
-    echo ""
-    echo "🔍 Checking if PR #${PR_NUMBER} already has approval..."
-    
-    APPROVAL_COUNT=$(gh pr view "$PR_NUMBER" --json reviews --jq '[.reviews[] | select(.state == "APPROVED")] | length' 2>/dev/null || echo "0")
-    
-    if [ "${APPROVAL_COUNT:-0}" -gt 0 ]; then
-      echo "✅ PR #${PR_NUMBER} already has ${APPROVAL_COUNT} approval(s)"
-      echo "🚀 FAST-PATH: Skipping quality checks since PR is already approved"
-      
-      gh pr comment "$PR_NUMBER" --body "✅ **Cleo Quality Check - Fast-Path**
-
-PR already has ${APPROVAL_COUNT} approval(s). Skipping redundant quality checks.
-
-**Fast-Path Benefits:**
-- Saves ~10-15 minutes of execution time
-- Reduces unnecessary compute and model API calls
-- PR already validated by previous quality gate
-
-_Cleo will still run full checks if approval is revoked._" 2>/dev/null || echo "⚠️ Could not post fast-path comment"
-
-      SUCCESS=1
-      COMPLETED_ATTEMPTS=1
-      break
-    else
-      echo "ℹ️ No existing approvals found, proceeding with quality checks"
-    fi
-  fi
-  echo ""
-
-  # =========================================================================
   # INCREMENTAL CONTEXT: Load previous iteration findings
   # =========================================================================
   AGENT_STATE_DIR="$TASK_WORKSPACE/.agent-state"
