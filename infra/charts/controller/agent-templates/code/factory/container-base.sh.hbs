@@ -1396,35 +1396,8 @@ echo "════════════════════════�
 
 TOOL_VERIFICATION_FAILED=false
 
-# Verify Context7 is available (if configured as local server)
-if grep -q '"context7"' "$FACTORY_WORK_DIR/client-config.json" 2>/dev/null; then
-  echo "🔍 Context7 configured - verifying availability..."
-  
-  # Check API key
-  if [ -n "${CONTEXT7_API_KEY:-}" ]; then
-    echo "  ✓ CONTEXT7_API_KEY is set"
-  else
-    echo "  ❌ CONTEXT7_API_KEY is missing"
-    TOOL_VERIFICATION_FAILED=true
-  fi
-  
-  # Check npx is available
-  if command -v npx >/dev/null 2>&1; then
-    echo "  ✓ npx is available"
-  else
-    echo "  ❌ npx not found (required for Context7)"
-    TOOL_VERIFICATION_FAILED=true
-  fi
-  
-  # Test Context7 package can be loaded
-  if timeout 10 npx -y @upstash/context7-mcp --help >/dev/null 2>&1; then
-    echo "  ✓ Context7 package can be loaded"
-  else
-    echo "  ⚠️ Context7 package test timed out or failed (may work at runtime)"
-  fi
-else
-  echo "ℹ️ Context7 not configured in client-config.json"
-fi
+# All remote tools are accessed via Toolman
+# Toolman connectivity is verified above - no additional tool-specific checks needed
 
 # Verify Toolman connectivity (already checked above, just summarize)
 if [ "$TOOLMAN_SUCCESS" = "true" ]; then
@@ -1487,7 +1460,7 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
   echo "Critical tools are not available. Cannot proceed with task."
   echo ""
   echo "Common issues:"
-  echo "  - CONTEXT7_API_KEY not set (check secret mounting)"
+  echo "  - Toolman server not reachable"
   echo "  - MCP servers not initialized properly"
   echo "  - client-config.json misconfigured"
   echo ""

@@ -155,7 +155,7 @@ agents:
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
     tools:
-      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
+      remote: ["brave_search_brave_web_search", "context7_resolve-library-id", "context7_get-library-docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
 
   cleo:
     name: "Cleo"
@@ -188,7 +188,7 @@ agents:
 
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
     tools:
-      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
+      remote: ["brave_search_brave_web_search", "context7_resolve-library-id", "context7_get-library-docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
 
   tess:
     name: "Tess"

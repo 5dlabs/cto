@@ -177,6 +177,15 @@ impl CodeTemplateGenerator {
         );
 
         templates.insert(
+            "cursor-mcp.json".to_string(),
+            Self::generate_cursor_mcp_config(
+                code_run,
+                &enriched_cli_config,
+                &remote_tools,
+            )?,
+        );
+
+        templates.insert(
             "coding-guidelines.md".to_string(),
             Self::generate_coding_guidelines(code_run)?,
         );
@@ -523,6 +532,40 @@ impl CodeTemplateGenerator {
 
     fn generate_cursor_project_permissions() -> Result<String> {
         Self::load_template(CODE_CURSOR_PROJECT_CONFIG_TEMPLATE)
+    }
+
+    fn generate_cursor_mcp_config(
+        code_run: &CodeRun,
+        cli_config: &Value,
+        remote_tools: &[String],
+    ) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template("code/cursor/cursor-mcp.json")?;
+
+        handlebars
+            .register_template_string("cursor_mcp", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register Cursor MCP config template: {e}"
+                ))
+            })?;
+
+        let render_settings = Self::build_cli_render_settings(code_run, cli_config);
+
+        let context = json!({
+            "toolman": {
+                "url": render_settings.toolman_url,
+                "tools": remote_tools,
+            },
+        });
+
+        handlebars.render("cursor_mcp", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render Cursor MCP config template: {e}"
+            ))
+        })
     }
 
     fn generate_factory_templates(
@@ -1022,9 +1065,39 @@ impl CodeTemplateGenerator {
         })
     }
 
-    fn generate_mcp_config(_code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
-        // MCP config is currently static, so just load and return the template content
-        Self::load_template(CODE_MCP_CONFIG_TEMPLATE)
+    fn generate_mcp_config(code_run: &CodeRun, _config: &ControllerConfig) -> Result<String> {
+        let mut handlebars = Handlebars::new();
+        handlebars.set_strict_mode(false);
+
+        let template = Self::load_template(CODE_MCP_CONFIG_TEMPLATE)?;
+
+        handlebars
+            .register_template_string("mcp_config", template)
+            .map_err(|e| {
+                crate::tasks::types::Error::ConfigError(format!(
+                    "Failed to register MCP config template: {e}"
+                ))
+            })?;
+
+        // Get CLI config to extract toolman URL
+        let cli_config_value = code_run
+            .spec
+            .cli_config
+            .as_ref()
+            .and_then(|cfg| serde_json::to_value(cfg).ok())
+            .unwrap_or_else(|| json!({}));
+
+        let render_settings = Self::build_cli_render_settings(code_run, &cli_config_value);
+
+        let context = json!({
+            "toolman_url": render_settings.toolman_url,
+        });
+
+        handlebars.render("mcp_config", &context).map_err(|e| {
+            crate::tasks::types::Error::ConfigError(format!(
+                "Failed to render MCP config template: {e}"
+            ))
+        })
     }
 
     fn generate_codex_container_script(
