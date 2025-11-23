@@ -16,6 +16,8 @@
 
 ## Regressions Found
 
+**Total:** 4 critical regressions discovered and fixed
+
 ### Regression #1: Atlas Integration Stages Missing from Resume Logic ⚠️
 
 **Severity:** HIGH  
