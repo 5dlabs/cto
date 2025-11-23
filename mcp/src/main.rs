@@ -1363,8 +1363,8 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
         (None, None) => {
             // No active workflow
 
-            // Try to get next task
-            let next_task = get_next_taskmaster_task(docs_dir)?;
+            // Try to get next task (only works if repository is in local workspace)
+            let next_task = get_next_taskmaster_task(docs_dir).ok().flatten();
 
             if let Some(task) = next_task {
                 Ok(json!({
@@ -1379,9 +1379,9 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                     },
                 }))
             } else {
-                // No tasks available
+                // No tasks available or tasks.json not in local workspace
                 let message = if blocked_tasks.is_empty() {
-                    "All tasks completed".to_string()
+                    "No active workflow. Repository may not be in local workspace - use task_id to start a new workflow.".to_string()
                 } else {
                     format!("{} task(s) blocked by dependencies", blocked_tasks.len())
                 };
