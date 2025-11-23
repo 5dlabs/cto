@@ -78,6 +78,10 @@ fn get_play_schema(agents: &HashMap<String, crate::AgentConfig>) -> Value {
                     "type": "string",
                     "description": "Target repository URL (e.g., 5dlabs/cto). Optional if defaults.play.repository is set in config."
                 },
+                "repository_path": {
+                    "type": "string",
+                    "description": "Absolute path to the repository on disk (e.g., /Users/name/code/cto-parallel-test). Use this when the target repository is not in the current workspace. Optional - if not provided, will use workspace detection."
+                },
                 "service": {
                     "type": "string",
                     "description": "Service identifier for persistent workspace. Optional if defaults.play.service is set in config.",

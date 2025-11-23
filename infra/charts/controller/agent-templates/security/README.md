@@ -63,3 +63,4 @@ To add new security patterns:
 - [OWASP Top Ten](https://owasp.org/www-project-top-ten/)
 - [RustSec Advisory Database](https://rustsec.org/)
 
+

@@ -201,6 +201,7 @@ struct PlayDefaults {
     #[serde(rename = "docsProjectDirectory")]
     docs_project_directory: Option<String>,
     #[serde(rename = "workingDirectory")]
+    #[allow(dead_code)] // Still in config for backward compatibility, but we use docs_project_directory for tasks
     working_directory: Option<String>,
     #[serde(rename = "maxRetries")]
     max_retries: Option<u32>,
@@ -342,6 +343,40 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
         },
         _ => None,
     })
+}
+
+fn resolve_workspace_dir() -> Option<std::path::PathBuf> {
+    // 1. Try current directory first - this is most likely the intended workspace
+    if let Ok(cwd) = std::env::current_dir() {
+        // Verify it's a valid workspace (has .git or cto-config.json)
+        if cwd.join(".git").exists() || cwd.join("cto-config.json").exists() {
+            return Some(cwd);
+        }
+    }
+    
+    // 2. Check WORKSPACE_FOLDER_PATHS as fallback (Cursor environment)
+    if let Ok(paths_str) = std::env::var("WORKSPACE_FOLDER_PATHS") {
+        let paths: Vec<&str> = paths_str.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+        
+        // If only one path, use it
+        if paths.len() == 1 {
+            return Some(std::path::PathBuf::from(paths[0]));
+        }
+        
+        // Multiple paths - try to find one with cto-config.json
+        for path_str in &paths {
+            let path = std::path::PathBuf::from(path_str);
+            if path.join("cto-config.json").exists() {
+                return Some(path);
+            }
+        }
+        
+        // No path has cto-config.json - return None to signal ambiguity
+        // Callers should handle this by requiring explicit configuration
+    }
+
+    // 3. No valid workspace found
+    None
 }
 
 fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
@@ -529,15 +564,8 @@ fn handle_docs_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     let config = CTO_CONFIG.get().unwrap();
 
     // Get workspace directory from Cursor environment, then navigate to working_directory
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            first_path.to_string()
-        })
-        .map_or_else(
-            |_| std::env::current_dir().unwrap_or_default(),
-            std::path::PathBuf::from,
-        );
+    let workspace_dir =
+        resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
 
     // Handle both absolute and relative paths
     let working_path = std::path::PathBuf::from(working_directory);
@@ -1115,22 +1143,21 @@ enum TasksFile {
 
 /// Find tasks.json in repository, optionally starting from a working directory
 fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
-    // Try to get workspace directory
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .ok()
-        .and_then(|paths| {
-            paths
-                .split(',')
-                .next()
-                .map(|p| std::path::PathBuf::from(p.trim()))
-        })
-        .or_else(|| std::env::current_dir().ok())?;
-
-    // If working_dir is provided, use it as the base directory
-    let base_dir = if let Some(wd) = working_dir {
-        workspace_dir.join(wd)
+    // If working_dir is an absolute path, use it directly
+    let (base_dir, workspace_dir) = if let Some(wd) = working_dir {
+        let wd_path = std::path::PathBuf::from(wd);
+        if wd_path.is_absolute() {
+            (wd_path, None)
+        } else {
+            // Try to get workspace directory for relative paths
+            let ws_dir = resolve_workspace_dir()?;
+            let base = ws_dir.join(wd);
+            (base, Some(ws_dir))
+        }
     } else {
-        workspace_dir.clone()
+        // Try to get workspace directory
+        let ws_dir = resolve_workspace_dir()?;
+        (ws_dir.clone(), Some(ws_dir))
     };
 
     let mut candidates = vec![
@@ -1142,16 +1169,18 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
         base_dir.join("tasks.json"),
     ];
 
-    // If working_dir was provided, also try workspace root as fallback
+    // If working_dir was provided and we have a workspace, also try workspace root as fallback
     if working_dir.is_some() {
-        candidates.push(
-            workspace_dir
-                .join(".taskmaster")
-                .join("tasks")
-                .join("tasks.json"),
-        );
-        candidates.push(workspace_dir.join(".taskmaster").join("tasks.json"));
-        candidates.push(workspace_dir.join("tasks.json"));
+        if let Some(ws_dir) = workspace_dir {
+            candidates.push(
+                ws_dir
+                    .join(".taskmaster")
+                    .join("tasks")
+                    .join("tasks.json"),
+            );
+            candidates.push(ws_dir.join(".taskmaster").join("tasks.json"));
+            candidates.push(ws_dir.join("tasks.json"));
+        }
     }
 
     candidates.into_iter().find(|p| p.exists())
@@ -1300,13 +1329,14 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
         .or_else(|| config.defaults.play.repository.clone())
         .ok_or(anyhow!("No repository specified. Please provide a 'repository' parameter or set defaults.play.repository in config"))?;
 
-    // Get working directory from config
-    let working_dir = config
+    // Get docs project directory for finding tasks.json
+    // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
+    let docs_dir = config
         .defaults
         .play
-        .working_directory
+        .docs_project_directory
         .as_ref()
-        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+        .and_then(|dd| if dd == "." { None } else { Some(dd.as_str()) });
 
     // Read progress from ConfigMap
     let progress = read_play_progress(&repository)?;
@@ -1315,7 +1345,7 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
     let active_workflow = find_active_play_workflow(&repository)?;
 
     // Check for blocked tasks
-    let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
+    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
 
     // Build comprehensive status response
     match (progress, active_workflow) {
@@ -1361,8 +1391,14 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
         (None, None) => {
             // No active workflow
 
-            // Try to get next task
-            let next_task = get_next_taskmaster_task(working_dir)?;
+            // Try to get next task (only works if repository is in local workspace)
+            let (next_task, tasks_found) = match get_next_taskmaster_task(docs_dir) {
+                Ok(task) => (task, true),
+                Err(err) => {
+                    eprintln!("ℹ️  Unable to read TaskMaster tasks locally: {err}");
+                    (None, false)
+                }
+            };
 
             if let Some(task) = next_task {
                 Ok(json!({
@@ -1377,10 +1413,15 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                     },
                 }))
             } else {
-                // No tasks available
-                let message = if blocked_tasks.is_empty() {
+                // Determine appropriate message based on whether tasks.json was found
+                let message = if !tasks_found {
+                    // tasks.json not found - repository likely not in workspace
+                    "No active workflow. Repository may not be in local workspace - use task_id to start a new workflow.".to_string()
+                } else if blocked_tasks.is_empty() {
+                    // tasks.json found but no tasks available
                     "All tasks completed".to_string()
                 } else {
+                    // tasks.json found but tasks are blocked
                     format!("{} task(s) blocked by dependencies", blocked_tasks.len())
                 };
 
@@ -1417,13 +1458,41 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Validate repository URL
     validate_repository_url(&repository)?;
 
-    // Get working directory from config
-    let working_dir = config
-        .defaults
-        .play
-        .working_directory
-        .as_ref()
-        .and_then(|wd| if wd == "." { None } else { Some(wd.as_str()) });
+    // Check for explicit repository_path parameter
+    let repository_path = arguments
+        .get("repository_path")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    // Get docs project directory for finding tasks.json
+    // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
+    let docs_dir = if let Some(repo_path) = &repository_path {
+        // If repository_path is provided, construct full path to docs directory
+        eprintln!("📁 Using explicit repository path: {repo_path}");
+        let docs_project_dir = config
+            .defaults
+            .play
+            .docs_project_directory
+            .as_deref()
+            .unwrap_or("docs");
+        
+        let full_docs_path = if docs_project_dir == "." {
+            repo_path.clone()
+        } else {
+            format!("{repo_path}/{docs_project_dir}")
+        };
+        
+        eprintln!("   Looking for tasks in: {full_docs_path}");
+        Some(full_docs_path)
+    } else {
+        // Otherwise use config with workspace detection
+        config
+            .defaults
+            .play
+            .docs_project_directory
+            .as_ref()
+            .and_then(|dd| if dd == "." { None } else { Some(dd.clone()) })
+    };
 
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
@@ -1471,40 +1540,144 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             }
         }
 
-        // 3. Query TaskMaster for next task
-        eprintln!("🔍 Querying TaskMaster for next available task...");
-        if let Some(task) = get_next_taskmaster_task(working_dir)? {
-            eprintln!("✅ Found next task: {} - {}", task.id, task.title);
-            Some(task.id)
+        // 3. If repository_path is provided, skip workspace detection and use it directly
+        if repository_path.is_some() {
+            eprintln!("🔍 Using explicit repository path - querying TaskMaster...");
+            match get_next_taskmaster_task(docs_dir.as_deref()) {
+                Ok(Some(task)) => {
+                    eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                    Some(task.id)
+                }
+                Ok(None) => {
+                    // Check for blocked tasks to provide helpful feedback
+                    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+
+                    let message = if blocked_tasks.is_empty() {
+                        "No tasks available - all tasks are completed".to_string()
+                    } else {
+                        let blocked_ids: Vec<String> = blocked_tasks
+                            .iter()
+                            .map(|t| format!("Task {} ({})", t.id, t.title))
+                            .collect();
+
+                        format!(
+                            "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                            blocked_tasks.len(),
+                            blocked_ids.join("\n")
+                        )
+                    };
+
+                    return Ok(json!({
+                        "success": false,
+                        "message": message,
+                        "repository": repository,
+                        "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                            "id": t.id,
+                            "title": t.title,
+                            "dependencies": t.dependencies
+                        })).collect::<Vec<_>>(),
+                    }));
+                }
+                Err(e) => {
+                    // Missing tasks.json is a serious error when repository_path is explicitly provided
+                    eprintln!("❌ Could not find tasks.json at repository_path: {e}");
+                    return Err(anyhow!(
+                        "tasks.json not found at specified repository_path: {}. Please ensure .taskmaster/tasks/tasks.json exists.",
+                        repository_path.as_ref().unwrap()
+                    ));
+                }
+            }
         } else {
-            // Check for blocked tasks to provide helpful feedback
-            let blocked_tasks = find_blocked_taskmaster_tasks(working_dir).unwrap_or_default();
+            // Check if repository is in local workspace
+            // Get current workspace repository (if available)
+            let workspace_repo = resolve_workspace_dir().and_then(|workspace_path| {
+                let output = std::process::Command::new("git")
+                    .args(["remote", "get-url", "origin"])
+                    .current_dir(&workspace_path)
+                    .output()
+                    .ok()?;
 
-            let message = if blocked_tasks.is_empty() {
-                "No tasks available - all tasks are completed".to_string()
+                if output.status.success() {
+                    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    url.strip_prefix("git@github.com:")
+                        .or_else(|| url.strip_prefix("https://github.com/"))
+                        .map(|repo_part| repo_part.trim_end_matches(".git").to_string())
+                } else {
+                    None
+                }
+            });
+
+            // Normalize repository to org/repo format for comparison
+            let normalized_repo = if repository.starts_with("https://github.com/") {
+                repository.strip_prefix("https://github.com/")
+                    .unwrap()
+                    .trim_end_matches(".git")
+                    .to_string()
             } else {
-                let blocked_ids: Vec<String> = blocked_tasks
-                    .iter()
-                    .map(|t| format!("Task {} ({})", t.id, t.title))
-                    .collect();
-
-                format!(
-                    "No tasks available. {} task(s) blocked by dependencies:\n{}",
-                    blocked_tasks.len(),
-                    blocked_ids.join("\n")
-                )
+                repository.clone()
             };
+            
+            // Check if the requested repository matches the workspace
+            let is_local_repo = workspace_repo.as_ref() == Some(&normalized_repo);
+            
+            if is_local_repo {
+                // Repository is local - try to auto-detect next task
+                eprintln!("🔍 Querying TaskMaster for next available task...");
+                match get_next_taskmaster_task(docs_dir.as_deref()) {
+                    Ok(Some(task)) => {
+                        eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                        Some(task.id)
+                    }
+                    Ok(None) => {
+                        // Check for blocked tasks to provide helpful feedback
+                        let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
 
-            return Ok(json!({
-                "success": false,
-                "message": message,
-                "repository": repository,
-                "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
-                    "id": t.id,
-                    "title": t.title,
-                    "dependencies": t.dependencies
-                })).collect::<Vec<_>>(),
-            }));
+                        let message = if blocked_tasks.is_empty() {
+                            "No tasks available - all tasks are completed".to_string()
+                        } else {
+                            let blocked_ids: Vec<String> = blocked_tasks
+                                .iter()
+                                .map(|t| format!("Task {} ({})", t.id, t.title))
+                                .collect();
+
+                            format!(
+                                "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                                blocked_tasks.len(),
+                                blocked_ids.join("\n")
+                            )
+                        };
+
+                        return Ok(json!({
+                            "success": false,
+                            "message": message,
+                            "repository": repository,
+                            "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                                "id": t.id,
+                                "title": t.title,
+                                "dependencies": t.dependencies
+                            })).collect::<Vec<_>>(),
+                        }));
+                    }
+                    Err(e) => {
+                        // Unexpected error reading tasks.json
+                        eprintln!("❌ Error reading tasks.json: {e}");
+                        return Err(anyhow!("Failed to read tasks.json: {e}"));
+                    }
+                }
+            } else {
+                // Repository is not in local workspace
+                eprintln!("📦 Repository '{repository}' is not in local workspace");
+                eprintln!("   Workspace repository: {}", workspace_repo.as_deref().unwrap_or("unknown"));
+                eprintln!("⚠️  Cannot auto-detect tasks for remote repository");
+                eprintln!("   Please specify task_id explicitly or use repository_path parameter");
+                
+                return Ok(json!({
+                    "success": false,
+                    "message": "Repository not in local workspace. Please specify task_id explicitly or use repository_path parameter to point to the local repository location.",
+                    "repository": repository,
+                    "hint": "Use cto_play({ task_id: 1 }) or cto_play({ repository_path: '/path/to/repo' })"
+                }));
+            }
         }
     };
 
@@ -2063,12 +2236,8 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
 
     // Check for requirements.yaml file
     // Try to determine workspace directory, but don't fail if we can't
-    let workspace_dir_result = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            std::path::PathBuf::from(first_path)
-        })
-        .or_else(|_| std::env::current_dir());
+    let workspace_dir_result =
+        resolve_workspace_dir().ok_or_else(|| anyhow!("Workspace directory not found"));
 
     // Only check for requirements if we have a valid workspace directory
     let requirements_path = if let Ok(workspace_dir) = workspace_dir_result {
@@ -2367,12 +2536,8 @@ fn handle_intake_prd_workflow(arguments: &HashMap<String, Value>) -> Result<Valu
     eprintln!("🚀 Processing project intake request");
 
     // Get workspace directory from Cursor environment
-    let workspace_dir = std::env::var("WORKSPACE_FOLDER_PATHS")
-        .map(|paths| {
-            let first_path = paths.split(',').next().unwrap_or(&paths).trim();
-            std::path::PathBuf::from(first_path)
-        })
-        .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
+    let workspace_dir =
+        resolve_workspace_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
 
     eprintln!("🔍 Using workspace directory: {}", workspace_dir.display());
 
