@@ -322,7 +322,7 @@ spec:
                   value: "waiting-pr-merged"
 
           - name: complete-task
-            dependencies: [wait-merge-to-main]
+            depends: "wait-merge-to-main.Succeeded"
             template: task-completion
             arguments:
               parameters:
