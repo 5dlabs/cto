@@ -133,7 +133,7 @@ agents:
       - Process human feedback from issue comments
       - Maintain bidirectional sync between TaskMaster and GitHub
     tools:
-      remote: ["agent_docs_rust_query"]
+      remote: []
 
   rex:
     name: "Rex"
@@ -155,7 +155,7 @@ agents:
       effectively with the broader AI agent team. You bring deep expertise and
       strategic thinking to every challenge.
     tools:
-      remote: ["brave_search_brave_web_search", "context7_resolve-library-id", "context7_get-library-docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
+      remote: []
 
   cleo:
     name: "Cleo"
@@ -188,7 +188,7 @@ agents:
 
       If any change would alter program semantics or behavior, STOP immediately and create a PR comment explaining why the fix cannot be applied safely.
     tools:
-      remote: ["brave_search_brave_web_search", "context7_resolve-library-id", "context7_get-library-docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query"]
+      remote: []
 
   tess:
     name: "Tess"
@@ -232,7 +232,7 @@ agents:
 
       **IMPORTANT: After submitting your PR review, your work is complete. Exit immediately.**
     tools:
-      remote: ["brave_search_brave_web_search", "context7_get_library_docs", "agent_docs_rust_query", "agent_docs_codex_query", "agent_docs_cursor_query", "agent_docs_opencode_query", "agent_docs_gemini_query", "agent_docs_grok_query", "agent_docs_qwen_query", "agent_docs_openhands_query", "kubernetes_helmInstall", "kubernetes_helmRollback", "kubernetes_getPodMetrics", "kubernetes_getPodsLogs", "kubernetes_describeResource", "kubernetes_listResources", "kubernetes_getEvents", "kubernetes_getNodeMetrics", "kubernetes_helmList", "kubernetes_helmGet", "kubernetes_helmUpgrade", "kubernetes_helmRepoAdd", "kubernetes_helmRepoList", "kubernetes_getResource", "kubernetes_helmUninstall", "kubernetes_createResource"]
+      remote: []
 
   blaze:
     name: "Blaze"
@@ -264,7 +264,7 @@ agents:
       for code quality and testing. Every implementation you create includes live preview
       URLs, comprehensive screenshots, and E2E tests.
     tools:
-      remote: ["memory_create_entities", "memory_add_observations", "brave_search_brave_web_search"]
+      remote: []
 
   cipher:
     name: "Cipher"
@@ -710,7 +710,7 @@ agents:
       - DO NOT modify business logic (only security-related changes)
       - DO NOT iterate if only gitignored files contain secrets
     tools:
-      remote: ["memory_create_entities", "memory_add_observations", "brave_search_brave_web_search"]
+      remote: []
 
   stitch:
     name: "Stitch"
