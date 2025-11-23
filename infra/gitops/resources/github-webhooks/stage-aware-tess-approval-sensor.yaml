@@ -565,8 +565,8 @@ spec:
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
                             "https://api.github.com/repos/$REPO_FULL/pulls?state=open&per_page=100" | \
                             jq "[.[] | select(
-                              (.labels[]?.name? // empty | test(\"approved\")) and
-                              (.labels[]?.name? // empty | test(\"service-$SERVICE\"))
+                              (.labels[]?.name? // empty | test(\"^approved$\")) and
+                              (.labels[]?.name? // empty | test(\"^service-$SERVICE$\"))
                             )] | length" 2>/dev/null || echo "1")
                         fi
 
@@ -582,8 +582,10 @@ spec:
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
                             "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" 2>/dev/null || echo "{}")
 
-                          MERGEABLE=$(echo "$PR_DATA" | jq -r '.mergeable // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
-                          MERGE_STATE=$(echo "$PR_DATA" | jq -r '.mergeable_state // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+                          # Use 'if .mergeable == null then "UNKNOWN" else (.mergeable | tostring) end'
+                          # to properly handle boolean false without treating it as falsy
+                          MERGEABLE=$(echo "$PR_DATA" | jq -r 'if .mergeable == null then "UNKNOWN" else (.mergeable | tostring) end' 2>/dev/null || echo "UNKNOWN")
+                          MERGE_STATE=$(echo "$PR_DATA" | jq -r 'if .mergeable_state == null then "UNKNOWN" else .mergeable_state end' 2>/dev/null || echo "UNKNOWN")
                         fi
 
                         echo "🔍 PR #$PR_NUMBER mergeable: $MERGEABLE, state: $MERGE_STATE"
