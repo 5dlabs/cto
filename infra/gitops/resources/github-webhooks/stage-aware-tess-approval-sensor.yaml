@@ -559,16 +559,17 @@ spec:
                         echo "🔍 Checking if Atlas integration is required..."
 
                         # Count approved PRs for this service using GitHub API
-                        # Note: Query returns count of OTHER approved PRs, we add current PR below
+                        # Exclude current PR to avoid double-counting if it already has labels
                         APPROVED_COUNT=1
                         if [ -n "$INSTALLATION_TOKEN" ]; then
                           OTHER_APPROVED=$(curl -s -L \
                             -H "Accept: application/vnd.github+json" \
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
                             "https://api.github.com/repos/$REPO_FULL/pulls?state=open&per_page=100" | \
-                            jq "[.[] | select(
-                              (.labels[]?.name? // empty | test(\"^approved$\")) and
-                              (.labels[]?.name? // empty | test(\"^service-$SERVICE$\"))
+                            jq --arg pr "$PR_NUMBER" "[.[] | select(
+                              (.number | tostring) != \$pr and
+                              (.labels[]?.name? // empty | ascii_downcase | test(\"^approved$\")) and
+                              (.labels[]?.name? // empty | ascii_downcase | test(\"^service-$SERVICE$\"))
                             )] | length" 2>/dev/null || echo "0")
 
                           # Add 1 for current PR (which just got Tess approval)
