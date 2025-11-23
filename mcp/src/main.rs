@@ -53,7 +53,7 @@ struct ModelRotationConfig {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct AgentTools {
-    #[serde(default, rename = "remoteTools")]
+    #[serde(default)]
     #[allow(dead_code)]
     remote: Vec<String>,
     #[serde(default, rename = "localServers")]

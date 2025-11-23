@@ -275,12 +275,12 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
           # Atlas integration gate (pause workflow until Atlas finishes)
-          # Run if: (1) agent-sequence completed OR (2) resuming at waiting-atlas
-          # Skip if resuming at or after waiting-merge
+          # Only run if coming from agent-sequence (not resuming at Atlas stage)
+          # Skip if resuming at waiting-atlas or waiting-merge
           - name: update-to-waiting-atlas
             depends: "(agent-sequence.Succeeded || agent-sequence.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
-            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -291,7 +291,7 @@ spec:
           - name: wait-for-atlas-integration
             depends: "(update-to-waiting-atlas.Succeeded || update-to-waiting-atlas.Skipped) && check-main-resume.Succeeded"
             template: suspend-for-event
-            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: event-type
