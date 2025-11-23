@@ -495,13 +495,14 @@ spec:
                         # Note: No longer waiting for status labels (needs-cleo, etc.)
                         # System now uses GitHub PR reviews for stage transitions
                         # PR creation event itself triggers the resume
+                        # NOTE: wait-for-pr-created suspend node was removed - workflows now poll for PR in implementation-cycle
 
-                        echo "Polling for workflow reaching wait-for-pr-created suspend point..."
-                        MAX_WORKFLOW_ATTEMPTS=90
-                        WORKFLOW_WAIT_SECONDS=10
+                        echo "Looking for active workflow for task $TASK_ID..."
+                        MAX_WORKFLOW_ATTEMPTS=30
+                        WORKFLOW_WAIT_SECONDS=2
                         WORKFLOW_ATTEMPT=1
                         WORKFLOW_NAME=""
-                        SUSPEND_READY=false
+                        WORKFLOW_FOUND=false
 
                         while [ $WORKFLOW_ATTEMPT -le $MAX_WORKFLOW_ATTEMPTS ]; do
                           WORKFLOW_JSON=$(kubectl get workflows -n agent-platform \
@@ -517,20 +518,23 @@ spec:
                           if [ -n "$WORKFLOW_NAME" ]; then
                             CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | \
                               jq -r '.items[0].metadata.labels["current-stage"] // ""' 2>/dev/null || echo "")
-                            SUSPEND_PHASE=$(echo "$WORKFLOW_JSON" | \
-                              jq -r '(.items[0].status.nodes // {})
-                                | to_entries[]?
-                                | select(.value.displayName == "wait-for-pr-created")
-                                | .value.phase' 2>/dev/null || echo "")
+                            WORKFLOW_PHASE=$(echo "$WORKFLOW_JSON" | \
+                              jq -r '.items[0].status.phase // ""' 2>/dev/null || echo "")
 
-                            if [ "$CURRENT_STAGE" = "waiting-pr-created" ] && [ "$SUSPEND_PHASE" = "Running" ]; then
-                              SUSPEND_READY=true
-                              echo "✅ Workflow $WORKFLOW_NAME is waiting for PR-created event"
+                            echo "✅ Found workflow $WORKFLOW_NAME (stage=$CURRENT_STAGE, phase=$WORKFLOW_PHASE)"
+                            
+                            # Check if workflow is in implementation stage and running
+                            # This means Rex just created the PR and workflow is polling for it
+                            if [ "$CURRENT_STAGE" = "implementation-in-progress" ] && [ "$WORKFLOW_PHASE" = "Running" ]; then
+                              WORKFLOW_FOUND=true
+                              echo "✅ Workflow is in implementation stage - PR creation will allow it to proceed"
                               break
+                            elif [ "$CURRENT_STAGE" = "quality-in-progress" ] || [ "$CURRENT_STAGE" = "security-in-progress" ] || [ "$CURRENT_STAGE" = "testing-in-progress" ]; then
+                              echo "ℹ️ Workflow already progressed past implementation (stage=$CURRENT_STAGE) - no action needed"
+                              exit 0
+                            else
+                              echo "⏳ Workflow stage=$CURRENT_STAGE phase=$WORKFLOW_PHASE - waiting ${WORKFLOW_WAIT_SECONDS}s"
                             fi
-
-                            echo "⏳ Workflow $WORKFLOW_NAME stage=$CURRENT_STAGE suspend-phase=${SUSPEND_PHASE:-none};"
-                            echo "   waiting ${WORKFLOW_WAIT_SECONDS}s"
                           else
                             echo "⏳ No workflow discovered for task-id=$TASK_ID yet; waiting ${WORKFLOW_WAIT_SECONDS}s"
                           fi
@@ -539,8 +543,8 @@ spec:
                           WORKFLOW_ATTEMPT=$((WORKFLOW_ATTEMPT + 1))
                         done
 
-                        if [ "$SUSPEND_READY" != true ]; then
-                          echo "⚠️ Workflow did not reach wait-for-pr-created suspend point in time; skipping resume"
+                        if [ "$WORKFLOW_FOUND" != true ]; then
+                          echo "ℹ️ No active workflow found in implementation stage - PR may have been created manually or workflow already progressed"
                           exit 0
                         fi
 

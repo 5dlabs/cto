@@ -1521,7 +1521,31 @@ spec:
 
             echo "✅ ConfigMap updated with stage: {{`{{inputs.parameters.new-stage}}`}}"
           else
-            echo "ConfigMap does not exist yet - will be created by controller"
+            echo "⚠️ ConfigMap does not exist - creating it now..."
+            
+            # Create ConfigMap with current stage
+            cat <<EOF | kubectl apply -f - || {
+              echo "❌ Failed to create ConfigMap, but workflow will continue"
+            }
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: $CONFIGMAP_NAME
+            namespace: {{ .Release.Namespace }}
+            labels:
+              play-tracking: "true"
+          data:
+            repository: "$REPO"
+            branch: "main"
+            current-task-id: "$TASK_ID"
+            workflow-name: "{{`{{workflow.name}}`}}"
+            status: "in-progress"
+            stage: "{{`{{inputs.parameters.new-stage}}`}}"
+            started-at: "$CURRENT_TIMESTAMP"
+            last-updated: "$CURRENT_TIMESTAMP"
+          EOF
+            
+            echo "✅ ConfigMap created with stage: {{`{{inputs.parameters.new-stage}}`}}"
           fi
 
           # Output monitoring metrics
