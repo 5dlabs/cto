@@ -495,8 +495,12 @@ spec:
                         if [ -n "$BRANCH_REF" ]; then
                           TASK_ID=$(extract_task_id "$BRANCH_REF")
                         fi
-                        if [ -z "$TASK_ID" ] && [ -n "$TASK_LABELS_JSON" ] && [ "$TASK_LABELS_JSON" != "null" ]; then
-                          TASK_ID=$(echo "$TASK_LABELS_JSON" | jq -er '.[]? | .name? | ascii_downcase | select(test("task-[0-9]+")) | capture("task-(?<id>[0-9]+)") | .id' 2>/dev/null || echo "")
+                        if [ -z "$TASK_ID" ] && [ -n "$TASK_LABELS_JSON" ] && \
+                           [ "$TASK_LABELS_JSON" != "null" ]; then
+                          TASK_ID=$(echo "$TASK_LABELS_JSON" | \
+                            jq -er '.[]? | .name? | ascii_downcase | \
+                            select(test("task-[0-9]+")) | \
+                            capture("task-(?<id>[0-9]+)") | .id' 2>/dev/null || echo "")
                         fi
 
                         if [ -z "$TASK_ID" ] && [ -n "$PR_TITLE" ] && [ "$PR_TITLE" != "null" ]; then
@@ -532,10 +536,15 @@ spec:
                           exit 0
                         fi
 
-                        CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | jq -r '.metadata.labels["current-stage"] // ""')
-                        SUSPEND_PHASE=$(echo "$WORKFLOW_JSON" | jq -r '(.status.nodes // {}) | to_entries[]? | select(.value.displayName == "wait-for-atlas-integration") | .value.phase' 2>/dev/null | head -n1)
+                        CURRENT_STAGE=$(echo "$WORKFLOW_JSON" | \
+                          jq -r '.metadata.labels["current-stage"] // ""')
+                        SUSPEND_PHASE=$(echo "$WORKFLOW_JSON" | \
+                          jq -r '(.status.nodes // {}) | to_entries[]? | \
+                          select(.value.displayName == "wait-for-atlas-integration") | \
+                          .value.phase' 2>/dev/null | head -n1)
 
-                        if [ "$CURRENT_STAGE" != "waiting-atlas-integration" ] || [ "$SUSPEND_PHASE" != "Running" ]; then
+                        if [ "$CURRENT_STAGE" != "waiting-atlas-integration" ] || \
+                           [ "$SUSPEND_PHASE" != "Running" ]; then
                           echo "Workflow not ready (stage=$CURRENT_STAGE, suspend=$SUSPEND_PHASE)"
                           exit 0
                         fi
@@ -543,7 +552,11 @@ spec:
                         # Extract SERVICE from PR labels (service-xxx format)
                         SERVICE=""
                         if [ -n "$TASK_LABELS_JSON" ] && [ "$TASK_LABELS_JSON" != "null" ]; then
-                          SERVICE=$(echo "$TASK_LABELS_JSON" | jq -er '.[]? | .name? | ascii_downcase | select(test("service-[a-z0-9-]+")) | capture("service-(?<svc>[a-z0-9-]+)") | .svc' 2>/dev/null || echo "")
+                          SERVICE=$(echo "$TASK_LABELS_JSON" | \
+                            jq -er '.[]? | .name? | ascii_downcase | \
+                            select(test("service-[a-z0-9-]+")) | \
+                            capture("service-(?<svc>[a-z0-9-]+)") | .svc' \
+                            2>/dev/null || echo "")
                         fi
 
                         # Fallback to repo name if no service label
@@ -576,10 +589,11 @@ spec:
                           APPROVED_COUNT=$((OTHER_APPROVED + 1))
                         fi
 
-                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE (including current)"
+                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE"
+                        echo "   (including current)"
 
                         # Check if current PR has merge conflicts using GitHub API
-                        # Query both mergeable (boolean) and mergeable_state (string) fields
+                        # Query both mergeable (boolean) and mergeable_state (string)
                         MERGEABLE="UNKNOWN"
                         MERGE_STATE="UNKNOWN"
                         if [ -n "$INSTALLATION_TOKEN" ]; then
@@ -588,10 +602,15 @@ spec:
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
                             "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" 2>/dev/null || echo "{}")
 
-                          # Use 'if .mergeable == null then "UNKNOWN" else (.mergeable | tostring) end'
-                          # to properly handle boolean false without treating it as falsy
-                          MERGEABLE=$(echo "$PR_DATA" | jq -r 'if .mergeable == null then "UNKNOWN" else (.mergeable | tostring) end' 2>/dev/null || echo "UNKNOWN")
-                          MERGE_STATE=$(echo "$PR_DATA" | jq -r 'if .mergeable_state == null then "UNKNOWN" else .mergeable_state end' 2>/dev/null || echo "UNKNOWN")
+                          # Handle boolean false without treating it as falsy
+                          MERGEABLE=$(echo "$PR_DATA" | \
+                            jq -r 'if .mergeable == null then "UNKNOWN" \
+                            else (.mergeable | tostring) end' \
+                            2>/dev/null || echo "UNKNOWN")
+                          MERGE_STATE=$(echo "$PR_DATA" | \
+                            jq -r 'if .mergeable_state == null then "UNKNOWN" \
+                            else .mergeable_state end' \
+                            2>/dev/null || echo "UNKNOWN")
                         fi
 
                         echo "🔍 PR #$PR_NUMBER mergeable: $MERGEABLE, state: $MERGE_STATE"
