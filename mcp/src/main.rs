@@ -346,20 +346,25 @@ fn parse_bool_argument(arguments: &HashMap<String, Value>, key: &str) -> Option<
 }
 
 fn resolve_workspace_dir() -> Option<std::path::PathBuf> {
-    std::env::current_dir().ok().or_else(|| {
-        std::env::var("WORKSPACE_FOLDER_PATHS")
-            .ok()
-            .and_then(|paths| {
-                paths.split(',').find_map(|p| {
-                    let trimmed = p.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        Some(std::path::PathBuf::from(trimmed))
-                    }
-                })
-            })
-    })
+    // 1. Check WORKSPACE_FOLDER_PATHS first (Cursor environment)
+    // We prioritize this because the process CWD might be the binary location (e.g. in the main 'cto' repo)
+    // while the intended workspace is the one open in Cursor (e.g. 'cto-parallel-test')
+    if let Ok(paths_str) = std::env::var("WORKSPACE_FOLDER_PATHS") {
+        let paths: Vec<&str> = paths_str.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        if !paths.is_empty() {
+            // If multiple paths, try to find one that matches current_dir to be safe
+            if let Ok(cwd) = std::env::current_dir() {
+                if let Some(matched) = paths.iter().find(|p| std::path::Path::new(*p) == cwd) {
+                    return Some(std::path::PathBuf::from(matched));
+                }
+            }
+            // Otherwise, default to the first path (standard behavior for single-root workspaces)
+            return Some(std::path::PathBuf::from(paths[0]));
+        }
+    }
+
+    // 2. Fallback to current directory if env var is missing
+    std::env::current_dir().ok()
 }
 
 fn handle_mcp_methods(method: &str, _params_map: &HashMap<String, Value>) -> Option<Result<Value>> {
@@ -1126,14 +1131,21 @@ enum TasksFile {
 
 /// Find tasks.json in repository, optionally starting from a working directory
 fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
-    // Try to get workspace directory
-    let workspace_dir = resolve_workspace_dir()?;
-
-    // If working_dir is provided, use it as the base directory
-    let base_dir = if let Some(wd) = working_dir {
-        workspace_dir.join(wd)
+    // If working_dir is an absolute path, use it directly
+    let (base_dir, workspace_dir) = if let Some(wd) = working_dir {
+        let wd_path = std::path::PathBuf::from(wd);
+        if wd_path.is_absolute() {
+            (wd_path, None)
+        } else {
+            // Try to get workspace directory for relative paths
+            let ws_dir = resolve_workspace_dir()?;
+            let base = ws_dir.join(wd);
+            (base, Some(ws_dir))
+        }
     } else {
-        workspace_dir.clone()
+        // Try to get workspace directory
+        let ws_dir = resolve_workspace_dir()?;
+        (ws_dir.clone(), Some(ws_dir))
     };
 
     let mut candidates = vec![
@@ -1145,16 +1157,18 @@ fn find_tasks_file(working_dir: Option<&str>) -> Option<std::path::PathBuf> {
         base_dir.join("tasks.json"),
     ];
 
-    // If working_dir was provided, also try workspace root as fallback
+    // If working_dir was provided and we have a workspace, also try workspace root as fallback
     if working_dir.is_some() {
-        candidates.push(
-            workspace_dir
-                .join(".taskmaster")
-                .join("tasks")
-                .join("tasks.json"),
-        );
-        candidates.push(workspace_dir.join(".taskmaster").join("tasks.json"));
-        candidates.push(workspace_dir.join("tasks.json"));
+        if let Some(ws_dir) = workspace_dir {
+            candidates.push(
+                ws_dir
+                    .join(".taskmaster")
+                    .join("tasks")
+                    .join("tasks.json"),
+            );
+            candidates.push(ws_dir.join(".taskmaster").join("tasks.json"));
+            candidates.push(ws_dir.join("tasks.json"));
+        }
     }
 
     candidates.into_iter().find(|p| p.exists())
@@ -1366,11 +1380,11 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
             // No active workflow
 
             // Try to get next task (only works if repository is in local workspace)
-            let next_task = match get_next_taskmaster_task(docs_dir) {
-                Ok(task) => task,
+            let (next_task, tasks_found) = match get_next_taskmaster_task(docs_dir) {
+                Ok(task) => (task, true),
                 Err(err) => {
                     eprintln!("ℹ️  Unable to read TaskMaster tasks locally: {err}");
-                    None
+                    (None, false)
                 }
             };
 
@@ -1387,10 +1401,15 @@ fn handle_play_status(arguments: &HashMap<String, Value>) -> Result<Value> {
                     },
                 }))
             } else {
-                // No tasks available or tasks.json not in local workspace
-                let message = if blocked_tasks.is_empty() {
+                // Determine appropriate message based on whether tasks.json was found
+                let message = if !tasks_found {
+                    // tasks.json not found - repository likely not in workspace
                     "No active workflow. Repository may not be in local workspace - use task_id to start a new workflow.".to_string()
+                } else if blocked_tasks.is_empty() {
+                    // tasks.json found but no tasks available
+                    "All tasks completed".to_string()
                 } else {
+                    // tasks.json found but tasks are blocked
                     format!("{} task(s) blocked by dependencies", blocked_tasks.len())
                 };
 
@@ -1427,14 +1446,42 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
     // Validate repository URL
     validate_repository_url(&repository)?;
 
+    // Check for explicit repository_path parameter
+    let repository_path = arguments
+        .get("repository_path")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
     // Get docs project directory for finding tasks.json
     // Note: We use docs_project_directory (where tasks live), NOT working_directory (where code lives)
-    let docs_dir = config
-        .defaults
-        .play
-        .docs_project_directory
-        .as_ref()
-        .and_then(|dd| if dd == "." { None } else { Some(dd.as_str()) });
+    let docs_dir = if let Some(repo_path) = &repository_path {
+        // If repository_path is provided, construct full path to docs directory
+        eprintln!("📁 Using explicit repository path: {}", repo_path);
+        let docs_project_dir = config
+            .defaults
+            .play
+            .docs_project_directory
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("docs");
+        
+        let full_docs_path = if docs_project_dir == "." {
+            repo_path.clone()
+        } else {
+            format!("{}/{}", repo_path, docs_project_dir)
+        };
+        
+        eprintln!("   Looking for tasks in: {}", full_docs_path);
+        Some(full_docs_path)
+    } else {
+        // Otherwise use config with workspace detection
+        config
+            .defaults
+            .play
+            .docs_project_directory
+            .as_ref()
+            .and_then(|dd| if dd == "." { None } else { Some(dd.to_string()) })
+    };
 
     // Check if task_id is provided
     let task_id = if let Some(id_value) = arguments.get("task_id") {
@@ -1482,45 +1529,91 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             }
         }
 
-        // 3. Check if repository is in local workspace
-        // Get current workspace repository (if available)
-        let workspace_repo = resolve_workspace_dir().and_then(|workspace_path| {
-            let output = std::process::Command::new("git")
-                .args(["remote", "get-url", "origin"])
-                .current_dir(&workspace_path)
-                .output()
-                .ok()?;
-
-            if output.status.success() {
-                let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                url.strip_prefix("git@github.com:")
-                    .or_else(|| url.strip_prefix("https://github.com/"))
-                    .map(|repo_part| repo_part.trim_end_matches(".git").to_string())
-            } else {
-                None
-            }
-        });
-
-        // Check if the requested repository matches the workspace
-        let is_local_repo = workspace_repo.as_ref().map_or(false, |wr| wr == &repository);
-        
-        if !is_local_repo {
-            // Repository is not in local workspace - use task_id 1 for first run
-            eprintln!("📦 Repository '{}' is not in local workspace", repository);
-            eprintln!("   Workspace repository: {}", workspace_repo.as_deref().unwrap_or("unknown"));
-            eprintln!("   Starting with task 1 for remote repository");
-            Some(1) // Default to task 1 for remote repositories on first run
-        } else {
-            // Repository is local - try to auto-detect next task
-            eprintln!("🔍 Querying TaskMaster for next available task...");
-            match get_next_taskmaster_task(docs_dir) {
+        // 3. If repository_path is provided, skip workspace detection and use it directly
+        if repository_path.is_some() {
+            eprintln!("🔍 Using explicit repository path - querying TaskMaster...");
+            match get_next_taskmaster_task(docs_dir.as_deref()) {
                 Ok(Some(task)) => {
                     eprintln!("✅ Found next task: {} - {}", task.id, task.title);
                     Some(task.id)
                 }
                 Ok(None) => {
                     // Check for blocked tasks to provide helpful feedback
-                    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir).unwrap_or_default();
+                    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
+
+                    let message = if blocked_tasks.is_empty() {
+                        "No tasks available - all tasks are completed".to_string()
+                    } else {
+                        let blocked_ids: Vec<String> = blocked_tasks
+                            .iter()
+                            .map(|t| format!("Task {} ({})", t.id, t.title))
+                            .collect();
+
+                        format!(
+                            "No tasks available. {} task(s) blocked by dependencies:\n{}",
+                            blocked_tasks.len(),
+                            blocked_ids.join("\n")
+                        )
+                    };
+
+                    return Ok(json!({
+                        "success": false,
+                        "message": message,
+                        "repository": repository,
+                        "blocked_tasks": blocked_tasks.into_iter().map(|t| json!({
+                            "id": t.id,
+                            "title": t.title,
+                            "dependencies": t.dependencies
+                        })).collect::<Vec<_>>(),
+                    }));
+                }
+                Err(e) => {
+                    eprintln!("❌ Could not find tasks.json at repository_path: {}", e);
+                    eprintln!("   Please ensure .taskmaster/tasks/tasks.json exists at the specified path");
+                    // Fall back to task 1 for first run
+                    Some(1)
+                }
+            }
+        } else {
+            // Check if repository is in local workspace
+            // Get current workspace repository (if available)
+            let workspace_repo = resolve_workspace_dir().and_then(|workspace_path| {
+                let output = std::process::Command::new("git")
+                    .args(["remote", "get-url", "origin"])
+                    .current_dir(&workspace_path)
+                    .output()
+                    .ok()?;
+
+                if output.status.success() {
+                    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    url.strip_prefix("git@github.com:")
+                        .or_else(|| url.strip_prefix("https://github.com/"))
+                        .map(|repo_part| repo_part.trim_end_matches(".git").to_string())
+                } else {
+                    None
+                }
+            });
+
+            // Check if the requested repository matches the workspace
+            let is_local_repo = workspace_repo.as_ref().map_or(false, |wr| wr == &repository);
+            
+            if !is_local_repo {
+                // Repository is not in local workspace - use task_id 1 for first run
+                eprintln!("📦 Repository '{}' is not in local workspace", repository);
+                eprintln!("   Workspace repository: {}", workspace_repo.as_deref().unwrap_or("unknown"));
+                eprintln!("   Starting with task 1 for remote repository");
+                Some(1) // Default to task 1 for remote repositories on first run
+            } else {
+                // Repository is local - try to auto-detect next task
+                eprintln!("🔍 Querying TaskMaster for next available task...");
+                match get_next_taskmaster_task(docs_dir.as_deref()) {
+                Ok(Some(task)) => {
+                    eprintln!("✅ Found next task: {} - {}", task.id, task.title);
+                    Some(task.id)
+                }
+                Ok(None) => {
+                    // Check for blocked tasks to provide helpful feedback
+                    let blocked_tasks = find_blocked_taskmaster_tasks(docs_dir.as_deref()).unwrap_or_default();
 
                     let message = if blocked_tasks.is_empty() {
                         "No tasks available - all tasks are completed".to_string()
@@ -1554,6 +1647,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
                     return Err(anyhow!("Failed to read tasks.json: {}", e));
                 }
             }
+        }
         }
     };
 

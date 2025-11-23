@@ -48,3 +48,4 @@ RUN gemini-cli --version 2>/dev/null || gemini --version 2>/dev/null || \
 # Final setup
 USER node
 
+
