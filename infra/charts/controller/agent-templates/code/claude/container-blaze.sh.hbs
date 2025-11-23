@@ -1415,6 +1415,74 @@ fi
 # Verify setup
 echo "✓ Code implementation environment ready"
 
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "🔍 Verifying Claude MCP tools..."
+
+TOOL_VERIFICATION_FAILED=false
+
+if command -v claude >/dev/null 2>&1; then
+  # Check MCP servers first
+  echo "📋 Checking MCP servers..."
+  MCP_LIST=$(claude mcp list 2>&1 || echo "FAILED")
+  
+  if echo "$MCP_LIST" | grep -q "Connected"; then
+    echo "  ✓ MCP servers connected"
+    echo "$MCP_LIST" | grep "Connected" | sed 's/^/  /'
+  else
+    echo "  ⚠️ No MCP servers connected"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Blaze needs: Context7, shadcn, GitHub
+  REQUIRED_SERVERS=("toolman")
+  
+  echo ""
+  echo "🔍 Verifying required MCP servers..."
+  for server in "${REQUIRED_SERVERS[@]}"; do
+    if echo "$MCP_LIST" | grep -q "$server.*Connected"; then
+      echo "  ✓ $server server available"
+    else
+      echo "  ❌ $server server NOT available"
+      TOOL_VERIFICATION_FAILED=true
+    fi
+  done
+  
+  echo ""
+else
+  echo "  ⚠️ claude CLI not available for tool verification"
+  TOOL_VERIFICATION_FAILED=true
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "Critical MCP servers are not available. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - CONTEXT7_API_KEY not set (check secret mounting)"
+  echo "  - MCP servers not initialized properly"
+  echo "  - .mcp.json misconfigured"
+  echo ""
+  echo "Full MCP server list:"
+  claude mcp list 2>&1 || echo "Failed to list MCP servers"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical MCP tools verified successfully"
+echo ""
+# =========================================================================
+
 # Build Claude command
 CLAUDE_CMD="claude -p --output-format stream-json --input-format stream-json --verbose"
 

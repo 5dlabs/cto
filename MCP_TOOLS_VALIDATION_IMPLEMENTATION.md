@@ -18,7 +18,13 @@ Implemented MCP tools validation across all CLI agents following the pattern est
 
 ### Files Modified
 
-1. **Claude**: `infra/charts/controller/agent-templates/code/claude/container.sh.hbs`
+1. **Claude** (6 files - Claude uses agent-specific scripts, not wrappers):
+   - `infra/charts/controller/agent-templates/code/claude/container.sh.hbs`
+   - `infra/charts/controller/agent-templates/code/claude/container-cleo.sh.hbs`
+   - `infra/charts/controller/agent-templates/code/claude/container-rex.sh.hbs`
+   - `infra/charts/controller/agent-templates/code/claude/container-blaze.sh.hbs`
+   - `infra/charts/controller/agent-templates/code/claude/container-cipher.sh.hbs`
+   - `infra/charts/controller/agent-templates/code/claude/container-rex-remediation.sh.hbs`
    - Added MCP server validation before Claude command execution
    - Checks for `toolman` server connectivity
    - Validates MCP configuration at `/workspace/.mcp.json`
