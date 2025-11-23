@@ -290,6 +290,84 @@ fn load_cto_config() -> Result<CtoConfig> {
     Err(anyhow!("cto-config.json not found in current directory or parent directory.{workspace_info} Please create a configuration file in your project root."))
 }
 
+/// Load repository-specific configuration from cto-config.json
+/// Used during workflow creation to get repository's agent tool configurations
+#[allow(clippy::disallowed_macros)]
+fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
+    // Try to load from explicit repository path first
+    if let Some(repo_path) = repository_path {
+        let config_path = std::path::PathBuf::from(repo_path).join("cto-config.json");
+
+        if config_path.exists() {
+            eprintln!(
+                "📋 Loading repository config from: {}",
+                config_path.display()
+            );
+
+            match std::fs::read_to_string(&config_path) {
+                Ok(config_content) => match serde_json::from_str::<CtoConfig>(&config_content) {
+                    Ok(config) => {
+                        if config.version == "1.0" {
+                            eprintln!("✅ Repository configuration loaded successfully");
+                            eprintln!("   Agents defined: {}", config.agents.len());
+                            return Some(config);
+                        } else {
+                            eprintln!(
+                                "⚠️  Repository config version mismatch: {} (expected 1.0)",
+                                config.version
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse repository config: {e}");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read repository config: {e}");
+                }
+            }
+        } else {
+            eprintln!(
+                "ℹ️  No cto-config.json found in repository at: {}",
+                config_path.display()
+            );
+        }
+    }
+
+    // Try workspace detection as fallback
+    if let Some(workspace_path) = resolve_workspace_dir() {
+        let config_path = workspace_path.join("cto-config.json");
+
+        if config_path.exists() {
+            eprintln!(
+                "📋 Loading repository config from workspace: {}",
+                config_path.display()
+            );
+
+            match std::fs::read_to_string(&config_path) {
+                Ok(config_content) => match serde_json::from_str::<CtoConfig>(&config_content) {
+                    Ok(config) => {
+                        if config.version == "1.0" {
+                            eprintln!("✅ Repository configuration loaded from workspace");
+                            eprintln!("   Agents defined: {}", config.agents.len());
+                            return Some(config);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse workspace config: {e}");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read workspace config: {e}");
+                }
+            }
+        }
+    }
+
+    eprintln!("ℹ️  Using platform default configuration (no repository config found)");
+    None
+}
+
 #[derive(Deserialize)]
 struct RpcRequest {
     id: Option<Value>,
@@ -1733,6 +1811,19 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .and_then(|v| v.as_str())
         .map_or_else(|| config.defaults.play.model.clone(), String::from);
 
+    // Try to load repository-specific configuration for agent tools
+    eprintln!("🔍 Checking for repository-specific configuration...");
+    let repo_config = load_repository_config(repository_path.as_deref());
+
+    // Use repository config if available, otherwise fall back to platform config
+    let effective_config = repo_config.as_ref().unwrap_or(config);
+
+    if repo_config.is_some() {
+        eprintln!("✅ Using repository configuration for agent tools");
+    } else {
+        eprintln!("ℹ️  Using platform configuration (no repository config)");
+    }
+
     // Handle implementation agent - use provided value or config default
     let implementation_agent_input = arguments
         .get("implementation_agent")
@@ -1742,7 +1833,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             String::from,
         );
 
-    let implementation_agent_cfg = config
+    let implementation_agent_cfg = effective_config
         .agents
         .values()
         .find(|a| a.github_app == implementation_agent_input);
@@ -1850,7 +1941,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
             fallback
         });
 
-    let frontend_agent_cfg = config
+    let frontend_agent_cfg = effective_config
         .agents
         .values()
         .find(|a| a.github_app == frontend_agent_input);
@@ -1934,7 +2025,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map_or_else(|| config.defaults.play.quality_agent.clone(), String::from);
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
-    let quality_agent_cfg = config
+    let quality_agent_cfg = effective_config
         .agents
         .values()
         .find(|a| a.github_app == quality_agent_input);
@@ -2018,7 +2109,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map_or_else(|| config.defaults.play.security_agent.clone(), String::from);
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
-    let security_agent_cfg = config
+    let security_agent_cfg = effective_config
         .agents
         .values()
         .find(|a| a.github_app == security_agent_input);
@@ -2102,7 +2193,7 @@ fn handle_play_workflow(arguments: &HashMap<String, Value>) -> Result<Value> {
         .map_or_else(|| config.defaults.play.testing_agent.clone(), String::from);
 
     // Resolve agent name and extract CLI/model/tools/modelRotation if it's a short alias
-    let testing_agent_cfg = config
+    let testing_agent_cfg = effective_config
         .agents
         .values()
         .find(|a| a.github_app == testing_agent_input);
