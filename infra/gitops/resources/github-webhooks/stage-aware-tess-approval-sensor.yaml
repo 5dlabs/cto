@@ -548,8 +548,9 @@ spec:
 
                         # Fallback to repo name if no service label
                         if [ -z "$SERVICE" ]; then
-                          SERVICE="$REPO_NAME"
-                          echo "ℹ️ No service label found, using repo name: $SERVICE"
+                          # Sanitize REPO_NAME: keep only alphanumeric and hyphens for regex safety
+                          SERVICE=$(echo "$REPO_NAME" | tr -cd 'a-zA-Z0-9-' | tr '[:upper:]' '[:lower:]')
+                          echo "ℹ️ No service label found, using sanitized repo name: $SERVICE"
                         else
                           echo "📦 Service: $SERVICE"
                         fi
@@ -558,19 +559,23 @@ spec:
                         echo "🔍 Checking if Atlas integration is required..."
 
                         # Count approved PRs for this service using GitHub API
+                        # Note: Query returns count of OTHER approved PRs, we add current PR below
                         APPROVED_COUNT=1
                         if [ -n "$INSTALLATION_TOKEN" ]; then
-                          APPROVED_COUNT=$(curl -s -L \
+                          OTHER_APPROVED=$(curl -s -L \
                             -H "Accept: application/vnd.github+json" \
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
                             "https://api.github.com/repos/$REPO_FULL/pulls?state=open&per_page=100" | \
                             jq "[.[] | select(
                               (.labels[]?.name? // empty | test(\"^approved$\")) and
                               (.labels[]?.name? // empty | test(\"^service-$SERVICE$\"))
-                            )] | length" 2>/dev/null || echo "1")
+                            )] | length" 2>/dev/null || echo "0")
+
+                          # Add 1 for current PR (which just got Tess approval)
+                          APPROVED_COUNT=$((OTHER_APPROVED + 1))
                         fi
 
-                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE"
+                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE (including current)"
 
                         # Check if current PR has merge conflicts using GitHub API
                         # Query both mergeable (boolean) and mergeable_state (string) fields
