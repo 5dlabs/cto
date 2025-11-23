@@ -140,6 +140,74 @@ fn load_cto_config() -> Result<CtoConfig> {
     Err(anyhow!("cto-config.json not found in current directory or parent directory.{} Please create a configuration file in your project root.", workspace_info))
 }
 
+/// Load repository-specific configuration from cto-config.json
+/// Used during workflow creation to get repository's agent tool configurations
+#[allow(clippy::disallowed_macros)]
+fn load_repository_config(repository_path: Option<&str>) -> Option<CtoConfig> {
+    // Try to load from explicit repository path first
+    if let Some(repo_path) = repository_path {
+        let config_path = std::path::PathBuf::from(repo_path).join("cto-config.json");
+
+        if config_path.exists() {
+            eprintln!(
+                "📋 Loading repository config from: {}",
+                config_path.display()
+            );
+
+            match std::fs::read_to_string(&config_path) {
+                Ok(config_content) => match serde_json::from_str::<CtoConfig>(&config_content) {
+                    Ok(config) => {
+                        if config.version == "1.0" {
+                            eprintln!("✅ Repository configuration loaded successfully");
+                            eprintln!("   Agents defined: {}", config.agents.len());
+                            return Some(config);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse repository config: {e}");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read repository config: {e}");
+                }
+            }
+        }
+    }
+
+    // Try workspace detection as fallback
+    if let Some(workspace_path) = resolve_workspace_dir() {
+        let config_path = workspace_path.join("cto-config.json");
+
+        if config_path.exists() {
+            eprintln!(
+                "📋 Loading repository config from workspace: {}",
+                config_path.display()
+            );
+
+            match std::fs::read_to_string(&config_path) {
+                Ok(config_content) => match serde_json::from_str::<CtoConfig>(&config_content) {
+                    Ok(config) => {
+                        if config.version == "1.0" {
+                            eprintln!("✅ Repository configuration loaded from workspace");
+                            eprintln!("   Agents defined: {}", config.agents.len());
+                            return Some(config);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("⚠️  Failed to parse workspace config: {e}");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("⚠️  Failed to read workspace config: {e}");
+                }
+            }
+        }
+    }
+
+    eprintln!("ℹ️  Using platform default configuration (no repository config found)");
+    None
+}
+
 #[derive(Deserialize)]
 struct RpcRequest {
     id: Option<Value>,
@@ -1196,16 +1264,10 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
         .unwrap_or("agent-platform");
 
     let include = arguments.get("include").and_then(|v| v.as_array());
-    let include_code = include.is_none()
-        || include
-            .unwrap()
-            .iter()
-            .any(|x| x.as_str() == Some("code"));
-    let include_docs = include.is_none()
-        || include
-            .unwrap()
-            .iter()
-            .any(|x| x.as_str() == Some("docs"));
+    let include_code =
+        include.is_none() || include.unwrap().iter().any(|x| x.as_str() == Some("code"));
+    let include_docs =
+        include.is_none() || include.unwrap().iter().any(|x| x.as_str() == Some("docs"));
     let include_intake = include.is_none()
         || include
             .unwrap()
@@ -1215,13 +1277,34 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
     let mut jobs: Vec<Value> = Vec::new();
 
     if include_code {
-        if let Ok(list) = run_kubectl_json(&["get", "coderuns.agents.platform", "-n", namespace, "-o", "json"]) {
+        if let Ok(list) = run_kubectl_json(&[
+            "get",
+            "coderuns.agents.platform",
+            "-n",
+            namespace,
+            "-o",
+            "json",
+        ]) {
             if let Some(items) = list.get("items").and_then(|v| v.as_array()) {
                 for item in items {
-                    let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-                    let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
-                    let message = item.get("status").and_then(|s| s.get("message")).and_then(|p| p.as_str());
-                    let job_name = item.get("status").and_then(|s| s.get("jobName")).and_then(|p| p.as_str());
+                    let name = item
+                        .get("metadata")
+                        .and_then(|m| m.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    let phase = item
+                        .get("status")
+                        .and_then(|s| s.get("phase"))
+                        .and_then(|p| p.as_str())
+                        .unwrap_or("");
+                    let message = item
+                        .get("status")
+                        .and_then(|s| s.get("message"))
+                        .and_then(|p| p.as_str());
+                    let job_name = item
+                        .get("status")
+                        .and_then(|s| s.get("jobName"))
+                        .and_then(|p| p.as_str());
                     jobs.push(json!({
                         "type": "code",
                         "name": name,
@@ -1236,13 +1319,34 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
     }
 
     if include_docs {
-        if let Ok(list) = run_kubectl_json(&["get", "docsruns.agents.platform", "-n", namespace, "-o", "json"]) {
+        if let Ok(list) = run_kubectl_json(&[
+            "get",
+            "docsruns.agents.platform",
+            "-n",
+            namespace,
+            "-o",
+            "json",
+        ]) {
             if let Some(items) = list.get("items").and_then(|v| v.as_array()) {
                 for item in items {
-                    let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-                    let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
-                    let message = item.get("status").and_then(|s| s.get("message")).and_then(|p| p.as_str());
-                    let job_name = item.get("status").and_then(|s| s.get("jobName")).and_then(|p| p.as_str());
+                    let name = item
+                        .get("metadata")
+                        .and_then(|m| m.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    let phase = item
+                        .get("status")
+                        .and_then(|s| s.get("phase"))
+                        .and_then(|p| p.as_str())
+                        .unwrap_or("");
+                    let message = item
+                        .get("status")
+                        .and_then(|s| s.get("message"))
+                        .and_then(|p| p.as_str());
+                    let job_name = item
+                        .get("status")
+                        .and_then(|s| s.get("jobName"))
+                        .and_then(|p| p.as_str());
                     jobs.push(json!({
                         "type": "docs",
                         "name": name,
@@ -1261,8 +1365,16 @@ fn handle_jobs_tool(arguments: &std::collections::HashMap<String, Value>) -> Res
             if let Ok(v) = serde_json::from_str::<Value>(&list_str) {
                 if let Some(items) = v.get("items").and_then(|v| v.as_array()) {
                     for item in items {
-                        let name = item.get("metadata").and_then(|m| m.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-                        let phase = item.get("status").and_then(|s| s.get("phase")).and_then(|p| p.as_str()).unwrap_or("");
+                        let name = item
+                            .get("metadata")
+                            .and_then(|m| m.get("name"))
+                            .and_then(|n| n.as_str())
+                            .unwrap_or("");
+                        let phase = item
+                            .get("status")
+                            .and_then(|s| s.get("phase"))
+                            .and_then(|p| p.as_str())
+                            .unwrap_or("");
                         jobs.push(json!({
                             "type": "intake",
                             "name": name,
@@ -1301,11 +1413,20 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
         "code" => {
             // Use plural, group-qualified CRD to avoid alias issues
             let out = std::process::Command::new("kubectl")
-                .args(["delete", "coderuns.agents.platform", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
+                .args([
+                    "delete",
+                    "coderuns.agents.platform",
+                    name,
+                    "-n",
+                    namespace,
+                    "--wait=false",
+                ]) // trigger finalizer cleanup
                 .output()
                 .context("Failed to execute kubectl delete coderuns.agents.platform")?;
             if out.status.success() {
-                Ok(json!({"success": true, "message": format!("Deleted CodeRun {name}"), "namespace": namespace}))
+                Ok(
+                    json!({"success": true, "message": format!("Deleted CodeRun {name}"), "namespace": namespace}),
+                )
             } else {
                 Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
             }
@@ -1313,11 +1434,20 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
         "docs" => {
             // Use plural, group-qualified CRD to avoid alias issues
             let out = std::process::Command::new("kubectl")
-                .args(["delete", "docsruns.agents.platform", name, "-n", namespace, "--wait=false"]) // trigger finalizer cleanup
+                .args([
+                    "delete",
+                    "docsruns.agents.platform",
+                    name,
+                    "-n",
+                    namespace,
+                    "--wait=false",
+                ]) // trigger finalizer cleanup
                 .output()
                 .context("Failed to execute kubectl delete docsruns.agents.platform")?;
             if out.status.success() {
-                Ok(json!({"success": true, "message": format!("Deleted DocsRun {name}"), "namespace": namespace}))
+                Ok(
+                    json!({"success": true, "message": format!("Deleted DocsRun {name}"), "namespace": namespace}),
+                )
             } else {
                 Err(anyhow!(String::from_utf8_lossy(&out.stderr).to_string()))
             }
@@ -1327,7 +1457,7 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
             let _ = run_argo_cli(&["terminate", name, "-n", namespace]);
             match run_argo_cli(&["delete", name, "-n", namespace]) {
                 Ok(msg) => Ok(json!({"success": true, "message": msg, "namespace": namespace})),
-                Err(e) => Err(anyhow!(format!("Failed to delete workflow {name}: {e}")))
+                Err(e) => Err(anyhow!(format!("Failed to delete workflow {name}: {e}"))),
             }
         }
         other => Err(anyhow!(format!("Unsupported job_type: {other}"))),
@@ -1335,7 +1465,9 @@ fn handle_stop_job_tool(arguments: &std::collections::HashMap<String, Value>) ->
 }
 
 #[allow(dead_code)]
-fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, Value>) -> Result<Value> {
+fn handle_anthropic_message_tool(
+    arguments: &std::collections::HashMap<String, Value>,
+) -> Result<Value> {
     let api_key = std::env::var("ANTHROPIC_API_KEY")
         .map_err(|_| anyhow!("ANTHROPIC_API_KEY environment variable not set"))?;
     let model = arguments
@@ -1371,7 +1503,9 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
         "messages": messages,
         "max_tokens": max_tokens
     });
-    if let Some(s) = system { body["system"] = json!(s); }
+    if let Some(s) = system {
+        body["system"] = json!(s);
+    }
 
     let resp = client
         .post("https://api.anthropic.com/v1/messages")
@@ -1382,7 +1516,9 @@ fn handle_anthropic_message_tool(arguments: &std::collections::HashMap<String, V
         .and_then(|r| r.error_for_status())
         .map_err(|e| anyhow!(format!("Anthropic request failed: {e}")))?;
 
-    let json_resp: Value = resp.json().map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
+    let json_resp: Value = resp
+        .json()
+        .map_err(|e| anyhow!(format!("Failed to parse Anthropic response: {e}")))?;
     Ok(json_resp)
 }
 
@@ -1409,7 +1545,9 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '/' || c == '-' || c == '_' || c == '.'))
     {
-        return Err(anyhow!("Invalid fifo_path; must be absolute and contain only [a-zA-Z0-9/_-.]"));
+        return Err(anyhow!(
+            "Invalid fifo_path; must be absolute and contain only [a-zA-Z0-9/_-.]"
+        ));
     }
 
     // Routing: explicit name + job_type, or by user label (optionally filtered by job_type)
@@ -1434,11 +1572,15 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
         }
         (label_selector, namespace)
     } else {
-        return Err(anyhow!("Provide either (job_type + name) or user label for routing"));
+        return Err(anyhow!(
+            "Provide either (job_type + name) or user label for routing"
+        ));
     };
 
     // Find pod by labels
-    let pods_json = run_kubectl_json(&["get", "pods", "-n", pod_ns, "-l", &selector, "-o", "json"])?.to_string();
+    let pods_json =
+        run_kubectl_json(&["get", "pods", "-n", pod_ns, "-l", &selector, "-o", "json"])?
+            .to_string();
     let pods: Value = serde_json::from_str(&pods_json)?;
     let pod_name = pods
         .get("items")
@@ -1462,8 +1604,13 @@ fn handle_send_job_input(arguments: &std::collections::HashMap<String, Value>) -
     // Stream input safely using tee without invoking a shell; pass fifo_path as an argument
     // This avoids shell interpolation entirely
     let mut child = std::process::Command::new("kubectl")
-        .args(["-n", namespace, "exec", "-i", pod_name, "--", "tee", "-a", fifo_path])
-        .env("KUBECONFIG", std::env::var("KUBECONFIG").unwrap_or_default())
+        .args([
+            "-n", namespace, "exec", "-i", pod_name, "--", "tee", "-a", fifo_path,
+        ])
+        .env(
+            "KUBECONFIG",
+            std::env::var("KUBECONFIG").unwrap_or_default(),
+        )
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
