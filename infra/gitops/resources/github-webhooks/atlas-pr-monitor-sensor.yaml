@@ -129,12 +129,15 @@ spec:
                           TASK_ID=$(extract_task_id "$PR_TITLE")
                         fi
 
+                        # Atlas doesn't need a task ID - it's an integration coordinator
+                        # Only use task ID if we actually found one from PR labels/branch/title
                         if [ -z "$TASK_ID" ]; then
-                          TASK_ID="0"
+                          echo "=== Atlas PR Monitor ==="
+                          echo "PR #$PR_NUMBER ($ACTION) | Repo: $REPO_FULL | No task ID (integration coordinator)"
+                        else
+                          echo "=== Atlas PR Monitor ==="
+                          echo "PR #$PR_NUMBER ($ACTION) | Repo: $REPO_FULL | Task: $TASK_ID"
                         fi
-
-                        echo "=== Atlas PR Monitor ==="
-                        echo "PR #$PR_NUMBER ($ACTION) | Repo: $REPO_FULL | Task: $TASK_ID"
 
                         LOCK_NAME="atlas-guardian-lock-$PR_NUMBER"
                         if kubectl create configmap "$LOCK_NAME" \
@@ -166,9 +169,12 @@ spec:
                         fi
 
                         TASK_LABEL_VALUE=""
-                        if [ "$TASK_ID" != "0" ]; then
+                        TASK_ID_SPEC=""
+                        if [ -n "$TASK_ID" ]; then
                           TASK_LABEL_VALUE="                        "
                           TASK_LABEL_VALUE="${TASK_LABEL_VALUE}    task-id: \"$TASK_ID\""
+                          TASK_ID_SPEC="                        "
+                          TASK_ID_SPEC="${TASK_ID_SPEC}  taskId: \"$TASK_ID\""
                         fi
 
                         cat <<EOF | sed 's/^                        //' | kubectl create -f - >/tmp/atlas-guardian.log 2>&1 || true
@@ -184,7 +190,7 @@ spec:
                             repository: "$REPO_LABEL"
                         ${TASK_LABEL_VALUE}
                         spec:
-                          taskId: "$TASK_ID"
+                        ${TASK_ID_SPEC}
                           service: "atlas"
                           githubApp: "5DLabs-Atlas"
                           model: "claude-sonnet-4-5-20250929"
@@ -208,7 +214,7 @@ spec:
                             - name: REPOSITORY_SLUG
                               value: "$REPO_FULL"
                             - name: TASK_ID
-                              value: "$TASK_ID"
+                              value: "${TASK_ID:-none}"
                             - name: ATLAS_MODE
                               value: "guardian"
                             - name: ATLAS_POLL_INTERVAL
