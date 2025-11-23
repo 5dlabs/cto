@@ -320,49 +320,6 @@ spec:
                           kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$patch_json"
                         }
 
-                        advance_stage_if_needed() {
-                          local workflow_name="$1"
-                          local task_id="$2"
-                          local repo_label="$3"
-
-                          local workflow_json resource_version patch_json
-                          workflow_json=$(kubectl get workflow "$workflow_name" -n agent-platform -o json 2>/dev/null)
-                          if [ -z "$workflow_json" ]; then
-                            echo "⚠️ Unable to fetch workflow $workflow_name for stage update"
-                            return 1
-                          fi
-
-                          local current_stage
-                          current_stage=$(echo "$workflow_json" | jq -r '.metadata.labels["current-stage"] // ""')
-                          if [ "$current_stage" != "waiting-pr-created" ]; then
-                            echo "ℹ️ Workflow $workflow_name no longer at waiting-pr-created (found '$current_stage')"
-                            return 0
-                          fi
-
-                          resource_version=$(echo "$workflow_json" | jq -r '.metadata.resourceVersion // ""')
-                          if [ -z "$resource_version" ]; then
-                            echo "⚠️ Missing resourceVersion for $workflow_name"
-                            return 1
-                          fi
-
-                          patch_json=$(jq -n \
-                            --arg rv "$resource_version" \
-                            --arg task "$task_id" \
-                            --arg repo "$repo_label" \
-                            '{
-                              metadata: {
-                                resourceVersion: $rv,
-                                labels: {
-                                  "previous-stage": "waiting-pr-created",
-                                  "current-stage": "waiting-quality-complete",
-                                  "task-id": $task,
-                                  repository: $repo
-                                }
-                              }
-                            }')
-
-                          kubectl patch workflow "$workflow_name" -n agent-platform --type='merge' -p "$patch_json"
-                        }
 
                         ensure_jq
                         ensure_openssl
@@ -547,19 +504,13 @@ spec:
                         echo "Updating workflow metadata with PR details"
                         if ! update_workflow_pr_metadata "$WORKFLOW_NAME" "$PR_URL" "$PR_NUMBER"; then
                           echo "⚠️ Failed to update workflow with PR metadata"
+                        else
+                          echo "✅ PR metadata updated - workflow will detect PR and proceed"
                         fi
 
-                        REPO_LABEL=$(echo "$REPO" | tr '/' '-')
-                        if ! advance_stage_if_needed "$WORKFLOW_NAME" "$TASK_ID" "$REPO_LABEL"; then
-                          echo "⚠️ Failed to advance workflow stage"
-                          exit 0
-                        fi
-
-                        echo "Resuming workflow $WORKFLOW_NAME"
-                        if ! resume_workflow; then
-                          echo "⚠️ Resume attempt failed"
-                          exit 0
-                        fi
+                        # NOTE: No longer calling advance_stage_if_needed or resume_workflow
+                        # Workflow template polls for PR internally via check-or-wait-for-pr
+                        # and handles stage transitions automatically.
 
                         echo "Finished processing PR-created event"
           parameters:
