@@ -239,10 +239,35 @@ STAGES=("implementation" "quality" "security" "testing" "waiting-atlas" "waiting
   depends: "(agent-sequence.Succeeded || agent-sequence.Skipped) && check-main-resume.Succeeded"
 ```
 
+## Critical Follow-Up Fix
+
+### Issue: Stage Updates Overwrite Resume State
+
+After the initial fix, discovered that `initialize-stage` and `update-to-implementation` were running unconditionally, overwriting the ConfigMap's resume state with `pending` → `implementation-in-progress` before skipping `agent-sequence`.
+
+**Impact:** Resume point lost, workflow thinks it's at implementation stage even when resuming at Atlas/merge.
+
+**Fix Applied:**
+```yaml
+# Only initialize stage when starting fresh
+- name: initialize-stage
+  when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' == 'implementation'"
+
+# Only update to implementation when starting fresh  
+- name: update-to-implementation
+  when: "'{{tasks.check-main-resume.outputs.parameters.resume-stage}}' == 'implementation'"
+  depends: "(initialize-stage.Succeeded || initialize-stage.Skipped) && ..."
+
+# Agent sequence handles skipped dependencies
+- name: agent-sequence
+  depends: "(update-to-implementation.Succeeded || update-to-implementation.Skipped) && ..."
+```
+
 ## Next Steps
 
 1. ✅ **DONE:** Applied fix to resume logic
-2. **TODO:** Test resume from each stage (including atlas stages)
-3. **TODO:** Verify stage transition validation still works  
-4. **TODO:** Document Atlas integration stage semantics
-5. **TODO:** Check if parallel-execution workflow template needs same fix
+2. ✅ **DONE:** Fixed stage update overwrite issue
+3. **TODO:** Test resume from each stage (including atlas stages)
+4. **TODO:** Verify stage transition validation still works  
+5. **TODO:** Document Atlas integration stage semantics
+6. **TODO:** Check if parallel-execution workflow template needs same fix

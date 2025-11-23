@@ -240,7 +240,7 @@ spec:
           # Stage 1: Initialize workflow stage tracking
           # Only run if starting fresh (not resuming from later stage)
           - name: initialize-stage
-            dependencies: [check-main-resume]
+            depends: "check-main-resume.Succeeded"
             template: update-workflow-stage
             when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' == 'implementation'"
             arguments:
@@ -253,7 +253,6 @@ spec:
           # Stage 2: Update to implementation stage before Rex starts
           # Only run if starting fresh (not resuming from later stage)
           - name: update-to-implementation
-            dependencies: [initialize-stage, check-main-resume]
             depends: "(initialize-stage.Succeeded || initialize-stage.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
             when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' == 'implementation'"
@@ -267,7 +266,6 @@ spec:
           # Agent execution sequence: Rex → Cleo → Cipher → Tess
           # Skip if resuming at or after waiting-atlas
           - name: agent-sequence
-            dependencies: [update-to-implementation, check-main-resume]
             depends: "(update-to-implementation.Succeeded || update-to-implementation.Skipped) && check-main-resume.Succeeded"
             template: agent-sequence
             when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
@@ -277,13 +275,12 @@ spec:
                   value: "{{`{{workflow.parameters.implementation-max-retries}}`}}"
 
           # Atlas integration gate (pause workflow until Atlas finishes)
-          # Run if: (1) agent-sequence completed OR (2) resuming at waiting-atlas
-          # Skip if resuming at or after waiting-merge
+          # Only run if coming from agent-sequence (not resuming at Atlas stage)
+          # Skip if resuming at waiting-atlas or waiting-merge
           - name: update-to-waiting-atlas
-            dependencies: [agent-sequence, check-main-resume]
             depends: "(agent-sequence.Succeeded || agent-sequence.Skipped) && check-main-resume.Succeeded"
             template: update-workflow-stage
-            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: new-stage
@@ -292,10 +289,9 @@ spec:
                   value: "true"
 
           - name: wait-for-atlas-integration
-            dependencies: [update-to-waiting-atlas, check-main-resume]
             depends: "(update-to-waiting-atlas.Succeeded || update-to-waiting-atlas.Skipped) && check-main-resume.Succeeded"
             template: suspend-for-event
-            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
+            when: "'{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-atlas' && '{{`{{tasks.check-main-resume.outputs.parameters.resume-stage}}`}}' != 'waiting-merge'"
             arguments:
               parameters:
                 - name: event-type
@@ -305,7 +301,6 @@ spec:
 
           # Update stage after Atlas completes integration checks
           - name: update-to-waiting-merge
-            dependencies: [wait-for-atlas-integration]
             depends: "wait-for-atlas-integration.Succeeded || wait-for-atlas-integration.Skipped"
             template: update-workflow-stage
             arguments:
@@ -317,7 +312,7 @@ spec:
 
           # Wait for PR merged to main
           - name: wait-merge-to-main
-            dependencies: [update-to-waiting-merge]
+            depends: "update-to-waiting-merge.Succeeded"
             template: suspend-for-event
             arguments:
               parameters:
@@ -327,7 +322,7 @@ spec:
                   value: "waiting-pr-merged"
 
           - name: complete-task
-            dependencies: [wait-merge-to-main]
+            depends: "wait-merge-to-main.Succeeded"
             template: task-completion
             arguments:
               parameters:
