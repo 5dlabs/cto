@@ -540,6 +540,83 @@ spec:
                           exit 0
                         fi
 
+                        # Extract SERVICE from PR labels (service-xxx format)
+                        SERVICE=""
+                        if [ -n "$TASK_LABELS_JSON" ] && [ "$TASK_LABELS_JSON" != "null" ]; then
+                          SERVICE=$(echo "$TASK_LABELS_JSON" | jq -er '.[]? | .name? | ascii_downcase | select(test("service-[a-z0-9-]+")) | capture("service-(?<svc>[a-z0-9-]+)") | .svc' 2>/dev/null || echo "")
+                        fi
+
+                        # Fallback to repo name if no service label
+                        if [ -z "$SERVICE" ]; then
+                          SERVICE="$REPO_NAME"
+                          echo "ℹ️ No service label found, using repo name: $SERVICE"
+                        else
+                          echo "📦 Service: $SERVICE"
+                        fi
+
+                        # Check if Atlas integration is actually needed
+                        echo "🔍 Checking if Atlas integration is required..."
+
+                        # Count approved PRs for this service using GitHub API
+                        APPROVED_COUNT=1
+                        if [ -n "$INSTALLATION_TOKEN" ]; then
+                          APPROVED_COUNT=$(curl -s -L \
+                            -H "Accept: application/vnd.github+json" \
+                            -H "Authorization: Bearer $INSTALLATION_TOKEN" \
+                            "https://api.github.com/repos/$REPO_FULL/pulls?state=open&per_page=100" | \
+                            jq "[.[] | select(
+                              (.labels[]?.name? // empty | test(\"approved\")) and
+                              (.labels[]?.name? // empty | test(\"service-$SERVICE\"))
+                            )] | length" 2>/dev/null || echo "1")
+                        fi
+
+                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE"
+
+                        # Check if current PR has merge conflicts using GitHub API
+                        MERGEABLE="UNKNOWN"
+                        if [ -n "$INSTALLATION_TOKEN" ]; then
+                          MERGEABLE=$(curl -s -L \
+                            -H "Accept: application/vnd.github+json" \
+                            -H "Authorization: Bearer $INSTALLATION_TOKEN" \
+                            "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" | \
+                            jq -r '.mergeable_state // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+                        fi
+
+                        echo "🔍 PR #$PR_NUMBER mergeable status: $MERGEABLE"
+
+                        ATLAS_NEEDED=false
+                        ATLAS_REASON=""
+
+                        if [ "$APPROVED_COUNT" -gt 1 ]; then
+                          ATLAS_NEEDED=true
+                          ATLAS_REASON="batch-integration"
+                          echo "🔀 Multiple approved PRs detected - Atlas batch integration required"
+                        elif [ "$MERGEABLE" = "dirty" ] || [ "$MERGEABLE" = "CONFLICTING" ]; then
+                          ATLAS_NEEDED=true
+                          ATLAS_REASON="conflict-resolution"
+                          echo "⚠️ Merge conflicts detected - Atlas conflict resolution required"
+                        elif [ "$MERGEABLE" = "UNKNOWN" ] || [ "$MERGEABLE" = "unknown" ]; then
+                          ATLAS_NEEDED=true
+                          ATLAS_REASON="status-verification"
+                          echo "⚠️ Unable to determine mergeable status - Atlas will verify"
+                        else
+                          echo "✅ Single approved PR with no conflicts - no Atlas integration needed"
+                          echo "ℹ️ Skipping Atlas, proceeding to direct merge readiness"
+                        fi
+
+                        if [ "$ATLAS_NEEDED" = "false" ]; then
+                          # No Atlas needed - mark workflow as ready for merge
+                          patch_workflow_stage "ready-for-merge" || true
+
+                          # Resume workflow to complete
+                          if resume_workflow; then
+                            echo "✅ Workflow resumed without Atlas integration"
+                          fi
+                          exit 0
+                        fi
+
+                        # Atlas is needed - proceed with integration
+                        echo "🚀 Launching Atlas for $ATLAS_REASON..."
                         patch_workflow_stage "atlas-integration-in-progress" || true
 
                         CODERUN_NAME=$(ensure_integration_coderun || echo "")
