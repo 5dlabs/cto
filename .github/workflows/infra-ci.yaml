@@ -282,27 +282,40 @@ jobs:
       - name: Generate diff summary
         id: diff
         run: |
+          # Ensure we have the base branch
+          git fetch origin main:main || git fetch origin main 2>/dev/null || true
+
+          # Determine the base ref for comparison
+          if git rev-parse origin/main >/dev/null 2>&1; then
+            BASE_REF="origin/main"
+          elif git rev-parse main >/dev/null 2>&1; then
+            BASE_REF="main"
+          else
+            echo "⚠️ Could not find main branch reference, skipping diff" > diff-summary.md
+            exit 0
+          fi
+
           echo "## 📋 GitOps Changes Summary" > diff-summary.md
           echo "" >> diff-summary.md
 
           # List modified applications
           echo "### Modified Applications:" >> diff-summary.md
-          git diff --name-only origin/main...HEAD -- 'infra/gitops/applications/*.yaml' | while read -r file; do
+          git diff --name-only "${BASE_REF}...HEAD" -- 'infra/gitops/applications/*.yaml' 2>/dev/null | while read -r file; do
             if [ -f "$file" ]; then
               app_name=$(basename "$file" .yaml)
               echo "- \`$app_name\`" >> diff-summary.md
             fi
-          done
+          done || true
 
           # List modified databases
           echo "" >> diff-summary.md
           echo "### Modified Database Resources:" >> diff-summary.md
-          git diff --name-only origin/main...HEAD -- 'infra/gitops/databases/*.yaml' | while read -r file; do
+          git diff --name-only "${BASE_REF}...HEAD" -- 'infra/gitops/databases/*.yaml' 2>/dev/null | while read -r file; do
             if [ -f "$file" ]; then
               resource_name=$(basename "$file" .yaml)
               echo "- \`$resource_name\`" >> diff-summary.md
             fi
-          done
+          done || true
 
           # Show actual diff for applications
           echo "" >> diff-summary.md
@@ -310,7 +323,7 @@ jobs:
           echo "<summary>📝 Detailed Diff</summary>" >> diff-summary.md
           echo "" >> diff-summary.md
           echo '```diff' >> diff-summary.md
-          git diff origin/main...HEAD -- 'infra/gitops/**/*.yaml' | head -500 >> diff-summary.md
+          git diff "${BASE_REF}...HEAD" -- 'infra/gitops/**/*.yaml' 2>/dev/null | head -500 >> diff-summary.md || true
           echo '```' >> diff-summary.md
           echo "</details>" >> diff-summary.md
 
