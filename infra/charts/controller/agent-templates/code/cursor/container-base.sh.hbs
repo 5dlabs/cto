@@ -1218,6 +1218,16 @@ else
   echo "⚠️ cursor-cli-config.json not provided; using existing global Cursor config"
 fi
 
+if [ -f /task-files/cursor-mcp.json ]; then
+  mkdir -p "$HOME/.cursor"
+  mkdir -p "$CURSOR_WORK_DIR/.cursor"
+  cp -f /task-files/cursor-mcp.json "$HOME/.cursor/mcp.json"
+  cp -f /task-files/cursor-mcp.json "$CURSOR_WORK_DIR/.cursor/mcp.json"
+  echo "✓ Installed Cursor MCP configuration"
+else
+  echo "⚠️ cursor-mcp.json not provided; MCP servers may not be available"
+fi
+
 if declare -F ensure_default_client_config >/dev/null 2>&1; then
   ensure_default_client_config "$CURSOR_WORK_DIR/client-config.json" "$REPO_ROOT/client-config.json" "/workspace/$REPO_NAME/client-config.json"
 fi
@@ -1626,34 +1636,15 @@ if command -v cursor-agent >/dev/null 2>&1; then
     TOOL_VERIFICATION_FAILED=true
   fi
   
-  # Check for critical servers based on agent role
-  {{#if (eq github_app "rex")}}
-  # Rex needs: Context7, GitHub, Brave Search
-  REQUIRED_SERVERS=("toolman" "context7")
-  {{else if (eq github_app "blaze")}}
-  # Blaze needs: Context7, shadcn, GitHub
-  REQUIRED_SERVERS=("toolman" "context7")
-  {{else if (eq github_app "cleo")}}
-  # Cleo needs: Context7, GitHub
-  REQUIRED_SERVERS=("toolman" "context7")
-  {{else if (eq github_app "tess")}}
-  # Tess needs: Context7, Kubernetes, GitHub
-  REQUIRED_SERVERS=("toolman" "context7")
-  {{else}}
-  # Default: Basic tools
-  REQUIRED_SERVERS=("toolman")
-  {{/if}}
-  
+  # Check for toolman server (required for remote tools)
   echo ""
-  echo "🔍 Verifying required MCP servers..."
-  for server in "${REQUIRED_SERVERS[@]}"; do
-    if echo "$MCP_LIST" | grep -qi "$server"; then
-      echo "  ✓ $server server configured"
-    else
-      echo "  ❌ $server server NOT configured"
-      TOOL_VERIFICATION_FAILED=true
-    fi
-  done
+  echo "🔍 Verifying Toolman MCP server..."
+  if echo "$MCP_LIST" | grep -qi "toolman"; then
+    echo "  ✓ toolman server configured"
+  else
+    echo "  ❌ toolman server NOT configured"
+    TOOL_VERIFICATION_FAILED=true
+  fi
   
   echo ""
 else
@@ -1670,7 +1661,7 @@ if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
   echo "Critical MCP servers are not available. Cannot proceed with task."
   echo ""
   echo "Common issues:"
-  echo "  - CONTEXT7_API_KEY not set (check secret mounting)"
+  echo "  - Toolman server not reachable"
   echo "  - MCP servers not initialized properly"
   echo "  - .cursor/mcp.json misconfigured"
   echo ""
