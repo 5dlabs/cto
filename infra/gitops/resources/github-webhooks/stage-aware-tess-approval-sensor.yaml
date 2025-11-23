@@ -548,8 +548,9 @@ spec:
 
                         # Fallback to repo name if no service label
                         if [ -z "$SERVICE" ]; then
-                          SERVICE="$REPO_NAME"
-                          echo "ℹ️ No service label found, using repo name: $SERVICE"
+                          # Sanitize REPO_NAME: keep only alphanumeric and hyphens for regex safety
+                          SERVICE=$(echo "$REPO_NAME" | tr -cd 'a-zA-Z0-9-' | tr '[:upper:]' '[:lower:]')
+                          echo "ℹ️ No service label found, using sanitized repo name: $SERVICE"
                         else
                           echo "📦 Service: $SERVICE"
                         fi
@@ -558,31 +559,42 @@ spec:
                         echo "🔍 Checking if Atlas integration is required..."
 
                         # Count approved PRs for this service using GitHub API
+                        # Exclude current PR to avoid double-counting if it already has labels
                         APPROVED_COUNT=1
                         if [ -n "$INSTALLATION_TOKEN" ]; then
-                          APPROVED_COUNT=$(curl -s -L \
+                          OTHER_APPROVED=$(curl -s -L \
                             -H "Accept: application/vnd.github+json" \
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
                             "https://api.github.com/repos/$REPO_FULL/pulls?state=open&per_page=100" | \
-                            jq "[.[] | select(
-                              (.labels[]?.name? // empty | test(\"approved\")) and
-                              (.labels[]?.name? // empty | test(\"service-$SERVICE\"))
-                            )] | length" 2>/dev/null || echo "1")
+                            jq --arg pr "$PR_NUMBER" "[.[] | select(
+                              (.number | tostring) != \$pr and
+                              (.labels[]?.name? // empty | ascii_downcase | test(\"^approved$\")) and
+                              (.labels[]?.name? // empty | ascii_downcase | test(\"^service-$SERVICE$\"))
+                            )] | length" 2>/dev/null || echo "0")
+
+                          # Add 1 for current PR (which just got Tess approval)
+                          APPROVED_COUNT=$((OTHER_APPROVED + 1))
                         fi
 
-                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE"
+                        echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE (including current)"
 
                         # Check if current PR has merge conflicts using GitHub API
+                        # Query both mergeable (boolean) and mergeable_state (string) fields
                         MERGEABLE="UNKNOWN"
+                        MERGE_STATE="UNKNOWN"
                         if [ -n "$INSTALLATION_TOKEN" ]; then
-                          MERGEABLE=$(curl -s -L \
+                          PR_DATA=$(curl -s -L \
                             -H "Accept: application/vnd.github+json" \
                             -H "Authorization: Bearer $INSTALLATION_TOKEN" \
-                            "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" | \
-                            jq -r '.mergeable_state // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+                            "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" 2>/dev/null || echo "{}")
+
+                          # Use 'if .mergeable == null then "UNKNOWN" else (.mergeable | tostring) end'
+                          # to properly handle boolean false without treating it as falsy
+                          MERGEABLE=$(echo "$PR_DATA" | jq -r 'if .mergeable == null then "UNKNOWN" else (.mergeable | tostring) end' 2>/dev/null || echo "UNKNOWN")
+                          MERGE_STATE=$(echo "$PR_DATA" | jq -r 'if .mergeable_state == null then "UNKNOWN" else .mergeable_state end' 2>/dev/null || echo "UNKNOWN")
                         fi
 
-                        echo "🔍 PR #$PR_NUMBER mergeable status: $MERGEABLE"
+                        echo "🔍 PR #$PR_NUMBER mergeable: $MERGEABLE, state: $MERGE_STATE"
 
                         ATLAS_NEEDED=false
                         ATLAS_REASON=""
@@ -591,11 +603,11 @@ spec:
                           ATLAS_NEEDED=true
                           ATLAS_REASON="batch-integration"
                           echo "🔀 Multiple approved PRs detected - Atlas batch integration required"
-                        elif [ "$MERGEABLE" = "dirty" ] || [ "$MERGEABLE" = "CONFLICTING" ]; then
+                        elif [ "$MERGEABLE" = "false" ] || [ "$MERGE_STATE" = "dirty" ]; then
                           ATLAS_NEEDED=true
                           ATLAS_REASON="conflict-resolution"
                           echo "⚠️ Merge conflicts detected - Atlas conflict resolution required"
-                        elif [ "$MERGEABLE" = "UNKNOWN" ] || [ "$MERGEABLE" = "unknown" ]; then
+                        elif [ "$MERGEABLE" = "UNKNOWN" ] || [ "$MERGE_STATE" = "unknown" ]; then
                           ATLAS_NEEDED=true
                           ATLAS_REASON="status-verification"
                           echo "⚠️ Unable to determine mergeable status - Atlas will verify"
