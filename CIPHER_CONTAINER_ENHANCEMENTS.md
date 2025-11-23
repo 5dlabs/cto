@@ -296,3 +296,4 @@ These container enhancements work with:
 
 **Summary**: Cipher now has comprehensive, easy-to-use security scanning capabilities built directly into the container template. The helper function simplifies the scanning process while maintaining full flexibility for individual tool usage. All security tools, documentation, and custom rules are verified at startup and readily available throughout the security scanning workflow.
 
+

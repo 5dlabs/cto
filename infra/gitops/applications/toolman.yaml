@@ -114,8 +114,6 @@ spec:
               command: "npx"
               args: ["-y", "@upstash/context7-mcp"]
               workingDirectory: "/tmp"
-              env:
-                CONTEXT7_API_KEY: ""  # Injected from secret
 
             shadcn:
               name: "shadcn/ui"
@@ -132,8 +130,6 @@ spec:
               command: "npx"
               args: ["-y", "@modelcontextprotocol/server-github"]
               workingDirectory: "/tmp"
-              env:
-                GITHUB_PERSONAL_ACCESS_TOKEN: ""  # Injected from secret
 
             agent-docs:
               name: "Agent Docs"
