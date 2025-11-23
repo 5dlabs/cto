@@ -178,11 +178,7 @@ impl CodeTemplateGenerator {
 
         templates.insert(
             "cursor-mcp.json".to_string(),
-            Self::generate_cursor_mcp_config(
-                code_run,
-                &enriched_cli_config,
-                &remote_tools,
-            )?,
+            Self::generate_cursor_mcp_config(code_run, &enriched_cli_config, &remote_tools)?,
         );
 
         templates.insert(
