@@ -1797,6 +1797,69 @@ elif [[ "{{github_app}}" =~ [Tt]ess ]] && [ -f /workspace/.tess-complete ]; then
     rm -f /workspace/.tess-complete
 fi
 
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "🔍 Verifying OpenCode MCP tools..."
+
+TOOL_VERIFICATION_FAILED=false
+
+if command -v opencode >/dev/null 2>&1; then
+  # OpenCode uses MCP servers - check if the binary is functional
+  echo "📋 Checking OpenCode installation..."
+  OPENCODE_VERSION=$(opencode --version 2>&1 || echo "FAILED")
+  
+  if echo "$OPENCODE_VERSION" | grep -q "opencode\|version"; then
+    echo "  ✓ OpenCode CLI is functional"
+    echo "  Version: $OPENCODE_VERSION"
+  else
+    echo "  ⚠️ OpenCode CLI may not be properly installed"
+    echo "  Output: $OPENCODE_VERSION"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Check for ANTHROPIC_API_KEY since OpenCode uses Claude models
+  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    echo "  ✓ ANTHROPIC_API_KEY is set"
+  else
+    echo "  ❌ ANTHROPIC_API_KEY is NOT set"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  echo ""
+else
+  echo "  ⚠️ opencode CLI not available for tool verification"
+  TOOL_VERIFICATION_FAILED=true
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "OpenCode is not properly configured. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - ANTHROPIC_API_KEY not set (check secret mounting)"
+  echo "  - OpenCode binary not installed or not in PATH"
+  echo "  - OpenCode installation failed during image build"
+  echo ""
+  echo "OpenCode status:"
+  opencode --version 2>&1 || echo "Failed to get OpenCode version"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical tools verified successfully"
+echo ""
+# =========================================================================
+
 COMPLETED_ATTEMPTS=0
 while [ "$UNLIMITED_RETRIES" = "1" ] || [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "$UNLIMITED_RETRIES"

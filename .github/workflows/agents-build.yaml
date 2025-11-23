@@ -152,6 +152,11 @@ jobs:
             file: ./infra/images/factory/Dockerfile
             version_type: script_hash
             script_url: https://app.factory.ai/cli
+          - id: gemini
+            image: gemini
+            context: ./infra/images/gemini
+            file: ./infra/images/gemini/Dockerfile
+            version_type: dir_hash
     steps:
       - uses: actions/checkout@v4
 

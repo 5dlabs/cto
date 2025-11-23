@@ -1599,6 +1599,91 @@ elif [[ "{{github_app}}" =~ [Tt]ess ]] && [ -f /workspace/.tess-complete ]; then
     rm -f /workspace/.tess-complete
 fi
 
+# =========================================================================
+# MCP TOOLS VALIDATION
+# =========================================================================
+echo ""
+echo "════════════════════════════════════════════════════════════════"
+echo "║                 VALIDATING MCP TOOLS ACCESS                   ║"
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+echo "🔍 Verifying Cursor MCP tools..."
+
+TOOL_VERIFICATION_FAILED=false
+
+if command -v cursor-agent >/dev/null 2>&1; then
+  # Check MCP servers first
+  echo "📋 Checking MCP servers..."
+  MCP_LIST=$(cursor-agent mcp list 2>&1 || echo "FAILED")
+  
+  # Count how many servers are configured (even if not approved)
+  SERVER_COUNT=$(echo "$MCP_LIST" | grep -c "MCP server" || echo "0")
+  
+  if [ "$SERVER_COUNT" -gt 0 ]; then
+    echo "  ✓ Found $SERVER_COUNT MCP server(s) configured"
+  else
+    echo "  ⚠️ No MCP servers configured"
+    TOOL_VERIFICATION_FAILED=true
+  fi
+  
+  # Check for critical servers based on agent role
+  {{#if (eq github_app "rex")}}
+  # Rex needs: Context7, GitHub, Brave Search
+  REQUIRED_SERVERS=("toolman" "context7")
+  {{else if (eq github_app "blaze")}}
+  # Blaze needs: Context7, shadcn, GitHub
+  REQUIRED_SERVERS=("toolman" "context7")
+  {{else if (eq github_app "cleo")}}
+  # Cleo needs: Context7, GitHub
+  REQUIRED_SERVERS=("toolman" "context7")
+  {{else if (eq github_app "tess")}}
+  # Tess needs: Context7, Kubernetes, GitHub
+  REQUIRED_SERVERS=("toolman" "context7")
+  {{else}}
+  # Default: Basic tools
+  REQUIRED_SERVERS=("toolman")
+  {{/if}}
+  
+  echo ""
+  echo "🔍 Verifying required MCP servers..."
+  for server in "${REQUIRED_SERVERS[@]}"; do
+    if echo "$MCP_LIST" | grep -qi "$server"; then
+      echo "  ✓ $server server configured"
+    else
+      echo "  ❌ $server server NOT configured"
+      TOOL_VERIFICATION_FAILED=true
+    fi
+  done
+  
+  echo ""
+else
+  echo "  ⚠️ cursor-agent CLI not available for tool verification"
+  TOOL_VERIFICATION_FAILED=true
+fi
+
+echo "════════════════════════════════════════════════════════════════"
+echo ""
+
+if [ "$TOOL_VERIFICATION_FAILED" = "true" ]; then
+  echo ""
+  echo "❌ TOOL VERIFICATION FAILED"
+  echo "Critical MCP servers are not available. Cannot proceed with task."
+  echo ""
+  echo "Common issues:"
+  echo "  - CONTEXT7_API_KEY not set (check secret mounting)"
+  echo "  - MCP servers not initialized properly"
+  echo "  - .cursor/mcp.json misconfigured"
+  echo ""
+  echo "Full MCP server list:"
+  cursor-agent mcp list 2>&1 || echo "Failed to list MCP servers"
+  echo ""
+  exit 1
+fi
+
+echo "✅ All critical MCP tools verified successfully"
+echo ""
+# =========================================================================
+
 COMPLETED_ATTEMPTS=0
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
   print_attempt_banner "$ATTEMPT" "$MAX_RETRIES" "0"
