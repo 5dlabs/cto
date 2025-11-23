@@ -557,19 +557,30 @@ spec:
                         # Check if Atlas integration is actually needed
                         echo "🔍 Checking if Atlas integration is required..."
                         
-                        # Count approved PRs for this service
-                        APPROVED_COUNT=$(gh pr list --repo "$REPO_FULL" \
-                          --label "approved" \
-                          --label "service-$SERVICE" \
-                          --state open \
-                          --json number \
-                          --jq 'length' 2>/dev/null || echo "1")
+                        # Count approved PRs for this service using GitHub API
+                        APPROVED_COUNT=1
+                        if [ -n "$INSTALLATION_TOKEN" ]; then
+                          APPROVED_COUNT=$(curl -s -L \
+                            -H "Accept: application/vnd.github+json" \
+                            -H "Authorization: Bearer $INSTALLATION_TOKEN" \
+                            "https://api.github.com/repos/$REPO_FULL/pulls?state=open&per_page=100" | \
+                            jq "[.[] | select(
+                              (.labels[]?.name? // empty | test(\"approved\")) and
+                              (.labels[]?.name? // empty | test(\"service-$SERVICE\"))
+                            )] | length" 2>/dev/null || echo "1")
+                        fi
                         
                         echo "📊 Found $APPROVED_COUNT approved PR(s) for service $SERVICE"
                         
-                        # Check if current PR has merge conflicts
-                        MERGEABLE=$(gh pr view "$PR_NUMBER" --repo "$REPO_FULL" \
-                          --json mergeable --jq '.mergeable' 2>/dev/null || echo "UNKNOWN")
+                        # Check if current PR has merge conflicts using GitHub API
+                        MERGEABLE="UNKNOWN"
+                        if [ -n "$INSTALLATION_TOKEN" ]; then
+                          MERGEABLE=$(curl -s -L \
+                            -H "Accept: application/vnd.github+json" \
+                            -H "Authorization: Bearer $INSTALLATION_TOKEN" \
+                            "https://api.github.com/repos/$REPO_FULL/pulls/$PR_NUMBER" | \
+                            jq -r '.mergeable_state // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+                        fi
                         
                         echo "🔍 PR #$PR_NUMBER mergeable status: $MERGEABLE"
                         
@@ -580,10 +591,14 @@ spec:
                           ATLAS_NEEDED=true
                           ATLAS_REASON="batch-integration"
                           echo "🔀 Multiple approved PRs detected - Atlas batch integration required"
-                        elif [ "$MERGEABLE" = "CONFLICTING" ]; then
+                        elif [ "$MERGEABLE" = "dirty" ] || [ "$MERGEABLE" = "CONFLICTING" ]; then
                           ATLAS_NEEDED=true
                           ATLAS_REASON="conflict-resolution"
                           echo "⚠️ Merge conflicts detected - Atlas conflict resolution required"
+                        elif [ "$MERGEABLE" = "UNKNOWN" ] || [ "$MERGEABLE" = "unknown" ]; then
+                          ATLAS_NEEDED=true
+                          ATLAS_REASON="status-verification"
+                          echo "⚠️ Unable to determine mergeable status - Atlas will verify"
                         else
                           echo "✅ Single approved PR with no conflicts - no Atlas integration needed"
                           echo "ℹ️ Skipping Atlas, proceeding to direct merge readiness"
